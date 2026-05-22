@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "workspaces": [
+    "web-app",
+    "shared-ui"
+  ],
+  "scripts": {
+    "build": "npm --workspace web-app run build",
+    "test": "npm --workspace web-app run test"
+  }
+}
+

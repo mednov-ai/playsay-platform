@@ -1,0 +1,10 @@
+.gradle/
+build/
+**/build/
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+contracts/generated/

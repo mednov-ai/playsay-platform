@@ -56,6 +56,7 @@ spec:
   options {
     buildDiscarder(logRotator(numToKeepStr: '20'))
     disableConcurrentBuilds()
+    skipDefaultCheckout(true)
     timestamps()
   }
 
@@ -67,6 +68,12 @@ spec:
   }
 
   stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
     stage('Backend test') {
       steps {
         container('gradle') {

@@ -197,11 +197,11 @@ EOF
               AUTH_REPO="$(echo "$INFRA_REPO" | sed "s#https://#https://${GITHUB_USER}:${GITHUB_TOKEN}@#")"
               git clone --branch "$INFRA_BRANCH" "$AUTH_REPO" infra
               cd infra
-              yq -i ".image.tag = strenv(GIT_COMMIT)" helm-charts/hello-world/values-dev.yaml
+              yq -i ".image.tag = strenv(GIT_COMMIT)" helm-charts/api-gateway/values-dev.yaml
               yq -i ".image.tag = strenv(GIT_COMMIT)" helm-charts/web-app/values-dev.yaml
               git config user.email "jenkins@play-and-say.ru"
               git config user.name "Play&Say Jenkins"
-              git add helm-charts/hello-world/values-dev.yaml helm-charts/web-app/values-dev.yaml
+              git add helm-charts/api-gateway/values-dev.yaml helm-charts/web-app/values-dev.yaml
               git commit -m "chore: bump dev image tags to ${GIT_COMMIT}" || exit 0
               git push origin "HEAD:${INFRA_BRANCH}"
             '''

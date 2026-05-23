@@ -242,8 +242,8 @@ EOF
             sh '''
               set -eu
               apk add --no-cache git
-              git config user.email "jenkins@play-and-say.ru"
-              git config user.name "Play&Say Jenkins"
+              git config --global user.email "jenkins@play-and-say.ru"
+              git config --global user.name "Play&Say Jenkins"
               AUTH_REPO="$(echo "$PLATFORM_REPO" | sed "s#https://#https://${GITHUB_USER}:${GITHUB_TOKEN}@#")"
               if git ls-remote --exit-code --tags "$AUTH_REPO" "refs/tags/${BUILD_LABEL}" >/dev/null 2>&1; then
                 echo "Source tag ${BUILD_LABEL} already exists"

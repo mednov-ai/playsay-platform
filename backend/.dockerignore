@@ -1,0 +1,5 @@
+.gradle
+**/build/*
+!api-gateway/build/
+!api-gateway/build/libs/
+!api-gateway/build/libs/*.jar

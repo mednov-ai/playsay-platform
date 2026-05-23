@@ -189,6 +189,13 @@ spec:
           withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
             sh '''
               set -eu
+              JAR_COUNT="$(find "$WORKSPACE/backend/api-gateway/build/libs" -maxdepth 1 -name "*.jar" | wc -l | tr -d " ")"
+              if [ "$JAR_COUNT" != "1" ]; then
+                echo "Expected exactly one api-gateway bootJar, found $JAR_COUNT"
+                find "$WORKSPACE/backend/api-gateway/build/libs" -maxdepth 1 -type f -print || true
+                exit 1
+              fi
+              ls -lh "$WORKSPACE/backend/api-gateway/build/libs"/*.jar
               mkdir -p /kaniko/.docker
               AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
               cat > /kaniko/.docker/config.json <<EOF

@@ -248,6 +248,10 @@ EOF
               if git ls-remote --exit-code --tags "$AUTH_REPO" "refs/tags/${BUILD_LABEL}" >/dev/null 2>&1; then
                 echo "Source tag ${BUILD_LABEL} already exists"
               else
+                rm -rf source-for-tag
+                git clone --branch "$CI_BRANCH" "$AUTH_REPO" source-for-tag
+                cd source-for-tag
+                git checkout "$GIT_COMMIT"
                 git tag -a "$BUILD_LABEL" \
                   -m "Play&Say build ${BUILD_LABEL}" \
                   -m "Branch: ${CI_BRANCH}" \

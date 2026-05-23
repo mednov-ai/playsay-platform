@@ -70,15 +70,28 @@ spec:
   stages {
     stage('Checkout') {
       steps {
-        checkout scm
+        script {
+          def scmVars = checkout scm
+          env.GIT_COMMIT = scmVars.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+        }
       }
     }
 
-    stage('Backend test') {
+    stage('Backend tests') {
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :api-gateway:test :api-gateway:bootJar --no-daemon'
+            sh 'gradle :api-gateway:test --no-daemon'
+          }
+        }
+      }
+    }
+
+    stage('Backend package') {
+      steps {
+        container('gradle') {
+          dir('backend') {
+            sh 'gradle :api-gateway:bootJar --no-daemon'
           }
         }
       }

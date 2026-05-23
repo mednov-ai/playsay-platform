@@ -62,7 +62,8 @@ spec:
 
   environment {
     GITHUB_OWNER = 'mednov-ai'
-    IMAGE_NAME = 'playsay-api-gateway'
+    API_IMAGE_NAME = 'playsay-api-gateway'
+    WEB_IMAGE_NAME = 'playsay-web-app'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
   }
@@ -109,7 +110,7 @@ spec:
       }
     }
 
-    stage('Build and push image') {
+    stage('Build and push backend image') {
       when {
         branch 'develop'
       }
@@ -126,8 +127,33 @@ EOF
               /kaniko/executor \
                 --context "$WORKSPACE/backend" \
                 --dockerfile "$WORKSPACE/backend/api-gateway/Dockerfile" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${IMAGE_NAME}:${GIT_COMMIT}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${IMAGE_NAME}:dev"
+                --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${GIT_COMMIT}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:dev"
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Build and push frontend image') {
+      when {
+        branch 'develop'
+      }
+      steps {
+        container('kaniko') {
+          withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+            sh '''
+              set -eu
+              mkdir -p /kaniko/.docker
+              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+              cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
+EOF
+              /kaniko/executor \
+                --context "$WORKSPACE/frontend" \
+                --dockerfile "$WORKSPACE/frontend/web-app/Dockerfile" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:${GIT_COMMIT}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:dev"
             '''
           }
         }
@@ -149,10 +175,11 @@ EOF
               git clone --branch "$INFRA_BRANCH" "$AUTH_REPO" infra
               cd infra
               yq -i ".image.tag = strenv(GIT_COMMIT)" helm-charts/hello-world/values-dev.yaml
+              yq -i ".image.tag = strenv(GIT_COMMIT)" helm-charts/web-app/values-dev.yaml
               git config user.email "jenkins@play-and-say.ru"
               git config user.name "Play&Say Jenkins"
-              git add helm-charts/hello-world/values-dev.yaml
-              git commit -m "chore: bump api-gateway image to ${GIT_COMMIT}" || exit 0
+              git add helm-charts/hello-world/values-dev.yaml helm-charts/web-app/values-dev.yaml
+              git commit -m "chore: bump dev image tags to ${GIT_COMMIT}" || exit 0
               git push origin "HEAD:${INFRA_BRANCH}"
             '''
           }

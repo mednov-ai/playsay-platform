@@ -88,6 +88,15 @@ spec:
         script {
           def scmVars = checkout scm
           env.GIT_COMMIT = scmVars.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          def branchName = scmVars.GIT_BRANCH ?: env.BRANCH_NAME ?: env.GIT_BRANCH
+          if (!branchName || branchName == 'HEAD') {
+            branchName = sh(script: 'git rev-parse --abbrev-ref HEAD || true', returnStdout: true).trim()
+          }
+          if (!branchName || branchName == 'HEAD') {
+            branchName = env.JOB_NAME?.tokenize('/')?.last()?.replaceFirst(/^playsay-platform-/, '')
+          }
+          env.CI_BRANCH = branchName.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
+          echo "Checked out ${env.GIT_COMMIT} on ${env.CI_BRANCH}"
         }
       }
     }
@@ -126,7 +135,7 @@ spec:
 
     stage('Build and push backend image') {
       when {
-        branch 'develop'
+        expression { env.CI_BRANCH == 'develop' }
       }
       steps {
         container('kaniko-backend') {
@@ -151,7 +160,7 @@ EOF
 
     stage('Build and push frontend image') {
       when {
-        branch 'develop'
+        expression { env.CI_BRANCH == 'develop' }
       }
       steps {
         container('kaniko-frontend') {
@@ -176,7 +185,7 @@ EOF
 
     stage('Update dev image tag') {
       when {
-        branch 'develop'
+        expression { env.CI_BRANCH == 'develop' }
       }
       steps {
         container('tools') {

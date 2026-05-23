@@ -28,7 +28,21 @@ spec:
         limits:
           cpu: "1"
           memory: 1024Mi
-    - name: kaniko
+    - name: kaniko-backend
+      image: gcr.io/kaniko-project/executor:debug
+      command: ["/busybox/cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 1536Mi
+    - name: kaniko-frontend
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]
       tty: true
@@ -115,7 +129,7 @@ spec:
         branch 'develop'
       }
       steps {
-        container('kaniko') {
+        container('kaniko-backend') {
           withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
             sh '''
               set -eu
@@ -140,7 +154,7 @@ EOF
         branch 'develop'
       }
       steps {
-        container('kaniko') {
+        container('kaniko-frontend') {
           withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
             sh '''
               set -eu

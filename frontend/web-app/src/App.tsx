@@ -1505,6 +1505,7 @@ function LiveLessonExperience({
 }
 
 function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
+  const controlsRef = useRef<HTMLDivElement | null>(null);
   const focusRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
@@ -1532,7 +1533,12 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
 
     const inset = 8;
     const maxX = Math.max(inset, focusRect.width - stripRect.width - inset);
-    const maxY = Math.max(inset, focusRect.height - stripRect.height - inset);
+    let maxY = Math.max(inset, focusRect.height - stripRect.height - inset);
+    const controlsRect = controlsRef.current?.getBoundingClientRect();
+
+    if (controlsRect && controlsRect.top < focusRect.bottom && controlsRect.bottom > focusRect.top) {
+      maxY = Math.min(maxY, Math.max(inset, controlsRect.top - focusRect.top - stripRect.height - inset));
+    }
 
     return {
       x: Math.min(Math.max(x, inset), maxX),
@@ -1629,7 +1635,7 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
           ) : null}
         </div>
       </div>
-      <div className="lk-control-bar playsay-classroom-controls">
+      <div className="lk-control-bar playsay-classroom-controls" ref={controlsRef}>
         <TrackToggle source={Track.Source.Microphone}>Микрофон</TrackToggle>
         <TrackToggle source={Track.Source.Camera}>Камера</TrackToggle>
         <StartMediaButton label="Включить медиа" />

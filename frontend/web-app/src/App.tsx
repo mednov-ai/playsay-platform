@@ -7,11 +7,13 @@ import {
   Loader2,
   LogIn,
   LogOut,
+  RefreshCw,
   RotateCcw,
   Save,
   ShieldCheck,
   Sparkles,
   User,
+  Users,
   Video,
   type LucideIcon,
 } from "lucide-react";
@@ -19,6 +21,7 @@ import {
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  fetchAdminUserProfiles,
   fetchMe,
   fetchUserProfile,
   isAuthCallback,
@@ -26,13 +29,15 @@ import {
   resetUserProfile,
   saveUserProfile,
   startLogin,
+  type AdminUserProfile,
   type AppUserProfile,
   type MeProfile,
   type UpdateUserProfileInput,
 } from "./auth";
 import { Button } from "./components/ui/button";
+import { getRoleSummary, getRoleWorkspace } from "./role-workspace";
 
-type SessionStatus = "checking" | "anonymous" | "authenticated" | "error";
+type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggingOut" | "error";
 
 type ProfileFormState = {
   displayName: string;
@@ -48,6 +53,9 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<AdminUserProfile[]>([]);
+  const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [adminLoading, setAdminLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,10 +76,14 @@ export function App() {
         }
 
         const me = await fetchMe();
-        const currentAppProfile = await fetchUserProfile();
+        const [currentAppProfile, currentAdminUsers] = await Promise.all([
+          fetchUserProfile(),
+          me.roles.includes("ADMIN") ? fetchAdminUserProfiles() : Promise.resolve([]),
+        ]);
         if (!cancelled) {
           setProfile(me);
           setAppProfile(currentAppProfile);
+          setAdminUsers(currentAdminUsers);
           setStatus("authenticated");
         }
       } catch (caught) {
@@ -90,11 +102,30 @@ export function App() {
   }, []);
 
   const isAuthenticated = status === "authenticated" && profile !== null;
+  const isAdmin = profile?.roles.includes("ADMIN") ?? false;
+  const roleWorkspace = profile ? getRoleWorkspace(profile.roles) : null;
 
   function logout() {
     const logoutUrl = buildLogoutUrl();
     clearTokens();
+    setProfile(null);
+    setAppProfile(null);
+    setAdminUsers([]);
+    setStatus("loggingOut");
     window.location.assign(logoutUrl);
+  }
+
+  function applySessionError(caught: unknown, fallback: string): string {
+    const message = caught instanceof Error ? caught.message : fallback;
+    if (message.includes("Not authenticated") || message.includes("HTTP 401")) {
+      clearTokens();
+      setProfile(null);
+      setAppProfile(null);
+      setAdminUsers([]);
+      setStatus("anonymous");
+      return "Сессия истекла, войдите снова";
+    }
+    return message;
   }
 
   async function saveProfile(input: UpdateUserProfileInput) {
@@ -103,9 +134,12 @@ export function App() {
     try {
       const updated = await saveUserProfile(input);
       setAppProfile(updated);
+      setAdminUsers((current) =>
+        current.map((user) => (user.subject === updated.subject ? updated : user)),
+      );
       setProfileMessage("Профиль сохранён");
     } catch (caught) {
-      setProfileMessage(caught instanceof Error ? caught.message : "Не удалось сохранить профиль");
+      setProfileMessage(applySessionError(caught, "Не удалось сохранить профиль"));
     } finally {
       setProfileSaving(false);
     }
@@ -118,11 +152,30 @@ export function App() {
       await resetUserProfile();
       const recreated = await fetchUserProfile();
       setAppProfile(recreated);
+      setAdminUsers((current) =>
+        current.map((user) => (user.subject === recreated.subject ? recreated : user)),
+      );
       setProfileMessage("Профиль сброшен");
     } catch (caught) {
-      setProfileMessage(caught instanceof Error ? caught.message : "Не удалось сбросить профиль");
+      setProfileMessage(applySessionError(caught, "Не удалось сбросить профиль"));
     } finally {
       setProfileSaving(false);
+    }
+  }
+
+  async function refreshAdminUsers() {
+    if (!isAdmin) {
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminMessage(null);
+    try {
+      setAdminUsers(await fetchAdminUserProfiles());
+    } catch (caught) {
+      setAdminMessage(applySessionError(caught, "Не удалось загрузить пользователей"));
+    } finally {
+      setAdminLoading(false);
     }
   }
 
@@ -139,8 +192,8 @@ export function App() {
                 Выйти
               </Button>
             ) : (
-              <Button onClick={() => void startLogin()} disabled={status === "checking"}>
-                {status === "checking" ? (
+              <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
+                {status === "checking" || status === "loggingOut" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <LogIn className="h-4 w-4" />
@@ -173,11 +226,11 @@ export function App() {
               <div className="relative mt-8 flex flex-wrap gap-3">
                 <Button disabled={!isAuthenticated} className="min-w-44">
                   <Video className="h-4 w-4" />
-                  Начать урок
+                  {roleWorkspace?.primaryAction ?? "Начать урок"}
                 </Button>
                 <Button variant="outline" disabled={!isAuthenticated}>
                   <BookOpen className="h-4 w-4" />
-                  Открыть задание
+                  {roleWorkspace?.secondaryAction ?? "Открыть задание"}
                 </Button>
               </div>
             </div>
@@ -187,6 +240,8 @@ export function App() {
               <FeatureCard icon={Gamepad2} title="Игровой формат" text="Кабинет готовится под живые занятия." />
               <FeatureCard icon={Sparkles} title="Фирменный стиль" text="Цвета и ритм как на сайте." />
             </div>
+
+            <RoleWorkspacePanel profile={profile} />
 
             <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
               <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
@@ -229,6 +284,15 @@ export function App() {
                 saving={profileSaving}
               />
             </section>
+
+            {isAdmin ? (
+              <AdminUsersPanel
+                loading={adminLoading}
+                message={adminMessage}
+                onRefresh={() => void refreshAdminUsers()}
+                users={adminUsers}
+              />
+            ) : null}
           </aside>
         </div>
       </section>
@@ -257,6 +321,7 @@ function SessionBadge({ status }: { status: SessionStatus }) {
     checking: "Проверяем сессию",
     anonymous: "Гость",
     authenticated: "В системе",
+    loggingOut: "Выходим",
     error: "Ошибка входа",
   }[status];
 
@@ -264,6 +329,57 @@ function SessionBadge({ status }: { status: SessionStatus }) {
     <span className="hidden rounded-full border border-border bg-white/80 px-3 py-2 text-xs font-extrabold text-muted-foreground sm:inline-flex">
       {label}
     </span>
+  );
+}
+
+function RoleWorkspacePanel({ profile }: { profile: MeProfile | null }) {
+  if (!profile) {
+    return (
+      <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-extrabold">Личный кабинет</h2>
+        </div>
+        <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
+          После входа здесь появится рабочее место для роли пользователя.
+        </div>
+      </section>
+    );
+  }
+
+  const workspace = getRoleWorkspace(profile.roles);
+  const Icon = workspace.icon;
+
+  return (
+    <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+        <div className="flex items-center gap-2">
+          <Icon className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-extrabold">{workspace.title}</h2>
+        </div>
+        <span className="rounded-full border border-primary/20 bg-white px-3 py-1 text-xs font-extrabold text-primary">
+          {workspace.label}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div>
+          <p className="text-sm leading-6 text-muted-foreground">{workspace.description}</p>
+          <p className="mt-2 text-xs font-bold text-muted-foreground">
+            Роли: {getRoleSummary(profile.roles)}
+          </p>
+        </div>
+        <div className="grid gap-2 sm:w-44">
+          <Button disabled>
+            <Video className="h-4 w-4" />
+            {workspace.primaryAction}
+          </Button>
+          <Button disabled variant="outline">
+            <BookOpen className="h-4 w-4" />
+            {workspace.secondaryAction}
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -480,5 +596,71 @@ function IdentityPanel({
         ))}
       </div>
     </div>
+  );
+}
+
+function AdminUsersPanel({
+  loading,
+  message,
+  onRefresh,
+  users,
+}: {
+  loading: boolean;
+  message: string | null;
+  onRefresh: () => void;
+  users: AdminUserProfile[];
+}) {
+  return (
+    <section className="rounded-[1.5rem] border border-border bg-white/90 p-5 shadow-[0_22px_70px_rgba(35,25,15,0.08)]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-extrabold">Admin users</h2>
+        </div>
+        <Button disabled={loading} onClick={onRefresh} type="button" variant="outline">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Обновить
+        </Button>
+      </div>
+
+      {message ? (
+        <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+          {message}
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid gap-3">
+        {users.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
+            Известных app-профилей пока нет.
+          </div>
+        ) : (
+          users.map((user) => <AdminUserRow key={user.subject} user={user} />)
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AdminUserRow({ user }: { user: AdminUserProfile }) {
+  return (
+    <article className="rounded-2xl border border-border bg-muted/60 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-extrabold">
+            {user.displayName ?? user.name ?? user.username ?? user.subject}
+          </div>
+          <div className="mt-1 break-all text-xs font-semibold text-muted-foreground">
+            {user.email ?? user.username ?? user.subject}
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-extrabold text-primary">
+          {user.roles[0] ?? "NO_ROLE"}
+        </span>
+      </div>
+      {user.learningGoal ? (
+        <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{user.learningGoal}</p>
+      ) : null}
+    </article>
   );
 }

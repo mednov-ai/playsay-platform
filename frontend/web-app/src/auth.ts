@@ -2,6 +2,7 @@ import {
   deleteMyUserProfile,
   getMe,
   getMyUserProfile,
+  listUserProfiles,
   updateMyUserProfile,
   type MeResponse,
   type UpdateUserProfileRequest,
@@ -24,6 +25,7 @@ export type TokenSet = {
 export type MeProfile = MeResponse;
 export type AppUserProfile = UserProfileResponse;
 export type UpdateUserProfileInput = UpdateUserProfileRequest;
+export type AdminUserProfile = UserProfileResponse;
 
 type TokenResponse = {
   access_token: string;
@@ -180,6 +182,20 @@ export async function fetchUserProfile(config = authConfig): Promise<AppUserProf
 
   if (response.status !== 200) {
     throw new Error(`User profile request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function fetchAdminUserProfiles(config = authConfig): Promise<AdminUserProfile[]> {
+  const response = await listUserProfiles(await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Admin users request failed with HTTP ${response.status}.`);
   }
 
   return response.data;

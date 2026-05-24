@@ -48,6 +48,73 @@ export interface UserProfileResponse {
   updatedAt: string;
 }
 
+export type ScheduledLessonRequestStatus = typeof ScheduledLessonRequestStatus[keyof typeof ScheduledLessonRequestStatus];
+
+
+export const ScheduledLessonRequestStatus = {
+  SCHEDULED: 'SCHEDULED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type ScheduledLessonRequestType = typeof ScheduledLessonRequestType[keyof typeof ScheduledLessonRequestType];
+
+
+export const ScheduledLessonRequestType = {
+  INDIVIDUAL: 'INDIVIDUAL',
+  GROUP: 'GROUP',
+} as const;
+
+export interface ScheduledLessonRequest {
+  /** @nullable */
+  lessonTemplateId?: string | null;
+  /** @nullable */
+  scheduledStart?: string | null;
+  /** @nullable */
+  scheduledEnd?: string | null;
+  status: ScheduledLessonRequestStatus;
+  type: ScheduledLessonRequestType;
+  participantSubjects: string[];
+}
+
+export interface ScheduledLessonParticipantResponse {
+  subject: string;
+  /** @nullable */
+  username?: string | null;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  attendanceStatus?: string | null;
+}
+
+export interface ScheduledLessonResponse {
+  id: string;
+  /** @nullable */
+  lessonTemplateId?: string | null;
+  /** @nullable */
+  courseId?: string | null;
+  /** @nullable */
+  courseTitle?: string | null;
+  /** @nullable */
+  lessonTitle?: string | null;
+  /** @nullable */
+  teacherSubject?: string | null;
+  /** @nullable */
+  teacherName?: string | null;
+  /** @nullable */
+  scheduledStart?: string | null;
+  /** @nullable */
+  scheduledEnd?: string | null;
+  status: string;
+  type: string;
+  /** @nullable */
+  livekitRoomName?: string | null;
+  participants: ScheduledLessonParticipantResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CourseRequest {
   /** @maxLength 160 */
   title: string;
@@ -274,6 +341,190 @@ export const deleteMyUserProfile = async ( options?: RequestInit): Promise<delet
 
   const data: deleteMyUserProfileResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteMyUserProfileResponse
+}
+
+
+
+export type getScheduledLessonResponse200 = {
+  data: ScheduledLessonResponse
+  status: 200
+}
+
+export type getScheduledLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getScheduledLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getScheduledLessonResponseSuccess = (getScheduledLessonResponse200) & {
+  headers: Headers;
+};
+export type getScheduledLessonResponseError = (getScheduledLessonResponse401 | getScheduledLessonResponse404) & {
+  headers: Headers;
+};
+
+export type getScheduledLessonResponse = (getScheduledLessonResponseSuccess | getScheduledLessonResponseError)
+
+export const getGetScheduledLessonUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}`
+}
+
+/**
+ * Returns a scheduled lesson visible to the current user.
+ * @summary Get scheduled lesson
+ */
+export const getScheduledLesson = async (lessonId: string, options?: RequestInit): Promise<getScheduledLessonResponse> => {
+
+  const res = await fetch(getGetScheduledLessonUrl(lessonId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getScheduledLessonResponse
+}
+
+
+
+export type updateScheduledLessonResponse200 = {
+  data: ScheduledLessonResponse
+  status: 200
+}
+
+export type updateScheduledLessonResponse400 = {
+  data: void
+  status: 400
+}
+
+export type updateScheduledLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type updateScheduledLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type updateScheduledLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type updateScheduledLessonResponseSuccess = (updateScheduledLessonResponse200) & {
+  headers: Headers;
+};
+export type updateScheduledLessonResponseError = (updateScheduledLessonResponse400 | updateScheduledLessonResponse401 | updateScheduledLessonResponse403 | updateScheduledLessonResponse404) & {
+  headers: Headers;
+};
+
+export type updateScheduledLessonResponse = (updateScheduledLessonResponseSuccess | updateScheduledLessonResponseError)
+
+export const getUpdateScheduledLessonUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}`
+}
+
+/**
+ * Updates a calendar lesson. Requires TEACHER or ADMIN role.
+ * @summary Update scheduled lesson
+ */
+export const updateScheduledLesson = async (lessonId: string,
+    scheduledLessonRequest: ScheduledLessonRequest, options?: RequestInit): Promise<updateScheduledLessonResponse> => {
+
+  const res = await fetch(getUpdateScheduledLessonUrl(lessonId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(scheduledLessonRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateScheduledLessonResponse
+}
+
+
+
+export type deleteScheduledLessonResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteScheduledLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type deleteScheduledLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type deleteScheduledLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type deleteScheduledLessonResponseSuccess = (deleteScheduledLessonResponse204) & {
+  headers: Headers;
+};
+export type deleteScheduledLessonResponseError = (deleteScheduledLessonResponse401 | deleteScheduledLessonResponse403 | deleteScheduledLessonResponse404) & {
+  headers: Headers;
+};
+
+export type deleteScheduledLessonResponse = (deleteScheduledLessonResponseSuccess | deleteScheduledLessonResponseError)
+
+export const getDeleteScheduledLessonUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}`
+}
+
+/**
+ * Deletes a calendar lesson. Requires TEACHER or ADMIN role.
+ * @summary Delete scheduled lesson
+ */
+export const deleteScheduledLesson = async (lessonId: string, options?: RequestInit): Promise<deleteScheduledLessonResponse> => {
+
+  const res = await fetch(getDeleteScheduledLessonUrl(lessonId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteScheduledLessonResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteScheduledLessonResponse
 }
 
 
@@ -594,6 +845,118 @@ export const deleteCourseLesson = async (courseId: string,
 
 
 
+export type listScheduledLessonsResponse200 = {
+  data: ScheduledLessonResponse[]
+  status: 200
+}
+
+export type listScheduledLessonsResponse401 = {
+  data: void
+  status: 401
+}
+
+export type listScheduledLessonsResponseSuccess = (listScheduledLessonsResponse200) & {
+  headers: Headers;
+};
+export type listScheduledLessonsResponseError = (listScheduledLessonsResponse401) & {
+  headers: Headers;
+};
+
+export type listScheduledLessonsResponse = (listScheduledLessonsResponseSuccess | listScheduledLessonsResponseError)
+
+export const getListScheduledLessonsUrl = () => {
+
+
+
+
+  return `/api/schedule/lessons`
+}
+
+/**
+ * Returns scheduled lessons. Teachers/admins see all, students see lessons where they are participants.
+ * @summary List scheduled lessons
+ */
+export const listScheduledLessons = async ( options?: RequestInit): Promise<listScheduledLessonsResponse> => {
+
+  const res = await fetch(getListScheduledLessonsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listScheduledLessonsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listScheduledLessonsResponse
+}
+
+
+
+export type createScheduledLessonResponse201 = {
+  data: ScheduledLessonResponse
+  status: 201
+}
+
+export type createScheduledLessonResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createScheduledLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createScheduledLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createScheduledLessonResponseSuccess = (createScheduledLessonResponse201) & {
+  headers: Headers;
+};
+export type createScheduledLessonResponseError = (createScheduledLessonResponse400 | createScheduledLessonResponse401 | createScheduledLessonResponse403) & {
+  headers: Headers;
+};
+
+export type createScheduledLessonResponse = (createScheduledLessonResponseSuccess | createScheduledLessonResponseError)
+
+export const getCreateScheduledLessonUrl = () => {
+
+
+
+
+  return `/api/schedule/lessons`
+}
+
+/**
+ * Creates a calendar lesson. Requires TEACHER or ADMIN role.
+ * @summary Create scheduled lesson
+ */
+export const createScheduledLesson = async (scheduledLessonRequest: ScheduledLessonRequest, options?: RequestInit): Promise<createScheduledLessonResponse> => {
+
+  const res = await fetch(getCreateScheduledLessonUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(scheduledLessonRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createScheduledLessonResponse
+}
+
+
+
 export type listCoursesResponse200 = {
   data: CourseResponse[]
   status: 200
@@ -825,6 +1188,62 @@ export const createCourseLesson = async (courseId: string,
 
   const data: createCourseLessonResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createCourseLessonResponse
+}
+
+
+
+export type listStudentProfilesResponse200 = {
+  data: UserProfileResponse[]
+  status: 200
+}
+
+export type listStudentProfilesResponse401 = {
+  data: void
+  status: 401
+}
+
+export type listStudentProfilesResponse403 = {
+  data: void
+  status: 403
+}
+
+export type listStudentProfilesResponseSuccess = (listStudentProfilesResponse200) & {
+  headers: Headers;
+};
+export type listStudentProfilesResponseError = (listStudentProfilesResponse401 | listStudentProfilesResponse403) & {
+  headers: Headers;
+};
+
+export type listStudentProfilesResponse = (listStudentProfilesResponseSuccess | listStudentProfilesResponseError)
+
+export const getListStudentProfilesUrl = () => {
+
+
+
+
+  return `/api/users/students`
+}
+
+/**
+ * Returns known app-level student profiles. Requires TEACHER or ADMIN role.
+ * @summary List student user profiles
+ */
+export const listStudentProfiles = async ( options?: RequestInit): Promise<listStudentProfilesResponse> => {
+
+  const res = await fetch(getListStudentProfilesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listStudentProfilesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listStudentProfilesResponse
 }
 
 

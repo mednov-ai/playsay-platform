@@ -96,6 +96,16 @@ class UserProfileControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher can list known student profiles`() {
+        controller.current(authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT"))
+        controller.current(authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER"))
+
+        val users = controller.listStudents(authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER"))
+
+        assertEquals(listOf("student.one"), users.map { user -> user.username })
+    }
+
+    @Test
     fun `non admin cannot list profiles`() {
         val error = assertFailsWith<ResponseStatusException> {
             controller.list(authentication(role = "ROLE_TEACHER"))

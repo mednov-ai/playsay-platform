@@ -64,6 +64,93 @@ paths:
           description: Missing or invalid bearer token
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}:
+    get:
+      tags:
+      - Schedule
+      summary: Get scheduled lesson
+      description: Returns a scheduled lesson visible to the current user.
+      operationId: getScheduledLesson
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Scheduled lesson
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledLessonResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Scheduled lesson not found
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Schedule
+      summary: Update scheduled lesson
+      description: Updates a calendar lesson. Requires TEACHER or ADMIN role.
+      operationId: updateScheduledLesson
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledLessonRequest"
+        required: true
+      responses:
+        "200":
+          description: Scheduled lesson updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledLessonResponse"
+        "400":
+          description: Invalid scheduled lesson payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage schedule
+        "404":
+          description: Scheduled lesson not found
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Schedule
+      summary: Delete scheduled lesson
+      description: Deletes a calendar lesson. Requires TEACHER or ADMIN role.
+      operationId: deleteScheduledLesson
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Scheduled lesson deleted
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage schedule
+        "404":
+          description: Scheduled lesson not found
+      security:
+      - bearerAuth: []
   /courses/{courseId}:
     get:
       tags:
@@ -228,6 +315,54 @@ paths:
           description: Course lesson not found
       security:
       - bearerAuth: []
+  /schedule/lessons:
+    get:
+      tags:
+      - Schedule
+      summary: List scheduled lessons
+      description: "Returns scheduled lessons. Teachers/admins see all, students see\
+        \ lessons where they are participants."
+      operationId: listScheduledLessons
+      responses:
+        "200":
+          description: Scheduled lessons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduledLessonResponse"
+        "401":
+          description: Missing or invalid bearer token
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Schedule
+      summary: Create scheduled lesson
+      description: Creates a calendar lesson. Requires TEACHER or ADMIN role.
+      operationId: createScheduledLesson
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledLessonRequest"
+        required: true
+      responses:
+        "201":
+          description: Scheduled lesson created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledLessonResponse"
+        "400":
+          description: Invalid scheduled lesson payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage schedule
+      security:
+      - bearerAuth: []
   /courses:
     get:
       tags:
@@ -340,6 +475,29 @@ paths:
           description: Current user cannot manage courses
         "404":
           description: Course not found
+      security:
+      - bearerAuth: []
+  /users/students:
+    get:
+      tags:
+      - Users
+      summary: List student user profiles
+      description: Returns known app-level student profiles. Requires TEACHER or ADMIN
+        role.
+      operationId: listStudentProfiles
+      responses:
+        "200":
+          description: Known student user profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user is not a teacher/admin
       security:
       - bearerAuth: []
   /me:
@@ -464,6 +622,130 @@ components:
       required:
       - roles
       - subject
+      - updatedAt
+    ScheduledLessonRequest:
+      type: object
+      properties:
+        lessonTemplateId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        scheduledStart:
+          type:
+          - string
+          - "null"
+          format: date-time
+        scheduledEnd:
+          type:
+          - string
+          - "null"
+          format: date-time
+        status:
+          type: string
+          enum:
+          - SCHEDULED
+          - IN_PROGRESS
+          - COMPLETED
+          - CANCELLED
+        type:
+          type: string
+          enum:
+          - INDIVIDUAL
+          - GROUP
+        participantSubjects:
+          type: array
+          items:
+            type: string
+      required:
+      - participantSubjects
+      - status
+      - type
+    ScheduledLessonParticipantResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        username:
+          type:
+          - string
+          - "null"
+        displayName:
+          type:
+          - string
+          - "null"
+        attendanceStatus:
+          type:
+          - string
+          - "null"
+      required:
+      - subject
+    ScheduledLessonResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lessonTemplateId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        courseId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        courseTitle:
+          type:
+          - string
+          - "null"
+        lessonTitle:
+          type:
+          - string
+          - "null"
+        teacherSubject:
+          type:
+          - string
+          - "null"
+        teacherName:
+          type:
+          - string
+          - "null"
+        scheduledStart:
+          type:
+          - string
+          - "null"
+          format: date-time
+        scheduledEnd:
+          type:
+          - string
+          - "null"
+          format: date-time
+        status:
+          type: string
+        type:
+          type: string
+        livekitRoomName:
+          type:
+          - string
+          - "null"
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduledLessonParticipantResponse"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - participants
+      - status
+      - type
       - updatedAt
     CourseRequest:
       type: object

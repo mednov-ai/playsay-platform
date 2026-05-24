@@ -171,6 +171,31 @@ class UserProfileStore(
             .list()
             .map { profile -> profile.toResponse() }
 
+    @Transactional(readOnly = true)
+    fun listStudents(): List<UserProfileResponse> =
+        jdbcClient.sql(
+            """
+            SELECT id,
+                   keycloak_subject,
+                   username,
+                   email,
+                   name,
+                   roles,
+                   display_name,
+                   locale,
+                   timezone,
+                   learning_goal,
+                   updated_at
+              FROM app_user
+             WHERE roles LIKE :role
+             ORDER BY COALESCE(display_name, username, keycloak_subject)
+            """.trimIndent(),
+        )
+            .param("role", "%STUDENT%")
+            .query(::mapProfile)
+            .list()
+            .map { profile -> profile.toResponse() }
+
     @Transactional
     fun currentUserId(authentication: JwtAuthenticationToken): UUID {
         val identity = authentication.toIdentity()
@@ -381,6 +406,29 @@ class UserProfileController(
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "ADMIN role is required.")
         }
         return store.list()
+    }
+
+    @GetMapping("/users/students", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "listStudentProfiles",
+        summary = "List student user profiles",
+        description = "Returns known app-level student profiles. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Known student user profiles"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user is not a teacher/admin", content = [Content()]),
+        ],
+    )
+    fun listStudents(authentication: JwtAuthenticationToken): List<UserProfileResponse> {
+        if (authentication.authorities.none { authority ->
+            authority.authority == "ROLE_TEACHER" || authority.authority == "ROLE_ADMIN"
+        }) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
+        }
+        return store.listStudents()
     }
 }
 

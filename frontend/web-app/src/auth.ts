@@ -1,10 +1,27 @@
 import {
+  createCourse,
+  createCourseLesson,
+  createScheduledLesson,
   deleteMyUserProfile,
+  deleteCourse,
+  deleteCourseLesson,
+  deleteScheduledLesson,
   getMe,
   getMyUserProfile,
+  listCourseLessons,
+  listCourses,
+  listScheduledLessons,
+  listStudentProfiles,
   listUserProfiles,
+  updateScheduledLesson,
   updateMyUserProfile,
+  type CourseLessonRequest,
+  type CourseLessonResponse,
+  type CourseRequest,
+  type CourseResponse,
   type MeResponse,
+  type ScheduledLessonRequest,
+  type ScheduledLessonResponse,
   type UpdateUserProfileRequest,
   type UserProfileResponse,
 } from "./generated/playsay-api";
@@ -26,6 +43,12 @@ export type MeProfile = MeResponse;
 export type AppUserProfile = UserProfileResponse;
 export type UpdateUserProfileInput = UpdateUserProfileRequest;
 export type AdminUserProfile = UserProfileResponse;
+export type Course = CourseResponse;
+export type CourseLesson = CourseLessonResponse;
+export type CourseInput = CourseRequest;
+export type CourseLessonInput = CourseLessonRequest;
+export type ScheduledLesson = ScheduledLessonResponse;
+export type ScheduledLessonInput = ScheduledLessonRequest;
 
 type TokenResponse = {
   access_token: string;
@@ -199,6 +222,169 @@ export async function fetchAdminUserProfiles(config = authConfig): Promise<Admin
   }
 
   return response.data;
+}
+
+export async function fetchStudentProfiles(config = authConfig): Promise<AdminUserProfile[]> {
+  const response = await listStudentProfiles(await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Student profiles request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function fetchCourses(config = authConfig): Promise<Course[]> {
+  const response = await listCourses(await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Courses request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function fetchCourseLessons(courseId: string, config = authConfig): Promise<CourseLesson[]> {
+  const response = await listCourseLessons(courseId, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Course lessons request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function saveCourse(input: CourseInput, config = authConfig): Promise<Course> {
+  const response = await createCourse(input, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 201) {
+    throw new Error(`Course create failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function removeCourse(courseId: string, config = authConfig): Promise<void> {
+  const response = await deleteCourse(courseId, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 204) {
+    throw new Error(`Course delete failed with HTTP ${response.status}.`);
+  }
+}
+
+export async function saveCourseLesson(
+  courseId: string,
+  input: CourseLessonInput,
+  config = authConfig,
+): Promise<CourseLesson> {
+  const response = await createCourseLesson(courseId, input, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 201) {
+    throw new Error(`Course lesson create failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function removeCourseLesson(
+  courseId: string,
+  lessonId: string,
+  config = authConfig,
+): Promise<void> {
+  const response = await deleteCourseLesson(courseId, lessonId, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 204) {
+    throw new Error(`Course lesson delete failed with HTTP ${response.status}.`);
+  }
+}
+
+export async function fetchScheduledLessons(config = authConfig): Promise<ScheduledLesson[]> {
+  const response = await listScheduledLessons(await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Schedule request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function saveScheduledLesson(
+  input: ScheduledLessonInput,
+  config = authConfig,
+): Promise<ScheduledLesson> {
+  const response = await createScheduledLesson(input, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 201) {
+    throw new Error(`Scheduled lesson create failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function editScheduledLesson(
+  lessonId: string,
+  input: ScheduledLessonInput,
+  config = authConfig,
+): Promise<ScheduledLesson> {
+  const response = await updateScheduledLesson(lessonId, input, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Scheduled lesson update failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function removeScheduledLesson(lessonId: string, config = authConfig): Promise<void> {
+  const response = await deleteScheduledLesson(lessonId, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 204) {
+    throw new Error(`Scheduled lesson delete failed with HTTP ${response.status}.`);
+  }
 }
 
 export async function saveUserProfile(

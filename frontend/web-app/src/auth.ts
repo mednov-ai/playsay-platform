@@ -1,8 +1,9 @@
+import { getMe, type MeResponse } from "./generated/playsay-api";
+
 export type AuthConfig = {
   issuer: string;
   clientId: string;
   redirectPath: string;
-  apiBaseUrl: string;
 };
 
 export type TokenSet = {
@@ -12,13 +13,7 @@ export type TokenSet = {
   expiresAt: number;
 };
 
-export type MeProfile = {
-  subject: string;
-  username: string | null;
-  email: string | null;
-  name: string | null;
-  roles: string[];
-};
+export type MeProfile = MeResponse;
 
 type TokenResponse = {
   access_token: string;
@@ -39,7 +34,6 @@ export const authConfig: AuthConfig = {
     "https://ops.play-and-say.ru:18443/keycloak/realms/playsay",
   clientId: import.meta.env.VITE_AUTH_CLIENT_ID ?? "playsay-web",
   redirectPath: import.meta.env.VITE_AUTH_REDIRECT_PATH ?? "/auth/callback",
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "/api",
 };
 
 const tokenStorageKey = "playsay.auth.tokens";
@@ -159,7 +153,7 @@ export async function fetchMe(config = authConfig): Promise<MeProfile> {
     throw new Error("Not authenticated.");
   }
 
-  const response = await fetch(`${trimTrailingSlash(config.apiBaseUrl)}/me`, {
+  const response = await getMe({
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -169,11 +163,11 @@ export async function fetchMe(config = authConfig): Promise<MeProfile> {
     clearTokens();
   }
 
-  if (!response.ok) {
+  if (response.status !== 200) {
     throw new Error(`Profile request failed with HTTP ${response.status}.`);
   }
 
-  return (await response.json()) as MeProfile;
+  return response.data;
 }
 
 export function buildLogoutUrl(config = authConfig): string {

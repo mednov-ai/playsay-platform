@@ -16,6 +16,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.3")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 }
@@ -26,4 +27,18 @@ tasks.withType<Test> {
 
 tasks.named("jar") {
     enabled = false
+}
+
+tasks.register<Test>("exportOpenApi") {
+    group = "documentation"
+    description = "Exports the api-gateway OpenAPI contract to contracts/openapi.yaml."
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.playsay.gateway.OpenApiExportTest")
+    }
+    systemProperty("playsay.openapi.export", "true")
+    systemProperty(
+        "playsay.openapi.output",
+        rootProject.layout.projectDirectory.file("../contracts/openapi.yaml").asFile.absolutePath,
+    )
 }

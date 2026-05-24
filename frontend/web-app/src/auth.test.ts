@@ -5,7 +5,6 @@ const config: AuthConfig = {
   issuer: "https://ops.play-and-say.ru:18443/keycloak/realms/playsay/",
   clientId: "playsay-web",
   redirectPath: "/auth/callback",
-  apiBaseUrl: "/api",
 };
 
 describe("auth helpers", () => {

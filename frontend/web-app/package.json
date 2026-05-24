@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "test": "vitest run --passWithNoTests",
+    "generate": "orval --config orval.config.ts",
+    "build": "npm run generate && tsc -b && vite build",
+    "test": "npm run generate && vitest run --passWithNoTests",
     "lint": "eslint src --ext ts,tsx"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.16.0",
+    "orval": "^8.12.3",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2",

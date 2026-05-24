@@ -165,12 +165,33 @@ spec:
       }
     }
 
+    stage('OpenAPI contract') {
+      steps {
+        container('gradle') {
+          dir('backend') {
+            echo "Exporting api-gateway OpenAPI contract for ${env.BUILD_LABEL}"
+            sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace'
+          }
+        }
+        sh '''
+          set -eu
+          git diff --exit-code -- contracts/openapi.yaml || {
+            echo "contracts/openapi.yaml is out of sync with api-gateway. Run gradle :api-gateway:exportOpenApi and commit the result."
+            exit 1
+          }
+        '''
+        archiveArtifacts artifacts: 'contracts/openapi.yaml', fingerprint: true
+      }
+    }
+
     stage('Frontend build') {
       steps {
         container('node') {
           dir('frontend') {
             echo "Installing frontend dependencies for ${env.BUILD_LABEL}"
             sh 'npm install --cache .npm --prefer-offline'
+            echo "Generating typed frontend API client for ${env.BUILD_LABEL}"
+            sh 'npm --workspace web-app run generate'
             echo "Building frontend for ${env.BUILD_LABEL}"
             sh 'npm --workspace web-app run build'
             echo "Running frontend tests for ${env.BUILD_LABEL}"

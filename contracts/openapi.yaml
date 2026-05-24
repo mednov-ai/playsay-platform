@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: Play&Say API Gateway
+  description: Public contract for the Play&Say API Gateway.
+  version: 0.1.0
+servers:
+- url: /api
+  description: Play&Say web-app API proxy
+paths:
+  /me:
+    get:
+      tags:
+      - Auth
+      summary: Current user profile
+      description: Returns the current JWT profile and Play&Say application roles.
+      operationId: getMe
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Missing or invalid bearer token
+      security:
+      - bearerAuth: []
+  /hello:
+    get:
+      tags:
+      - Dev
+      summary: Dev health message
+      description: Returns a small public payload used by smoke tests.
+      operationId: getHello
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelloResponse"
+components:
+  schemas:
+    MeResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        username:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+        name:
+          type:
+          - string
+          - "null"
+        roles:
+          type: array
+          items:
+            type: string
+      required:
+      - roles
+      - subject
+    HelloResponse:
+      type: object
+      properties:
+        service:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+      - message
+      - service
+      - timestamp
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

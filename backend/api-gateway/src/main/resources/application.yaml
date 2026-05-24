@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${PLAYSAY_AUTH_ISSUER_URI:https://ops.play-and-say.ru:18443/keycloak/realms/playsay}
+          jwk-set-uri: ${PLAYSAY_AUTH_JWK_SET_URI:https://ops.play-and-say.ru:18443/keycloak/realms/playsay/protocol/openid-connect/certs}
 
 management:
   endpoints:
@@ -14,4 +20,3 @@ management:
     health:
       probes:
         enabled: true
-

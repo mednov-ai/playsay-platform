@@ -77,7 +77,7 @@ spec:
       tty: true
       securityContext:
         runAsUser: 1000
-        runAsGroup: 1000
+        runAsGroup: 0
       env:
         - name: PLAYSAY_DB_JDBC_URL
           valueFrom:

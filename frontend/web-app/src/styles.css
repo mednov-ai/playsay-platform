@@ -60,3 +60,20 @@ textarea {
   cursor: not-allowed;
   opacity: 0.62;
 }
+
+.playsay-live-room {
+  --lk-brand-color: hsl(var(--primary));
+  --lk-brand-color-hover: #e65300;
+  --lk-control-bar-height: 4.5rem;
+}
+
+.playsay-live-room [data-lk-theme="default"] {
+  min-height: 28rem;
+  background: #171717;
+}
+
+@media (max-width: 640px) {
+  .playsay-live-room [data-lk-theme="default"] {
+    min-height: 24rem;
+  }
+}

@@ -1,6 +1,7 @@
 import {
   createCourse,
   createCourseLesson,
+  createScheduledLessonRoomToken,
   createScheduledLesson,
   deleteMyUserProfile,
   deleteCourse,
@@ -19,6 +20,7 @@ import {
   type CourseLessonResponse,
   type CourseRequest,
   type CourseResponse,
+  type LiveKitRoomTokenResponse,
   type MeResponse,
   type ScheduledLessonRequest,
   type ScheduledLessonResponse,
@@ -49,6 +51,7 @@ export type CourseInput = CourseRequest;
 export type CourseLessonInput = CourseLessonRequest;
 export type ScheduledLesson = ScheduledLessonResponse;
 export type ScheduledLessonInput = ScheduledLessonRequest;
+export type LiveKitRoomToken = LiveKitRoomTokenResponse;
 
 type TokenResponse = {
   access_token: string;
@@ -385,6 +388,20 @@ export async function removeScheduledLesson(lessonId: string, config = authConfi
   if (response.status !== 204) {
     throw new Error(`Scheduled lesson delete failed with HTTP ${response.status}.`);
   }
+}
+
+export async function enterScheduledLessonRoom(lessonId: string, config = authConfig): Promise<LiveKitRoomToken> {
+  const response = await createScheduledLessonRoomToken(lessonId, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Video room token request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
 }
 
 export async function saveUserProfile(

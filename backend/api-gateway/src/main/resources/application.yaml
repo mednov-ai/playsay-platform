@@ -27,3 +27,10 @@ management:
     health:
       probes:
         enabled: true
+
+playsay:
+  livekit:
+    url: ${PLAYSAY_LIVEKIT_URL:wss://online.play-and-say.ru/livekit}
+    api-key: ${PLAYSAY_LIVEKIT_API_KEY:}
+    api-secret: ${PLAYSAY_LIVEKIT_API_SECRET:}
+    token-ttl-seconds: ${PLAYSAY_LIVEKIT_TOKEN_TTL_SECONDS:3600}

@@ -363,6 +363,36 @@ paths:
           description: Current user cannot manage schedule
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/room-token:
+    post:
+      tags:
+      - Schedule
+      summary: Create scheduled lesson video token
+      description: Returns a short-lived LiveKit join token for a scheduled lesson
+        visible to the current user.
+      operationId: createScheduledLessonRoomToken
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: LiveKit room token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveKitRoomTokenResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Scheduled lesson not found
+        "503":
+          description: LiveKit is not configured
+      security:
+      - bearerAuth: []
   /courses:
     get:
       tags:
@@ -865,6 +895,26 @@ components:
       - id
       - title
       - updatedAt
+    LiveKitRoomTokenResponse:
+      type: object
+      properties:
+        serverUrl:
+          type: string
+        token:
+          type: string
+        roomName:
+          type: string
+        identity:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - identity
+      - roomName
+      - serverUrl
+      - token
     MeResponse:
       type: object
       properties:

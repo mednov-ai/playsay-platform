@@ -1,5 +1,6 @@
 package com.playsay.gateway
 
+import com.nimbusds.jwt.SignedJWT
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -27,11 +28,16 @@ import liquibase.integration.spring.SpringLiquibase
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=true",
+        "playsay.livekit.url=wss://online.play-and-say.ru/livekit",
+        "playsay.livekit.api-key=test-key",
+        "playsay.livekit.api-secret=01234567890123456789012345678901",
+        "playsay.livekit.token-ttl-seconds=900",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ScheduledLessonControllerTest @Autowired constructor(
     private val scheduleController: ScheduledLessonController,
+    private val liveKitRoomController: LiveKitRoomController,
     private val courseController: CourseController,
     private val userProfileStore: UserProfileStore,
     private val jdbcClient: JdbcClient,
@@ -167,6 +173,60 @@ class ScheduledLessonControllerTest @Autowired constructor(
 
         assertEquals(HttpStatus.NO_CONTENT, scheduleController.delete(teacher, lesson.id).statusCode)
         assertEquals(emptyList(), scheduleController.list(teacher))
+    }
+
+    @Test
+    fun `teacher and participant receive LiveKit room token`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
+                scheduledEnd = Instant.parse("2026-05-25T10:45:00Z"),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val teacherToken = liveKitRoomController.createToken(teacher, lesson.id)
+        val studentToken = liveKitRoomController.createToken(student, lesson.id)
+        val claims = SignedJWT.parse(teacherToken.token).jwtClaimsSet
+        val videoGrant = claims.getJSONObjectClaim("video")
+
+        assertEquals("wss://online.play-and-say.ru/livekit", teacherToken.serverUrl)
+        assertEquals("lesson-${lesson.id}", teacherToken.roomName)
+        assertEquals("teacher-1", teacherToken.identity)
+        assertEquals("lesson-${lesson.id}", studentToken.roomName)
+        assertEquals("test-key", claims.issuer)
+        assertEquals("teacher-1", claims.subject)
+        assertEquals("lesson-${lesson.id}", videoGrant["room"])
+        assertEquals(true, videoGrant["roomJoin"])
+        assertEquals(true, videoGrant["canPublish"])
+        assertEquals(true, videoGrant["canSubscribe"])
+    }
+
+    @Test
+    fun `non participant cannot receive LiveKit room token`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val otherStudent = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        userProfileStore.currentUserId(otherStudent)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
+                scheduledEnd = Instant.parse("2026-05-25T10:45:00Z"),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val error = assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(otherStudent, lesson.id)
+        }
+
+        assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
     }
 
     private fun courseLessonId(teacher: JwtAuthenticationToken): UUID {

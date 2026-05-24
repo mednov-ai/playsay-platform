@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import {
   AlertCircle,
   BookOpen,
@@ -24,6 +25,7 @@ import {
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  enterScheduledLessonRoom,
   editScheduledLesson,
   fetchAdminUserProfiles,
   fetchCourseLessons,
@@ -49,6 +51,7 @@ import {
   type CourseInput,
   type CourseLesson,
   type CourseLessonInput,
+  type LiveKitRoomToken,
   type MeProfile,
   type ScheduledLesson,
   type ScheduledLessonInput,
@@ -90,6 +93,10 @@ type ScheduleFormState = {
   participantSubjects: string;
 };
 
+type LessonRoomSession = LiveKitRoomToken & {
+  lessonTitle: string;
+};
+
 export function App() {
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [appProfile, setAppProfile] = useState<AppUserProfile | null>(null);
@@ -108,6 +115,9 @@ export function App() {
   const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [studentUsers, setStudentUsers] = useState<AdminUserProfile[]>([]);
+  const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(null);
+  const [roomLoadingLessonId, setRoomLoadingLessonId] = useState<string | null>(null);
+  const [roomMessage, setRoomMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,6 +185,9 @@ export function App() {
     setCourseLessons({});
     setScheduledLessons([]);
     setStudentUsers([]);
+    setRoomSession(null);
+    setRoomLoadingLessonId(null);
+    setRoomMessage(null);
     setStatus("loggingOut");
     window.location.assign(logoutUrl);
   }
@@ -190,6 +203,9 @@ export function App() {
       setCourseLessons({});
       setScheduledLessons([]);
       setStudentUsers([]);
+      setRoomSession(null);
+      setRoomLoadingLessonId(null);
+      setRoomMessage(null);
       setStatus("anonymous");
       return "Сессия истекла, войдите снова";
     }
@@ -389,12 +405,35 @@ export function App() {
     try {
       await removeScheduledLesson(lessonId);
       setScheduledLessons((current) => current.filter((lesson) => lesson.id !== lessonId));
+      setRoomSession((current) => (current?.roomName === `lesson-${lessonId}` ? null : current));
       setScheduleMessage("Занятие удалено");
     } catch (caught) {
       setScheduleMessage(applySessionError(caught, "Не удалось удалить занятие"));
     } finally {
       setScheduleLoading(false);
     }
+  }
+
+  async function joinScheduledLesson(lesson: ScheduledLesson) {
+    setRoomLoadingLessonId(lesson.id);
+    setRoomMessage(null);
+    try {
+      const token = await enterScheduledLessonRoom(lesson.id);
+      setRoomSession({
+        ...token,
+        lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? "Занятие",
+      });
+      setRoomMessage("Комната готова");
+    } catch (caught) {
+      setRoomMessage(applySessionError(caught, "Не удалось открыть видеокомнату"));
+    } finally {
+      setRoomLoadingLessonId(null);
+    }
+  }
+
+  function leaveScheduledLessonRoom() {
+    setRoomSession(null);
+    setRoomMessage(null);
   }
 
   return (
@@ -484,8 +523,13 @@ export function App() {
               onCancel={(lesson) => void cancelScheduledLesson(lesson)}
               onCreate={(input) => void createScheduledLesson(input)}
               onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
+              onJoin={(lesson) => void joinScheduledLesson(lesson)}
+              onLeaveRoom={leaveScheduledLessonRoom}
               onRefresh={() => void refreshSchedule()}
               profile={profile}
+              roomLoadingLessonId={roomLoadingLessonId}
+              roomMessage={roomMessage}
+              roomSession={roomSession}
               scheduledLessons={scheduledLessons}
               studentUsers={studentUsers}
             />
@@ -976,8 +1020,13 @@ function SchedulePanel({
   onCancel,
   onCreate,
   onDelete,
+  onJoin,
+  onLeaveRoom,
   onRefresh,
   profile,
+  roomLoadingLessonId,
+  roomMessage,
+  roomSession,
   scheduledLessons,
   studentUsers,
 }: {
@@ -989,8 +1038,13 @@ function SchedulePanel({
   onCancel: (lesson: ScheduledLesson) => void;
   onCreate: (input: ScheduledLessonInput) => void;
   onDelete: (lessonId: string) => void;
+  onJoin: (lesson: ScheduledLesson) => void;
+  onLeaveRoom: () => void;
   onRefresh: () => void;
   profile: MeProfile | null;
+  roomLoadingLessonId: string | null;
+  roomMessage: string | null;
+  roomSession: LessonRoomSession | null;
   scheduledLessons: ScheduledLesson[];
   studentUsers: AdminUserProfile[];
 }) {
@@ -1031,6 +1085,14 @@ function SchedulePanel({
             </div>
           ) : null}
 
+          {roomMessage ? (
+            <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+              {roomMessage}
+            </div>
+          ) : null}
+
+          {roomSession ? <LiveLessonRoom onLeave={onLeaveRoom} session={roomSession} /> : null}
+
           {scheduledLessons.length === 0 ? (
             <div className="rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
               {canManage ? "В расписании пока нет занятий." : "У вас пока нет запланированных занятий."}
@@ -1045,6 +1107,8 @@ function SchedulePanel({
                   lesson={lesson}
                   onCancel={() => onCancel(lesson)}
                   onDelete={() => onDelete(lesson.id)}
+                  onJoin={() => onJoin(lesson)}
+                  roomLoading={roomLoadingLessonId === lesson.id}
                 />
               ))}
             </div>
@@ -1206,12 +1270,16 @@ function ScheduledLessonCard({
   lesson,
   onCancel,
   onDelete,
+  onJoin,
+  roomLoading,
 }: {
   canManage: boolean;
   disabled: boolean;
   lesson: ScheduledLesson;
   onCancel: () => void;
   onDelete: () => void;
+  onJoin: () => void;
+  roomLoading: boolean;
 }) {
   return (
     <article className="rounded-2xl border border-border bg-white p-4">
@@ -1251,8 +1319,17 @@ function ScheduledLessonCard({
             )}
           </div>
         </div>
-        {canManage ? (
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={disabled || roomLoading || lesson.status === "CANCELLED"}
+            onClick={onJoin}
+            type="button"
+          >
+            {roomLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+            Войти в урок
+          </Button>
+          {canManage ? (
+            <>
             <Button disabled={disabled || lesson.status === "CANCELLED"} onClick={onCancel} type="button" variant="outline">
               <RotateCcw className="h-4 w-4" />
               Отменить
@@ -1261,8 +1338,41 @@ function ScheduledLessonCard({
               <Trash2 className="h-4 w-4" />
               Удалить
             </Button>
-          </div>
-        ) : null}
+            </>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function LiveLessonRoom({ onLeave, session }: { onLeave: () => void; session: LessonRoomSession }) {
+  return (
+    <article className="overflow-hidden rounded-2xl border border-primary/20 bg-[#171717] shadow-[0_18px_48px_rgba(17,17,17,0.18)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-extrabold">{session.lessonTitle}</h3>
+          <p className="mt-1 break-all text-xs font-bold text-muted-foreground">
+            {session.roomName} · токен до {new Date(session.expiresAt).toLocaleTimeString()}
+          </p>
+        </div>
+        <Button onClick={onLeave} type="button" variant="outline">
+          <LogOut className="h-4 w-4" />
+          Закрыть
+        </Button>
+      </div>
+      <div className="playsay-live-room">
+        <LiveKitRoom
+          audio
+          connect
+          data-lk-theme="default"
+          onDisconnected={onLeave}
+          serverUrl={session.serverUrl}
+          token={session.token}
+          video
+        >
+          <VideoConference />
+        </LiveKitRoom>
       </div>
     </article>
   );

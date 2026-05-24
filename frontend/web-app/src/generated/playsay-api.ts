@@ -170,6 +170,14 @@ export interface CourseLessonResponse {
   updatedAt: string;
 }
 
+export interface LiveKitRoomTokenResponse {
+  serverUrl: string;
+  token: string;
+  roomName: string;
+  identity: string;
+  expiresAt: string;
+}
+
 export interface MeResponse {
   subject: string;
   /** @nullable */
@@ -953,6 +961,67 @@ export const createScheduledLesson = async (scheduledLessonRequest: ScheduledLes
 
   const data: createScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createScheduledLessonResponse
+}
+
+
+
+export type createScheduledLessonRoomTokenResponse200 = {
+  data: LiveKitRoomTokenResponse
+  status: 200
+}
+
+export type createScheduledLessonRoomTokenResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createScheduledLessonRoomTokenResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createScheduledLessonRoomTokenResponse503 = {
+  data: void
+  status: 503
+}
+
+export type createScheduledLessonRoomTokenResponseSuccess = (createScheduledLessonRoomTokenResponse200) & {
+  headers: Headers;
+};
+export type createScheduledLessonRoomTokenResponseError = (createScheduledLessonRoomTokenResponse401 | createScheduledLessonRoomTokenResponse404 | createScheduledLessonRoomTokenResponse503) & {
+  headers: Headers;
+};
+
+export type createScheduledLessonRoomTokenResponse = (createScheduledLessonRoomTokenResponseSuccess | createScheduledLessonRoomTokenResponseError)
+
+export const getCreateScheduledLessonRoomTokenUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/room-token`
+}
+
+/**
+ * Returns a short-lived LiveKit join token for a scheduled lesson visible to the current user.
+ * @summary Create scheduled lesson video token
+ */
+export const createScheduledLessonRoomToken = async (lessonId: string, options?: RequestInit): Promise<createScheduledLessonRoomTokenResponse> => {
+
+  const res = await fetch(getCreateScheduledLessonRoomTokenUrl(lessonId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createScheduledLessonRoomTokenResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createScheduledLessonRoomTokenResponse
 }
 
 

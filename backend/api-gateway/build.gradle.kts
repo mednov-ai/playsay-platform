@@ -17,6 +17,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("com.nimbusds:nimbus-jose-jwt")
     implementation("org.liquibase:liquibase-core")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.3")
     runtimeOnly("org.postgresql:postgresql")

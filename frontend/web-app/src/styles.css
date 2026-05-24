@@ -569,17 +569,109 @@ textarea {
     border-width: 0;
   }
 
+  .playsay-video-rail {
+    position: relative;
+  }
+
+  .playsay-video-header {
+    position: absolute;
+    z-index: 5;
+    top: 0;
+    right: 0;
+    left: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    border-bottom: 0;
+    background: linear-gradient(180deg, rgb(15 15 15 / 0.92) 0%, rgb(15 15 15 / 0.62) 72%, transparent 100%);
+    padding: 0.75rem;
+  }
+
   .playsay-video-header h1,
   .playsay-lesson-statusline {
     display: none;
   }
 
+  .playsay-video-header p {
+    max-width: 58vw;
+    font-size: 0.75rem;
+  }
+
+  .playsay-lesson-exit {
+    min-height: 2.75rem;
+    padding-inline: 0.875rem;
+  }
+
+  .playsay-classroom-room {
+    height: 100%;
+  }
+
   .playsay-classroom-conference {
-    grid-template-rows: minmax(0, 1fr) minmax(4.75rem, auto);
+    position: relative;
+    display: block;
+    min-height: 100%;
+    overflow: hidden;
+  }
+
+  .playsay-video-focus {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+  }
+
+  .playsay-video-focus .lk-participant-tile {
+    border-radius: 0;
   }
 
   .playsay-video-strip {
+    position: absolute;
+    z-index: 4;
+    right: 0.75rem;
+    bottom: 4.9rem;
+    left: 0.75rem;
+    display: grid;
+    height: 4.875rem;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(5.25rem, 6.5rem);
+    justify-content: start;
+    border-top: 0;
+    padding: 0;
+    scrollbar-width: none;
+  }
+
+  .playsay-video-strip::-webkit-scrollbar {
     display: none;
+  }
+
+  .playsay-video-strip[data-empty="true"] {
+    display: none;
+  }
+
+  .playsay-video-strip .lk-participant-tile {
+    border: 1px solid rgb(255 255 255 / 0.32);
+    border-radius: 0.75rem;
+    box-shadow: 0 0.75rem 1.75rem rgb(0 0 0 / 0.32);
+  }
+
+  .playsay-classroom-conference .lk-control-bar {
+    position: absolute;
+    z-index: 5;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    min-height: 4.35rem;
+    border-top: 0;
+    background: linear-gradient(180deg, transparent 0%, rgb(15 15 15 / 0.72) 34%, rgb(15 15 15 / 0.94) 100%);
+    padding: 0.75rem;
+  }
+
+  .playsay-classroom-controls {
+    align-items: flex-end;
+  }
+
+  .playsay-classroom-controls .lk-button {
+    min-height: 2.875rem;
+    border-radius: 0.75rem;
+    padding-inline: 0.875rem;
+    font-size: 0.9375rem;
   }
 
   .playsay-workbench-topbar {

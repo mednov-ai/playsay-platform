@@ -1509,12 +1509,13 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
   );
-  const featuredTrack = tracks[0];
-  const stripTracks = tracks.slice(1);
+  const orderedTracks = [...tracks].sort((left, right) => Number(left.participant.isLocal) - Number(right.participant.isLocal));
+  const featuredTrack = orderedTracks[0];
+  const stripTracks = orderedTracks.slice(1);
   const hasStrip = stripTracks.length > 0;
 
   return (
-    <div className="playsay-classroom-conference" data-group={isGroupLesson || tracks.length > 2 ? "true" : "false"}>
+    <div className="playsay-classroom-conference" data-group={isGroupLesson || orderedTracks.length > 2 ? "true" : "false"}>
       <div className="playsay-video-focus">
         {featuredTrack ? <ParticipantTile trackRef={featuredTrack} /> : null}
       </div>

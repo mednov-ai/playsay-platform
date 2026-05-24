@@ -23,7 +23,7 @@ spec:
           memory: 512Mi
         limits:
           cpu: "1"
-          memory: 1024Mi
+          memory: 1536Mi
     - name: node
       image: node:22
       command: ["cat"]

@@ -5,14 +5,20 @@ import {
   BookOpen,
   CalendarDays,
   CheckCircle2,
+  Clock3,
+  FileText,
   Gamepad2,
   Loader2,
   LogIn,
   LogOut,
+  MonitorUp,
+  PhoneOff,
   Plus,
+  Radio,
   RefreshCw,
   RotateCcw,
   Save,
+  Send,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -94,7 +100,13 @@ type ScheduleFormState = {
 };
 
 type LessonRoomSession = LiveKitRoomToken & {
+  courseTitle: string | null;
+  lessonEndsAt: string | null;
+  lessonStartsAt: string | null;
   lessonTitle: string;
+  lessonType: string;
+  participants: ScheduledLesson["participants"];
+  teacherName: string | null;
 };
 
 export function App() {
@@ -421,7 +433,13 @@ export function App() {
       const token = await enterScheduledLessonRoom(lesson.id);
       setRoomSession({
         ...token,
+        courseTitle: lesson.courseTitle ?? null,
+        lessonEndsAt: lesson.scheduledEnd ?? null,
+        lessonStartsAt: lesson.scheduledStart ?? null,
         lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? "Занятие",
+        lessonType: lesson.type,
+        participants: lesson.participants,
+        teacherName: lesson.teacherName ?? null,
       });
       setRoomMessage("Комната готова");
     } catch (caught) {
@@ -438,7 +456,11 @@ export function App() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
-      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-7 px-5 py-6 sm:px-8">
+      <section
+        className={`mx-auto flex min-h-screen w-full flex-col gap-7 px-5 py-6 sm:px-8 ${
+          roomSession ? "max-w-[92rem]" : "max-w-6xl"
+        }`}
+      >
         <header className="flex items-center justify-between gap-4">
           <BrandMark />
           <div className="flex items-center gap-3">
@@ -461,6 +483,9 @@ export function App() {
           </div>
         </header>
 
+        {roomSession ? (
+          <LiveLessonExperience onLeave={leaveScheduledLessonRoom} profile={profile} session={roomSession} />
+        ) : (
         <div className="grid flex-1 gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           <section className="flex flex-col gap-5">
             <div className="relative overflow-hidden rounded-[1.75rem] border border-border bg-white/85 p-6 shadow-[0_22px_70px_rgba(35,25,15,0.10)] sm:p-8">
@@ -524,12 +549,10 @@ export function App() {
               onCreate={(input) => void createScheduledLesson(input)}
               onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
               onJoin={(lesson) => void joinScheduledLesson(lesson)}
-              onLeaveRoom={leaveScheduledLessonRoom}
               onRefresh={() => void refreshSchedule()}
               profile={profile}
               roomLoadingLessonId={roomLoadingLessonId}
               roomMessage={roomMessage}
-              roomSession={roomSession}
               scheduledLessons={scheduledLessons}
               studentUsers={studentUsers}
             />
@@ -586,6 +609,7 @@ export function App() {
             ) : null}
           </aside>
         </div>
+        )}
       </section>
     </main>
   );
@@ -1021,12 +1045,10 @@ function SchedulePanel({
   onCreate,
   onDelete,
   onJoin,
-  onLeaveRoom,
   onRefresh,
   profile,
   roomLoadingLessonId,
   roomMessage,
-  roomSession,
   scheduledLessons,
   studentUsers,
 }: {
@@ -1039,12 +1061,10 @@ function SchedulePanel({
   onCreate: (input: ScheduledLessonInput) => void;
   onDelete: (lessonId: string) => void;
   onJoin: (lesson: ScheduledLesson) => void;
-  onLeaveRoom: () => void;
   onRefresh: () => void;
   profile: MeProfile | null;
   roomLoadingLessonId: string | null;
   roomMessage: string | null;
-  roomSession: LessonRoomSession | null;
   scheduledLessons: ScheduledLesson[];
   studentUsers: AdminUserProfile[];
 }) {
@@ -1090,8 +1110,6 @@ function SchedulePanel({
               {roomMessage}
             </div>
           ) : null}
-
-          {roomSession ? <LiveLessonRoom onLeave={onLeaveRoom} session={roomSession} /> : null}
 
           {scheduledLessons.length === 0 ? (
             <div className="rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
@@ -1346,35 +1364,139 @@ function ScheduledLessonCard({
   );
 }
 
-function LiveLessonRoom({ onLeave, session }: { onLeave: () => void; session: LessonRoomSession }) {
+function LiveLessonExperience({
+  onLeave,
+  profile,
+  session,
+}: {
+  onLeave: () => void;
+  profile: MeProfile | null;
+  session: LessonRoomSession;
+}) {
+  const displayName = profile?.name ?? profile?.username ?? "Участник";
+  const roleLabel = profile?.roles[0] ?? "STUDENT";
+
   return (
-    <article className="overflow-hidden rounded-2xl border border-primary/20 bg-[#171717] shadow-[0_18px_48px_rgba(17,17,17,0.18)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-base font-extrabold">{session.lessonTitle}</h3>
-          <p className="mt-1 break-all text-xs font-bold text-muted-foreground">
-            {session.roomName} · токен до {new Date(session.expiresAt).toLocaleTimeString()}
-          </p>
+    <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.75fr)]">
+      <section className="flex min-h-[38rem] flex-col overflow-hidden rounded-[1.5rem] border border-border bg-[#171717] shadow-[0_22px_70px_rgba(35,25,15,0.12)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#111111] px-4 py-3 text-white sm:px-5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-extrabold text-primary-foreground">
+                <Radio className="h-3.5 w-3.5" />
+                В эфире
+              </span>
+              <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs font-extrabold text-white/80">
+                {formatLessonType(session.lessonType)}
+              </span>
+            </div>
+            <h1 className="mt-2 truncate text-2xl font-black tracking-normal sm:text-3xl">{session.lessonTitle}</h1>
+            <p className="mt-1 truncate text-sm font-semibold text-white/60">
+              {session.courseTitle ?? "Play&Say"} · {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
+            </p>
+          </div>
+          <Button onClick={onLeave} type="button" variant="outline">
+            <PhoneOff className="h-4 w-4" />
+            Выйти
+          </Button>
         </div>
-        <Button onClick={onLeave} type="button" variant="outline">
-          <LogOut className="h-4 w-4" />
-          Закрыть
-        </Button>
+
+        <div className="playsay-classroom-room min-h-0 flex-1">
+          <LiveKitRoom
+            audio
+            connect
+            data-lk-theme="default"
+            onDisconnected={onLeave}
+            serverUrl={session.serverUrl}
+            token={session.token}
+            video
+          >
+            <VideoConference />
+          </LiveKitRoom>
+        </div>
+      </section>
+
+      <aside className="flex min-h-[38rem] flex-col gap-4">
+        <section className="rounded-[1.25rem] border border-border bg-white/95 p-4 shadow-[0_16px_48px_rgba(35,25,15,0.08)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <MonitorUp className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-extrabold">Урок</h2>
+              </div>
+              <p className="mt-1 truncate text-sm font-semibold text-muted-foreground">{displayName}</p>
+            </div>
+            <span className="shrink-0 rounded-full border border-primary/20 bg-muted px-3 py-1 text-xs font-extrabold text-primary">
+              {roleLabel}
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-2 text-sm">
+            <LessonMetaRow icon={Clock3} label="Время" value={formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)} />
+            <LessonMetaRow icon={Video} label="Комната" value={session.roomName} />
+            <LessonMetaRow icon={Users} label="Ученики" value={formatParticipantCount(session.participants.length)} />
+            {session.teacherName ? <LessonMetaRow icon={User} label="Педагог" value={session.teacherName} /> : null}
+          </div>
+        </section>
+
+        <section className="flex flex-1 flex-col rounded-[1.25rem] border border-border bg-white/95 p-4 shadow-[0_16px_48px_rgba(35,25,15,0.08)]">
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-extrabold">Задание</h2>
+            </div>
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-extrabold text-muted-foreground">
+              Speaking
+            </span>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-border bg-muted/55 p-4">
+            <p className="text-sm font-extrabold text-foreground">Tell me about your favourite game.</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              I like this game because...
+            </p>
+          </div>
+
+          <label className="mt-4 grid flex-1 gap-2 text-xs font-extrabold text-muted-foreground">
+            Ответ ученика
+            <textarea
+              className="playsay-input min-h-44 flex-1 resize-none py-3 text-sm leading-6"
+              defaultValue="My favourite game is..."
+            />
+          </label>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs font-semibold text-muted-foreground">
+              Токен до {new Date(session.expiresAt).toLocaleTimeString()}
+            </div>
+            <Button type="button">
+              <Send className="h-4 w-4" />
+              Готово
+            </Button>
+          </div>
+        </section>
+      </aside>
+    </div>
+  );
+}
+
+function LessonMetaRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-2 rounded-2xl border border-border bg-muted/45 px-3 py-2">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+      <div className="min-w-0">
+        <div className="text-xs font-extrabold text-muted-foreground">{label}</div>
+        <div className="break-words text-sm font-extrabold text-foreground">{value}</div>
       </div>
-      <div className="playsay-live-room">
-        <LiveKitRoom
-          audio
-          connect
-          data-lk-theme="default"
-          onDisconnected={onLeave}
-          serverUrl={session.serverUrl}
-          token={session.token}
-          video
-        >
-          <VideoConference />
-        </LiveKitRoom>
-      </div>
-    </article>
+    </div>
   );
 }
 
@@ -1725,6 +1847,42 @@ function localDateTimeToIso(value: string): string | null {
 
 function formatDateTime(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleString() : "время позже";
+}
+
+function formatLessonRange(start: string | null | undefined, end: string | null | undefined): string {
+  if (!start && !end) {
+    return "время позже";
+  }
+
+  if (!start) {
+    return `до ${formatDateTime(end)}`;
+  }
+
+  if (!end) {
+    return `с ${formatDateTime(start)}`;
+  }
+
+  return `${formatDateTime(start)} - ${new Date(end).toLocaleTimeString()}`;
+}
+
+function formatLessonType(value: string): string {
+  return value === "INDIVIDUAL" ? "Индивидуально" : "Группа";
+}
+
+function formatParticipantCount(value: number): string {
+  if (value === 0) {
+    return "ученики позже";
+  }
+
+  if (value === 1) {
+    return "1 ученик";
+  }
+
+  if (value > 1 && value < 5) {
+    return `${value} ученика`;
+  }
+
+  return `${value} учеников`;
 }
 
 function selectedParticipantSubjects(value: string): string[] {

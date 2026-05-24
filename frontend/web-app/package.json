@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "generate": "orval --config orval.config.ts",
-    "build": "npm run generate && tsc -b && vite build",
-    "test": "npm run generate && vitest run --passWithNoTests",
+    "build": "tsc -b && vite build",
+    "test": "vitest run --passWithNoTests",
     "lint": "eslint src --ext ts,tsx"
   },
   "dependencies": {

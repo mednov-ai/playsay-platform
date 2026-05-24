@@ -5,8 +5,8 @@
     "shared-ui"
   ],
   "scripts": {
-    "build": "npm --workspace web-app run build",
+    "build": "npm --workspace web-app run generate && npm --workspace web-app run build",
     "generate": "npm --workspace web-app run generate",
-    "test": "npm --workspace web-app run test"
+    "test": "npm --workspace web-app run generate && npm --workspace web-app run test"
   }
 }

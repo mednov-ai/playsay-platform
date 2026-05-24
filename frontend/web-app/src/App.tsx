@@ -1,11 +1,11 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type PointerEvent, type ReactNode } from "react";
 import {
   ConnectionStateToast,
-  GridLayout,
   LiveKitRoom,
   ParticipantTile,
   RoomAudioRenderer,
   StartMediaButton,
+  TrackLoop,
   TrackToggle,
   useTracks,
 } from "@livekit/components-react";
@@ -14,14 +14,19 @@ import {
   AlertCircle,
   BookOpen,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Clock3,
+  Eraser,
   FileText,
   Gamepad2,
   Loader2,
   LogIn,
   LogOut,
-  MonitorUp,
+  MousePointer2,
+  Paperclip,
+  PenLine,
   PhoneOff,
   Plus,
   Radio,
@@ -32,6 +37,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Undo2,
   User,
   Users,
   Video,
@@ -117,6 +123,19 @@ type LessonRoomSession = LiveKitRoomToken & {
   lessonType: string;
   participants: ScheduledLesson["participants"];
   teacherName: string | null;
+};
+
+type AnnotationTool = "pointer" | "pen" | "eraser";
+
+type AnnotationPoint = {
+  x: number;
+  y: number;
+};
+
+type AnnotationStroke = {
+  color: string;
+  id: string;
+  points: AnnotationPoint[];
 };
 
 export function App() {
@@ -1439,11 +1458,12 @@ function LiveLessonExperience({
 }) {
   const displayName = profile?.name ?? profile?.username ?? "Участник";
   const roleLabel = profile?.roles[0] ?? "STUDENT";
+  const lessonTypeLabel = formatLessonType(session.lessonType);
 
   return (
-    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.1fr)_minmax(15rem,0.9fr)] gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.75fr)] lg:grid-rows-1">
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-border bg-[#171717] shadow-[0_22px_70px_rgba(35,25,15,0.12)]">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#111111] px-4 py-3 text-white sm:px-5">
+    <div className="playsay-classroom-shell">
+      <section className="playsay-video-rail">
+        <div className="playsay-video-header">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-extrabold text-primary-foreground">
@@ -1451,10 +1471,10 @@ function LiveLessonExperience({
                 В эфире
               </span>
               <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs font-extrabold text-white/80">
-                {formatLessonType(session.lessonType)}
+                {lessonTypeLabel}
               </span>
             </div>
-            <h1 className="mt-2 truncate text-2xl font-black tracking-normal sm:text-3xl">{session.lessonTitle}</h1>
+            <h1 className="mt-2 truncate text-2xl font-black tracking-normal">{session.lessonTitle}</h1>
             <p className="mt-1 truncate text-sm font-semibold text-white/60">
               {session.courseTitle ?? "Play&Say"} · {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
             </p>
@@ -1474,94 +1494,41 @@ function LiveLessonExperience({
             token={session.token}
             video
           >
-            <ClassroomVideoStage />
+            <ClassroomVideoStage isGroupLesson={session.lessonType === "GROUP"} />
           </LiveKitRoom>
         </div>
       </section>
 
-      <aside className="flex min-h-0 flex-col gap-3 overflow-hidden">
-        <section className="hidden shrink-0 rounded-[1rem] border border-border bg-white/95 p-3 shadow-[0_16px_48px_rgba(35,25,15,0.08)] sm:block sm:p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <MonitorUp className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-extrabold">Урок</h2>
-              </div>
-              <p className="mt-1 truncate text-sm font-semibold text-muted-foreground">{displayName}</p>
-            </div>
-            <span className="shrink-0 rounded-full border border-primary/20 bg-muted px-3 py-1 text-xs font-extrabold text-primary">
-              {roleLabel}
-            </span>
-          </div>
-
-          <div className="mt-4 grid gap-2 text-sm">
-            <LessonMetaRow icon={Clock3} label="Время" value={formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)} />
-            <LessonMetaRow icon={Video} label="Комната" value={session.roomName} />
-            <LessonMetaRow icon={Users} label="Ученики" value={formatParticipantCount(session.participants.length)} />
-          </div>
-        </section>
-
-        <section className="flex min-h-0 flex-1 flex-col rounded-[1rem] border border-border bg-white/95 p-3 shadow-[0_16px_48px_rgba(35,25,15,0.08)] sm:p-4">
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border pb-3">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-extrabold">Назначенные задания</h2>
-            </div>
-            {canAssignLessons(profile) ? (
-              <Button disabled type="button" variant="outline">
-                <Plus className="h-4 w-4" />
-                Назначить
-              </Button>
-            ) : null}
-          </div>
-
-          <div className="mt-3 grid shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-            <AssignmentStub title="Speaking warm-up" tag="Speaking" />
-            <AssignmentStub title="Favourite game" tag="Writing" />
-          </div>
-
-          <label className="mt-3 grid min-h-0 flex-1 gap-2 text-xs font-extrabold text-muted-foreground">
-            Рабочая область
-            <textarea
-              className="playsay-input min-h-0 flex-1 resize-none py-3 text-sm leading-6"
-              defaultValue="My favourite game is..."
-            />
-          </label>
-
-          <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
-            <div className="text-xs font-semibold text-muted-foreground">
-              {session.teacherName ?? displayName}
-            </div>
-            <Button disabled type="button">
-              <Send className="h-4 w-4" />
-              Отправить
-            </Button>
-          </div>
-        </section>
-      </aside>
+      <LessonWorkspace displayName={displayName} profile={profile} roleLabel={roleLabel} session={session} />
     </div>
   );
 }
 
-function ClassroomVideoStage() {
+function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
   const tracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
   );
+  const featuredTrack = tracks[0];
+  const stripTracks = tracks.slice(1);
+  const hasStrip = stripTracks.length > 0;
 
   return (
-    <div className="playsay-classroom-conference">
-      <div className="lk-video-conference-inner">
-        <div className="lk-grid-layout-wrapper">
-          <GridLayout tracks={tracks}>
+    <div className="playsay-classroom-conference" data-group={isGroupLesson || tracks.length > 2 ? "true" : "false"}>
+      <div className="playsay-video-focus">
+        {featuredTrack ? <ParticipantTile trackRef={featuredTrack} /> : null}
+      </div>
+      <div className="playsay-video-strip" data-empty={hasStrip ? "false" : "true"}>
+        {hasStrip ? (
+          <TrackLoop tracks={stripTracks}>
             <ParticipantTile />
-          </GridLayout>
-        </div>
-        <div className="lk-control-bar playsay-classroom-controls">
-          <TrackToggle source={Track.Source.Microphone}>Микрофон</TrackToggle>
-          <TrackToggle source={Track.Source.Camera}>Камера</TrackToggle>
-          <StartMediaButton label="Включить медиа" />
-        </div>
+          </TrackLoop>
+        ) : null}
+      </div>
+      <div className="lk-control-bar playsay-classroom-controls">
+        <TrackToggle source={Track.Source.Microphone}>Микрофон</TrackToggle>
+        <TrackToggle source={Track.Source.Camera}>Камера</TrackToggle>
+        <StartMediaButton label="Включить медиа" />
       </div>
       <RoomAudioRenderer />
       <ConnectionStateToast />
@@ -1569,9 +1536,254 @@ function ClassroomVideoStage() {
   );
 }
 
-function AssignmentStub({ tag, title }: { tag: string; title: string }) {
+function LessonWorkspace({
+  displayName,
+  profile,
+  roleLabel,
+  session,
+}: {
+  displayName: string;
+  profile: MeProfile | null;
+  roleLabel: string;
+  session: LessonRoomSession;
+}) {
   return (
-    <article className="rounded-2xl border border-border bg-muted/55 p-3">
+    <section className="playsay-workbench">
+      <header className="playsay-workbench-topbar">
+        <nav className="playsay-lesson-tabs" aria-label="Разделы урока">
+          <button className="playsay-lesson-tab" data-active="true" type="button">
+            Урок
+          </button>
+          <button className="playsay-lesson-tab" type="button">
+            <Paperclip className="h-4 w-4" />
+            Вложения
+          </button>
+        </nav>
+
+        <div className="playsay-lesson-statusline">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock3 className="h-4 w-4 text-primary" />
+            {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Users className="h-4 w-4 text-primary" />
+            {formatParticipantCount(session.participants.length)}
+          </span>
+        </div>
+      </header>
+
+      <div className="playsay-workbench-body">
+        <div className="playsay-material-header">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-[#dff8ee] px-2.5 py-1 text-xs font-black text-[#167953]">
+                {roleLabel}
+              </span>
+              <span className="rounded-full border border-border bg-white px-2.5 py-1 text-xs font-extrabold text-muted-foreground">
+                {displayName}
+              </span>
+            </div>
+            <h2 className="mt-2 truncate text-2xl font-black tracking-normal">{session.lessonTitle}</h2>
+            <p className="mt-1 truncate text-sm font-semibold text-muted-foreground">
+              {session.courseTitle ?? "Play&Say"} · {session.roomName}
+            </p>
+          </div>
+          {canAssignLessons(profile) ? (
+            <Button disabled type="button" variant="outline">
+              <Plus className="h-4 w-4" />
+              Назначить
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="playsay-assignment-strip" aria-label="Назначенные задания">
+          <AssignmentStub active title="Speaking warm-up" tag="Speaking" />
+          <AssignmentStub title="Favourite game" tag="Writing" />
+          <AssignmentStub title="Mini dialogue" tag="Grammar" />
+        </div>
+
+        <LessonTaskCanvas teacherName={session.teacherName ?? displayName} />
+      </div>
+    </section>
+  );
+}
+
+function LessonTaskCanvas({ teacherName }: { teacherName: string }) {
+  const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pointer");
+  const [annotationColor, setAnnotationColor] = useState("#ff5c00");
+  const [annotationStrokes, setAnnotationStrokes] = useState<AnnotationStroke[]>([]);
+  const activeStrokeId = useRef<string | null>(null);
+
+  function beginAnnotation(event: PointerEvent<SVGSVGElement>) {
+    if (annotationTool === "pointer") {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = svgPointFromEvent(event);
+    if (annotationTool === "eraser") {
+      eraseAnnotationAt(point, setAnnotationStrokes);
+      return;
+    }
+
+    const id = `stroke-${Date.now()}-${Math.round(point.x)}-${Math.round(point.y)}`;
+    activeStrokeId.current = id;
+    setAnnotationStrokes((current) => [...current, { color: annotationColor, id, points: [point] }]);
+  }
+
+  function extendAnnotation(event: PointerEvent<SVGSVGElement>) {
+    if (annotationTool === "pointer") {
+      return;
+    }
+
+    event.preventDefault();
+    const point = svgPointFromEvent(event);
+    if (annotationTool === "eraser") {
+      eraseAnnotationAt(point, setAnnotationStrokes);
+      return;
+    }
+
+    const id = activeStrokeId.current;
+    if (!id) {
+      return;
+    }
+
+    setAnnotationStrokes((current) =>
+      current.map((stroke) => (stroke.id === id ? { ...stroke, points: [...stroke.points, point] } : stroke)),
+    );
+  }
+
+  function endAnnotation(event: PointerEvent<SVGSVGElement>) {
+    if (activeStrokeId.current) {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture may already be gone after browser-level cancellation.
+      }
+    }
+    activeStrokeId.current = null;
+  }
+
+  return (
+    <div className="playsay-task-board">
+      <aside className="playsay-annotation-toolbar" aria-label="Инструменты задания">
+        <AnnotationToolButton active={annotationTool === "pointer"} label="Курсор" onClick={() => setAnnotationTool("pointer")}>
+          <MousePointer2 className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "pen"} label="Карандаш" onClick={() => setAnnotationTool("pen")}>
+          <PenLine className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "eraser"} label="Ластик" onClick={() => setAnnotationTool("eraser")}>
+          <Eraser className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton
+          active={false}
+          disabled={annotationStrokes.length === 0}
+          label="Отменить"
+          onClick={() => setAnnotationStrokes((current) => current.slice(0, -1))}
+        >
+          <Undo2 className="h-4 w-4" />
+        </AnnotationToolButton>
+        <div className="playsay-color-swatches" aria-label="Цвет">
+          {["#ff5c00", "#00a878", "#2574ff"].map((color) => (
+            <button
+              aria-label={color}
+              className="playsay-color-swatch"
+              data-active={annotationColor === color ? "true" : "false"}
+              key={color}
+              onClick={() => setAnnotationColor(color)}
+              style={{ backgroundColor: color }}
+              type="button"
+            />
+          ))}
+        </div>
+      </aside>
+
+      <div className="playsay-task-page">
+        <div className="playsay-task-document">
+          <div className="playsay-task-kicker">
+            <FileText className="h-4 w-4 text-primary" />
+            2. Let's chat
+          </div>
+          <h3>Make a guess and complete the descriptions below the pictures</h3>
+          <p className="playsay-task-subtitle">The importance of food for travellers</p>
+
+          <div className="playsay-task-cards">
+            <TaskPictureCard caption="Travellers who think food is important" tone="mint" />
+            <TaskPictureCard caption="Travellers who think food is not important" tone="yellow" />
+          </div>
+
+          <div className="playsay-fill-exercise">
+            <label>
+              I am in the
+              <input aria-label="gap 1" defaultValue="" />
+            </label>
+            <label>
+              I see a lot of
+              <input aria-label="gap 2" defaultValue="" />
+              around.
+            </label>
+            <label>
+              I feel
+              <input aria-label="gap 3" defaultValue="" />
+              because the trip is exciting.
+            </label>
+          </div>
+        </div>
+
+        <svg
+          className="playsay-annotation-layer"
+          data-tool={annotationTool}
+          onPointerCancel={endAnnotation}
+          onPointerDown={beginAnnotation}
+          onPointerMove={extendAnnotation}
+          onPointerUp={endAnnotation}
+          viewBox="0 0 1000 700"
+        >
+          {annotationStrokes.map((stroke) => (
+            <path
+              d={pointsToSvgPath(stroke.points)}
+              fill="none"
+              key={stroke.id}
+              stroke={stroke.color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="8"
+            />
+          ))}
+        </svg>
+      </div>
+
+      <footer className="playsay-task-footer">
+        <button aria-label="Предыдущее задание" className="playsay-page-button" type="button">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span>1 из 14</span>
+        <button aria-label="Следующее задание" className="playsay-page-button" type="button">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <Button disabled type="button">
+          <Send className="h-4 w-4" />
+          Отправить
+        </Button>
+        <span className="playsay-task-teacher">{teacherName}</span>
+      </footer>
+    </div>
+  );
+}
+
+function AssignmentStub({
+  active = false,
+  tag,
+  title,
+}: {
+  active?: boolean;
+  tag: string;
+  title: string;
+}) {
+  return (
+    <article className="playsay-assignment-card" data-active={active ? "true" : "false"}>
       <div className="text-sm font-extrabold text-foreground">{title}</div>
       <div className="mt-2 inline-flex rounded-full border border-primary/15 bg-white px-2 py-1 text-xs font-extrabold text-primary">
         {tag}
@@ -1580,23 +1792,52 @@ function AssignmentStub({ tag, title }: { tag: string; title: string }) {
   );
 }
 
-function LessonMetaRow({
-  icon: Icon,
-  label,
-  value,
+function TaskPictureCard({
+  caption,
+  tone,
 }: {
-  icon: LucideIcon;
+  caption: string;
+  tone: "mint" | "yellow";
+}) {
+  const toneClass = tone === "mint" ? "playsay-picture-card-mint" : "playsay-picture-card-yellow";
+
+  return (
+    <figure className={`playsay-picture-card ${toneClass}`}>
+      <div className="playsay-picture-illustration">
+        <div className="playsay-picture-face" />
+        <div className="playsay-picture-plate" />
+        <div className="playsay-picture-tower" />
+      </div>
+      <figcaption>{caption}</figcaption>
+    </figure>
+  );
+}
+
+function AnnotationToolButton({
+  active,
+  children,
+  disabled = false,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  disabled?: boolean;
   label: string;
-  value: string;
+  onClick: () => void;
 }) {
   return (
-    <div className="flex items-start gap-2 rounded-2xl border border-border bg-muted/45 px-3 py-2">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-      <div className="min-w-0">
-        <div className="text-xs font-extrabold text-muted-foreground">{label}</div>
-        <div className="break-words text-sm font-extrabold text-foreground">{value}</div>
-      </div>
-    </div>
+    <button
+      aria-label={label}
+      className="playsay-annotation-button"
+      data-active={active ? "true" : "false"}
+      disabled={disabled}
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -1967,6 +2208,40 @@ function formatLessonRange(start: string | null | undefined, end: string | null 
 
 function formatLessonType(value: string): string {
   return value === "INDIVIDUAL" ? "Индивидуально" : "Группа";
+}
+
+function svgPointFromEvent(event: PointerEvent<SVGSVGElement>): AnnotationPoint {
+  const rect = event.currentTarget.getBoundingClientRect();
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * 1000,
+    y: ((event.clientY - rect.top) / rect.height) * 700,
+  };
+}
+
+function eraseAnnotationAt(
+  point: AnnotationPoint,
+  setStrokes: (updater: (current: AnnotationStroke[]) => AnnotationStroke[]) => void,
+) {
+  setStrokes((current) => current.filter((stroke) => distanceToStroke(point, stroke) > 34));
+}
+
+function distanceToStroke(point: AnnotationPoint, stroke: AnnotationStroke): number {
+  return stroke.points.reduce((nearest, strokePoint) => {
+    const distance = Math.hypot(point.x - strokePoint.x, point.y - strokePoint.y);
+    return Math.min(nearest, distance);
+  }, Number.POSITIVE_INFINITY);
+}
+
+function pointsToSvgPath(points: AnnotationPoint[]): string {
+  if (points.length === 0) {
+    return "";
+  }
+
+  const [firstPoint, ...rest] = points;
+  return rest.reduce(
+    (path, point) => `${path} L ${point.x.toFixed(1)} ${point.y.toFixed(1)}`,
+    `M ${firstPoint.x.toFixed(1)} ${firstPoint.y.toFixed(1)}`,
+  );
 }
 
 function canAssignLessons(profile: MeProfile | null): boolean {

@@ -12,6 +12,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Base64
+import java.util.Date
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -70,6 +71,10 @@ class LiveKitWebhookVerifier(
         val claims = jwt.jwtClaimsSet
         if (claims.issuer != cleanApiKey) {
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid LiveKit webhook issuer.")
+        }
+        val now = Date()
+        if (claims.expirationTime?.after(now) != true || claims.notBeforeTime?.after(now) == true) {
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Expired LiveKit webhook signature.")
         }
 
         val expectedHash = claims.getStringClaim("sha256")

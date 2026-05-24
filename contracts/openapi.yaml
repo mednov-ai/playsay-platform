@@ -64,6 +64,284 @@ paths:
           description: Missing or invalid bearer token
       security:
       - bearerAuth: []
+  /courses/{courseId}:
+    get:
+      tags:
+      - Courses
+      summary: Get course
+      description: Returns a single course. Unpublished courses are visible only to
+        teachers/admins.
+      operationId: getCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Course not found
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Courses
+      summary: Update course
+      description: Updates a course. Requires TEACHER or ADMIN role.
+      operationId: updateCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseRequest"
+        required: true
+      responses:
+        "200":
+          description: Course updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseResponse"
+        "400":
+          description: Invalid course payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage courses
+        "404":
+          description: Course not found
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Courses
+      summary: Delete course
+      description: Deletes a course and its draft lesson templates. Requires TEACHER
+        or ADMIN role.
+      operationId: deleteCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Course deleted
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage courses
+        "404":
+          description: Course not found
+      security:
+      - bearerAuth: []
+  /courses/{courseId}/lessons/{lessonId}:
+    put:
+      tags:
+      - Courses
+      summary: Update course lesson
+      description: Updates a lesson template inside a course. Requires TEACHER or
+        ADMIN role.
+      operationId: updateCourseLesson
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseLessonRequest"
+        required: true
+      responses:
+        "200":
+          description: Course lesson updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseLessonResponse"
+        "400":
+          description: Invalid course lesson payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage courses
+        "404":
+          description: Course lesson not found
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Courses
+      summary: Delete course lesson
+      description: Deletes a lesson template inside a course. Requires TEACHER or
+        ADMIN role.
+      operationId: deleteCourseLesson
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Course lesson deleted
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage courses
+        "404":
+          description: Course lesson not found
+      security:
+      - bearerAuth: []
+  /courses:
+    get:
+      tags:
+      - Courses
+      summary: List courses
+      description: Returns published courses for students and all courses for teachers/admins.
+      operationId: listCourses
+      responses:
+        "200":
+          description: Courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CourseResponse"
+        "401":
+          description: Missing or invalid bearer token
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Courses
+      summary: Create course
+      description: Creates a course. Requires TEACHER or ADMIN role.
+      operationId: createCourse
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseRequest"
+        required: true
+      responses:
+        "201":
+          description: Course created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseResponse"
+        "400":
+          description: Invalid course payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage courses
+      security:
+      - bearerAuth: []
+  /courses/{courseId}/lessons:
+    get:
+      tags:
+      - Courses
+      summary: List course lessons
+      description: Returns lesson templates inside a course. Unpublished courses are
+        visible only to teachers/admins.
+      operationId: listCourseLessons
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Course lessons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CourseLessonResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Course not found
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Courses
+      summary: Create course lesson
+      description: Creates a lesson template inside a course. Requires TEACHER or
+        ADMIN role.
+      operationId: createCourseLesson
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseLessonRequest"
+        required: true
+      responses:
+        "201":
+          description: Course lesson created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseLessonResponse"
+        "400":
+          description: Invalid course lesson payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage courses
+        "404":
+          description: Course not found
+      security:
+      - bearerAuth: []
   /me:
     get:
       tags:
@@ -186,6 +464,124 @@ components:
       required:
       - roles
       - subject
+      - updatedAt
+    CourseRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+        level:
+          type:
+          - string
+          - "null"
+          maxLength: 16
+        language:
+          type: string
+          maxLength: 16
+        isPublished:
+          type: boolean
+      required:
+      - isPublished
+      - language
+      - title
+    CourseResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - "null"
+        level:
+          type:
+          - string
+          - "null"
+        language:
+          type: string
+        createdByUserId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        isPublished:
+          type: boolean
+        lessonCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - isPublished
+      - language
+      - lessonCount
+      - title
+      - updatedAt
+    CourseLessonRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 160
+        orderIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+        plannedDurationMin:
+          type:
+          - integer
+          - "null"
+          format: int32
+      required:
+      - title
+    CourseLessonResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        courseId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        orderIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+        plannedDurationMin:
+          type:
+          - integer
+          - "null"
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - courseId
+      - createdAt
+      - id
+      - title
       - updatedAt
     MeResponse:
       type: object

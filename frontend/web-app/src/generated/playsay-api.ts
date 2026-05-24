@@ -48,6 +48,61 @@ export interface UserProfileResponse {
   updatedAt: string;
 }
 
+export interface CourseRequest {
+  /** @maxLength 160 */
+  title: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  level?: string | null;
+  /** @maxLength 16 */
+  language: string;
+  isPublished: boolean;
+}
+
+export interface CourseResponse {
+  id: string;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  level?: string | null;
+  language: string;
+  /** @nullable */
+  createdByUserId?: string | null;
+  isPublished: boolean;
+  lessonCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourseLessonRequest {
+  /** @maxLength 160 */
+  title: string;
+  /** @nullable */
+  orderIndex?: number | null;
+  /** @nullable */
+  plannedDurationMin?: number | null;
+}
+
+export interface CourseLessonResponse {
+  id: string;
+  courseId: string;
+  title: string;
+  /** @nullable */
+  orderIndex?: number | null;
+  /** @nullable */
+  plannedDurationMin?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MeResponse {
   subject: string;
   /** @nullable */
@@ -219,6 +274,557 @@ export const deleteMyUserProfile = async ( options?: RequestInit): Promise<delet
 
   const data: deleteMyUserProfileResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteMyUserProfileResponse
+}
+
+
+
+export type getCourseResponse200 = {
+  data: CourseResponse
+  status: 200
+}
+
+export type getCourseResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getCourseResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getCourseResponseSuccess = (getCourseResponse200) & {
+  headers: Headers;
+};
+export type getCourseResponseError = (getCourseResponse401 | getCourseResponse404) & {
+  headers: Headers;
+};
+
+export type getCourseResponse = (getCourseResponseSuccess | getCourseResponseError)
+
+export const getGetCourseUrl = (courseId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}`
+}
+
+/**
+ * Returns a single course. Unpublished courses are visible only to teachers/admins.
+ * @summary Get course
+ */
+export const getCourse = async (courseId: string, options?: RequestInit): Promise<getCourseResponse> => {
+
+  const res = await fetch(getGetCourseUrl(courseId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getCourseResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getCourseResponse
+}
+
+
+
+export type updateCourseResponse200 = {
+  data: CourseResponse
+  status: 200
+}
+
+export type updateCourseResponse400 = {
+  data: void
+  status: 400
+}
+
+export type updateCourseResponse401 = {
+  data: void
+  status: 401
+}
+
+export type updateCourseResponse403 = {
+  data: void
+  status: 403
+}
+
+export type updateCourseResponse404 = {
+  data: void
+  status: 404
+}
+
+export type updateCourseResponseSuccess = (updateCourseResponse200) & {
+  headers: Headers;
+};
+export type updateCourseResponseError = (updateCourseResponse400 | updateCourseResponse401 | updateCourseResponse403 | updateCourseResponse404) & {
+  headers: Headers;
+};
+
+export type updateCourseResponse = (updateCourseResponseSuccess | updateCourseResponseError)
+
+export const getUpdateCourseUrl = (courseId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}`
+}
+
+/**
+ * Updates a course. Requires TEACHER or ADMIN role.
+ * @summary Update course
+ */
+export const updateCourse = async (courseId: string,
+    courseRequest: CourseRequest, options?: RequestInit): Promise<updateCourseResponse> => {
+
+  const res = await fetch(getUpdateCourseUrl(courseId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(courseRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateCourseResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateCourseResponse
+}
+
+
+
+export type deleteCourseResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteCourseResponse401 = {
+  data: void
+  status: 401
+}
+
+export type deleteCourseResponse403 = {
+  data: void
+  status: 403
+}
+
+export type deleteCourseResponse404 = {
+  data: void
+  status: 404
+}
+
+export type deleteCourseResponseSuccess = (deleteCourseResponse204) & {
+  headers: Headers;
+};
+export type deleteCourseResponseError = (deleteCourseResponse401 | deleteCourseResponse403 | deleteCourseResponse404) & {
+  headers: Headers;
+};
+
+export type deleteCourseResponse = (deleteCourseResponseSuccess | deleteCourseResponseError)
+
+export const getDeleteCourseUrl = (courseId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}`
+}
+
+/**
+ * Deletes a course and its draft lesson templates. Requires TEACHER or ADMIN role.
+ * @summary Delete course
+ */
+export const deleteCourse = async (courseId: string, options?: RequestInit): Promise<deleteCourseResponse> => {
+
+  const res = await fetch(getDeleteCourseUrl(courseId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteCourseResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteCourseResponse
+}
+
+
+
+export type updateCourseLessonResponse200 = {
+  data: CourseLessonResponse
+  status: 200
+}
+
+export type updateCourseLessonResponse400 = {
+  data: void
+  status: 400
+}
+
+export type updateCourseLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type updateCourseLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type updateCourseLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type updateCourseLessonResponseSuccess = (updateCourseLessonResponse200) & {
+  headers: Headers;
+};
+export type updateCourseLessonResponseError = (updateCourseLessonResponse400 | updateCourseLessonResponse401 | updateCourseLessonResponse403 | updateCourseLessonResponse404) & {
+  headers: Headers;
+};
+
+export type updateCourseLessonResponse = (updateCourseLessonResponseSuccess | updateCourseLessonResponseError)
+
+export const getUpdateCourseLessonUrl = (courseId: string,
+    lessonId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/lessons/${lessonId}`
+}
+
+/**
+ * Updates a lesson template inside a course. Requires TEACHER or ADMIN role.
+ * @summary Update course lesson
+ */
+export const updateCourseLesson = async (courseId: string,
+    lessonId: string,
+    courseLessonRequest: CourseLessonRequest, options?: RequestInit): Promise<updateCourseLessonResponse> => {
+
+  const res = await fetch(getUpdateCourseLessonUrl(courseId,lessonId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(courseLessonRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateCourseLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateCourseLessonResponse
+}
+
+
+
+export type deleteCourseLessonResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteCourseLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type deleteCourseLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type deleteCourseLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type deleteCourseLessonResponseSuccess = (deleteCourseLessonResponse204) & {
+  headers: Headers;
+};
+export type deleteCourseLessonResponseError = (deleteCourseLessonResponse401 | deleteCourseLessonResponse403 | deleteCourseLessonResponse404) & {
+  headers: Headers;
+};
+
+export type deleteCourseLessonResponse = (deleteCourseLessonResponseSuccess | deleteCourseLessonResponseError)
+
+export const getDeleteCourseLessonUrl = (courseId: string,
+    lessonId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/lessons/${lessonId}`
+}
+
+/**
+ * Deletes a lesson template inside a course. Requires TEACHER or ADMIN role.
+ * @summary Delete course lesson
+ */
+export const deleteCourseLesson = async (courseId: string,
+    lessonId: string, options?: RequestInit): Promise<deleteCourseLessonResponse> => {
+
+  const res = await fetch(getDeleteCourseLessonUrl(courseId,lessonId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteCourseLessonResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteCourseLessonResponse
+}
+
+
+
+export type listCoursesResponse200 = {
+  data: CourseResponse[]
+  status: 200
+}
+
+export type listCoursesResponse401 = {
+  data: void
+  status: 401
+}
+
+export type listCoursesResponseSuccess = (listCoursesResponse200) & {
+  headers: Headers;
+};
+export type listCoursesResponseError = (listCoursesResponse401) & {
+  headers: Headers;
+};
+
+export type listCoursesResponse = (listCoursesResponseSuccess | listCoursesResponseError)
+
+export const getListCoursesUrl = () => {
+
+
+
+
+  return `/api/courses`
+}
+
+/**
+ * Returns published courses for students and all courses for teachers/admins.
+ * @summary List courses
+ */
+export const listCourses = async ( options?: RequestInit): Promise<listCoursesResponse> => {
+
+  const res = await fetch(getListCoursesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listCoursesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listCoursesResponse
+}
+
+
+
+export type createCourseResponse201 = {
+  data: CourseResponse
+  status: 201
+}
+
+export type createCourseResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createCourseResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createCourseResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createCourseResponseSuccess = (createCourseResponse201) & {
+  headers: Headers;
+};
+export type createCourseResponseError = (createCourseResponse400 | createCourseResponse401 | createCourseResponse403) & {
+  headers: Headers;
+};
+
+export type createCourseResponse = (createCourseResponseSuccess | createCourseResponseError)
+
+export const getCreateCourseUrl = () => {
+
+
+
+
+  return `/api/courses`
+}
+
+/**
+ * Creates a course. Requires TEACHER or ADMIN role.
+ * @summary Create course
+ */
+export const createCourse = async (courseRequest: CourseRequest, options?: RequestInit): Promise<createCourseResponse> => {
+
+  const res = await fetch(getCreateCourseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(courseRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createCourseResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createCourseResponse
+}
+
+
+
+export type listCourseLessonsResponse200 = {
+  data: CourseLessonResponse[]
+  status: 200
+}
+
+export type listCourseLessonsResponse401 = {
+  data: void
+  status: 401
+}
+
+export type listCourseLessonsResponse404 = {
+  data: void
+  status: 404
+}
+
+export type listCourseLessonsResponseSuccess = (listCourseLessonsResponse200) & {
+  headers: Headers;
+};
+export type listCourseLessonsResponseError = (listCourseLessonsResponse401 | listCourseLessonsResponse404) & {
+  headers: Headers;
+};
+
+export type listCourseLessonsResponse = (listCourseLessonsResponseSuccess | listCourseLessonsResponseError)
+
+export const getListCourseLessonsUrl = (courseId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/lessons`
+}
+
+/**
+ * Returns lesson templates inside a course. Unpublished courses are visible only to teachers/admins.
+ * @summary List course lessons
+ */
+export const listCourseLessons = async (courseId: string, options?: RequestInit): Promise<listCourseLessonsResponse> => {
+
+  const res = await fetch(getListCourseLessonsUrl(courseId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listCourseLessonsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listCourseLessonsResponse
+}
+
+
+
+export type createCourseLessonResponse201 = {
+  data: CourseLessonResponse
+  status: 201
+}
+
+export type createCourseLessonResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createCourseLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createCourseLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createCourseLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createCourseLessonResponseSuccess = (createCourseLessonResponse201) & {
+  headers: Headers;
+};
+export type createCourseLessonResponseError = (createCourseLessonResponse400 | createCourseLessonResponse401 | createCourseLessonResponse403 | createCourseLessonResponse404) & {
+  headers: Headers;
+};
+
+export type createCourseLessonResponse = (createCourseLessonResponseSuccess | createCourseLessonResponseError)
+
+export const getCreateCourseLessonUrl = (courseId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/lessons`
+}
+
+/**
+ * Creates a lesson template inside a course. Requires TEACHER or ADMIN role.
+ * @summary Create course lesson
+ */
+export const createCourseLesson = async (courseId: string,
+    courseLessonRequest: CourseLessonRequest, options?: RequestInit): Promise<createCourseLessonResponse> => {
+
+  const res = await fetch(getCreateCourseLessonUrl(courseId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(courseLessonRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createCourseLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createCourseLessonResponse
 }
 
 

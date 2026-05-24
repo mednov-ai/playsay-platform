@@ -171,6 +171,18 @@ class UserProfileStore(
             .list()
             .map { profile -> profile.toResponse() }
 
+    @Transactional
+    fun currentUserId(authentication: JwtAuthenticationToken): UUID {
+        val identity = authentication.toIdentity()
+        val existing = findBySubject(identity.subject)
+        if (existing == null) {
+            return insertProfile(identity).id
+        }
+
+        updateIdentity(existing.id, identity)
+        return existing.id
+    }
+
     private fun clean(value: String?, maxLength: Int): String? {
         val cleaned = value?.trim()?.takeIf { it.isNotEmpty() }
         if (cleaned != null && cleaned.length > maxLength) {

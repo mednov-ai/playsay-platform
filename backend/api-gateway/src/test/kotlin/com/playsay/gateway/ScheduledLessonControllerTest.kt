@@ -109,8 +109,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 lessonTemplateId = lessonTemplateId,
-                scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
-                scheduledEnd = Instant.parse("2026-05-25T10:45:00Z"),
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -118,13 +118,53 @@ class ScheduledLessonControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 lessonTemplateId = lessonTemplateId,
-                scheduledStart = Instant.parse("2026-05-25T11:00:00Z"),
-                scheduledEnd = Instant.parse("2026-05-25T11:45:00Z"),
+                scheduledStart = futureStart(120),
+                scheduledEnd = futureEnd(120),
                 participantSubjects = listOf("student-2"),
             ),
         )
 
         assertEquals(listOf(ownLesson.id), scheduleController.list(student).map { lesson -> lesson.id })
+    }
+
+    @Test
+    fun `student does not see cancelled completed or expired scheduled lessons`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lessonTemplateId = courseLessonId(teacher)
+
+        scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = Instant.now().minusSeconds(7200),
+                scheduledEnd = Instant.now().minusSeconds(3600),
+                participantSubjects = listOf("student-1"),
+            ),
+        )
+        scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = futureStart(90),
+                scheduledEnd = futureEnd(90),
+                status = "CANCELLED",
+                participantSubjects = listOf("student-1"),
+            ),
+        )
+        val visibleLesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = futureStart(120),
+                scheduledEnd = futureEnd(120),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        assertEquals(listOf(visibleLesson.id), scheduleController.list(student).map { lesson -> lesson.id })
+        assertEquals(3, scheduleController.list(teacher).size)
     }
 
     @Test
@@ -193,8 +233,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
-                scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
-                scheduledEnd = Instant.parse("2026-05-25T10:45:00Z"),
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -226,8 +266,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
-                scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
-                scheduledEnd = Instant.parse("2026-05-25T10:45:00Z"),
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -237,6 +277,31 @@ class ScheduledLessonControllerTest @Autowired constructor(
         }
 
         assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
+    }
+
+    @Test
+    fun `expired scheduled lesson does not issue LiveKit room token`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.now().minusSeconds(7200),
+                scheduledEnd = Instant.now().minusSeconds(3600),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val teacherError = assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(teacher, lesson.id)
+        }
+        val studentError = assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(student, lesson.id)
+        }
+
+        assertEquals(HttpStatus.NOT_FOUND, teacherError.statusCode)
+        assertEquals(HttpStatus.NOT_FOUND, studentError.statusCode)
     }
 
     @Test
@@ -347,6 +412,12 @@ class ScheduledLessonControllerTest @Autowired constructor(
                 )
             }
             .single()
+
+    private fun futureStart(minutesFromNow: Long): Instant =
+        Instant.now().plusSeconds(minutesFromNow * 60)
+
+    private fun futureEnd(minutesFromNow: Long): Instant =
+        Instant.now().plusSeconds((minutesFromNow + 45) * 60)
 
     private data class AttendanceRow(
         val status: String,

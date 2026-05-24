@@ -102,6 +102,7 @@ class ScheduledLessonStore(
             ""
         } else {
             params["subject"] = authentication.token.subject
+            params["now"] = Instant.now().toScheduleOffsetDateTime()
             """
              WHERE EXISTS (
                    SELECT 1
@@ -110,6 +111,8 @@ class ScheduledLessonStore(
                     WHERE lp_filter.lesson_id = l.id
                       AND student_filter.keycloak_subject = :subject
              )
+               AND l.status NOT IN ('CANCELLED', 'COMPLETED')
+               AND (l.scheduled_end IS NULL OR l.scheduled_end > :now)
             """.trimIndent()
         }
 
@@ -231,6 +234,10 @@ class ScheduledLessonStore(
         val lesson = find(lessonId) ?: return null
         if (authentication.canManageSchedule()) {
             return lesson
+        }
+
+        if (!lesson.isVisibleToParticipant(Instant.now())) {
+            return null
         }
 
         val isParticipant = jdbcClient.sql(
@@ -569,6 +576,9 @@ private fun StoredScheduledLesson.toResponse(participants: List<StoredLessonPart
         updatedAt = updatedAt,
     )
 
+private fun StoredScheduledLesson.isVisibleToParticipant(now: Instant): Boolean =
+    status !in expiredParticipantStatuses && scheduledEnd?.isAfter(now) != false
+
 private fun StoredLessonParticipant.toResponse(): ScheduledLessonParticipantResponse =
     ScheduledLessonParticipantResponse(
         subject = subject,
@@ -616,3 +626,4 @@ private fun Instant.toScheduleOffsetDateTime(): OffsetDateTime =
 
 private val scheduleStatuses = setOf("SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED")
 private val scheduleTypes = setOf("INDIVIDUAL", "GROUP")
+private val expiredParticipantStatuses = setOf("COMPLETED", "CANCELLED")

@@ -12,7 +12,6 @@ import {
 import { Track } from "livekit-client";
 import {
   AlertCircle,
-  BookOpen,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -20,7 +19,6 @@ import {
   Clock3,
   Eraser,
   FileText,
-  Gamepad2,
   Loader2,
   LogIn,
   LogOut,
@@ -35,13 +33,11 @@ import {
   Save,
   Send,
   ShieldCheck,
-  Sparkles,
   Trash2,
   Undo2,
   User,
   Users,
   Video,
-  type LucideIcon,
 } from "lucide-react";
 import {
   buildLogoutUrl,
@@ -80,7 +76,6 @@ import {
   type UpdateUserProfileInput,
 } from "./auth";
 import { Button } from "./components/ui/button";
-import { getRoleSummary, getRoleWorkspace } from "./role-workspace";
 
 type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggingOut" | "error";
 
@@ -145,6 +140,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [adminUsers, setAdminUsers] = useState<AdminUserProfile[]>([]);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [adminLoading, setAdminLoading] = useState(false);
@@ -160,6 +156,7 @@ export function App() {
   const [roomLoadingLessonId, setRoomLoadingLessonId] = useState<string | null>(null);
   const [roomMessage, setRoomMessage] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const routeLessonId = classroomLessonIdFromPath(currentPath);
 
   useEffect(() => {
@@ -231,8 +228,17 @@ export function App() {
 
   const isAuthenticated = status === "authenticated" && profile !== null;
   const isAdmin = profile?.roles.includes("ADMIN") ?? false;
-  const roleWorkspace = profile ? getRoleWorkspace(profile.roles) : null;
   const isClassroomOpen = roomSession !== null;
+  const nextJoinableLesson = [...scheduledLessons]
+    .filter((lesson) => isJoinableScheduledLesson(lesson, nowMs))
+    .sort((left, right) => compareJoinableLessons(left, right, nowMs))[0] ?? null;
+  const anyLessonLoading = roomLoadingLessonId !== null;
+  const nextLessonLoading = nextJoinableLesson ? roomLoadingLessonId === nextJoinableLesson.id : false;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!routeLessonId && roomSession) {
@@ -248,9 +254,13 @@ export function App() {
 
     const routeLesson = scheduledLessons.find((lesson) => lesson.id === routeLessonId);
     if (routeLesson) {
+      if (!isJoinableScheduledLesson(routeLesson, nowMs)) {
+        setRoomMessage("Занятие уже завершено или отменено");
+        return;
+      }
       void joinScheduledLesson(routeLesson, { updateRoute: false });
     }
-  }, [routeLessonId, roomLoadingLessonId, roomSession, scheduledLessons, status]);
+  }, [nowMs, routeLessonId, roomLoadingLessonId, roomSession, scheduledLessons, status]);
 
   function logout() {
     const logoutUrl = buildLogoutUrl();
@@ -265,6 +275,7 @@ export function App() {
     setRoomSession(null);
     setRoomLoadingLessonId(null);
     setRoomMessage(null);
+    setProfileOpen(false);
     setStatus("loggingOut");
     window.location.assign(logoutUrl);
   }
@@ -283,6 +294,7 @@ export function App() {
       setRoomSession(null);
       setRoomLoadingLessonId(null);
       setRoomMessage(null);
+      setProfileOpen(false);
       setStatus("anonymous");
       return "Сессия истекла, войдите снова";
     }
@@ -543,15 +555,38 @@ export function App() {
         }`}
       >
         {isClassroomOpen ? null : (
-          <header className="flex shrink-0 items-center justify-between gap-4">
+          <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <BrandMark />
-            <div className="flex items-center gap-3">
-              <SessionBadge status={status} />
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {isAuthenticated ? (
-                <Button variant="outline" onClick={logout}>
-                  <LogOut className="h-4 w-4" />
-                  Выйти
-                </Button>
+                <>
+                  <Button
+                    className="min-w-40"
+                    disabled={!nextJoinableLesson || anyLessonLoading}
+                    onClick={() => {
+                      if (nextJoinableLesson) {
+                        void joinScheduledLesson(nextJoinableLesson);
+                      }
+                    }}
+                    type="button"
+                  >
+                    {nextLessonLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                    Войти в урок
+                  </Button>
+                  <Button
+                    aria-expanded={profileOpen}
+                    onClick={() => setProfileOpen((current) => !current)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <User className="h-4 w-4" />
+                    Профиль
+                  </Button>
+                  <Button aria-label="Выйти" variant="outline" onClick={logout}>
+                    <LogOut className="h-4 w-4" />
+                    Выйти
+                  </Button>
+                </>
               ) : (
                 <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
                   {status === "checking" || status === "loggingOut" ? (
@@ -569,44 +604,44 @@ export function App() {
         {roomSession ? (
           <LiveLessonExperience onLeave={leaveScheduledLessonRoom} profile={profile} session={roomSession} />
         ) : (
-        <div className="grid flex-1 gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="flex flex-col gap-5">
-            <div className="relative overflow-hidden rounded-[1.75rem] border border-border bg-white/85 p-6 shadow-[0_22px_70px_rgba(35,25,15,0.10)] sm:p-8">
-              <div className="absolute -right-9 top-10 hidden h-24 w-24 rounded-full bg-[#ffe07a] sm:block" />
-              <div className="absolute -bottom-10 right-20 hidden h-28 w-28 rounded-full bg-primary sm:block" />
-              <p className="relative text-sm font-black uppercase text-primary">Online classroom</p>
-              <h1 className="relative mt-4 max-w-2xl text-5xl font-black leading-[0.98] tracking-normal sm:text-6xl">
-                Английский начинается с живого общения
-                <span className="ml-3 inline-block h-3 w-14 rounded-full bg-primary align-middle -rotate-3" />
-              </h1>
-              <p className="relative mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
-                Заготовка кабинета уже следует стилю сайта: тёплый фон, оранжевые действия,
-                мягкие блоки и понятный маршрут от входа до занятия.
-              </p>
-              <div className="relative mt-7 flex flex-wrap gap-3">
-                <AccentChip>Play</AccentChip>
-                <AccentChip tone="mint">I can speak</AccentChip>
-                <AccentChip tone="yellow">Hello!</AccentChip>
-              </div>
-              <div className="relative mt-8 flex flex-wrap gap-3">
-                <Button disabled={!isAuthenticated} className="min-w-44">
-                  <Video className="h-4 w-4" />
-                  {roleWorkspace?.primaryAction ?? "Начать урок"}
-                </Button>
-                <Button variant="outline" disabled={!isAuthenticated}>
-                  <BookOpen className="h-4 w-4" />
-                  {roleWorkspace?.secondaryAction ?? "Открыть задание"}
-                </Button>
-              </div>
-            </div>
+          <div className="grid flex-1 gap-5">
+            {profileOpen ? (
+              <ProfileAccountPanel
+                adminLoading={adminLoading}
+                adminMessage={adminMessage}
+                adminUsers={adminUsers}
+                appProfile={appProfile}
+                error={error}
+                isAdmin={isAdmin}
+                isAuthenticated={isAuthenticated}
+                onRefreshAdminUsers={() => void refreshAdminUsers()}
+                onResetProfile={() => void resetProfile()}
+                onSaveProfile={(input) => void saveProfile(input)}
+                profile={profile}
+                profileMessage={profileMessage}
+                profileSaving={profileSaving}
+                status={status}
+              />
+            ) : null}
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <FeatureCard icon={ShieldCheck} title="Безопасный вход" text="Keycloak и роли Play&Say." />
-              <FeatureCard icon={Gamepad2} title="Игровой формат" text="Кабинет готовится под живые занятия." />
-              <FeatureCard icon={Sparkles} title="Фирменный стиль" text="Цвета и ритм как на сайте." />
-            </div>
-
-            <RoleWorkspacePanel profile={profile} />
+            <SchedulePanel
+              courses={courses}
+              disabled={!isAuthenticated || scheduleLoading}
+              lessons={courseLessons}
+              loading={scheduleLoading}
+              message={scheduleMessage}
+              nowMs={nowMs}
+              onCancel={(lesson) => void cancelScheduledLesson(lesson)}
+              onCreate={(input) => void createScheduledLesson(input)}
+              onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
+              onJoin={(lesson) => void joinScheduledLesson(lesson)}
+              onRefresh={() => void refreshSchedule()}
+              profile={profile}
+              roomLoadingLessonId={roomLoadingLessonId}
+              roomMessage={roomMessage}
+              scheduledLessons={scheduledLessons}
+              studentUsers={studentUsers}
+            />
 
             <CourseWorkspacePanel
               courses={courses}
@@ -621,77 +656,7 @@ export function App() {
               onRefresh={() => void refreshCourses()}
               profile={profile}
             />
-
-            <SchedulePanel
-              courses={courses}
-              disabled={!isAuthenticated || scheduleLoading}
-              lessons={courseLessons}
-              loading={scheduleLoading}
-              message={scheduleMessage}
-              onCancel={(lesson) => void cancelScheduledLesson(lesson)}
-              onCreate={(input) => void createScheduledLesson(input)}
-              onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
-              onJoin={(lesson) => void joinScheduledLesson(lesson)}
-              onRefresh={() => void refreshSchedule()}
-              profile={profile}
-              roomLoadingLessonId={roomLoadingLessonId}
-              roomMessage={roomMessage}
-              scheduledLessons={scheduledLessons}
-              studentUsers={studentUsers}
-            />
-
-            <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
-              <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  <h2 className="text-lg font-extrabold">Черновик задания</h2>
-                </div>
-                <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
-                  Sprint 1
-                </span>
-              </div>
-              <textarea
-                className="mt-4 min-h-36 w-full resize-none rounded-2xl border border-border bg-muted/70 p-4 text-sm outline-none ring-primary/30 focus:ring-2"
-                defaultValue="Hello! My name is..."
-                disabled={!isAuthenticated}
-              />
-            </section>
-          </section>
-
-          <aside className="flex flex-col gap-4">
-            <section className="rounded-[1.5rem] border border-border bg-white/90 p-5 shadow-[0_22px_70px_rgba(35,25,15,0.08)]">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-extrabold">Пользователь</h2>
-              </div>
-              <IdentityPanel error={error} profile={profile} status={status} />
-            </section>
-
-            <section className="rounded-[1.5rem] border border-border bg-white/90 p-5 shadow-[0_22px_70px_rgba(35,25,15,0.08)]">
-              <div className="mb-4 flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-extrabold">Профиль Play&Say</h2>
-              </div>
-              <ProfileEditor
-                disabled={!isAuthenticated || profileSaving}
-                message={profileMessage}
-                onReset={() => void resetProfile()}
-                onSave={(input) => void saveProfile(input)}
-                profile={appProfile}
-                saving={profileSaving}
-              />
-            </section>
-
-            {isAdmin ? (
-              <AdminUsersPanel
-                loading={adminLoading}
-                message={adminMessage}
-                onRefresh={() => void refreshAdminUsers()}
-                users={adminUsers}
-              />
-            ) : null}
-          </aside>
-        </div>
+          </div>
         )}
       </section>
     </main>
@@ -714,69 +679,74 @@ function BrandMark() {
   );
 }
 
-function SessionBadge({ status }: { status: SessionStatus }) {
-  const label = {
-    checking: "Проверяем сессию",
-    anonymous: "Гость",
-    authenticated: "В системе",
-    loggingOut: "Выходим",
-    error: "Ошибка входа",
-  }[status];
-
+function ProfileAccountPanel({
+  adminLoading,
+  adminMessage,
+  adminUsers,
+  appProfile,
+  error,
+  isAdmin,
+  isAuthenticated,
+  onRefreshAdminUsers,
+  onResetProfile,
+  onSaveProfile,
+  profile,
+  profileMessage,
+  profileSaving,
+  status,
+}: {
+  adminLoading: boolean;
+  adminMessage: string | null;
+  adminUsers: AdminUserProfile[];
+  appProfile: AppUserProfile | null;
+  error: string | null;
+  isAdmin: boolean;
+  isAuthenticated: boolean;
+  onRefreshAdminUsers: () => void;
+  onResetProfile: () => void;
+  onSaveProfile: (input: UpdateUserProfileInput) => void;
+  profile: MeProfile | null;
+  profileMessage: string | null;
+  profileSaving: boolean;
+  status: SessionStatus;
+}) {
   return (
-    <span className="hidden rounded-full border border-border bg-white/80 px-3 py-2 text-xs font-extrabold text-muted-foreground sm:inline-flex">
-      {label}
-    </span>
-  );
-}
+    <section className="rounded-[1.5rem] border border-border bg-white/90 p-5 shadow-[0_22px_70px_rgba(35,25,15,0.08)]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <section className="min-w-0">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-extrabold">Пользователь</h2>
+          </div>
+          <IdentityPanel error={error} profile={profile} status={status} />
+        </section>
 
-function RoleWorkspacePanel({ profile }: { profile: MeProfile | null }) {
-  if (!profile) {
-    return (
-      <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">Личный кабинет</h2>
-        </div>
-        <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-          После входа здесь появится рабочее место для роли пользователя.
-        </div>
-      </section>
-    );
-  }
-
-  const workspace = getRoleWorkspace(profile.roles);
-  const Icon = workspace.icon;
-
-  return (
-    <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
-        <div className="flex items-center gap-2">
-          <Icon className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">{workspace.title}</h2>
-        </div>
-        <span className="rounded-full border border-primary/20 bg-white px-3 py-1 text-xs font-extrabold text-primary">
-          {workspace.label}
-        </span>
+        <section className="min-w-0">
+          <div className="mb-4 flex items-center gap-2">
+            <User className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-extrabold">Профиль Play&Say</h2>
+          </div>
+          <ProfileEditor
+            disabled={!isAuthenticated || profileSaving}
+            message={profileMessage}
+            onReset={onResetProfile}
+            onSave={onSaveProfile}
+            profile={appProfile}
+            saving={profileSaving}
+          />
+        </section>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-        <div>
-          <p className="text-sm leading-6 text-muted-foreground">{workspace.description}</p>
-          <p className="mt-2 text-xs font-bold text-muted-foreground">
-            Роли: {getRoleSummary(profile.roles)}
-          </p>
+
+      {isAdmin ? (
+        <div className="mt-5">
+          <AdminUsersPanel
+            loading={adminLoading}
+            message={adminMessage}
+            onRefresh={onRefreshAdminUsers}
+            users={adminUsers}
+          />
         </div>
-        <div className="grid gap-2 sm:w-44">
-          <Button disabled>
-            <Video className="h-4 w-4" />
-            {workspace.primaryAction}
-          </Button>
-          <Button disabled variant="outline">
-            <BookOpen className="h-4 w-4" />
-            {workspace.secondaryAction}
-          </Button>
-        </div>
-      </div>
+      ) : null}
     </section>
   );
 }
@@ -1124,6 +1094,7 @@ function SchedulePanel({
   lessons,
   loading,
   message,
+  nowMs,
   onCancel,
   onCreate,
   onDelete,
@@ -1140,6 +1111,7 @@ function SchedulePanel({
   lessons: CourseLessonMap;
   loading: boolean;
   message: string | null;
+  nowMs: number;
   onCancel: (lesson: ScheduledLesson) => void;
   onCreate: (input: ScheduledLessonInput) => void;
   onDelete: (lessonId: string) => void;
@@ -1153,6 +1125,7 @@ function SchedulePanel({
 }) {
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const lessonOptions = flattenCourseLessonOptions(courses, lessons);
+  const orderedLessons = [...scheduledLessons].sort((left, right) => compareScheduleLessons(left, right, nowMs));
 
   return (
     <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
@@ -1200,12 +1173,13 @@ function SchedulePanel({
             </div>
           ) : (
             <div className="grid gap-3">
-              {scheduledLessons.map((lesson) => (
+              {orderedLessons.map((lesson) => (
                 <ScheduledLessonCard
                   canManage={canManage}
                   disabled={disabled}
                   key={lesson.id}
                   lesson={lesson}
+                  nowMs={nowMs}
                   onCancel={() => onCancel(lesson)}
                   onDelete={() => onDelete(lesson.id)}
                   onJoin={() => onJoin(lesson)}
@@ -1369,6 +1343,7 @@ function ScheduledLessonCard({
   canManage,
   disabled,
   lesson,
+  nowMs,
   onCancel,
   onDelete,
   onJoin,
@@ -1377,11 +1352,15 @@ function ScheduledLessonCard({
   canManage: boolean;
   disabled: boolean;
   lesson: ScheduledLesson;
+  nowMs: number;
   onCancel: () => void;
   onDelete: () => void;
   onJoin: () => void;
   roomLoading: boolean;
 }) {
+  const joinable = isJoinableScheduledLesson(lesson, nowMs);
+  const stateLabel = scheduleStateLabel(lesson, nowMs);
+
   return (
     <article className="rounded-2xl border border-border bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1391,17 +1370,17 @@ function ScheduledLessonCard({
               {lesson.lessonTitle ?? lesson.courseTitle ?? "Занятие"}
             </h3>
             <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground">
-              {lesson.status}
+              {stateLabel}
             </span>
             <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground">
-              {lesson.type}
+              {formatLessonType(lesson.type)}
             </span>
           </div>
           <p className="mt-2 text-sm font-semibold text-muted-foreground">
             {formatDateTime(lesson.scheduledStart)} — {formatDateTime(lesson.scheduledEnd)}
           </p>
           <p className="mt-1 text-xs font-bold text-muted-foreground">
-            {lesson.courseTitle ?? "Курс позже"} · {lesson.teacherName ?? "teacher later"} · room {lesson.livekitRoomName ?? "later"}
+            {lesson.courseTitle ?? "Курс позже"} · {lesson.teacherName ?? "Преподаватель позже"}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {lesson.participants.length === 0 ? (
@@ -1422,7 +1401,7 @@ function ScheduledLessonCard({
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
-            disabled={disabled || roomLoading || lesson.status === "CANCELLED"}
+            disabled={disabled || roomLoading || !joinable}
             onClick={onJoin}
             type="button"
           >
@@ -1951,46 +1930,6 @@ function AnnotationToolButton({
   );
 }
 
-function AccentChip({
-  children,
-  tone = "white",
-}: {
-  children: string;
-  tone?: "white" | "mint" | "yellow";
-}) {
-  const toneClass = {
-    white: "bg-white",
-    mint: "bg-[#dff8ee]",
-    yellow: "bg-[#ffe07a]",
-  }[tone];
-
-  return (
-    <span className={`rounded-full border-2 border-primary/15 px-4 py-2 text-sm font-black ${toneClass}`}>
-      {children}
-    </span>
-  );
-}
-
-function FeatureCard({
-  icon: Icon,
-  text,
-  title,
-}: {
-  icon: LucideIcon;
-  text: string;
-  title: string;
-}) {
-  return (
-    <article className="rounded-[1.25rem] border border-border bg-white/80 p-4">
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
-        <Icon className="h-5 w-5" />
-      </div>
-      <h3 className="font-extrabold">{title}</h3>
-      <p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p>
-    </article>
-  );
-}
-
 function ProfileEditor({
   disabled,
   message,
@@ -2298,6 +2237,81 @@ function localDateTimeToIso(value: string): string | null {
 
 function formatDateTime(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleString() : "время позже";
+}
+
+function isClosedScheduleStatus(status: string): boolean {
+  return status === "CANCELLED" || status === "COMPLETED";
+}
+
+function dateValueMs(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isScheduleExpired(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+  const endMs = dateValueMs(lesson.scheduledEnd);
+  return endMs !== null && endMs <= nowMs;
+}
+
+function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean {
+  const startMs = dateValueMs(lesson.scheduledStart);
+  const endMs = dateValueMs(lesson.scheduledEnd);
+  return (startMs === null || startMs <= nowMs) && (endMs === null || endMs > nowMs);
+}
+
+function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+  return !isClosedScheduleStatus(lesson.status) && !isScheduleExpired(lesson, nowMs);
+}
+
+function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number): string {
+  if (lesson.status === "CANCELLED") {
+    return "Отменён";
+  }
+
+  if (lesson.status === "COMPLETED" || isScheduleExpired(lesson, nowMs)) {
+    return "Истёк";
+  }
+
+  if (lesson.status === "IN_PROGRESS" || isLessonCurrent(lesson, nowMs)) {
+    return "В эфире";
+  }
+
+  return "Запланирован";
+}
+
+function scheduleSortRank(lesson: ScheduledLesson, nowMs: number): number {
+  if (!isJoinableScheduledLesson(lesson, nowMs)) {
+    return 3;
+  }
+
+  if (lesson.status === "IN_PROGRESS" || isLessonCurrent(lesson, nowMs)) {
+    return 0;
+  }
+
+  return dateValueMs(lesson.scheduledStart) === null ? 2 : 1;
+}
+
+function compareScheduleLessons(left: ScheduledLesson, right: ScheduledLesson, nowMs: number): number {
+  const rankDiff = scheduleSortRank(left, nowMs) - scheduleSortRank(right, nowMs);
+  if (rankDiff !== 0) {
+    return rankDiff;
+  }
+
+  const leftStart = dateValueMs(left.scheduledStart) ?? Number.MAX_SAFE_INTEGER;
+  const rightStart = dateValueMs(right.scheduledStart) ?? Number.MAX_SAFE_INTEGER;
+  if (leftStart !== rightStart) {
+    return leftStart - rightStart;
+  }
+
+  return (left.lessonTitle ?? left.courseTitle ?? left.id).localeCompare(right.lessonTitle ?? right.courseTitle ?? right.id);
+}
+
+function compareJoinableLessons(left: ScheduledLesson, right: ScheduledLesson, nowMs: number): number {
+  return compareScheduleLessons(left, right, nowMs);
 }
 
 function formatLessonRange(start: string | null | undefined, end: string | null | undefined): string {

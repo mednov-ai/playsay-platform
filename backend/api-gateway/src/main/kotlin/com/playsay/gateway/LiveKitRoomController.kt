@@ -116,10 +116,16 @@ class LiveKitRoomStore(
 
     private fun findJoinableLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LiveKitLesson? {
         val whereClause = if (authentication.canJoinAnyLiveKitLesson()) {
-            "WHERE l.id = :lessonId"
+            """
+            WHERE l.id = :lessonId
+              AND l.status NOT IN ('CANCELLED', 'COMPLETED')
+              AND (l.scheduled_end IS NULL OR l.scheduled_end > :now)
+            """.trimIndent()
         } else {
             """
             WHERE l.id = :lessonId
+              AND l.status NOT IN ('CANCELLED', 'COMPLETED')
+              AND (l.scheduled_end IS NULL OR l.scheduled_end > :now)
               AND EXISTS (
                   SELECT 1
                     FROM lesson_participant lp
@@ -130,7 +136,10 @@ class LiveKitRoomStore(
             """.trimIndent()
         }
 
-        val params = mutableMapOf<String, Any?>("lessonId" to lessonId)
+        val params = mutableMapOf<String, Any?>(
+            "lessonId" to lessonId,
+            "now" to Instant.now().atOffset(java.time.ZoneOffset.UTC),
+        )
         if (!authentication.canJoinAnyLiveKitLesson()) {
             params["subject"] = authentication.token.subject
         }

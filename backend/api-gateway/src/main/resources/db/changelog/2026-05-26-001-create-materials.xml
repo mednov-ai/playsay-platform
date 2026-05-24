@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-05-26-001-create-materials" author="codex">
+        <createTable tableName="lesson_material">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_lesson_material"/>
+            </column>
+            <column name="owner_teacher_user_id" type="UUID"/>
+            <column name="title" type="VARCHAR(160)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="language" type="VARCHAR(16)" defaultValue="en">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cefr_level" type="VARCHAR(8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="visibility" type="VARCHAR(16)" defaultValue="PRIVATE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(32)" defaultValue="DRAFT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="document" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_meta" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="scoring_rubric" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="lesson_material"
+            baseColumnNames="owner_teacher_user_id"
+            constraintName="fk_lesson_material_owner_teacher"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <createIndex tableName="lesson_material" indexName="idx_lesson_material_owner">
+            <column name="owner_teacher_user_id"/>
+            <column name="status"/>
+        </createIndex>
+        <createIndex tableName="lesson_material" indexName="idx_lesson_material_public">
+            <column name="visibility"/>
+            <column name="status"/>
+        </createIndex>
+
+        <createTable tableName="material_asset">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_material_asset"/>
+            </column>
+            <column name="material_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="kind" type="VARCHAR(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="storage_key" type="VARCHAR(1024)"/>
+            <column name="external_url" type="TEXT"/>
+            <column name="provider" type="VARCHAR(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="metadata" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="material_asset"
+            baseColumnNames="material_id"
+            constraintName="fk_material_asset_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <createIndex tableName="material_asset" indexName="idx_material_asset_material">
+            <column name="material_id"/>
+            <column name="kind"/>
+        </createIndex>
+
+        <addColumn tableName="lesson_template">
+            <column name="material_id" type="UUID"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="lesson_template"
+            baseColumnNames="material_id"
+            constraintName="fk_lesson_template_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <addColumn tableName="lesson">
+            <column name="material_id" type="UUID"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="lesson"
+            baseColumnNames="material_id"
+            constraintName="fk_lesson_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <addColumn tableName="assignment">
+            <column name="material_id" type="UUID"/>
+            <column name="material_block_id" type="VARCHAR(120)"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="assignment"
+            baseColumnNames="material_id"
+            constraintName="fk_assignment_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="assignment" constraintName="fk_assignment_material"/>
+            <dropColumn tableName="assignment" columnName="material_block_id"/>
+            <dropColumn tableName="assignment" columnName="material_id"/>
+            <dropForeignKeyConstraint baseTableName="lesson" constraintName="fk_lesson_material"/>
+            <dropColumn tableName="lesson" columnName="material_id"/>
+            <dropForeignKeyConstraint baseTableName="lesson_template" constraintName="fk_lesson_template_material"/>
+            <dropColumn tableName="lesson_template" columnName="material_id"/>
+            <dropTable tableName="material_asset"/>
+            <dropTable tableName="lesson_material"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

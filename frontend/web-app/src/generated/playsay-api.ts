@@ -70,6 +70,8 @@ export interface ScheduledLessonRequest {
   /** @nullable */
   lessonTemplateId?: string | null;
   /** @nullable */
+  materialId?: string | null;
+  /** @nullable */
   scheduledStart?: string | null;
   /** @nullable */
   scheduledEnd?: string | null;
@@ -93,6 +95,10 @@ export interface ScheduledLessonResponse {
   /** @nullable */
   lessonTemplateId?: string | null;
   /** @nullable */
+  materialId?: string | null;
+  /** @nullable */
+  materialTitle?: string | null;
+  /** @nullable */
   courseId?: string | null;
   /** @nullable */
   courseTitle?: string | null;
@@ -111,6 +117,78 @@ export interface ScheduledLessonResponse {
   /** @nullable */
   livekitRoomName?: string | null;
   participants: ScheduledLessonParticipantResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JsonNode {}
+
+export type LessonMaterialRequestCefrLevel = typeof LessonMaterialRequestCefrLevel[keyof typeof LessonMaterialRequestCefrLevel];
+
+
+export const LessonMaterialRequestCefrLevel = {
+  A1: 'A1',
+  A2: 'A2',
+  B1: 'B1',
+  B2: 'B2',
+  C1: 'C1',
+  C2: 'C2',
+} as const;
+
+export type LessonMaterialRequestVisibility = typeof LessonMaterialRequestVisibility[keyof typeof LessonMaterialRequestVisibility];
+
+
+export const LessonMaterialRequestVisibility = {
+  PRIVATE: 'PRIVATE',
+  PUBLIC: 'PUBLIC',
+} as const;
+
+export type LessonMaterialRequestStatus = typeof LessonMaterialRequestStatus[keyof typeof LessonMaterialRequestStatus];
+
+
+export const LessonMaterialRequestStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export interface LessonMaterialRequest {
+  /** @maxLength 160 */
+  title: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  description?: string | null;
+  /** @maxLength 16 */
+  language: string;
+  cefrLevel: LessonMaterialRequestCefrLevel;
+  visibility: LessonMaterialRequestVisibility;
+  status: LessonMaterialRequestStatus;
+  document?: JsonNode | null;
+  sourceMeta?: JsonNode | null;
+  scoringRubric?: JsonNode | null;
+}
+
+export interface LessonMaterialResponse {
+  id: string;
+  /** @nullable */
+  ownerTeacherUserId?: string | null;
+  /** @nullable */
+  ownerTeacherSubject?: string | null;
+  /** @nullable */
+  ownerTeacherName?: string | null;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  language: string;
+  cefrLevel: string;
+  visibility: string;
+  status: string;
+  document: JsonNode;
+  sourceMeta: JsonNode;
+  scoringRubric: JsonNode;
+  blockCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -156,6 +234,8 @@ export interface CourseLessonRequest {
   orderIndex?: number | null;
   /** @nullable */
   plannedDurationMin?: number | null;
+  /** @nullable */
+  materialId?: string | null;
 }
 
 export interface CourseLessonResponse {
@@ -166,6 +246,10 @@ export interface CourseLessonResponse {
   orderIndex?: number | null;
   /** @nullable */
   plannedDurationMin?: number | null;
+  /** @nullable */
+  materialId?: string | null;
+  /** @nullable */
+  materialTitle?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -176,6 +260,95 @@ export interface LiveKitRoomTokenResponse {
   roomName: string;
   identity: string;
   expiresAt: string;
+}
+
+export type MaterialAssetRequestKind = typeof MaterialAssetRequestKind[keyof typeof MaterialAssetRequestKind];
+
+
+export const MaterialAssetRequestKind = {
+  IMAGE: 'IMAGE',
+  GENERATED_IMAGE: 'GENERATED_IMAGE',
+  DOCUMENT_SCAN: 'DOCUMENT_SCAN',
+  VIDEO_EMBED: 'VIDEO_EMBED',
+  EXTERNAL_SOURCE: 'EXTERNAL_SOURCE',
+  AUDIO_NOTE: 'AUDIO_NOTE',
+} as const;
+
+export type MaterialAssetRequestProvider = typeof MaterialAssetRequestProvider[keyof typeof MaterialAssetRequestProvider];
+
+
+export const MaterialAssetRequestProvider = {
+  YOUTUBE: 'YOUTUBE',
+  VK: 'VK',
+  RUTUBE: 'RUTUBE',
+  URL: 'URL',
+  UPLOAD: 'UPLOAD',
+  AI: 'AI',
+} as const;
+
+export interface MaterialAssetRequest {
+  kind: MaterialAssetRequestKind;
+  /** @nullable */
+  storageKey?: string | null;
+  /** @nullable */
+  externalUrl?: string | null;
+  provider: MaterialAssetRequestProvider;
+  metadata?: JsonNode | null;
+}
+
+export interface MaterialAssetResponse {
+  id: string;
+  materialId: string;
+  kind: string;
+  /** @nullable */
+  storageKey?: string | null;
+  /** @nullable */
+  externalUrl?: string | null;
+  provider: string;
+  metadata: JsonNode;
+  createdAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type MaterialAiDraftRequestCefrLevel = typeof MaterialAiDraftRequestCefrLevel[keyof typeof MaterialAiDraftRequestCefrLevel] | null;
+
+
+export const MaterialAiDraftRequestCefrLevel = {
+  A1: 'A1',
+  A2: 'A2',
+  B1: 'B1',
+  B2: 'B2',
+  C1: 'C1',
+  C2: 'C2',
+} as const;
+
+export interface MaterialAiDraftRequest {
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  title?: string | null;
+  /** @maxLength 4000 */
+  prompt: string;
+  /** @maxLength 16 */
+  language: string;
+  /** @nullable */
+  cefrLevel?: MaterialAiDraftRequestCefrLevel;
+}
+
+export interface LessonMaterialDraftResponse {
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  language: string;
+  cefrLevel: string;
+  visibility: string;
+  status: string;
+  document: JsonNode;
+  sourceMeta: JsonNode;
+  scoringRubric: JsonNode;
 }
 
 export interface MeResponse {
@@ -533,6 +706,190 @@ export const deleteScheduledLesson = async (lessonId: string, options?: RequestI
 
   const data: deleteScheduledLessonResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteScheduledLessonResponse
+}
+
+
+
+export type getMaterialResponse200 = {
+  data: LessonMaterialResponse
+  status: 200
+}
+
+export type getMaterialResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getMaterialResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getMaterialResponseSuccess = (getMaterialResponse200) & {
+  headers: Headers;
+};
+export type getMaterialResponseError = (getMaterialResponse401 | getMaterialResponse404) & {
+  headers: Headers;
+};
+
+export type getMaterialResponse = (getMaterialResponseSuccess | getMaterialResponseError)
+
+export const getGetMaterialUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}`
+}
+
+/**
+ * Returns a visible lesson material.
+ * @summary Get lesson material
+ */
+export const getMaterial = async (materialId: string, options?: RequestInit): Promise<getMaterialResponse> => {
+
+  const res = await fetch(getGetMaterialUrl(materialId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMaterialResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMaterialResponse
+}
+
+
+
+export type updateMaterialResponse200 = {
+  data: LessonMaterialResponse
+  status: 200
+}
+
+export type updateMaterialResponse400 = {
+  data: void
+  status: 400
+}
+
+export type updateMaterialResponse401 = {
+  data: void
+  status: 401
+}
+
+export type updateMaterialResponse403 = {
+  data: void
+  status: 403
+}
+
+export type updateMaterialResponse404 = {
+  data: void
+  status: 404
+}
+
+export type updateMaterialResponseSuccess = (updateMaterialResponse200) & {
+  headers: Headers;
+};
+export type updateMaterialResponseError = (updateMaterialResponse400 | updateMaterialResponse401 | updateMaterialResponse403 | updateMaterialResponse404) & {
+  headers: Headers;
+};
+
+export type updateMaterialResponse = (updateMaterialResponseSuccess | updateMaterialResponseError)
+
+export const getUpdateMaterialUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}`
+}
+
+/**
+ * Updates a structured lesson material. Requires material owner or ADMIN role.
+ * @summary Update lesson material
+ */
+export const updateMaterial = async (materialId: string,
+    lessonMaterialRequest: LessonMaterialRequest, options?: RequestInit): Promise<updateMaterialResponse> => {
+
+  const res = await fetch(getUpdateMaterialUrl(materialId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(lessonMaterialRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateMaterialResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateMaterialResponse
+}
+
+
+
+export type archiveMaterialResponse204 = {
+  data: void
+  status: 204
+}
+
+export type archiveMaterialResponse401 = {
+  data: void
+  status: 401
+}
+
+export type archiveMaterialResponse403 = {
+  data: void
+  status: 403
+}
+
+export type archiveMaterialResponse404 = {
+  data: void
+  status: 404
+}
+
+export type archiveMaterialResponseSuccess = (archiveMaterialResponse204) & {
+  headers: Headers;
+};
+export type archiveMaterialResponseError = (archiveMaterialResponse401 | archiveMaterialResponse403 | archiveMaterialResponse404) & {
+  headers: Headers;
+};
+
+export type archiveMaterialResponse = (archiveMaterialResponseSuccess | archiveMaterialResponseError)
+
+export const getArchiveMaterialUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}`
+}
+
+/**
+ * Archives a lesson material. Requires material owner or ADMIN role.
+ * @summary Archive lesson material
+ */
+export const archiveMaterial = async (materialId: string, options?: RequestInit): Promise<archiveMaterialResponse> => {
+
+  const res = await fetch(getArchiveMaterialUrl(materialId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: archiveMaterialResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as archiveMaterialResponse
 }
 
 
@@ -1026,6 +1383,266 @@ export const createScheduledLessonRoomToken = async (lessonId: string, options?:
 
 
 
+export type listMaterialsResponse200 = {
+  data: LessonMaterialResponse[]
+  status: 200
+}
+
+export type listMaterialsResponse401 = {
+  data: void
+  status: 401
+}
+
+export type listMaterialsResponseSuccess = (listMaterialsResponse200) & {
+  headers: Headers;
+};
+export type listMaterialsResponseError = (listMaterialsResponse401) & {
+  headers: Headers;
+};
+
+export type listMaterialsResponse = (listMaterialsResponseSuccess | listMaterialsResponseError)
+
+export const getListMaterialsUrl = () => {
+
+
+
+
+  return `/api/materials`
+}
+
+/**
+ * Teachers/admins see their materials and published public materials. Students see published public materials.
+ * @summary List lesson materials
+ */
+export const listMaterials = async ( options?: RequestInit): Promise<listMaterialsResponse> => {
+
+  const res = await fetch(getListMaterialsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listMaterialsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listMaterialsResponse
+}
+
+
+
+export type createMaterialResponse201 = {
+  data: LessonMaterialResponse
+  status: 201
+}
+
+export type createMaterialResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createMaterialResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createMaterialResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createMaterialResponseSuccess = (createMaterialResponse201) & {
+  headers: Headers;
+};
+export type createMaterialResponseError = (createMaterialResponse400 | createMaterialResponse401 | createMaterialResponse403) & {
+  headers: Headers;
+};
+
+export type createMaterialResponse = (createMaterialResponseSuccess | createMaterialResponseError)
+
+export const getCreateMaterialUrl = () => {
+
+
+
+
+  return `/api/materials`
+}
+
+/**
+ * Creates a structured lesson material. Requires TEACHER or ADMIN role.
+ * @summary Create lesson material
+ */
+export const createMaterial = async (lessonMaterialRequest: LessonMaterialRequest, options?: RequestInit): Promise<createMaterialResponse> => {
+
+  const res = await fetch(getCreateMaterialUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(lessonMaterialRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createMaterialResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createMaterialResponse
+}
+
+
+
+export type listMaterialAssetsResponse200 = {
+  data: MaterialAssetResponse[]
+  status: 200
+}
+
+export type listMaterialAssetsResponseSuccess = (listMaterialAssetsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listMaterialAssetsResponse = (listMaterialAssetsResponseSuccess)
+
+export const getListMaterialAssetsUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets`
+}
+
+/**
+ * @summary List material assets
+ */
+export const listMaterialAssets = async (materialId: string, options?: RequestInit): Promise<listMaterialAssetsResponse> => {
+
+  const res = await fetch(getListMaterialAssetsUrl(materialId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listMaterialAssetsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listMaterialAssetsResponse
+}
+
+
+
+export type createMaterialAssetResponse200 = {
+  data: MaterialAssetResponse
+  status: 200
+}
+
+export type createMaterialAssetResponseSuccess = (createMaterialAssetResponse200) & {
+  headers: Headers;
+};
+;
+
+export type createMaterialAssetResponse = (createMaterialAssetResponseSuccess)
+
+export const getCreateMaterialAssetUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets`
+}
+
+/**
+ * @summary Create material asset reference
+ */
+export const createMaterialAsset = async (materialId: string,
+    materialAssetRequest: MaterialAssetRequest, options?: RequestInit): Promise<createMaterialAssetResponse> => {
+
+  const res = await fetch(getCreateMaterialAssetUrl(materialId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialAssetRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createMaterialAssetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createMaterialAssetResponse
+}
+
+
+
+export type draftMaterialWithAiResponse200 = {
+  data: LessonMaterialDraftResponse
+  status: 200
+}
+
+export type draftMaterialWithAiResponse400 = {
+  data: void
+  status: 400
+}
+
+export type draftMaterialWithAiResponse401 = {
+  data: void
+  status: 401
+}
+
+export type draftMaterialWithAiResponse403 = {
+  data: void
+  status: 403
+}
+
+export type draftMaterialWithAiResponseSuccess = (draftMaterialWithAiResponse200) & {
+  headers: Headers;
+};
+export type draftMaterialWithAiResponseError = (draftMaterialWithAiResponse400 | draftMaterialWithAiResponse401 | draftMaterialWithAiResponse403) & {
+  headers: Headers;
+};
+
+export type draftMaterialWithAiResponse = (draftMaterialWithAiResponseSuccess | draftMaterialWithAiResponseError)
+
+export const getDraftMaterialWithAiUrl = () => {
+
+
+
+
+  return `/api/materials/ai-draft`
+}
+
+/**
+ * Returns a deterministic Play&Say material draft until a real LLM key is configured.
+ * @summary Draft lesson material with AI
+ */
+export const draftMaterialWithAi = async (materialAiDraftRequest: MaterialAiDraftRequest, options?: RequestInit): Promise<draftMaterialWithAiResponse> => {
+
+  const res = await fetch(getDraftMaterialWithAiUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialAiDraftRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: draftMaterialWithAiResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as draftMaterialWithAiResponse
+}
+
+
+
 export type listCoursesResponse200 = {
   data: CourseResponse[]
   status: 200
@@ -1317,6 +1934,62 @@ export const listStudentProfiles = async ( options?: RequestInit): Promise<listS
 
 
 
+export type getScheduledLessonMaterialResponse200 = {
+  data: LessonMaterialResponse
+  status: 200
+}
+
+export type getScheduledLessonMaterialResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getScheduledLessonMaterialResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getScheduledLessonMaterialResponseSuccess = (getScheduledLessonMaterialResponse200) & {
+  headers: Headers;
+};
+export type getScheduledLessonMaterialResponseError = (getScheduledLessonMaterialResponse401 | getScheduledLessonMaterialResponse404) & {
+  headers: Headers;
+};
+
+export type getScheduledLessonMaterialResponse = (getScheduledLessonMaterialResponseSuccess | getScheduledLessonMaterialResponseError)
+
+export const getGetScheduledLessonMaterialUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/material`
+}
+
+/**
+ * Returns the material attached directly to a scheduled lesson or inherited from its lesson template.
+ * @summary Get scheduled lesson material
+ */
+export const getScheduledLessonMaterial = async (lessonId: string, options?: RequestInit): Promise<getScheduledLessonMaterialResponse> => {
+
+  const res = await fetch(getGetScheduledLessonMaterialUrl(lessonId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getScheduledLessonMaterialResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getScheduledLessonMaterialResponse
+}
+
+
+
 export type getMeResponse200 = {
   data: MeResponse
   status: 200
@@ -1464,4 +2137,49 @@ export const listUserProfiles = async ( options?: RequestInit): Promise<listUser
 
   const data: listUserProfilesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listUserProfilesResponse
+}
+
+
+
+export type deleteMaterialAssetResponse200 = {
+  data: void
+  status: 200
+}
+
+export type deleteMaterialAssetResponseSuccess = (deleteMaterialAssetResponse200) & {
+  headers: Headers;
+};
+;
+
+export type deleteMaterialAssetResponse = (deleteMaterialAssetResponseSuccess)
+
+export const getDeleteMaterialAssetUrl = (materialId: string,
+    assetId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}`
+}
+
+/**
+ * @summary Delete material asset reference
+ */
+export const deleteMaterialAsset = async (materialId: string,
+    assetId: string, options?: RequestInit): Promise<deleteMaterialAssetResponse> => {
+
+  const res = await fetch(getDeleteMaterialAssetUrl(materialId,assetId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteMaterialAssetResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteMaterialAssetResponse
 }

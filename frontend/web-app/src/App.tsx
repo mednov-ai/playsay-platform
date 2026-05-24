@@ -11,6 +11,9 @@ import {
 import { Track } from "livekit-client";
 import {
   AlertCircle,
+  Archive,
+  BookOpen,
+  Bot,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -18,9 +21,14 @@ import {
   Clock3,
   Eraser,
   FileText,
+  Globe2,
+  ImageIcon,
+  Layers3,
+  Link2,
   Loader2,
   LogIn,
   LogOut,
+  LockKeyhole,
   MousePointer2,
   Paperclip,
   PenLine,
@@ -32,23 +40,30 @@ import {
   Save,
   Send,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Undo2,
   User,
   Users,
   Video,
+  Wand2,
 } from "lucide-react";
 import {
+  archiveMaterial,
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  draftMaterial,
   enterScheduledLessonRoom,
+  editCourseLesson,
   editScheduledLesson,
   fetchAdminUserProfiles,
   fetchCourseLessons,
   fetchCourses,
+  fetchMaterials,
   fetchMe,
   fetchScheduledLessons,
+  fetchScheduledLessonMaterial,
   fetchStudentProfiles,
   fetchUserProfile,
   isAuthCallback,
@@ -59,6 +74,7 @@ import {
   resetUserProfile,
   saveCourse,
   saveCourseLesson,
+  saveMaterial,
   saveScheduledLesson,
   saveUserProfile,
   startLogin,
@@ -68,6 +84,11 @@ import {
   type CourseInput,
   type CourseLesson,
   type CourseLessonInput,
+  type LessonMaterial,
+  type LessonMaterialDraft,
+  type LessonMaterialDraftInput,
+  type LessonMaterialInput,
+  type LessonMaterialJson,
   type LiveKitRoomToken,
   type MeProfile,
   type ScheduledLesson,
@@ -111,6 +132,7 @@ type ScheduleFormState = {
 
 type LessonRoomSession = LiveKitRoomToken & {
   courseTitle: string | null;
+  lessonId: string;
   lessonEndsAt: string | null;
   lessonStartsAt: string | null;
   lessonTitle: string;
@@ -135,6 +157,58 @@ type AnnotationStroke = {
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
 type ClassroomStripLayout = "single" | "row";
 
+type MaterialBlockType =
+  | "text"
+  | "image"
+  | "videoEmbed"
+  | "flashcards"
+  | "fillGaps"
+  | "multipleChoice"
+  | "freeWriting"
+  | "speakingPrompt"
+  | "drawingArea"
+  | "generatedImage";
+
+type MaterialEditorBlock = {
+  id: string;
+  type: MaterialBlockType;
+  title: string;
+  body?: string;
+  prompt?: string;
+  url?: string;
+  provider?: string;
+  caption?: string;
+  cards?: Array<{ id: string; front: string; back: string; example?: string }>;
+  items?: Array<{ prompt: string; answer?: string; options?: string[] }>;
+  height?: number;
+};
+
+type MaterialEditorPage = {
+  id: string;
+  title: string;
+  layout: "FLOW" | "WORKSHEET";
+  blocks: MaterialEditorBlock[];
+};
+
+type MaterialEditorDocument = {
+  schemaVersion: 1;
+  pages: MaterialEditorPage[];
+};
+
+type MaterialFormState = {
+  id: string | null;
+  title: string;
+  description: string;
+  language: string;
+  cefrLevel: string;
+  visibility: "PRIVATE" | "PUBLIC";
+  status: "DRAFT" | "PUBLISHED";
+  sourcePrompt: string;
+  document: MaterialEditorDocument;
+  scoringRubric: LessonMaterialJson;
+  sourceMeta: LessonMaterialJson;
+};
+
 export function App() {
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [appProfile, setAppProfile] = useState<AppUserProfile | null>(null);
@@ -150,6 +224,9 @@ export function App() {
   const [courseLessons, setCourseLessons] = useState<CourseLessonMap>({});
   const [courseMessage, setCourseMessage] = useState<string | null>(null);
   const [courseLoading, setCourseLoading] = useState(false);
+  const [materials, setMaterials] = useState<LessonMaterial[]>([]);
+  const [materialMessage, setMaterialMessage] = useState<string | null>(null);
+  const [materialLoading, setMaterialLoading] = useState(false);
   const [scheduledLessons, setScheduledLessons] = useState<ScheduledLesson[]>([]);
   const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
@@ -182,10 +259,11 @@ export function App() {
 
         const me = await fetchMe();
         const canManagePeople = me.roles.includes("TEACHER") || me.roles.includes("ADMIN");
-        const [currentAppProfile, currentAdminUsers, currentCourseBundle, currentSchedule, currentStudents] = await Promise.all([
+        const [currentAppProfile, currentAdminUsers, currentCourseBundle, currentMaterials, currentSchedule, currentStudents] = await Promise.all([
           fetchUserProfile(),
           me.roles.includes("ADMIN") ? fetchAdminUserProfiles() : Promise.resolve([]),
           fetchCourseBundle(),
+          fetchMaterials(),
           fetchScheduledLessons(),
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
         ]);
@@ -195,6 +273,7 @@ export function App() {
           setAdminUsers(currentAdminUsers);
           setCourses(currentCourseBundle.courses);
           setCourseLessons(currentCourseBundle.lessons);
+          setMaterials(currentMaterials);
           setScheduledLessons(currentSchedule);
           setStudentUsers(currentStudents);
           setStatus("authenticated");
@@ -272,6 +351,7 @@ export function App() {
     setAdminUsers([]);
     setCourses([]);
     setCourseLessons({});
+    setMaterials([]);
     setScheduledLessons([]);
     setStudentUsers([]);
     setRoomSession(null);
@@ -291,6 +371,7 @@ export function App() {
       setAdminUsers([]);
       setCourses([]);
       setCourseLessons({});
+      setMaterials([]);
       setScheduledLessons([]);
       setStudentUsers([]);
       setRoomSession(null);
@@ -436,6 +517,89 @@ export function App() {
     }
   }
 
+  async function refreshMaterials() {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      setMaterials(await fetchMaterials());
+      setMaterialMessage("Материалы обновлены");
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, "Не удалось загрузить материалы"));
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
+  async function upsertMaterial(input: LessonMaterialInput, materialId?: string): Promise<LessonMaterial | null> {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      const saved = await saveMaterial(input, materialId);
+      setMaterials((current) => {
+        const exists = current.some((material) => material.id === saved.id);
+        return exists
+          ? current.map((material) => (material.id === saved.id ? saved : material))
+          : [saved, ...current];
+      });
+      setMaterialMessage(materialId ? "Материал сохранён" : "Материал создан");
+      return saved;
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, "Не удалось сохранить материал"));
+      return null;
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
+  async function generateMaterialDraft(input: LessonMaterialDraftInput): Promise<LessonMaterialDraft | null> {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      const draft = await draftMaterial(input);
+      setMaterialMessage("Черновик подготовлен");
+      return draft;
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, "Не удалось подготовить черновик"));
+      return null;
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
+  async function deleteMaterial(materialId: string) {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      await archiveMaterial(materialId);
+      setMaterials((current) => current.filter((material) => material.id !== materialId));
+      setMaterialMessage("Материал архивирован");
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, "Не удалось архивировать материал"));
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
+  async function linkMaterialToCourseLesson(courseId: string, lesson: CourseLesson, materialId: string | null) {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      await editCourseLesson(courseId, lesson.id, {
+        title: lesson.title,
+        orderIndex: lesson.orderIndex ?? null,
+        plannedDurationMin: lesson.plannedDurationMin ?? null,
+        materialId,
+      });
+      const lessons = await fetchCourseLessons(courseId);
+      setCourseLessons((current) => ({ ...current, [courseId]: lessons }));
+      setMaterialMessage(materialId ? "Материал привязан к уроку" : "Материал отвязан от урока");
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, "Не удалось привязать материал"));
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
   async function refreshSchedule() {
     setScheduleLoading(true);
     setScheduleMessage(null);
@@ -475,6 +639,7 @@ export function App() {
     try {
       await editScheduledLesson(lesson.id, {
         lessonTemplateId: lesson.lessonTemplateId ?? null,
+        materialId: lesson.materialId ?? null,
         scheduledStart: lesson.scheduledStart ?? null,
         scheduledEnd: lesson.scheduledEnd ?? null,
         status: "CANCELLED",
@@ -519,6 +684,7 @@ export function App() {
       setRoomSession({
         ...token,
         courseTitle: lesson.courseTitle ?? null,
+        lessonId: lesson.id,
         lessonEndsAt: lesson.scheduledEnd ?? null,
         lessonStartsAt: lesson.scheduledStart ?? null,
         lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? "Занятие",
@@ -645,6 +811,21 @@ export function App() {
               studentUsers={studentUsers}
             />
 
+            <MaterialLibraryPanel
+              courses={courses}
+              disabled={!isAuthenticated || materialLoading}
+              lessons={courseLessons}
+              loading={materialLoading}
+              materials={materials}
+              message={materialMessage}
+              onArchive={(materialId) => void deleteMaterial(materialId)}
+              onDraft={(input) => generateMaterialDraft(input)}
+              onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
+              onRefresh={() => void refreshMaterials()}
+              onSave={(input, materialId) => upsertMaterial(input, materialId)}
+              profile={profile}
+            />
+
             <CourseWorkspacePanel
               courses={courses}
               disabled={!isAuthenticated || courseLoading}
@@ -750,6 +931,542 @@ function ProfileAccountPanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function MaterialLibraryPanel({
+  courses,
+  disabled,
+  lessons,
+  loading,
+  materials,
+  message,
+  onArchive,
+  onDraft,
+  onLinkLesson,
+  onRefresh,
+  onSave,
+  profile,
+}: {
+  courses: Course[];
+  disabled: boolean;
+  lessons: CourseLessonMap;
+  loading: boolean;
+  materials: LessonMaterial[];
+  message: string | null;
+  onArchive: (materialId: string) => void;
+  onDraft: (input: LessonMaterialDraftInput) => Promise<LessonMaterialDraft | null>;
+  onLinkLesson: (courseId: string, lesson: CourseLesson, materialId: string | null) => void;
+  onRefresh: () => void;
+  onSave: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
+  profile: MeProfile | null;
+}) {
+  const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+  const lessonOptions = flattenCourseLessonMaterialOptions(courses, lessons);
+  const [form, setForm] = useState<MaterialFormState>(() => defaultMaterialForm());
+  const [autoSelectedMaterialId, setAutoSelectedMaterialId] = useState<string | null>(null);
+  const [draftPrompt, setDraftPrompt] = useState("");
+  const [selectedLessonKey, setSelectedLessonKey] = useState("");
+
+  useEffect(() => {
+    if (selectedLessonKey || lessonOptions.length === 0) {
+      return;
+    }
+    setSelectedLessonKey(lessonOptions[0].key);
+  }, [lessonOptions, selectedLessonKey]);
+
+  useEffect(() => {
+    const firstMaterial = materials[0];
+    if (!firstMaterial || autoSelectedMaterialId === firstMaterial.id || form.id || form.title.trim()) {
+      return;
+    }
+
+    setForm(materialToForm(firstMaterial));
+    setDraftPrompt(readPromptFromSourceMeta(firstMaterial.sourceMeta));
+    setAutoSelectedMaterialId(firstMaterial.id);
+  }, [autoSelectedMaterialId, form.id, form.title, materials]);
+
+  function updateForm<Key extends keyof MaterialFormState>(field: Key, value: MaterialFormState[Key]) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetForm() {
+    setForm(defaultMaterialForm());
+    setDraftPrompt("");
+  }
+
+  function selectMaterial(material: LessonMaterial) {
+    setForm(materialToForm(material));
+    setDraftPrompt(readPromptFromSourceMeta(material.sourceMeta));
+  }
+
+  function addBlock(type: MaterialBlockType) {
+    setForm((current) => ({
+      ...current,
+      document: {
+        ...current.document,
+        pages: current.document.pages.map((page, index) => (
+          index === 0
+            ? { ...page, blocks: [...page.blocks, newMaterialBlock(type)] }
+            : page
+        )),
+      },
+    }));
+  }
+
+  function updateBlock(blockId: string, patch: Partial<MaterialEditorBlock>) {
+    setForm((current) => ({
+      ...current,
+      document: {
+        ...current.document,
+        pages: current.document.pages.map((page) => ({
+          ...page,
+          blocks: page.blocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block)),
+        })),
+      },
+    }));
+  }
+
+  function removeBlock(blockId: string) {
+    setForm((current) => ({
+      ...current,
+      document: {
+        ...current.document,
+        pages: current.document.pages.map((page) => ({
+          ...page,
+          blocks: page.blocks.filter((block) => block.id !== blockId),
+        })),
+      },
+    }));
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const saved = await onSave(materialFormToInput(form), form.id ?? undefined);
+    if (saved) {
+      setForm(materialToForm(saved));
+    }
+  }
+
+  async function generateDraft() {
+    const draft = await onDraft({
+      title: form.title || null,
+      prompt: draftPrompt,
+      language: form.language,
+      cefrLevel: form.cefrLevel,
+    });
+    if (draft) {
+      setForm(materialDraftToForm(draft));
+    }
+  }
+
+  function linkSelectedLesson() {
+    const option = lessonOptions.find((item) => item.key === selectedLessonKey);
+    if (!option) {
+      return;
+    }
+    onLinkLesson(option.courseId, option.lesson, form.id);
+  }
+
+  if (!profile) {
+    return (
+      <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-extrabold">Материалы</h2>
+        </div>
+        <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
+          Войдите, чтобы создавать и открывать материалы уроков.
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-extrabold">Материалы</h2>
+        </div>
+        <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Обновить
+        </Button>
+      </div>
+
+      {!canManage ? (
+        <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
+          Сейчас ученику доступны опубликованные материалы только внутри назначенного урока.
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(18rem,0.72fr)_minmax(0,1.28fr)]">
+          <aside className="grid content-start gap-3">
+            <div className="rounded-2xl border border-border bg-muted/45 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="text-sm font-extrabold">Библиотека</div>
+                <Button disabled={disabled} onClick={resetForm} type="button" variant="outline">
+                  <Plus className="h-4 w-4" />
+                  Новый
+                </Button>
+              </div>
+              {materials.length === 0 ? (
+                <div className="rounded-xl border border-border bg-white p-3 text-sm font-semibold text-muted-foreground">
+                  Материалов пока нет.
+                </div>
+              ) : (
+                <div className="grid max-h-[30rem] gap-2 overflow-auto pr-1">
+                  {materials.map((material) => (
+                    <button
+                      className="playsay-material-list-item"
+                      data-active={form.id === material.id ? "true" : "false"}
+                      key={material.id}
+                      onClick={() => selectMaterial(material)}
+                      type="button"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-extrabold">{material.title}</span>
+                        <span className="mt-1 flex flex-wrap gap-1.5 text-[0.68rem] font-black uppercase text-muted-foreground">
+                          <span>{material.cefrLevel}</span>
+                          <span>{material.status}</span>
+                          <span>{material.visibility}</span>
+                          <span>{material.blockCount} blocks</span>
+                        </span>
+                      </span>
+                      {material.visibility === "PUBLIC" ? (
+                        <Globe2 className="h-4 w-4 shrink-0 text-primary" />
+                      ) : (
+                        <LockKeyhole className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-border bg-white p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-extrabold">
+                <Wand2 className="h-4 w-4 text-primary" />
+                Черновик с AI
+              </div>
+              <textarea
+                className="playsay-input min-h-28 resize-none py-3"
+                disabled={disabled}
+                maxLength={4_000}
+                onChange={(event) => setDraftPrompt(event.target.value)}
+                placeholder="Например: A2, travelling, 45 минут, warm-up, слова, speaking и короткое письмо"
+                value={draftPrompt}
+              />
+              <Button
+                className="mt-2 w-full"
+                disabled={disabled || draftPrompt.trim().length === 0}
+                onClick={() => void generateDraft()}
+                type="button"
+              >
+                <Sparkles className="h-4 w-4" />
+                Подготовить черновик
+              </Button>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-white p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-extrabold">
+                <Link2 className="h-4 w-4 text-primary" />
+                Привязка к уроку
+              </div>
+              <select
+                className="playsay-input"
+                disabled={disabled || lessonOptions.length === 0}
+                onChange={(event) => setSelectedLessonKey(event.target.value)}
+                value={selectedLessonKey}
+              >
+                {lessonOptions.length === 0 ? (
+                  <option value="">Создайте урок курса</option>
+                ) : (
+                  lessonOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))
+                )}
+              </select>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Button disabled={disabled || !form.id || !selectedLessonKey} onClick={linkSelectedLesson} type="button">
+                  <Link2 className="h-4 w-4" />
+                  Привязать
+                </Button>
+                <Button
+                  disabled={disabled || !selectedLessonKey}
+                  onClick={() => {
+                    const option = lessonOptions.find((item) => item.key === selectedLessonKey);
+                    if (option) {
+                      onLinkLesson(option.courseId, option.lesson, null);
+                    }
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Снять
+                </Button>
+              </div>
+            </div>
+          </aside>
+
+          <form className="grid gap-4" onSubmit={submit}>
+            <div className="rounded-2xl border border-border bg-white p-4">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_7rem_8rem_8rem]">
+                <ProfileField label="Название">
+                  <input
+                    className="playsay-input"
+                    disabled={disabled}
+                    maxLength={160}
+                    onChange={(event) => updateForm("title", event.target.value)}
+                    required
+                    value={form.title}
+                  />
+                </ProfileField>
+                <ProfileField label="Уровень">
+                  <select
+                    className="playsay-input"
+                    disabled={disabled}
+                    onChange={(event) => updateForm("cefrLevel", event.target.value)}
+                    value={form.cefrLevel}
+                  >
+                    {["A1", "A2", "B1", "B2", "C1", "C2"].map((level) => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
+                  </select>
+                </ProfileField>
+                <ProfileField label="Доступ">
+                  <select
+                    className="playsay-input"
+                    disabled={disabled}
+                    onChange={(event) => updateForm("visibility", event.target.value as MaterialFormState["visibility"])}
+                    value={form.visibility}
+                  >
+                    <option value="PRIVATE">Приватный</option>
+                    <option value="PUBLIC">Публичный</option>
+                  </select>
+                </ProfileField>
+                <ProfileField label="Статус">
+                  <select
+                    className="playsay-input"
+                    disabled={disabled}
+                    onChange={(event) => updateForm("status", event.target.value as MaterialFormState["status"])}
+                    value={form.status}
+                  >
+                    <option value="DRAFT">Черновик</option>
+                    <option value="PUBLISHED">Опубликован</option>
+                  </select>
+                </ProfileField>
+              </div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-[8rem_minmax(0,1fr)]">
+                <ProfileField label="Язык">
+                  <input
+                    className="playsay-input"
+                    disabled={disabled}
+                    maxLength={16}
+                    onChange={(event) => updateForm("language", event.target.value)}
+                    value={form.language}
+                  />
+                </ProfileField>
+                <ProfileField label="Описание">
+                  <input
+                    className="playsay-input"
+                    disabled={disabled}
+                    maxLength={2_000}
+                    onChange={(event) => updateForm("description", event.target.value)}
+                    placeholder="Короткая заметка для себя"
+                    value={form.description}
+                  />
+                </ProfileField>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {(["text", "videoEmbed", "image", "generatedImage", "flashcards", "fillGaps", "multipleChoice", "freeWriting", "speakingPrompt", "drawingArea"] as MaterialBlockType[]).map((type) => (
+                    <Button disabled={disabled} key={type} onClick={() => addBlock(type)} type="button" variant="outline">
+                      {materialBlockIcon(type)}
+                      {materialBlockLabel(type)}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  {form.id ? (
+                    <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
+                      <Archive className="h-4 w-4" />
+                      Архив
+                    </Button>
+                  ) : null}
+                  <Button disabled={disabled || form.title.trim().length === 0} type="submit">
+                    <Save className="h-4 w-4" />
+                    Сохранить
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="playsay-material-editor">
+              {form.document.pages[0]?.blocks.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-muted/60 p-4 text-sm font-semibold text-muted-foreground">
+                  Добавьте первый блок материала.
+                </div>
+              ) : (
+                form.document.pages[0]?.blocks.map((block, index) => (
+                  <MaterialBlockEditor
+                    block={block}
+                    disabled={disabled}
+                    index={index}
+                    key={block.id}
+                    onRemove={() => removeBlock(block.id)}
+                    onUpdate={(patch) => updateBlock(block.id, patch)}
+                  />
+                ))
+              )}
+            </div>
+
+            {message ? (
+              <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+                {message}
+              </div>
+            ) : null}
+          </form>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MaterialBlockEditor({
+  block,
+  disabled,
+  index,
+  onRemove,
+  onUpdate,
+}: {
+  block: MaterialEditorBlock;
+  disabled: boolean;
+  index: number;
+  onRemove: () => void;
+  onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
+}) {
+  return (
+    <article className="rounded-2xl border border-border bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-muted px-2 py-1 text-xs font-black text-muted-foreground">
+              {index + 1}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#fff3eb] px-2 py-1 text-xs font-black text-primary">
+              {materialBlockIcon(block.type)}
+              {materialBlockLabel(block.type)}
+            </span>
+          </div>
+          <input
+            className="mt-3 w-full border-0 bg-transparent p-0 text-lg font-black outline-none"
+            disabled={disabled}
+            maxLength={160}
+            onChange={(event) => onUpdate({ title: event.target.value })}
+            value={block.title}
+          />
+        </div>
+        <Button disabled={disabled} onClick={onRemove} type="button" variant="outline">
+          <Trash2 className="h-4 w-4" />
+          Удалить
+        </Button>
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        {block.type === "videoEmbed" ? (
+          <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
+            <ProfileField label="Платформа">
+              <select
+                className="playsay-input"
+                disabled={disabled}
+                onChange={(event) => onUpdate({ provider: event.target.value })}
+                value={block.provider ?? "YOUTUBE"}
+              >
+                <option value="YOUTUBE">YouTube</option>
+                <option value="VK">VK</option>
+                <option value="RUTUBE">Rutube</option>
+              </select>
+            </ProfileField>
+            <ProfileField label="Ссылка">
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                onChange={(event) => onUpdate({ url: event.target.value })}
+                placeholder="https://..."
+                value={block.url ?? ""}
+              />
+            </ProfileField>
+          </div>
+        ) : null}
+
+        {block.type === "image" || block.type === "generatedImage" ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ProfileField label={block.type === "generatedImage" ? "Prompt" : "Ссылка на изображение"}>
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                onChange={(event) => onUpdate(block.type === "generatedImage" ? { prompt: event.target.value } : { url: event.target.value })}
+                placeholder={block.type === "generatedImage" ? "friendly classroom picture" : "https://..."}
+                value={block.type === "generatedImage" ? block.prompt ?? "" : block.url ?? ""}
+              />
+            </ProfileField>
+            <ProfileField label="Подпись">
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                onChange={(event) => onUpdate({ caption: event.target.value })}
+                value={block.caption ?? ""}
+              />
+            </ProfileField>
+          </div>
+        ) : null}
+
+        {block.type === "flashcards" ? (
+          <textarea
+            className="playsay-input min-h-28 resize-none py-3"
+            disabled={disabled}
+            onChange={(event) => onUpdate({ cards: parseFlashcards(event.target.value) })}
+            value={formatFlashcards(block.cards)}
+          />
+        ) : null}
+
+        {block.type === "fillGaps" || block.type === "multipleChoice" ? (
+          <textarea
+            className="playsay-input min-h-28 resize-none py-3"
+            disabled={disabled}
+            onChange={(event) => onUpdate({ items: parseExerciseItems(event.target.value, block.type as "fillGaps" | "multipleChoice") })}
+            value={formatExerciseItems(block.items, block.type as "fillGaps" | "multipleChoice")}
+          />
+        ) : null}
+
+        {block.type === "text" || block.type === "freeWriting" || block.type === "speakingPrompt" ? (
+          <textarea
+            className="playsay-input min-h-28 resize-none py-3"
+            disabled={disabled}
+            onChange={(event) => onUpdate(block.type === "text" ? { body: event.target.value } : { prompt: event.target.value })}
+            value={block.type === "text" ? block.body ?? "" : block.prompt ?? ""}
+          />
+        ) : null}
+
+        {block.type === "drawingArea" ? (
+          <ProfileField label="Высота области">
+            <input
+              className="playsay-input"
+              disabled={disabled}
+              max={800}
+              min={120}
+              onChange={(event) => onUpdate({ height: Number(event.target.value) })}
+              type="number"
+              value={block.height ?? 240}
+            />
+          </ProfileField>
+        ) : null}
+      </div>
+    </article>
   );
 }
 
@@ -1014,6 +1731,12 @@ function CourseLessonRow({
         <div className="mt-1 text-xs font-bold text-muted-foreground">
           № {lesson.orderIndex ?? "?"} · {formatDuration(lesson.plannedDurationMin)}
         </div>
+        {lesson.materialTitle ? (
+          <div className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-[#fff3eb] px-2 py-1 text-xs font-extrabold text-primary">
+            <BookOpen className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{lesson.materialTitle}</span>
+          </div>
+        ) : null}
       </div>
       {canManage ? (
         <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
@@ -1235,6 +1958,7 @@ function ScheduleCreateForm({
     event.preventDefault();
     onCreate({
       lessonTemplateId: form.lessonTemplateId || null,
+      materialId: null,
       scheduledStart: localDateTimeToIso(form.scheduledStart),
       scheduledEnd: localDateTimeToIso(form.scheduledEnd),
       status: "SCHEDULED",
@@ -1384,6 +2108,12 @@ function ScheduledLessonCard({
           <p className="mt-1 text-xs font-bold text-muted-foreground">
             {lesson.courseTitle ?? "Курс позже"} · {lesson.teacherName ?? "Преподаватель позже"}
           </p>
+          {lesson.materialTitle ? (
+            <p className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-[#fff3eb] px-2.5 py-1 text-xs font-extrabold text-primary">
+              <BookOpen className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{lesson.materialTitle}</span>
+            </p>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             {lesson.participants.length === 0 ? (
               <span className="rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-extrabold text-muted-foreground">
@@ -1689,6 +2419,39 @@ function LessonWorkspace({
   roleLabel: string;
   session: LessonRoomSession;
 }) {
+  const [material, setMaterial] = useState<LessonMaterial | null>(null);
+  const [materialLoading, setMaterialLoading] = useState(false);
+  const [materialError, setMaterialError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMaterial() {
+      setMaterialLoading(true);
+      setMaterialError(null);
+      try {
+        const lessonMaterial = await fetchScheduledLessonMaterial(session.lessonId);
+        if (!cancelled) {
+          setMaterial(lessonMaterial);
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          setMaterial(null);
+          setMaterialError(caught instanceof Error ? caught.message : "Не удалось загрузить материал");
+        }
+      } finally {
+        if (!cancelled) {
+          setMaterialLoading(false);
+        }
+      }
+    }
+
+    void loadMaterial();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.lessonId]);
+
   return (
     <section className="playsay-workbench">
       <header className="playsay-workbench-topbar">
@@ -1738,19 +2501,48 @@ function LessonWorkspace({
           ) : null}
         </div>
 
-        <div className="playsay-assignment-strip" aria-label="Назначенные задания">
-          <AssignmentStub active title="Speaking warm-up" tag="Speaking" />
-          <AssignmentStub title="Favourite game" tag="Writing" />
-          <AssignmentStub title="Mini dialogue" tag="Grammar" />
-        </div>
+        {material ? (
+          <div className="playsay-assignment-strip" aria-label="Назначенные задания">
+            {materialDocumentBlocks(material).slice(0, 6).map((block, index) => (
+              <AssignmentStub
+                active={index === 0}
+                key={block.id}
+                tag={materialBlockLabel(block.type)}
+                title={block.title}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="playsay-assignment-strip" aria-label="Назначенные задания">
+            <AssignmentStub active title="Speaking warm-up" tag="Speaking" />
+            <AssignmentStub title="Favourite game" tag="Writing" />
+            <AssignmentStub title="Mini dialogue" tag="Grammar" />
+          </div>
+        )}
 
-        <LessonTaskCanvas teacherName={session.teacherName ?? displayName} />
+        {materialLoading ? (
+          <div className="playsay-task-board playsay-material-loading">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span>Материал загружается</span>
+          </div>
+        ) : material ? (
+          <LessonTaskCanvas material={material} teacherName={session.teacherName ?? displayName} />
+        ) : (
+          <>
+            {materialError ? (
+              <div className="mb-2 rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+                {materialError}
+              </div>
+            ) : null}
+            <LessonTaskCanvas teacherName={session.teacherName ?? displayName} />
+          </>
+        )}
       </div>
     </section>
   );
 }
 
-function LessonTaskCanvas({ teacherName }: { teacherName: string }) {
+function LessonTaskCanvas({ material, teacherName }: { material?: LessonMaterial | null; teacherName: string }) {
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pointer");
   const [annotationColor, setAnnotationColor] = useState("#ff5c00");
   const [annotationStrokes, setAnnotationStrokes] = useState<AnnotationStroke[]>([]);
@@ -1844,34 +2636,7 @@ function LessonTaskCanvas({ teacherName }: { teacherName: string }) {
 
       <div className="playsay-task-page">
         <div className="playsay-task-document">
-          <div className="playsay-task-kicker">
-            <FileText className="h-4 w-4 text-primary" />
-            2. Let's chat
-          </div>
-          <h3>Make a guess and complete the descriptions below the pictures</h3>
-          <p className="playsay-task-subtitle">The importance of food for travellers</p>
-
-          <div className="playsay-task-cards">
-            <TaskPictureCard caption="Travellers who think food is important" tone="mint" />
-            <TaskPictureCard caption="Travellers who think food is not important" tone="yellow" />
-          </div>
-
-          <div className="playsay-fill-exercise">
-            <label>
-              I am in the
-              <input aria-label="gap 1" defaultValue="" />
-            </label>
-            <label>
-              I see a lot of
-              <input aria-label="gap 2" defaultValue="" />
-              around.
-            </label>
-            <label>
-              I feel
-              <input aria-label="gap 3" defaultValue="" />
-              because the trip is exciting.
-            </label>
-          </div>
+          {material ? <LessonMaterialDocumentView material={material} /> : <FallbackLessonDocument />}
         </div>
 
         <svg
@@ -1912,6 +2677,170 @@ function LessonTaskCanvas({ teacherName }: { teacherName: string }) {
         <span className="playsay-task-teacher">{teacherName}</span>
       </footer>
     </div>
+  );
+}
+
+function LessonMaterialDocumentView({ material }: { material: LessonMaterial }) {
+  const document = editorDocumentFromJson(material.document);
+  const page = document.pages[0] ?? defaultMaterialPage(material.title);
+  const maxScore = materialMaxScore(material.scoringRubric);
+
+  return (
+    <div className="playsay-rendered-material">
+      <div className="playsay-material-score-badge">
+        <span>{material.cefrLevel}</span>
+        <strong>{maxScore}</strong>
+      </div>
+      <div className="playsay-task-kicker">
+        <FileText className="h-4 w-4 text-primary" />
+        {material.title}
+      </div>
+      <h3>{page.title}</h3>
+      {material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
+      <div className="playsay-material-blocks">
+        {page.blocks.map((block) => (
+          <RenderedMaterialBlock block={block} key={block.id} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RenderedMaterialBlock({ block }: { block: MaterialEditorBlock }) {
+  switch (block.type) {
+    case "text":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <p>{block.body}</p>
+        </section>
+      );
+    case "videoEmbed":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <div className="playsay-video-embed-placeholder">
+            <Video className="h-5 w-5 text-primary" />
+            <span>{block.provider ?? "VIDEO"}</span>
+            <small>{block.url || "Ссылка на видео будет здесь"}</small>
+          </div>
+        </section>
+      );
+    case "image":
+    case "generatedImage":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <figure className="playsay-image-placeholder">
+            <ImageIcon className="h-6 w-6 text-primary" />
+            <figcaption>{block.caption || block.prompt || block.url || "Изображение"}</figcaption>
+          </figure>
+        </section>
+      );
+    case "flashcards":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <div className="playsay-flashcards">
+            {(block.cards ?? []).map((card) => (
+              <article key={card.id}>
+                <strong>{card.front}</strong>
+                <span>{card.back}</span>
+                {card.example ? <small>{card.example}</small> : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      );
+    case "fillGaps":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <div className="playsay-fill-exercise">
+            {(block.items ?? []).map((item, index) => (
+              <label key={`${item.prompt}-${index}`}>
+                {item.prompt.replace("___", "")}
+                <input aria-label={`gap ${index + 1}`} defaultValue="" />
+              </label>
+            ))}
+          </div>
+        </section>
+      );
+    case "multipleChoice":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <div className="playsay-choice-list">
+            {(block.items ?? []).map((item, index) => (
+              <div key={`${item.prompt}-${index}`}>
+                <p>{item.prompt}</p>
+                {(item.options ?? []).map((option) => (
+                  <button key={option} type="button">{option}</button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+      );
+    case "freeWriting":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <p>{block.prompt}</p>
+          <textarea className="playsay-student-answer" placeholder="Ответ ученика" />
+        </section>
+      );
+    case "speakingPrompt":
+      return (
+        <section className="playsay-render-block playsay-speaking-prompt">
+          <h4>{block.title}</h4>
+          <p>{block.prompt}</p>
+        </section>
+      );
+    case "drawingArea":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <div className="playsay-drawing-area" style={{ minHeight: block.height ?? 220 }} />
+        </section>
+      );
+    default:
+      return null;
+  }
+}
+
+function FallbackLessonDocument() {
+  return (
+    <>
+      <div className="playsay-task-kicker">
+        <FileText className="h-4 w-4 text-primary" />
+        2. Let's chat
+      </div>
+      <h3>Make a guess and complete the descriptions below the pictures</h3>
+      <p className="playsay-task-subtitle">The importance of food for travellers</p>
+
+      <div className="playsay-task-cards">
+        <TaskPictureCard caption="Travellers who think food is important" tone="mint" />
+        <TaskPictureCard caption="Travellers who think food is not important" tone="yellow" />
+      </div>
+
+      <div className="playsay-fill-exercise">
+        <label>
+          I am in the
+          <input aria-label="gap 1" defaultValue="" />
+        </label>
+        <label>
+          I see a lot of
+          <input aria-label="gap 2" defaultValue="" />
+          around.
+        </label>
+        <label>
+          I feel
+          <input aria-label="gap 3" defaultValue="" />
+          because the trip is exciting.
+        </label>
+      </div>
+    </>
   );
 }
 
@@ -2235,6 +3164,519 @@ async function fetchCourseBundle(): Promise<{ courses: Course[]; lessons: Course
     courses,
     lessons: Object.fromEntries(lessonEntries),
   };
+}
+
+function defaultMaterialForm(): MaterialFormState {
+  return {
+    id: null,
+    title: "",
+    description: "",
+    language: "en",
+    cefrLevel: "A2",
+    visibility: "PRIVATE",
+    status: "DRAFT",
+    sourcePrompt: "",
+    document: defaultMaterialDocument(),
+    scoringRubric: {
+      scale: 10,
+      maxScore: 10,
+      criteria: [
+        { id: "accuracy", title: "Accuracy", maxScore: 4 },
+        { id: "fluency", title: "Fluency", maxScore: 3 },
+        { id: "task", title: "Task completion", maxScore: 3 },
+      ],
+    },
+    sourceMeta: {
+      kind: "MANUAL",
+      prompt: "",
+    },
+  };
+}
+
+function defaultMaterialDocument(title = "Новый материал"): MaterialEditorDocument {
+  return {
+    schemaVersion: 1,
+    pages: [defaultMaterialPage(title)],
+  };
+}
+
+function defaultMaterialPage(title = "Новый материал"): MaterialEditorPage {
+  return {
+    id: createClientId("page"),
+    title,
+    layout: "FLOW",
+    blocks: [
+      {
+        id: createClientId("block"),
+        type: "text",
+        title: "Цель урока",
+        body: "Добавьте короткую инструкцию, упражнение, видео или карточки.",
+      },
+    ],
+  };
+}
+
+function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
+  const base = {
+    id: createClientId("block"),
+    type,
+    title: materialBlockLabel(type),
+  };
+
+  switch (type) {
+    case "videoEmbed":
+      return { ...base, provider: "YOUTUBE", url: "" };
+    case "image":
+      return { ...base, caption: "", url: "" };
+    case "generatedImage":
+      return { ...base, caption: "", prompt: "" };
+    case "flashcards":
+      return {
+        ...base,
+        cards: [
+          { id: createClientId("card"), front: "boarding pass", back: "посадочный талон", example: "Show your boarding pass at the gate." },
+        ],
+      };
+    case "fillGaps":
+      return {
+        ...base,
+        items: [{ prompt: "I am ___ the airport.", answer: "at" }],
+      };
+    case "multipleChoice":
+      return {
+        ...base,
+        items: [{ prompt: "Choose the correct answer.", answer: "at", options: ["at", "in", "on"] }],
+      };
+    case "freeWriting":
+      return { ...base, prompt: "Write 3-5 sentences." };
+    case "speakingPrompt":
+      return { ...base, prompt: "Discuss the questions with your teacher." };
+    case "drawingArea":
+      return { ...base, height: 240 };
+    case "text":
+    default:
+      return { ...base, body: "Введите текст задания." };
+  }
+}
+
+function materialToForm(material: LessonMaterial): MaterialFormState {
+  const sourceMeta = asJsonObject(material.sourceMeta);
+
+  return {
+    id: material.id,
+    title: material.title,
+    description: material.description ?? "",
+    language: material.language || "en",
+    cefrLevel: material.cefrLevel || "A2",
+    visibility: material.visibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
+    status: material.status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
+    sourcePrompt: readPromptFromSourceMeta(material.sourceMeta),
+    document: editorDocumentFromJson(material.document, material.title),
+    scoringRubric: asJsonObject(material.scoringRubric),
+    sourceMeta,
+  };
+}
+
+function materialDraftToForm(draft: LessonMaterialDraft): MaterialFormState {
+  const sourceMeta = asJsonObject(draft.sourceMeta);
+
+  return {
+    id: null,
+    title: draft.title,
+    description: draft.description ?? "",
+    language: draft.language || "en",
+    cefrLevel: draft.cefrLevel || "A2",
+    visibility: draft.visibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
+    status: draft.status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
+    sourcePrompt: readPromptFromSourceMeta(sourceMeta),
+    document: editorDocumentFromJson(draft.document, draft.title),
+    scoringRubric: asJsonObject(draft.scoringRubric),
+    sourceMeta,
+  };
+}
+
+function materialFormToInput(form: MaterialFormState): LessonMaterialInput {
+  const title = form.title.trim();
+  const sourceMeta = {
+    ...asJsonObject(form.sourceMeta),
+    prompt: form.sourcePrompt.trim(),
+  };
+
+  return {
+    title,
+    description: form.description.trim() || null,
+    language: form.language.trim() || "en",
+    cefrLevel: form.cefrLevel,
+    visibility: form.visibility,
+    status: form.status,
+    document: {
+      ...form.document,
+      pages: form.document.pages.map((page) => ({
+        ...page,
+        title: page.title.trim() || title,
+        blocks: page.blocks.map((block) => cleanMaterialBlock(block)),
+      })),
+    } as unknown as LessonMaterialJson,
+    sourceMeta,
+    scoringRubric: form.scoringRubric,
+  };
+}
+
+function editorDocumentFromJson(value: LessonMaterialJson | unknown, fallbackTitle = "Материал"): MaterialEditorDocument {
+  const root = asJsonObject(value);
+  const rawPages = Array.isArray(root.pages) ? root.pages : [];
+  const pages = rawPages
+    .map((page, index) => materialPageFromJson(page, index, fallbackTitle))
+    .filter((page): page is MaterialEditorPage => page !== null);
+
+  if (pages.length === 0) {
+    return defaultMaterialDocument(fallbackTitle);
+  }
+
+  return {
+    schemaVersion: 1,
+    pages,
+  };
+}
+
+function materialPageFromJson(value: unknown, index: number, fallbackTitle: string): MaterialEditorPage | null {
+  const page = asJsonObject(value);
+  const rawBlocks = Array.isArray(page.blocks) ? page.blocks : [];
+  const blocks = rawBlocks
+    .map((block) => materialBlockFromJson(block))
+    .filter((block): block is MaterialEditorBlock => block !== null);
+
+  return {
+    id: asString(page.id) || createClientId("page"),
+    title: asString(page.title) || (index === 0 ? fallbackTitle : `Страница ${index + 1}`),
+    layout: page.layout === "WORKSHEET" ? "WORKSHEET" : "FLOW",
+    blocks,
+  };
+}
+
+function materialBlockFromJson(value: unknown): MaterialEditorBlock | null {
+  const block = asJsonObject(value);
+  const type = normalizeMaterialBlockType(asString(block.type));
+  if (!type) {
+    return null;
+  }
+
+  const result: MaterialEditorBlock = {
+    id: asString(block.id) || createClientId("block"),
+    type,
+    title: asString(block.title) || materialBlockLabel(type),
+  };
+
+  const body = asString(block.body);
+  const prompt = asString(block.prompt);
+  const url = asString(block.url);
+  const provider = asString(block.provider);
+  const caption = asString(block.caption);
+  const height = asNumber(block.height);
+
+  if (body) {
+    result.body = body;
+  }
+  if (prompt) {
+    result.prompt = prompt;
+  }
+  if (url) {
+    result.url = url;
+  }
+  if (provider) {
+    result.provider = provider;
+  }
+  if (caption) {
+    result.caption = caption;
+  }
+  if (height !== null) {
+    result.height = Math.min(800, Math.max(120, height));
+  }
+
+  if (Array.isArray(block.cards)) {
+    result.cards = block.cards.map(materialCardFromJson).filter((card): card is NonNullable<MaterialEditorBlock["cards"]>[number] => card !== null);
+  }
+
+  if (Array.isArray(block.items)) {
+    result.items = block.items.map(materialItemFromJson).filter((item): item is NonNullable<MaterialEditorBlock["items"]>[number] => item !== null);
+  }
+
+  return result;
+}
+
+function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBlock {
+  const title = block.title.trim() || materialBlockLabel(block.type);
+  const clean: MaterialEditorBlock = {
+    id: block.id || createClientId("block"),
+    type: block.type,
+    title,
+  };
+
+  if (block.body?.trim()) {
+    clean.body = block.body.trim();
+  }
+  if (block.prompt?.trim()) {
+    clean.prompt = block.prompt.trim();
+  }
+  if (block.url?.trim()) {
+    clean.url = block.url.trim();
+  }
+  if (block.provider?.trim()) {
+    clean.provider = block.provider.trim();
+  }
+  if (block.caption?.trim()) {
+    clean.caption = block.caption.trim();
+  }
+  if (block.height) {
+    clean.height = Math.min(800, Math.max(120, block.height));
+  }
+  if (block.cards?.length) {
+    clean.cards = block.cards
+      .filter((card) => card.front.trim() || card.back.trim())
+      .map((card) => ({
+        id: card.id || createClientId("card"),
+        front: card.front.trim(),
+        back: card.back.trim(),
+        example: card.example?.trim() || undefined,
+      }));
+  }
+  if (block.items?.length) {
+    clean.items = block.items
+      .filter((item) => item.prompt.trim())
+      .map((item) => ({
+        prompt: item.prompt.trim(),
+        answer: item.answer?.trim() || undefined,
+        options: item.options?.map((option) => option.trim()).filter(Boolean),
+      }));
+  }
+
+  return clean;
+}
+
+function materialCardFromJson(value: unknown): NonNullable<MaterialEditorBlock["cards"]>[number] | null {
+  const card = asJsonObject(value);
+  const front = asString(card.front);
+  const back = asString(card.back);
+  if (!front && !back) {
+    return null;
+  }
+
+  return {
+    id: asString(card.id) || createClientId("card"),
+    front,
+    back,
+    example: asString(card.example) || undefined,
+  };
+}
+
+function materialItemFromJson(value: unknown): NonNullable<MaterialEditorBlock["items"]>[number] | null {
+  const item = asJsonObject(value);
+  const prompt = asString(item.prompt);
+  if (!prompt) {
+    return null;
+  }
+
+  return {
+    prompt,
+    answer: asString(item.answer) || undefined,
+    options: Array.isArray(item.options) ? item.options.map(asString).filter(Boolean) : undefined,
+  };
+}
+
+function materialDocumentBlocks(material: LessonMaterial): MaterialEditorBlock[] {
+  return editorDocumentFromJson(material.document, material.title).pages.flatMap((page) => page.blocks);
+}
+
+function materialMaxScore(rubric: LessonMaterialJson): number {
+  const object = asJsonObject(rubric);
+  const maxScore = asNumber(object.maxScore);
+  if (maxScore !== null) {
+    return maxScore;
+  }
+
+  const scale = asNumber(object.scale);
+  return scale ?? 10;
+}
+
+function readPromptFromSourceMeta(value: LessonMaterialJson | unknown): string {
+  const sourceMeta = asJsonObject(value);
+  return asString(sourceMeta.prompt) || asString(sourceMeta.sourceText) || "";
+}
+
+function flattenCourseLessonMaterialOptions(
+  courses: Course[],
+  lessons: CourseLessonMap,
+): Array<{ key: string; label: string; courseId: string; lesson: CourseLesson }> {
+  return courses.flatMap((course) =>
+    (lessons[course.id] ?? []).map((lesson) => ({
+      key: `${course.id}:${lesson.id}`,
+      courseId: course.id,
+      lesson,
+      label: `${course.title} · ${lesson.orderIndex ?? "?"}. ${lesson.title}${lesson.materialTitle ? ` · ${lesson.materialTitle}` : ""}`,
+    })),
+  );
+}
+
+function materialBlockIcon(type: MaterialBlockType): ReactNode {
+  switch (type) {
+    case "videoEmbed":
+      return <Video className="h-4 w-4" />;
+    case "image":
+      return <ImageIcon className="h-4 w-4" />;
+    case "generatedImage":
+      return <Bot className="h-4 w-4" />;
+    case "flashcards":
+      return <Layers3 className="h-4 w-4" />;
+    case "fillGaps":
+    case "multipleChoice":
+      return <FileText className="h-4 w-4" />;
+    case "freeWriting":
+      return <PenLine className="h-4 w-4" />;
+    case "speakingPrompt":
+      return <Users className="h-4 w-4" />;
+    case "drawingArea":
+      return <MousePointer2 className="h-4 w-4" />;
+    case "text":
+    default:
+      return <BookOpen className="h-4 w-4" />;
+  }
+}
+
+function materialBlockLabel(type: MaterialBlockType): string {
+  switch (type) {
+    case "text":
+      return "Текст";
+    case "image":
+      return "Картинка";
+    case "generatedImage":
+      return "AI-картинка";
+    case "videoEmbed":
+      return "Видео";
+    case "flashcards":
+      return "Карточки";
+    case "fillGaps":
+      return "Пропуски";
+    case "multipleChoice":
+      return "Тест";
+    case "freeWriting":
+      return "Письмо";
+    case "speakingPrompt":
+      return "Speaking";
+    case "drawingArea":
+      return "Поле";
+    default:
+      return "Блок";
+  }
+}
+
+function parseFlashcards(value: string): MaterialEditorBlock["cards"] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [front = "", back = "", example = ""] = splitMaterialLine(line, 3);
+      return {
+        id: createClientId("card"),
+        front: front.trim(),
+        back: back.trim(),
+        example: example.trim() || undefined,
+      };
+    })
+    .filter((card) => card.front || card.back);
+}
+
+function formatFlashcards(cards: MaterialEditorBlock["cards"]): string {
+  return (cards ?? [])
+    .map((card) => [card.front, card.back, card.example].filter(Boolean).join(" | "))
+    .join("\n");
+}
+
+function parseExerciseItems(value: string, type: "fillGaps" | "multipleChoice"): MaterialEditorBlock["items"] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [prompt = "", optionsOrAnswer = "", answer = ""] = splitMaterialLine(line, 3);
+      if (type === "multipleChoice") {
+        return {
+          prompt: prompt.trim(),
+          options: optionsOrAnswer.split(",").map((option) => option.trim()).filter(Boolean),
+          answer: answer.trim() || undefined,
+        };
+      }
+
+      return {
+        prompt: prompt.trim(),
+        answer: optionsOrAnswer.trim() || undefined,
+      };
+    })
+    .filter((item) => item.prompt);
+}
+
+function formatExerciseItems(items: MaterialEditorBlock["items"], type: "fillGaps" | "multipleChoice"): string {
+  return (items ?? [])
+    .map((item) => {
+      if (type === "multipleChoice") {
+        return [item.prompt, item.options?.join(", "), item.answer].filter(Boolean).join(" | ");
+      }
+
+      return [item.prompt, item.answer].filter(Boolean).join(" | ");
+    })
+    .join("\n");
+}
+
+function splitMaterialLine(value: string, maxParts: number): string[] {
+  const separator = value.includes("|") ? "|" : ";";
+  return value.split(separator).slice(0, maxParts);
+}
+
+function normalizeMaterialBlockType(value: string): MaterialBlockType | null {
+  const allowed: MaterialBlockType[] = [
+    "text",
+    "image",
+    "videoEmbed",
+    "flashcards",
+    "fillGaps",
+    "multipleChoice",
+    "freeWriting",
+    "speakingPrompt",
+    "drawingArea",
+    "generatedImage",
+  ];
+
+  return allowed.includes(value as MaterialBlockType) ? value as MaterialBlockType : null;
+}
+
+function asJsonObject(value: unknown): LessonMaterialJson {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as LessonMaterialJson;
+  }
+
+  return {};
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function createClientId(prefix: string): string {
+  const randomId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
+  return `${prefix}-${randomId}`;
 }
 
 function parseOptionalNumber(value: string): number | null {

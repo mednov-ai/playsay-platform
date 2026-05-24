@@ -30,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException
 
 data class ScheduledLessonRequest(
     val lessonTemplateId: UUID? = null,
+    val materialId: UUID? = null,
     val scheduledStart: Instant? = null,
     val scheduledEnd: Instant? = null,
     @field:Schema(allowableValues = ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
@@ -49,6 +50,8 @@ data class ScheduledLessonParticipantResponse(
 data class ScheduledLessonResponse(
     val id: UUID,
     val lessonTemplateId: UUID?,
+    val materialId: UUID?,
+    val materialTitle: String?,
     val courseId: UUID?,
     val courseTitle: String?,
     val lessonTitle: String?,
@@ -67,6 +70,8 @@ data class ScheduledLessonResponse(
 private data class StoredScheduledLesson(
     val id: UUID,
     val lessonTemplateId: UUID?,
+    val materialId: UUID?,
+    val materialTitle: String?,
     val courseId: UUID?,
     val courseTitle: String?,
     val lessonTitle: String?,
@@ -134,6 +139,7 @@ class ScheduledLessonStore(
         val teacherUserId = userProfileStore.currentUserId(authentication)
         val values = request.validated()
         validateLessonTemplate(values.lessonTemplateId)
+        validateMaterialId(authentication, values.materialId)
         val participantIds = participantIds(values.participantSubjects)
         val id = UUID.randomUUID()
         val now = Instant.now()
@@ -143,6 +149,7 @@ class ScheduledLessonStore(
             INSERT INTO lesson (
                 id,
                 lesson_template_id,
+                material_id,
                 teacher_user_id,
                 scheduled_start,
                 scheduled_end,
@@ -154,6 +161,7 @@ class ScheduledLessonStore(
             ) VALUES (
                 :id,
                 :lessonTemplateId,
+                :materialId,
                 :teacherUserId,
                 :scheduledStart,
                 :scheduledEnd,
@@ -167,6 +175,7 @@ class ScheduledLessonStore(
         )
             .param("id", id)
             .param("lessonTemplateId", values.lessonTemplateId)
+            .param("materialId", values.materialId)
             .param("teacherUserId", teacherUserId)
             .param("scheduledStart", values.scheduledStart?.toScheduleOffsetDateTime())
             .param("scheduledEnd", values.scheduledEnd?.toScheduleOffsetDateTime())
@@ -191,12 +200,14 @@ class ScheduledLessonStore(
         find(lessonId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
         val values = request.validated()
         validateLessonTemplate(values.lessonTemplateId)
+        validateMaterialId(authentication, values.materialId)
         val participantIds = participantIds(values.participantSubjects)
 
         jdbcClient.sql(
             """
             UPDATE lesson
                SET lesson_template_id = :lessonTemplateId,
+                   material_id = :materialId,
                    scheduled_start = :scheduledStart,
                    scheduled_end = :scheduledEnd,
                    status = :status,
@@ -207,6 +218,7 @@ class ScheduledLessonStore(
         )
             .param("id", lessonId)
             .param("lessonTemplateId", values.lessonTemplateId)
+            .param("materialId", values.materialId)
             .param("scheduledStart", values.scheduledStart?.toScheduleOffsetDateTime())
             .param("scheduledEnd", values.scheduledEnd?.toScheduleOffsetDateTime())
             .param("status", values.status)
@@ -370,10 +382,48 @@ class ScheduledLessonStore(
         }
     }
 
+    private fun validateMaterialId(authentication: JwtAuthenticationToken, materialId: UUID?) {
+        if (materialId == null) {
+            return
+        }
+
+        val params = mutableMapOf<String, Any?>("materialId" to materialId)
+        val visibilityClause = if (authentication.isScheduleAdmin()) {
+            ""
+        } else {
+            params["currentUserId"] = userProfileStore.currentUserId(authentication)
+            """
+               AND (
+                     owner_teacher_user_id = :currentUserId
+                  OR (visibility = 'PUBLIC' AND status = 'PUBLISHED')
+               )
+            """.trimIndent()
+        }
+
+        val exists = jdbcClient.sql(
+            """
+            SELECT COUNT(*)
+              FROM lesson_material
+             WHERE id = :materialId
+               AND status <> 'ARCHIVED'
+             $visibilityClause
+            """.trimIndent(),
+        )
+            .params(params)
+            .query(Int::class.java)
+            .single() > 0
+
+        if (!exists) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
+        }
+    }
+
     private fun lessonSelect(whereClause: String): String =
         """
         SELECT l.id,
                l.lesson_template_id,
+               COALESCE(l.material_id, lt.material_id) AS material_id,
+               lm.title AS material_title,
                lt.course_id,
                c.title AS course_title,
                lt.title AS lesson_title,
@@ -389,6 +439,7 @@ class ScheduledLessonStore(
           FROM lesson l
           LEFT JOIN lesson_template lt ON lt.id = l.lesson_template_id
           LEFT JOIN course c ON c.id = lt.course_id
+          LEFT JOIN lesson_material lm ON lm.id = COALESCE(l.material_id, lt.material_id)
           LEFT JOIN app_user teacher ON teacher.id = l.teacher_user_id
           $whereClause
          ORDER BY CASE WHEN l.scheduled_start IS NULL THEN 1 ELSE 0 END,
@@ -516,6 +567,7 @@ class ScheduledLessonController(
 
 private data class ValidatedScheduledLessonRequest(
     val lessonTemplateId: UUID?,
+    val materialId: UUID?,
     val scheduledStart: Instant?,
     val scheduledEnd: Instant?,
     val status: String,
@@ -540,6 +592,7 @@ private fun ScheduledLessonRequest.validated(): ValidatedScheduledLessonRequest 
 
     return ValidatedScheduledLessonRequest(
         lessonTemplateId = lessonTemplateId,
+        materialId = materialId,
         scheduledStart = scheduledStart,
         scheduledEnd = scheduledEnd,
         status = cleanedStatus,
@@ -557,10 +610,15 @@ private fun JwtAuthenticationToken.requireScheduleManager() {
 private fun JwtAuthenticationToken.canManageSchedule(): Boolean =
     authorities.any { authority -> authority.authority == "ROLE_TEACHER" || authority.authority == "ROLE_ADMIN" }
 
+private fun JwtAuthenticationToken.isScheduleAdmin(): Boolean =
+    authorities.any { authority -> authority.authority == "ROLE_ADMIN" }
+
 private fun StoredScheduledLesson.toResponse(participants: List<StoredLessonParticipant>): ScheduledLessonResponse =
     ScheduledLessonResponse(
         id = id,
         lessonTemplateId = lessonTemplateId,
+        materialId = materialId,
+        materialTitle = materialTitle,
         courseId = courseId,
         courseTitle = courseTitle,
         lessonTitle = lessonTitle,
@@ -591,6 +649,8 @@ private fun mapScheduledLesson(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowN
     StoredScheduledLesson(
         id = rs.getObject("id", UUID::class.java),
         lessonTemplateId = rs.getObject("lesson_template_id", UUID::class.java),
+        materialId = rs.getObject("material_id", UUID::class.java),
+        materialTitle = rs.getString("material_title"),
         courseId = rs.getObject("course_id", UUID::class.java),
         courseTitle = rs.getString("course_title"),
         lessonTitle = rs.getString("lesson_title"),

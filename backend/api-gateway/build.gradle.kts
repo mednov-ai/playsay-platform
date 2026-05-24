@@ -38,6 +38,8 @@ tasks.register<Test>("exportOpenApi") {
     group = "documentation"
     description = "Exports the api-gateway OpenAPI contract to contracts/openapi.yaml."
     useJUnitPlatform()
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
     filter {
         includeTestsMatching("com.playsay.gateway.OpenApiExportTest")
     }

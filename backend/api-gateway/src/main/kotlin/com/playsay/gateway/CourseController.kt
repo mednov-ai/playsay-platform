@@ -60,6 +60,8 @@ data class CourseLessonRequest(
     val orderIndex: Int? = null,
     @field:Schema(nullable = true)
     val plannedDurationMin: Int? = null,
+    @field:Schema(nullable = true)
+    val materialId: UUID? = null,
 )
 
 data class CourseLessonResponse(
@@ -68,6 +70,8 @@ data class CourseLessonResponse(
     val title: String,
     val orderIndex: Int?,
     val plannedDurationMin: Int?,
+    val materialId: UUID?,
+    val materialTitle: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
@@ -91,6 +95,8 @@ private data class StoredCourseLesson(
     val title: String,
     val orderIndex: Int?,
     val plannedDurationMin: Int?,
+    val materialId: UUID?,
+    val materialTitle: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
@@ -223,10 +229,24 @@ class CourseStore(
                    title,
                    order_index,
                    planned_duration_min,
+                   material_id,
+                   material_title,
                    created_at,
                    updated_at
-              FROM lesson_template
-             WHERE course_id = :courseId
+              FROM (
+                SELECT lt.id,
+                       lt.course_id,
+                       lt.title,
+                       lt.order_index,
+                       lt.planned_duration_min,
+                       lt.material_id,
+                       lm.title AS material_title,
+                       lt.created_at,
+                       lt.updated_at
+                  FROM lesson_template lt
+                  LEFT JOIN lesson_material lm ON lm.id = lt.material_id
+                 WHERE lt.course_id = :courseId
+              ) lesson_template_with_material
              ORDER BY COALESCE(order_index, 2147483647), created_at, title
             """.trimIndent(),
         )
@@ -245,6 +265,7 @@ class CourseStore(
         authentication.requireCourseManager()
         findCourse(courseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found.")
         val values = request.validated()
+        validateMaterialId(authentication, values.materialId)
         val now = Instant.now()
         val id = UUID.randomUUID()
 
@@ -256,6 +277,7 @@ class CourseStore(
                 title,
                 order_index,
                 planned_duration_min,
+                material_id,
                 created_at,
                 updated_at
             ) VALUES (
@@ -264,6 +286,7 @@ class CourseStore(
                 :title,
                 :orderIndex,
                 :plannedDurationMin,
+                :materialId,
                 :createdAt,
                 :updatedAt
             )
@@ -274,6 +297,7 @@ class CourseStore(
             .param("title", values.title)
             .param("orderIndex", values.orderIndex)
             .param("plannedDurationMin", values.plannedDurationMin)
+            .param("materialId", values.materialId)
             .param("createdAt", now.toCourseOffsetDateTime())
             .param("updatedAt", now.toCourseOffsetDateTime())
             .update()
@@ -291,12 +315,14 @@ class CourseStore(
         authentication.requireCourseManager()
         findCourse(courseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found.")
         val values = request.validated()
+        validateMaterialId(authentication, values.materialId)
         val updated = jdbcClient.sql(
             """
             UPDATE lesson_template
                SET title = :title,
                    order_index = :orderIndex,
                    planned_duration_min = :plannedDurationMin,
+                   material_id = :materialId,
                    updated_at = :updatedAt
              WHERE id = :lessonId
                AND course_id = :courseId
@@ -307,6 +333,7 @@ class CourseStore(
             .param("title", values.title)
             .param("orderIndex", values.orderIndex)
             .param("plannedDurationMin", values.plannedDurationMin)
+            .param("materialId", values.materialId)
             .param("updatedAt", Instant.now().toCourseOffsetDateTime())
             .update()
 
@@ -359,11 +386,25 @@ class CourseStore(
                    title,
                    order_index,
                    planned_duration_min,
+                   material_id,
+                   material_title,
                    created_at,
                    updated_at
-              FROM lesson_template
-             WHERE course_id = :courseId
-               AND id = :lessonId
+              FROM (
+                SELECT lt.id,
+                       lt.course_id,
+                       lt.title,
+                       lt.order_index,
+                       lt.planned_duration_min,
+                       lt.material_id,
+                       lm.title AS material_title,
+                       lt.created_at,
+                       lt.updated_at
+                  FROM lesson_template lt
+                  LEFT JOIN lesson_material lm ON lm.id = lt.material_id
+                 WHERE lt.course_id = :courseId
+                   AND lt.id = :lessonId
+              ) lesson_template_with_material
             """.trimIndent(),
         )
             .param("courseId", courseId)
@@ -398,6 +439,42 @@ class CourseStore(
                   c.updated_at
         """.trimIndent() +
             "\n"
+
+    private fun validateMaterialId(authentication: JwtAuthenticationToken, materialId: UUID?) {
+        if (materialId == null) {
+            return
+        }
+
+        val params = mutableMapOf<String, Any?>("materialId" to materialId)
+        val visibilityClause = if (authentication.isCourseAdmin()) {
+            ""
+        } else {
+            params["currentUserId"] = userProfileStore.currentUserId(authentication)
+            """
+               AND (
+                     owner_teacher_user_id = :currentUserId
+                  OR (visibility = 'PUBLIC' AND status = 'PUBLISHED')
+               )
+            """.trimIndent()
+        }
+
+        val exists = jdbcClient.sql(
+            """
+            SELECT COUNT(*)
+              FROM lesson_material
+             WHERE id = :materialId
+               AND status <> 'ARCHIVED'
+             $visibilityClause
+            """.trimIndent(),
+        )
+            .params(params)
+            .query(Int::class.java)
+            .single() > 0
+
+        if (!exists) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
+        }
+    }
 }
 
 @RestController
@@ -628,6 +705,7 @@ private data class ValidatedCourseLessonRequest(
     val title: String,
     val orderIndex: Int?,
     val plannedDurationMin: Int?,
+    val materialId: UUID?,
 )
 
 private fun CourseRequest.validated(): ValidatedCourseRequest =
@@ -651,6 +729,7 @@ private fun CourseLessonRequest.validated(): ValidatedCourseLessonRequest {
         title = title.requiredClean("title", 160),
         orderIndex = orderIndex,
         plannedDurationMin = plannedDurationMin,
+        materialId = materialId,
     )
 }
 
@@ -675,6 +754,9 @@ private fun JwtAuthenticationToken.requireCourseManager() {
 private fun JwtAuthenticationToken.canManageCourses(): Boolean =
     authorities.any { authority -> authority.authority == "ROLE_TEACHER" || authority.authority == "ROLE_ADMIN" }
 
+private fun JwtAuthenticationToken.isCourseAdmin(): Boolean =
+    authorities.any { authority -> authority.authority == "ROLE_ADMIN" }
+
 private fun StoredCourse.toResponse(): CourseResponse =
     CourseResponse(
         id = id,
@@ -696,6 +778,8 @@ private fun StoredCourseLesson.toResponse(): CourseLessonResponse =
         title = title,
         orderIndex = orderIndex,
         plannedDurationMin = plannedDurationMin,
+        materialId = materialId,
+        materialTitle = materialTitle,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
@@ -721,6 +805,8 @@ private fun mapCourseLesson(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum:
         title = rs.getString("title"),
         orderIndex = rs.getNullableInt("order_index"),
         plannedDurationMin = rs.getNullableInt("planned_duration_min"),
+        materialId = rs.getObject("material_id", UUID::class.java),
+        materialTitle = rs.getString("material_title"),
         createdAt = rs.getCourseInstant("created_at"),
         updatedAt = rs.getCourseInstant("updated_at"),
     )

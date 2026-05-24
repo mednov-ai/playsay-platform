@@ -1,0 +1,1141 @@
+package com.playsay.gateway
+
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
+import io.swagger.v3.oas.annotations.tags.Tag
+import java.sql.ResultSet
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.UUID
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
+import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
+
+data class LessonMaterialRequest(
+    @field:Schema(maxLength = 160)
+    val title: String,
+    @field:Schema(maxLength = 2_000, nullable = true)
+    val description: String? = null,
+    @field:Schema(maxLength = 16)
+    val language: String = "en",
+    @field:Schema(allowableValues = ["A1", "A2", "B1", "B2", "C1", "C2"])
+    val cefrLevel: String = "A2",
+    @field:Schema(allowableValues = ["PRIVATE", "PUBLIC"])
+    val visibility: String = "PRIVATE",
+    @field:Schema(allowableValues = ["DRAFT", "PUBLISHED", "ARCHIVED"])
+    val status: String = "DRAFT",
+    val document: JsonNode? = null,
+    val sourceMeta: JsonNode? = null,
+    val scoringRubric: JsonNode? = null,
+)
+
+data class LessonMaterialResponse(
+    val id: UUID,
+    val ownerTeacherUserId: UUID?,
+    val ownerTeacherSubject: String?,
+    val ownerTeacherName: String?,
+    val title: String,
+    val description: String?,
+    val language: String,
+    val cefrLevel: String,
+    val visibility: String,
+    val status: String,
+    val document: JsonNode,
+    val sourceMeta: JsonNode,
+    val scoringRubric: JsonNode,
+    val blockCount: Int,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+data class MaterialAssetRequest(
+    @field:Schema(allowableValues = ["IMAGE", "GENERATED_IMAGE", "DOCUMENT_SCAN", "VIDEO_EMBED", "EXTERNAL_SOURCE", "AUDIO_NOTE"])
+    val kind: String,
+    val storageKey: String? = null,
+    val externalUrl: String? = null,
+    @field:Schema(allowableValues = ["YOUTUBE", "VK", "RUTUBE", "URL", "UPLOAD", "AI"])
+    val provider: String = "UPLOAD",
+    val metadata: JsonNode? = null,
+)
+
+data class MaterialAssetResponse(
+    val id: UUID,
+    val materialId: UUID,
+    val kind: String,
+    val storageKey: String?,
+    val externalUrl: String?,
+    val provider: String,
+    val metadata: JsonNode,
+    val createdAt: Instant,
+)
+
+data class MaterialAiDraftRequest(
+    @field:Schema(maxLength = 160, nullable = true)
+    val title: String? = null,
+    @field:Schema(maxLength = 4_000)
+    val prompt: String,
+    @field:Schema(maxLength = 16)
+    val language: String = "en",
+    @field:Schema(allowableValues = ["A1", "A2", "B1", "B2", "C1", "C2"], nullable = true)
+    val cefrLevel: String? = null,
+)
+
+data class LessonMaterialDraftResponse(
+    val title: String,
+    val description: String?,
+    val language: String,
+    val cefrLevel: String,
+    val visibility: String,
+    val status: String,
+    val document: JsonNode,
+    val sourceMeta: JsonNode,
+    val scoringRubric: JsonNode,
+)
+
+private data class StoredLessonMaterial(
+    val id: UUID,
+    val ownerTeacherUserId: UUID?,
+    val ownerTeacherSubject: String?,
+    val ownerTeacherName: String?,
+    val title: String,
+    val description: String?,
+    val language: String,
+    val cefrLevel: String,
+    val visibility: String,
+    val status: String,
+    val document: String,
+    val sourceMeta: String,
+    val scoringRubric: String,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+private data class StoredMaterialAsset(
+    val id: UUID,
+    val materialId: UUID,
+    val kind: String,
+    val storageKey: String?,
+    val externalUrl: String?,
+    val provider: String,
+    val metadata: String,
+    val createdAt: Instant,
+)
+
+private data class ValidatedLessonMaterialRequest(
+    val title: String,
+    val description: String?,
+    val language: String,
+    val cefrLevel: String,
+    val visibility: String,
+    val status: String,
+    val document: JsonNode,
+    val sourceMeta: JsonNode,
+    val scoringRubric: JsonNode,
+)
+
+private data class ValidatedMaterialAssetRequest(
+    val kind: String,
+    val storageKey: String?,
+    val externalUrl: String?,
+    val provider: String,
+    val metadata: JsonNode,
+)
+
+@Component
+class LessonMaterialStore(
+    private val jdbcClient: JdbcClient,
+    private val userProfileStore: UserProfileStore,
+) {
+    private val objectMapper: ObjectMapper = jacksonObjectMapper()
+
+    @Transactional
+    fun list(authentication: JwtAuthenticationToken): List<LessonMaterialResponse> {
+        val sql: String
+        val params = mutableMapOf<String, Any?>()
+
+        when {
+            authentication.isMaterialAdmin() -> {
+                sql = materialSelect("WHERE m.status <> 'ARCHIVED' ORDER BY m.updated_at DESC, m.title")
+            }
+            authentication.canManageMaterials() -> {
+                params["ownerTeacherUserId"] = userProfileStore.currentUserId(authentication)
+                sql = materialSelect(
+                    """
+                    WHERE m.status <> 'ARCHIVED'
+                      AND (
+                            m.owner_teacher_user_id = :ownerTeacherUserId
+                         OR (m.visibility = 'PUBLIC' AND m.status = 'PUBLISHED')
+                      )
+                    ORDER BY CASE WHEN m.owner_teacher_user_id = :ownerTeacherUserId THEN 0 ELSE 1 END,
+                             m.updated_at DESC,
+                             m.title
+                    """.trimIndent(),
+                )
+            }
+            else -> {
+                sql = materialSelect(
+                    """
+                    WHERE m.visibility = 'PUBLIC'
+                      AND m.status = 'PUBLISHED'
+                    ORDER BY m.updated_at DESC, m.title
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        return jdbcClient.sql(sql)
+            .params(params)
+            .query(::mapMaterial)
+            .list()
+            .map { material -> material.toResponse(objectMapper) }
+    }
+
+    @Transactional
+    fun get(authentication: JwtAuthenticationToken, materialId: UUID): LessonMaterialResponse {
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        if (!material.canRead(authentication, currentUserId)) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        }
+        return material.toResponse(objectMapper)
+    }
+
+    @Transactional
+    fun create(authentication: JwtAuthenticationToken, request: LessonMaterialRequest): LessonMaterialResponse {
+        authentication.requireMaterialManager()
+        val ownerTeacherUserId = userProfileStore.currentUserId(authentication)
+        val values = request.validated(objectMapper)
+        val id = UUID.randomUUID()
+        val now = Instant.now()
+
+        jdbcClient.sql(
+            """
+            INSERT INTO lesson_material (
+                id,
+                owner_teacher_user_id,
+                title,
+                description,
+                language,
+                cefr_level,
+                visibility,
+                status,
+                document,
+                source_meta,
+                scoring_rubric,
+                created_at,
+                updated_at
+            ) VALUES (
+                :id,
+                :ownerTeacherUserId,
+                :title,
+                :description,
+                :language,
+                :cefrLevel,
+                :visibility,
+                :status,
+                :document,
+                :sourceMeta,
+                :scoringRubric,
+                :createdAt,
+                :updatedAt
+            )
+            """.trimIndent(),
+        )
+            .param("id", id)
+            .param("ownerTeacherUserId", ownerTeacherUserId)
+            .param("title", values.title)
+            .param("description", values.description)
+            .param("language", values.language)
+            .param("cefrLevel", values.cefrLevel)
+            .param("visibility", values.visibility)
+            .param("status", values.status)
+            .param("document", objectMapper.writeValueAsString(values.document))
+            .param("sourceMeta", objectMapper.writeValueAsString(values.sourceMeta))
+            .param("scoringRubric", objectMapper.writeValueAsString(values.scoringRubric))
+            .param("createdAt", now.toMaterialOffsetDateTime())
+            .param("updatedAt", now.toMaterialOffsetDateTime())
+            .update()
+
+        return requireNotNull(find(id)).toResponse(objectMapper)
+    }
+
+    @Transactional
+    fun update(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        request: LessonMaterialRequest,
+    ): LessonMaterialResponse {
+        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        if (!material.canEdit(authentication, currentUserId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit this material.")
+        }
+
+        val values = request.validated(objectMapper)
+        jdbcClient.sql(
+            """
+            UPDATE lesson_material
+               SET title = :title,
+                   description = :description,
+                   language = :language,
+                   cefr_level = :cefrLevel,
+                   visibility = :visibility,
+                   status = :status,
+                   document = :document,
+                   source_meta = :sourceMeta,
+                   scoring_rubric = :scoringRubric,
+                   updated_at = :updatedAt
+             WHERE id = :id
+            """.trimIndent(),
+        )
+            .param("id", materialId)
+            .param("title", values.title)
+            .param("description", values.description)
+            .param("language", values.language)
+            .param("cefrLevel", values.cefrLevel)
+            .param("visibility", values.visibility)
+            .param("status", values.status)
+            .param("document", objectMapper.writeValueAsString(values.document))
+            .param("sourceMeta", objectMapper.writeValueAsString(values.sourceMeta))
+            .param("scoringRubric", objectMapper.writeValueAsString(values.scoringRubric))
+            .param("updatedAt", Instant.now().toMaterialOffsetDateTime())
+            .update()
+
+        return requireNotNull(find(materialId)).toResponse(objectMapper)
+    }
+
+    @Transactional
+    fun archive(authentication: JwtAuthenticationToken, materialId: UUID) {
+        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        if (!material.canEdit(authentication, currentUserId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the material owner or admin can archive this material.")
+        }
+
+        jdbcClient.sql(
+            """
+            UPDATE lesson_material
+               SET status = 'ARCHIVED',
+                   updated_at = :updatedAt
+             WHERE id = :id
+            """.trimIndent(),
+        )
+            .param("id", materialId)
+            .param("updatedAt", Instant.now().toMaterialOffsetDateTime())
+            .update()
+    }
+
+    @Transactional(readOnly = true)
+    fun getForScheduledLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LessonMaterialResponse {
+        val lesson = jdbcClient.sql(
+            """
+            SELECT l.id,
+                   l.status,
+                   l.scheduled_end,
+                   COALESCE(l.material_id, lt.material_id) AS material_id
+              FROM lesson l
+              LEFT JOIN lesson_template lt ON lt.id = l.lesson_template_id
+             WHERE l.id = :lessonId
+            """.trimIndent(),
+        )
+            .param("lessonId", lessonId)
+            .query { rs, _ ->
+                ScheduledMaterialLookup(
+                    id = rs.getObject("id", UUID::class.java),
+                    status = rs.getString("status"),
+                    scheduledEnd = rs.getObject("scheduled_end", OffsetDateTime::class.java)?.toInstant(),
+                    materialId = rs.getObject("material_id", UUID::class.java),
+                )
+            }
+            .optional()
+            .orElse(null)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+
+        if (!authentication.canManageMaterials() && !lesson.isVisibleToParticipant(Instant.now())) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+        }
+
+        if (!authentication.canManageMaterials() && !isLessonParticipant(lessonId, authentication.token.subject)) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+        }
+
+        val materialId = lesson.materialId ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId)?.takeIf { it.status != "ARCHIVED" }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        return material.toResponse(objectMapper)
+    }
+
+    fun draft(authentication: JwtAuthenticationToken, request: MaterialAiDraftRequest): LessonMaterialDraftResponse {
+        authentication.requireMaterialManager()
+        val prompt = request.prompt.requiredClean("prompt", 4_000)
+        val language = request.language.requiredClean("language", 16)
+        val cefrLevel = request.cefrLevel?.trim()?.uppercase()?.takeIf { it in cefrLevels }
+            ?: inferCefrLevel(prompt)
+        val title = request.title.optionalClean("title", 160)
+            ?: prompt.lineSequence().firstOrNull()?.take(90)?.ifBlank { null }
+            ?: "Новый материал"
+        val document = aiDraftDocument(title, prompt, language, cefrLevel, objectMapper)
+        val sourceMeta = objectMapper.createObjectNode()
+            .put("kind", "AI_STUB")
+            .put("provider", "stub")
+            .put("prompt", prompt)
+            .put("note", "LLM key is not configured yet; this deterministic draft uses the final Play&Say schema.")
+        val scoringRubric = defaultScoringRubric(objectMapper)
+
+        return LessonMaterialDraftResponse(
+            title = title,
+            description = "Черновик по описанию: ${prompt.take(180)}",
+            language = language,
+            cefrLevel = cefrLevel,
+            visibility = "PRIVATE",
+            status = "DRAFT",
+            document = document,
+            sourceMeta = sourceMeta,
+            scoringRubric = scoringRubric,
+        )
+    }
+
+    @Transactional(readOnly = true)
+    fun listAssets(authentication: JwtAuthenticationToken, materialId: UUID): List<MaterialAssetResponse> {
+        get(authentication, materialId)
+        return jdbcClient.sql(
+            """
+            SELECT id,
+                   material_id,
+                   kind,
+                   storage_key,
+                   external_url,
+                   provider,
+                   metadata,
+                   created_at
+              FROM material_asset
+             WHERE material_id = :materialId
+             ORDER BY created_at DESC
+            """.trimIndent(),
+        )
+            .param("materialId", materialId)
+            .query(::mapMaterialAsset)
+            .list()
+            .map { asset -> asset.toResponse(objectMapper) }
+    }
+
+    @Transactional
+    fun createAsset(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        request: MaterialAssetRequest,
+    ): MaterialAssetResponse {
+        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        if (!material.canEdit(authentication, currentUserId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit assets.")
+        }
+
+        val values = request.validated(objectMapper)
+        val id = UUID.randomUUID()
+        val now = Instant.now()
+        jdbcClient.sql(
+            """
+            INSERT INTO material_asset (
+                id,
+                material_id,
+                kind,
+                storage_key,
+                external_url,
+                provider,
+                metadata,
+                created_at
+            ) VALUES (
+                :id,
+                :materialId,
+                :kind,
+                :storageKey,
+                :externalUrl,
+                :provider,
+                :metadata,
+                :createdAt
+            )
+            """.trimIndent(),
+        )
+            .param("id", id)
+            .param("materialId", materialId)
+            .param("kind", values.kind)
+            .param("storageKey", values.storageKey)
+            .param("externalUrl", values.externalUrl)
+            .param("provider", values.provider)
+            .param("metadata", objectMapper.writeValueAsString(values.metadata))
+            .param("createdAt", now.toMaterialOffsetDateTime())
+            .update()
+
+        return requireNotNull(findAsset(id)).toResponse(objectMapper)
+    }
+
+    @Transactional
+    fun deleteAsset(authentication: JwtAuthenticationToken, materialId: UUID, assetId: UUID) {
+        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        if (!material.canEdit(authentication, currentUserId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit assets.")
+        }
+
+        val deleted = jdbcClient.sql(
+            """
+            DELETE FROM material_asset
+             WHERE id = :assetId
+               AND material_id = :materialId
+            """.trimIndent(),
+        )
+            .param("assetId", assetId)
+            .param("materialId", materialId)
+            .update()
+
+        if (deleted == 0) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material asset not found.")
+        }
+    }
+
+    private fun find(materialId: UUID): StoredLessonMaterial? =
+        jdbcClient.sql(materialSelect("WHERE m.id = :materialId"))
+            .param("materialId", materialId)
+            .query(::mapMaterial)
+            .optional()
+            .orElse(null)
+
+    private fun findAsset(assetId: UUID): StoredMaterialAsset? =
+        jdbcClient.sql(
+            """
+            SELECT id,
+                   material_id,
+                   kind,
+                   storage_key,
+                   external_url,
+                   provider,
+                   metadata,
+                   created_at
+              FROM material_asset
+             WHERE id = :assetId
+            """.trimIndent(),
+        )
+            .param("assetId", assetId)
+            .query(::mapMaterialAsset)
+            .optional()
+            .orElse(null)
+
+    private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
+        jdbcClient.sql(
+            """
+            SELECT COUNT(*)
+              FROM lesson_participant lp
+              JOIN app_user student ON student.id = lp.student_user_id
+             WHERE lp.lesson_id = :lessonId
+               AND student.keycloak_subject = :subject
+            """.trimIndent(),
+        )
+            .param("lessonId", lessonId)
+            .param("subject", subject)
+            .query(Int::class.java)
+            .single() > 0
+
+    private fun JwtAuthenticationToken.currentUserIdIfNeeded(): UUID? =
+        if (canManageMaterials()) userProfileStore.currentUserId(this) else null
+
+    private fun materialSelect(whereClause: String): String =
+        """
+        SELECT m.id,
+               m.owner_teacher_user_id,
+               owner.keycloak_subject AS owner_teacher_subject,
+               COALESCE(owner.display_name, owner.name, owner.username) AS owner_teacher_name,
+               m.title,
+               m.description,
+               m.language,
+               m.cefr_level,
+               m.visibility,
+               m.status,
+               m.document,
+               m.source_meta,
+               m.scoring_rubric,
+               m.created_at,
+               m.updated_at
+          FROM lesson_material m
+          LEFT JOIN app_user owner ON owner.id = m.owner_teacher_user_id
+          $whereClause
+        """.trimIndent()
+}
+
+@RestController
+@Tag(name = "Materials")
+class MaterialController(
+    private val store: LessonMaterialStore,
+) {
+    @GetMapping("/materials", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "listMaterials",
+        summary = "List lesson materials",
+        description = "Teachers/admins see their materials and published public materials. Students see published public materials.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Lesson materials"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+        ],
+    )
+    fun list(authentication: JwtAuthenticationToken): List<LessonMaterialResponse> =
+        store.list(authentication)
+
+    @GetMapping("/materials/{materialId}", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "getMaterial",
+        summary = "Get lesson material",
+        description = "Returns a visible lesson material.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Lesson material"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Material not found", content = [Content()]),
+        ],
+    )
+    fun get(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+    ): LessonMaterialResponse =
+        store.get(authentication, materialId)
+
+    @PostMapping(
+        "/materials",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "createMaterial",
+        summary = "Create lesson material",
+        description = "Creates a structured lesson material. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "201", description = "Lesson material created"),
+            ApiResponse(responseCode = "400", description = "Invalid material payload", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot manage materials", content = [Content()]),
+        ],
+    )
+    fun create(
+        authentication: JwtAuthenticationToken,
+        @RequestBody request: LessonMaterialRequest,
+    ): ResponseEntity<LessonMaterialResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(store.create(authentication, request))
+
+    @PutMapping(
+        "/materials/{materialId}",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "updateMaterial",
+        summary = "Update lesson material",
+        description = "Updates a structured lesson material. Requires material owner or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Lesson material updated"),
+            ApiResponse(responseCode = "400", description = "Invalid material payload", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot edit material", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Material not found", content = [Content()]),
+        ],
+    )
+    fun update(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @RequestBody request: LessonMaterialRequest,
+    ): LessonMaterialResponse =
+        store.update(authentication, materialId, request)
+
+    @DeleteMapping("/materials/{materialId}")
+    @Operation(
+        operationId = "archiveMaterial",
+        summary = "Archive lesson material",
+        description = "Archives a lesson material. Requires material owner or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "Lesson material archived"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot archive material", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Material not found", content = [Content()]),
+        ],
+    )
+    fun archive(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+    ): ResponseEntity<Void> {
+        store.archive(authentication, materialId)
+        return ResponseEntity.noContent().build()
+    }
+
+    @GetMapping("/schedule/lessons/{lessonId}/material", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "getScheduledLessonMaterial",
+        summary = "Get scheduled lesson material",
+        description = "Returns the material attached directly to a scheduled lesson or inherited from its lesson template.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Scheduled lesson material"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
+        ],
+    )
+    fun scheduledLessonMaterial(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+    ): LessonMaterialResponse =
+        store.getForScheduledLesson(authentication, lessonId)
+
+    @PostMapping(
+        "/materials/ai-draft",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "draftMaterialWithAi",
+        summary = "Draft lesson material with AI",
+        description = "Returns a deterministic Play&Say material draft until a real LLM key is configured.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Draft material"),
+            ApiResponse(responseCode = "400", description = "Invalid draft prompt", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot manage materials", content = [Content()]),
+        ],
+    )
+    fun draft(
+        authentication: JwtAuthenticationToken,
+        @RequestBody request: MaterialAiDraftRequest,
+    ): LessonMaterialDraftResponse =
+        store.draft(authentication, request)
+
+    @GetMapping("/materials/{materialId}/assets", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "listMaterialAssets",
+        summary = "List material assets",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun listAssets(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+    ): List<MaterialAssetResponse> =
+        store.listAssets(authentication, materialId)
+
+    @PostMapping(
+        "/materials/{materialId}/assets",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "createMaterialAsset",
+        summary = "Create material asset reference",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun createAsset(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @RequestBody request: MaterialAssetRequest,
+    ): ResponseEntity<MaterialAssetResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(store.createAsset(authentication, materialId, request))
+
+    @DeleteMapping("/materials/{materialId}/assets/{assetId}")
+    @Operation(
+        operationId = "deleteMaterialAsset",
+        summary = "Delete material asset reference",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun deleteAsset(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @PathVariable assetId: UUID,
+    ): ResponseEntity<Void> {
+        store.deleteAsset(authentication, materialId, assetId)
+        return ResponseEntity.noContent().build()
+    }
+}
+
+private data class ScheduledMaterialLookup(
+    val id: UUID,
+    val status: String,
+    val scheduledEnd: Instant?,
+    val materialId: UUID?,
+) {
+    fun isVisibleToParticipant(now: Instant): Boolean =
+        status !in setOf("COMPLETED", "CANCELLED") && scheduledEnd?.isAfter(now) != false
+}
+
+private fun LessonMaterialRequest.validated(objectMapper: ObjectMapper): ValidatedLessonMaterialRequest {
+    val title = title.requiredClean("title", 160)
+    val language = language.requiredClean("language", 16)
+    val cefrLevel = cefrLevel.trim().uppercase()
+    if (cefrLevel !in cefrLevels) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported CEFR level.")
+    }
+    val visibility = visibility.trim().uppercase()
+    if (visibility !in materialVisibilities) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported material visibility.")
+    }
+    val status = status.trim().uppercase()
+    if (status !in materialStatuses) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported material status.")
+    }
+
+    val document = document ?: defaultMaterialDocument(title, objectMapper)
+    val sourceMeta = sourceMeta ?: objectMapper.createObjectNode().put("kind", "MANUAL")
+    val scoringRubric = scoringRubric ?: defaultScoringRubric(objectMapper)
+
+    validateJsonSize("document", document, objectMapper, 200_000)
+    validateJsonSize("sourceMeta", sourceMeta, objectMapper, 40_000)
+    validateJsonSize("scoringRubric", scoringRubric, objectMapper, 40_000)
+
+    return ValidatedLessonMaterialRequest(
+        title = title,
+        description = description.optionalClean("description", 2_000),
+        language = language,
+        cefrLevel = cefrLevel,
+        visibility = visibility,
+        status = status,
+        document = document,
+        sourceMeta = sourceMeta,
+        scoringRubric = scoringRubric,
+    )
+}
+
+private fun MaterialAssetRequest.validated(objectMapper: ObjectMapper): ValidatedMaterialAssetRequest {
+    val kind = kind.trim().uppercase()
+    if (kind !in assetKinds) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported material asset kind.")
+    }
+    val provider = provider.trim().uppercase()
+    if (provider !in assetProviders) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported material asset provider.")
+    }
+    val storageKey = storageKey.optionalClean("storageKey", 1_024)
+    val externalUrl = externalUrl.optionalClean("externalUrl", 4_000)
+    if (storageKey == null && externalUrl == null) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "storageKey or externalUrl is required.")
+    }
+    val metadata = metadata ?: objectMapper.createObjectNode()
+    validateJsonSize("metadata", metadata, objectMapper, 40_000)
+
+    return ValidatedMaterialAssetRequest(
+        kind = kind,
+        storageKey = storageKey,
+        externalUrl = externalUrl,
+        provider = provider,
+        metadata = metadata,
+    )
+}
+
+private fun StoredLessonMaterial.canRead(authentication: JwtAuthenticationToken, currentUserId: UUID?): Boolean {
+    if (authentication.isMaterialAdmin()) {
+        return true
+    }
+    if (authentication.canManageMaterials() && ownerTeacherUserId == currentUserId) {
+        return true
+    }
+    return visibility == "PUBLIC" && status == "PUBLISHED"
+}
+
+private fun StoredLessonMaterial.canEdit(authentication: JwtAuthenticationToken, currentUserId: UUID?): Boolean =
+    authentication.isMaterialAdmin() || (authentication.canManageMaterials() && ownerTeacherUserId == currentUserId)
+
+private fun StoredLessonMaterial.toResponse(objectMapper: ObjectMapper): LessonMaterialResponse {
+    val documentNode = objectMapper.readTree(document)
+    return LessonMaterialResponse(
+        id = id,
+        ownerTeacherUserId = ownerTeacherUserId,
+        ownerTeacherSubject = ownerTeacherSubject,
+        ownerTeacherName = ownerTeacherName,
+        title = title,
+        description = description,
+        language = language,
+        cefrLevel = cefrLevel,
+        visibility = visibility,
+        status = status,
+        document = documentNode,
+        sourceMeta = objectMapper.readTree(sourceMeta),
+        scoringRubric = objectMapper.readTree(scoringRubric),
+        blockCount = documentNode.blockCount(),
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+}
+
+private fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): MaterialAssetResponse =
+    MaterialAssetResponse(
+        id = id,
+        materialId = materialId,
+        kind = kind,
+        storageKey = storageKey,
+        externalUrl = externalUrl,
+        provider = provider,
+        metadata = objectMapper.readTree(metadata),
+        createdAt = createdAt,
+    )
+
+private fun mapMaterial(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredLessonMaterial =
+    StoredLessonMaterial(
+        id = rs.getObject("id", UUID::class.java),
+        ownerTeacherUserId = rs.getObject("owner_teacher_user_id", UUID::class.java),
+        ownerTeacherSubject = rs.getString("owner_teacher_subject"),
+        ownerTeacherName = rs.getString("owner_teacher_name"),
+        title = rs.getString("title"),
+        description = rs.getString("description"),
+        language = rs.getString("language"),
+        cefrLevel = rs.getString("cefr_level"),
+        visibility = rs.getString("visibility"),
+        status = rs.getString("status"),
+        document = rs.getString("document"),
+        sourceMeta = rs.getString("source_meta"),
+        scoringRubric = rs.getString("scoring_rubric"),
+        createdAt = rs.getMaterialInstant("created_at"),
+        updatedAt = rs.getMaterialInstant("updated_at"),
+    )
+
+private fun mapMaterialAsset(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredMaterialAsset =
+    StoredMaterialAsset(
+        id = rs.getObject("id", UUID::class.java),
+        materialId = rs.getObject("material_id", UUID::class.java),
+        kind = rs.getString("kind"),
+        storageKey = rs.getString("storage_key"),
+        externalUrl = rs.getString("external_url"),
+        provider = rs.getString("provider"),
+        metadata = rs.getString("metadata"),
+        createdAt = rs.getMaterialInstant("created_at"),
+    )
+
+private fun JwtAuthenticationToken.requireMaterialManager() {
+    if (!canManageMaterials()) {
+        throw ResponseStatusException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
+    }
+}
+
+private fun JwtAuthenticationToken.canManageMaterials(): Boolean =
+    authorities.any { authority -> authority.authority == "ROLE_TEACHER" || authority.authority == "ROLE_ADMIN" }
+
+private fun JwtAuthenticationToken.isMaterialAdmin(): Boolean =
+    authorities.any { authority -> authority.authority == "ROLE_ADMIN" }
+
+private fun defaultMaterialDocument(title: String, objectMapper: ObjectMapper): ObjectNode =
+    objectMapper.createObjectNode().apply {
+        put("schemaVersion", 1)
+        putArray("pages").add(
+            objectMapper.createObjectNode().apply {
+                put("id", "page-1")
+                put("title", title)
+                put("layout", "FLOW")
+                putArray("blocks").add(
+                    objectMapper.createObjectNode().apply {
+                        put("id", "block-text-1")
+                        put("type", "text")
+                        put("title", "Новый блок")
+                        put("body", "Добавьте текст, видео, карточки или задание.")
+                    },
+                )
+            },
+        )
+    }
+
+private fun aiDraftDocument(
+    title: String,
+    prompt: String,
+    language: String,
+    cefrLevel: String,
+    objectMapper: ObjectMapper,
+): ObjectNode =
+    objectMapper.createObjectNode().apply {
+        put("schemaVersion", 1)
+        putArray("pages").add(
+            objectMapper.createObjectNode().apply {
+                put("id", "page-warmup")
+                put("title", title)
+                put("layout", "FLOW")
+                val blocks = putArray("blocks")
+                blocks.add(textBlock(objectMapper, "block-goal", "Цель урока", prompt))
+                blocks.add(
+                    objectMapper.createObjectNode().apply {
+                        put("id", "block-vocab")
+                        put("type", "flashcards")
+                        put("title", "Useful words")
+                        putArray("cards")
+                            .add(flashcard(objectMapper, "topic", "topic", "тема", "Let's discuss this topic."))
+                            .add(flashcard(objectMapper, "opinion", "opinion", "мнение", "I think it is useful."))
+                            .add(flashcard(objectMapper, "because", "because", "потому что", "I agree because..."))
+                    },
+                )
+                blocks.add(
+                    objectMapper.createObjectNode().apply {
+                        put("id", "block-gap")
+                        put("type", "fillGaps")
+                        put("title", "Complete the ideas")
+                        put("instruction", "Choose words that fit the meaning.")
+                        putArray("items")
+                            .add(gapItem(objectMapper, "I can talk about ___ in English.", "this topic"))
+                            .add(gapItem(objectMapper, "My opinion is ___ because it is useful.", "positive"))
+                    },
+                )
+                blocks.add(
+                    objectMapper.createObjectNode().apply {
+                        put("id", "block-speaking")
+                        put("type", "speakingPrompt")
+                        put("title", "Let's speak")
+                        put("prompt", "Ask your partner three questions about the topic, then share one answer.")
+                        put("level", cefrLevel)
+                        put("language", language)
+                    },
+                )
+                blocks.add(
+                    objectMapper.createObjectNode().apply {
+                        put("id", "block-writing")
+                        put("type", "freeWriting")
+                        put("title", "Short answer")
+                        put("prompt", "Write 3-5 sentences using the new words.")
+                        put("minWords", 20)
+                    },
+                )
+                blocks.add(
+                    objectMapper.createObjectNode().apply {
+                        put("id", "block-drawing")
+                        put("type", "drawingArea")
+                        put("title", "Teacher notes")
+                        put("height", 220)
+                    },
+                )
+            },
+        )
+    }
+
+private fun textBlock(objectMapper: ObjectMapper, id: String, title: String, body: String): ObjectNode =
+    objectMapper.createObjectNode().apply {
+        put("id", id)
+        put("type", "text")
+        put("title", title)
+        put("body", body)
+    }
+
+private fun flashcard(objectMapper: ObjectMapper, id: String, front: String, back: String, example: String): ObjectNode =
+    objectMapper.createObjectNode().apply {
+        put("id", id)
+        put("front", front)
+        put("back", back)
+        put("example", example)
+    }
+
+private fun gapItem(objectMapper: ObjectMapper, prompt: String, answer: String): ObjectNode =
+    objectMapper.createObjectNode().apply {
+        put("prompt", prompt)
+        put("answer", answer)
+    }
+
+private fun defaultScoringRubric(objectMapper: ObjectMapper): ObjectNode =
+    objectMapper.createObjectNode().apply {
+        put("maxScore", 10)
+        putArray("criteria")
+            .add(criteria(objectMapper, "taskCompletion", "Выполнение задания", 4))
+            .add(criteria(objectMapper, "grammar", "Грамматика", 2))
+            .add(criteria(objectMapper, "vocabulary", "Лексика", 2))
+            .add(criteria(objectMapper, "fluency", "Беглость/самостоятельность", 2))
+        putArray("analysisFlags")
+            .add("taskCompletion")
+            .add("grammar")
+            .add("vocabulary")
+            .add("spelling")
+    }
+
+private fun criteria(objectMapper: ObjectMapper, key: String, label: String, weight: Int): ObjectNode =
+    objectMapper.createObjectNode().apply {
+        put("key", key)
+        put("label", label)
+        put("weight", weight)
+    }
+
+private fun JsonNode.blockCount(): Int {
+    val pages = get("pages")
+    if (pages !is ArrayNode) {
+        return 0
+    }
+    return pages.sumOf { page ->
+        val blocks = page.get("blocks")
+        if (blocks is ArrayNode) blocks.size() else 0
+    }
+}
+
+private fun String.requiredClean(fieldName: String, maxLength: Int): String =
+    optionalClean(fieldName, maxLength)
+        ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$fieldName is required.")
+
+private fun String?.optionalClean(fieldName: String, maxLength: Int): String? {
+    val cleaned = this?.trim()?.takeIf { it.isNotEmpty() }
+    if (cleaned != null && cleaned.length > maxLength) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$fieldName must be at most $maxLength characters.")
+    }
+    return cleaned
+}
+
+private fun validateJsonSize(fieldName: String, value: JsonNode, objectMapper: ObjectMapper, maxBytes: Int) {
+    val byteSize = objectMapper.writeValueAsBytes(value).size
+    if (byteSize > maxBytes) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$fieldName must be at most $maxBytes bytes.")
+    }
+}
+
+private fun inferCefrLevel(prompt: String): String {
+    val lower = prompt.lowercase()
+    return when {
+        listOf("c1", "advanced", "debate", "academic").any { marker -> marker in lower } -> "C1"
+        listOf("b2", "upper", "argument", "presentation").any { marker -> marker in lower } -> "B2"
+        listOf("b1", "intermediate", "story", "travel").any { marker -> marker in lower } -> "B1"
+        listOf("a1", "beginner", "kids", "alphabet").any { marker -> marker in lower } -> "A1"
+        listOf("a2", "elementary").any { marker -> marker in lower } -> "A2"
+        else -> "A2"
+    }
+}
+
+private fun ResultSet.getMaterialInstant(columnName: String): Instant =
+    getObject(columnName, OffsetDateTime::class.java).toInstant()
+
+private fun Instant.toMaterialOffsetDateTime(): OffsetDateTime =
+    atOffset(ZoneOffset.UTC)
+
+private val cefrLevels = setOf("A1", "A2", "B1", "B2", "C1", "C2")
+private val materialStatuses = setOf("DRAFT", "PUBLISHED", "ARCHIVED")
+private val materialVisibilities = setOf("PRIVATE", "PUBLIC")
+private val assetKinds = setOf("IMAGE", "GENERATED_IMAGE", "DOCUMENT_SCAN", "VIDEO_EMBED", "EXTERNAL_SOURCE", "AUDIO_NOTE")
+private val assetProviders = setOf("YOUTUBE", "VK", "RUTUBE", "URL", "UPLOAD", "AI")

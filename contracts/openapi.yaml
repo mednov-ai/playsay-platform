@@ -151,6 +151,94 @@ paths:
           description: Scheduled lesson not found
       security:
       - bearerAuth: []
+  /materials/{materialId}:
+    get:
+      tags:
+      - Materials
+      summary: Get lesson material
+      description: Returns a visible lesson material.
+      operationId: getMaterial
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Lesson material
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Material not found
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Materials
+      summary: Update lesson material
+      description: Updates a structured lesson material. Requires material owner or
+        ADMIN role.
+      operationId: updateMaterial
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonMaterialRequest"
+        required: true
+      responses:
+        "200":
+          description: Lesson material updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialResponse"
+        "400":
+          description: Invalid material payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot edit material
+        "404":
+          description: Material not found
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Materials
+      summary: Archive lesson material
+      description: Archives a lesson material. Requires material owner or ADMIN role.
+      operationId: archiveMaterial
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Lesson material archived
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot archive material
+        "404":
+          description: Material not found
+      security:
+      - bearerAuth: []
   /courses/{courseId}:
     get:
       tags:
@@ -393,6 +481,135 @@ paths:
           description: LiveKit is not configured
       security:
       - bearerAuth: []
+  /materials:
+    get:
+      tags:
+      - Materials
+      summary: List lesson materials
+      description: Teachers/admins see their materials and published public materials.
+        Students see published public materials.
+      operationId: listMaterials
+      responses:
+        "200":
+          description: Lesson materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LessonMaterialResponse"
+        "401":
+          description: Missing or invalid bearer token
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Materials
+      summary: Create lesson material
+      description: Creates a structured lesson material. Requires TEACHER or ADMIN
+        role.
+      operationId: createMaterial
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonMaterialRequest"
+        required: true
+      responses:
+        "201":
+          description: Lesson material created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialResponse"
+        "400":
+          description: Invalid material payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage materials
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets:
+    get:
+      tags:
+      - Materials
+      summary: List material assets
+      operationId: listMaterialAssets
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaterialAssetResponse"
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Materials
+      summary: Create material asset reference
+      operationId: createMaterialAsset
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialAssetRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAssetResponse"
+      security:
+      - bearerAuth: []
+  /materials/ai-draft:
+    post:
+      tags:
+      - Materials
+      summary: Draft lesson material with AI
+      description: Returns a deterministic Play&Say material draft until a real LLM
+        key is configured.
+      operationId: draftMaterialWithAi
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialAiDraftRequest"
+        required: true
+      responses:
+        "200":
+          description: Draft material
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialDraftResponse"
+        "400":
+          description: Invalid draft prompt
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage materials
+      security:
+      - bearerAuth: []
   /courses:
     get:
       tags:
@@ -530,6 +747,34 @@ paths:
           description: Current user is not a teacher/admin
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/material:
+    get:
+      tags:
+      - Materials
+      summary: Get scheduled lesson material
+      description: Returns the material attached directly to a scheduled lesson or
+        inherited from its lesson template.
+      operationId: getScheduledLessonMaterial
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Scheduled lesson material
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Scheduled lesson or material not found
+      security:
+      - bearerAuth: []
   /me:
     get:
       tags:
@@ -582,6 +827,30 @@ paths:
           description: Missing or invalid bearer token
         "403":
           description: Current user is not an admin
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets/{assetId}:
+    delete:
+      tags:
+      - Materials
+      summary: Delete material asset reference
+      operationId: deleteMaterialAsset
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
       security:
       - bearerAuth: []
 components:
@@ -661,6 +930,11 @@ components:
           - string
           - "null"
           format: uuid
+        materialId:
+          type:
+          - string
+          - "null"
+          format: uuid
         scheduledStart:
           type:
           - string
@@ -721,6 +995,15 @@ components:
           - string
           - "null"
           format: uuid
+        materialId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        materialTitle:
+          type:
+          - string
+          - "null"
         courseId:
           type:
           - string
@@ -777,6 +1060,120 @@ components:
       - status
       - type
       - updatedAt
+    JsonNode: {}
+    LessonMaterialRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+        language:
+          type: string
+          maxLength: 16
+        cefrLevel:
+          type: string
+          enum:
+          - A1
+          - A2
+          - B1
+          - B2
+          - C1
+          - C2
+        visibility:
+          type: string
+          enum:
+          - PRIVATE
+          - PUBLIC
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+        document:
+          oneOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
+        sourceMeta:
+          oneOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
+        scoringRubric:
+          oneOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
+      required:
+      - cefrLevel
+      - language
+      - status
+      - title
+      - visibility
+    LessonMaterialResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerTeacherUserId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        ownerTeacherSubject:
+          type:
+          - string
+          - "null"
+        ownerTeacherName:
+          type:
+          - string
+          - "null"
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - "null"
+        language:
+          type: string
+        cefrLevel:
+          type: string
+        visibility:
+          type: string
+        status:
+          type: string
+        document:
+          $ref: "#/components/schemas/JsonNode"
+        sourceMeta:
+          $ref: "#/components/schemas/JsonNode"
+        scoringRubric:
+          $ref: "#/components/schemas/JsonNode"
+        blockCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - blockCount
+      - cefrLevel
+      - createdAt
+      - document
+      - id
+      - language
+      - scoringRubric
+      - sourceMeta
+      - status
+      - title
+      - updatedAt
+      - visibility
     CourseRequest:
       type: object
       properties:
@@ -860,6 +1257,11 @@ components:
           - integer
           - "null"
           format: int32
+        materialId:
+          type:
+          - string
+          - "null"
+          format: uuid
       required:
       - title
     CourseLessonResponse:
@@ -883,6 +1285,15 @@ components:
           - integer
           - "null"
           format: int32
+        materialId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        materialTitle:
+          type:
+          - string
+          - "null"
         createdAt:
           type: string
           format: date-time
@@ -915,6 +1326,135 @@ components:
       - roomName
       - serverUrl
       - token
+    MaterialAssetRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - IMAGE
+          - GENERATED_IMAGE
+          - DOCUMENT_SCAN
+          - VIDEO_EMBED
+          - EXTERNAL_SOURCE
+          - AUDIO_NOTE
+        storageKey:
+          type:
+          - string
+          - "null"
+        externalUrl:
+          type:
+          - string
+          - "null"
+        provider:
+          type: string
+          enum:
+          - YOUTUBE
+          - VK
+          - RUTUBE
+          - URL
+          - UPLOAD
+          - AI
+        metadata:
+          oneOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
+      required:
+      - kind
+      - provider
+    MaterialAssetResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        storageKey:
+          type:
+          - string
+          - "null"
+        externalUrl:
+          type:
+          - string
+          - "null"
+        provider:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/JsonNode"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - kind
+      - materialId
+      - metadata
+      - provider
+    MaterialAiDraftRequest:
+      type: object
+      properties:
+        title:
+          type:
+          - string
+          - "null"
+          maxLength: 160
+        prompt:
+          type: string
+          maxLength: 4000
+        language:
+          type: string
+          maxLength: 16
+        cefrLevel:
+          type:
+          - string
+          - "null"
+          enum:
+          - A1
+          - A2
+          - B1
+          - B2
+          - C1
+          - C2
+      required:
+      - language
+      - prompt
+    LessonMaterialDraftResponse:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - "null"
+        language:
+          type: string
+        cefrLevel:
+          type: string
+        visibility:
+          type: string
+        status:
+          type: string
+        document:
+          $ref: "#/components/schemas/JsonNode"
+        sourceMeta:
+          $ref: "#/components/schemas/JsonNode"
+        scoringRubric:
+          $ref: "#/components/schemas/JsonNode"
+      required:
+      - cefrLevel
+      - document
+      - language
+      - scoringRubric
+      - sourceMeta
+      - status
+      - title
+      - visibility
     MeResponse:
       type: object
       properties:

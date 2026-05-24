@@ -5,29 +5,40 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
+  securityContext:
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
   containers:
     - name: gradle
       image: gradle:8-jdk21
       command: ["cat"]
       tty: true
+      volumeMounts:
+        - name: jenkins-agent-cache
+          mountPath: /home/gradle/.gradle
+          subPath: gradle
       resources:
         requests:
           cpu: 250m
           memory: 512Mi
         limits:
-          cpu: "2"
-          memory: 1536Mi
+          cpu: "1"
+          memory: 1024Mi
     - name: node
       image: node:22
       command: ["cat"]
       tty: true
+      volumeMounts:
+        - name: jenkins-agent-cache
+          mountPath: /cache/npm
+          subPath: npm
       resources:
         requests:
           cpu: 150m
           memory: 256Mi
         limits:
-          cpu: "1"
-          memory: 1024Mi
+          cpu: 750m
+          memory: 768Mi
     - name: kaniko-backend
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]
@@ -40,8 +51,8 @@ spec:
           cpu: 250m
           memory: 256Mi
         limits:
-          cpu: "2"
-          memory: 1536Mi
+          cpu: "1"
+          memory: 1024Mi
     - name: kaniko-frontend
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]
@@ -54,8 +65,8 @@ spec:
           cpu: 250m
           memory: 256Mi
         limits:
-          cpu: "2"
-          memory: 1536Mi
+          cpu: "1"
+          memory: 1024Mi
     - name: tools
       image: alpine:3.20
       command: ["cat"]
@@ -63,6 +74,9 @@ spec:
   volumes:
     - name: kaniko-docker-config
       emptyDir: {}
+    - name: jenkins-agent-cache
+      persistentVolumeClaim:
+        claimName: jenkins-agent-cache
 """
     }
   }
@@ -148,7 +162,7 @@ spec:
         container('gradle') {
           dir('backend') {
             echo "Running backend tests for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:test --no-daemon --stacktrace'
+            sh 'gradle :api-gateway:test --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
       }
@@ -159,7 +173,7 @@ spec:
         container('gradle') {
           dir('backend') {
             echo "Packaging api-gateway for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:bootJar --no-daemon'
+            sh 'gradle :api-gateway:bootJar --no-daemon --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
       }
@@ -170,7 +184,7 @@ spec:
         container('gradle') {
           dir('backend') {
             echo "Exporting api-gateway OpenAPI contract for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace'
+            sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
         sh '''
@@ -189,7 +203,7 @@ spec:
         container('node') {
           dir('frontend') {
             echo "Installing frontend dependencies for ${env.BUILD_LABEL}"
-            sh 'npm install --cache .npm --prefer-offline'
+            sh 'npm install --cache /cache/npm --prefer-offline'
             echo "Generating typed frontend API client for ${env.BUILD_LABEL}"
             sh 'npm --workspace web-app run generate'
             echo "Linting frontend for ${env.BUILD_LABEL}"

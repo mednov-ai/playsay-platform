@@ -75,6 +75,9 @@ spec:
       image: liquibase/liquibase:5.0.3
       command: ["cat"]
       tty: true
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
       env:
         - name: PLAYSAY_DB_JDBC_URL
           valueFrom:

@@ -173,7 +173,7 @@ textarea {
   user-select: none;
 }
 
-.playsay-video-strip:active {
+.playsay-video-strip[data-draggable="true"]:active {
   cursor: grabbing;
 }
 
@@ -185,13 +185,21 @@ textarea {
   display: none;
 }
 
-.playsay-classroom-conference[data-group="true"] {
-  grid-template-rows: minmax(0, 1fr) auto;
+.playsay-video-strip[data-layout="single"] {
+  max-width: min(18rem, calc(100% - 1.5rem));
 }
 
-.playsay-classroom-conference[data-group="true"] .playsay-video-strip {
-  max-width: min(31rem, calc(100% - 1.5rem));
-  grid-auto-columns: minmax(6.75rem, 8rem);
+.playsay-video-strip[data-layout="row"] {
+  top: auto;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  width: auto;
+  max-width: none;
+  grid-auto-columns: minmax(6.25rem, 7rem);
+  cursor: default;
+  touch-action: pan-x;
+  user-select: auto;
 }
 
 .playsay-video-strip .lk-participant-tile {
@@ -674,7 +682,11 @@ textarea {
     display: none;
   }
 
-  .playsay-classroom-conference[data-group="true"] .playsay-video-strip {
+  .playsay-video-strip[data-layout="row"] {
+    top: auto;
+    right: 0.5rem;
+    bottom: 5.25rem;
+    left: 0.5rem;
     max-width: calc(100% - 1rem);
     grid-auto-columns: minmax(6.25rem, 6.75rem);
   }

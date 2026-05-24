@@ -1473,7 +1473,7 @@ function LiveLessonExperience({
             token={session.token}
             video
           >
-            <ClassroomVideoStage isGroupLesson={session.lessonType === "GROUP"} />
+            <ClassroomVideoStage />
           </LiveKitRoom>
         </div>
       </section>
@@ -1483,9 +1483,10 @@ function LiveLessonExperience({
   );
 }
 
-function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
+function ClassroomVideoStage() {
   const controlsRef = useRef<HTMLDivElement | null>(null);
   const focusRef = useRef<HTMLDivElement | null>(null);
+  const singlePipInitializedRef = useRef(false);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const [pipPosition, setPipPosition] = useState({ x: 12, y: 120 });
@@ -1497,6 +1498,8 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
   const featuredTrack = orderedTracks[0];
   const stripTracks = orderedTracks.slice(1);
   const hasStrip = stripTracks.length > 0;
+  const stripLayout = stripTracks.length > 1 ? "row" : "single";
+  const canDragStrip = hasStrip && stripLayout === "single";
   const pipStyle = {
     "--playsay-pip-x": `${pipPosition.x}px`,
     "--playsay-pip-y": `${pipPosition.y}px`,
@@ -1525,6 +1528,18 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
     };
   }
 
+  function getDefaultSinglePipPosition() {
+    const focusRect = focusRef.current?.getBoundingClientRect();
+    const stripRect = stripRef.current?.getBoundingClientRect();
+    const inset = 8;
+
+    if (!focusRect || !stripRect) {
+      return pipPosition;
+    }
+
+    return clampPipPosition(inset, focusRect.height - stripRect.height - inset);
+  }
+
   function getPipPositionFromPointer(event: PointerEvent<HTMLDivElement>) {
     const focusRect = focusRef.current?.getBoundingClientRect();
     const currentDrag = dragState.current;
@@ -1540,7 +1555,7 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
   }
 
   function handlePipPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (!hasStrip || !stripRef.current) {
+    if (!canDragStrip || !stripRef.current) {
       return;
     }
 
@@ -1577,11 +1592,22 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
 
   useEffect(() => {
     if (!hasStrip) {
+      singlePipInitializedRef.current = false;
+      return undefined;
+    }
+
+    if (stripLayout === "row") {
+      dragState.current = null;
+      singlePipInitializedRef.current = false;
       return undefined;
     }
 
     function keepPipInBounds() {
-      setPipPosition((current) => clampPipPosition(current.x, current.y));
+      setPipPosition((current) => {
+        const next = singlePipInitializedRef.current ? current : getDefaultSinglePipPosition();
+        singlePipInitializedRef.current = true;
+        return clampPipPosition(next.x, next.y);
+      });
     }
 
     const animationFrame = window.requestAnimationFrame(keepPipInBounds);
@@ -1591,15 +1617,17 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", keepPipInBounds);
     };
-  }, [hasStrip, stripTracks.length]);
+  }, [hasStrip, stripLayout, stripTracks.length]);
 
   return (
-    <div className="playsay-classroom-conference" data-group={isGroupLesson || orderedTracks.length > 2 ? "true" : "false"}>
+    <div className="playsay-classroom-conference" data-layout={stripLayout}>
       <div className="playsay-video-focus" ref={focusRef}>
         {featuredTrack ? <ParticipantTile trackRef={featuredTrack} /> : null}
         <div
           className="playsay-video-strip"
+          data-draggable={canDragStrip ? "true" : "false"}
           data-empty={hasStrip ? "false" : "true"}
+          data-layout={stripLayout}
           onPointerCancel={handlePipPointerEnd}
           onPointerDown={handlePipPointerDown}
           onPointerMove={handlePipPointerMove}

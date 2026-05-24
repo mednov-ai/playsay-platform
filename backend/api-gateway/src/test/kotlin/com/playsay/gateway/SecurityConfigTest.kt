@@ -1,6 +1,7 @@
 package com.playsay.gateway
 
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.springframework.security.oauth2.jwt.Jwt
 
@@ -10,7 +11,10 @@ class SecurityConfigTest {
         val jwt = Jwt.withTokenValue("token")
             .header("alg", "none")
             .subject("user-1")
-            .claim("realm_access", mapOf("roles" to listOf("STUDENT", "TEACHER")))
+            .claim(
+                "realm_access",
+                mapOf("roles" to listOf("STUDENT", "TEACHER", "offline_access", "uma_authorization")),
+            )
             .build()
 
         val authentication = SecurityConfig().jwtAuthenticationConverter().convert(jwt)
@@ -18,5 +22,7 @@ class SecurityConfigTest {
 
         assertTrue("ROLE_STUDENT" in authorities)
         assertTrue("ROLE_TEACHER" in authorities)
+        assertFalse("ROLE_offline_access" in authorities)
+        assertFalse("ROLE_uma_authorization" in authorities)
     }
 }

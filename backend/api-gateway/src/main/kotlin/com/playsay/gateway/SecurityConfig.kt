@@ -45,6 +45,7 @@ class SecurityConfig {
                     .asStringCollection()
 
                 realmRoles
+                    .filter { role -> role in applicationRoles }
                     .map { role -> SimpleGrantedAuthority("ROLE_$role") }
                     .forEach { authority -> authorities.add(authority) }
 
@@ -59,4 +60,8 @@ class SecurityConfig {
             is Collection<*> -> this.filterIsInstance<String>()
             else -> emptyList()
         }
+
+    private companion object {
+        val applicationRoles = setOf("STUDENT", "TEACHER", "ADMIN")
+    }
 }

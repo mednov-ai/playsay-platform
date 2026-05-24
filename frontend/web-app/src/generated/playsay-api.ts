@@ -5,6 +5,49 @@
  * Public contract for the Play&Say API Gateway.
  * OpenAPI spec version: 0.1.0
  */
+export interface UpdateUserProfileRequest {
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  displayName?: string | null;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  locale?: string | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  timezone?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  learningGoal?: string | null;
+}
+
+export interface UserProfileResponse {
+  subject: string;
+  /** @nullable */
+  username?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  name?: string | null;
+  roles: string[];
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  locale?: string | null;
+  /** @nullable */
+  timezone?: string | null;
+  /** @nullable */
+  learningGoal?: string | null;
+  updatedAt: string;
+}
+
 export interface MeResponse {
   subject: string;
   /** @nullable */
@@ -21,6 +64,164 @@ export interface HelloResponse {
   message: string;
   timestamp: string;
 }
+
+export type getMyUserProfileResponse200 = {
+  data: UserProfileResponse
+  status: 200
+}
+
+export type getMyUserProfileResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getMyUserProfileResponseSuccess = (getMyUserProfileResponse200) & {
+  headers: Headers;
+};
+export type getMyUserProfileResponseError = (getMyUserProfileResponse401) & {
+  headers: Headers;
+};
+
+export type getMyUserProfileResponse = (getMyUserProfileResponseSuccess | getMyUserProfileResponseError)
+
+export const getGetMyUserProfileUrl = () => {
+
+
+
+
+  return `/api/users/me/profile`
+}
+
+/**
+ * Returns the app-level profile for the current Keycloak user.
+ * @summary Current application user profile
+ */
+export const getMyUserProfile = async ( options?: RequestInit): Promise<getMyUserProfileResponse> => {
+
+  const res = await fetch(getGetMyUserProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMyUserProfileResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMyUserProfileResponse
+}
+
+
+
+export type updateMyUserProfileResponse200 = {
+  data: UserProfileResponse
+  status: 200
+}
+
+export type updateMyUserProfileResponse400 = {
+  data: void
+  status: 400
+}
+
+export type updateMyUserProfileResponse401 = {
+  data: void
+  status: 401
+}
+
+export type updateMyUserProfileResponseSuccess = (updateMyUserProfileResponse200) & {
+  headers: Headers;
+};
+export type updateMyUserProfileResponseError = (updateMyUserProfileResponse400 | updateMyUserProfileResponse401) & {
+  headers: Headers;
+};
+
+export type updateMyUserProfileResponse = (updateMyUserProfileResponseSuccess | updateMyUserProfileResponseError)
+
+export const getUpdateMyUserProfileUrl = () => {
+
+
+
+
+  return `/api/users/me/profile`
+}
+
+/**
+ * Updates editable profile fields for the current Keycloak user.
+ * @summary Update current application user profile
+ */
+export const updateMyUserProfile = async (updateUserProfileRequest: UpdateUserProfileRequest, options?: RequestInit): Promise<updateMyUserProfileResponse> => {
+
+  const res = await fetch(getUpdateMyUserProfileUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateUserProfileRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateMyUserProfileResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateMyUserProfileResponse
+}
+
+
+
+export type deleteMyUserProfileResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteMyUserProfileResponse401 = {
+  data: void
+  status: 401
+}
+
+export type deleteMyUserProfileResponseSuccess = (deleteMyUserProfileResponse204) & {
+  headers: Headers;
+};
+export type deleteMyUserProfileResponseError = (deleteMyUserProfileResponse401) & {
+  headers: Headers;
+};
+
+export type deleteMyUserProfileResponse = (deleteMyUserProfileResponseSuccess | deleteMyUserProfileResponseError)
+
+export const getDeleteMyUserProfileUrl = () => {
+
+
+
+
+  return `/api/users/me/profile`
+}
+
+/**
+ * Deletes editable app-level profile data for the current Keycloak user.
+ * @summary Delete current application user profile
+ */
+export const deleteMyUserProfile = async ( options?: RequestInit): Promise<deleteMyUserProfileResponse> => {
+
+  const res = await fetch(getDeleteMyUserProfileUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteMyUserProfileResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteMyUserProfileResponse
+}
+
+
 
 export type getMeResponse200 = {
   data: MeResponse
@@ -113,4 +314,60 @@ export const getHello = async ( options?: RequestInit): Promise<getHelloResponse
 
   const data: getHelloResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getHelloResponse
+}
+
+
+
+export type listUserProfilesResponse200 = {
+  data: UserProfileResponse[]
+  status: 200
+}
+
+export type listUserProfilesResponse401 = {
+  data: void
+  status: 401
+}
+
+export type listUserProfilesResponse403 = {
+  data: void
+  status: 403
+}
+
+export type listUserProfilesResponseSuccess = (listUserProfilesResponse200) & {
+  headers: Headers;
+};
+export type listUserProfilesResponseError = (listUserProfilesResponse401 | listUserProfilesResponse403) & {
+  headers: Headers;
+};
+
+export type listUserProfilesResponse = (listUserProfilesResponseSuccess | listUserProfilesResponseError)
+
+export const getListUserProfilesUrl = () => {
+
+
+
+
+  return `/api/admin/users`
+}
+
+/**
+ * Returns known app-level user profiles. Requires the ADMIN role.
+ * @summary List application user profiles
+ */
+export const listUserProfiles = async ( options?: RequestInit): Promise<listUserProfilesResponse> => {
+
+  const res = await fetch(getListUserProfilesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listUserProfilesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listUserProfilesResponse
 }

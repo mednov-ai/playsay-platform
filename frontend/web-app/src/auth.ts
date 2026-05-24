@@ -1,4 +1,12 @@
-import { getMe, type MeResponse } from "./generated/playsay-api";
+import {
+  deleteMyUserProfile,
+  getMe,
+  getMyUserProfile,
+  updateMyUserProfile,
+  type MeResponse,
+  type UpdateUserProfileRequest,
+  type UserProfileResponse,
+} from "./generated/playsay-api";
 
 export type AuthConfig = {
   issuer: string;
@@ -14,6 +22,8 @@ export type TokenSet = {
 };
 
 export type MeProfile = MeResponse;
+export type AppUserProfile = UserProfileResponse;
+export type UpdateUserProfileInput = UpdateUserProfileRequest;
 
 type TokenResponse = {
   access_token: string;
@@ -148,16 +158,7 @@ export async function getValidAccessToken(config = authConfig): Promise<string |
 }
 
 export async function fetchMe(config = authConfig): Promise<MeProfile> {
-  const accessToken = await getValidAccessToken(config);
-  if (!accessToken) {
-    throw new Error("Not authenticated.");
-  }
-
-  const response = await getMe({
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await getMe(await authorizedOptions(config));
 
   if (response.status === 401) {
     clearTokens();
@@ -168,6 +169,62 @@ export async function fetchMe(config = authConfig): Promise<MeProfile> {
   }
 
   return response.data;
+}
+
+export async function fetchUserProfile(config = authConfig): Promise<AppUserProfile> {
+  const response = await getMyUserProfile(await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`User profile request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function saveUserProfile(
+  input: UpdateUserProfileInput,
+  config = authConfig,
+): Promise<AppUserProfile> {
+  const response = await updateMyUserProfile(input, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`User profile update failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function resetUserProfile(config = authConfig): Promise<void> {
+  const response = await deleteMyUserProfile(await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 204) {
+    throw new Error(`User profile reset failed with HTTP ${response.status}.`);
+  }
+}
+
+async function authorizedOptions(config: AuthConfig): Promise<RequestInit> {
+  const accessToken = await getValidAccessToken(config);
+  if (!accessToken) {
+    throw new Error("Not authenticated.");
+  }
+
+  return {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  };
 }
 
 export function buildLogoutUrl(config = authConfig): string {

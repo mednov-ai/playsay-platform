@@ -7,6 +7,63 @@ servers:
 - url: /api
   description: Play&Say web-app API proxy
 paths:
+  /users/me/profile:
+    get:
+      tags:
+      - Users
+      summary: Current application user profile
+      description: Returns the app-level profile for the current Keycloak user.
+      operationId: getMyUserProfile
+      responses:
+        "200":
+          description: Current app-level user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          description: Missing or invalid bearer token
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Users
+      summary: Update current application user profile
+      description: Updates editable profile fields for the current Keycloak user.
+      operationId: updateMyUserProfile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserProfileRequest"
+        required: true
+      responses:
+        "200":
+          description: Updated app-level user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "400":
+          description: Invalid profile payload
+        "401":
+          description: Missing or invalid bearer token
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Users
+      summary: Delete current application user profile
+      description: Deletes editable app-level profile data for the current Keycloak
+        user.
+      operationId: deleteMyUserProfile
+      responses:
+        "204":
+          description: Current app-level user profile deleted
+        "401":
+          description: Missing or invalid bearer token
+      security:
+      - bearerAuth: []
   /me:
     get:
       tags:
@@ -39,8 +96,97 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HelloResponse"
+  /admin/users:
+    get:
+      tags:
+      - Users
+      summary: List application user profiles
+      description: Returns known app-level user profiles. Requires the ADMIN role.
+      operationId: listUserProfiles
+      responses:
+        "200":
+          description: Known app-level user profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user is not an admin
+      security:
+      - bearerAuth: []
 components:
   schemas:
+    UpdateUserProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type:
+          - string
+          - "null"
+          maxLength: 120
+        locale:
+          type:
+          - string
+          - "null"
+          maxLength: 16
+        timezone:
+          type:
+          - string
+          - "null"
+          maxLength: 64
+        learningGoal:
+          type:
+          - string
+          - "null"
+          maxLength: 500
+    UserProfileResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        username:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+        name:
+          type:
+          - string
+          - "null"
+        roles:
+          type: array
+          items:
+            type: string
+        displayName:
+          type:
+          - string
+          - "null"
+        locale:
+          type:
+          - string
+          - "null"
+        timezone:
+          type:
+          - string
+          - "null"
+        learningGoal:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - roles
+      - subject
+      - updatedAt
     MeResponse:
       type: object
       properties:

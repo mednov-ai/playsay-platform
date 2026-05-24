@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   BookOpen,
   Loader2,
   LogIn,
   LogOut,
+  RotateCcw,
+  Save,
   ShieldCheck,
   User,
   Video,
@@ -14,19 +16,34 @@ import {
   clearTokens,
   completeLogin,
   fetchMe,
+  fetchUserProfile,
   isAuthCallback,
   readTokens,
+  resetUserProfile,
+  saveUserProfile,
   startLogin,
+  type AppUserProfile,
   type MeProfile,
+  type UpdateUserProfileInput,
 } from "./auth";
 import { Button } from "./components/ui/button";
 
+type ProfileFormState = {
+  displayName: string;
+  locale: string;
+  timezone: string;
+  learningGoal: string;
+};
+
 export function App() {
   const [profile, setProfile] = useState<MeProfile | null>(null);
+  const [appProfile, setAppProfile] = useState<AppUserProfile | null>(null);
   const [status, setStatus] = useState<"checking" | "anonymous" | "authenticated" | "error">(
     "checking",
   );
   const [error, setError] = useState<string | null>(null);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,8 +64,10 @@ export function App() {
         }
 
         const me = await fetchMe();
+        const currentAppProfile = await fetchUserProfile();
         if (!cancelled) {
           setProfile(me);
+          setAppProfile(currentAppProfile);
           setStatus("authenticated");
         }
       } catch (caught) {
@@ -72,6 +91,35 @@ export function App() {
     const logoutUrl = buildLogoutUrl();
     clearTokens();
     window.location.assign(logoutUrl);
+  }
+
+  async function saveProfile(input: UpdateUserProfileInput) {
+    setProfileSaving(true);
+    setProfileMessage(null);
+    try {
+      const updated = await saveUserProfile(input);
+      setAppProfile(updated);
+      setProfileMessage("Profile saved");
+    } catch (caught) {
+      setProfileMessage(caught instanceof Error ? caught.message : "Profile save failed");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  async function resetProfile() {
+    setProfileSaving(true);
+    setProfileMessage(null);
+    try {
+      await resetUserProfile();
+      const recreated = await fetchUserProfile();
+      setAppProfile(recreated);
+      setProfileMessage("Profile reset");
+    } catch (caught) {
+      setProfileMessage(caught instanceof Error ? caught.message : "Profile reset failed");
+    } finally {
+      setProfileSaving(false);
+    }
   }
 
   return (
@@ -124,6 +172,15 @@ export function App() {
 
             <IdentityPanel error={error} profile={profile} status={status} />
 
+            <ProfileEditor
+              disabled={!isAuthenticated || profileSaving}
+              message={profileMessage}
+              onReset={() => void resetProfile()}
+              onSave={(input) => void saveProfile(input)}
+              profile={appProfile}
+              saving={profileSaving}
+            />
+
             <div className="flex items-center gap-2 border-t border-border pt-4">
               <BookOpen className="h-5 w-5" />
               <h2 className="text-lg font-medium">Assignment editor</h2>
@@ -137,6 +194,119 @@ export function App() {
         </div>
       </section>
     </main>
+  );
+}
+
+function ProfileEditor({
+  disabled,
+  message,
+  onReset,
+  onSave,
+  profile,
+  saving,
+}: {
+  disabled: boolean;
+  message: string | null;
+  onReset: () => void;
+  onSave: (input: UpdateUserProfileInput) => void;
+  profile: AppUserProfile | null;
+  saving: boolean;
+}) {
+  const [form, setForm] = useState<ProfileFormState>({
+    displayName: "",
+    locale: "",
+    timezone: "",
+    learningGoal: "",
+  });
+
+  useEffect(() => {
+    setForm({
+      displayName: profile?.displayName ?? "",
+      locale: profile?.locale ?? "",
+      timezone: profile?.timezone ?? "",
+      learningGoal: profile?.learningGoal ?? "",
+    });
+  }, [profile]);
+
+  function updateField(field: keyof ProfileFormState, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSave({
+      displayName: form.displayName,
+      locale: form.locale,
+      timezone: form.timezone,
+      learningGoal: form.learningGoal,
+    });
+  }
+
+  return (
+    <form className="grid gap-3 rounded-md border border-border p-3" onSubmit={submit}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+          Display name
+          <input
+            className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+            disabled={disabled}
+            maxLength={120}
+            onChange={(event) => updateField("displayName", event.target.value)}
+            value={form.displayName}
+          />
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+          Locale
+          <input
+            className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+            disabled={disabled}
+            maxLength={16}
+            onChange={(event) => updateField("locale", event.target.value)}
+            placeholder="en"
+            value={form.locale}
+          />
+        </label>
+      </div>
+
+      <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+        Timezone
+        <input
+          className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+          disabled={disabled}
+          maxLength={64}
+          onChange={(event) => updateField("timezone", event.target.value)}
+          placeholder="Europe/Moscow"
+          value={form.timezone}
+        />
+      </label>
+
+      <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+        Learning goal
+        <textarea
+          className="min-h-20 resize-none rounded-md border border-border bg-background p-3 text-sm text-foreground outline-none ring-primary/30 focus:ring-2"
+          disabled={disabled}
+          maxLength={500}
+          onChange={(event) => updateField("learningGoal", event.target.value)}
+          value={form.learningGoal}
+        />
+      </label>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs text-muted-foreground">
+          {message ?? (profile ? `Updated ${new Date(profile.updatedAt).toLocaleString()}` : "Sign in to edit profile")}
+        </div>
+        <div className="flex gap-2">
+          <Button disabled={disabled || !profile} onClick={onReset} type="button" variant="outline">
+            <RotateCcw className="h-4 w-4" />
+            Reset
+          </Button>
+          <Button disabled={disabled} type="submit">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save
+          </Button>
+        </div>
+      </div>
+    </form>
   );
 }
 

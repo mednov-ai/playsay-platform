@@ -1,7 +1,16 @@
 package com.playsay.gateway
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.crypto.MACSigner
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Instant
+import java.time.OffsetDateTime
+import java.util.Base64
+import java.util.Date
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,6 +47,7 @@ import liquibase.integration.spring.SpringLiquibase
 class ScheduledLessonControllerTest @Autowired constructor(
     private val scheduleController: ScheduledLessonController,
     private val liveKitRoomController: LiveKitRoomController,
+    private val liveKitWebhookController: LiveKitWebhookController,
     private val courseController: CourseController,
     private val userProfileStore: UserProfileStore,
     private val jdbcClient: JdbcClient,
@@ -229,6 +239,46 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
     }
 
+    @Test
+    fun `LiveKit webhook marks participant attendance`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
+                scheduledEnd = Instant.parse("2026-05-25T10:45:00Z"),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        val joinedAt = Instant.parse("2026-05-25T10:05:00Z")
+        val leftAt = Instant.parse("2026-05-25T10:40:00Z")
+        val joinedBody = webhookBody("participant_joined", lesson.livekitRoomName!!, "student-1", joinedAt)
+        val leftBody = webhookBody("participant_left", lesson.livekitRoomName!!, "student-1", leftAt)
+
+        assertEquals(HttpStatus.NO_CONTENT, liveKitWebhookController.receive(joinedBody, webhookAuthorization(joinedBody)).statusCode)
+        assertEquals(HttpStatus.NO_CONTENT, liveKitWebhookController.receive(leftBody, webhookAuthorization(leftBody)).statusCode)
+
+        val attendance = attendanceRow(lesson.id)
+        assertEquals("IN_PROGRESS", attendance.status)
+        assertEquals(joinedAt, attendance.actualStart)
+        assertEquals(joinedAt, attendance.joinedAt)
+        assertEquals(leftAt, attendance.leftAt)
+        assertEquals("PRESENT", attendance.attendanceStatus)
+    }
+
+    @Test
+    fun `LiveKit webhook rejects invalid signature`() {
+        val body = webhookBody("participant_joined", "lesson-1", "student-1", Instant.parse("2026-05-25T10:05:00Z"))
+
+        val error = assertFailsWith<ResponseStatusException> {
+            liveKitWebhookController.receive(body, "Bearer invalid")
+        }
+
+        assertEquals(HttpStatus.UNAUTHORIZED, error.statusCode)
+    }
+
     private fun courseLessonId(teacher: JwtAuthenticationToken): UUID {
         val course = courseController.create(teacher, CourseRequest(title = "Course", isPublished = true)).body!!
         return courseController.createLesson(
@@ -253,4 +303,56 @@ class ScheduledLessonControllerTest @Autowired constructor(
 
         return JwtAuthenticationToken(jwt, listOf(SimpleGrantedAuthority(role)))
     }
+
+    private fun webhookBody(event: String, roomName: String, identity: String, createdAt: Instant): String =
+        """
+        {"id":"event-1","createdAt":${createdAt.epochSecond},"event":"$event","room":{"name":"$roomName"},"participant":{"identity":"$identity"}}
+        """.trimIndent()
+
+    private fun webhookAuthorization(body: String): String {
+        val hash = Base64.getEncoder().encodeToString(
+            MessageDigest.getInstance("SHA-256").digest(body.toByteArray(StandardCharsets.UTF_8)),
+        )
+        val claims = JWTClaimsSet.Builder()
+            .issuer("test-key")
+            .claim("sha256", hash)
+            .expirationTime(Date.from(Instant.now().plusSeconds(60)))
+            .build()
+        val jwt = SignedJWT(JWSHeader.Builder(JWSAlgorithm.HS256).build(), claims)
+        jwt.sign(MACSigner("01234567890123456789012345678901".toByteArray(StandardCharsets.UTF_8)))
+        return "Bearer ${jwt.serialize()}"
+    }
+
+    private fun attendanceRow(lessonId: UUID): AttendanceRow =
+        jdbcClient.sql(
+            """
+            SELECT l.status,
+                   l.actual_start,
+                   lp.joined_at,
+                   lp.left_at,
+                   lp.attendance_status
+              FROM lesson l
+              JOIN lesson_participant lp ON lp.lesson_id = l.id
+             WHERE l.id = :lessonId
+            """.trimIndent(),
+        )
+            .param("lessonId", lessonId)
+            .query { rs, _ ->
+                AttendanceRow(
+                    status = rs.getString("status"),
+                    actualStart = rs.getObject("actual_start", OffsetDateTime::class.java)?.toInstant(),
+                    joinedAt = rs.getObject("joined_at", OffsetDateTime::class.java)?.toInstant(),
+                    leftAt = rs.getObject("left_at", OffsetDateTime::class.java)?.toInstant(),
+                    attendanceStatus = rs.getString("attendance_status"),
+                )
+            }
+            .single()
+
+    private data class AttendanceRow(
+        val status: String,
+        val actualStart: Instant?,
+        val joinedAt: Instant?,
+        val leftAt: Instant?,
+        val attendanceStatus: String?,
+    )
 }

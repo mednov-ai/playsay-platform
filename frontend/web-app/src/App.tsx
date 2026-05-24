@@ -1,5 +1,15 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { LiveKitRoom, VideoConference } from "@livekit/components-react";
+import {
+  ConnectionStateToast,
+  GridLayout,
+  LiveKitRoom,
+  ParticipantTile,
+  RoomAudioRenderer,
+  StartMediaButton,
+  TrackToggle,
+  useTracks,
+} from "@livekit/components-react";
+import { Track } from "livekit-client";
 import {
   AlertCircle,
   BookOpen,
@@ -130,6 +140,8 @@ export function App() {
   const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(null);
   const [roomLoadingLessonId, setRoomLoadingLessonId] = useState<string | null>(null);
   const [roomMessage, setRoomMessage] = useState<string | null>(null);
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const routeLessonId = classroomLessonIdFromPath(currentPath);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,6 +152,7 @@ export function App() {
         if (isAuthCallback(currentUrl)) {
           await completeLogin(currentUrl);
           window.history.replaceState({}, document.title, "/");
+          setCurrentPath("/");
         }
 
         if (!readTokens()) {
@@ -183,9 +196,42 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    function updatePathFromHistory() {
+      setCurrentPath(window.location.pathname);
+    }
+
+    window.addEventListener("popstate", updatePathFromHistory);
+    return () => window.removeEventListener("popstate", updatePathFromHistory);
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("playsay-classroom-active", roomSession !== null);
+    return () => document.body.classList.remove("playsay-classroom-active");
+  }, [roomSession]);
+
   const isAuthenticated = status === "authenticated" && profile !== null;
   const isAdmin = profile?.roles.includes("ADMIN") ?? false;
   const roleWorkspace = profile ? getRoleWorkspace(profile.roles) : null;
+  const isClassroomOpen = roomSession !== null;
+
+  useEffect(() => {
+    if (!routeLessonId && roomSession) {
+      setRoomSession(null);
+      setRoomMessage(null);
+    }
+  }, [routeLessonId, roomSession]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !routeLessonId || roomSession || roomLoadingLessonId) {
+      return;
+    }
+
+    const routeLesson = scheduledLessons.find((lesson) => lesson.id === routeLessonId);
+    if (routeLesson) {
+      void joinScheduledLesson(routeLesson, { updateRoute: false });
+    }
+  }, [routeLessonId, roomLoadingLessonId, roomSession, scheduledLessons, status]);
 
   function logout() {
     const logoutUrl = buildLogoutUrl();
@@ -426,11 +472,17 @@ export function App() {
     }
   }
 
-  async function joinScheduledLesson(lesson: ScheduledLesson) {
+  async function joinScheduledLesson(
+    lesson: ScheduledLesson,
+    options: { updateRoute?: boolean } = {},
+  ) {
     setRoomLoadingLessonId(lesson.id);
     setRoomMessage(null);
     try {
       const token = await enterScheduledLessonRoom(lesson.id);
+      if (options.updateRoute ?? true) {
+        navigateToPath(classroomPath(lesson.id));
+      }
       setRoomSession({
         ...token,
         courseTitle: lesson.courseTitle ?? null,
@@ -452,36 +504,48 @@ export function App() {
   function leaveScheduledLessonRoom() {
     setRoomSession(null);
     setRoomMessage(null);
+    if (classroomLessonIdFromPath(window.location.pathname)) {
+      navigateToPath("/");
+    }
+  }
+
+  function navigateToPath(path: string) {
+    window.history.pushState({}, "", path);
+    setCurrentPath(path);
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-background text-foreground">
+    <main className={`${isClassroomOpen ? "h-dvh overflow-hidden" : "min-h-screen overflow-hidden"} bg-background text-foreground`}>
       <section
-        className={`mx-auto flex min-h-screen w-full flex-col gap-7 px-5 py-6 sm:px-8 ${
-          roomSession ? "max-w-[92rem]" : "max-w-6xl"
+        className={`mx-auto flex w-full flex-col ${
+          isClassroomOpen
+            ? "h-full max-w-[92rem] gap-3 px-3 py-3 sm:px-4"
+            : "min-h-screen max-w-6xl gap-7 px-5 py-6 sm:px-8"
         }`}
       >
-        <header className="flex items-center justify-between gap-4">
-          <BrandMark />
-          <div className="flex items-center gap-3">
-            <SessionBadge status={status} />
-            {isAuthenticated ? (
-              <Button variant="outline" onClick={logout}>
-                <LogOut className="h-4 w-4" />
-                Выйти
-              </Button>
-            ) : (
-              <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
-                {status === "checking" || status === "loggingOut" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <LogIn className="h-4 w-4" />
-                )}
-                Войти
-              </Button>
-            )}
-          </div>
-        </header>
+        {isClassroomOpen ? null : (
+          <header className="flex shrink-0 items-center justify-between gap-4">
+            <BrandMark />
+            <div className="flex items-center gap-3">
+              <SessionBadge status={status} />
+              {isAuthenticated ? (
+                <Button variant="outline" onClick={logout}>
+                  <LogOut className="h-4 w-4" />
+                  Выйти
+                </Button>
+              ) : (
+                <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
+                  {status === "checking" || status === "loggingOut" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogIn className="h-4 w-4" />
+                  )}
+                  Войти
+                </Button>
+              )}
+            </div>
+          </header>
+        )}
 
         {roomSession ? (
           <LiveLessonExperience onLeave={leaveScheduledLessonRoom} profile={profile} session={roomSession} />
@@ -1377,9 +1441,9 @@ function LiveLessonExperience({
   const roleLabel = profile?.roles[0] ?? "STUDENT";
 
   return (
-    <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.75fr)]">
-      <section className="flex min-h-[38rem] flex-col overflow-hidden rounded-[1.5rem] border border-border bg-[#171717] shadow-[0_22px_70px_rgba(35,25,15,0.12)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#111111] px-4 py-3 text-white sm:px-5">
+    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.1fr)_minmax(15rem,0.9fr)] gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.75fr)] lg:grid-rows-1">
+      <section className="flex min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-border bg-[#171717] shadow-[0_22px_70px_rgba(35,25,15,0.12)]">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#111111] px-4 py-3 text-white sm:px-5">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-extrabold text-primary-foreground">
@@ -1395,7 +1459,7 @@ function LiveLessonExperience({
               {session.courseTitle ?? "Play&Say"} · {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
             </p>
           </div>
-          <Button onClick={onLeave} type="button" variant="outline">
+          <Button className="playsay-lesson-exit" onClick={onLeave} type="button" variant="outline">
             <PhoneOff className="h-4 w-4" />
             Выйти
           </Button>
@@ -1406,18 +1470,17 @@ function LiveLessonExperience({
             audio
             connect
             data-lk-theme="default"
-            onDisconnected={onLeave}
             serverUrl={session.serverUrl}
             token={session.token}
             video
           >
-            <VideoConference />
+            <ClassroomVideoStage />
           </LiveKitRoom>
         </div>
       </section>
 
-      <aside className="flex min-h-[38rem] flex-col gap-4">
-        <section className="rounded-[1.25rem] border border-border bg-white/95 p-4 shadow-[0_16px_48px_rgba(35,25,15,0.08)]">
+      <aside className="flex min-h-0 flex-col gap-3 overflow-hidden">
+        <section className="hidden shrink-0 rounded-[1rem] border border-border bg-white/95 p-3 shadow-[0_16px_48px_rgba(35,25,15,0.08)] sm:block sm:p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -1435,48 +1498,85 @@ function LiveLessonExperience({
             <LessonMetaRow icon={Clock3} label="Время" value={formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)} />
             <LessonMetaRow icon={Video} label="Комната" value={session.roomName} />
             <LessonMetaRow icon={Users} label="Ученики" value={formatParticipantCount(session.participants.length)} />
-            {session.teacherName ? <LessonMetaRow icon={User} label="Педагог" value={session.teacherName} /> : null}
           </div>
         </section>
 
-        <section className="flex flex-1 flex-col rounded-[1.25rem] border border-border bg-white/95 p-4 shadow-[0_16px_48px_rgba(35,25,15,0.08)]">
-          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+        <section className="flex min-h-0 flex-1 flex-col rounded-[1rem] border border-border bg-white/95 p-3 shadow-[0_16px_48px_rgba(35,25,15,0.08)] sm:p-4">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border pb-3">
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-extrabold">Задание</h2>
+              <h2 className="text-lg font-extrabold">Назначенные задания</h2>
             </div>
-            <span className="rounded-full bg-muted px-3 py-1 text-xs font-extrabold text-muted-foreground">
-              Speaking
-            </span>
+            {canAssignLessons(profile) ? (
+              <Button disabled type="button" variant="outline">
+                <Plus className="h-4 w-4" />
+                Назначить
+              </Button>
+            ) : null}
           </div>
 
-          <div className="mt-4 rounded-2xl border border-border bg-muted/55 p-4">
-            <p className="text-sm font-extrabold text-foreground">Tell me about your favourite game.</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              I like this game because...
-            </p>
+          <div className="mt-3 grid shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <AssignmentStub title="Speaking warm-up" tag="Speaking" />
+            <AssignmentStub title="Favourite game" tag="Writing" />
           </div>
 
-          <label className="mt-4 grid flex-1 gap-2 text-xs font-extrabold text-muted-foreground">
-            Ответ ученика
+          <label className="mt-3 grid min-h-0 flex-1 gap-2 text-xs font-extrabold text-muted-foreground">
+            Рабочая область
             <textarea
-              className="playsay-input min-h-44 flex-1 resize-none py-3 text-sm leading-6"
+              className="playsay-input min-h-0 flex-1 resize-none py-3 text-sm leading-6"
               defaultValue="My favourite game is..."
             />
           </label>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
             <div className="text-xs font-semibold text-muted-foreground">
-              Токен до {new Date(session.expiresAt).toLocaleTimeString()}
+              {session.teacherName ?? displayName}
             </div>
-            <Button type="button">
+            <Button disabled type="button">
               <Send className="h-4 w-4" />
-              Готово
+              Отправить
             </Button>
           </div>
         </section>
       </aside>
     </div>
+  );
+}
+
+function ClassroomVideoStage() {
+  const tracks = useTracks(
+    [{ source: Track.Source.Camera, withPlaceholder: true }],
+    { onlySubscribed: false },
+  );
+
+  return (
+    <div className="playsay-classroom-conference">
+      <div className="lk-video-conference-inner">
+        <div className="lk-grid-layout-wrapper">
+          <GridLayout tracks={tracks}>
+            <ParticipantTile />
+          </GridLayout>
+        </div>
+        <div className="lk-control-bar playsay-classroom-controls">
+          <TrackToggle source={Track.Source.Microphone}>Микрофон</TrackToggle>
+          <TrackToggle source={Track.Source.Camera}>Камера</TrackToggle>
+          <StartMediaButton label="Включить медиа" />
+        </div>
+      </div>
+      <RoomAudioRenderer />
+      <ConnectionStateToast />
+    </div>
+  );
+}
+
+function AssignmentStub({ tag, title }: { tag: string; title: string }) {
+  return (
+    <article className="rounded-2xl border border-border bg-muted/55 p-3">
+      <div className="text-sm font-extrabold text-foreground">{title}</div>
+      <div className="mt-2 inline-flex rounded-full border border-primary/15 bg-white px-2 py-1 text-xs font-extrabold text-primary">
+        {tag}
+      </div>
+    </article>
   );
 }
 
@@ -1869,6 +1969,10 @@ function formatLessonType(value: string): string {
   return value === "INDIVIDUAL" ? "Индивидуально" : "Группа";
 }
 
+function canAssignLessons(profile: MeProfile | null): boolean {
+  return profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+}
+
 function formatParticipantCount(value: number): string {
   if (value === 0) {
     return "ученики позже";
@@ -1890,4 +1994,13 @@ function selectedParticipantSubjects(value: string): string[] {
     .split(",")
     .map((subject) => subject.trim())
     .filter(Boolean);
+}
+
+function classroomPath(lessonId: string): string {
+  return `/lessons/${lessonId}/classroom`;
+}
+
+function classroomLessonIdFromPath(pathname: string): string | null {
+  const match = /^\/lessons\/([^/]+)\/classroom\/?$/.exec(pathname);
+  return match ? decodeURIComponent(match[1]) : null;
 }

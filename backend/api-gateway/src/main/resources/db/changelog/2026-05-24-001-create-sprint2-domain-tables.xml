@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-05-24-001-create-sprint2-domain-tables" author="codex">
+        <createTable tableName="app_user">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_app_user"/>
+            </column>
+            <column name="keycloak_subject" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_app_user_keycloak_subject"/>
+            </column>
+            <column name="username" type="VARCHAR(255)"/>
+            <column name="email" type="VARCHAR(320)"/>
+            <column name="name" type="VARCHAR(255)"/>
+            <column name="roles" type="VARCHAR(255)"/>
+            <column name="display_name" type="VARCHAR(120)"/>
+            <column name="avatar_url" type="VARCHAR(1024)"/>
+            <column name="locale" type="VARCHAR(16)"/>
+            <column name="timezone" type="VARCHAR(64)"/>
+            <column name="learning_goal" type="VARCHAR(500)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="app_user" indexName="idx_app_user_username">
+            <column name="username"/>
+        </createIndex>
+        <createIndex tableName="app_user" indexName="idx_app_user_email">
+            <column name="email"/>
+        </createIndex>
+
+        <createTable tableName="student_profile">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_student_profile"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_student_profile_user"/>
+            </column>
+            <column name="current_level" type="VARCHAR(8)"/>
+            <column name="birth_date" type="DATE"/>
+            <column name="parent_contact" type="VARCHAR(255)"/>
+            <column name="notes" type="TEXT"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="student_profile"
+            baseColumnNames="user_id"
+            constraintName="fk_student_profile_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <createTable tableName="teacher_profile">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_teacher_profile"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_teacher_profile_user"/>
+            </column>
+            <column name="bio" type="TEXT"/>
+            <column name="specializations" type="TEXT"/>
+            <column name="hourly_rate" type="NUMERIC(12,2)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="teacher_profile"
+            baseColumnNames="user_id"
+            constraintName="fk_teacher_profile_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <createTable tableName="course">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_course"/>
+            </column>
+            <column name="title" type="VARCHAR(160)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="level" type="VARCHAR(16)"/>
+            <column name="language" type="VARCHAR(16)" defaultValue="en">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by_user_id" type="UUID"/>
+            <column name="is_published" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="course"
+            baseColumnNames="created_by_user_id"
+            constraintName="fk_course_created_by_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <createTable tableName="lesson_template">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_lesson_template"/>
+            </column>
+            <column name="course_id" type="UUID"/>
+            <column name="title" type="VARCHAR(160)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_index" type="INT"/>
+            <column name="planned_duration_min" type="INT"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="lesson_template"
+            baseColumnNames="course_id"
+            constraintName="fk_lesson_template_course"
+            referencedTableName="course"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <createTable tableName="lesson">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_lesson"/>
+            </column>
+            <column name="lesson_template_id" type="UUID"/>
+            <column name="teacher_user_id" type="UUID"/>
+            <column name="scheduled_start" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="scheduled_end" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="actual_start" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="actual_end" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="status" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="livekit_room_name" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="lesson"
+            baseColumnNames="lesson_template_id"
+            constraintName="fk_lesson_lesson_template"
+            referencedTableName="lesson_template"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <addForeignKeyConstraint
+            baseTableName="lesson"
+            baseColumnNames="teacher_user_id"
+            constraintName="fk_lesson_teacher_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <createIndex tableName="lesson" indexName="idx_lesson_schedule">
+            <column name="scheduled_start"/>
+            <column name="scheduled_end"/>
+        </createIndex>
+
+        <createTable tableName="lesson_participant">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_lesson_participant"/>
+            </column>
+            <column name="lesson_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="student_user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="joined_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="left_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="attendance_status" type="VARCHAR(32)"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="lesson_participant"
+            baseColumnNames="lesson_id"
+            constraintName="fk_lesson_participant_lesson"
+            referencedTableName="lesson"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="lesson_participant"
+            baseColumnNames="student_user_id"
+            constraintName="fk_lesson_participant_student_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint
+            tableName="lesson_participant"
+            columnNames="lesson_id, student_user_id"
+            constraintName="uq_lesson_participant_lesson_student"/>
+
+        <createTable tableName="assignment">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_assignment"/>
+            </column>
+            <column name="lesson_template_id" type="UUID"/>
+            <column name="lesson_id" type="UUID"/>
+            <column name="title" type="VARCHAR(160)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="instructions" type="TEXT"/>
+            <column name="type" type="VARCHAR(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload" type="TEXT"/>
+            <column name="max_score" type="NUMERIC(6,2)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="assignment"
+            baseColumnNames="lesson_template_id"
+            constraintName="fk_assignment_lesson_template"
+            referencedTableName="lesson_template"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <addForeignKeyConstraint
+            baseTableName="assignment"
+            baseColumnNames="lesson_id"
+            constraintName="fk_assignment_lesson"
+            referencedTableName="lesson"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <createTable tableName="submission">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_submission"/>
+            </column>
+            <column name="assignment_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="student_user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="lesson_id" type="UUID"/>
+            <column name="yjs_document_id" type="VARCHAR(255)"/>
+            <column name="content" type="TEXT"/>
+            <column name="score" type="NUMERIC(6,2)"/>
+            <column name="errors_count" type="INT"/>
+            <column name="submitted_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="submission"
+            baseColumnNames="assignment_id"
+            constraintName="fk_submission_assignment"
+            referencedTableName="assignment"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="submission"
+            baseColumnNames="student_user_id"
+            constraintName="fk_submission_student_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="submission"
+            baseColumnNames="lesson_id"
+            constraintName="fk_submission_lesson"
+            referencedTableName="lesson"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <rollback>
+            <dropTable tableName="submission"/>
+            <dropTable tableName="assignment"/>
+            <dropTable tableName="lesson_participant"/>
+            <dropTable tableName="lesson"/>
+            <dropTable tableName="lesson_template"/>
+            <dropTable tableName="course"/>
+            <dropTable tableName="teacher_profile"/>
+            <dropTable tableName="student_profile"/>
+            <dropTable tableName="app_user"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -71,6 +71,33 @@ spec:
       image: alpine:3.20
       command: ["cat"]
       tty: true
+    - name: liquibase
+      image: liquibase/liquibase:5.0.3
+      command: ["cat"]
+      tty: true
+      env:
+        - name: PLAYSAY_DB_JDBC_URL
+          valueFrom:
+            secretKeyRef:
+              name: playsay-app-db
+              key: jdbc-uri
+        - name: PLAYSAY_DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: playsay-app-db
+              key: username
+        - name: PLAYSAY_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: playsay-app-db
+              key: password
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
   volumes:
     - name: kaniko-docker-config
       emptyDir: {}
@@ -195,6 +222,40 @@ spec:
           }
         '''
         archiveArtifacts artifacts: 'contracts/openapi.yaml', fingerprint: true
+      }
+    }
+
+    stage('DB migrate') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('liquibase') {
+          echo "Applying api-gateway database migrations for ${env.BUILD_LABEL}"
+          sh '''
+            set -eu
+            CHANGELOG="backend/api-gateway/src/main/resources/db/changelog/db.changelog-master.xml"
+            POSTGRES_JDBC_VERSION="42.7.8"
+            POSTGRES_JDBC_JAR="/tmp/postgresql-${POSTGRES_JDBC_VERSION}.jar"
+            if [ ! -f "$POSTGRES_JDBC_JAR" ]; then
+              curl -fsSL "https://repo1.maven.org/maven2/org/postgresql/postgresql/${POSTGRES_JDBC_VERSION}/postgresql-${POSTGRES_JDBC_VERSION}.jar" -o "$POSTGRES_JDBC_JAR"
+            fi
+            liquibase \
+              --changelog-file="$CHANGELOG" \
+              --classpath="$POSTGRES_JDBC_JAR" \
+              --url="$PLAYSAY_DB_JDBC_URL" \
+              --username="$PLAYSAY_DB_USERNAME" \
+              --password="$PLAYSAY_DB_PASSWORD" \
+              status --verbose
+            liquibase \
+              --changelog-file="$CHANGELOG" \
+              --classpath="$POSTGRES_JDBC_JAR" \
+              --url="$PLAYSAY_DB_JDBC_URL" \
+              --username="$PLAYSAY_DB_USERNAME" \
+              --password="$PLAYSAY_DB_PASSWORD" \
+              update
+          '''
+        }
       }
     }
 

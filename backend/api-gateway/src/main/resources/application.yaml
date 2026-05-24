@@ -4,6 +4,13 @@ server:
 spring:
   application:
     name: api-gateway
+  datasource:
+    url: ${PLAYSAY_DB_JDBC_URL:jdbc:postgresql://playsay-postgres-rw.playsay-data.svc.cluster.local:5432/playsay}
+    username: ${PLAYSAY_DB_USERNAME:playsay_app}
+    password: ${PLAYSAY_DB_PASSWORD:}
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: ${PLAYSAY_LIQUIBASE_ENABLED:false}
   security:
     oauth2:
       resourceserver:

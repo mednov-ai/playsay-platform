@@ -4,15 +4,47 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.TestInstance
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpStatus
+import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.server.ResponseStatusException
+import javax.sql.DataSource
+import liquibase.integration.spring.SpringLiquibase
 
-class UserProfileControllerTest {
-    private val store = UserProfileStore()
-    private val controller = UserProfileController(store)
+@SpringBootTest(
+    properties = [
+        "spring.datasource.url=jdbc:h2:mem:user-profile-controller;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.liquibase.enabled=true",
+    ],
+)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class UserProfileControllerTest @Autowired constructor(
+    private val controller: UserProfileController,
+    private val jdbcClient: JdbcClient,
+    private val dataSource: DataSource,
+) {
+    @BeforeAll
+    fun migrateDatabase() {
+        SpringLiquibase().apply {
+            this.dataSource = this@UserProfileControllerTest.dataSource
+            changeLog = "classpath:db/changelog/db.changelog-master.xml"
+        }.afterPropertiesSet()
+    }
+
+    @BeforeEach
+    fun cleanDatabase() {
+        jdbcClient.sql("DELETE FROM app_user").update()
+    }
 
     @Test
     fun `creates and updates current app user profile`() {

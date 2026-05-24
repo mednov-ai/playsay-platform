@@ -5,7 +5,6 @@ import {
   ParticipantTile,
   RoomAudioRenderer,
   StartMediaButton,
-  TrackLoop,
   TrackToggle,
   useTracks,
 } from "@livekit/components-react";
@@ -132,6 +131,9 @@ type AnnotationStroke = {
   id: string;
   points: AnnotationPoint[];
 };
+
+type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
+type ClassroomStripLayout = "single" | "row";
 
 export function App() {
   const [profile, setProfile] = useState<MeProfile | null>(null);
@@ -1531,7 +1533,7 @@ function ClassroomVideoStage() {
   function getDefaultSinglePipPosition() {
     const focusRect = focusRef.current?.getBoundingClientRect();
     const stripRect = stripRef.current?.getBoundingClientRect();
-    const inset = 8;
+    const inset = 22;
 
     if (!focusRect || !stripRect) {
       return pipPosition;
@@ -1635,11 +1637,15 @@ function ClassroomVideoStage() {
           ref={stripRef}
           style={pipStyle}
         >
-          {hasStrip ? (
-            <TrackLoop tracks={stripTracks}>
-              <ParticipantTile />
-            </TrackLoop>
-          ) : null}
+          {hasStrip
+            ? stripTracks.map((trackRef) => (
+              <ClassroomMiniVideoTile
+                key={classroomTrackKey(trackRef)}
+                layout={stripLayout}
+                trackRef={trackRef}
+              />
+            ))
+            : null}
         </div>
       </div>
       <div className="lk-control-bar playsay-classroom-controls" ref={controlsRef}>
@@ -1649,6 +1655,25 @@ function ClassroomVideoStage() {
       </div>
       <RoomAudioRenderer />
       <ConnectionStateToast />
+    </div>
+  );
+}
+
+function ClassroomMiniVideoTile({
+  layout,
+  trackRef,
+}: {
+  layout: ClassroomStripLayout;
+  trackRef: ClassroomTrackReference;
+}) {
+  const label = participantDisplayName(trackRef);
+
+  return (
+    <div className="playsay-video-card" data-layout={layout}>
+      <ParticipantTile trackRef={trackRef} />
+      <div className="playsay-video-card-label" title={label}>
+        {label}
+      </div>
     </div>
   );
 }
@@ -2398,6 +2423,18 @@ function pointsToSvgPath(points: AnnotationPoint[]): string {
 
 function canAssignLessons(profile: MeProfile | null): boolean {
   return profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+}
+
+function participantDisplayName(trackRef: ClassroomTrackReference): string {
+  return (
+    trackRef.participant.name?.trim()
+    || trackRef.participant.identity?.trim()
+    || "Участник"
+  );
+}
+
+function classroomTrackKey(trackRef: ClassroomTrackReference): string {
+  return `${trackRef.participant.sid || trackRef.participant.identity}-${trackRef.source ?? "camera"}`;
 }
 
 function formatParticipantCount(value: number): string {

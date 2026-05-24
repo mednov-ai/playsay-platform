@@ -202,6 +202,16 @@ textarea {
   user-select: auto;
 }
 
+.playsay-video-card {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.playsay-video-card[data-layout="single"] {
+  position: relative;
+}
+
 .playsay-video-strip .lk-participant-tile {
   aspect-ratio: 16 / 10;
   height: auto;
@@ -215,6 +225,30 @@ textarea {
 .playsay-video-strip .lk-participant-metadata-item,
 .playsay-video-strip .lk-participant-name {
   display: none !important;
+}
+
+.playsay-video-card-label {
+  min-width: 0;
+  overflow: hidden;
+  color: rgb(255 255 255 / 0.92);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
+  white-space: nowrap;
+}
+
+.playsay-video-card[data-layout="single"] .playsay-video-card-label {
+  position: absolute;
+  right: 0.375rem;
+  bottom: 0.375rem;
+  left: 0.375rem;
+  border-radius: 0.5rem;
+  background: rgb(0 0 0 / 0.62);
+  padding: 0.1875rem 0.375rem;
+  text-align: left;
 }
 
 .playsay-classroom-conference .lk-control-bar {

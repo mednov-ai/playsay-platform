@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent, type ReactNode } from "react";
 import {
   ConnectionStateToast,
   LiveKitRoom,
@@ -1505,6 +1505,10 @@ function LiveLessonExperience({
 }
 
 function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
+  const focusRef = useRef<HTMLDivElement | null>(null);
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const dragState = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
+  const [pipPosition, setPipPosition] = useState({ x: 12, y: 120 });
   const tracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
@@ -1513,18 +1517,117 @@ function ClassroomVideoStage({ isGroupLesson }: { isGroupLesson: boolean }) {
   const featuredTrack = orderedTracks[0];
   const stripTracks = orderedTracks.slice(1);
   const hasStrip = stripTracks.length > 0;
+  const pipStyle = {
+    "--playsay-pip-x": `${pipPosition.x}px`,
+    "--playsay-pip-y": `${pipPosition.y}px`,
+  } as CSSProperties;
+
+  function clampPipPosition(x: number, y: number) {
+    const focusRect = focusRef.current?.getBoundingClientRect();
+    const stripRect = stripRef.current?.getBoundingClientRect();
+
+    if (!focusRect || !stripRect) {
+      return { x, y };
+    }
+
+    const inset = 8;
+    const maxX = Math.max(inset, focusRect.width - stripRect.width - inset);
+    const maxY = Math.max(inset, focusRect.height - stripRect.height - inset);
+
+    return {
+      x: Math.min(Math.max(x, inset), maxX),
+      y: Math.min(Math.max(y, inset), maxY),
+    };
+  }
+
+  function getPipPositionFromPointer(event: PointerEvent<HTMLDivElement>) {
+    const focusRect = focusRef.current?.getBoundingClientRect();
+    const currentDrag = dragState.current;
+
+    if (!focusRect || !currentDrag) {
+      return pipPosition;
+    }
+
+    return clampPipPosition(
+      event.clientX - focusRect.left - currentDrag.offsetX,
+      event.clientY - focusRect.top - currentDrag.offsetY,
+    );
+  }
+
+  function handlePipPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!hasStrip || !stripRef.current) {
+      return;
+    }
+
+    const stripRect = stripRef.current.getBoundingClientRect();
+    dragState.current = {
+      offsetX: event.clientX - stripRect.left,
+      offsetY: event.clientY - stripRect.top,
+      pointerId: event.pointerId,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    setPipPosition(getPipPositionFromPointer(event));
+  }
+
+  function handlePipPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (dragState.current?.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    setPipPosition(getPipPositionFromPointer(event));
+  }
+
+  function handlePipPointerEnd(event: PointerEvent<HTMLDivElement>) {
+    if (dragState.current?.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragState.current = null;
+  }
+
+  useEffect(() => {
+    if (!hasStrip) {
+      return undefined;
+    }
+
+    function keepPipInBounds() {
+      setPipPosition((current) => clampPipPosition(current.x, current.y));
+    }
+
+    const animationFrame = window.requestAnimationFrame(keepPipInBounds);
+    window.addEventListener("resize", keepPipInBounds);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("resize", keepPipInBounds);
+    };
+  }, [hasStrip, stripTracks.length]);
 
   return (
     <div className="playsay-classroom-conference" data-group={isGroupLesson || orderedTracks.length > 2 ? "true" : "false"}>
-      <div className="playsay-video-focus">
+      <div className="playsay-video-focus" ref={focusRef}>
         {featuredTrack ? <ParticipantTile trackRef={featuredTrack} /> : null}
-      </div>
-      <div className="playsay-video-strip" data-empty={hasStrip ? "false" : "true"}>
-        {hasStrip ? (
-          <TrackLoop tracks={stripTracks}>
-            <ParticipantTile />
-          </TrackLoop>
-        ) : null}
+        <div
+          className="playsay-video-strip"
+          data-empty={hasStrip ? "false" : "true"}
+          onPointerCancel={handlePipPointerEnd}
+          onPointerDown={handlePipPointerDown}
+          onPointerMove={handlePipPointerMove}
+          onPointerUp={handlePipPointerEnd}
+          ref={stripRef}
+          style={pipStyle}
+        >
+          {hasStrip ? (
+            <TrackLoop tracks={stripTracks}>
+              <ParticipantTile />
+            </TrackLoop>
+          ) : null}
+        </div>
       </div>
       <div className="lk-control-bar playsay-classroom-controls">
         <TrackToggle source={Track.Source.Microphone}>Микрофон</TrackToggle>

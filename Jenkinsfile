@@ -20,10 +20,10 @@ spec:
       resources:
         requests:
           cpu: 250m
-          memory: 512Mi
+          memory: 768Mi
         limits:
           cpu: "1"
-          memory: 1536Mi
+          memory: 2Gi
     - name: node
       image: node:22
       command: ["cat"]

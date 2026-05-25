@@ -29,6 +29,12 @@ management:
         enabled: true
 
 playsay:
+  ai:
+    provider: ${PLAYSAY_AI_PROVIDER:stub}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${OPENAI_MODEL:gpt-5.4-mini}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
   livekit:
     url: ${PLAYSAY_LIVEKIT_URL:wss://online.play-and-say.ru/livekit}
     api-key: ${PLAYSAY_LIVEKIT_API_KEY:}

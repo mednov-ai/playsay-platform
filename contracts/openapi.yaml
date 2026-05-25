@@ -586,8 +586,8 @@ paths:
       tags:
       - Materials
       summary: Draft lesson material with AI
-      description: Returns a deterministic Play&Say material draft until a real LLM
-        key is configured.
+      description: "Returns a structured Play&Say material draft from the configured\
+        \ AI provider, or deterministic stub when AI is disabled."
       operationId: draftMaterialWithAi
       requestBody:
         content:

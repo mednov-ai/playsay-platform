@@ -1,0 +1,145 @@
+package com.playsay.gateway
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class MaterialAiDraftServiceTest {
+    @Test
+    fun `openai provider parses structured response and enriches source metadata`() {
+        val transport = RecordingOpenAiTransport(openAiResponse(openAiDraftJson()))
+        val provider = OpenAiMaterialAiDraftProvider(
+            transport = transport,
+            apiKey = "test-key",
+            model = "gpt-5.4-mini",
+            baseUrl = "https://api.openai.com/v1",
+        )
+
+        val draft = provider.draft(
+            MaterialAiDraftInput(
+                title = "Travel food",
+                prompt = "B1 travel food speaking lesson",
+                language = "en",
+                cefrLevel = "B1",
+            ),
+        )
+
+        assertEquals("Travel food", draft.title)
+        assertEquals("B1", draft.cefrLevel)
+        assertEquals("PRIVATE", draft.visibility)
+        assertEquals("DRAFT", draft.status)
+        assertEquals("openai", draft.sourceMeta["provider"].asText())
+        assertEquals("gpt-5.4-mini", draft.sourceMeta["model"].asText())
+        assertEquals("text", draft.document["pages"][0]["blocks"][0]["type"].asText())
+        assertTrue(transport.requestBody.contains("\"text\""))
+        assertTrue(transport.requestBody.contains("\"json_schema\""))
+    }
+
+    private class RecordingOpenAiTransport(
+        private val responseBody: String,
+    ) : OpenAiResponsesTransport {
+        lateinit var requestBody: String
+
+        override fun createResponse(baseUrl: String, apiKey: String, requestBody: String): String {
+            assertEquals("https://api.openai.com/v1", baseUrl)
+            assertEquals("test-key", apiKey)
+            this.requestBody = requestBody
+            return responseBody
+        }
+    }
+
+    private fun openAiResponse(outputText: String): String =
+        """
+        {
+          "id": "resp_test",
+          "output": [
+            {
+              "type": "message",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": ${jsonString(outputText)}
+                }
+              ]
+            }
+          ]
+        }
+        """.trimIndent()
+
+    private fun openAiDraftJson(): String =
+        """
+        {
+          "title": "Travel food",
+          "description": "Speaking lesson about food while travelling.",
+          "language": "en",
+          "cefrLevel": "B1",
+          "visibility": "PRIVATE",
+          "status": "DRAFT",
+          "document": {
+            "schemaVersion": 1,
+            "pages": [
+              {
+                "id": "page-1",
+                "title": "Travel food",
+                "layout": "FLOW",
+                "blocks": [
+                  {
+                    "id": "block-1",
+                    "type": "text",
+                    "title": "Warm-up",
+                    "body": "Talk about your favourite food when you travel.",
+                    "instruction": null,
+                    "prompt": null,
+                    "level": null,
+                    "language": null,
+                    "url": null,
+                    "provider": null,
+                    "caption": null,
+                    "imageUrl": null,
+                    "alt": null,
+                    "height": null,
+                    "minWords": null,
+                    "cards": [],
+                    "items": [],
+                    "options": []
+                  }
+                ]
+              }
+            ]
+          },
+          "sourceMeta": {
+            "kind": "AI_GENERATED",
+            "provider": "openai",
+            "sourceType": "teacher_prompt",
+            "inputSummary": "B1 travel food speaking lesson",
+            "notes": "Original live lesson draft."
+          },
+          "scoringRubric": {
+            "maxScore": 10,
+            "criteria": [
+              { "key": "taskCompletion", "label": "Task completion", "weight": 4 },
+              { "key": "grammar", "label": "Grammar", "weight": 2 },
+              { "key": "vocabulary", "label": "Vocabulary", "weight": 2 },
+              { "key": "fluency", "label": "Fluency", "weight": 2 }
+            ],
+            "analysisFlags": ["taskCompletion", "grammar", "vocabulary", "fluency"]
+          }
+        }
+        """.trimIndent()
+
+    private fun jsonString(value: String): String =
+        buildString {
+            append('"')
+            value.forEach { char ->
+                when (char) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(char)
+                }
+            }
+            append('"')
+        }
+}

@@ -1620,7 +1620,7 @@ export const getDraftMaterialWithAiUrl = () => {
 }
 
 /**
- * Returns a deterministic Play&Say material draft until a real LLM key is configured.
+ * Returns a structured Play&Say material draft from the configured AI provider, or deterministic stub when AI is disabled.
  * @summary Draft lesson material with AI
  */
 export const draftMaterialWithAi = async (materialAiDraftRequest: MaterialAiDraftRequest, options?: RequestInit): Promise<draftMaterialWithAiResponse> => {

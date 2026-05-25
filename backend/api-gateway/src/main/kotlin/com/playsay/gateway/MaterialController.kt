@@ -167,6 +167,7 @@ private data class ValidatedMaterialAssetRequest(
 class LessonMaterialStore(
     private val jdbcClient: JdbcClient,
     private val userProfileStore: UserProfileStore,
+    private val materialAiDraftService: MaterialAiDraftService,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -396,24 +397,13 @@ class LessonMaterialStore(
         val title = request.title.optionalClean("title", 160)
             ?: prompt.lineSequence().firstOrNull()?.take(90)?.ifBlank { null }
             ?: "Новый материал"
-        val document = aiDraftDocument(title, prompt, language, cefrLevel, objectMapper)
-        val sourceMeta = objectMapper.createObjectNode()
-            .put("kind", "AI_STUB")
-            .put("provider", "stub")
-            .put("prompt", prompt)
-            .put("note", "LLM key is not configured yet; this deterministic draft uses the final Play&Say schema.")
-        val scoringRubric = defaultScoringRubric(objectMapper)
-
-        return LessonMaterialDraftResponse(
-            title = title,
-            description = "Черновик по описанию: ${prompt.take(180)}",
-            language = language,
-            cefrLevel = cefrLevel,
-            visibility = "PRIVATE",
-            status = "DRAFT",
-            document = document,
-            sourceMeta = sourceMeta,
-            scoringRubric = scoringRubric,
+        return materialAiDraftService.draft(
+            MaterialAiDraftInput(
+                title = title,
+                prompt = prompt,
+                language = language,
+                cefrLevel = cefrLevel,
+            ),
         )
     }
 
@@ -728,7 +718,7 @@ class MaterialController(
     @Operation(
         operationId = "draftMaterialWithAi",
         summary = "Draft lesson material with AI",
-        description = "Returns a deterministic Play&Say material draft until a real LLM key is configured.",
+        description = "Returns a structured Play&Say material draft from the configured AI provider, or deterministic stub when AI is disabled.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(

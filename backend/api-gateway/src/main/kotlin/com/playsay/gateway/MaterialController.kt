@@ -456,9 +456,9 @@ class LessonMaterialStore(
                     alt = target.imageAlt,
                 ),
             )
-            target.pair.put("imageUrl", generated.dataUrl)
+            val assetId = insertGeneratedImageAsset(materialId, target, generated)
+            target.pair.put("imageUrl", "material-asset:$assetId")
             target.pair.put("imageAlt", target.imageAlt)
-            insertGeneratedImageAsset(materialId, target, generated)
         }
 
         jdbcClient.sql(
@@ -479,7 +479,13 @@ class LessonMaterialStore(
 
     @Transactional(readOnly = true)
     fun listAssets(authentication: JwtAuthenticationToken, materialId: UUID): List<MaterialAssetResponse> {
-        get(authentication, materialId)
+        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        val canRead = material.canRead(authentication, currentUserId) ||
+            isActiveMaterialParticipant(materialId, authentication.token.subject, Instant.now())
+        if (!canRead) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        }
         return jdbcClient.sql(
             """
             SELECT id,
@@ -580,7 +586,7 @@ class LessonMaterialStore(
         materialId: UUID,
         target: MatchingImageTarget,
         generated: GeneratedMaterialImage,
-    ) {
+    ): UUID {
         val id = UUID.randomUUID()
         jdbcClient.sql(
             """
@@ -612,6 +618,7 @@ class LessonMaterialStore(
             .param("metadata", objectMapper.writeValueAsString(generatedImageMetadata(target, generated)))
             .param("createdAt", Instant.now().toMaterialOffsetDateTime())
             .update()
+        return id
     }
 
     private fun generatedImageMetadata(target: MatchingImageTarget, generated: GeneratedMaterialImage): ObjectNode =
@@ -666,6 +673,26 @@ class LessonMaterialStore(
         )
             .param("lessonId", lessonId)
             .param("subject", subject)
+            .query(Int::class.java)
+            .single() > 0
+
+    private fun isActiveMaterialParticipant(materialId: UUID, subject: String, now: Instant): Boolean =
+        jdbcClient.sql(
+            """
+            SELECT COUNT(*)
+              FROM lesson l
+              LEFT JOIN lesson_template lt ON lt.id = l.lesson_template_id
+              JOIN lesson_participant lp ON lp.lesson_id = l.id
+              JOIN app_user student ON student.id = lp.student_user_id
+             WHERE COALESCE(l.material_id, lt.material_id) = :materialId
+               AND student.keycloak_subject = :subject
+               AND l.status NOT IN ('COMPLETED', 'CANCELLED')
+               AND (l.scheduled_end IS NULL OR l.scheduled_end > :now)
+            """.trimIndent(),
+        )
+            .param("materialId", materialId)
+            .param("subject", subject)
+            .param("now", now.toMaterialOffsetDateTime())
             .query(Int::class.java)
             .single() > 0
 

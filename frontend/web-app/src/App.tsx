@@ -62,6 +62,7 @@ import {
   fetchAdminUserProfiles,
   fetchCourseLessons,
   fetchCourses,
+  fetchMaterialAssets,
   fetchMaterials,
   fetchMe,
   fetchScheduledLessons,
@@ -88,6 +89,7 @@ import {
   type CourseLesson,
   type CourseLessonInput,
   type LessonMaterial,
+  type LessonMaterialAsset,
   type LessonMaterialDraft,
   type LessonMaterialGenerateImagesInput,
   type LessonMaterialDraftInput,
@@ -2853,6 +2855,36 @@ function LessonMaterialDocumentView({
   const document = editorDocumentFromJson(material.document);
   const page = document.pages[0] ?? defaultMaterialPage(material.title);
   const maxScore = materialMaxScore(material.scoringRubric);
+  const assetIds = materialDocumentAssetIds(document);
+  const assetKey = assetIds.join("|");
+  const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let active = true;
+
+    if (material.id === "preview" || assetKey.length === 0) {
+      setAssetUrls({});
+      return () => {
+        active = false;
+      };
+    }
+
+    fetchMaterialAssets(material.id)
+      .then((assets) => {
+        if (active) {
+          setAssetUrls(materialAssetUrlMap(assets));
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAssetUrls({});
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [assetKey, material.id]);
 
   return (
     <div className="playsay-rendered-material">
@@ -2868,7 +2900,7 @@ function LessonMaterialDocumentView({
       {material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
       <div className="playsay-material-blocks">
         {page.blocks.map((block) => (
-          <RenderedMaterialBlock block={block} key={block.id} mode={mode} />
+          <RenderedMaterialBlock assetUrls={assetUrls} block={block} key={block.id} mode={mode} />
         ))}
       </div>
     </div>
@@ -2876,9 +2908,11 @@ function LessonMaterialDocumentView({
 }
 
 function RenderedMaterialBlock({
+  assetUrls,
   block,
   mode,
 }: {
+  assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
   mode: MaterialRenderMode;
 }) {
@@ -2903,15 +2937,25 @@ function RenderedMaterialBlock({
       );
     case "image":
     case "generatedImage":
-      return (
-        <section className="playsay-render-block">
-          <h4>{block.title}</h4>
-          <figure className="playsay-image-placeholder">
-            <ImageIcon className="h-6 w-6 text-primary" />
-            <figcaption>{block.caption || block.prompt || block.url || "Изображение"}</figcaption>
-          </figure>
-        </section>
-      );
+      {
+        const imageUrl = resolveMaterialImageUrl(block.url, assetUrls);
+        return (
+          <section className="playsay-render-block">
+            <h4>{block.title}</h4>
+            {imageUrl ? (
+              <figure className="playsay-rendered-image">
+                <img alt={block.caption || block.prompt || block.title} src={imageUrl} />
+                {block.caption ? <figcaption>{block.caption}</figcaption> : null}
+              </figure>
+            ) : (
+              <figure className="playsay-image-placeholder">
+                <ImageIcon className="h-6 w-6 text-primary" />
+                <figcaption>{block.caption || block.prompt || block.url || "Изображение"}</figcaption>
+              </figure>
+            )}
+          </section>
+        );
+      }
     case "flashcards":
       return (
         <section className="playsay-render-block">
@@ -2945,7 +2989,7 @@ function RenderedMaterialBlock({
       return (
         <section className="playsay-render-block">
           <h4>{block.title}</h4>
-          <RenderedMatchingPairsExercise block={block} mode={mode} />
+          <RenderedMatchingPairsExercise assetUrls={assetUrls} block={block} mode={mode} />
         </section>
       );
     case "freeWriting":
@@ -3051,9 +3095,11 @@ function RenderedChoiceExercise({ block }: { block: MaterialEditorBlock }) {
 }
 
 function RenderedMatchingPairsExercise({
+  assetUrls,
   block,
   mode,
 }: {
+  assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
   mode: MaterialRenderMode;
 }) {
@@ -3128,6 +3174,8 @@ function RenderedMatchingPairsExercise({
       <div className="playsay-match-rows">
         {pairs.map((leftPair, index) => {
           const pair = rightOptions[index] ?? leftPair;
+          const imageUrl = resolveMaterialImageUrl(pair.imageUrl, assetUrls);
+          const hasPendingAsset = Boolean(materialAssetIdFromUrl(pair.imageUrl) && !imageUrl);
           const connected = Object.values(matches).includes(pair.id);
           return (
             <div className="playsay-match-row" key={leftPair.id}>
@@ -3149,16 +3197,16 @@ function RenderedMatchingPairsExercise({
                 ref={(node) => { rightRefs.current[pair.id] = node; }}
                 type="button"
               >
-                {pair.imageUrl ? (
-                  <img alt={pair.imageAlt || pair.right} src={pair.imageUrl} />
+                {imageUrl ? (
+                  <img alt={pair.imageAlt || pair.right} src={imageUrl} />
                 ) : (
                   <span className="playsay-match-generated-thumb" aria-hidden="true">
-                    <Sparkles className="h-5 w-5" />
+                    {hasPendingAsset ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
                   </span>
                 )}
                 <span>Картинка {index + 1}</span>
-                {!pair.imageUrl ? (
-                  <small>{pair.imagePrompt || pair.imageAlt || pair.right}</small>
+                {!imageUrl ? (
+                  <small>{hasPendingAsset ? "Загружаем картинку" : pair.imagePrompt || pair.imageAlt || pair.right}</small>
                 ) : null}
               </button>
             </div>
@@ -4099,6 +4147,52 @@ function materialMatchingPairFromJson(value: unknown): MaterialMatchingPair | nu
     imageAlt: asString(pair.imageAlt) || asString(pair.alt) || right,
     imageUrl: asString(pair.imageUrl) || asString(pair.url) || undefined,
   };
+}
+
+function materialDocumentAssetIds(document: MaterialEditorDocument): string[] {
+  const ids = new Set<string>();
+  document.pages.forEach((page) => {
+    page.blocks.forEach((block) => {
+      (block.pairs ?? []).forEach((pair) => {
+        const assetId = materialAssetIdFromUrl(pair.imageUrl);
+        if (assetId) {
+          ids.add(assetId);
+        }
+      });
+      const blockAssetId = materialAssetIdFromUrl(block.url);
+      if (blockAssetId) {
+        ids.add(blockAssetId);
+      }
+    });
+  });
+  return [...ids].sort();
+}
+
+function materialAssetIdFromUrl(value: string | undefined): string | null {
+  const marker = "material-asset:";
+  const clean = value?.trim() ?? "";
+  if (!clean.startsWith(marker)) {
+    return null;
+  }
+  return clean.slice(marker.length).trim() || null;
+}
+
+function resolveMaterialImageUrl(value: string | undefined, assetUrls: Record<string, string>): string | undefined {
+  const assetId = materialAssetIdFromUrl(value);
+  if (assetId) {
+    return assetUrls[assetId];
+  }
+  return value?.trim() || undefined;
+}
+
+function materialAssetUrlMap(assets: LessonMaterialAsset[]): Record<string, string> {
+  return assets.reduce<Record<string, string>>((result, asset) => {
+    const externalUrl = asset.externalUrl?.trim();
+    if (externalUrl) {
+      result[asset.id] = externalUrl;
+    }
+    return result;
+  }, {});
 }
 
 function materialDocumentBlocks(material: LessonMaterial): MaterialEditorBlock[] {

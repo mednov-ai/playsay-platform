@@ -117,6 +117,15 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             LessonMaterialRequest(title = "Private classroom material", status = "PUBLISHED"),
         ).body!!
+        val asset = materialController.createAsset(
+            teacher,
+            material.id,
+            MaterialAssetRequest(
+                kind = "GENERATED_IMAGE",
+                externalUrl = "data:image/svg+xml;base64,PHN2Zy8+",
+                provider = "AI",
+            ),
+        ).body!!
 
         val course = courseController.create(teacher, CourseRequest(title = "Course", isPublished = true)).body!!
         val lessonTemplate = courseController.createLesson(
@@ -138,6 +147,7 @@ class MaterialControllerTest @Autowired constructor(
 
         assertEquals(material.id, scheduledMaterial.id)
         assertEquals("Private classroom material", scheduledMaterial.title)
+        assertEquals(listOf(asset.id), materialController.listAssets(student, material.id).map { item -> item.id })
         val directReadError = assertFailsWith<ResponseStatusException> {
             materialController.get(student, material.id)
         }
@@ -334,11 +344,13 @@ class MaterialControllerTest @Autowired constructor(
         val pairs = generated.document["pages"][0]["blocks"][0]["pairs"]
         assertEquals("owl", pairs[0]["left"].asText())
         assertEquals("duck", pairs[1]["left"].asText())
-        assertTrue(pairs[0]["imageUrl"].asText().startsWith("data:image/svg+xml;base64,"))
-        assertTrue(pairs[1]["imageUrl"].asText().startsWith("data:image/svg+xml;base64,"))
+        assertTrue(pairs[0]["imageUrl"].asText().startsWith("material-asset:"))
+        assertTrue(pairs[1]["imageUrl"].asText().startsWith("material-asset:"))
         val assets = materialController.listAssets(teacher, material.id)
         assertEquals(2, assets.size)
         assertEquals("GENERATED_IMAGE", assets[0].kind)
+        assertTrue(assets.all { asset -> asset.externalUrl?.startsWith("data:image/svg+xml;base64,") == true })
+        assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(pairs[0]["imageUrl"].asText()))
     }
 
     private fun authentication(

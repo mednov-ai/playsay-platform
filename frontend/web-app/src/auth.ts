@@ -82,6 +82,16 @@ export type LessonMaterial = {
   createdAt: string;
   updatedAt: string;
 };
+export type LessonMaterialAsset = {
+  id: string;
+  materialId: string;
+  kind: string;
+  storageKey?: string | null;
+  externalUrl?: string | null;
+  provider: string;
+  metadata: LessonMaterialJson;
+  createdAt: string;
+};
 export type LessonMaterialInput = {
   title: string;
   description?: string | null;
@@ -512,6 +522,13 @@ export async function generateMaterialImages(
     },
     config,
   );
+}
+
+export async function fetchMaterialAssets(
+  materialId: string,
+  config = authConfig,
+): Promise<LessonMaterialAsset[]> {
+  return apiJson<LessonMaterialAsset[]>(`/api/materials/${materialId}/assets`, { method: "GET" }, config);
 }
 
 export async function fetchScheduledLessonMaterial(

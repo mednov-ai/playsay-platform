@@ -668,6 +668,28 @@ textarea {
   font-weight: 800;
 }
 
+.playsay-rendered-image {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.playsay-rendered-image img {
+  display: block;
+  width: min(100%, 28rem);
+  max-height: 22rem;
+  object-fit: contain;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: #fff7f1;
+}
+
+.playsay-rendered-image figcaption {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .playsay-flashcards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));

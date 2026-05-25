@@ -111,6 +111,13 @@ export type LessonMaterialDraftInput = {
   sourceImageDataUrl?: string | null;
   sourceFileName?: string | null;
 };
+export type LessonMaterialUrlDraftInput = {
+  url: string;
+  title?: string | null;
+  prompt?: string | null;
+  language?: string;
+  cefrLevel?: string | null;
+};
 export type LessonMaterialGenerateImagesInput = {
   blockId?: string | null;
   maxImages?: number | null;
@@ -531,6 +538,20 @@ export async function draftMaterial(
 ): Promise<LessonMaterialDraft> {
   return apiJson<LessonMaterialDraft>(
     "/api/materials/ai-draft",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    config,
+  );
+}
+
+export async function draftMaterialFromUrl(
+  input: LessonMaterialUrlDraftInput,
+  config = authConfig,
+): Promise<LessonMaterialDraft> {
+  return apiJson<LessonMaterialDraft>(
+    "/api/materials/import-url",
     {
       method: "POST",
       body: JSON.stringify(input),

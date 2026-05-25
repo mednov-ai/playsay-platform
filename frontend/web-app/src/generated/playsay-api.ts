@@ -365,6 +365,53 @@ export interface MaterialAssetResponse {
 /**
  * @nullable
  */
+export type MaterialUrlImportRequestCefrLevel = typeof MaterialUrlImportRequestCefrLevel[keyof typeof MaterialUrlImportRequestCefrLevel] | null;
+
+
+export const MaterialUrlImportRequestCefrLevel = {
+  A1: 'A1',
+  A2: 'A2',
+  B1: 'B1',
+  B2: 'B2',
+  C1: 'C1',
+  C2: 'C2',
+} as const;
+
+export interface MaterialUrlImportRequest {
+  /** @maxLength 2000 */
+  url: string;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  title?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  prompt?: string | null;
+  /** @maxLength 16 */
+  language: string;
+  /** @nullable */
+  cefrLevel?: MaterialUrlImportRequestCefrLevel;
+}
+
+export interface LessonMaterialDraftResponse {
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  language: string;
+  cefrLevel: string;
+  visibility: string;
+  status: string;
+  document: JsonNode;
+  sourceMeta: JsonNode;
+  scoringRubric: JsonNode;
+}
+
+/**
+ * @nullable
+ */
 export type MaterialAiDraftRequestCefrLevel = typeof MaterialAiDraftRequestCefrLevel[keyof typeof MaterialAiDraftRequestCefrLevel] | null;
 
 
@@ -400,19 +447,6 @@ export interface MaterialAiDraftRequest {
      * @nullable
      */
   sourceFileName?: string | null;
-}
-
-export interface LessonMaterialDraftResponse {
-  title: string;
-  /** @nullable */
-  description?: string | null;
-  language: string;
-  cefrLevel: string;
-  visibility: string;
-  status: string;
-  document: JsonNode;
-  sourceMeta: JsonNode;
-  scoringRubric: JsonNode;
 }
 
 export interface MeResponse {
@@ -1940,6 +1974,72 @@ export const createMaterialAsset = async (materialId: string,
 
   const data: createMaterialAssetResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createMaterialAssetResponse
+}
+
+
+
+export type draftMaterialFromUrlResponse200 = {
+  data: LessonMaterialDraftResponse
+  status: 200
+}
+
+export type draftMaterialFromUrlResponse400 = {
+  data: void
+  status: 400
+}
+
+export type draftMaterialFromUrlResponse401 = {
+  data: void
+  status: 401
+}
+
+export type draftMaterialFromUrlResponse403 = {
+  data: void
+  status: 403
+}
+
+export type draftMaterialFromUrlResponse502 = {
+  data: void
+  status: 502
+}
+
+export type draftMaterialFromUrlResponseSuccess = (draftMaterialFromUrlResponse200) & {
+  headers: Headers;
+};
+export type draftMaterialFromUrlResponseError = (draftMaterialFromUrlResponse400 | draftMaterialFromUrlResponse401 | draftMaterialFromUrlResponse403 | draftMaterialFromUrlResponse502) & {
+  headers: Headers;
+};
+
+export type draftMaterialFromUrlResponse = (draftMaterialFromUrlResponseSuccess | draftMaterialFromUrlResponseError)
+
+export const getDraftMaterialFromUrlUrl = () => {
+
+
+
+
+  return `/api/materials/import-url`
+}
+
+/**
+ * Fetches readable text from an http/https page, then returns a structured Play&Say draft through the configured AI provider. Local/private hosts are rejected.
+ * @summary Draft lesson material from external URL
+ */
+export const draftMaterialFromUrl = async (materialUrlImportRequest: MaterialUrlImportRequest, options?: RequestInit): Promise<draftMaterialFromUrlResponse> => {
+
+  const res = await fetch(getDraftMaterialFromUrlUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialUrlImportRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: draftMaterialFromUrlResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as draftMaterialFromUrlResponse
 }
 
 

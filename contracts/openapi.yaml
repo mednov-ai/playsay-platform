@@ -743,6 +743,38 @@ paths:
                 $ref: "#/components/schemas/MaterialAssetResponse"
       security:
       - bearerAuth: []
+  /materials/import-url:
+    post:
+      tags:
+      - Materials
+      summary: Draft lesson material from external URL
+      description: "Fetches readable text from an http/https page, then returns a\
+        \ structured Play&Say draft through the configured AI provider. Local/private\
+        \ hosts are rejected."
+      operationId: draftMaterialFromUrl
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialUrlImportRequest"
+        required: true
+      responses:
+        "200":
+          description: Draft material
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialDraftResponse"
+        "400":
+          description: Invalid or unreadable external URL
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage materials
+        "502":
+          description: External URL or AI provider failed
+      security:
+      - bearerAuth: []
   /materials/ai-draft:
     post:
       tags:
@@ -1706,6 +1738,71 @@ components:
       - materialId
       - metadata
       - provider
+    MaterialUrlImportRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          maxLength: 2000
+        title:
+          type:
+          - string
+          - "null"
+          maxLength: 160
+        prompt:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+        language:
+          type: string
+          maxLength: 16
+        cefrLevel:
+          type:
+          - string
+          - "null"
+          enum:
+          - A1
+          - A2
+          - B1
+          - B2
+          - C1
+          - C2
+      required:
+      - language
+      - url
+    LessonMaterialDraftResponse:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - "null"
+        language:
+          type: string
+        cefrLevel:
+          type: string
+        visibility:
+          type: string
+        status:
+          type: string
+        document:
+          $ref: "#/components/schemas/JsonNode"
+        sourceMeta:
+          $ref: "#/components/schemas/JsonNode"
+        scoringRubric:
+          $ref: "#/components/schemas/JsonNode"
+      required:
+      - cefrLevel
+      - document
+      - language
+      - scoringRubric
+      - sourceMeta
+      - status
+      - title
+      - visibility
     MaterialAiDraftRequest:
       type: object
       properties:
@@ -1746,38 +1843,6 @@ components:
       required:
       - language
       - prompt
-    LessonMaterialDraftResponse:
-      type: object
-      properties:
-        title:
-          type: string
-        description:
-          type:
-          - string
-          - "null"
-        language:
-          type: string
-        cefrLevel:
-          type: string
-        visibility:
-          type: string
-        status:
-          type: string
-        document:
-          $ref: "#/components/schemas/JsonNode"
-        sourceMeta:
-          $ref: "#/components/schemas/JsonNode"
-        scoringRubric:
-          $ref: "#/components/schemas/JsonNode"
-      required:
-      - cefrLevel
-      - document
-      - language
-      - scoringRubric
-      - sourceMeta
-      - status
-      - title
-      - visibility
     MeResponse:
       type: object
       properties:

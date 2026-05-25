@@ -56,6 +56,7 @@ import {
   clearTokens,
   completeLogin,
   draftMaterial,
+  draftMaterialFromUrl,
   enterScheduledLessonRoom,
   editCourseLesson,
   editScheduledLesson,
@@ -100,6 +101,7 @@ import {
   type LessonMaterialDraftInput,
   type LessonMaterialInput,
   type LessonMaterialJson,
+  type LessonMaterialUrlDraftInput,
   type LessonMaterialSubmission,
   type LiveKitRoomToken,
   type MeProfile,
@@ -603,6 +605,21 @@ export function App() {
     }
   }
 
+  async function generateMaterialDraftFromUrl(input: LessonMaterialUrlDraftInput): Promise<LessonMaterialDraft | null> {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      const draft = await draftMaterialFromUrl(input);
+      setMaterialMessage("Черновик из ссылки подготовлен");
+      return draft;
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, "Не удалось подготовить черновик из ссылки"));
+      return null;
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
   async function generateImagesForMaterial(
     materialId: string,
     input: LessonMaterialGenerateImagesInput,
@@ -876,6 +893,7 @@ export function App() {
               message={materialMessage}
               onArchive={(materialId) => void deleteMaterial(materialId)}
               onDraft={(input) => generateMaterialDraft(input)}
+              onDraftFromUrl={(input) => generateMaterialDraftFromUrl(input)}
               onGenerateImages={(materialId, input) => generateImagesForMaterial(materialId, input)}
               onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
               onRefresh={() => void refreshMaterials()}
@@ -1000,6 +1018,7 @@ function MaterialLibraryPanel({
   message,
   onArchive,
   onDraft,
+  onDraftFromUrl,
   onGenerateImages,
   onLinkLesson,
   onRefresh,
@@ -1014,6 +1033,7 @@ function MaterialLibraryPanel({
   message: string | null;
   onArchive: (materialId: string) => void;
   onDraft: (input: LessonMaterialDraftInput) => Promise<LessonMaterialDraft | null>;
+  onDraftFromUrl: (input: LessonMaterialUrlDraftInput) => Promise<LessonMaterialDraft | null>;
   onGenerateImages: (materialId: string, input: LessonMaterialGenerateImagesInput) => Promise<LessonMaterial | null>;
   onLinkLesson: (courseId: string, lesson: CourseLesson, materialId: string | null) => void;
   onRefresh: () => void;
@@ -1025,11 +1045,13 @@ function MaterialLibraryPanel({
   const [form, setForm] = useState<MaterialFormState>(() => defaultMaterialForm());
   const [autoSelectedMaterialId, setAutoSelectedMaterialId] = useState<string | null>(null);
   const [draftPrompt, setDraftPrompt] = useState("");
+  const [draftUrl, setDraftUrl] = useState("");
   const [draftImage, setDraftImage] = useState<MaterialDraftSourceImage | null>(null);
   const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedLessonKey, setSelectedLessonKey] = useState("");
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
+  const canGenerateUrlDraft = draftUrl.trim().length > 0;
   const canGenerateImages = hasMissingMatchingPairImages(form.document);
 
   useEffect(() => {
@@ -1047,6 +1069,7 @@ function MaterialLibraryPanel({
 
     setForm(materialToForm(firstMaterial));
     setDraftPrompt(readPromptFromSourceMeta(firstMaterial.sourceMeta));
+    setDraftUrl(readUrlFromSourceMeta(firstMaterial.sourceMeta));
     setAutoSelectedMaterialId(firstMaterial.id);
   }, [autoSelectedMaterialId, form.id, form.title, materials]);
 
@@ -1057,6 +1080,7 @@ function MaterialLibraryPanel({
   function resetForm() {
     setForm(defaultMaterialForm());
     setDraftPrompt("");
+    setDraftUrl("");
     setDraftImage(null);
     setDraftImageMessage(null);
   }
@@ -1064,6 +1088,7 @@ function MaterialLibraryPanel({
   function selectMaterial(material: LessonMaterial) {
     setForm(materialToForm(material));
     setDraftPrompt(readPromptFromSourceMeta(material.sourceMeta));
+    setDraftUrl(readUrlFromSourceMeta(material.sourceMeta));
     setDraftImage(null);
     setDraftImageMessage(null);
   }
@@ -1129,6 +1154,25 @@ function MaterialLibraryPanel({
     if (draft) {
       setForm(materialDraftToForm(draft));
       setDraftPrompt(readPromptFromSourceMeta(draft.sourceMeta) || prompt);
+    }
+  }
+
+  async function generateDraftFromUrl() {
+    const url = draftUrl.trim();
+    if (!url) {
+      return;
+    }
+    const draft = await onDraftFromUrl({
+      url,
+      title: form.title || null,
+      prompt: draftPrompt.trim() || null,
+      language: form.language,
+      cefrLevel: form.cefrLevel,
+    });
+    if (draft) {
+      setForm(materialDraftToForm(draft));
+      setDraftPrompt(readPromptFromSourceMeta(draft.sourceMeta));
+      setDraftUrl(readUrlFromSourceMeta(draft.sourceMeta) || url);
     }
   }
 
@@ -1265,6 +1309,21 @@ function MaterialLibraryPanel({
               />
               <label className="mt-2 block">
                 <span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase text-muted-foreground">
+                  <Globe2 className="h-3.5 w-3.5 text-primary" />
+                  Внешняя страница
+                </span>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  maxLength={2_000}
+                  onChange={(event) => setDraftUrl(event.target.value)}
+                  placeholder="https://..."
+                  type="url"
+                  value={draftUrl}
+                />
+              </label>
+              <label className="mt-2 block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase text-muted-foreground">
                   <Paperclip className="h-3.5 w-3.5 text-primary" />
                   Фото или скан
                 </span>
@@ -1307,6 +1366,16 @@ function MaterialLibraryPanel({
               >
                 <Sparkles className="h-4 w-4" />
                 Подготовить черновик
+              </Button>
+              <Button
+                className="mt-2 w-full"
+                disabled={disabled || !canGenerateUrlDraft}
+                onClick={() => void generateDraftFromUrl()}
+                type="button"
+                variant="outline"
+              >
+                <Globe2 className="h-4 w-4" />
+                Черновик из ссылки
               </Button>
             </div>
 
@@ -4614,6 +4683,11 @@ function materialMaxScore(rubric: LessonMaterialJson): number {
 function readPromptFromSourceMeta(value: LessonMaterialJson | unknown): string {
   const sourceMeta = asJsonObject(value);
   return asString(sourceMeta.prompt) || asString(sourceMeta.sourceText) || "";
+}
+
+function readUrlFromSourceMeta(value: LessonMaterialJson | unknown): string {
+  const sourceMeta = asJsonObject(value);
+  return asString(sourceMeta.sourceUrl) || asString(sourceMeta.url) || "";
 }
 
 function flattenCourseLessonMaterialOptions(

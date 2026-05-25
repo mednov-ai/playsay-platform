@@ -23,6 +23,10 @@ data class MaterialAiDraftInput(
     val cefrLevel: String,
     val sourceImageDataUrl: String? = null,
     val sourceFileName: String? = null,
+    val sourceType: String? = null,
+    val sourceUrl: String? = null,
+    val sourceTitle: String? = null,
+    val sourceFetchedChars: Int? = null,
 )
 
 @Component
@@ -47,10 +51,13 @@ class StubMaterialAiDraftProvider {
         val sourceMeta = objectMapper.createObjectNode()
             .put("kind", "AI_STUB")
             .put("provider", "stub")
-            .put("sourceType", if (input.hasSourceImage()) "scan" else "teacher_prompt")
+            .put("sourceType", input.resolvedSourceType())
             .put("prompt", input.prompt)
             .put("note", "Deterministic fallback draft; configure PLAYSAY_AI_PROVIDER=openai for live generation.")
         input.sourceFileName?.let { fileName -> sourceMeta.put("sourceFileName", fileName) }
+        input.sourceUrl?.let { url -> sourceMeta.put("sourceUrl", url) }
+        input.sourceTitle?.let { title -> sourceMeta.put("sourceTitle", title) }
+        input.sourceFetchedChars?.let { chars -> sourceMeta.put("sourceFetchedChars", chars) }
 
         return LessonMaterialDraftResponse(
             title = input.title,
@@ -219,11 +226,14 @@ private fun LessonMaterialDraftResponse.withOpenAiSourceMeta(
     meta.put("provider", "openai")
     meta.put("model", model)
     meta.put("prompt", input.prompt)
-    meta.put("sourceType", if (input.hasSourceImage()) "scan" else "teacher_prompt")
+    meta.put("sourceType", input.resolvedSourceType())
     meta.put("requestedTitle", input.title)
     meta.put("requestedLanguage", input.language)
     meta.put("requestedCefrLevel", input.cefrLevel)
     input.sourceFileName?.let { fileName -> meta.put("sourceFileName", fileName) }
+    input.sourceUrl?.let { url -> meta.put("sourceUrl", url) }
+    input.sourceTitle?.let { title -> meta.put("sourceTitle", title) }
+    input.sourceFetchedChars?.let { chars -> meta.put("sourceFetchedChars", chars) }
 
     return copy(
         title = title.trim().ifEmpty { input.title }.take(160),
@@ -331,9 +341,12 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     Lesson format: infer individual/group if the request mentions it.
     Source image attached: ${if (input.hasSourceImage()) "yes" else "no"}.
     Source file name: ${input.sourceFileName ?: "not provided"}.
+    External source URL: ${input.sourceUrl ?: "not provided"}.
+    External source page title: ${input.sourceTitle ?: "not provided"}.
 
     Requirements:
     - Build a practical live lesson for children learning English.
+    - If external source text is provided in the teacher request, use it as source material, but transform it into original live-lesson activities instead of copying the page verbatim.
     - Before writing the JSON, classify the worksheet type from the source image or request: fill gaps, multiple choice, matching pairs, flashcards, reading/listening/speaking, or mixed.
     - If a source image is attached, first solve the worksheet yourself, then convert it into editable Play&Say blocks.
     - Do not merely translate or copy the scan as text. Turn worksheet blanks into interactive exercise items.
@@ -355,6 +368,10 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     """.trimIndent()
 
 private fun MaterialAiDraftInput.hasSourceImage(): Boolean = sourceImageDataUrl?.isNotBlank() == true
+
+private fun MaterialAiDraftInput.resolvedSourceType(): String =
+    sourceType?.trim()?.takeIf { value -> value.isNotEmpty() }
+        ?: if (hasSourceImage()) "scan" else "teacher_prompt"
 
 private val materialAiSystemPrompt = """
     You are Play&Say lesson material builder for an online English school for children.

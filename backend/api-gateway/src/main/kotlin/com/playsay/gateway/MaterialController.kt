@@ -113,6 +113,19 @@ data class MaterialAiDraftRequest(
     val sourceFileName: String? = null,
 )
 
+data class MaterialUrlImportRequest(
+    @field:Schema(maxLength = 2_000)
+    val url: String,
+    @field:Schema(maxLength = 160, nullable = true)
+    val title: String? = null,
+    @field:Schema(maxLength = 2_000, nullable = true)
+    val prompt: String? = null,
+    @field:Schema(maxLength = 16)
+    val language: String = "en",
+    @field:Schema(allowableValues = ["A1", "A2", "B1", "B2", "C1", "C2"], nullable = true)
+    val cefrLevel: String? = null,
+)
+
 data class MaterialGenerateImagesRequest(
     @field:Schema(maxLength = 80, nullable = true)
     val blockId: String? = null,
@@ -241,6 +254,8 @@ private data class ValidatedMaterialAssetRequest(
 )
 
 private const val materialAiSourceImageDataUrlMaxLength = 2_500_000
+private const val materialUrlImportPromptLimit = 8_000
+private const val materialUrlImportPromptTextLimit = 6_000
 
 @Component
 class LessonMaterialStore(
@@ -248,6 +263,7 @@ class LessonMaterialStore(
     private val userProfileStore: UserProfileStore,
     private val materialAiDraftService: MaterialAiDraftService,
     private val materialImageGenerationService: MaterialImageGenerationService,
+    private val materialUrlImportService: MaterialUrlImportService,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -766,6 +782,43 @@ class LessonMaterialStore(
                 cefrLevel = cefrLevel,
                 sourceImageDataUrl = sourceImageDataUrl,
                 sourceFileName = sourceFileName,
+            ),
+        )
+    }
+
+    fun draftFromUrl(authentication: JwtAuthenticationToken, request: MaterialUrlImportRequest): LessonMaterialDraftResponse {
+        authentication.requireMaterialManager()
+        val url = request.url.requiredClean("url", 2_000)
+        val language = request.language.requiredClean("language", 16)
+        val imported = materialUrlImportService.fetch(url)
+        val importPrompt = request.prompt.optionalClean("prompt", 2_000)
+            ?: "Создай редактируемый материал Play&Say по внешней странице. Сохрани тему источника, но сделай упражнения интерактивными для живого онлайн-урока."
+        val cefrLevel = request.cefrLevel?.trim()?.uppercase()?.takeIf { it in cefrLevels }
+            ?: inferCefrLevel(importPrompt + "\n" + imported.text.take(500))
+        val title = request.title.optionalClean("title", 160)
+            ?: imported.title?.take(120)?.ifBlank { null }
+            ?: "Материал из URL"
+        val prompt = buildString {
+            appendLine(importPrompt)
+            appendLine()
+            appendLine("External source URL: ${imported.finalUrl}")
+            imported.title?.let { pageTitle -> appendLine("Page title: $pageTitle") }
+            imported.description?.let { description -> appendLine("Page description: $description") }
+            appendLine()
+            appendLine("Readable source text:")
+            appendLine(imported.text.take(materialUrlImportPromptTextLimit))
+        }.take(materialUrlImportPromptLimit)
+
+        return materialAiDraftService.draft(
+            MaterialAiDraftInput(
+                title = title,
+                prompt = prompt,
+                language = language,
+                cefrLevel = cefrLevel,
+                sourceType = "external_url",
+                sourceUrl = imported.finalUrl,
+                sourceTitle = imported.title,
+                sourceFetchedChars = imported.text.length,
             ),
         )
     }
@@ -1553,6 +1606,32 @@ class MaterialController(
         @RequestBody request: MaterialAiDraftRequest,
     ): LessonMaterialDraftResponse =
         store.draft(authentication, request)
+
+    @PostMapping(
+        "/materials/import-url",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "draftMaterialFromUrl",
+        summary = "Draft lesson material from external URL",
+        description = "Fetches readable text from an http/https page, then returns a structured Play&Say draft through the configured AI provider. Local/private hosts are rejected.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Draft material"),
+            ApiResponse(responseCode = "400", description = "Invalid or unreadable external URL", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot manage materials", content = [Content()]),
+            ApiResponse(responseCode = "502", description = "External URL or AI provider failed", content = [Content()]),
+        ],
+    )
+    fun draftFromUrl(
+        authentication: JwtAuthenticationToken,
+        @RequestBody request: MaterialUrlImportRequest,
+    ): LessonMaterialDraftResponse =
+        store.draftFromUrl(authentication, request)
 
     @PostMapping(
         "/materials/{materialId}/generate-images",

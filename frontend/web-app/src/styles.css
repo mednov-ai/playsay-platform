@@ -416,6 +416,89 @@ textarea {
   box-shadow: inset 0 0 0 1px rgb(255 92 0 / 0.08);
 }
 
+.playsay-submission-monitor {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgb(255 92 0 / 0.2);
+  border-radius: 0.875rem;
+  background: #fff7f1;
+  padding: 0.625rem 0.75rem;
+}
+
+.playsay-submission-monitor-summary {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+  color: hsl(var(--foreground));
+  font-size: 0.8125rem;
+  font-weight: 950;
+}
+
+.playsay-submission-monitor-summary strong {
+  display: inline-flex;
+  min-width: 1.625rem;
+  height: 1.625rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 0.8125rem;
+}
+
+.playsay-submission-monitor-list {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.playsay-submission-monitor-list::-webkit-scrollbar {
+  display: none;
+}
+
+.playsay-submission-pill,
+.playsay-submission-monitor-empty,
+.playsay-submission-monitor-error {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 12rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 0.375rem 0.625rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.playsay-submission-pill svg {
+  color: #00a878;
+}
+
+.playsay-submission-pill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-submission-pill time {
+  color: hsl(var(--foreground));
+}
+
+.playsay-submission-monitor-error {
+  color: #b42318;
+}
+
 .playsay-task-board {
   display: grid;
   min-height: 0;
@@ -1249,6 +1332,23 @@ textarea {
 
   .playsay-assignment-card {
     padding: 0.625rem;
+  }
+
+  .playsay-submission-monitor {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .playsay-submission-monitor-summary {
+    justify-content: space-between;
+  }
+
+  .playsay-submission-pill,
+  .playsay-submission-monitor-empty,
+  .playsay-submission-monitor-error {
+    max-width: 10rem;
   }
 
   .playsay-task-board {

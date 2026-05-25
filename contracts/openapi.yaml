@@ -875,6 +875,38 @@ paths:
           description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/material-submissions:
+    get:
+      tags:
+      - Materials
+      summary: List material answer snapshots for scheduled lesson
+      description: Returns saved student answers for the material attached to a scheduled
+        lesson. Requires TEACHER or ADMIN role.
+      operationId: listScheduledLessonMaterialSubmissions
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Material submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaterialSubmissionResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot monitor submissions
+        "404":
+          description: Scheduled lesson or material not found
+      security:
+      - bearerAuth: []
   /me:
     get:
       tags:
@@ -1189,6 +1221,14 @@ components:
         userId:
           type: string
           format: uuid
+        userSubject:
+          type:
+          - string
+          - "null"
+        userName:
+          type:
+          - string
+          - "null"
         content:
           $ref: "#/components/schemas/JsonNode"
         submittedAt:

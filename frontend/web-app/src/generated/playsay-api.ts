@@ -134,6 +134,10 @@ export interface MaterialSubmissionResponse {
   lessonId: string;
   materialId: string;
   userId: string;
+  /** @nullable */
+  userSubject?: string | null;
+  /** @nullable */
+  userName?: string | null;
   content: JsonNode;
   /** @nullable */
   submittedAt?: string | null;
@@ -2209,6 +2213,67 @@ export const getScheduledLessonMaterial = async (lessonId: string, options?: Req
 
   const data: getScheduledLessonMaterialResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getScheduledLessonMaterialResponse
+}
+
+
+
+export type listScheduledLessonMaterialSubmissionsResponse200 = {
+  data: MaterialSubmissionResponse[]
+  status: 200
+}
+
+export type listScheduledLessonMaterialSubmissionsResponse401 = {
+  data: void
+  status: 401
+}
+
+export type listScheduledLessonMaterialSubmissionsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type listScheduledLessonMaterialSubmissionsResponse404 = {
+  data: void
+  status: 404
+}
+
+export type listScheduledLessonMaterialSubmissionsResponseSuccess = (listScheduledLessonMaterialSubmissionsResponse200) & {
+  headers: Headers;
+};
+export type listScheduledLessonMaterialSubmissionsResponseError = (listScheduledLessonMaterialSubmissionsResponse401 | listScheduledLessonMaterialSubmissionsResponse403 | listScheduledLessonMaterialSubmissionsResponse404) & {
+  headers: Headers;
+};
+
+export type listScheduledLessonMaterialSubmissionsResponse = (listScheduledLessonMaterialSubmissionsResponseSuccess | listScheduledLessonMaterialSubmissionsResponseError)
+
+export const getListScheduledLessonMaterialSubmissionsUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/material-submissions`
+}
+
+/**
+ * Returns saved student answers for the material attached to a scheduled lesson. Requires TEACHER or ADMIN role.
+ * @summary List material answer snapshots for scheduled lesson
+ */
+export const listScheduledLessonMaterialSubmissions = async (lessonId: string, options?: RequestInit): Promise<listScheduledLessonMaterialSubmissionsResponse> => {
+
+  const res = await fetch(getListScheduledLessonMaterialSubmissionsUrl(lessonId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listScheduledLessonMaterialSubmissionsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listScheduledLessonMaterialSubmissionsResponse
 }
 
 

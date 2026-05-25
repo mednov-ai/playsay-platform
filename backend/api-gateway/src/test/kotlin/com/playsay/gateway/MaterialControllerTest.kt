@@ -173,9 +173,20 @@ class MaterialControllerTest @Autowired constructor(
         )
         assertEquals(material.id, submission.materialId)
         assertEquals(lesson.id, submission.lessonId)
+        assertEquals("student-1", submission.userSubject)
+        assertEquals("Student one", submission.userName)
         assertNotNull(submission.submittedAt)
         assertEquals("an", submission.content["answers"]["warmup"]["items"]["gap-1"].asText())
         assertEquals(submission.id, materialController.scheduledLessonMaterialSubmission(student, lesson.id).id)
+        val teacherSubmissions = materialController.scheduledLessonMaterialSubmissions(teacher, lesson.id)
+        assertEquals(1, teacherSubmissions.size)
+        assertEquals(submission.id, teacherSubmissions.single().id)
+        assertEquals("student-1", teacherSubmissions.single().userSubject)
+        assertEquals("an", teacherSubmissions.single().content["answers"]["warmup"]["items"]["gap-1"].asText())
+        val studentMonitorError = assertFailsWith<ResponseStatusException> {
+            materialController.scheduledLessonMaterialSubmissions(student, lesson.id)
+        }
+        assertEquals(HttpStatus.FORBIDDEN, studentMonitorError.statusCode)
         val directReadError = assertFailsWith<ResponseStatusException> {
             materialController.get(student, material.id)
         }

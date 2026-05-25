@@ -142,6 +142,8 @@ data class MaterialSubmissionResponse(
     val lessonId: UUID,
     val materialId: UUID,
     val userId: UUID,
+    val userSubject: String?,
+    val userName: String?,
     val content: JsonNode,
     val submittedAt: Instant?,
     val createdAt: Instant,
@@ -183,6 +185,8 @@ private data class StoredMaterialSubmission(
     val lessonId: UUID,
     val materialId: UUID,
     val userId: UUID,
+    val userSubject: String?,
+    val userName: String?,
     val content: String,
     val submittedAt: Instant?,
     val createdAt: Instant,
@@ -450,6 +454,44 @@ class LessonMaterialStore(
         val submission = findMaterialSubmission(assignmentId, lessonId, userId)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material submission not found.")
         return submission.toResponse(objectMapper)
+    }
+
+    @Transactional(readOnly = true)
+    fun listSubmissionsForScheduledLesson(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+    ): List<MaterialSubmissionResponse> {
+        authentication.requireMaterialManager()
+        val lookup = accessibleScheduledMaterial(authentication, lessonId)
+        val materialId = lookup.materialId ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val assignmentId = findMaterialSubmissionAssignment(lessonId, materialId) ?: return emptyList()
+
+        return jdbcClient.sql(
+            """
+            SELECT s.id,
+                   s.assignment_id,
+                   s.lesson_id,
+                   a.material_id,
+                   s.student_user_id,
+                   student.keycloak_subject AS user_subject,
+                   COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
+                   s.content,
+                   s.submitted_at,
+                   s.created_at,
+                   s.updated_at
+              FROM submission s
+              JOIN assignment a ON a.id = s.assignment_id
+              JOIN app_user student ON student.id = s.student_user_id
+             WHERE s.assignment_id = :assignmentId
+               AND s.lesson_id = :lessonId
+             ORDER BY s.updated_at DESC
+            """.trimIndent(),
+        )
+            .param("assignmentId", assignmentId)
+            .param("lessonId", lessonId)
+            .query(::mapMaterialSubmission)
+            .list()
+            .map { submission -> submission.toResponse(objectMapper) }
     }
 
     @Transactional
@@ -897,12 +939,15 @@ class LessonMaterialStore(
                    s.lesson_id,
                    a.material_id,
                    s.student_user_id,
+                   student.keycloak_subject AS user_subject,
+                   COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
                    s.content,
                    s.submitted_at,
                    s.created_at,
                    s.updated_at
               FROM submission s
               JOIN assignment a ON a.id = s.assignment_id
+              JOIN app_user student ON student.id = s.student_user_id
              WHERE s.assignment_id = :assignmentId
                AND s.lesson_id = :lessonId
                AND s.student_user_id = :userId
@@ -925,12 +970,15 @@ class LessonMaterialStore(
                    s.lesson_id,
                    a.material_id,
                    s.student_user_id,
+                   student.keycloak_subject AS user_subject,
+                   COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
                    s.content,
                    s.submitted_at,
                    s.created_at,
                    s.updated_at
               FROM submission s
               JOIN assignment a ON a.id = s.assignment_id
+              JOIN app_user student ON student.id = s.student_user_id
              WHERE s.id = :submissionId
             """.trimIndent(),
         )
@@ -1165,6 +1213,27 @@ class MaterialController(
         @PathVariable lessonId: UUID,
     ): MaterialSubmissionResponse =
         store.getSubmissionForScheduledLesson(authentication, lessonId)
+
+    @GetMapping("/schedule/lessons/{lessonId}/material-submissions", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "listScheduledLessonMaterialSubmissions",
+        summary = "List material answer snapshots for scheduled lesson",
+        description = "Returns saved student answers for the material attached to a scheduled lesson. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Material submissions"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot monitor submissions", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
+        ],
+    )
+    fun scheduledLessonMaterialSubmissions(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+    ): List<MaterialSubmissionResponse> =
+        store.listSubmissionsForScheduledLesson(authentication, lessonId)
 
     @PutMapping(
         "/schedule/lessons/{lessonId}/material-submission",
@@ -1415,6 +1484,8 @@ private fun StoredMaterialSubmission.toResponse(objectMapper: ObjectMapper): Mat
         lessonId = lessonId,
         materialId = materialId,
         userId = userId,
+        userSubject = userSubject,
+        userName = userName,
         content = objectMapper.readTree(content),
         submittedAt = submittedAt,
         createdAt = createdAt,
@@ -1517,6 +1588,8 @@ private fun mapMaterialSubmission(rs: ResultSet, @Suppress("UNUSED_PARAMETER") r
         lessonId = rs.getObject("lesson_id", UUID::class.java),
         materialId = rs.getObject("material_id", UUID::class.java),
         userId = rs.getObject("student_user_id", UUID::class.java),
+        userSubject = rs.getString("user_subject"),
+        userName = rs.getString("user_name"),
         content = rs.getString("content"),
         submittedAt = rs.getObject("submitted_at", OffsetDateTime::class.java)?.toInstant(),
         createdAt = rs.getMaterialInstant("created_at"),

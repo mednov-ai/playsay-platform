@@ -68,6 +68,7 @@ import {
   fetchScheduledLessons,
   fetchScheduledLessonMaterial,
   fetchScheduledLessonMaterialSubmission,
+  fetchScheduledLessonMaterialSubmissions,
   fetchStudentProfiles,
   fetchUserProfile,
   generateMaterialImages,
@@ -2595,6 +2596,9 @@ function LessonWorkspace({
   const [submission, setSubmission] = useState<LessonMaterialSubmission | null>(null);
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [submissionSaving, setSubmissionSaving] = useState(false);
+  const [submissionSnapshots, setSubmissionSnapshots] = useState<LessonMaterialSubmission[]>([]);
+  const [submissionMonitorError, setSubmissionMonitorError] = useState<string | null>(null);
+  const canMonitorSubmissions = canAssignLessons(profile);
 
   useEffect(() => {
     let cancelled = false;
@@ -2647,6 +2651,41 @@ function LessonWorkspace({
       cancelled = true;
     };
   }, [session.lessonId]);
+
+  useEffect(() => {
+    if (!canMonitorSubmissions || !material?.id) {
+      setSubmissionSnapshots([]);
+      setSubmissionMonitorError(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function loadSubmissionSnapshots() {
+      try {
+        const snapshots = await fetchScheduledLessonMaterialSubmissions(session.lessonId);
+        if (!cancelled) {
+          setSubmissionSnapshots(snapshots);
+          setSubmissionMonitorError(null);
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          setSubmissionSnapshots([]);
+          setSubmissionMonitorError(caught instanceof Error ? caught.message : "Не удалось загрузить ответы учеников");
+        }
+      }
+    }
+
+    void loadSubmissionSnapshots();
+    const intervalId = window.setInterval(() => {
+      void loadSubmissionSnapshots();
+    }, 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [canMonitorSubmissions, material?.id, session.lessonId]);
 
   async function saveMaterialAnswers(content: LessonMaterialJson) {
     setSubmissionSaving(true);
@@ -2733,6 +2772,10 @@ function LessonWorkspace({
           </div>
         )}
 
+        {canMonitorSubmissions && material ? (
+          <MaterialSubmissionsMonitor error={submissionMonitorError} submissions={submissionSnapshots} />
+        ) : null}
+
         {materialLoading ? (
           <div className="playsay-task-board playsay-material-loading">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -2762,6 +2805,45 @@ function LessonWorkspace({
               teacherName={session.teacherName ?? displayName}
             />
           </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MaterialSubmissionsMonitor({
+  error,
+  submissions,
+}: {
+  error: string | null;
+  submissions: LessonMaterialSubmission[];
+}) {
+  const latestSubmissions = submissions.slice(0, 4);
+
+  return (
+    <section className="playsay-submission-monitor" aria-label="Ответы учеников">
+      <div className="playsay-submission-monitor-summary">
+        <span>Ответы учеников</span>
+        <strong>{submissions.length}</strong>
+      </div>
+      <div className="playsay-submission-monitor-list">
+        {error ? (
+          <span className="playsay-submission-monitor-error">
+            <AlertCircle className="h-3.5 w-3.5" />
+            Ошибка загрузки
+          </span>
+        ) : latestSubmissions.length === 0 ? (
+          <span className="playsay-submission-monitor-empty">пока нет ответов</span>
+        ) : (
+          latestSubmissions.map((submission) => (
+            <span className="playsay-submission-pill" key={submission.id} title={materialSubmissionUserLabel(submission)}>
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>{materialSubmissionUserLabel(submission)}</span>
+              <time dateTime={submission.submittedAt ?? submission.updatedAt}>
+                {formatSubmissionTime(submission.submittedAt ?? submission.updatedAt)}
+              </time>
+            </span>
+          ))
         )}
       </div>
     </section>
@@ -4849,6 +4931,18 @@ function pointsToSvgPath(points: AnnotationPoint[]): string {
 
 function canAssignLessons(profile: MeProfile | null): boolean {
   return profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+}
+
+function materialSubmissionUserLabel(submission: LessonMaterialSubmission): string {
+  return submission.userName?.trim() || submission.userSubject?.trim() || "Ученик";
+}
+
+function formatSubmissionTime(value: string | null | undefined): string {
+  if (!value) {
+    return "черновик";
+  }
+
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function participantDisplayName(trackRef: ClassroomTrackReference): string {

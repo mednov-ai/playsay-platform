@@ -132,6 +132,8 @@ export type LessonMaterialSubmission = {
   lessonId: string;
   materialId: string;
   userId: string;
+  userSubject?: string | null;
+  userName?: string | null;
   content: LessonMaterialJson;
   submittedAt?: string | null;
   createdAt: string;
@@ -576,6 +578,17 @@ export async function fetchScheduledLessonMaterialSubmission(
     }
     throw caught;
   }
+}
+
+export async function fetchScheduledLessonMaterialSubmissions(
+  lessonId: string,
+  config = authConfig,
+): Promise<LessonMaterialSubmission[]> {
+  return apiJson<LessonMaterialSubmission[]>(
+    `/api/schedule/lessons/${lessonId}/material-submissions`,
+    { method: "GET" },
+    config,
+  );
 }
 
 export async function saveScheduledLessonMaterialSubmission(

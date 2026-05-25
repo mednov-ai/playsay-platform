@@ -1,11 +1,13 @@
 package com.playsay.gateway
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
@@ -38,6 +40,8 @@ class MaterialControllerTest @Autowired constructor(
     private val jdbcClient: JdbcClient,
     private val dataSource: DataSource,
 ) {
+    private val objectMapper = jacksonObjectMapper()
+
     @BeforeAll
     fun migrateDatabase() {
         SpringLiquibase().apply {
@@ -272,6 +276,69 @@ class MaterialControllerTest @Autowired constructor(
         }
 
         assertEquals(HttpStatus.BAD_REQUEST, error.statusCode)
+    }
+
+    @Test
+    fun `teacher generates missing matching pair images and preserves row order`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val material = materialController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "Birds",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Birds",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "block-birds",
+                              "type": "matchingPairs",
+                              "title": "Birds matching",
+                              "pairs": [
+                                {
+                                  "id": "pair-owl",
+                                  "left": "owl",
+                                  "right": "owl",
+                                  "imagePrompt": "child-friendly workbook owl illustration",
+                                  "imageAlt": "owl"
+                                },
+                                {
+                                  "id": "pair-duck",
+                                  "left": "duck",
+                                  "right": "duck",
+                                  "imagePrompt": "child-friendly workbook duck illustration",
+                                  "imageAlt": "duck"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        ).body!!
+
+        val generated = materialController.generateImages(
+            teacher,
+            material.id,
+            MaterialGenerateImagesRequest(maxImages = 12),
+        )
+
+        val pairs = generated.document["pages"][0]["blocks"][0]["pairs"]
+        assertEquals("owl", pairs[0]["left"].asText())
+        assertEquals("duck", pairs[1]["left"].asText())
+        assertTrue(pairs[0]["imageUrl"].asText().startsWith("data:image/svg+xml;base64,"))
+        assertTrue(pairs[1]["imageUrl"].asText().startsWith("data:image/svg+xml;base64,"))
+        val assets = materialController.listAssets(teacher, material.id)
+        assertEquals(2, assets.size)
+        assertEquals("GENERATED_IMAGE", assets[0].kind)
     }
 
     private fun authentication(

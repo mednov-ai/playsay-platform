@@ -262,6 +262,20 @@ export interface LiveKitRoomTokenResponse {
   expiresAt: string;
 }
 
+export interface MaterialGenerateImagesRequest {
+  /**
+     * @maxLength 80
+     * @nullable
+     */
+  blockId?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 12
+     * @nullable
+     */
+  maxImages?: number | null;
+}
+
 export type MaterialAssetRequestKind = typeof MaterialAssetRequestKind[keyof typeof MaterialAssetRequestKind];
 
 
@@ -1502,6 +1516,68 @@ export const createMaterial = async (lessonMaterialRequest: LessonMaterialReques
 
   const data: createMaterialResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createMaterialResponse
+}
+
+
+
+export type generateMaterialImagesResponse200 = {
+  data: LessonMaterialResponse
+  status: 200
+}
+
+export type generateMaterialImagesResponse401 = {
+  data: void
+  status: 401
+}
+
+export type generateMaterialImagesResponse403 = {
+  data: void
+  status: 403
+}
+
+export type generateMaterialImagesResponse404 = {
+  data: void
+  status: 404
+}
+
+export type generateMaterialImagesResponseSuccess = (generateMaterialImagesResponse200) & {
+  headers: Headers;
+};
+export type generateMaterialImagesResponseError = (generateMaterialImagesResponse401 | generateMaterialImagesResponse403 | generateMaterialImagesResponse404) & {
+  headers: Headers;
+};
+
+export type generateMaterialImagesResponse = (generateMaterialImagesResponseSuccess | generateMaterialImagesResponseError)
+
+export const getGenerateMaterialImagesUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/generate-images`
+}
+
+/**
+ * Generates new AI illustrations for matching-pairs material blocks and updates the material document. Requires material owner or ADMIN role.
+ * @summary Generate missing material images
+ */
+export const generateMaterialImages = async (materialId: string,
+    materialGenerateImagesRequest: MaterialGenerateImagesRequest, options?: RequestInit): Promise<generateMaterialImagesResponse> => {
+
+  const res = await fetch(getGenerateMaterialImagesUrl(materialId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialGenerateImagesRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: generateMaterialImagesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as generateMaterialImagesResponse
 }
 
 

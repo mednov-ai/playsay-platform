@@ -530,6 +530,42 @@ paths:
           description: Current user cannot manage materials
       security:
       - bearerAuth: []
+  /materials/{materialId}/generate-images:
+    post:
+      tags:
+      - Materials
+      summary: Generate missing material images
+      description: Generates new AI illustrations for matching-pairs material blocks
+        and updates the material document. Requires material owner or ADMIN role.
+      operationId: generateMaterialImages
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialGenerateImagesRequest"
+        required: true
+      responses:
+        "200":
+          description: Lesson material with generated images
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot edit material
+        "404":
+          description: Material not found
+      security:
+      - bearerAuth: []
   /materials/{materialId}/assets:
     get:
       tags:
@@ -1327,6 +1363,21 @@ components:
       - roomName
       - serverUrl
       - token
+    MaterialGenerateImagesRequest:
+      type: object
+      properties:
+        blockId:
+          type:
+          - string
+          - "null"
+          maxLength: 80
+        maxImages:
+          type:
+          - integer
+          - "null"
+          format: int32
+          maximum: 12
+          minimum: 1
     MaterialAssetRequest:
       type: object
       properties:

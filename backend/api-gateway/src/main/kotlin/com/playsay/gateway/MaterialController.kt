@@ -111,6 +111,13 @@ data class MaterialAiDraftRequest(
     val sourceFileName: String? = null,
 )
 
+data class MaterialGenerateImagesRequest(
+    @field:Schema(maxLength = 80, nullable = true)
+    val blockId: String? = null,
+    @field:Schema(minimum = "1", maximum = "12", nullable = true)
+    val maxImages: Int? = null,
+)
+
 data class LessonMaterialDraftResponse(
     val title: String,
     val description: String?,
@@ -179,6 +186,7 @@ class LessonMaterialStore(
     private val jdbcClient: JdbcClient,
     private val userProfileStore: UserProfileStore,
     private val materialAiDraftService: MaterialAiDraftService,
+    private val materialImageGenerationService: MaterialImageGenerationService,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -422,6 +430,53 @@ class LessonMaterialStore(
         )
     }
 
+    fun generateImages(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        request: MaterialGenerateImagesRequest,
+    ): LessonMaterialResponse {
+        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        if (!material.canEdit(authentication, currentUserId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit generated images.")
+        }
+
+        val blockId = request.blockId.optionalClean("blockId", 80)
+        val maxImages = (request.maxImages ?: 12).coerceIn(1, 12)
+        val document = objectMapper.readTree(material.document).deepCopy<ObjectNode>()
+        val targets = matchingImageTargets(document, blockId, maxImages)
+        if (targets.isEmpty()) {
+            return material.toResponse(objectMapper)
+        }
+
+        targets.forEach { target ->
+            val generated = materialImageGenerationService.generate(
+                MaterialImageGenerationInput(
+                    prompt = target.imagePrompt,
+                    alt = target.imageAlt,
+                ),
+            )
+            target.pair.put("imageUrl", generated.dataUrl)
+            target.pair.put("imageAlt", target.imageAlt)
+            insertGeneratedImageAsset(materialId, target, generated)
+        }
+
+        jdbcClient.sql(
+            """
+            UPDATE lesson_material
+               SET document = :document,
+                   updated_at = :updatedAt
+             WHERE id = :id
+            """.trimIndent(),
+        )
+            .param("id", materialId)
+            .param("document", objectMapper.writeValueAsString(document))
+            .param("updatedAt", Instant.now().toMaterialOffsetDateTime())
+            .update()
+
+        return requireNotNull(find(materialId)).toResponse(objectMapper)
+    }
+
     @Transactional(readOnly = true)
     fun listAssets(authentication: JwtAuthenticationToken, materialId: UUID): List<MaterialAssetResponse> {
         get(authentication, materialId)
@@ -521,6 +576,57 @@ class LessonMaterialStore(
         }
     }
 
+    private fun insertGeneratedImageAsset(
+        materialId: UUID,
+        target: MatchingImageTarget,
+        generated: GeneratedMaterialImage,
+    ) {
+        val id = UUID.randomUUID()
+        jdbcClient.sql(
+            """
+            INSERT INTO material_asset (
+                id,
+                material_id,
+                kind,
+                storage_key,
+                external_url,
+                provider,
+                metadata,
+                created_at
+            ) VALUES (
+                :id,
+                :materialId,
+                'GENERATED_IMAGE',
+                :storageKey,
+                :externalUrl,
+                'AI',
+                :metadata,
+                :createdAt
+            )
+            """.trimIndent(),
+        )
+            .param("id", id)
+            .param("materialId", materialId)
+            .param("storageKey", "material-assets/$materialId/$id.jpg")
+            .param("externalUrl", generated.dataUrl)
+            .param("metadata", objectMapper.writeValueAsString(generatedImageMetadata(target, generated)))
+            .param("createdAt", Instant.now().toMaterialOffsetDateTime())
+            .update()
+    }
+
+    private fun generatedImageMetadata(target: MatchingImageTarget, generated: GeneratedMaterialImage): ObjectNode =
+        objectMapper.createObjectNode().apply {
+            put("blockId", target.blockId)
+            put("pairId", target.pairId)
+            put("left", target.left)
+            put("right", target.right)
+            put("imageAlt", target.imageAlt)
+            put("prompt", generated.prompt)
+            put("model", generated.model)
+            put("mimeType", generated.mimeType)
+            generated.revisedPrompt?.let { value -> put("revisedPrompt", value) }
+        }
+
     private fun find(materialId: UUID): StoredLessonMaterial? =
         jdbcClient.sql(materialSelect("WHERE m.id = :materialId"))
             .param("materialId", materialId)
@@ -588,6 +694,16 @@ class LessonMaterialStore(
           $whereClause
         """.trimIndent()
 }
+
+private data class MatchingImageTarget(
+    val blockId: String,
+    val pairId: String,
+    val left: String,
+    val right: String,
+    val imagePrompt: String,
+    val imageAlt: String,
+    val pair: ObjectNode,
+)
 
 @RestController
 @Tag(name = "Materials")
@@ -750,6 +866,32 @@ class MaterialController(
     ): LessonMaterialDraftResponse =
         store.draft(authentication, request)
 
+    @PostMapping(
+        "/materials/{materialId}/generate-images",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "generateMaterialImages",
+        summary = "Generate missing material images",
+        description = "Generates new AI illustrations for matching-pairs material blocks and updates the material document. Requires material owner or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Lesson material with generated images"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot edit material", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Material not found", content = [Content()]),
+        ],
+    )
+    fun generateImages(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @RequestBody request: MaterialGenerateImagesRequest,
+    ): LessonMaterialResponse =
+        store.generateImages(authentication, materialId, request)
+
     @GetMapping("/materials/{materialId}/assets", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
         operationId = "listMaterialAssets",
@@ -825,7 +967,7 @@ private fun LessonMaterialRequest.validated(objectMapper: ObjectMapper): Validat
     val sourceMeta = sourceMeta ?: objectMapper.createObjectNode().put("kind", "MANUAL")
     val scoringRubric = scoringRubric ?: defaultScoringRubric(objectMapper)
 
-    validateJsonSize("document", document, objectMapper, 200_000)
+    validateJsonSize("document", document, objectMapper, 6_000_000)
     validateJsonSize("sourceMeta", sourceMeta, objectMapper, 40_000)
     validateJsonSize("scoringRubric", scoringRubric, objectMapper, 40_000)
 
@@ -914,6 +1056,58 @@ private fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): Material
         metadata = objectMapper.readTree(metadata),
         createdAt = createdAt,
     )
+
+private fun matchingImageTargets(document: ObjectNode, blockId: String?, maxImages: Int): List<MatchingImageTarget> {
+    val pages = document.get("pages") as? ArrayNode ?: return emptyList()
+    val targets = mutableListOf<MatchingImageTarget>()
+    pages.forEach { page ->
+        val blocks = page.get("blocks") as? ArrayNode ?: return@forEach
+        blocks.forEach { block ->
+            val blockObject = block as? ObjectNode ?: return@forEach
+            if (blockObject.get("type")?.asText() != "matchingPairs") {
+                return@forEach
+            }
+            val currentBlockId = blockObject.get("id")?.asText()?.takeIf { value -> value.isNotBlank() } ?: "matchingPairs"
+            if (blockId != null && currentBlockId != blockId) {
+                return@forEach
+            }
+            val pairs = blockObject.get("pairs") as? ArrayNode ?: return@forEach
+            pairs.forEach { pair ->
+                if (targets.size >= maxImages) {
+                    return@forEach
+                }
+                val pairObject = pair as? ObjectNode ?: return@forEach
+                val imageUrl = pairObject.get("imageUrl")?.asText()?.trim().orEmpty()
+                if (imageUrl.isNotEmpty()) {
+                    return@forEach
+                }
+                val left = pairObject.get("left")?.asText()?.trim().orEmpty()
+                val right = pairObject.get("right")?.asText()?.trim().orEmpty()
+                if (left.isEmpty() || right.isEmpty()) {
+                    return@forEach
+                }
+                val pairId = pairObject.get("id")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    ?: "pair-${targets.size + 1}"
+                val imageAlt = pairObject.get("imageAlt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    ?: right
+                val imagePrompt = pairObject.get("imagePrompt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                    ?: "child-friendly workbook illustration of $imageAlt, white background"
+                targets.add(
+                    MatchingImageTarget(
+                        blockId = currentBlockId,
+                        pairId = pairId,
+                        left = left,
+                        right = right,
+                        imagePrompt = imagePrompt,
+                        imageAlt = imageAlt,
+                        pair = pairObject,
+                    ),
+                )
+            }
+        }
+    }
+    return targets
+}
 
 private fun mapMaterial(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredLessonMaterial =
     StoredLessonMaterial(

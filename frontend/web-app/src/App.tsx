@@ -68,6 +68,7 @@ import {
   fetchScheduledLessonMaterial,
   fetchStudentProfiles,
   fetchUserProfile,
+  generateMaterialImages,
   isAuthCallback,
   removeCourse,
   removeCourseLesson,
@@ -88,6 +89,7 @@ import {
   type CourseLessonInput,
   type LessonMaterial,
   type LessonMaterialDraft,
+  type LessonMaterialGenerateImagesInput,
   type LessonMaterialDraftInput,
   type LessonMaterialInput,
   type LessonMaterialJson,
@@ -589,6 +591,25 @@ export function App() {
     }
   }
 
+  async function generateImagesForMaterial(
+    materialId: string,
+    input: LessonMaterialGenerateImagesInput,
+  ): Promise<LessonMaterial | null> {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      const material = await generateMaterialImages(materialId, input);
+      setMaterials((current) => current.map((item) => (item.id === material.id ? material : item)));
+      setMaterialMessage("Картинки сгенерированы");
+      return material;
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, "Не удалось сгенерировать картинки"));
+      return null;
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
   async function deleteMaterial(materialId: string) {
     setMaterialLoading(true);
     setMaterialMessage(null);
@@ -843,6 +864,7 @@ export function App() {
               message={materialMessage}
               onArchive={(materialId) => void deleteMaterial(materialId)}
               onDraft={(input) => generateMaterialDraft(input)}
+              onGenerateImages={(materialId, input) => generateImagesForMaterial(materialId, input)}
               onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
               onRefresh={() => void refreshMaterials()}
               onSave={(input, materialId) => upsertMaterial(input, materialId)}
@@ -966,6 +988,7 @@ function MaterialLibraryPanel({
   message,
   onArchive,
   onDraft,
+  onGenerateImages,
   onLinkLesson,
   onRefresh,
   onSave,
@@ -979,6 +1002,7 @@ function MaterialLibraryPanel({
   message: string | null;
   onArchive: (materialId: string) => void;
   onDraft: (input: LessonMaterialDraftInput) => Promise<LessonMaterialDraft | null>;
+  onGenerateImages: (materialId: string, input: LessonMaterialGenerateImagesInput) => Promise<LessonMaterial | null>;
   onLinkLesson: (courseId: string, lesson: CourseLesson, materialId: string | null) => void;
   onRefresh: () => void;
   onSave: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
@@ -994,6 +1018,7 @@ function MaterialLibraryPanel({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedLessonKey, setSelectedLessonKey] = useState("");
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
+  const canGenerateImages = hasMissingMatchingPairImages(form.document);
 
   useEffect(() => {
     if (selectedLessonKey || lessonOptions.length === 0) {
@@ -1123,6 +1148,18 @@ function MaterialLibraryPanel({
 
   function duplicateCurrentMaterial() {
     setForm((current) => duplicateMaterialForm(current));
+  }
+
+  async function generateCurrentImages() {
+    const saved = await onSave(materialFormToInput(form), form.id ?? undefined);
+    if (!saved) {
+      return;
+    }
+    setForm(materialToForm(saved));
+    const generated = await onGenerateImages(saved.id, { maxImages: 12 });
+    if (generated) {
+      setForm(materialToForm(generated));
+    }
   }
 
   if (!profile) {
@@ -1391,6 +1428,10 @@ function MaterialLibraryPanel({
                   <Button disabled={disabled || form.title.trim().length === 0} onClick={() => setPreviewOpen((current) => !current)} type="button" variant="outline">
                     <Eye className="h-4 w-4" />
                     {previewOpen ? "Скрыть" : "Просмотр"}
+                  </Button>
+                  <Button disabled={disabled || !canGenerateImages || form.title.trim().length === 0} onClick={() => void generateCurrentImages()} type="button" variant="outline">
+                    <Sparkles className="h-4 w-4" />
+                    Картинки
                   </Button>
                   {form.id ? (
                     <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
@@ -3064,46 +3105,43 @@ function RenderedMatchingPairsExercise({ block }: { block: MaterialEditorBlock }
           <line key={line.id} x1={line.x1} x2={line.x2} y1={line.y1} y2={line.y2} />
         ))}
       </svg>
-      <div className="playsay-match-column">
-        {pairs.map((pair) => (
-          <button
-            className="playsay-match-word"
-            data-active={activeLeftId === pair.id ? "true" : "false"}
-            data-connected={matches[pair.id] ? "true" : "false"}
-            key={pair.id}
-            onClick={() => setActiveLeftId((current) => (current === pair.id ? null : pair.id))}
-            ref={(node) => { leftRefs.current[pair.id] = node; }}
-            type="button"
-          >
-            {pair.left}
-          </button>
-        ))}
-      </div>
-      <div className="playsay-match-column">
-        {rightOptions.map((pair, index) => {
+      <div className="playsay-match-rows">
+        {pairs.map((leftPair, index) => {
+          const pair = rightOptions[index] ?? leftPair;
           const connected = Object.values(matches).includes(pair.id);
           return (
-            <button
-              aria-label={`picture ${index + 1}`}
-              className="playsay-match-picture"
-              data-connected={connected ? "true" : "false"}
-              key={pair.id}
-              onClick={() => connectPair(pair.id)}
-              ref={(node) => { rightRefs.current[pair.id] = node; }}
-              type="button"
-            >
-              {pair.imageUrl ? (
-                <img alt={pair.imageAlt || pair.right} src={pair.imageUrl} />
-              ) : (
-                <span className="playsay-match-generated-thumb" aria-hidden="true">
-                  <Sparkles className="h-5 w-5" />
-                </span>
-              )}
-              <span>Картинка {index + 1}</span>
-              {!pair.imageUrl ? (
-                <small>{pair.imagePrompt || pair.imageAlt || pair.right}</small>
-              ) : null}
-            </button>
+            <div className="playsay-match-row" key={leftPair.id}>
+              <button
+                className="playsay-match-word"
+                data-active={activeLeftId === leftPair.id ? "true" : "false"}
+                data-connected={matches[leftPair.id] ? "true" : "false"}
+                onClick={() => setActiveLeftId((current) => (current === leftPair.id ? null : leftPair.id))}
+                ref={(node) => { leftRefs.current[leftPair.id] = node; }}
+                type="button"
+              >
+                {leftPair.left}
+              </button>
+              <button
+                aria-label={`picture ${index + 1}`}
+                className="playsay-match-picture"
+                data-connected={connected ? "true" : "false"}
+                onClick={() => connectPair(pair.id)}
+                ref={(node) => { rightRefs.current[pair.id] = node; }}
+                type="button"
+              >
+                {pair.imageUrl ? (
+                  <img alt={pair.imageAlt || pair.right} src={pair.imageUrl} />
+                ) : (
+                  <span className="playsay-match-generated-thumb" aria-hidden="true">
+                    <Sparkles className="h-5 w-5" />
+                  </span>
+                )}
+                <span>Картинка {index + 1}</span>
+                {!pair.imageUrl ? (
+                  <small>{pair.imagePrompt || pair.imageAlt || pair.right}</small>
+                ) : null}
+              </button>
+            </div>
           );
         })}
       </div>
@@ -4045,6 +4083,13 @@ function materialMatchingPairFromJson(value: unknown): MaterialMatchingPair | nu
 
 function materialDocumentBlocks(material: LessonMaterial): MaterialEditorBlock[] {
   return editorDocumentFromJson(material.document, material.title).pages.flatMap((page) => page.blocks);
+}
+
+function hasMissingMatchingPairImages(document: MaterialEditorDocument): boolean {
+  return document.pages.some((page) => page.blocks.some((block) => (
+    block.type === "matchingPairs" &&
+    (block.pairs ?? []).some((pair) => !pair.imageUrl?.trim() && (pair.imagePrompt?.trim() || pair.imageAlt?.trim() || pair.right.trim()))
+  )));
 }
 
 function materialMaxScore(rubric: LessonMaterialJson): number {

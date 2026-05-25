@@ -214,6 +214,69 @@ paths:
           description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/material-annotation:
+    get:
+      tags:
+      - Materials
+      summary: Get shared material annotation layer
+      description: Returns the shared drawing layer for the material attached to a
+        scheduled lesson.
+      operationId: getScheduledLessonMaterialAnnotation
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Material annotation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAnnotationResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: "Annotation, scheduled lesson, or material not found"
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Materials
+      summary: Save shared material annotation layer
+      description: Creates or updates the shared drawing layer for the material attached
+        to a scheduled lesson.
+      operationId: saveScheduledLessonMaterialAnnotation
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialAnnotationRequest"
+        required: true
+      responses:
+        "200":
+          description: Material annotation saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAnnotationResponse"
+        "400":
+          description: Invalid annotation payload
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Scheduled lesson or material not found
+      security:
+      - bearerAuth: []
   /materials/{materialId}:
     get:
       tags:
@@ -1251,6 +1314,40 @@ components:
       - materialId
       - updatedAt
       - userId
+    MaterialAnnotationRequest:
+      type: object
+      properties:
+        content:
+          $ref: "#/components/schemas/JsonNode"
+      required:
+      - content
+    MaterialAnnotationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lessonId:
+          type: string
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        content:
+          $ref: "#/components/schemas/JsonNode"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - content
+      - createdAt
+      - id
+      - lessonId
+      - materialId
+      - updatedAt
     LessonMaterialRequest:
       type: object
       properties:

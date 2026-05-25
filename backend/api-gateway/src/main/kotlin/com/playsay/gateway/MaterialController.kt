@@ -150,6 +150,19 @@ data class MaterialSubmissionResponse(
     val updatedAt: Instant,
 )
 
+data class MaterialAnnotationRequest(
+    val content: JsonNode,
+)
+
+data class MaterialAnnotationResponse(
+    val id: UUID,
+    val lessonId: UUID,
+    val materialId: UUID,
+    val content: JsonNode,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
 private data class StoredLessonMaterial(
     val id: UUID,
     val ownerTeacherUserId: UUID?,
@@ -189,6 +202,15 @@ private data class StoredMaterialSubmission(
     val userName: String?,
     val content: String,
     val submittedAt: Instant?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+private data class StoredMaterialAnnotation(
+    val id: UUID,
+    val lessonId: UUID,
+    val materialId: UUID,
+    val content: String,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
@@ -570,6 +592,81 @@ class LessonMaterialStore(
         }
 
         return requireNotNull(findMaterialSubmission(submissionId)).toResponse(objectMapper)
+    }
+
+    @Transactional(readOnly = true)
+    fun getAnnotationForScheduledLesson(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+    ): MaterialAnnotationResponse {
+        val lookup = accessibleScheduledMaterial(authentication, lessonId)
+        val materialId = lookup.materialId ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val annotation = findMaterialAnnotation(lessonId, materialId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material annotation not found.")
+        return annotation.toResponse(objectMapper)
+    }
+
+    @Transactional
+    fun saveAnnotationForScheduledLesson(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+        request: MaterialAnnotationRequest,
+    ): MaterialAnnotationResponse {
+        val lookup = accessibleScheduledMaterial(authentication, lessonId)
+        val materialId = lookup.materialId ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        find(materialId)?.takeIf { it.status != "ARCHIVED" }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        validateJsonSize("content", request.content, objectMapper, 1_000_000)
+
+        val existing = findMaterialAnnotation(lessonId, materialId)
+        val now = Instant.now()
+        val content = objectMapper.writeValueAsString(request.content)
+        val annotationId = if (existing == null) {
+            val id = UUID.randomUUID()
+            jdbcClient.sql(
+                """
+                INSERT INTO lesson_material_annotation (
+                    id,
+                    lesson_id,
+                    material_id,
+                    content,
+                    created_at,
+                    updated_at
+                ) VALUES (
+                    :id,
+                    :lessonId,
+                    :materialId,
+                    :content,
+                    :createdAt,
+                    :updatedAt
+                )
+                """.trimIndent(),
+            )
+                .param("id", id)
+                .param("lessonId", lessonId)
+                .param("materialId", materialId)
+                .param("content", content)
+                .param("createdAt", now.toMaterialOffsetDateTime())
+                .param("updatedAt", now.toMaterialOffsetDateTime())
+                .update()
+            id
+        } else {
+            jdbcClient.sql(
+                """
+                UPDATE lesson_material_annotation
+                   SET content = :content,
+                       updated_at = :updatedAt
+                 WHERE id = :id
+                """.trimIndent(),
+            )
+                .param("id", existing.id)
+                .param("content", content)
+                .param("updatedAt", now.toMaterialOffsetDateTime())
+                .update()
+            existing.id
+        }
+
+        return requireNotNull(findMaterialAnnotation(annotationId)).toResponse(objectMapper)
     }
 
     fun draft(authentication: JwtAuthenticationToken, request: MaterialAiDraftRequest): LessonMaterialDraftResponse {
@@ -987,6 +1084,44 @@ class LessonMaterialStore(
             .optional()
             .orElse(null)
 
+    private fun findMaterialAnnotation(lessonId: UUID, materialId: UUID): StoredMaterialAnnotation? =
+        jdbcClient.sql(
+            """
+            SELECT id,
+                   lesson_id,
+                   material_id,
+                   content,
+                   created_at,
+                   updated_at
+              FROM lesson_material_annotation
+             WHERE lesson_id = :lessonId
+               AND material_id = :materialId
+            """.trimIndent(),
+        )
+            .param("lessonId", lessonId)
+            .param("materialId", materialId)
+            .query(::mapMaterialAnnotation)
+            .optional()
+            .orElse(null)
+
+    private fun findMaterialAnnotation(annotationId: UUID): StoredMaterialAnnotation? =
+        jdbcClient.sql(
+            """
+            SELECT id,
+                   lesson_id,
+                   material_id,
+                   content,
+                   created_at,
+                   updated_at
+              FROM lesson_material_annotation
+             WHERE id = :annotationId
+            """.trimIndent(),
+        )
+            .param("annotationId", annotationId)
+            .query(::mapMaterialAnnotation)
+            .optional()
+            .orElse(null)
+
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         jdbcClient.sql(
             """
@@ -1234,6 +1369,52 @@ class MaterialController(
         @PathVariable lessonId: UUID,
     ): List<MaterialSubmissionResponse> =
         store.listSubmissionsForScheduledLesson(authentication, lessonId)
+
+    @GetMapping("/schedule/lessons/{lessonId}/material-annotation", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "getScheduledLessonMaterialAnnotation",
+        summary = "Get shared material annotation layer",
+        description = "Returns the shared drawing layer for the material attached to a scheduled lesson.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Material annotation"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Annotation, scheduled lesson, or material not found", content = [Content()]),
+        ],
+    )
+    fun scheduledLessonMaterialAnnotation(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+    ): MaterialAnnotationResponse =
+        store.getAnnotationForScheduledLesson(authentication, lessonId)
+
+    @PutMapping(
+        "/schedule/lessons/{lessonId}/material-annotation",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "saveScheduledLessonMaterialAnnotation",
+        summary = "Save shared material annotation layer",
+        description = "Creates or updates the shared drawing layer for the material attached to a scheduled lesson.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Material annotation saved"),
+            ApiResponse(responseCode = "400", description = "Invalid annotation payload", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
+        ],
+    )
+    fun saveScheduledLessonMaterialAnnotation(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @RequestBody request: MaterialAnnotationRequest,
+    ): MaterialAnnotationResponse =
+        store.saveAnnotationForScheduledLesson(authentication, lessonId, request)
 
     @PutMapping(
         "/schedule/lessons/{lessonId}/material-submission",
@@ -1492,6 +1673,16 @@ private fun StoredMaterialSubmission.toResponse(objectMapper: ObjectMapper): Mat
         updatedAt = updatedAt,
     )
 
+private fun StoredMaterialAnnotation.toResponse(objectMapper: ObjectMapper): MaterialAnnotationResponse =
+    MaterialAnnotationResponse(
+        id = id,
+        lessonId = lessonId,
+        materialId = materialId,
+        content = objectMapper.readTree(content),
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+
 private fun materialMaxScore(scoringRubric: String): BigDecimal? =
     runCatching {
         val node = jacksonObjectMapper().readTree(scoringRubric)
@@ -1592,6 +1783,16 @@ private fun mapMaterialSubmission(rs: ResultSet, @Suppress("UNUSED_PARAMETER") r
         userName = rs.getString("user_name"),
         content = rs.getString("content"),
         submittedAt = rs.getObject("submitted_at", OffsetDateTime::class.java)?.toInstant(),
+        createdAt = rs.getMaterialInstant("created_at"),
+        updatedAt = rs.getMaterialInstant("updated_at"),
+    )
+
+private fun mapMaterialAnnotation(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredMaterialAnnotation =
+    StoredMaterialAnnotation(
+        id = rs.getObject("id", UUID::class.java),
+        lessonId = rs.getObject("lesson_id", UUID::class.java),
+        materialId = rs.getObject("material_id", UUID::class.java),
+        content = rs.getString("content"),
         createdAt = rs.getMaterialInstant("created_at"),
         updatedAt = rs.getMaterialInstant("updated_at"),
     )

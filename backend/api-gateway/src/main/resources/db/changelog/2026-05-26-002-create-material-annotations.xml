@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-05-26-002-create-material-annotations" author="codex">
+        <createTable tableName="lesson_material_annotation">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_lesson_material_annotation"/>
+            </column>
+            <column name="lesson_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="material_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="content" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="lesson_material_annotation"
+            baseColumnNames="lesson_id"
+            constraintName="fk_lesson_material_annotation_lesson"
+            referencedTableName="lesson"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="lesson_material_annotation"
+            baseColumnNames="material_id"
+            constraintName="fk_lesson_material_annotation_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint
+            tableName="lesson_material_annotation"
+            columnNames="lesson_id, material_id"
+            constraintName="uq_lesson_material_annotation_lesson_material"/>
+        <createIndex tableName="lesson_material_annotation" indexName="idx_lesson_material_annotation_updated">
+            <column name="lesson_id"/>
+            <column name="updated_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="lesson_material_annotation"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

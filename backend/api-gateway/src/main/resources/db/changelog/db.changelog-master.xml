@@ -6,4 +6,5 @@
 
     <include file="2026-05-24-001-create-sprint2-domain-tables.xml" relativeToChangelogFile="true"/>
     <include file="2026-05-26-001-create-materials.xml" relativeToChangelogFile="true"/>
+    <include file="2026-05-26-002-create-material-annotations.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

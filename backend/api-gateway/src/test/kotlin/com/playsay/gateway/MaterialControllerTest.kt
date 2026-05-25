@@ -52,6 +52,7 @@ class MaterialControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
+        jdbcClient.sql("DELETE FROM lesson_material_annotation").update()
         jdbcClient.sql("DELETE FROM material_asset").update()
         jdbcClient.sql("DELETE FROM submission").update()
         jdbcClient.sql("DELETE FROM assignment").update()
@@ -187,6 +188,35 @@ class MaterialControllerTest @Autowired constructor(
             materialController.scheduledLessonMaterialSubmissions(student, lesson.id)
         }
         assertEquals(HttpStatus.FORBIDDEN, studentMonitorError.statusCode)
+        val annotation = materialController.saveScheduledLessonMaterialAnnotation(
+            student,
+            lesson.id,
+            MaterialAnnotationRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "strokes": [
+                        {
+                          "id": "stroke-1",
+                          "color": "#ff5c00",
+                          "points": [
+                            { "x": 10, "y": 10 },
+                            { "x": 20, "y": 25 }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        assertEquals(material.id, annotation.materialId)
+        assertEquals(lesson.id, annotation.lessonId)
+        assertEquals("stroke-1", annotation.content["strokes"][0]["id"].asText())
+        val teacherAnnotation = materialController.scheduledLessonMaterialAnnotation(teacher, lesson.id)
+        assertEquals(annotation.id, teacherAnnotation.id)
+        assertEquals(20, teacherAnnotation.content["strokes"][0]["points"][1]["x"].asInt())
         val directReadError = assertFailsWith<ResponseStatusException> {
             materialController.get(student, material.id)
         }

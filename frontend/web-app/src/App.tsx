@@ -66,6 +66,7 @@ import {
   fetchMaterials,
   fetchMe,
   fetchScheduledLessons,
+  fetchScheduledLessonMaterialAnnotation,
   fetchScheduledLessonMaterial,
   fetchScheduledLessonMaterialSubmission,
   fetchScheduledLessonMaterialSubmissions,
@@ -80,6 +81,7 @@ import {
   resetUserProfile,
   saveCourse,
   saveCourseLesson,
+  saveScheduledLessonMaterialAnnotation,
   saveMaterial,
   saveScheduledLessonMaterialSubmission,
   saveScheduledLesson,
@@ -2783,6 +2785,7 @@ function LessonWorkspace({
           </div>
         ) : material ? (
           <LessonTaskCanvas
+            lessonId={session.lessonId}
             material={material}
             onSaveAnswers={(content) => void saveMaterialAnswers(content)}
             submission={submission}
@@ -2798,6 +2801,7 @@ function LessonWorkspace({
               </div>
             ) : null}
             <LessonTaskCanvas
+              lessonId={session.lessonId}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
               submission={submission}
               submissionMessage={submissionMessage}
@@ -2851,6 +2855,7 @@ function MaterialSubmissionsMonitor({
 }
 
 function LessonTaskCanvas({
+  lessonId,
   material,
   onSaveAnswers,
   submission,
@@ -2858,6 +2863,7 @@ function LessonTaskCanvas({
   submissionSaving,
   teacherName,
 }: {
+  lessonId: string;
   material?: LessonMaterial | null;
   onSaveAnswers: (content: LessonMaterialJson) => void;
   submission: LessonMaterialSubmission | null;
@@ -2868,12 +2874,86 @@ function LessonTaskCanvas({
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pointer");
   const [annotationColor, setAnnotationColor] = useState("#ff5c00");
   const [annotationStrokes, setAnnotationStrokes] = useState<AnnotationStroke[]>([]);
+  const [annotationReady, setAnnotationReady] = useState(false);
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
   const activeStrokeId = useRef<string | null>(null);
+  const lastSyncedAnnotationRef = useRef("");
 
   useEffect(() => {
     setAnswers(materialAnswersFromSubmission(submission));
   }, [material?.id, submission?.id, submission?.updatedAt]);
+
+  useEffect(() => {
+    const materialId = material?.id;
+    if (!materialId) {
+      setAnnotationReady(false);
+      setAnnotationStrokes([]);
+      lastSyncedAnnotationRef.current = "";
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function loadAnnotation() {
+      try {
+        const annotation = await fetchScheduledLessonMaterialAnnotation(lessonId);
+        const content = annotationContentFromJson(annotation?.content);
+        const serialized = JSON.stringify(content);
+        if (!cancelled && serialized !== lastSyncedAnnotationRef.current) {
+          lastSyncedAnnotationRef.current = serialized;
+          setAnnotationStrokes(content.strokes);
+        }
+      } catch {
+        const content = emptyAnnotationContent();
+        const serialized = JSON.stringify(content);
+        if (!cancelled && serialized !== lastSyncedAnnotationRef.current) {
+          lastSyncedAnnotationRef.current = serialized;
+          setAnnotationStrokes(content.strokes);
+        }
+      } finally {
+        if (!cancelled) {
+          setAnnotationReady(true);
+        }
+      }
+    }
+
+    setAnnotationReady(false);
+    lastSyncedAnnotationRef.current = "";
+    setAnnotationStrokes([]);
+    void loadAnnotation();
+    const intervalId = window.setInterval(() => {
+      void loadAnnotation();
+    }, 2_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [lessonId, material?.id]);
+
+  useEffect(() => {
+    if (!material?.id || !annotationReady) {
+      return undefined;
+    }
+
+    const content = annotationContentFromStrokes(annotationStrokes);
+    const serialized = JSON.stringify(content);
+    if (serialized === lastSyncedAnnotationRef.current) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      saveScheduledLessonMaterialAnnotation(lessonId, { content })
+        .then(() => {
+          lastSyncedAnnotationRef.current = serialized;
+        })
+        .catch(() => {
+          // The next local edit or polling cycle will retry without blocking the lesson UI.
+        });
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [annotationReady, annotationStrokes, lessonId, material?.id]);
 
   function updateAnswer(blockId: string, answer: MaterialAnswerBlock) {
     setAnswers((current) => ({
@@ -4908,6 +4988,56 @@ function eraseAnnotationAt(
   setStrokes: (updater: (current: AnnotationStroke[]) => AnnotationStroke[]) => void,
 ) {
   setStrokes((current) => current.filter((stroke) => distanceToStroke(point, stroke) > 34));
+}
+
+function emptyAnnotationContent(): { schemaVersion: 1; strokes: AnnotationStroke[] } {
+  return { schemaVersion: 1, strokes: [] };
+}
+
+function annotationContentFromStrokes(strokes: AnnotationStroke[]): LessonMaterialJson {
+  return {
+    schemaVersion: 1,
+    strokes: strokes.map((stroke) => ({
+      color: stroke.color,
+      id: stroke.id,
+      points: stroke.points.map((point) => ({
+        x: Number(point.x.toFixed(1)),
+        y: Number(point.y.toFixed(1)),
+      })),
+    })),
+  };
+}
+
+function annotationContentFromJson(value: unknown): { schemaVersion: 1; strokes: AnnotationStroke[] } {
+  const root = asJsonObject(value);
+  const strokes = Array.isArray(root.strokes)
+    ? root.strokes
+        .map((stroke) => annotationStrokeFromJson(stroke))
+        .filter((stroke): stroke is AnnotationStroke => stroke !== null)
+    : [];
+
+  return { schemaVersion: 1, strokes };
+}
+
+function annotationStrokeFromJson(value: unknown): AnnotationStroke | null {
+  const stroke = asJsonObject(value);
+  const id = asString(stroke.id).trim();
+  const color = asString(stroke.color).trim() || "#ff5c00";
+  const rawPoints = Array.isArray(stroke.points) ? stroke.points : [];
+  const points = rawPoints
+    .map((point) => {
+      const pointObject = asJsonObject(point);
+      const x = asNumber(pointObject.x);
+      const y = asNumber(pointObject.y);
+      return x === null || y === null ? null : { x, y };
+    })
+    .filter((point): point is AnnotationPoint => point !== null);
+
+  if (!id || points.length === 0) {
+    return null;
+  }
+
+  return { color, id, points };
 }
 
 function distanceToStroke(point: AnnotationPoint, stroke: AnnotationStroke): number {

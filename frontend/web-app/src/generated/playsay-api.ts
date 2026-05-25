@@ -145,6 +145,19 @@ export interface MaterialSubmissionResponse {
   updatedAt: string;
 }
 
+export interface MaterialAnnotationRequest {
+  content: JsonNode;
+}
+
+export interface MaterialAnnotationResponse {
+  id: string;
+  lessonId: string;
+  materialId: string;
+  content: JsonNode;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type LessonMaterialRequestCefrLevel = typeof LessonMaterialRequestCefrLevel[keyof typeof LessonMaterialRequestCefrLevel];
 
 
@@ -871,6 +884,124 @@ export const saveScheduledLessonMaterialSubmission = async (lessonId: string,
 
   const data: saveScheduledLessonMaterialSubmissionResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as saveScheduledLessonMaterialSubmissionResponse
+}
+
+
+
+export type getScheduledLessonMaterialAnnotationResponse200 = {
+  data: MaterialAnnotationResponse
+  status: 200
+}
+
+export type getScheduledLessonMaterialAnnotationResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getScheduledLessonMaterialAnnotationResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getScheduledLessonMaterialAnnotationResponseSuccess = (getScheduledLessonMaterialAnnotationResponse200) & {
+  headers: Headers;
+};
+export type getScheduledLessonMaterialAnnotationResponseError = (getScheduledLessonMaterialAnnotationResponse401 | getScheduledLessonMaterialAnnotationResponse404) & {
+  headers: Headers;
+};
+
+export type getScheduledLessonMaterialAnnotationResponse = (getScheduledLessonMaterialAnnotationResponseSuccess | getScheduledLessonMaterialAnnotationResponseError)
+
+export const getGetScheduledLessonMaterialAnnotationUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/material-annotation`
+}
+
+/**
+ * Returns the shared drawing layer for the material attached to a scheduled lesson.
+ * @summary Get shared material annotation layer
+ */
+export const getScheduledLessonMaterialAnnotation = async (lessonId: string, options?: RequestInit): Promise<getScheduledLessonMaterialAnnotationResponse> => {
+
+  const res = await fetch(getGetScheduledLessonMaterialAnnotationUrl(lessonId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getScheduledLessonMaterialAnnotationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getScheduledLessonMaterialAnnotationResponse
+}
+
+
+
+export type saveScheduledLessonMaterialAnnotationResponse200 = {
+  data: MaterialAnnotationResponse
+  status: 200
+}
+
+export type saveScheduledLessonMaterialAnnotationResponse400 = {
+  data: void
+  status: 400
+}
+
+export type saveScheduledLessonMaterialAnnotationResponse401 = {
+  data: void
+  status: 401
+}
+
+export type saveScheduledLessonMaterialAnnotationResponse404 = {
+  data: void
+  status: 404
+}
+
+export type saveScheduledLessonMaterialAnnotationResponseSuccess = (saveScheduledLessonMaterialAnnotationResponse200) & {
+  headers: Headers;
+};
+export type saveScheduledLessonMaterialAnnotationResponseError = (saveScheduledLessonMaterialAnnotationResponse400 | saveScheduledLessonMaterialAnnotationResponse401 | saveScheduledLessonMaterialAnnotationResponse404) & {
+  headers: Headers;
+};
+
+export type saveScheduledLessonMaterialAnnotationResponse = (saveScheduledLessonMaterialAnnotationResponseSuccess | saveScheduledLessonMaterialAnnotationResponseError)
+
+export const getSaveScheduledLessonMaterialAnnotationUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/material-annotation`
+}
+
+/**
+ * Creates or updates the shared drawing layer for the material attached to a scheduled lesson.
+ * @summary Save shared material annotation layer
+ */
+export const saveScheduledLessonMaterialAnnotation = async (lessonId: string,
+    materialAnnotationRequest: MaterialAnnotationRequest, options?: RequestInit): Promise<saveScheduledLessonMaterialAnnotationResponse> => {
+
+  const res = await fetch(getSaveScheduledLessonMaterialAnnotationUrl(lessonId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialAnnotationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: saveScheduledLessonMaterialAnnotationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as saveScheduledLessonMaterialAnnotationResponse
 }
 
 

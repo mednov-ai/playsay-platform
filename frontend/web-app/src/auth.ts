@@ -143,6 +143,17 @@ export type LessonMaterialSubmissionInput = {
   content: LessonMaterialJson;
   submitted?: boolean;
 };
+export type LessonMaterialAnnotation = {
+  id: string;
+  lessonId: string;
+  materialId: string;
+  content: LessonMaterialJson;
+  createdAt: string;
+  updatedAt: string;
+};
+export type LessonMaterialAnnotationInput = {
+  content: LessonMaterialJson;
+};
 
 type TokenResponse = {
   access_token: string;
@@ -587,6 +598,39 @@ export async function fetchScheduledLessonMaterialSubmissions(
   return apiJson<LessonMaterialSubmission[]>(
     `/api/schedule/lessons/${lessonId}/material-submissions`,
     { method: "GET" },
+    config,
+  );
+}
+
+export async function fetchScheduledLessonMaterialAnnotation(
+  lessonId: string,
+  config = authConfig,
+): Promise<LessonMaterialAnnotation | null> {
+  try {
+    return await apiJson<LessonMaterialAnnotation>(
+      `/api/schedule/lessons/${lessonId}/material-annotation`,
+      { method: "GET" },
+      config,
+    );
+  } catch (caught) {
+    if (caught instanceof Error && caught.message.includes("HTTP 404")) {
+      return null;
+    }
+    throw caught;
+  }
+}
+
+export async function saveScheduledLessonMaterialAnnotation(
+  lessonId: string,
+  input: LessonMaterialAnnotationInput,
+  config = authConfig,
+): Promise<LessonMaterialAnnotation> {
+  return apiJson<LessonMaterialAnnotation>(
+    `/api/schedule/lessons/${lessonId}/material-annotation`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
     config,
   );
 }

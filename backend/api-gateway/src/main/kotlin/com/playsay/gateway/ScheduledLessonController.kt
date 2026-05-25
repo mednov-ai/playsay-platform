@@ -7,11 +7,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import com.playsay.gateway.realtime.LessonChangedEvent
+import com.playsay.gateway.realtime.LessonDeletedEvent
 import java.sql.ResultSet
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -99,6 +102,7 @@ private data class StoredLessonParticipant(
 class ScheduledLessonStore(
     private val jdbcClient: JdbcClient,
     private val userProfileStore: UserProfileStore,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional(readOnly = true)
     fun list(authentication: JwtAuthenticationToken): List<ScheduledLessonResponse> {
@@ -187,7 +191,9 @@ class ScheduledLessonStore(
             .update()
 
         replaceParticipants(id, participantIds)
-        return requireNotNull(find(id)).withParticipants()
+        val created = requireNotNull(find(id)).withParticipants()
+        eventPublisher.publishEvent(LessonChangedEvent(created))
+        return created
     }
 
     @Transactional
@@ -227,7 +233,9 @@ class ScheduledLessonStore(
             .update()
 
         replaceParticipants(lessonId, participantIds)
-        return requireNotNull(find(lessonId)).withParticipants()
+        val updated = requireNotNull(find(lessonId)).withParticipants()
+        eventPublisher.publishEvent(LessonChangedEvent(updated))
+        return updated
     }
 
     @Transactional
@@ -240,6 +248,8 @@ class ScheduledLessonStore(
         if (deleted == 0) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
         }
+
+        eventPublisher.publishEvent(LessonDeletedEvent(lessonId))
     }
 
     private fun findVisible(authentication: JwtAuthenticationToken, lessonId: UUID): StoredScheduledLesson? {

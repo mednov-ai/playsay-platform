@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.config
 
 import kotlin.test.Test
 import kotlin.test.assertFalse

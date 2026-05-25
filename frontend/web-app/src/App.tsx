@@ -67,7 +67,6 @@ import {
   fetchMaterialAssets,
   fetchMaterials,
   fetchMe,
-  fetchScheduledLesson,
   fetchScheduledLessons,
   fetchScheduledLessonMaterialAnnotation,
   fetchScheduledLessonMaterial,
@@ -75,6 +74,7 @@ import {
   fetchScheduledLessonMaterialSubmissions,
   fetchStudentProfiles,
   fetchUserProfile,
+  getValidAccessToken,
   generateMaterialImages,
   isAuthCallback,
   removeCourse,
@@ -114,6 +114,13 @@ import {
 import { Button } from "./components/ui/button";
 
 type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggingOut" | "error";
+
+type LessonRealtimeMessage = {
+  type?: string;
+  lesson?: ScheduledLesson;
+  lessonId?: string;
+  message?: string;
+};
 
 type ProfileFormState = {
   displayName: string;
@@ -283,6 +290,10 @@ export function App() {
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("schedule");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const realtimeSocketRef = useRef<WebSocket | null>(null);
+  const realtimeReconnectTimerRef = useRef<number | null>(null);
+  const roomSessionRef = useRef<LessonRoomSession | null>(null);
+  const scheduleSyncInFlightRef = useRef(false);
   const routeLessonId = classroomLessonIdFromPath(currentPath);
 
   useEffect(() => {
@@ -370,34 +381,181 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    roomSessionRef.current = roomSession;
+  }, [roomSession]);
+
+  useEffect(() => {
     if (status !== "authenticated") {
+      return;
+    }
+
+    const canManageSchedule = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+    if (!canManageSchedule) {
+      setScheduledLessons((current) => current.filter((lesson) => isJoinableScheduledLesson(lesson, nowMs)));
+    }
+
+    if (roomSession && isRoomSessionExpired(roomSession, nowMs)) {
+      closeClassroom("Занятие завершено");
+    }
+  }, [nowMs, profile?.roles, roomSession, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      realtimeSocketRef.current?.close();
+      realtimeSocketRef.current = null;
+      if (realtimeReconnectTimerRef.current !== null) {
+        window.clearTimeout(realtimeReconnectTimerRef.current);
+        realtimeReconnectTimerRef.current = null;
+      }
       return undefined;
     }
 
-    let cancelled = false;
+    let closed = false;
 
-    async function syncVisibleSchedule() {
-      try {
-        const freshSchedule = await fetchScheduledLessons();
-        if (!cancelled) {
-          setScheduledLessons(freshSchedule);
-        }
-      } catch (caught) {
-        if (!cancelled) {
-          applySessionError(caught, "Не удалось обновить расписание");
-        }
+    async function connectRealtime() {
+      const accessToken = await getValidAccessToken();
+      if (closed || !accessToken) {
+        return;
       }
+
+      const socket = new WebSocket(buildLessonRealtimeUrl(), ["playsay", accessToken]);
+      realtimeSocketRef.current = socket;
+
+      socket.onopen = () => {
+        const activeLessonId = roomSessionRef.current?.lessonId;
+        if (activeLessonId) {
+          sendLessonRealtimeSubscribe(activeLessonId);
+        }
+      };
+
+      socket.onmessage = (event) => {
+        handleLessonRealtimeMessage(event.data);
+      };
+
+      socket.onerror = () => {
+        socket.close();
+      };
+
+      socket.onclose = () => {
+        if (realtimeSocketRef.current === socket) {
+          realtimeSocketRef.current = null;
+        }
+        if (!closed) {
+          realtimeReconnectTimerRef.current = window.setTimeout(() => {
+            realtimeReconnectTimerRef.current = null;
+            void connectRealtime();
+          }, 2_000);
+        }
+      };
     }
 
-    const intervalId = window.setInterval(() => {
-      void syncVisibleSchedule();
-    }, isClassroomOpen ? 15_000 : 5_000);
+    void connectRealtime();
 
     return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
+      closed = true;
+      if (realtimeReconnectTimerRef.current !== null) {
+        window.clearTimeout(realtimeReconnectTimerRef.current);
+        realtimeReconnectTimerRef.current = null;
+      }
+      realtimeSocketRef.current?.close();
+      realtimeSocketRef.current = null;
     };
-  }, [isClassroomOpen, status]);
+  }, [status]);
+
+  useEffect(() => {
+    if (roomSession?.lessonId) {
+      sendLessonRealtimeSubscribe(roomSession.lessonId);
+    }
+  }, [roomSession?.lessonId]);
+
+  async function syncScheduleFromServer(options: { message?: string } = {}) {
+    if (scheduleSyncInFlightRef.current) {
+      return;
+    }
+
+    scheduleSyncInFlightRef.current = true;
+    try {
+      const freshSchedule = await fetchScheduledLessons();
+      setScheduledLessons(freshSchedule);
+      if (options.message) {
+        setScheduleMessage(options.message);
+      }
+    } catch (caught) {
+      applySessionError(caught, "Не удалось обновить расписание");
+    } finally {
+      scheduleSyncInFlightRef.current = false;
+    }
+  }
+
+  function handleLessonRealtimeMessage(rawPayload: string) {
+    let message: LessonRealtimeMessage;
+    try {
+      message = JSON.parse(rawPayload) as LessonRealtimeMessage;
+    } catch {
+      return;
+    }
+
+    if (message.type === "schedule.changed") {
+      void syncScheduleFromServer();
+      return;
+    }
+
+    if (message.type === "lesson.updated" && message.lesson) {
+      applyRealtimeLessonSnapshot(message.lesson);
+      return;
+    }
+
+    if (message.type === "lesson.deleted" && message.lessonId) {
+      removeRealtimeLesson(message.lessonId, "Занятие больше недоступно");
+    }
+  }
+
+  function applyRealtimeLessonSnapshot(lesson: ScheduledLesson) {
+    const currentTimeMs = Date.now();
+    const canManageSchedule = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+    const canKeepInSchedule = canManageSchedule || isJoinableScheduledLesson(lesson, currentTimeMs);
+
+    setScheduledLessons((current) => (
+      canKeepInSchedule
+        ? upsertScheduledLesson(current, lesson)
+        : current.filter((item) => item.id !== lesson.id)
+    ));
+
+    if (roomSessionRef.current?.lessonId !== lesson.id) {
+      return;
+    }
+
+    if (!isJoinableScheduledLesson(lesson, currentTimeMs)) {
+      closeClassroom("Занятие завершено или отменено");
+      return;
+    }
+
+    setRoomSession((current) => (
+      current?.lessonId === lesson.id
+        ? roomSessionFromScheduledLesson(current, lesson)
+        : current
+    ));
+  }
+
+  function removeRealtimeLesson(lessonId: string, message: string) {
+    setScheduledLessons((current) => current.filter((lesson) => lesson.id !== lessonId));
+    if (roomSessionRef.current?.lessonId === lessonId) {
+      closeClassroom(message);
+    }
+  }
+
+  function sendLessonRealtimeSubscribe(lessonId: string) {
+    const socket = realtimeSocketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    try {
+      socket.send(JSON.stringify({ type: "subscribe.lesson", lessonId }));
+    } catch {
+      socket.close();
+    }
+  }
 
   useEffect(() => {
     if (!workspaceTabs.some((tab) => tab.id === workspaceTab)) {
@@ -426,61 +584,6 @@ export function App() {
       void joinScheduledLesson(routeLesson, { updateRoute: false });
     }
   }, [nowMs, routeLessonId, roomLoadingLessonId, roomSession, scheduledLessons, status]);
-
-  useEffect(() => {
-    if (status !== "authenticated" || !roomSession) {
-      return undefined;
-    }
-
-    const activeLessonId = roomSession.lessonId;
-    let cancelled = false;
-
-    async function syncOpenLesson() {
-      try {
-        const freshLesson = await fetchScheduledLesson(activeLessonId);
-        if (cancelled) {
-          return;
-        }
-
-        if (!isJoinableScheduledLesson(freshLesson, Date.now())) {
-          setScheduledLessons((current) => upsertScheduledLesson(current, freshLesson));
-          setRoomMessage("Занятие завершено или отменено");
-          setRoomSession(null);
-          if (classroomLessonIdFromPath(window.location.pathname)) {
-            navigateToPath("/");
-          }
-          return;
-        }
-
-        setScheduledLessons((current) => upsertScheduledLesson(current, freshLesson));
-        setRoomSession((current) => (
-          current?.lessonId === freshLesson.id
-            ? roomSessionFromScheduledLesson(current, freshLesson)
-            : current
-        ));
-      } catch (caught) {
-        if (cancelled) {
-          return;
-        }
-
-        setRoomMessage(applySessionError(caught, "Занятие больше недоступно"));
-        setRoomSession(null);
-        if (classroomLessonIdFromPath(window.location.pathname)) {
-          navigateToPath("/");
-        }
-      }
-    }
-
-    void syncOpenLesson();
-    const intervalId = window.setInterval(() => {
-      void syncOpenLesson();
-    }, 5_000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [roomSession?.lessonId, status]);
 
   function logout() {
     const logoutUrl = buildLogoutUrl();
@@ -921,8 +1024,12 @@ export function App() {
   }
 
   function leaveScheduledLessonRoom() {
+    closeClassroom(null);
+  }
+
+  function closeClassroom(message: string | null) {
     setRoomSession(null);
-    setRoomMessage(null);
+    setRoomMessage(message);
     if (classroomLessonIdFromPath(window.location.pathname)) {
       navigateToPath("/");
     }
@@ -5319,6 +5426,11 @@ function roomSessionFromScheduledLesson(
   };
 }
 
+function buildLessonRealtimeUrl(): string {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/api/ws/lessons`;
+}
+
 function formatDateTime(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleString() : "время позже";
 }
@@ -5359,6 +5471,15 @@ function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean {
 
 function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
   return !isClosedScheduleStatus(lesson.status) && !isScheduleExpired(lesson, nowMs);
+}
+
+function isRoomSessionExpired(session: LessonRoomSession, nowMs = Date.now()): boolean {
+  if (isClosedScheduleStatus(session.lessonStatus)) {
+    return true;
+  }
+
+  const endMs = dateValueMs(session.lessonEndsAt);
+  return endMs !== null && endMs <= nowMs;
 }
 
 function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number): string {

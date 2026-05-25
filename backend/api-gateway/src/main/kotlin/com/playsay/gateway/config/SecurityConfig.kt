@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -27,6 +27,7 @@ class SecurityConfig {
                         "/v3/api-docs.yaml",
                         "/v3/api-docs/**",
                         "/livekit/webhook",
+                        "/ws/lessons",
                     ).permitAll()
                     .anyRequest().authenticated()
             }

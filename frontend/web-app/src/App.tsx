@@ -2951,6 +2951,15 @@ function LessonWorkspace({
   }, [session.materialId]);
 
   useEffect(() => {
+    if (assignmentMessage !== "Материал назначен" && assignmentMessage !== "Материал снят") {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => setAssignmentMessage(null), 2_500);
+    return () => window.clearTimeout(timeoutId);
+  }, [assignmentMessage]);
+
+  useEffect(() => {
     if (!session.materialId) {
       setMaterial(null);
       setMaterialError(null);

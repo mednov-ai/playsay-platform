@@ -759,11 +759,15 @@ textarea {
 
 .playsay-task-kicker {
   display: inline-flex;
+  max-width: calc(100% - 5rem);
   align-items: center;
   gap: 0.5rem;
+  overflow: hidden;
   color: hsl(var(--foreground));
   font-size: 1.125rem;
   font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .playsay-task-document h3 {
@@ -1576,6 +1580,16 @@ textarea {
   .playsay-task-document {
     padding: 0.875rem 0.875rem calc(4.75rem + env(safe-area-inset-bottom));
     scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+
+  .playsay-task-kicker {
+    max-width: calc(100% - 4.25rem);
+    font-size: 0.9375rem;
+  }
+
+  .playsay-task-document h3 {
+    margin-top: 0.625rem;
+    font-size: 1.05rem;
   }
 
   .playsay-material-blocks {

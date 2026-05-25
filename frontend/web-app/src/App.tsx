@@ -67,6 +67,7 @@ import {
   fetchMaterialAssets,
   fetchMaterials,
   fetchMe,
+  fetchScheduledLesson,
   fetchScheduledLessons,
   fetchScheduledLessonMaterialAnnotation,
   fetchScheduledLessonMaterial,
@@ -369,6 +370,36 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (status !== "authenticated") {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function syncVisibleSchedule() {
+      try {
+        const freshSchedule = await fetchScheduledLessons();
+        if (!cancelled) {
+          setScheduledLessons(freshSchedule);
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          applySessionError(caught, "Не удалось обновить расписание");
+        }
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      void syncVisibleSchedule();
+    }, isClassroomOpen ? 15_000 : 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isClassroomOpen, status]);
+
+  useEffect(() => {
     if (!workspaceTabs.some((tab) => tab.id === workspaceTab)) {
       setWorkspaceTab("schedule");
     }
@@ -395,6 +426,61 @@ export function App() {
       void joinScheduledLesson(routeLesson, { updateRoute: false });
     }
   }, [nowMs, routeLessonId, roomLoadingLessonId, roomSession, scheduledLessons, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !roomSession) {
+      return undefined;
+    }
+
+    const activeLessonId = roomSession.lessonId;
+    let cancelled = false;
+
+    async function syncOpenLesson() {
+      try {
+        const freshLesson = await fetchScheduledLesson(activeLessonId);
+        if (cancelled) {
+          return;
+        }
+
+        if (!isJoinableScheduledLesson(freshLesson, Date.now())) {
+          setScheduledLessons((current) => upsertScheduledLesson(current, freshLesson));
+          setRoomMessage("Занятие завершено или отменено");
+          setRoomSession(null);
+          if (classroomLessonIdFromPath(window.location.pathname)) {
+            navigateToPath("/");
+          }
+          return;
+        }
+
+        setScheduledLessons((current) => upsertScheduledLesson(current, freshLesson));
+        setRoomSession((current) => (
+          current?.lessonId === freshLesson.id
+            ? roomSessionFromScheduledLesson(current, freshLesson)
+            : current
+        ));
+      } catch (caught) {
+        if (cancelled) {
+          return;
+        }
+
+        setRoomMessage(applySessionError(caught, "Занятие больше недоступно"));
+        setRoomSession(null);
+        if (classroomLessonIdFromPath(window.location.pathname)) {
+          navigateToPath("/");
+        }
+      }
+    }
+
+    void syncOpenLesson();
+    const intervalId = window.setInterval(() => {
+      void syncOpenLesson();
+    }, 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [roomSession?.lessonId, status]);
 
   function logout() {
     const logoutUrl = buildLogoutUrl();
@@ -2521,7 +2607,6 @@ function LiveLessonExperience({
   session: LessonRoomSession;
 }) {
   const displayName = profile?.name ?? profile?.username ?? "Участник";
-  const roleLabel = profile?.roles[0] ?? "STUDENT";
   const lessonTypeLabel = formatLessonType(session.lessonType);
   const canManageLesson = canAssignLessons(profile);
   const videoOnly = !session.materialId && !canManageLesson;
@@ -2571,7 +2656,6 @@ function LiveLessonExperience({
           materials={materials}
           onAssignMaterial={onAssignMaterial}
           profile={profile}
-          roleLabel={roleLabel}
           session={session}
         />
       )}
@@ -2838,14 +2922,12 @@ function LessonWorkspace({
   materials,
   onAssignMaterial,
   profile,
-  roleLabel,
   session,
 }: {
   displayName: string;
   materials: LessonMaterial[];
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   profile: MeProfile | null;
-  roleLabel: string;
   session: LessonRoomSession;
 }) {
   const [material, setMaterial] = useState<LessonMaterial | null>(null);
@@ -2869,6 +2951,13 @@ function LessonWorkspace({
   }, [session.materialId]);
 
   useEffect(() => {
+    if (!session.materialId) {
+      setMaterial(null);
+      setMaterialError(null);
+      setMaterialLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function loadMaterial() {
@@ -2898,6 +2987,12 @@ function LessonWorkspace({
   }, [session.lessonId, session.materialId]);
 
   useEffect(() => {
+    if (!session.materialId) {
+      setSubmission(null);
+      setSubmissionMessage(null);
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function loadSubmission() {
@@ -2918,7 +3013,7 @@ function LessonWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [session.lessonId]);
+  }, [session.lessonId, session.materialId]);
 
   useEffect(() => {
     if (!canMonitorSubmissions || !material?.id) {
@@ -3013,34 +3108,7 @@ function LessonWorkspace({
           </button>
         </nav>
 
-        <div className="playsay-lesson-statusline">
-          <span className="inline-flex items-center gap-1.5">
-            <Clock3 className="h-4 w-4 text-primary" />
-            {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Users className="h-4 w-4 text-primary" />
-            {formatParticipantCount(session.participants.length)}
-          </span>
-        </div>
-      </header>
-
-      <div className="playsay-workbench-body">
-        <div className="playsay-material-header">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#dff8ee] px-2.5 py-1 text-xs font-black text-[#167953]">
-                {roleLabel}
-              </span>
-              <span className="rounded-full border border-border bg-white px-2.5 py-1 text-xs font-extrabold text-muted-foreground">
-                {displayName}
-              </span>
-            </div>
-            <h2 className="mt-2 truncate text-2xl font-black tracking-normal">{session.lessonTitle}</h2>
-            <p className="mt-1 truncate text-sm font-semibold text-muted-foreground">
-              {session.courseTitle ?? "Play&Say"} · {session.roomName}
-            </p>
-          </div>
+        <div className="playsay-workbench-tools">
           {canManageMaterial ? (
             <div className="playsay-lesson-material-picker">
               <select
@@ -3067,10 +3135,23 @@ function LessonWorkspace({
               </Button>
             </div>
           ) : null}
+          <div className="playsay-lesson-statusline">
+            <span className="inline-flex items-center gap-1.5">
+              <Clock3 className="h-4 w-4 text-primary" />
+              {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="h-4 w-4 text-primary" />
+              {formatParticipantCount(session.participants.length)}
+            </span>
+          </div>
         </div>
+      </header>
+
+      <div className="playsay-workbench-body">
 
         {assignmentMessage ? (
-          <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+          <div className="playsay-lesson-inline-message">
             {assignmentMessage}
           </div>
         ) : null}
@@ -5200,6 +5281,33 @@ function toDateTimeLocalValue(date: Date): string {
 
 function localDateTimeToIso(value: string): string | null {
   return value ? new Date(value).toISOString() : null;
+}
+
+function upsertScheduledLesson(current: ScheduledLesson[], lesson: ScheduledLesson): ScheduledLesson[] {
+  if (current.some((item) => item.id === lesson.id)) {
+    return current.map((item) => (item.id === lesson.id ? lesson : item));
+  }
+
+  return [lesson, ...current];
+}
+
+function roomSessionFromScheduledLesson(
+  session: LessonRoomSession,
+  lesson: ScheduledLesson,
+): LessonRoomSession {
+  return {
+    ...session,
+    courseTitle: lesson.courseTitle ?? session.courseTitle,
+    lessonEndsAt: lesson.scheduledEnd ?? null,
+    lessonStartsAt: lesson.scheduledStart ?? null,
+    lessonStatus: lesson.status,
+    lessonTemplateId: lesson.lessonTemplateId ?? null,
+    lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? session.lessonTitle,
+    lessonType: lesson.type,
+    materialId: lesson.materialId ?? null,
+    participants: lesson.participants,
+    teacherName: lesson.teacherName ?? session.teacherName,
+  };
 }
 
 function formatDateTime(value: string | null | undefined): string {

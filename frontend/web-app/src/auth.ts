@@ -7,6 +7,7 @@ import {
   deleteCourse,
   deleteCourseLesson,
   deleteScheduledLesson,
+  getScheduledLesson,
   getMe,
   getMyUserProfile,
   listCourseLessons,
@@ -468,6 +469,23 @@ export async function fetchScheduledLessons(config = authConfig): Promise<Schedu
 
   if (response.status !== 200) {
     throw new Error(`Schedule request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function fetchScheduledLesson(
+  lessonId: string,
+  config = authConfig,
+): Promise<ScheduledLesson> {
+  const response = await getScheduledLesson(lessonId, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Scheduled lesson request failed with HTTP ${response.status}.`);
   }
 
   return response.data;

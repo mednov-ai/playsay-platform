@@ -279,9 +279,12 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     - Build a practical live lesson for children learning English.
     - If a source image is attached, first solve the worksheet yourself, then convert it into editable Play&Say blocks.
     - Do not merely translate or copy the scan as text. Turn worksheet blanks into interactive exercise items.
+    - Preserve every visible worksheet blank as an interactive item, grouped by the original section order, before adding any invented follow-up activity.
+    - Do not drop later worksheet sections and do not replace the worksheet with a shorter practice set unless the scan is unreadable.
     - For fill-in-article or grammar worksheet scans, use fillGaps or multipleChoice items with concise prompts, the correct answer, and choices.
     - For a/an article tasks, each blank item must provide choices ["a", "an", "-"] and an answer such as "a", "an", or "-".
     - Keep the blank marker in item prompts, for example "___ apple" or "It is ___ girl.", so the renderer can place the combobox at the blank.
+    - For sentence tasks, keep the full visible sentence with the blank marker and solve from grammar context.
     - Prefer 4-8 blocks: warm-up text, vocabulary/flashcards, one controlled exercise, one speaking task, one writing or drawing task.
     - Use supported block types only.
     - For unused block fields, return null or an empty array as required by the schema.

@@ -65,6 +65,7 @@ class MaterialAiDraftServiceTest {
         assertTrue(transport.requestBody.contains("\"detail\":\"high\""))
         assertTrue(transport.requestBody.contains("first solve the worksheet"))
         assertTrue(transport.requestBody.contains("Turn worksheet blanks into interactive exercise items"))
+        assertTrue(transport.requestBody.contains("Preserve every visible worksheet blank"))
         assertTrue(transport.requestBody.contains("each blank item must provide choices"))
     }
 

@@ -103,6 +103,7 @@ class OpenAiMaterialAiDraftProvider(
         val draftNode = parseJson(outputText)
         val draft = runCatching { objectMapper.treeToValue(draftNode, LessonMaterialDraftResponse::class.java) }
             .getOrElse { throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI response did not match material schema.") }
+            .withNormalizedArticleAnswers()
 
         validateDraft(draft)
         return draft.withOpenAiSourceMeta(objectMapper, input, cleanModel)
@@ -235,6 +236,62 @@ private fun LessonMaterialDraftResponse.withOpenAiSourceMeta(
     )
 }
 
+private fun LessonMaterialDraftResponse.withNormalizedArticleAnswers(): LessonMaterialDraftResponse =
+    copy(document = normalizeArticleExerciseAnswers(document))
+
+private fun normalizeArticleExerciseAnswers(document: JsonNode): JsonNode {
+    val normalized = document.deepCopy<JsonNode>()
+    val pages = normalized.get("pages") as? ArrayNode ?: return normalized
+    pages.forEach { page ->
+        val blocks = page.get("blocks") as? ArrayNode ?: return@forEach
+        blocks.forEach { block ->
+            val items = block.get("items") as? ArrayNode ?: return@forEach
+            items.forEach { item ->
+                val itemObject = item as? ObjectNode ?: return@forEach
+                if (!itemObject.hasArticleChoices()) {
+                    return@forEach
+                }
+                val prompt = itemObject.get("prompt")?.asText() ?: return@forEach
+                val answer = solveArticleBlank(prompt) ?: return@forEach
+                itemObject.put("answer", answer)
+                itemObject.put("correct", answer)
+            }
+        }
+    }
+    return normalized
+}
+
+private fun ObjectNode.hasArticleChoices(): Boolean {
+    val choices = get("choices") as? ArrayNode ?: return false
+    val normalizedChoices = choices.map { choice -> choice.asText().trim().lowercase() }.toSet()
+    return normalizedChoices.containsAll(setOf("a", "an", "-"))
+}
+
+private fun solveArticleBlank(prompt: String): String? {
+    val afterBlank = materialArticleBlankRegex.find(prompt)?.groupValues?.get(1)?.trim() ?: return null
+    val words = materialEnglishWordRegex.findAll(afterBlank)
+        .map { match -> match.value.lowercase() }
+        .toList()
+    val firstWord = words.firstOrNull() ?: return "-"
+    if (firstWord in materialNoArticleWords || firstWord in materialNumberWords) {
+        return "-"
+    }
+    if (words.size == 1 && firstWord in materialAdjectiveOnlyWords) {
+        return "-"
+    }
+    if (isPluralArticleWord(firstWord)) {
+        return "-"
+    }
+    return if (takesAnArticle(firstWord)) "an" else "a"
+}
+
+private fun isPluralArticleWord(word: String): Boolean =
+    word in materialPluralArticleWords ||
+        (word.endsWith("s") && word !in materialSingularSArticleWords && !word.endsWith("ss"))
+
+private fun takesAnArticle(word: String): Boolean =
+    word.firstOrNull() in setOf('a', 'e', 'i', 'o', 'u') || word in materialSilentHArticleWords
+
 private fun validateDraft(draft: LessonMaterialDraftResponse) {
     if (draft.title.isBlank() || draft.title.length > 160) {
         throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid material title.")
@@ -283,6 +340,7 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     - Do not drop later worksheet sections and do not replace the worksheet with a shorter practice set unless the scan is unreadable.
     - For fill-in-article or grammar worksheet scans, use fillGaps or multipleChoice items with concise prompts, the correct answer, and choices.
     - For a/an article tasks, each blank item must provide choices ["a", "an", "-"] and an answer such as "a", "an", or "-".
+    - Solve a/an tasks with English article rules: singular countable nouns use a/an by sound; plural nouns, uncountable nouns, numbers, and adjectives without a following noun use "-".
     - Keep the blank marker in item prompts, for example "___ apple" or "It is ___ girl.", so the renderer can place the combobox at the blank.
     - For sentence tasks, keep the full visible sentence with the blank marker and solve from grammar context.
     - Prefer 4-8 blocks: warm-up text, vocabulary/flashcards, one controlled exercise, one speaking task, one writing or drawing task.
@@ -426,6 +484,40 @@ private val materialAiBlockTypes = setOf(
     "speakingPrompt",
     "drawingArea",
 )
+
+private val materialArticleBlankRegex = Regex("""(?:___|__|…|\.{3})\s*([^.,;:!?]*)""")
+private val materialEnglishWordRegex = Regex("""[A-Za-z]+(?:-[A-Za-z]+)?""")
+private val materialAdjectiveOnlyWords = setOf("bad", "big", "blue", "funny", "good", "red", "small", "white", "yellow")
+private val materialNoArticleWords = setOf(
+    "bread",
+    "cheese",
+    "homework",
+    "information",
+    "jeans",
+    "juice",
+    "milk",
+    "money",
+    "music",
+    "rice",
+    "tea",
+    "water",
+)
+private val materialNumberWords = setOf(
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+)
+private val materialPluralArticleWords = setOf("children", "people")
+private val materialSingularSArticleWords = setOf("bus", "class", "dress", "glass")
+private val materialSilentHArticleWords = setOf("heir", "honest", "honour", "honor", "hour")
 
 private val materialDraftJsonSchemaJson = """
 {

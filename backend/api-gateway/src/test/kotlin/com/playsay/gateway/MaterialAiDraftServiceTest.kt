@@ -67,6 +67,36 @@ class MaterialAiDraftServiceTest {
         assertTrue(transport.requestBody.contains("Turn worksheet blanks into interactive exercise items"))
         assertTrue(transport.requestBody.contains("Preserve every visible worksheet blank"))
         assertTrue(transport.requestBody.contains("each blank item must provide choices"))
+        assertTrue(transport.requestBody.contains("singular countable nouns use a/an by sound"))
+    }
+
+    @Test
+    fun `openai provider normalizes common article answers from generated worksheets`() {
+        val transport = RecordingOpenAiTransport(openAiResponse(openAiArticleDraftJson()))
+        val provider = OpenAiMaterialAiDraftProvider(
+            transport = transport,
+            apiKey = "test-key",
+            model = "gpt-5.4-mini",
+            baseUrl = "https://api.openai.com/v1",
+        )
+
+        val draft = provider.draft(
+            MaterialAiDraftInput(
+                title = "Articles",
+                prompt = "Create an editable A1 article worksheet from the attached scan",
+                language = "en",
+                cefrLevel = "A1",
+                sourceImageDataUrl = "data:image/png;base64,iVBORw0KGgo=",
+                sourceFileName = "articles.png",
+            ),
+        )
+
+        val items = draft.document["pages"][0]["blocks"][0]["items"]
+        assertEquals("-", items[0]["answer"].asText())
+        assertEquals("an", items[1]["answer"].asText())
+        assertEquals("-", items[2]["answer"].asText())
+        assertEquals("a", items[3]["answer"].asText())
+        assertEquals("-", items[4]["correct"].asText())
     }
 
     private class RecordingOpenAiTransport(
@@ -147,6 +177,73 @@ class MaterialAiDraftServiceTest {
             "sourceType": "teacher_prompt",
             "inputSummary": "B1 travel food speaking lesson",
             "notes": "Original live lesson draft."
+          },
+          "scoringRubric": {
+            "maxScore": 10,
+            "criteria": [
+              { "key": "taskCompletion", "label": "Task completion", "weight": 4 },
+              { "key": "grammar", "label": "Grammar", "weight": 2 },
+              { "key": "vocabulary", "label": "Vocabulary", "weight": 2 },
+              { "key": "fluency", "label": "Fluency", "weight": 2 }
+            ],
+            "analysisFlags": ["taskCompletion", "grammar", "vocabulary", "fluency"]
+          }
+        }
+        """.trimIndent()
+
+    private fun openAiArticleDraftJson(): String =
+        """
+        {
+          "title": "Articles",
+          "description": "Interactive article worksheet.",
+          "language": "en",
+          "cefrLevel": "A1",
+          "visibility": "PRIVATE",
+          "status": "DRAFT",
+          "document": {
+            "schemaVersion": 1,
+            "pages": [
+              {
+                "id": "page-1",
+                "title": "Articles",
+                "layout": "FLOW",
+                "blocks": [
+                  {
+                    "id": "block-1",
+                    "type": "fillGaps",
+                    "title": "Articles practice",
+                    "body": null,
+                    "instruction": "Choose a, an, or no article.",
+                    "prompt": null,
+                    "level": null,
+                    "language": null,
+                    "url": null,
+                    "provider": null,
+                    "caption": null,
+                    "imageUrl": null,
+                    "alt": null,
+                    "height": null,
+                    "minWords": null,
+                    "cards": [],
+                    "items": [
+                      { "prompt": "It is ___ white.", "answer": "a", "correct": "a", "choices": ["a", "an", "-"] },
+                      { "prompt": "___ apple", "answer": "a", "correct": "a", "choices": ["a", "an", "-"] },
+                      { "prompt": "___ tea", "answer": "a", "correct": "a", "choices": ["a", "an", "-"] },
+                      { "prompt": "It is ___ red pencil.", "answer": "-", "correct": "-", "choices": ["a", "an", "-"] },
+                      { "prompt": "___ children", "answer": "a", "correct": "a", "choices": ["a", "an", "-"] }
+                    ],
+                    "options": []
+                  }
+                ]
+              }
+            ]
+          },
+          "sourceMeta": {
+            "kind": "AI_GENERATED",
+            "provider": "openai",
+            "sourceType": "scan",
+            "inputSummary": "A1 article worksheet",
+            "notes": "Scan converted to article choices."
           },
           "scoringRubric": {
             "maxScore": 10,

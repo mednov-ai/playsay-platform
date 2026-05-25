@@ -477,7 +477,7 @@ class LessonMaterialStore(
         return requireNotNull(find(materialId)).toResponse(objectMapper)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun listAssets(authentication: JwtAuthenticationToken, materialId: UUID): List<MaterialAssetResponse> {
         val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
         val currentUserId = authentication.currentUserIdIfNeeded()

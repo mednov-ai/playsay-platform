@@ -185,6 +185,8 @@ type MaterialEditorBlock = {
   height?: number;
 };
 
+type MaterialExerciseItem = NonNullable<MaterialEditorBlock["items"]>[number];
+
 type MaterialEditorPage = {
   id: string;
   title: string;
@@ -2852,30 +2854,14 @@ function RenderedMaterialBlock({ block }: { block: MaterialEditorBlock }) {
       return (
         <section className="playsay-render-block">
           <h4>{block.title}</h4>
-          <div className="playsay-fill-exercise">
-            {(block.items ?? []).map((item, index) => (
-              <label key={`${item.prompt}-${index}`}>
-                {item.prompt.replace("___", "")}
-                <input aria-label={`gap ${index + 1}`} defaultValue="" />
-              </label>
-            ))}
-          </div>
+          <RenderedFillGapExercise block={block} />
         </section>
       );
     case "multipleChoice":
       return (
         <section className="playsay-render-block">
           <h4>{block.title}</h4>
-          <div className="playsay-choice-list">
-            {(block.items ?? []).map((item, index) => (
-              <div key={`${item.prompt}-${index}`}>
-                <p>{item.prompt}</p>
-                {(item.options ?? []).map((option) => (
-                  <button key={option} type="button">{option}</button>
-                ))}
-              </div>
-            ))}
-          </div>
+          <RenderedChoiceExercise block={block} />
         </section>
       );
     case "freeWriting":
@@ -2903,6 +2889,131 @@ function RenderedMaterialBlock({ block }: { block: MaterialEditorBlock }) {
     default:
       return null;
   }
+}
+
+function RenderedFillGapExercise({ block }: { block: MaterialEditorBlock }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  return (
+    <div className="playsay-fill-exercise">
+      {(block.items ?? []).map((item, index) => {
+        const itemKey = `${item.prompt}-${index}`;
+        const options = materialExerciseOptions(item, block);
+        const prompt = splitGapPrompt(item.prompt);
+
+        return (
+          <label key={itemKey}>
+            {prompt.before ? <span>{prompt.before}</span> : null}
+            {options.length > 0 ? (
+              <select
+                aria-label={`gap ${index + 1}`}
+                className="playsay-inline-select"
+                onChange={(event) => setAnswers((current) => ({ ...current, [itemKey]: event.target.value }))}
+                value={answers[itemKey] ?? ""}
+              >
+                <option value="">Выбрать</option>
+                {options.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            ) : (
+              <input aria-label={`gap ${index + 1}`} defaultValue="" />
+            )}
+            {prompt.after ? <span>{prompt.after}</span> : null}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+function RenderedChoiceExercise({ block }: { block: MaterialEditorBlock }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  return (
+    <div className="playsay-choice-list">
+      {(block.items ?? []).map((item, index) => {
+        const itemKey = `${item.prompt}-${index}`;
+        const options = materialExerciseOptions(item, block);
+
+        return (
+          <label className="playsay-choice-row" key={itemKey}>
+            <span>{item.prompt}</span>
+            {options.length > 0 ? (
+              <select
+                aria-label={`choice ${index + 1}`}
+                className="playsay-inline-select"
+                onChange={(event) => setAnswers((current) => ({ ...current, [itemKey]: event.target.value }))}
+                value={answers[itemKey] ?? ""}
+              >
+                <option value="">Выбрать</option>
+                {options.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                aria-label={`choice ${index + 1}`}
+                className="playsay-inline-input"
+                onChange={(event) => setAnswers((current) => ({ ...current, [itemKey]: event.target.value }))}
+                value={answers[itemKey] ?? ""}
+              />
+            )}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+function materialExerciseOptions(item: MaterialExerciseItem, block: MaterialEditorBlock): string[] {
+  const configuredOptions = uniqueMaterialOptions(item.options ?? []);
+  if (configuredOptions.length > 0) {
+    return configuredOptions;
+  }
+
+  const answer = normalizeMaterialAnswer(item.answer);
+  const articleContext = `${block.title} ${block.body ?? ""} ${block.prompt ?? ""} ${item.prompt}`.toLowerCase();
+  if (
+    ["a", "an", "-"].includes(answer) ||
+    articleContext.includes("article") ||
+    articleContext.includes("артик")
+  ) {
+    return ["a", "an", "-"];
+  }
+
+  return [];
+}
+
+function splitGapPrompt(prompt: string): { before: string; after: string } {
+  const match = prompt.match(/^(.*?)(___|__|…|\.\.\.)(.*)$/);
+  if (!match) {
+    return { before: prompt, after: "" };
+  }
+
+  return {
+    before: match[1].trimEnd(),
+    after: match[3].trimStart(),
+  };
+}
+
+function uniqueMaterialOptions(options: string[]): string[] {
+  const result: string[] = [];
+  options.forEach((option) => {
+    const normalized = option.trim();
+    if (normalized && !result.includes(normalized)) {
+      result.push(normalized);
+    }
+  });
+  return result;
+}
+
+function normalizeMaterialAnswer(value: string | undefined): string {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  if (["no article", "no article needed", "zero article", "нет артикля"].includes(normalized)) {
+    return "-";
+  }
+  return normalized;
 }
 
 function FallbackLessonDocument() {
@@ -3707,11 +3818,13 @@ function materialItemFromJson(value: unknown): NonNullable<MaterialEditorBlock["
   if (!prompt) {
     return null;
   }
+  const options = Array.isArray(item.options) ? item.options.map(asString).filter(Boolean) : [];
+  const choices = Array.isArray(item.choices) ? item.choices.map(asString).filter(Boolean) : [];
 
   return {
     prompt,
-    answer: asString(item.answer) || undefined,
-    options: Array.isArray(item.options) ? item.options.map(asString).filter(Boolean) : undefined,
+    answer: asString(item.answer) || asString(item.correct) || undefined,
+    options: uniqueMaterialOptions([...options, ...choices]),
   };
 }
 
@@ -3841,7 +3954,8 @@ function parseExerciseItems(value: string, type: "fillGaps" | "multipleChoice"):
 
       return {
         prompt: prompt.trim(),
-        answer: optionsOrAnswer.trim() || undefined,
+        options: answer ? optionsOrAnswer.split(",").map((option) => option.trim()).filter(Boolean) : undefined,
+        answer: (answer || optionsOrAnswer).trim() || undefined,
       };
     })
     .filter((item) => item.prompt);
@@ -3854,7 +3968,7 @@ function formatExerciseItems(items: MaterialEditorBlock["items"], type: "fillGap
         return [item.prompt, item.options?.join(", "), item.answer].filter(Boolean).join(" | ");
       }
 
-      return [item.prompt, item.answer].filter(Boolean).join(" | ");
+      return [item.prompt, item.options?.join(", "), item.answer].filter(Boolean).join(" | ");
     })
     .join("\n");
 }

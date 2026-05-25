@@ -63,6 +63,9 @@ class MaterialAiDraftServiceTest {
         assertTrue(transport.requestBody.contains("\"type\":\"input_image\""))
         assertTrue(transport.requestBody.contains("\"image_url\":\"$dataUrl\""))
         assertTrue(transport.requestBody.contains("\"detail\":\"high\""))
+        assertTrue(transport.requestBody.contains("first solve the worksheet"))
+        assertTrue(transport.requestBody.contains("Turn worksheet blanks into interactive exercise items"))
+        assertTrue(transport.requestBody.contains("each blank item must provide choices"))
     }
 
     private class RecordingOpenAiTransport(

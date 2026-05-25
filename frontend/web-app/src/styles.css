@@ -701,20 +701,48 @@ textarea {
   gap: 0.875rem;
 }
 
-.playsay-choice-list p {
-  margin-bottom: 0.5rem;
+.playsay-choice-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(6rem, 9rem);
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: rgb(255 255 255 / 0.72);
+  color: hsl(var(--muted-foreground));
+  font-weight: 850;
+  padding: 0.625rem 0.75rem;
 }
 
-.playsay-choice-list button {
-  min-height: 2.25rem;
-  margin: 0 0.375rem 0.375rem 0;
+.playsay-inline-select {
+  min-height: 2.4rem;
+  min-width: 5.75rem;
   border: 1px solid hsl(var(--border));
-  border-radius: 0.625rem;
+  border-radius: 0.75rem;
   background: #ffffff;
   color: hsl(var(--foreground));
   cursor: pointer;
-  font-weight: 850;
-  padding: 0.375rem 0.75rem;
+  font-weight: 900;
+  outline: none;
+  padding: 0.375rem 0.625rem;
+}
+
+.playsay-inline-input {
+  min-height: 2.4rem;
+  min-width: 5.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: #ffffff;
+  color: hsl(var(--foreground));
+  font-weight: 900;
+  outline: none;
+  padding: 0.375rem 0.625rem;
+}
+
+.playsay-inline-select:focus,
+.playsay-inline-input:focus {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px rgb(255 92 0 / 0.14);
 }
 
 .playsay-student-answer {
@@ -840,6 +868,10 @@ textarea {
 
 .playsay-fill-exercise input:focus {
   border-bottom-color: hsl(var(--primary));
+}
+
+.playsay-fill-exercise .playsay-inline-select {
+  width: auto;
 }
 
 .playsay-annotation-layer {
@@ -1081,6 +1113,15 @@ textarea {
 
   .playsay-flashcards {
     grid-template-columns: 1fr;
+  }
+
+  .playsay-choice-row {
+    grid-template-columns: 1fr;
+  }
+
+  .playsay-inline-select,
+  .playsay-inline-input {
+    width: 100%;
   }
 
   .playsay-video-embed-placeholder,

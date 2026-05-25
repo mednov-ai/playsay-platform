@@ -140,6 +140,10 @@ export interface MaterialSubmissionResponse {
   userName?: string | null;
   content: JsonNode;
   /** @nullable */
+  score?: number | null;
+  /** @nullable */
+  errorsCount?: number | null;
+  /** @nullable */
   submittedAt?: string | null;
   createdAt: string;
   updatedAt: string;

@@ -135,6 +135,8 @@ export type LessonMaterialSubmission = {
   userSubject?: string | null;
   userName?: string | null;
   content: LessonMaterialJson;
+  score?: number | null;
+  errorsCount?: number | null;
   submittedAt?: string | null;
   createdAt: string;
   updatedAt: string;

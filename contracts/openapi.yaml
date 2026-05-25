@@ -1294,6 +1294,15 @@ components:
           - "null"
         content:
           $ref: "#/components/schemas/JsonNode"
+        score:
+          type:
+          - number
+          - "null"
+        errorsCount:
+          type:
+          - integer
+          - "null"
+          format: int32
         submittedAt:
           type:
           - string

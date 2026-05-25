@@ -491,6 +491,10 @@ textarea {
   white-space: nowrap;
 }
 
+.playsay-submission-pill strong {
+  color: hsl(var(--primary));
+}
+
 .playsay-submission-pill time {
   flex: 0 0 auto;
   color: hsl(var(--foreground));

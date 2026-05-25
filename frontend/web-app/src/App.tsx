@@ -2601,6 +2601,7 @@ function LessonWorkspace({
   const [submissionSnapshots, setSubmissionSnapshots] = useState<LessonMaterialSubmission[]>([]);
   const [submissionMonitorError, setSubmissionMonitorError] = useState<string | null>(null);
   const canMonitorSubmissions = canAssignLessons(profile);
+  const lessonScore = canMonitorSubmissions ? averageSubmissionScore(submissionSnapshots) : submission?.score ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -2788,6 +2789,7 @@ function LessonWorkspace({
             lessonId={session.lessonId}
             material={material}
             onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+            score={lessonScore}
             submission={submission}
             submissionMessage={submissionMessage}
             submissionSaving={submissionSaving}
@@ -2803,6 +2805,7 @@ function LessonWorkspace({
             <LessonTaskCanvas
               lessonId={session.lessonId}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              score={lessonScore}
               submission={submission}
               submissionMessage={submissionMessage}
               submissionSaving={submissionSaving}
@@ -2843,6 +2846,7 @@ function MaterialSubmissionsMonitor({
             <span className="playsay-submission-pill" key={submission.id} title={materialSubmissionUserLabel(submission)}>
               <CheckCircle2 className="h-3.5 w-3.5" />
               <span>{materialSubmissionUserLabel(submission)}</span>
+              {typeof submission.score === "number" ? <strong>{formatMaterialScore(submission.score)}</strong> : null}
               <time dateTime={submission.submittedAt ?? submission.updatedAt}>
                 {formatSubmissionTime(submission.submittedAt ?? submission.updatedAt)}
               </time>
@@ -2858,6 +2862,7 @@ function LessonTaskCanvas({
   lessonId,
   material,
   onSaveAnswers,
+  score,
   submission,
   submissionMessage,
   submissionSaving,
@@ -2866,6 +2871,7 @@ function LessonTaskCanvas({
   lessonId: string;
   material?: LessonMaterial | null;
   onSaveAnswers: (content: LessonMaterialJson) => void;
+  score: number | null;
   submission: LessonMaterialSubmission | null;
   submissionMessage: string | null;
   submissionSaving: boolean;
@@ -3067,6 +3073,7 @@ function LessonTaskCanvas({
               material={material}
               mode="classroom"
               onAnswerChange={updateAnswer}
+              score={score}
             />
           ) : (
             <FallbackLessonDocument />
@@ -3120,11 +3127,13 @@ function LessonMaterialDocumentView({
   material,
   mode = "classroom",
   onAnswerChange,
+  score,
 }: {
   answers?: MaterialAnswerState;
   material: LessonMaterial;
   mode?: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
+  score?: number | null;
 }) {
   const document = editorDocumentFromJson(material.document);
   const page = document.pages[0] ?? defaultMaterialPage(material.title);
@@ -3164,7 +3173,7 @@ function LessonMaterialDocumentView({
     <div className="playsay-rendered-material">
       <div className="playsay-material-score-badge">
         <span>{material.cefrLevel}</span>
-        <strong>{maxScore}</strong>
+        <strong>{formatMaterialScore(score ?? maxScore)}</strong>
       </div>
       <div className="playsay-task-kicker">
         <FileText className="h-4 w-4 text-primary" />
@@ -5065,6 +5074,31 @@ function canAssignLessons(profile: MeProfile | null): boolean {
 
 function materialSubmissionUserLabel(submission: LessonMaterialSubmission): string {
   return submission.userName?.trim() || submission.userSubject?.trim() || "Ученик";
+}
+
+function averageSubmissionScore(submissions: LessonMaterialSubmission[]): number | null {
+  const scores = submissions
+    .map((submission) => submission.score)
+    .filter((score): score is number => typeof score === "number" && Number.isFinite(score));
+
+  if (scores.length === 0) {
+    return null;
+  }
+
+  return scores.reduce((total, score) => total + score, 0) / scores.length;
+}
+
+function formatMaterialScore(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "10";
+  }
+
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return String(value);
+  }
+
+  return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
 }
 
 function formatSubmissionTime(value: string | null | undefined): string {

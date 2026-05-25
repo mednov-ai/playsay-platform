@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.sql.ResultSet
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -145,6 +146,8 @@ data class MaterialSubmissionResponse(
     val userSubject: String?,
     val userName: String?,
     val content: JsonNode,
+    val score: BigDecimal?,
+    val errorsCount: Int?,
     val submittedAt: Instant?,
     val createdAt: Instant,
     val updatedAt: Instant,
@@ -201,6 +204,8 @@ private data class StoredMaterialSubmission(
     val userSubject: String?,
     val userName: String?,
     val content: String,
+    val score: BigDecimal?,
+    val errorsCount: Int?,
     val submittedAt: Instant?,
     val createdAt: Instant,
     val updatedAt: Instant,
@@ -498,6 +503,8 @@ class LessonMaterialStore(
                    student.keycloak_subject AS user_subject,
                    COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
                    s.content,
+                   s.score,
+                   s.errors_count,
                    s.submitted_at,
                    s.created_at,
                    s.updated_at
@@ -532,6 +539,7 @@ class LessonMaterialStore(
         val assignmentId = findOrCreateMaterialSubmissionAssignment(lessonId, material)
         val now = Instant.now()
         val content = objectMapper.writeValueAsString(request.content)
+        val scoring = scoreMaterialSubmission(material, request.content)
         val existing = findMaterialSubmission(assignmentId, lessonId, userId)
 
         val submissionId = if (existing == null) {
@@ -544,6 +552,8 @@ class LessonMaterialStore(
                     student_user_id,
                     lesson_id,
                     content,
+                    score,
+                    errors_count,
                     submitted_at,
                     created_at,
                     updated_at
@@ -553,6 +563,8 @@ class LessonMaterialStore(
                     :userId,
                     :lessonId,
                     :content,
+                    :score,
+                    :errorsCount,
                     :submittedAt,
                     :createdAt,
                     :updatedAt
@@ -564,6 +576,8 @@ class LessonMaterialStore(
                 .param("userId", userId)
                 .param("lessonId", lessonId)
                 .param("content", content)
+                .param("score", scoring?.score)
+                .param("errorsCount", scoring?.errorsCount)
                 .param("submittedAt", if (request.submitted) now.toMaterialOffsetDateTime() else null)
                 .param("createdAt", now.toMaterialOffsetDateTime())
                 .param("updatedAt", now.toMaterialOffsetDateTime())
@@ -574,6 +588,8 @@ class LessonMaterialStore(
                 """
                 UPDATE submission
                    SET content = :content,
+                       score = :score,
+                       errors_count = :errorsCount,
                        submitted_at = CASE
                            WHEN :submitted = TRUE THEN :submittedAt
                            ELSE submitted_at
@@ -584,6 +600,8 @@ class LessonMaterialStore(
             )
                 .param("id", existing.id)
                 .param("content", content)
+                .param("score", scoring?.score)
+                .param("errorsCount", scoring?.errorsCount)
                 .param("submitted", request.submitted)
                 .param("submittedAt", now.toMaterialOffsetDateTime())
                 .param("updatedAt", now.toMaterialOffsetDateTime())
@@ -667,6 +685,66 @@ class LessonMaterialStore(
         }
 
         return requireNotNull(findMaterialAnnotation(annotationId)).toResponse(objectMapper)
+    }
+
+    private fun scoreMaterialSubmission(material: StoredLessonMaterial, content: JsonNode): MaterialSubmissionScore? {
+        val document = runCatching { objectMapper.readTree(material.document) }.getOrNull() ?: return null
+        val answerRoot = content.get("answers")?.takeIf { node -> node.isObject } ?: return null
+        val pages = document.get("pages") as? ArrayNode ?: return null
+        var total = 0
+        var correct = 0
+
+        pages.forEach { page ->
+            val blocks = page.get("blocks") as? ArrayNode ?: return@forEach
+            blocks.forEach { block ->
+                val blockId = block.get("id")?.asText()?.takeIf { value -> value.isNotBlank() } ?: return@forEach
+                val blockType = block.get("type")?.asText().orEmpty()
+                val answerBlock = answerRoot.get(blockId)
+                when (blockType) {
+                    "fillGaps",
+                    "multipleChoice"
+                    -> {
+                        val answerItems = answerBlock?.get("items")?.takeIf { node -> node.isObject }
+                        val items = block.get("items") as? ArrayNode ?: return@forEach
+                        items.forEachIndexed { index, item ->
+                            val expected = item.get("answer")?.asText()?.takeIf { value -> value.isNotBlank() }
+                                ?: return@forEachIndexed
+                            val prompt = item.get("prompt")?.asText().orEmpty()
+                            val key = "$prompt-$index"
+                            val actual = answerItems?.get(key)?.asText()
+                            total += 1
+                            if (normalizedScoringAnswer(actual) == normalizedScoringAnswer(expected)) {
+                                correct += 1
+                            }
+                        }
+                    }
+                    "matchingPairs" -> {
+                        val matches = answerBlock?.get("matches")?.takeIf { node -> node.isObject }
+                        val pairs = block.get("pairs") as? ArrayNode ?: return@forEach
+                        pairs.forEach { pair ->
+                            val expectedPairId = pair.get("id")?.asText()?.takeIf { value -> value.isNotBlank() }
+                                ?: return@forEach
+                            total += 1
+                            if (matches?.get(expectedPairId)?.asText() == expectedPairId) {
+                                correct += 1
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (total == 0) {
+            return null
+        }
+
+        val maxScore = materialMaxScore(material.scoringRubric) ?: BigDecimal.TEN
+        return MaterialSubmissionScore(
+            score = maxScore
+                .multiply(BigDecimal(correct))
+                .divide(BigDecimal(total), 2, RoundingMode.HALF_UP),
+            errorsCount = total - correct,
+        )
     }
 
     fun draft(authentication: JwtAuthenticationToken, request: MaterialAiDraftRequest): LessonMaterialDraftResponse {
@@ -1039,6 +1117,8 @@ class LessonMaterialStore(
                    student.keycloak_subject AS user_subject,
                    COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
                    s.content,
+                   s.score,
+                   s.errors_count,
                    s.submitted_at,
                    s.created_at,
                    s.updated_at
@@ -1070,6 +1150,8 @@ class LessonMaterialStore(
                    student.keycloak_subject AS user_subject,
                    COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
                    s.content,
+                   s.score,
+                   s.errors_count,
                    s.submitted_at,
                    s.created_at,
                    s.updated_at
@@ -1191,6 +1273,11 @@ private data class MatchingImageTarget(
     val imagePrompt: String,
     val imageAlt: String,
     val pair: ObjectNode,
+)
+
+private data class MaterialSubmissionScore(
+    val score: BigDecimal,
+    val errorsCount: Int,
 )
 
 @RestController
@@ -1668,6 +1755,8 @@ private fun StoredMaterialSubmission.toResponse(objectMapper: ObjectMapper): Mat
         userSubject = userSubject,
         userName = userName,
         content = objectMapper.readTree(content),
+        score = score,
+        errorsCount = errorsCount,
         submittedAt = submittedAt,
         createdAt = createdAt,
         updatedAt = updatedAt,
@@ -1688,6 +1777,13 @@ private fun materialMaxScore(scoringRubric: String): BigDecimal? =
         val node = jacksonObjectMapper().readTree(scoringRubric)
         node.get("maxScore")?.takeIf { value -> value.isNumber }?.decimalValue()
     }.getOrNull()
+
+private fun normalizedScoringAnswer(value: String?): String =
+    value
+        ?.trim()
+        ?.lowercase()
+        ?.replace(Regex("\\s+"), " ")
+        ?: ""
 
 private fun matchingImageTargets(document: ObjectNode, blockId: String?, maxImages: Int): List<MatchingImageTarget> {
     val pages = document.get("pages") as? ArrayNode ?: return emptyList()
@@ -1782,6 +1878,8 @@ private fun mapMaterialSubmission(rs: ResultSet, @Suppress("UNUSED_PARAMETER") r
         userSubject = rs.getString("user_subject"),
         userName = rs.getString("user_name"),
         content = rs.getString("content"),
+        score = rs.getBigDecimal("score"),
+        errorsCount = rs.getNullableMaterialInt("errors_count"),
         submittedAt = rs.getObject("submitted_at", OffsetDateTime::class.java)?.toInstant(),
         createdAt = rs.getMaterialInstant("created_at"),
         updatedAt = rs.getMaterialInstant("updated_at"),
@@ -1999,6 +2097,11 @@ private fun inferCefrLevel(prompt: String): String {
 
 private fun ResultSet.getMaterialInstant(columnName: String): Instant =
     getObject(columnName, OffsetDateTime::class.java).toInstant()
+
+private fun ResultSet.getNullableMaterialInt(columnName: String): Int? {
+    val value = getInt(columnName)
+    return if (wasNull()) null else value
+}
 
 private fun Instant.toMaterialOffsetDateTime(): OffsetDateTime =
     atOffset(ZoneOffset.UTC)

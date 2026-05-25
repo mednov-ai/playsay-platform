@@ -1,6 +1,7 @@
 package com.playsay.gateway
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -116,7 +117,38 @@ class MaterialControllerTest @Autowired constructor(
         userProfileStore.currentUserId(student)
         val material = materialController.create(
             teacher,
-            LessonMaterialRequest(title = "Private classroom material", status = "PUBLISHED"),
+            LessonMaterialRequest(
+                title = "Private classroom material",
+                status = "PUBLISHED",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Articles",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "warmup",
+                              "type": "fillGaps",
+                              "title": "Articles",
+                              "items": [
+                                {
+                                  "prompt": "It is ... apple.",
+                                  "answer": "an",
+                                  "options": ["a", "an", "-"]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
         ).body!!
         val asset = materialController.createAsset(
             teacher,
@@ -162,7 +194,7 @@ class MaterialControllerTest @Autowired constructor(
                         "warmup": {
                           "type": "fillGaps",
                           "items": {
-                            "gap-1": "an"
+                            "It is ... apple.-0": "an"
                           }
                         }
                       }
@@ -177,13 +209,16 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals("student-1", submission.userSubject)
         assertEquals("Student one", submission.userName)
         assertNotNull(submission.submittedAt)
-        assertEquals("an", submission.content["answers"]["warmup"]["items"]["gap-1"].asText())
+        assertEquals(0, BigDecimal.TEN.compareTo(assertNotNull(submission.score)))
+        assertEquals(0, submission.errorsCount)
+        assertEquals("an", submission.content["answers"]["warmup"]["items"]["It is ... apple.-0"].asText())
         assertEquals(submission.id, materialController.scheduledLessonMaterialSubmission(student, lesson.id).id)
         val teacherSubmissions = materialController.scheduledLessonMaterialSubmissions(teacher, lesson.id)
         assertEquals(1, teacherSubmissions.size)
         assertEquals(submission.id, teacherSubmissions.single().id)
         assertEquals("student-1", teacherSubmissions.single().userSubject)
-        assertEquals("an", teacherSubmissions.single().content["answers"]["warmup"]["items"]["gap-1"].asText())
+        assertEquals(0, BigDecimal.TEN.compareTo(assertNotNull(teacherSubmissions.single().score)))
+        assertEquals("an", teacherSubmissions.single().content["answers"]["warmup"]["items"]["It is ... apple.-0"].asText())
         val studentMonitorError = assertFailsWith<ResponseStatusException> {
             materialController.scheduledLessonMaterialSubmissions(student, lesson.id)
         }

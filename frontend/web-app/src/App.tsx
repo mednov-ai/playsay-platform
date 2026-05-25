@@ -166,10 +166,20 @@ type MaterialBlockType =
   | "flashcards"
   | "fillGaps"
   | "multipleChoice"
+  | "matchingPairs"
   | "freeWriting"
   | "speakingPrompt"
   | "drawingArea"
   | "generatedImage";
+
+type MaterialMatchingPair = {
+  id: string;
+  left: string;
+  right: string;
+  imagePrompt?: string;
+  imageAlt?: string;
+  imageUrl?: string;
+};
 
 type MaterialEditorBlock = {
   id: string;
@@ -182,8 +192,11 @@ type MaterialEditorBlock = {
   caption?: string;
   cards?: Array<{ id: string; front: string; back: string; example?: string }>;
   items?: Array<{ prompt: string; answer?: string; options?: string[] }>;
+  pairs?: MaterialMatchingPair[];
   height?: number;
 };
+
+const emptyMaterialMatchingPairs: MaterialMatchingPair[] = [];
 
 type MaterialExerciseItem = NonNullable<MaterialEditorBlock["items"]>[number];
 
@@ -1363,7 +1376,7 @@ function MaterialLibraryPanel({
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap gap-2">
-                  {(["text", "videoEmbed", "image", "generatedImage", "flashcards", "fillGaps", "multipleChoice", "freeWriting", "speakingPrompt", "drawingArea"] as MaterialBlockType[]).map((type) => (
+                  {(["text", "videoEmbed", "image", "generatedImage", "flashcards", "fillGaps", "multipleChoice", "matchingPairs", "freeWriting", "speakingPrompt", "drawingArea"] as MaterialBlockType[]).map((type) => (
                     <Button disabled={disabled} key={type} onClick={() => addBlock(type)} type="button" variant="outline">
                       {materialBlockIcon(type)}
                       {materialBlockLabel(type)}
@@ -1538,6 +1551,15 @@ function MaterialBlockEditor({
             disabled={disabled}
             onChange={(event) => onUpdate({ items: parseExerciseItems(event.target.value, block.type as "fillGaps" | "multipleChoice") })}
             value={formatExerciseItems(block.items, block.type as "fillGaps" | "multipleChoice")}
+          />
+        ) : null}
+
+        {block.type === "matchingPairs" ? (
+          <textarea
+            className="playsay-input min-h-36 resize-none py-3"
+            disabled={disabled}
+            onChange={(event) => onUpdate({ pairs: parseMatchingPairs(event.target.value) })}
+            value={formatMatchingPairs(block.pairs)}
           />
         ) : null}
 
@@ -2864,6 +2886,13 @@ function RenderedMaterialBlock({ block }: { block: MaterialEditorBlock }) {
           <RenderedChoiceExercise block={block} />
         </section>
       );
+    case "matchingPairs":
+      return (
+        <section className="playsay-render-block">
+          <h4>{block.title}</h4>
+          <RenderedMatchingPairsExercise block={block} />
+        </section>
+      );
     case "freeWriting":
       return (
         <section className="playsay-render-block">
@@ -2964,6 +2993,132 @@ function RenderedChoiceExercise({ block }: { block: MaterialEditorBlock }) {
       })}
     </div>
   );
+}
+
+function RenderedMatchingPairsExercise({ block }: { block: MaterialEditorBlock }) {
+  const pairs = block.pairs ?? emptyMaterialMatchingPairs;
+  const rightOptions = matchingRightOptions(pairs);
+  const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
+  const [matches, setMatches] = useState<Record<string, string>>({});
+  const [lines, setLines] = useState<Array<{ id: string; x1: number; x2: number; y1: number; y2: number }>>([]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const leftRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const rightRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  useEffect(() => {
+    function updateLines() {
+      const container = containerRef.current;
+      if (!container) {
+        setLines([]);
+        return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const nextLines = Object.entries(matches).flatMap(([leftId, rightId]) => {
+        const leftNode = leftRefs.current[leftId];
+        const rightNode = rightRefs.current[rightId];
+        if (!leftNode || !rightNode) {
+          return [];
+        }
+
+        const leftRect = leftNode.getBoundingClientRect();
+        const rightRect = rightNode.getBoundingClientRect();
+        return [{
+          id: leftId,
+          x1: leftRect.right - containerRect.left,
+          y1: leftRect.top + leftRect.height / 2 - containerRect.top,
+          x2: rightRect.left - containerRect.left,
+          y2: rightRect.top + rightRect.height / 2 - containerRect.top,
+        }];
+      });
+      setLines(nextLines);
+    }
+
+    updateLines();
+    window.addEventListener("resize", updateLines);
+    return () => window.removeEventListener("resize", updateLines);
+  }, [matches, pairs]);
+
+  function connectPair(rightId: string) {
+    if (!activeLeftId) {
+      return;
+    }
+
+    setMatches((current) => ({ ...current, [activeLeftId]: rightId }));
+    setActiveLeftId(null);
+  }
+
+  if (pairs.length === 0) {
+    return (
+      <div className="playsay-match-empty">
+        <Link2 className="h-5 w-5 text-primary" />
+        <span>Matching pairs</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="playsay-matching-exercise" ref={containerRef}>
+      <svg className="playsay-match-lines" aria-hidden="true">
+        {lines.map((line) => (
+          <line key={line.id} x1={line.x1} x2={line.x2} y1={line.y1} y2={line.y2} />
+        ))}
+      </svg>
+      <div className="playsay-match-column">
+        {pairs.map((pair) => (
+          <button
+            className="playsay-match-word"
+            data-active={activeLeftId === pair.id ? "true" : "false"}
+            data-connected={matches[pair.id] ? "true" : "false"}
+            key={pair.id}
+            onClick={() => setActiveLeftId((current) => (current === pair.id ? null : pair.id))}
+            ref={(node) => { leftRefs.current[pair.id] = node; }}
+            type="button"
+          >
+            {pair.left}
+          </button>
+        ))}
+      </div>
+      <div className="playsay-match-column">
+        {rightOptions.map((pair, index) => {
+          const connected = Object.values(matches).includes(pair.id);
+          return (
+            <button
+              aria-label={`picture ${index + 1}`}
+              className="playsay-match-picture"
+              data-connected={connected ? "true" : "false"}
+              key={pair.id}
+              onClick={() => connectPair(pair.id)}
+              ref={(node) => { rightRefs.current[pair.id] = node; }}
+              type="button"
+            >
+              {pair.imageUrl ? (
+                <img alt={pair.imageAlt || pair.right} src={pair.imageUrl} />
+              ) : (
+                <span className="playsay-match-generated-thumb" aria-hidden="true">
+                  <Sparkles className="h-5 w-5" />
+                </span>
+              )}
+              <span>Картинка {index + 1}</span>
+              {!pair.imageUrl ? (
+                <small>{pair.imagePrompt || pair.imageAlt || pair.right}</small>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function matchingRightOptions(pairs: MaterialMatchingPair[]): MaterialMatchingPair[] {
+  return [...pairs].sort((left, right) => matchingPairSortKey(left) - matchingPairSortKey(right));
+}
+
+function matchingPairSortKey(pair: MaterialMatchingPair): number {
+  return `${pair.id}:${pair.right}`.split("").reduce((hash, char) => (
+    (hash * 31 + char.charCodeAt(0)) % 10_000
+  ), 7);
 }
 
 function materialExerciseOptions(item: MaterialExerciseItem, block: MaterialEditorBlock): string[] {
@@ -3454,6 +3609,26 @@ function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
         ...base,
         items: [{ prompt: "Choose the correct answer.", answer: "at", options: ["at", "in", "on"] }],
       };
+    case "matchingPairs":
+      return {
+        ...base,
+        pairs: [
+          {
+            id: createClientId("pair"),
+            left: "owl",
+            right: "owl",
+            imagePrompt: "child-friendly workbook illustration of an owl, white background",
+            imageAlt: "owl",
+          },
+          {
+            id: createClientId("pair"),
+            left: "penguin",
+            right: "penguin",
+            imagePrompt: "child-friendly workbook illustration of a penguin, white background",
+            imageAlt: "penguin",
+          },
+        ],
+      };
     case "freeWriting":
       return { ...base, prompt: "Write 3-5 sentences." };
     case "speakingPrompt":
@@ -3608,6 +3783,10 @@ function cloneMaterialBlock(block: MaterialEditorBlock): MaterialEditorBlock {
       id: createClientId("card"),
     })),
     items: block.items?.map((item) => ({ ...item })),
+    pairs: block.pairs?.map((pair) => ({
+      ...pair,
+      id: createClientId("pair"),
+    })),
   };
 }
 
@@ -3744,6 +3923,12 @@ function materialBlockFromJson(value: unknown): MaterialEditorBlock | null {
     result.items = block.items.map(materialItemFromJson).filter((item): item is NonNullable<MaterialEditorBlock["items"]>[number] => item !== null);
   }
 
+  if (Array.isArray(block.pairs)) {
+    result.pairs = block.pairs.map(materialMatchingPairFromJson).filter((pair): pair is MaterialMatchingPair => pair !== null);
+  } else if (type === "matchingPairs" && Array.isArray(block.items)) {
+    result.pairs = block.items.map(materialMatchingPairFromJson).filter((pair): pair is MaterialMatchingPair => pair !== null);
+  }
+
   return result;
 }
 
@@ -3792,6 +3977,18 @@ function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBlock {
         options: item.options?.map((option) => option.trim()).filter(Boolean),
       }));
   }
+  if (block.pairs?.length) {
+    clean.pairs = block.pairs
+      .filter((pair) => pair.left.trim() && pair.right.trim())
+      .map((pair) => ({
+        id: pair.id || createClientId("pair"),
+        left: pair.left.trim(),
+        right: pair.right.trim(),
+        imagePrompt: pair.imagePrompt?.trim() || undefined,
+        imageAlt: pair.imageAlt?.trim() || pair.right.trim(),
+        imageUrl: pair.imageUrl?.trim() || undefined,
+      }));
+  }
 
   return clean;
 }
@@ -3825,6 +4022,24 @@ function materialItemFromJson(value: unknown): NonNullable<MaterialEditorBlock["
     prompt,
     answer: asString(item.answer) || asString(item.correct) || undefined,
     options: uniqueMaterialOptions([...options, ...choices]),
+  };
+}
+
+function materialMatchingPairFromJson(value: unknown): MaterialMatchingPair | null {
+  const pair = asJsonObject(value);
+  const left = asString(pair.left) || asString(pair.word) || asString(pair.prompt);
+  const right = asString(pair.right) || asString(pair.target) || asString(pair.answer) || asString(pair.correct) || left;
+  if (!left || !right) {
+    return null;
+  }
+
+  return {
+    id: asString(pair.id) || createClientId("pair"),
+    left,
+    right,
+    imagePrompt: asString(pair.imagePrompt) || asString(pair.promptForImage) || asString(pair.generatedImagePrompt) || undefined,
+    imageAlt: asString(pair.imageAlt) || asString(pair.alt) || right,
+    imageUrl: asString(pair.imageUrl) || asString(pair.url) || undefined,
   };
 }
 
@@ -3875,6 +4090,8 @@ function materialBlockIcon(type: MaterialBlockType): ReactNode {
     case "fillGaps":
     case "multipleChoice":
       return <FileText className="h-4 w-4" />;
+    case "matchingPairs":
+      return <Link2 className="h-4 w-4" />;
     case "freeWriting":
       return <PenLine className="h-4 w-4" />;
     case "speakingPrompt":
@@ -3903,6 +4120,8 @@ function materialBlockLabel(type: MaterialBlockType): string {
       return "Пропуски";
     case "multipleChoice":
       return "Тест";
+    case "matchingPairs":
+      return "Соответствия";
     case "freeWriting":
       return "Письмо";
     case "speakingPrompt":
@@ -3973,6 +4192,32 @@ function formatExerciseItems(items: MaterialEditorBlock["items"], type: "fillGap
     .join("\n");
 }
 
+function parseMatchingPairs(value: string): MaterialMatchingPair[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [left = "", right = "", imagePrompt = "", imageAlt = ""] = splitMaterialLine(line, 4);
+      const cleanLeft = left.trim();
+      const cleanRight = (right || left).trim();
+      return {
+        id: createClientId("pair"),
+        left: cleanLeft,
+        right: cleanRight,
+        imagePrompt: imagePrompt.trim() || `child-friendly workbook illustration of ${cleanRight}, white background`,
+        imageAlt: imageAlt.trim() || cleanRight,
+      };
+    })
+    .filter((pair) => pair.left && pair.right);
+}
+
+function formatMatchingPairs(pairs: MaterialEditorBlock["pairs"]): string {
+  return (pairs ?? [])
+    .map((pair) => [pair.left, pair.right, pair.imagePrompt, pair.imageAlt].filter(Boolean).join(" | "))
+    .join("\n");
+}
+
 function splitMaterialLine(value: string, maxParts: number): string[] {
   const separator = value.includes("|") ? "|" : ";";
   return value.split(separator).slice(0, maxParts);
@@ -3986,6 +4231,7 @@ function normalizeMaterialBlockType(value: string): MaterialBlockType | null {
     "flashcards",
     "fillGaps",
     "multipleChoice",
+    "matchingPairs",
     "freeWriting",
     "speakingPrompt",
     "drawingArea",

@@ -334,10 +334,13 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
 
     Requirements:
     - Build a practical live lesson for children learning English.
+    - Before writing the JSON, classify the worksheet type from the source image or request: fill gaps, multiple choice, matching pairs, flashcards, reading/listening/speaking, or mixed.
     - If a source image is attached, first solve the worksheet yourself, then convert it into editable Play&Say blocks.
     - Do not merely translate or copy the scan as text. Turn worksheet blanks into interactive exercise items.
     - Preserve every visible worksheet blank as an interactive item, grouped by the original section order, before adding any invented follow-up activity.
     - Do not drop later worksheet sections and do not replace the worksheet with a shorter practice set unless the scan is unreadable.
+    - For "match words to pictures", "draw lines", "connect", or two-column matching worksheets, use matchingPairs blocks.
+    - For matchingPairs, preserve every visible word/picture pair. Put the word in left, the correct target in right, and create a fresh child-friendly imagePrompt for the target picture. Do not crop, reuse, embed, or describe copying the original scan picture. Set imageUrl null until a generated asset exists.
     - For fill-in-article or grammar worksheet scans, use fillGaps or multipleChoice items with concise prompts, the correct answer, and choices.
     - For a/an article tasks, each blank item must provide choices ["a", "an", "-"] and an answer such as "a", "an", or "-".
     - Solve a/an tasks with English article rules: singular countable nouns use a/an by sound; plural nouns, uncountable nouns, numbers, and adjectives without a following noun use "-".
@@ -480,6 +483,7 @@ private val materialAiBlockTypes = setOf(
     "flashcards",
     "fillGaps",
     "multipleChoice",
+    "matchingPairs",
     "freeWriting",
     "speakingPrompt",
     "drawingArea",
@@ -602,7 +606,7 @@ private val materialDraftJsonSchemaJson = """
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 80 },
-        "type": { "type": "string", "enum": ["text", "videoEmbed", "image", "generatedImage", "flashcards", "fillGaps", "multipleChoice", "freeWriting", "speakingPrompt", "drawingArea"] },
+        "type": { "type": "string", "enum": ["text", "videoEmbed", "image", "generatedImage", "flashcards", "fillGaps", "multipleChoice", "matchingPairs", "freeWriting", "speakingPrompt", "drawingArea"] },
         "title": { "type": "string", "maxLength": 160 },
         "body": { "type": ["string", "null"], "maxLength": 4000 },
         "instruction": { "type": ["string", "null"], "maxLength": 1000 },
@@ -626,13 +630,18 @@ private val materialDraftJsonSchemaJson = """
           "maxItems": 20,
           "items": { "${'$'}ref": "#/${'$'}defs/exerciseItem" }
         },
+        "pairs": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "${'$'}ref": "#/${'$'}defs/matchingPair" }
+        },
         "options": {
           "type": "array",
           "maxItems": 8,
           "items": { "type": "string", "maxLength": 160 }
         }
       },
-      "required": ["id", "type", "title", "body", "instruction", "prompt", "level", "language", "url", "provider", "caption", "imageUrl", "alt", "height", "minWords", "cards", "items", "options"],
+      "required": ["id", "type", "title", "body", "instruction", "prompt", "level", "language", "url", "provider", "caption", "imageUrl", "alt", "height", "minWords", "cards", "items", "pairs", "options"],
       "additionalProperties": false
     },
     "flashcard": {
@@ -659,6 +668,19 @@ private val materialDraftJsonSchemaJson = """
         }
       },
       "required": ["prompt", "answer", "correct", "choices"],
+      "additionalProperties": false
+    },
+    "matchingPair": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 80 },
+        "left": { "type": "string", "maxLength": 160 },
+        "right": { "type": "string", "maxLength": 160 },
+        "imagePrompt": { "type": "string", "maxLength": 500 },
+        "imageAlt": { "type": "string", "maxLength": 200 },
+        "imageUrl": { "type": ["string", "null"], "maxLength": 4000 }
+      },
+      "required": ["id", "left", "right", "imagePrompt", "imageAlt", "imageUrl"],
       "additionalProperties": false
     },
     "criterion": {

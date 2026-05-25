@@ -2,6 +2,8 @@ package com.playsay.gateway
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import java.time.Instant
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.springframework.beans.factory.annotation.Autowired
@@ -49,6 +51,45 @@ class JacksonConfigTest @Autowired constructor(
         assertEquals(1, serialized["document"]["schemaVersion"].asInt())
         assertEquals("stub", serialized["sourceMeta"]["provider"].asText())
         assertEquals(10, serialized["scoringRubric"]["maxScore"].asInt())
+    }
+
+    @Test
+    @Suppress("UNCHECKED_CAST")
+    fun `mvc json converter serializes Java time response fields`() {
+        val converter = handlerAdapter.messageConverters
+            .first { candidate -> candidate.canWrite(ScheduledLessonResponse::class.java, MediaType.APPLICATION_JSON) }
+            as HttpMessageConverter<Any>
+        val output = MockHttpOutputMessage()
+        val now = Instant.parse("2026-05-25T07:20:00Z")
+
+        converter.write(
+            ScheduledLessonResponse(
+                id = UUID.randomUUID(),
+                lessonTemplateId = null,
+                materialId = null,
+                materialTitle = null,
+                courseId = null,
+                courseTitle = null,
+                lessonTitle = "JSON time smoke",
+                teacherSubject = "teacher-demo",
+                teacherName = "Teacher Demo",
+                scheduledStart = now,
+                scheduledEnd = now.plusSeconds(2700),
+                status = "SCHEDULED",
+                type = "GROUP",
+                livekitRoomName = "lesson-json-time",
+                participants = emptyList(),
+                createdAt = now,
+                updatedAt = now,
+            ),
+            MediaType.APPLICATION_JSON,
+            output,
+        )
+        val serialized = objectMapper.readTree(output.bodyAsString)
+
+        assertEquals("2026-05-25T07:20:00Z", serialized["scheduledStart"].asText())
+        assertEquals("2026-05-25T08:05:00Z", serialized["scheduledEnd"].asText())
+        assertEquals("2026-05-25T07:20:00Z", serialized["createdAt"].asText())
     }
 
     private fun materialDraftResponse(): LessonMaterialDraftResponse {

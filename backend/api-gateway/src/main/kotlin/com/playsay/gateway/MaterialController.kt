@@ -16,6 +16,7 @@ import java.sql.ResultSet
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.Base64
 import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -100,6 +101,14 @@ data class MaterialAiDraftRequest(
     val language: String = "en",
     @field:Schema(allowableValues = ["A1", "A2", "B1", "B2", "C1", "C2"], nullable = true)
     val cefrLevel: String? = null,
+    @field:Schema(
+        description = "Optional JPEG/PNG/WebP data URL for a worksheet scan/photo. The API stores only metadata, not this data URL.",
+        maxLength = 2_500_000,
+        nullable = true,
+    )
+    val sourceImageDataUrl: String? = null,
+    @field:Schema(maxLength = 160, nullable = true)
+    val sourceFileName: String? = null,
 )
 
 data class LessonMaterialDraftResponse(
@@ -162,6 +171,8 @@ private data class ValidatedMaterialAssetRequest(
     val provider: String,
     val metadata: JsonNode,
 )
+
+private const val materialAiSourceImageDataUrlMaxLength = 2_500_000
 
 @Component
 class LessonMaterialStore(
@@ -397,12 +408,16 @@ class LessonMaterialStore(
         val title = request.title.optionalClean("title", 160)
             ?: prompt.lineSequence().firstOrNull()?.take(90)?.ifBlank { null }
             ?: "Новый материал"
+        val sourceImageDataUrl = request.sourceImageDataUrl.validatedImageDataUrl("sourceImageDataUrl")
+        val sourceFileName = request.sourceFileName.optionalClean("sourceFileName", 160)
         return materialAiDraftService.draft(
             MaterialAiDraftInput(
                 title = title,
                 prompt = prompt,
                 language = language,
                 cefrLevel = cefrLevel,
+                sourceImageDataUrl = sourceImageDataUrl,
+                sourceFileName = sourceFileName,
             ),
         )
     }
@@ -718,7 +733,7 @@ class MaterialController(
     @Operation(
         operationId = "draftMaterialWithAi",
         summary = "Draft lesson material with AI",
-        description = "Returns a structured Play&Say material draft from the configured AI provider, or deterministic stub when AI is disabled.",
+        description = "Returns a structured Play&Say material draft from a text prompt and optional worksheet image scan/photo. Uses the configured AI provider, or deterministic stub when AI is disabled.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(
@@ -1099,6 +1114,19 @@ private fun String?.optionalClean(fieldName: String, maxLength: Int): String? {
     return cleaned
 }
 
+private fun String?.validatedImageDataUrl(fieldName: String): String? {
+    val cleaned = optionalClean(fieldName, materialAiSourceImageDataUrlMaxLength) ?: return null
+    val prefix = materialAiImageDataUrlPrefixes.firstOrNull { prefix -> cleaned.startsWith(prefix) }
+        ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$fieldName must be a JPEG, PNG, or WebP data URL.")
+    val encoded = cleaned.removePrefix(prefix)
+    if (encoded.isBlank()) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$fieldName is empty.")
+    }
+    runCatching { Base64.getDecoder().decode(encoded) }
+        .getOrElse { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$fieldName must contain valid base64 image data.") }
+    return cleaned
+}
+
 private fun validateJsonSize(fieldName: String, value: JsonNode, objectMapper: ObjectMapper, maxBytes: Int) {
     val byteSize = objectMapper.writeValueAsBytes(value).size
     if (byteSize > maxBytes) {
@@ -1129,3 +1157,9 @@ private val materialStatuses = setOf("DRAFT", "PUBLISHED", "ARCHIVED")
 private val materialVisibilities = setOf("PRIVATE", "PUBLIC")
 private val assetKinds = setOf("IMAGE", "GENERATED_IMAGE", "DOCUMENT_SCAN", "VIDEO_EMBED", "EXTERNAL_SOURCE", "AUDIO_NOTE")
 private val assetProviders = setOf("YOUTUBE", "VK", "RUTUBE", "URL", "UPLOAD", "AI")
+private val materialAiImageDataUrlPrefixes = listOf(
+    "data:image/jpeg;base64,",
+    "data:image/jpg;base64,",
+    "data:image/png;base64,",
+    "data:image/webp;base64,",
+)

@@ -586,8 +586,9 @@ paths:
       tags:
       - Materials
       summary: Draft lesson material with AI
-      description: "Returns a structured Play&Say material draft from the configured\
-        \ AI provider, or deterministic stub when AI is disabled."
+      description: "Returns a structured Play&Say material draft from a text prompt\
+        \ and optional worksheet image scan/photo. Uses the configured AI provider,\
+        \ or deterministic stub when AI is disabled."
       operationId: draftMaterialWithAi
       requestBody:
         content:
@@ -1420,6 +1421,18 @@ components:
           - B2
           - C1
           - C2
+        sourceImageDataUrl:
+          type:
+          - string
+          - "null"
+          description: "Optional JPEG/PNG/WebP data URL for a worksheet scan/photo.\
+            \ The API stores only metadata, not this data URL."
+          maxLength: 2500000
+        sourceFileName:
+          type:
+          - string
+          - "null"
+          maxLength: 160
       required:
       - language
       - prompt

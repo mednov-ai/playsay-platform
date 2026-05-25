@@ -21,6 +21,8 @@ data class MaterialAiDraftInput(
     val prompt: String,
     val language: String,
     val cefrLevel: String,
+    val sourceImageDataUrl: String? = null,
+    val sourceFileName: String? = null,
 )
 
 @Component
@@ -45,8 +47,10 @@ class StubMaterialAiDraftProvider {
         val sourceMeta = objectMapper.createObjectNode()
             .put("kind", "AI_STUB")
             .put("provider", "stub")
+            .put("sourceType", if (input.hasSourceImage()) "scan" else "teacher_prompt")
             .put("prompt", input.prompt)
             .put("note", "Deterministic fallback draft; configure PLAYSAY_AI_PROVIDER=openai for live generation.")
+        input.sourceFileName?.let { fileName -> sourceMeta.put("sourceFileName", fileName) }
 
         return LessonMaterialDraftResponse(
             title = input.title,
@@ -110,7 +114,7 @@ class OpenAiMaterialAiDraftProvider(
             put("max_output_tokens", 8_000)
             putArray("input")
                 .add(openAiMessage("system", materialAiSystemPrompt))
-                .add(openAiMessage("user", materialAiUserPrompt(input)))
+                .add(openAiMessage("user", materialAiUserPrompt(input), input.sourceImageDataUrl))
             set<JsonNode>(
                 "text",
                 objectMapper.createObjectNode().apply {
@@ -127,10 +131,26 @@ class OpenAiMaterialAiDraftProvider(
             )
         }
 
-    private fun openAiMessage(role: String, content: String): ObjectNode =
+    private fun openAiMessage(role: String, content: String, imageDataUrl: String? = null): ObjectNode =
         objectMapper.createObjectNode().apply {
             put("role", role)
-            put("content", content)
+            putArray("content").apply {
+                add(
+                    objectMapper.createObjectNode().apply {
+                        put("type", "input_text")
+                        put("text", content)
+                    },
+                )
+                imageDataUrl?.let { dataUrl ->
+                    add(
+                        objectMapper.createObjectNode().apply {
+                            put("type", "input_image")
+                            put("image_url", dataUrl)
+                            put("detail", "high")
+                        },
+                    )
+                }
+            }
         }
 
     private fun parseJson(raw: String): JsonNode =
@@ -198,9 +218,11 @@ private fun LessonMaterialDraftResponse.withOpenAiSourceMeta(
     meta.put("provider", "openai")
     meta.put("model", model)
     meta.put("prompt", input.prompt)
+    meta.put("sourceType", if (input.hasSourceImage()) "scan" else "teacher_prompt")
     meta.put("requestedTitle", input.title)
     meta.put("requestedLanguage", input.language)
     meta.put("requestedCefrLevel", input.cefrLevel)
+    input.sourceFileName?.let { fileName -> meta.put("sourceFileName", fileName) }
 
     return copy(
         title = title.trim().ifEmpty { input.title }.take(160),
@@ -250,9 +272,13 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     Language: ${input.language}
     CEFR level: ${input.cefrLevel}
     Lesson format: infer individual/group if the request mentions it.
+    Source image attached: ${if (input.hasSourceImage()) "yes" else "no"}.
+    Source file name: ${input.sourceFileName ?: "not provided"}.
 
     Requirements:
     - Build a practical live lesson for children learning English.
+    - If a source image is attached, extract the visible worksheet content, preserve the exercise intent, and convert it into editable Play&Say blocks.
+    - For fill-in-article or grammar worksheet scans, prefer fillGaps and multipleChoice blocks with concise prompts and answers.
     - Prefer 4-8 blocks: warm-up text, vocabulary/flashcards, one controlled exercise, one speaking task, one writing or drawing task.
     - Use supported block types only.
     - For unused block fields, return null or an empty array as required by the schema.
@@ -260,6 +286,8 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     - Do not copy long copyrighted source text verbatim; transform it into original activities.
     - Keep status DRAFT and visibility PRIVATE.
     """.trimIndent()
+
+private fun MaterialAiDraftInput.hasSourceImage(): Boolean = sourceImageDataUrl?.isNotBlank() == true
 
 private val materialAiSystemPrompt = """
     You are Play&Say lesson material builder for an online English school for children.

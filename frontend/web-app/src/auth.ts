@@ -98,6 +98,8 @@ export type LessonMaterialDraftInput = {
   prompt: string;
   language?: string;
   cefrLevel?: string | null;
+  sourceImageDataUrl?: string | null;
+  sourceFileName?: string | null;
 };
 export type LessonMaterialDraft = Omit<LessonMaterialInput, "title"> & {
   title: string;

@@ -35,6 +35,36 @@ class MaterialAiDraftServiceTest {
         assertTrue(transport.requestBody.contains("\"json_schema\""))
     }
 
+    @Test
+    fun `openai provider sends scan image as multimodal input without storing image data in source metadata`() {
+        val transport = RecordingOpenAiTransport(openAiResponse(openAiDraftJson()))
+        val provider = OpenAiMaterialAiDraftProvider(
+            transport = transport,
+            apiKey = "test-key",
+            model = "gpt-5.4-mini",
+            baseUrl = "https://api.openai.com/v1",
+        )
+        val dataUrl = "data:image/png;base64,iVBORw0KGgo="
+
+        val draft = provider.draft(
+            MaterialAiDraftInput(
+                title = "Articles",
+                prompt = "Create an editable A1 grammar worksheet from the attached scan",
+                language = "en",
+                cefrLevel = "A1",
+                sourceImageDataUrl = dataUrl,
+                sourceFileName = "articles.png",
+            ),
+        )
+
+        assertEquals("scan", draft.sourceMeta["sourceType"].asText())
+        assertEquals("articles.png", draft.sourceMeta["sourceFileName"].asText())
+        assertTrue(draft.sourceMeta["sourceImageDataUrl"] == null)
+        assertTrue(transport.requestBody.contains("\"type\":\"input_image\""))
+        assertTrue(transport.requestBody.contains("\"image_url\":\"$dataUrl\""))
+        assertTrue(transport.requestBody.contains("\"detail\":\"high\""))
+    }
+
     private class RecordingOpenAiTransport(
         private val responseBody: String,
     ) : OpenAiResponsesTransport {

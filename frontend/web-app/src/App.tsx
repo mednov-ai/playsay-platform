@@ -211,6 +211,12 @@ type MaterialFormState = {
   sourceMeta: LessonMaterialJson;
 };
 
+type MaterialDraftSourceImage = {
+  dataUrl: string;
+  fileName: string;
+  originalSize: number;
+};
+
 export function App() {
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [appProfile, setAppProfile] = useState<AppUserProfile | null>(null);
@@ -968,8 +974,11 @@ function MaterialLibraryPanel({
   const [form, setForm] = useState<MaterialFormState>(() => defaultMaterialForm());
   const [autoSelectedMaterialId, setAutoSelectedMaterialId] = useState<string | null>(null);
   const [draftPrompt, setDraftPrompt] = useState("");
+  const [draftImage, setDraftImage] = useState<MaterialDraftSourceImage | null>(null);
+  const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedLessonKey, setSelectedLessonKey] = useState("");
+  const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
 
   useEffect(() => {
     if (selectedLessonKey || lessonOptions.length === 0) {
@@ -996,11 +1005,15 @@ function MaterialLibraryPanel({
   function resetForm() {
     setForm(defaultMaterialForm());
     setDraftPrompt("");
+    setDraftImage(null);
+    setDraftImageMessage(null);
   }
 
   function selectMaterial(material: LessonMaterial) {
     setForm(materialToForm(material));
     setDraftPrompt(readPromptFromSourceMeta(material.sourceMeta));
+    setDraftImage(null);
+    setDraftImageMessage(null);
   }
 
   function addBlock(type: MaterialBlockType) {
@@ -1052,14 +1065,36 @@ function MaterialLibraryPanel({
   }
 
   async function generateDraft() {
+    const prompt = draftPrompt.trim() || "Создай редактируемый материал Play&Say по приложенному скану или фото задания.";
     const draft = await onDraft({
       title: form.title || null,
-      prompt: draftPrompt,
+      prompt,
       language: form.language,
       cefrLevel: form.cefrLevel,
+      sourceImageDataUrl: draftImage?.dataUrl ?? null,
+      sourceFileName: draftImage?.fileName ?? null,
     });
     if (draft) {
       setForm(materialDraftToForm(draft));
+      setDraftPrompt(readPromptFromSourceMeta(draft.sourceMeta) || prompt);
+    }
+  }
+
+  async function handleDraftImageChange(file: File | null) {
+    setDraftImageMessage(null);
+    if (!file) {
+      return;
+    }
+
+    try {
+      const image = await prepareMaterialDraftSourceImage(file);
+      setDraftImage(image);
+      if (draftPrompt.trim().length === 0) {
+        setDraftPrompt("Создай редактируемый материал Play&Say по приложенному скану: выдели упражнения, ответы и добавь speaking follow-up.");
+      }
+    } catch (caught) {
+      setDraftImage(null);
+      setDraftImageMessage(caught instanceof Error ? caught.message : "Не удалось подготовить изображение.");
     }
   }
 
@@ -1164,9 +1199,45 @@ function MaterialLibraryPanel({
                 placeholder="Например: A2, travelling, 45 минут, warm-up, слова, speaking и короткое письмо"
                 value={draftPrompt}
               />
+              <label className="mt-2 block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase text-muted-foreground">
+                  <Paperclip className="h-3.5 w-3.5 text-primary" />
+                  Фото или скан
+                </span>
+                <input
+                  accept="image/jpeg,image/png,image/webp"
+                  className="playsay-file-input"
+                  disabled={disabled}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0] ?? null;
+                    event.currentTarget.value = "";
+                    void handleDraftImageChange(file);
+                  }}
+                  type="file"
+                />
+              </label>
+              {draftImage ? (
+                <div className="playsay-draft-image-preview">
+                  <img alt="" src={draftImage.dataUrl} />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-extrabold">{draftImage.fileName}</div>
+                    <div className="text-xs font-bold text-muted-foreground">
+                      {formatFileSize(draftImage.originalSize)} · подготовлено для AI
+                    </div>
+                  </div>
+                  <Button disabled={disabled} onClick={() => setDraftImage(null)} type="button" variant="outline">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : null}
+              {draftImageMessage ? (
+                <div className="mt-2 rounded-xl border border-border bg-muted/60 p-2 text-xs font-bold text-muted-foreground">
+                  {draftImageMessage}
+                </div>
+              ) : null}
               <Button
                 className="mt-2 w-full"
-                disabled={disabled || draftPrompt.trim().length === 0}
+                disabled={disabled || !canGenerateDraft}
                 onClick={() => void generateDraft()}
                 type="button"
               >
@@ -3284,6 +3355,75 @@ function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
   }
 }
 
+async function prepareMaterialDraftSourceImage(file: File): Promise<MaterialDraftSourceImage> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    throw new Error("Поддерживаются JPEG, PNG и WebP.");
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    throw new Error("Изображение должно быть меньше 12 МБ.");
+  }
+
+  const rawDataUrl = await readFileAsDataUrl(file);
+  const image = await loadHtmlImage(rawDataUrl);
+  const maxSide = 1400;
+  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Браузер не смог подготовить изображение.");
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  let quality = 0.84;
+  let dataUrl = canvas.toDataURL("image/jpeg", quality);
+  while (dataUrl.length > 2_400_000 && quality > 0.58) {
+    quality -= 0.08;
+    dataUrl = canvas.toDataURL("image/jpeg", quality);
+  }
+  if (dataUrl.length > 2_400_000) {
+    throw new Error("Изображение слишком большое после сжатия. Попробуйте обрезать фото ближе к заданию.");
+  }
+
+  return {
+    dataUrl,
+    fileName: file.name || "worksheet.jpg",
+    originalSize: file.size,
+  };
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (result) {
+        resolve(result);
+      } else {
+        reject(new Error("Не удалось прочитать файл."));
+      }
+    };
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadHtmlImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Не удалось открыть изображение."));
+    image.src = src;
+  });
+}
+
 function materialToForm(material: LessonMaterial): MaterialFormState {
   const sourceMeta = asJsonObject(material.sourceMeta);
 
@@ -3824,6 +3964,16 @@ function localDateTimeToIso(value: string): string | null {
 
 function formatDateTime(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleString() : "время позже";
+}
+
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 КБ";
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.ceil(bytes / 1024)} КБ`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
 function isClosedScheduleStatus(status: string): boolean {

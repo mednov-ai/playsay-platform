@@ -336,6 +336,17 @@ export interface MaterialAiDraftRequest {
   language: string;
   /** @nullable */
   cefrLevel?: MaterialAiDraftRequestCefrLevel;
+  /**
+     * Optional JPEG/PNG/WebP data URL for a worksheet scan/photo. The API stores only metadata, not this data URL.
+     * @maxLength 2500000
+     * @nullable
+     */
+  sourceImageDataUrl?: string | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  sourceFileName?: string | null;
 }
 
 export interface LessonMaterialDraftResponse {
@@ -1620,7 +1631,7 @@ export const getDraftMaterialWithAiUrl = () => {
 }
 
 /**
- * Returns a structured Play&Say material draft from the configured AI provider, or deterministic stub when AI is disabled.
+ * Returns a structured Play&Say material draft from a text prompt and optional worksheet image scan/photo. Uses the configured AI provider, or deterministic stub when AI is disabled.
  * @summary Draft lesson material with AI
  */
 export const draftMaterialWithAi = async (materialAiDraftRequest: MaterialAiDraftRequest, options?: RequestInit): Promise<draftMaterialWithAiResponse> => {

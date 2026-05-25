@@ -244,6 +244,36 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals(10, draft.scoringRubric["maxScore"].asInt())
     }
 
+    @Test
+    fun `AI draft accepts worksheet image metadata and rejects invalid image data URLs`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+
+        val draft = materialController.draft(
+            teacher,
+            MaterialAiDraftRequest(
+                prompt = "A1 articles worksheet from scan",
+                title = "Articles",
+                sourceImageDataUrl = "data:image/png;base64,iVBORw0KGgo=",
+                sourceFileName = "articles.png",
+            ),
+        )
+
+        assertEquals("scan", draft.sourceMeta["sourceType"].asText())
+        assertEquals("articles.png", draft.sourceMeta["sourceFileName"].asText())
+
+        val error = assertFailsWith<ResponseStatusException> {
+            materialController.draft(
+                teacher,
+                MaterialAiDraftRequest(
+                    prompt = "A1 articles worksheet from scan",
+                    sourceImageDataUrl = "data:text/plain;base64,SGVsbG8=",
+                ),
+            )
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.statusCode)
+    }
+
     private fun authentication(
         subject: String = UUID.randomUUID().toString(),
         username: String = "teacher.one",

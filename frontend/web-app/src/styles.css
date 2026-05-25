@@ -499,6 +499,28 @@ textarea {
   gap: 0.875rem;
 }
 
+.playsay-material-preview {
+  min-width: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 10% 12%, rgb(223 248 238 / 0.55), transparent 18rem),
+    linear-gradient(180deg, #ffffff 0%, #fffdfb 100%);
+  padding: 1rem;
+}
+
+.playsay-material-preview .playsay-rendered-material h3 {
+  margin: 0.75rem 0 0;
+  color: #77b84e;
+  font-size: 1.35rem;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.playsay-material-preview .playsay-task-subtitle {
+  text-align: left;
+}
+
 .playsay-material-loading {
   display: flex;
   min-height: 12rem;

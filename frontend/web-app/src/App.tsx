@@ -19,7 +19,9 @@ import {
   ChevronRight,
   CheckCircle2,
   Clock3,
+  Copy,
   Eraser,
+  Eye,
   FileText,
   Globe2,
   ImageIcon,
@@ -966,6 +968,7 @@ function MaterialLibraryPanel({
   const [form, setForm] = useState<MaterialFormState>(() => defaultMaterialForm());
   const [autoSelectedMaterialId, setAutoSelectedMaterialId] = useState<string | null>(null);
   const [draftPrompt, setDraftPrompt] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedLessonKey, setSelectedLessonKey] = useState("");
 
   useEffect(() => {
@@ -1066,6 +1069,10 @@ function MaterialLibraryPanel({
       return;
     }
     onLinkLesson(option.courseId, option.lesson, form.id);
+  }
+
+  function duplicateCurrentMaterial() {
+    setForm((current) => duplicateMaterialForm(current));
   }
 
   if (!profile) {
@@ -1291,6 +1298,14 @@ function MaterialLibraryPanel({
                   ))}
                 </div>
                 <div className="flex gap-2">
+                  <Button disabled={disabled || form.title.trim().length === 0} onClick={duplicateCurrentMaterial} type="button" variant="outline">
+                    <Copy className="h-4 w-4" />
+                    Дублировать
+                  </Button>
+                  <Button disabled={disabled || form.title.trim().length === 0} onClick={() => setPreviewOpen((current) => !current)} type="button" variant="outline">
+                    <Eye className="h-4 w-4" />
+                    {previewOpen ? "Скрыть" : "Просмотр"}
+                  </Button>
                   {form.id ? (
                     <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
                       <Archive className="h-4 w-4" />
@@ -1323,6 +1338,16 @@ function MaterialLibraryPanel({
                 ))
               )}
             </div>
+
+            {previewOpen ? (
+              <div className="playsay-material-preview">
+                <div className="mb-3 flex items-center gap-2 text-sm font-extrabold text-muted-foreground">
+                  <Eye className="h-4 w-4 text-primary" />
+                  Предпросмотр
+                </div>
+                <LessonMaterialDocumentView material={materialPreviewFromForm(form)} />
+              </div>
+            ) : null}
 
             {message ? (
               <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
@@ -3295,6 +3320,46 @@ function materialDraftToForm(draft: LessonMaterialDraft): MaterialFormState {
   };
 }
 
+function duplicateMaterialForm(form: MaterialFormState): MaterialFormState {
+  const sourceMeta = {
+    ...asJsonObject(form.sourceMeta),
+    duplicatedFromMaterialId: form.id,
+  };
+
+  return {
+    ...form,
+    id: null,
+    title: form.title.trim() ? `Копия ${form.title.trim()}` : "Копия материала",
+    visibility: "PRIVATE",
+    status: "DRAFT",
+    document: cloneMaterialDocument(form.document),
+    sourceMeta,
+  };
+}
+
+function cloneMaterialDocument(document: MaterialEditorDocument): MaterialEditorDocument {
+  return {
+    schemaVersion: 1,
+    pages: document.pages.map((page) => ({
+      ...page,
+      id: createClientId("page"),
+      blocks: page.blocks.map(cloneMaterialBlock),
+    })),
+  };
+}
+
+function cloneMaterialBlock(block: MaterialEditorBlock): MaterialEditorBlock {
+  return {
+    ...block,
+    id: createClientId("block"),
+    cards: block.cards?.map((card) => ({
+      ...card,
+      id: createClientId("card"),
+    })),
+    items: block.items?.map((item) => ({ ...item })),
+  };
+}
+
 function materialFormToInput(form: MaterialFormState): LessonMaterialInput {
   const title = form.title.trim();
   const sourceMeta = {
@@ -3319,6 +3384,33 @@ function materialFormToInput(form: MaterialFormState): LessonMaterialInput {
     } as unknown as LessonMaterialJson,
     sourceMeta,
     scoringRubric: form.scoringRubric,
+  };
+}
+
+function materialPreviewFromForm(form: MaterialFormState): LessonMaterial {
+  const input = materialFormToInput({
+    ...form,
+    title: form.title.trim() || "Новый материал",
+  });
+  const now = new Date().toISOString();
+
+  return {
+    id: form.id ?? "preview",
+    ownerTeacherUserId: null,
+    ownerTeacherSubject: null,
+    ownerTeacherName: null,
+    title: input.title,
+    description: input.description ?? null,
+    language: input.language ?? "en",
+    cefrLevel: input.cefrLevel ?? "A2",
+    visibility: input.visibility ?? "PRIVATE",
+    status: input.status ?? "DRAFT",
+    document: input.document ?? {},
+    sourceMeta: input.sourceMeta ?? {},
+    scoringRubric: input.scoringRubric ?? {},
+    blockCount: form.document.pages.reduce((count, page) => count + page.blocks.length, 0),
+    createdAt: now,
+    updatedAt: now,
   };
 }
 

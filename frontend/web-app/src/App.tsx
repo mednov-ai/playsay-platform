@@ -214,6 +214,8 @@ type MaterialEditorDocument = {
   pages: MaterialEditorPage[];
 };
 
+type MaterialRenderMode = "classroom" | "teacherPreview";
+
 type MaterialFormState = {
   id: string | null;
   title: string;
@@ -1472,7 +1474,7 @@ function MaterialLibraryPanel({
                   <Eye className="h-4 w-4 text-primary" />
                   Предпросмотр
                 </div>
-                <LessonMaterialDocumentView material={materialPreviewFromForm(form)} />
+                <LessonMaterialDocumentView material={materialPreviewFromForm(form)} mode="teacherPreview" />
               </div>
             ) : null}
 
@@ -2797,7 +2799,7 @@ function LessonTaskCanvas({ material, teacherName }: { material?: LessonMaterial
 
       <div className="playsay-task-page">
         <div className="playsay-task-document">
-          {material ? <LessonMaterialDocumentView material={material} /> : <FallbackLessonDocument />}
+          {material ? <LessonMaterialDocumentView material={material} mode="classroom" /> : <FallbackLessonDocument />}
         </div>
 
         <svg
@@ -2841,7 +2843,13 @@ function LessonTaskCanvas({ material, teacherName }: { material?: LessonMaterial
   );
 }
 
-function LessonMaterialDocumentView({ material }: { material: LessonMaterial }) {
+function LessonMaterialDocumentView({
+  material,
+  mode = "classroom",
+}: {
+  material: LessonMaterial;
+  mode?: MaterialRenderMode;
+}) {
   const document = editorDocumentFromJson(material.document);
   const page = document.pages[0] ?? defaultMaterialPage(material.title);
   const maxScore = materialMaxScore(material.scoringRubric);
@@ -2860,14 +2868,20 @@ function LessonMaterialDocumentView({ material }: { material: LessonMaterial }) 
       {material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
       <div className="playsay-material-blocks">
         {page.blocks.map((block) => (
-          <RenderedMaterialBlock block={block} key={block.id} />
+          <RenderedMaterialBlock block={block} key={block.id} mode={mode} />
         ))}
       </div>
     </div>
   );
 }
 
-function RenderedMaterialBlock({ block }: { block: MaterialEditorBlock }) {
+function RenderedMaterialBlock({
+  block,
+  mode,
+}: {
+  block: MaterialEditorBlock;
+  mode: MaterialRenderMode;
+}) {
   switch (block.type) {
     case "text":
       return (
@@ -2931,7 +2945,7 @@ function RenderedMaterialBlock({ block }: { block: MaterialEditorBlock }) {
       return (
         <section className="playsay-render-block">
           <h4>{block.title}</h4>
-          <RenderedMatchingPairsExercise block={block} />
+          <RenderedMatchingPairsExercise block={block} mode={mode} />
         </section>
       );
     case "freeWriting":
@@ -3036,9 +3050,15 @@ function RenderedChoiceExercise({ block }: { block: MaterialEditorBlock }) {
   );
 }
 
-function RenderedMatchingPairsExercise({ block }: { block: MaterialEditorBlock }) {
+function RenderedMatchingPairsExercise({
+  block,
+  mode,
+}: {
+  block: MaterialEditorBlock;
+  mode: MaterialRenderMode;
+}) {
   const pairs = block.pairs ?? emptyMaterialMatchingPairs;
-  const rightOptions = matchingRightOptions(pairs);
+  const rightOptions = mode === "teacherPreview" ? pairs : matchingRightOptions(pairs);
   const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
   const [matches, setMatches] = useState<Record<string, string>>({});
   const [lines, setLines] = useState<Array<{ id: string; x1: number; x2: number; y1: number; y2: number }>>([]);

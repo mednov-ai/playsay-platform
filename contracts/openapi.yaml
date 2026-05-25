@@ -692,57 +692,6 @@ paths:
           description: Material not found
       security:
       - bearerAuth: []
-  /materials/{materialId}/assets:
-    get:
-      tags:
-      - Materials
-      summary: List material assets
-      operationId: listMaterialAssets
-      parameters:
-      - name: materialId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/MaterialAssetResponse"
-      security:
-      - bearerAuth: []
-    post:
-      tags:
-      - Materials
-      summary: Create material asset reference
-      operationId: createMaterialAsset
-      parameters:
-      - name: materialId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/MaterialAssetRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MaterialAssetResponse"
-      security:
-      - bearerAuth: []
   /materials/import-url:
     post:
       tags:
@@ -1020,6 +969,67 @@ paths:
           description: Missing or invalid bearer token
       security:
       - bearerAuth: []
+  /materials/{materialId}/assets:
+    get:
+      tags:
+      - Materials
+      summary: List material assets
+      operationId: listMaterialAssets
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaterialAssetResponse"
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets/{assetId}/content:
+    get:
+      tags:
+      - Materials
+      summary: Get material asset content
+      description: Streams material asset bytes through the backend from the configured
+        S3-compatible object storage.
+      operationId: getMaterialAssetContent
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Material asset content
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Material asset not found
+        "502":
+          description: Object storage failed
+      security:
+      - bearerAuth: []
   /hello:
     get:
       tags:
@@ -1054,30 +1064,6 @@ paths:
           description: Missing or invalid bearer token
         "403":
           description: Current user is not an admin
-      security:
-      - bearerAuth: []
-  /materials/{materialId}/assets/{assetId}:
-    delete:
-      tags:
-      - Materials
-      summary: Delete material asset reference
-      operationId: deleteMaterialAsset
-      parameters:
-      - name: materialId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: assetId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
       security:
       - bearerAuth: []
 components:
@@ -1669,75 +1655,6 @@ components:
           format: int32
           maximum: 12
           minimum: 1
-    MaterialAssetRequest:
-      type: object
-      properties:
-        kind:
-          type: string
-          enum:
-          - IMAGE
-          - GENERATED_IMAGE
-          - DOCUMENT_SCAN
-          - VIDEO_EMBED
-          - EXTERNAL_SOURCE
-          - AUDIO_NOTE
-        storageKey:
-          type:
-          - string
-          - "null"
-        externalUrl:
-          type:
-          - string
-          - "null"
-        provider:
-          type: string
-          enum:
-          - YOUTUBE
-          - VK
-          - RUTUBE
-          - URL
-          - UPLOAD
-          - AI
-        metadata:
-          oneOf:
-          - $ref: "#/components/schemas/JsonNode"
-          - type: "null"
-      required:
-      - kind
-      - provider
-    MaterialAssetResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        materialId:
-          type: string
-          format: uuid
-        kind:
-          type: string
-        storageKey:
-          type:
-          - string
-          - "null"
-        externalUrl:
-          type:
-          - string
-          - "null"
-        provider:
-          type: string
-        metadata:
-          $ref: "#/components/schemas/JsonNode"
-        createdAt:
-          type: string
-          format: date-time
-      required:
-      - createdAt
-      - id
-      - kind
-      - materialId
-      - metadata
-      - provider
     MaterialUrlImportRequest:
       type: object
       properties:
@@ -1867,6 +1784,43 @@ components:
       required:
       - roles
       - subject
+    MaterialAssetResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        storageKey:
+          type:
+          - string
+          - "null"
+        externalUrl:
+          type:
+          - string
+          - "null"
+        contentUrl:
+          type:
+          - string
+          - "null"
+        provider:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/JsonNode"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - kind
+      - materialId
+      - metadata
+      - provider
     HelloResponse:
       type: object
       properties:

@@ -15,11 +15,13 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.sql.ResultSet
+import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Base64
 import java.util.UUID
+import org.springframework.http.CacheControl
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -73,22 +75,13 @@ data class LessonMaterialResponse(
     val updatedAt: Instant,
 )
 
-data class MaterialAssetRequest(
-    @field:Schema(allowableValues = ["IMAGE", "GENERATED_IMAGE", "DOCUMENT_SCAN", "VIDEO_EMBED", "EXTERNAL_SOURCE", "AUDIO_NOTE"])
-    val kind: String,
-    val storageKey: String? = null,
-    val externalUrl: String? = null,
-    @field:Schema(allowableValues = ["YOUTUBE", "VK", "RUTUBE", "URL", "UPLOAD", "AI"])
-    val provider: String = "UPLOAD",
-    val metadata: JsonNode? = null,
-)
-
 data class MaterialAssetResponse(
     val id: UUID,
     val materialId: UUID,
     val kind: String,
     val storageKey: String?,
     val externalUrl: String?,
+    val contentUrl: String?,
     val provider: String,
     val metadata: JsonNode,
     val createdAt: Instant,
@@ -245,14 +238,6 @@ private data class ValidatedLessonMaterialRequest(
     val scoringRubric: JsonNode,
 )
 
-private data class ValidatedMaterialAssetRequest(
-    val kind: String,
-    val storageKey: String?,
-    val externalUrl: String?,
-    val provider: String,
-    val metadata: JsonNode,
-)
-
 private const val materialAiSourceImageDataUrlMaxLength = 2_500_000
 private const val materialUrlImportPromptLimit = 8_000
 private const val materialUrlImportPromptTextLimit = 6_000
@@ -264,6 +249,7 @@ class LessonMaterialStore(
     private val materialAiDraftService: MaterialAiDraftService,
     private val materialImageGenerationService: MaterialImageGenerationService,
     private val materialUrlImportService: MaterialUrlImportService,
+    private val materialObjectStorage: MaterialObjectStorage,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -901,78 +887,33 @@ class LessonMaterialStore(
     }
 
     @Transactional
-    fun createAsset(
-        authentication: JwtAuthenticationToken,
-        materialId: UUID,
-        request: MaterialAssetRequest,
-    ): MaterialAssetResponse {
+    fun assetContent(authentication: JwtAuthenticationToken, materialId: UUID, assetId: UUID): ResponseEntity<ByteArray> {
         val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
         val currentUserId = authentication.currentUserIdIfNeeded()
-        if (!material.canEdit(authentication, currentUserId)) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit assets.")
+        val canRead = material.canRead(authentication, currentUserId) ||
+            isActiveMaterialParticipant(materialId, authentication.token.subject, Instant.now())
+        if (!canRead) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
         }
-
-        val values = request.validated(objectMapper)
-        val id = UUID.randomUUID()
-        val now = Instant.now()
-        jdbcClient.sql(
-            """
-            INSERT INTO material_asset (
-                id,
-                material_id,
-                kind,
-                storage_key,
-                external_url,
-                provider,
-                metadata,
-                created_at
-            ) VALUES (
-                :id,
-                :materialId,
-                :kind,
-                :storageKey,
-                :externalUrl,
-                :provider,
-                :metadata,
-                :createdAt
-            )
-            """.trimIndent(),
-        )
-            .param("id", id)
-            .param("materialId", materialId)
-            .param("kind", values.kind)
-            .param("storageKey", values.storageKey)
-            .param("externalUrl", values.externalUrl)
-            .param("provider", values.provider)
-            .param("metadata", objectMapper.writeValueAsString(values.metadata))
-            .param("createdAt", now.toMaterialOffsetDateTime())
-            .update()
-
-        return requireNotNull(findAsset(id)).toResponse(objectMapper)
-    }
-
-    @Transactional
-    fun deleteAsset(authentication: JwtAuthenticationToken, materialId: UUID, assetId: UUID) {
-        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
-        val currentUserId = authentication.currentUserIdIfNeeded()
-        if (!material.canEdit(authentication, currentUserId)) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit assets.")
-        }
-
-        val deleted = jdbcClient.sql(
-            """
-            DELETE FROM material_asset
-             WHERE id = :assetId
-               AND material_id = :materialId
-            """.trimIndent(),
-        )
-            .param("assetId", assetId)
-            .param("materialId", materialId)
-            .update()
-
-        if (deleted == 0) {
+        val asset = findAsset(assetId)
+            ?.takeIf { found -> found.materialId == materialId }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material asset not found.")
+        val storageKey = asset.storageKey?.trim()?.takeIf { key -> key.isNotEmpty() }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material asset content not found.")
+        val content = try {
+            materialObjectStorage.getObject(storageKey)
+        } catch (exception: MaterialObjectNotFoundException) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material asset not found.")
+        } catch (exception: MaterialObjectStorageException) {
+            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Material asset storage failed.")
         }
+        val contentType = runCatching { MediaType.parseMediaType(content.contentType) }
+            .getOrDefault(MediaType.APPLICATION_OCTET_STREAM)
+        return ResponseEntity.ok()
+            .contentType(contentType)
+            .contentLength(content.contentLength)
+            .cacheControl(CacheControl.maxAge(Duration.ofMinutes(10)).cachePrivate())
+            .body(content.bytes)
     }
 
     private fun insertGeneratedImageAsset(
@@ -981,40 +922,48 @@ class LessonMaterialStore(
         generated: GeneratedMaterialImage,
     ): UUID {
         val id = UUID.randomUUID()
-        jdbcClient.sql(
-            """
-            INSERT INTO material_asset (
-                id,
-                material_id,
-                kind,
-                storage_key,
-                external_url,
-                provider,
-                metadata,
-                created_at
-            ) VALUES (
-                :id,
-                :materialId,
-                'GENERATED_IMAGE',
-                :storageKey,
-                :externalUrl,
-                'AI',
-                :metadata,
-                :createdAt
+        val storageKey = "material-assets/$materialId/$id.${generated.mimeType.materialImageExtension()}"
+        try {
+            materialObjectStorage.putObject(storageKey, generated.bytes, generated.mimeType)
+            jdbcClient.sql(
+                """
+                INSERT INTO material_asset (
+                    id,
+                    material_id,
+                    kind,
+                    storage_key,
+                    external_url,
+                    provider,
+                    metadata,
+                    created_at
+                ) VALUES (
+                    :id,
+                    :materialId,
+                    'GENERATED_IMAGE',
+                    :storageKey,
+                    NULL,
+                    'AI',
+                    :metadata,
+                    :createdAt
+                )
+                """.trimIndent(),
             )
-            """.trimIndent(),
-        )
-            .param("id", id)
-            .param("materialId", materialId)
-            .param("storageKey", "material-assets/$materialId/$id.jpg")
-            .param("externalUrl", generated.dataUrl)
-            .param("metadata", objectMapper.writeValueAsString(generatedImageMetadata(target, generated)))
-            .param("createdAt", Instant.now().toMaterialOffsetDateTime())
-            .update()
+                .param("id", id)
+                .param("materialId", materialId)
+                .param("storageKey", storageKey)
+                .param("metadata", objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey)))
+                .param("createdAt", Instant.now().toMaterialOffsetDateTime())
+                .update()
+        } catch (exception: MaterialObjectStorageException) {
+            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Material asset storage failed.")
+        } catch (exception: RuntimeException) {
+            runCatching { materialObjectStorage.deleteObject(storageKey) }
+            throw exception
+        }
         return id
     }
 
-    private fun generatedImageMetadata(target: MatchingImageTarget, generated: GeneratedMaterialImage): ObjectNode =
+    private fun generatedImageMetadata(target: MatchingImageTarget, generated: GeneratedMaterialImage, storageKey: String): ObjectNode =
         objectMapper.createObjectNode().apply {
             put("blockId", target.blockId)
             put("pairId", target.pairId)
@@ -1024,6 +973,8 @@ class LessonMaterialStore(
             put("prompt", generated.prompt)
             put("model", generated.model)
             put("mimeType", generated.mimeType)
+            put("storageKey", storageKey)
+            put("byteSize", generated.bytes.size)
             generated.revisedPrompt?.let { value -> put("revisedPrompt", value) }
         }
 
@@ -1671,37 +1622,27 @@ class MaterialController(
     ): List<MaterialAssetResponse> =
         store.listAssets(authentication, materialId)
 
-    @PostMapping(
-        "/materials/{materialId}/assets",
-        consumes = [MediaType.APPLICATION_JSON_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
+    @GetMapping("/materials/{materialId}/assets/{assetId}/content")
     @Operation(
-        operationId = "createMaterialAsset",
-        summary = "Create material asset reference",
+        operationId = "getMaterialAssetContent",
+        summary = "Get material asset content",
+        description = "Streams material asset bytes through the backend from the configured S3-compatible object storage.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
-    fun createAsset(
-        authentication: JwtAuthenticationToken,
-        @PathVariable materialId: UUID,
-        @RequestBody request: MaterialAssetRequest,
-    ): ResponseEntity<MaterialAssetResponse> =
-        ResponseEntity.status(HttpStatus.CREATED).body(store.createAsset(authentication, materialId, request))
-
-    @DeleteMapping("/materials/{materialId}/assets/{assetId}")
-    @Operation(
-        operationId = "deleteMaterialAsset",
-        summary = "Delete material asset reference",
-        security = [SecurityRequirement(name = "bearerAuth")],
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Material asset content"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Material asset not found", content = [Content()]),
+            ApiResponse(responseCode = "502", description = "Object storage failed", content = [Content()]),
+        ],
     )
-    fun deleteAsset(
+    fun assetContent(
         authentication: JwtAuthenticationToken,
         @PathVariable materialId: UUID,
         @PathVariable assetId: UUID,
-    ): ResponseEntity<Void> {
-        store.deleteAsset(authentication, materialId, assetId)
-        return ResponseEntity.noContent().build()
-    }
+    ): ResponseEntity<ByteArray> =
+        store.assetContent(authentication, materialId, assetId)
 }
 
 private data class ScheduledMaterialLookup(
@@ -1751,32 +1692,6 @@ private fun LessonMaterialRequest.validated(objectMapper: ObjectMapper): Validat
     )
 }
 
-private fun MaterialAssetRequest.validated(objectMapper: ObjectMapper): ValidatedMaterialAssetRequest {
-    val kind = kind.trim().uppercase()
-    if (kind !in assetKinds) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported material asset kind.")
-    }
-    val provider = provider.trim().uppercase()
-    if (provider !in assetProviders) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported material asset provider.")
-    }
-    val storageKey = storageKey.optionalClean("storageKey", 1_024)
-    val externalUrl = externalUrl.optionalClean("externalUrl", 4_000)
-    if (storageKey == null && externalUrl == null) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "storageKey or externalUrl is required.")
-    }
-    val metadata = metadata ?: objectMapper.createObjectNode()
-    validateJsonSize("metadata", metadata, objectMapper, 40_000)
-
-    return ValidatedMaterialAssetRequest(
-        kind = kind,
-        storageKey = storageKey,
-        externalUrl = externalUrl,
-        provider = provider,
-        metadata = metadata,
-    )
-}
-
 private fun StoredLessonMaterial.canRead(authentication: JwtAuthenticationToken, currentUserId: UUID?): Boolean {
     if (authentication.isMaterialAdmin()) {
         return true
@@ -1819,6 +1734,9 @@ private fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): Material
         kind = kind,
         storageKey = storageKey,
         externalUrl = externalUrl,
+        contentUrl = storageKey?.takeIf { key -> key.isNotBlank() }?.let {
+            "/api/materials/$materialId/assets/$id/content"
+        },
         provider = provider,
         metadata = objectMapper.readTree(metadata),
         createdAt = createdAt,
@@ -2188,11 +2106,18 @@ private fun Instant.toMaterialOffsetDateTime(): OffsetDateTime =
 private val cefrLevels = setOf("A1", "A2", "B1", "B2", "C1", "C2")
 private val materialStatuses = setOf("DRAFT", "PUBLISHED", "ARCHIVED")
 private val materialVisibilities = setOf("PRIVATE", "PUBLIC")
-private val assetKinds = setOf("IMAGE", "GENERATED_IMAGE", "DOCUMENT_SCAN", "VIDEO_EMBED", "EXTERNAL_SOURCE", "AUDIO_NOTE")
-private val assetProviders = setOf("YOUTUBE", "VK", "RUTUBE", "URL", "UPLOAD", "AI")
 private val materialAiImageDataUrlPrefixes = listOf(
     "data:image/jpeg;base64,",
     "data:image/jpg;base64,",
     "data:image/png;base64,",
     "data:image/webp;base64,",
 )
+
+private fun String.materialImageExtension(): String =
+    when (lowercase()) {
+        "image/jpeg", "image/jpg" -> "jpg"
+        "image/png" -> "png"
+        "image/webp" -> "webp"
+        "image/svg+xml" -> "svg"
+        else -> "bin"
+    }

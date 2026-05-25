@@ -32,7 +32,7 @@ data class MaterialImageGenerationInput(
 )
 
 data class GeneratedMaterialImage(
-    val dataUrl: String,
+    val bytes: ByteArray,
     val model: String,
     val prompt: String,
     val revisedPrompt: String?,
@@ -65,9 +65,8 @@ class StubMaterialImageGenerationProvider {
               <path d="M191 94l17 49 49 17-49 17-17 49-17-49-49-17 49-17 17-49z" fill="#ff5c00"/>
             </svg>
         """.trimIndent()
-        val dataUrl = "data:image/svg+xml;base64,${Base64.getEncoder().encodeToString(svg.toByteArray(StandardCharsets.UTF_8))}"
         return GeneratedMaterialImage(
-            dataUrl = dataUrl,
+            bytes = svg.toByteArray(StandardCharsets.UTF_8),
             model = "stub",
             prompt = materialImageGenerationPrompt(input.prompt, safeAlt),
             revisedPrompt = null,
@@ -114,10 +113,10 @@ class OpenAiMaterialImageGenerationProvider(
             ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI image response did not contain data.")
         val base64Image = imageNode.get("b64_json")?.takeIf { node -> node.isTextual }?.asText()?.trim()
             ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI image response did not contain image bytes.")
-        val compactDataUrl = compactJpegDataUrl(base64Image)
+        val compactBytes = compactJpegBytes(base64Image)
 
         return GeneratedMaterialImage(
-            dataUrl = compactDataUrl,
+            bytes = compactBytes,
             model = cleanModel,
             prompt = prompt,
             revisedPrompt = imageNode.get("revised_prompt")?.takeIf { node -> node.isTextual }?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() },
@@ -181,10 +180,10 @@ private fun materialImageGenerationPrompt(prompt: String, alt: String): String {
     """.trimIndent()
 }
 
-private fun compactJpegDataUrl(base64Image: String): String {
+private fun compactJpegBytes(base64Image: String): ByteArray {
     val sourceBytes = Base64.getDecoder().decode(base64Image)
     val source = ImageIO.read(ByteArrayInputStream(sourceBytes))
-        ?: return "data:image/png;base64,$base64Image"
+        ?: return sourceBytes
     val canvasSize = 384
     val canvas = BufferedImage(canvasSize, canvasSize, BufferedImage.TYPE_INT_RGB)
     val graphics = canvas.createGraphics()
@@ -206,7 +205,7 @@ private fun compactJpegDataUrl(base64Image: String): String {
 
     val output = ByteArrayOutputStream()
     val writer = ImageIO.getImageWritersByFormatName("jpeg").asSequence().firstOrNull()
-        ?: return "data:image/png;base64,$base64Image"
+        ?: return sourceBytes
     writer.output = MemoryCacheImageOutputStream(output)
     try {
         val params = writer.defaultWriteParam
@@ -219,5 +218,5 @@ private fun compactJpegDataUrl(base64Image: String): String {
         writer.dispose()
     }
 
-    return "data:image/jpeg;base64,${Base64.getEncoder().encodeToString(output.toByteArray())}"
+    return output.toByteArray()
 }

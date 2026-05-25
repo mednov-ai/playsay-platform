@@ -5062,6 +5062,11 @@ function resolveMaterialImageUrl(value: string | undefined, assetUrls: Record<st
 
 function materialAssetUrlMap(assets: LessonMaterialAsset[]): Record<string, string> {
   return assets.reduce<Record<string, string>>((result, asset) => {
+    const contentUrl = asset.contentUrl?.trim();
+    if (contentUrl) {
+      result[asset.id] = contentUrl;
+      return result;
+    }
     const externalUrl = asset.externalUrl?.trim();
     if (externalUrl) {
       result[asset.id] = externalUrl;

@@ -23,6 +23,8 @@ dependencies {
     implementation("com.nimbusds:nimbus-jose-jwt")
     implementation("org.liquibase:liquibase-core")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.3")
+    implementation(platform("software.amazon.awssdk:bom:2.44.12"))
+    implementation("software.amazon.awssdk:s3")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

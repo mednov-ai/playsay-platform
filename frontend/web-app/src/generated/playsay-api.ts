@@ -315,53 +315,6 @@ export interface MaterialGenerateImagesRequest {
   maxImages?: number | null;
 }
 
-export type MaterialAssetRequestKind = typeof MaterialAssetRequestKind[keyof typeof MaterialAssetRequestKind];
-
-
-export const MaterialAssetRequestKind = {
-  IMAGE: 'IMAGE',
-  GENERATED_IMAGE: 'GENERATED_IMAGE',
-  DOCUMENT_SCAN: 'DOCUMENT_SCAN',
-  VIDEO_EMBED: 'VIDEO_EMBED',
-  EXTERNAL_SOURCE: 'EXTERNAL_SOURCE',
-  AUDIO_NOTE: 'AUDIO_NOTE',
-} as const;
-
-export type MaterialAssetRequestProvider = typeof MaterialAssetRequestProvider[keyof typeof MaterialAssetRequestProvider];
-
-
-export const MaterialAssetRequestProvider = {
-  YOUTUBE: 'YOUTUBE',
-  VK: 'VK',
-  RUTUBE: 'RUTUBE',
-  URL: 'URL',
-  UPLOAD: 'UPLOAD',
-  AI: 'AI',
-} as const;
-
-export interface MaterialAssetRequest {
-  kind: MaterialAssetRequestKind;
-  /** @nullable */
-  storageKey?: string | null;
-  /** @nullable */
-  externalUrl?: string | null;
-  provider: MaterialAssetRequestProvider;
-  metadata?: JsonNode | null;
-}
-
-export interface MaterialAssetResponse {
-  id: string;
-  materialId: string;
-  kind: string;
-  /** @nullable */
-  storageKey?: string | null;
-  /** @nullable */
-  externalUrl?: string | null;
-  provider: string;
-  metadata: JsonNode;
-  createdAt: string;
-}
-
 /**
  * @nullable
  */
@@ -458,6 +411,21 @@ export interface MeResponse {
   /** @nullable */
   name?: string | null;
   roles: string[];
+}
+
+export interface MaterialAssetResponse {
+  id: string;
+  materialId: string;
+  kind: string;
+  /** @nullable */
+  storageKey?: string | null;
+  /** @nullable */
+  externalUrl?: string | null;
+  /** @nullable */
+  contentUrl?: string | null;
+  provider: string;
+  metadata: JsonNode;
+  createdAt: string;
 }
 
 export interface HelloResponse {
@@ -1891,93 +1859,6 @@ export const generateMaterialImages = async (materialId: string,
 
 
 
-export type listMaterialAssetsResponse200 = {
-  data: MaterialAssetResponse[]
-  status: 200
-}
-
-export type listMaterialAssetsResponseSuccess = (listMaterialAssetsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listMaterialAssetsResponse = (listMaterialAssetsResponseSuccess)
-
-export const getListMaterialAssetsUrl = (materialId: string,) => {
-
-
-
-
-  return `/api/materials/${materialId}/assets`
-}
-
-/**
- * @summary List material assets
- */
-export const listMaterialAssets = async (materialId: string, options?: RequestInit): Promise<listMaterialAssetsResponse> => {
-
-  const res = await fetch(getListMaterialAssetsUrl(materialId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: listMaterialAssetsResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as listMaterialAssetsResponse
-}
-
-
-
-export type createMaterialAssetResponse200 = {
-  data: MaterialAssetResponse
-  status: 200
-}
-
-export type createMaterialAssetResponseSuccess = (createMaterialAssetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createMaterialAssetResponse = (createMaterialAssetResponseSuccess)
-
-export const getCreateMaterialAssetUrl = (materialId: string,) => {
-
-
-
-
-  return `/api/materials/${materialId}/assets`
-}
-
-/**
- * @summary Create material asset reference
- */
-export const createMaterialAsset = async (materialId: string,
-    materialAssetRequest: MaterialAssetRequest, options?: RequestInit): Promise<createMaterialAssetResponse> => {
-
-  const res = await fetch(getCreateMaterialAssetUrl(materialId),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(materialAssetRequest)
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: createMaterialAssetResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as createMaterialAssetResponse
-}
-
-
-
 export type draftMaterialFromUrlResponse200 = {
   data: LessonMaterialDraftResponse
   status: 200
@@ -2564,6 +2445,112 @@ export const getMe = async ( options?: RequestInit): Promise<getMeResponse> => {
 
 
 
+export type listMaterialAssetsResponse200 = {
+  data: MaterialAssetResponse[]
+  status: 200
+}
+
+export type listMaterialAssetsResponseSuccess = (listMaterialAssetsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listMaterialAssetsResponse = (listMaterialAssetsResponseSuccess)
+
+export const getListMaterialAssetsUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets`
+}
+
+/**
+ * @summary List material assets
+ */
+export const listMaterialAssets = async (materialId: string, options?: RequestInit): Promise<listMaterialAssetsResponse> => {
+
+  const res = await fetch(getListMaterialAssetsUrl(materialId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listMaterialAssetsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listMaterialAssetsResponse
+}
+
+
+
+export type getMaterialAssetContentResponse200 = {
+  data: string
+  status: 200
+}
+
+export type getMaterialAssetContentResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getMaterialAssetContentResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getMaterialAssetContentResponse502 = {
+  data: void
+  status: 502
+}
+
+export type getMaterialAssetContentResponseSuccess = (getMaterialAssetContentResponse200) & {
+  headers: Headers;
+};
+export type getMaterialAssetContentResponseError = (getMaterialAssetContentResponse401 | getMaterialAssetContentResponse404 | getMaterialAssetContentResponse502) & {
+  headers: Headers;
+};
+
+export type getMaterialAssetContentResponse = (getMaterialAssetContentResponseSuccess | getMaterialAssetContentResponseError)
+
+export const getGetMaterialAssetContentUrl = (materialId: string,
+    assetId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}/content`
+}
+
+/**
+ * Streams material asset bytes through the backend from the configured S3-compatible object storage.
+ * @summary Get material asset content
+ */
+export const getMaterialAssetContent = async (materialId: string,
+    assetId: string, options?: RequestInit): Promise<getMaterialAssetContentResponse> => {
+
+  const res = await fetch(getGetMaterialAssetContentUrl(materialId,assetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMaterialAssetContentResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
+  return { data, status: res.status, headers: res.headers } as getMaterialAssetContentResponse
+}
+
+
+
 export type getHelloResponse200 = {
   data: HelloResponse
   status: 200
@@ -2660,49 +2647,4 @@ export const listUserProfiles = async ( options?: RequestInit): Promise<listUser
 
   const data: listUserProfilesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listUserProfilesResponse
-}
-
-
-
-export type deleteMaterialAssetResponse200 = {
-  data: void
-  status: 200
-}
-
-export type deleteMaterialAssetResponseSuccess = (deleteMaterialAssetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteMaterialAssetResponse = (deleteMaterialAssetResponseSuccess)
-
-export const getDeleteMaterialAssetUrl = (materialId: string,
-    assetId: string,) => {
-
-
-
-
-  return `/api/materials/${materialId}/assets/${assetId}`
-}
-
-/**
- * @summary Delete material asset reference
- */
-export const deleteMaterialAsset = async (materialId: string,
-    assetId: string, options?: RequestInit): Promise<deleteMaterialAssetResponse> => {
-
-  const res = await fetch(getDeleteMaterialAssetUrl(materialId,assetId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: deleteMaterialAssetResponse['data'] = body ? JSON.parse(body) : undefined
-  return { data, status: res.status, headers: res.headers } as deleteMaterialAssetResponse
 }

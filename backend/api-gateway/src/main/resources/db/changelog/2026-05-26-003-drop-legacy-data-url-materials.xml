@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-05-26-003-drop-legacy-data-url-materials" author="codex">
+        <comment>
+            Remove Sprint 4 demo materials that embedded generated image bytes as data URLs.
+            Object-backed assets are the only supported image storage path after this migration.
+        </comment>
+        <sql splitStatements="true" stripComments="true">
+            DELETE FROM lesson
+             WHERE material_id IN (
+                SELECT id
+                  FROM lesson_material
+                 WHERE document LIKE '%material-asset:%'
+                    OR document LIKE '%data:image%'
+                    OR id IN (
+                        SELECT material_id
+                          FROM material_asset
+                         WHERE external_url LIKE 'data:image%'
+                    )
+             )
+                OR lesson_template_id IN (
+                    SELECT id
+                      FROM lesson_template
+                     WHERE material_id IN (
+                        SELECT id
+                          FROM lesson_material
+                         WHERE document LIKE '%material-asset:%'
+                            OR document LIKE '%data:image%'
+                            OR id IN (
+                                SELECT material_id
+                                  FROM material_asset
+                                 WHERE external_url LIKE 'data:image%'
+                            )
+                     )
+                );
+
+            DELETE FROM lesson_template
+             WHERE material_id IN (
+                SELECT id
+                  FROM lesson_material
+                 WHERE document LIKE '%material-asset:%'
+                    OR document LIKE '%data:image%'
+                    OR id IN (
+                        SELECT material_id
+                          FROM material_asset
+                         WHERE external_url LIKE 'data:image%'
+                    )
+             );
+
+            DELETE FROM assignment
+             WHERE material_id IN (
+                SELECT id
+                  FROM lesson_material
+                 WHERE document LIKE '%material-asset:%'
+                    OR document LIKE '%data:image%'
+                    OR id IN (
+                        SELECT material_id
+                          FROM material_asset
+                         WHERE external_url LIKE 'data:image%'
+                    )
+             );
+
+            DELETE FROM lesson_material
+             WHERE document LIKE '%material-asset:%'
+                OR document LIKE '%data:image%'
+                OR id IN (
+                    SELECT material_id
+                      FROM material_asset
+                     WHERE external_url LIKE 'data:image%'
+                );
+        </sql>
+        <rollback/>
+    </changeSet>
+</databaseChangeLog>

@@ -30,6 +30,7 @@ import liquibase.integration.spring.SpringLiquibase
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=true",
+        "playsay.storage.provider=memory",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -141,6 +142,20 @@ class MaterialControllerTest @Autowired constructor(
                                   "options": ["a", "an", "-"]
                                 }
                               ]
+                            },
+                            {
+                              "id": "pictures",
+                              "type": "matchingPairs",
+                              "title": "Pictures",
+                              "pairs": [
+                                {
+                                  "id": "pair-apple",
+                                  "left": "apple",
+                                  "right": "apple",
+                                  "imagePrompt": "child-friendly workbook apple illustration",
+                                  "imageAlt": "apple"
+                                }
+                              ]
                             }
                           ]
                         }
@@ -150,15 +165,13 @@ class MaterialControllerTest @Autowired constructor(
                 ),
             ),
         ).body!!
-        val asset = materialController.createAsset(
+        val generatedMaterial = materialController.generateImages(
             teacher,
             material.id,
-            MaterialAssetRequest(
-                kind = "GENERATED_IMAGE",
-                externalUrl = "data:image/svg+xml;base64,PHN2Zy8+",
-                provider = "AI",
-            ),
-        ).body!!
+            MaterialGenerateImagesRequest(maxImages = 1),
+        )
+        val asset = materialController.listAssets(teacher, material.id).single()
+        assertEquals(material.id, generatedMaterial.id)
 
         val course = courseController.create(teacher, CourseRequest(title = "Course", isPublished = true)).body!!
         val lessonTemplate = courseController.createLesson(
@@ -181,6 +194,10 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals(material.id, scheduledMaterial.id)
         assertEquals("Private classroom material", scheduledMaterial.title)
         assertEquals(listOf(asset.id), materialController.listAssets(student, material.id).map { item -> item.id })
+        val assetContent = materialController.assetContent(student, material.id, asset.id)
+        assertEquals(HttpStatus.OK, assetContent.statusCode)
+        assertEquals("image/svg+xml", assetContent.headers.contentType?.toString())
+        assertTrue(assertNotNull(assetContent.body).decodeToString().contains("<svg"))
         val submission = materialController.saveScheduledLessonMaterialSubmission(
             student,
             lesson.id,
@@ -195,6 +212,12 @@ class MaterialControllerTest @Autowired constructor(
                           "type": "fillGaps",
                           "items": {
                             "It is ... apple.-0": "an"
+                          }
+                        },
+                        "pictures": {
+                          "type": "matchingPairs",
+                          "matches": {
+                            "pair-apple": "pair-apple"
                           }
                         }
                       }
@@ -453,7 +476,9 @@ class MaterialControllerTest @Autowired constructor(
         val assets = materialController.listAssets(teacher, material.id)
         assertEquals(2, assets.size)
         assertEquals("GENERATED_IMAGE", assets[0].kind)
-        assertTrue(assets.all { asset -> asset.externalUrl?.startsWith("data:image/svg+xml;base64,") == true })
+        assertTrue(assets.all { asset -> asset.externalUrl == null })
+        assertTrue(assets.all { asset -> asset.storageKey?.startsWith("material-assets/${material.id}/") == true })
+        assertTrue(assets.all { asset -> asset.contentUrl?.startsWith("/api/materials/${material.id}/assets/") == true })
         assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(pairs[0]["imageUrl"].asText()))
     }
 

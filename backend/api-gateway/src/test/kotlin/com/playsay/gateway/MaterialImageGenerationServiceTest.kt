@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 class MaterialImageGenerationServiceTest {
     @Test
-    fun `openai image provider requests safe workbook illustration and returns compact data url`() {
+    fun `openai image provider requests safe workbook illustration and returns compact bytes`() {
         val transport = RecordingOpenAiImagesTransport(openAiImageResponse(testPngBase64()))
         val provider = OpenAiMaterialImageGenerationProvider(
             transport = transport,
@@ -29,7 +29,7 @@ class MaterialImageGenerationServiceTest {
 
         assertEquals("gpt-image-1-mini", image.model)
         assertEquals("image/jpeg", image.mimeType)
-        assertTrue(image.dataUrl.startsWith("data:image/jpeg;base64,"))
+        assertTrue(image.bytes.isNotEmpty())
         assertTrue(transport.requestBody.contains("\"/images/generations\"").not())
         assertTrue(transport.requestBody.contains("\"model\":\"gpt-image-1-mini\""))
         assertTrue(transport.requestBody.contains("\"quality\":\"low\""))

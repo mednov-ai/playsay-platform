@@ -89,6 +89,7 @@ export type LessonMaterialAsset = {
   kind: string;
   storageKey?: string | null;
   externalUrl?: string | null;
+  contentUrl?: string | null;
   provider: string;
   metadata: LessonMaterialJson;
   createdAt: string;

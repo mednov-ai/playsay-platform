@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import java.math.BigDecimal
 import java.sql.ResultSet
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -130,6 +131,23 @@ data class LessonMaterialDraftResponse(
     val scoringRubric: JsonNode,
 )
 
+data class MaterialSubmissionRequest(
+    val content: JsonNode,
+    val submitted: Boolean = true,
+)
+
+data class MaterialSubmissionResponse(
+    val id: UUID,
+    val assignmentId: UUID,
+    val lessonId: UUID,
+    val materialId: UUID,
+    val userId: UUID,
+    val content: JsonNode,
+    val submittedAt: Instant?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
 private data class StoredLessonMaterial(
     val id: UUID,
     val ownerTeacherUserId: UUID?,
@@ -157,6 +175,18 @@ private data class StoredMaterialAsset(
     val provider: String,
     val metadata: String,
     val createdAt: Instant,
+)
+
+private data class StoredMaterialSubmission(
+    val id: UUID,
+    val assignmentId: UUID,
+    val lessonId: UUID,
+    val materialId: UUID,
+    val userId: UUID,
+    val content: String,
+    val submittedAt: Instant?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
 )
 
 private data class ValidatedLessonMaterialRequest(
@@ -405,6 +435,99 @@ class LessonMaterialStore(
         val material = find(materialId)?.takeIf { it.status != "ARCHIVED" }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
         return material.toResponse(objectMapper)
+    }
+
+    @Transactional
+    fun getSubmissionForScheduledLesson(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+    ): MaterialSubmissionResponse {
+        val lookup = accessibleScheduledMaterial(authentication, lessonId)
+        val materialId = lookup.materialId ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val userId = userProfileStore.currentUserId(authentication)
+        val assignmentId = findMaterialSubmissionAssignment(lessonId, materialId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material submission not found.")
+        val submission = findMaterialSubmission(assignmentId, lessonId, userId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material submission not found.")
+        return submission.toResponse(objectMapper)
+    }
+
+    @Transactional
+    fun saveSubmissionForScheduledLesson(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+        request: MaterialSubmissionRequest,
+    ): MaterialSubmissionResponse {
+        val lookup = accessibleScheduledMaterial(authentication, lessonId)
+        val materialId = lookup.materialId ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId)?.takeIf { it.status != "ARCHIVED" }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        validateJsonSize("content", request.content, objectMapper, 1_000_000)
+
+        val userId = userProfileStore.currentUserId(authentication)
+        val assignmentId = findOrCreateMaterialSubmissionAssignment(lessonId, material)
+        val now = Instant.now()
+        val content = objectMapper.writeValueAsString(request.content)
+        val existing = findMaterialSubmission(assignmentId, lessonId, userId)
+
+        val submissionId = if (existing == null) {
+            val id = UUID.randomUUID()
+            jdbcClient.sql(
+                """
+                INSERT INTO submission (
+                    id,
+                    assignment_id,
+                    student_user_id,
+                    lesson_id,
+                    content,
+                    submitted_at,
+                    created_at,
+                    updated_at
+                ) VALUES (
+                    :id,
+                    :assignmentId,
+                    :userId,
+                    :lessonId,
+                    :content,
+                    :submittedAt,
+                    :createdAt,
+                    :updatedAt
+                )
+                """.trimIndent(),
+            )
+                .param("id", id)
+                .param("assignmentId", assignmentId)
+                .param("userId", userId)
+                .param("lessonId", lessonId)
+                .param("content", content)
+                .param("submittedAt", if (request.submitted) now.toMaterialOffsetDateTime() else null)
+                .param("createdAt", now.toMaterialOffsetDateTime())
+                .param("updatedAt", now.toMaterialOffsetDateTime())
+                .update()
+            id
+        } else {
+            jdbcClient.sql(
+                """
+                UPDATE submission
+                   SET content = :content,
+                       submitted_at = CASE
+                           WHEN :submitted = TRUE THEN :submittedAt
+                           ELSE submitted_at
+                       END,
+                       updated_at = :updatedAt
+                 WHERE id = :id
+                """.trimIndent(),
+            )
+                .param("id", existing.id)
+                .param("content", content)
+                .param("submitted", request.submitted)
+                .param("submittedAt", now.toMaterialOffsetDateTime())
+                .param("updatedAt", now.toMaterialOffsetDateTime())
+                .update()
+            existing.id
+        }
+
+        return requireNotNull(findMaterialSubmission(submissionId)).toResponse(objectMapper)
     }
 
     fun draft(authentication: JwtAuthenticationToken, request: MaterialAiDraftRequest): LessonMaterialDraftResponse {
@@ -661,6 +784,161 @@ class LessonMaterialStore(
             .optional()
             .orElse(null)
 
+    private fun accessibleScheduledMaterial(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledMaterialLookup {
+        val lookup = scheduledMaterialLookup(lessonId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+
+        if (!authentication.canManageMaterials() && !lookup.isVisibleToParticipant(Instant.now())) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+        }
+
+        if (!authentication.canManageMaterials() && !isLessonParticipant(lessonId, authentication.token.subject)) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+        }
+
+        if (lookup.materialId == null) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        }
+        return lookup
+    }
+
+    private fun scheduledMaterialLookup(lessonId: UUID): ScheduledMaterialLookup? =
+        jdbcClient.sql(
+            """
+            SELECT l.id,
+                   l.status,
+                   l.scheduled_end,
+                   COALESCE(l.material_id, lt.material_id) AS material_id
+              FROM lesson l
+              LEFT JOIN lesson_template lt ON lt.id = l.lesson_template_id
+             WHERE l.id = :lessonId
+            """.trimIndent(),
+        )
+            .param("lessonId", lessonId)
+            .query { rs, _ ->
+                ScheduledMaterialLookup(
+                    id = rs.getObject("id", UUID::class.java),
+                    status = rs.getString("status"),
+                    scheduledEnd = rs.getObject("scheduled_end", OffsetDateTime::class.java)?.toInstant(),
+                    materialId = rs.getObject("material_id", UUID::class.java),
+                )
+            }
+            .optional()
+            .orElse(null)
+
+    private fun findOrCreateMaterialSubmissionAssignment(lessonId: UUID, material: StoredLessonMaterial): UUID =
+        findMaterialSubmissionAssignment(lessonId, material.id) ?: run {
+            val id = UUID.randomUUID()
+            val now = Instant.now()
+            jdbcClient.sql(
+                """
+                INSERT INTO assignment (
+                    id,
+                    lesson_id,
+                    title,
+                    instructions,
+                    type,
+                    payload,
+                    max_score,
+                    material_id,
+                    created_at,
+                    updated_at
+                ) VALUES (
+                    :id,
+                    :lessonId,
+                    :title,
+                    :instructions,
+                    'MATERIAL_WORK',
+                    :payload,
+                    :maxScore,
+                    :materialId,
+                    :createdAt,
+                    :updatedAt
+                )
+                """.trimIndent(),
+            )
+                .param("id", id)
+                .param("lessonId", lessonId)
+                .param("title", material.title)
+                .param("instructions", "Play&Say material answer snapshot")
+                .param("payload", objectMapper.writeValueAsString(objectMapper.createObjectNode().put("source", "material")))
+                .param("maxScore", materialMaxScore(material.scoringRubric))
+                .param("materialId", material.id)
+                .param("createdAt", now.toMaterialOffsetDateTime())
+                .param("updatedAt", now.toMaterialOffsetDateTime())
+                .update()
+            id
+        }
+
+    private fun findMaterialSubmissionAssignment(lessonId: UUID, materialId: UUID): UUID? =
+        jdbcClient.sql(
+            """
+            SELECT id
+              FROM assignment
+             WHERE lesson_id = :lessonId
+               AND material_id = :materialId
+               AND material_block_id IS NULL
+               AND type = 'MATERIAL_WORK'
+             ORDER BY created_at
+             LIMIT 1
+            """.trimIndent(),
+        )
+            .param("lessonId", lessonId)
+            .param("materialId", materialId)
+            .query(UUID::class.java)
+            .optional()
+            .orElse(null)
+
+    private fun findMaterialSubmission(assignmentId: UUID, lessonId: UUID, userId: UUID): StoredMaterialSubmission? =
+        jdbcClient.sql(
+            """
+            SELECT s.id,
+                   s.assignment_id,
+                   s.lesson_id,
+                   a.material_id,
+                   s.student_user_id,
+                   s.content,
+                   s.submitted_at,
+                   s.created_at,
+                   s.updated_at
+              FROM submission s
+              JOIN assignment a ON a.id = s.assignment_id
+             WHERE s.assignment_id = :assignmentId
+               AND s.lesson_id = :lessonId
+               AND s.student_user_id = :userId
+             ORDER BY s.updated_at DESC
+             LIMIT 1
+            """.trimIndent(),
+        )
+            .param("assignmentId", assignmentId)
+            .param("lessonId", lessonId)
+            .param("userId", userId)
+            .query(::mapMaterialSubmission)
+            .optional()
+            .orElse(null)
+
+    private fun findMaterialSubmission(submissionId: UUID): StoredMaterialSubmission? =
+        jdbcClient.sql(
+            """
+            SELECT s.id,
+                   s.assignment_id,
+                   s.lesson_id,
+                   a.material_id,
+                   s.student_user_id,
+                   s.content,
+                   s.submitted_at,
+                   s.created_at,
+                   s.updated_at
+              FROM submission s
+              JOIN assignment a ON a.id = s.assignment_id
+             WHERE s.id = :submissionId
+            """.trimIndent(),
+        )
+            .param("submissionId", submissionId)
+            .query(::mapMaterialSubmission)
+            .optional()
+            .orElse(null)
+
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         jdbcClient.sql(
             """
@@ -867,6 +1145,52 @@ class MaterialController(
         @PathVariable lessonId: UUID,
     ): LessonMaterialResponse =
         store.getForScheduledLesson(authentication, lessonId)
+
+    @GetMapping("/schedule/lessons/{lessonId}/material-submission", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "getScheduledLessonMaterialSubmission",
+        summary = "Get current material answer snapshot",
+        description = "Returns the current user's saved answers for the material attached to a scheduled lesson.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Material submission"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Submission, lesson, or material not found", content = [Content()]),
+        ],
+    )
+    fun scheduledLessonMaterialSubmission(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+    ): MaterialSubmissionResponse =
+        store.getSubmissionForScheduledLesson(authentication, lessonId)
+
+    @PutMapping(
+        "/schedule/lessons/{lessonId}/material-submission",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "saveScheduledLessonMaterialSubmission",
+        summary = "Save current material answer snapshot",
+        description = "Creates or updates the current user's answers for the material attached to a scheduled lesson.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Material submission saved"),
+            ApiResponse(responseCode = "400", description = "Invalid submission payload", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
+        ],
+    )
+    fun saveScheduledLessonMaterialSubmission(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @RequestBody request: MaterialSubmissionRequest,
+    ): MaterialSubmissionResponse =
+        store.saveSubmissionForScheduledLesson(authentication, lessonId, request)
 
     @PostMapping(
         "/materials/ai-draft",
@@ -1084,6 +1408,25 @@ private fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): Material
         createdAt = createdAt,
     )
 
+private fun StoredMaterialSubmission.toResponse(objectMapper: ObjectMapper): MaterialSubmissionResponse =
+    MaterialSubmissionResponse(
+        id = id,
+        assignmentId = assignmentId,
+        lessonId = lessonId,
+        materialId = materialId,
+        userId = userId,
+        content = objectMapper.readTree(content),
+        submittedAt = submittedAt,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+
+private fun materialMaxScore(scoringRubric: String): BigDecimal? =
+    runCatching {
+        val node = jacksonObjectMapper().readTree(scoringRubric)
+        node.get("maxScore")?.takeIf { value -> value.isNumber }?.decimalValue()
+    }.getOrNull()
+
 private fun matchingImageTargets(document: ObjectNode, blockId: String?, maxImages: Int): List<MatchingImageTarget> {
     val pages = document.get("pages") as? ArrayNode ?: return emptyList()
     val targets = mutableListOf<MatchingImageTarget>()
@@ -1165,6 +1508,19 @@ private fun mapMaterialAsset(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum
         provider = rs.getString("provider"),
         metadata = rs.getString("metadata"),
         createdAt = rs.getMaterialInstant("created_at"),
+    )
+
+private fun mapMaterialSubmission(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredMaterialSubmission =
+    StoredMaterialSubmission(
+        id = rs.getObject("id", UUID::class.java),
+        assignmentId = rs.getObject("assignment_id", UUID::class.java),
+        lessonId = rs.getObject("lesson_id", UUID::class.java),
+        materialId = rs.getObject("material_id", UUID::class.java),
+        userId = rs.getObject("student_user_id", UUID::class.java),
+        content = rs.getString("content"),
+        submittedAt = rs.getObject("submitted_at", OffsetDateTime::class.java)?.toInstant(),
+        createdAt = rs.getMaterialInstant("created_at"),
+        updatedAt = rs.getMaterialInstant("updated_at"),
     )
 
 private fun JwtAuthenticationToken.requireMaterialManager() {

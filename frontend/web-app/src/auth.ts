@@ -126,6 +126,21 @@ export type LessonMaterialDraft = Omit<LessonMaterialInput, "title"> & {
   sourceMeta: LessonMaterialJson;
   scoringRubric: LessonMaterialJson;
 };
+export type LessonMaterialSubmission = {
+  id: string;
+  assignmentId: string;
+  lessonId: string;
+  materialId: string;
+  userId: string;
+  content: LessonMaterialJson;
+  submittedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type LessonMaterialSubmissionInput = {
+  content: LessonMaterialJson;
+  submitted?: boolean;
+};
 
 type TokenResponse = {
   access_token: string;
@@ -543,6 +558,39 @@ export async function fetchScheduledLessonMaterial(
     }
     throw caught;
   }
+}
+
+export async function fetchScheduledLessonMaterialSubmission(
+  lessonId: string,
+  config = authConfig,
+): Promise<LessonMaterialSubmission | null> {
+  try {
+    return await apiJson<LessonMaterialSubmission>(
+      `/api/schedule/lessons/${lessonId}/material-submission`,
+      { method: "GET" },
+      config,
+    );
+  } catch (caught) {
+    if (caught instanceof Error && caught.message.includes("HTTP 404")) {
+      return null;
+    }
+    throw caught;
+  }
+}
+
+export async function saveScheduledLessonMaterialSubmission(
+  lessonId: string,
+  input: LessonMaterialSubmissionInput,
+  config = authConfig,
+): Promise<LessonMaterialSubmission> {
+  return apiJson<LessonMaterialSubmission>(
+    `/api/schedule/lessons/${lessonId}/material-submission`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+    config,
+  );
 }
 
 export async function removeScheduledLesson(lessonId: string, config = authConfig): Promise<void> {

@@ -67,6 +67,7 @@ import {
   fetchMe,
   fetchScheduledLessons,
   fetchScheduledLessonMaterial,
+  fetchScheduledLessonMaterialSubmission,
   fetchStudentProfiles,
   fetchUserProfile,
   generateMaterialImages,
@@ -79,6 +80,7 @@ import {
   saveCourse,
   saveCourseLesson,
   saveMaterial,
+  saveScheduledLessonMaterialSubmission,
   saveScheduledLesson,
   saveUserProfile,
   startLogin,
@@ -95,6 +97,7 @@ import {
   type LessonMaterialDraftInput,
   type LessonMaterialInput,
   type LessonMaterialJson,
+  type LessonMaterialSubmission,
   type LiveKitRoomToken,
   type MeProfile,
   type ScheduledLesson,
@@ -217,6 +220,8 @@ type MaterialEditorDocument = {
 };
 
 type MaterialRenderMode = "classroom" | "teacherPreview";
+type MaterialAnswerBlock = Record<string, unknown>;
+type MaterialAnswerState = Record<string, MaterialAnswerBlock>;
 
 type MaterialFormState = {
   id: string | null;
@@ -2587,6 +2592,9 @@ function LessonWorkspace({
   const [material, setMaterial] = useState<LessonMaterial | null>(null);
   const [materialLoading, setMaterialLoading] = useState(false);
   const [materialError, setMaterialError] = useState<string | null>(null);
+  const [submission, setSubmission] = useState<LessonMaterialSubmission | null>(null);
+  const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
+  const [submissionSaving, setSubmissionSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -2616,6 +2624,46 @@ function LessonWorkspace({
       cancelled = true;
     };
   }, [session.lessonId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSubmission() {
+      try {
+        const savedSubmission = await fetchScheduledLessonMaterialSubmission(session.lessonId);
+        if (!cancelled) {
+          setSubmission(savedSubmission);
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          setSubmission(null);
+          setSubmissionMessage(caught instanceof Error ? caught.message : "Не удалось загрузить ответы");
+        }
+      }
+    }
+
+    void loadSubmission();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.lessonId]);
+
+  async function saveMaterialAnswers(content: LessonMaterialJson) {
+    setSubmissionSaving(true);
+    setSubmissionMessage(null);
+    try {
+      const savedSubmission = await saveScheduledLessonMaterialSubmission(session.lessonId, {
+        content,
+        submitted: true,
+      });
+      setSubmission(savedSubmission);
+      setSubmissionMessage("Ответ отправлен");
+    } catch (caught) {
+      setSubmissionMessage(caught instanceof Error ? caught.message : "Не удалось отправить ответ");
+    } finally {
+      setSubmissionSaving(false);
+    }
+  }
 
   return (
     <section className="playsay-workbench">
@@ -2691,7 +2739,14 @@ function LessonWorkspace({
             <span>Материал загружается</span>
           </div>
         ) : material ? (
-          <LessonTaskCanvas material={material} teacherName={session.teacherName ?? displayName} />
+          <LessonTaskCanvas
+            material={material}
+            onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+            submission={submission}
+            submissionMessage={submissionMessage}
+            submissionSaving={submissionSaving}
+            teacherName={session.teacherName ?? displayName}
+          />
         ) : (
           <>
             {materialError ? (
@@ -2699,7 +2754,13 @@ function LessonWorkspace({
                 {materialError}
               </div>
             ) : null}
-            <LessonTaskCanvas teacherName={session.teacherName ?? displayName} />
+            <LessonTaskCanvas
+              onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              submission={submission}
+              submissionMessage={submissionMessage}
+              submissionSaving={submissionSaving}
+              teacherName={session.teacherName ?? displayName}
+            />
           </>
         )}
       </div>
@@ -2707,11 +2768,48 @@ function LessonWorkspace({
   );
 }
 
-function LessonTaskCanvas({ material, teacherName }: { material?: LessonMaterial | null; teacherName: string }) {
+function LessonTaskCanvas({
+  material,
+  onSaveAnswers,
+  submission,
+  submissionMessage,
+  submissionSaving,
+  teacherName,
+}: {
+  material?: LessonMaterial | null;
+  onSaveAnswers: (content: LessonMaterialJson) => void;
+  submission: LessonMaterialSubmission | null;
+  submissionMessage: string | null;
+  submissionSaving: boolean;
+  teacherName: string;
+}) {
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pointer");
   const [annotationColor, setAnnotationColor] = useState("#ff5c00");
   const [annotationStrokes, setAnnotationStrokes] = useState<AnnotationStroke[]>([]);
+  const [answers, setAnswers] = useState<MaterialAnswerState>({});
   const activeStrokeId = useRef<string | null>(null);
+
+  useEffect(() => {
+    setAnswers(materialAnswersFromSubmission(submission));
+  }, [material?.id, submission?.id, submission?.updatedAt]);
+
+  function updateAnswer(blockId: string, answer: MaterialAnswerBlock) {
+    setAnswers((current) => ({
+      ...current,
+      [blockId]: answer,
+    }));
+  }
+
+  function submitAnswers() {
+    if (!material) {
+      return;
+    }
+    onSaveAnswers({
+      schemaVersion: 1,
+      materialId: material.id,
+      answers,
+    });
+  }
 
   function beginAnnotation(event: PointerEvent<SVGSVGElement>) {
     if (annotationTool === "pointer") {
@@ -2801,7 +2899,16 @@ function LessonTaskCanvas({ material, teacherName }: { material?: LessonMaterial
 
       <div className="playsay-task-page">
         <div className="playsay-task-document">
-          {material ? <LessonMaterialDocumentView material={material} mode="classroom" /> : <FallbackLessonDocument />}
+          {material ? (
+            <LessonMaterialDocumentView
+              answers={answers}
+              material={material}
+              mode="classroom"
+              onAnswerChange={updateAnswer}
+            />
+          ) : (
+            <FallbackLessonDocument />
+          )}
         </div>
 
         <svg
@@ -2835,10 +2942,11 @@ function LessonTaskCanvas({ material, teacherName }: { material?: LessonMaterial
         <button aria-label="Следующее задание" className="playsay-page-button" type="button">
           <ChevronRight className="h-4 w-4" />
         </button>
-        <Button disabled type="button">
-          <Send className="h-4 w-4" />
-          Отправить
+        <Button disabled={!material || submissionSaving} onClick={submitAnswers} type="button">
+          {submissionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {submissionSaving ? "Отправляем" : "Отправить"}
         </Button>
+        {submissionMessage ? <span className="playsay-task-submit-status">{submissionMessage}</span> : null}
         <span className="playsay-task-teacher">{teacherName}</span>
       </footer>
     </div>
@@ -2846,11 +2954,15 @@ function LessonTaskCanvas({ material, teacherName }: { material?: LessonMaterial
 }
 
 function LessonMaterialDocumentView({
+  answers = {},
   material,
   mode = "classroom",
+  onAnswerChange,
 }: {
+  answers?: MaterialAnswerState;
   material: LessonMaterial;
   mode?: MaterialRenderMode;
+  onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
   const document = editorDocumentFromJson(material.document);
   const page = document.pages[0] ?? defaultMaterialPage(material.title);
@@ -2900,7 +3012,14 @@ function LessonMaterialDocumentView({
       {material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
       <div className="playsay-material-blocks">
         {page.blocks.map((block) => (
-          <RenderedMaterialBlock assetUrls={assetUrls} block={block} key={block.id} mode={mode} />
+          <RenderedMaterialBlock
+            answer={answers[block.id]}
+            assetUrls={assetUrls}
+            block={block}
+            key={block.id}
+            mode={mode}
+            onAnswerChange={onAnswerChange}
+          />
         ))}
       </div>
     </div>
@@ -2908,13 +3027,17 @@ function LessonMaterialDocumentView({
 }
 
 function RenderedMaterialBlock({
+  answer,
   assetUrls,
   block,
   mode,
+  onAnswerChange,
 }: {
+  answer?: MaterialAnswerBlock;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
   mode: MaterialRenderMode;
+  onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
   switch (block.type) {
     case "text":
@@ -2975,21 +3098,27 @@ function RenderedMaterialBlock({
       return (
         <section className="playsay-render-block">
           <h4>{block.title}</h4>
-          <RenderedFillGapExercise block={block} />
+          <RenderedFillGapExercise answer={answer} block={block} onAnswerChange={onAnswerChange} />
         </section>
       );
     case "multipleChoice":
       return (
         <section className="playsay-render-block">
           <h4>{block.title}</h4>
-          <RenderedChoiceExercise block={block} />
+          <RenderedChoiceExercise answer={answer} block={block} onAnswerChange={onAnswerChange} />
         </section>
       );
     case "matchingPairs":
       return (
         <section className="playsay-render-block">
           <h4>{block.title}</h4>
-          <RenderedMatchingPairsExercise assetUrls={assetUrls} block={block} mode={mode} />
+          <RenderedMatchingPairsExercise
+            answer={answer}
+            assetUrls={assetUrls}
+            block={block}
+            mode={mode}
+            onAnswerChange={onAnswerChange}
+          />
         </section>
       );
     case "freeWriting":
@@ -2997,7 +3126,12 @@ function RenderedMaterialBlock({
         <section className="playsay-render-block">
           <h4>{block.title}</h4>
           <p>{block.prompt}</p>
-          <textarea className="playsay-student-answer" placeholder="Ответ ученика" />
+          <textarea
+            className="playsay-student-answer"
+            onChange={(event) => onAnswerChange?.(block.id, { type: "freeWriting", text: event.target.value })}
+            placeholder="Ответ ученика"
+            value={materialAnswerText(answer)}
+          />
         </section>
       );
     case "speakingPrompt":
@@ -3019,8 +3153,26 @@ function RenderedMaterialBlock({
   }
 }
 
-function RenderedFillGapExercise({ block }: { block: MaterialEditorBlock }) {
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+function RenderedFillGapExercise({
+  answer,
+  block,
+  onAnswerChange,
+}: {
+  answer?: MaterialAnswerBlock;
+  block: MaterialEditorBlock;
+  onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
+}) {
+  const answers = materialAnswerItems(answer);
+
+  function updateItem(itemKey: string, value: string) {
+    onAnswerChange?.(block.id, {
+      type: "fillGaps",
+      items: {
+        ...answers,
+        [itemKey]: value,
+      },
+    });
+  }
 
   return (
     <div className="playsay-fill-exercise">
@@ -3036,7 +3188,7 @@ function RenderedFillGapExercise({ block }: { block: MaterialEditorBlock }) {
               <select
                 aria-label={`gap ${index + 1}`}
                 className="playsay-inline-select"
-                onChange={(event) => setAnswers((current) => ({ ...current, [itemKey]: event.target.value }))}
+                onChange={(event) => updateItem(itemKey, event.target.value)}
                 value={answers[itemKey] ?? ""}
               >
                 <option value="">Выбрать</option>
@@ -3045,7 +3197,11 @@ function RenderedFillGapExercise({ block }: { block: MaterialEditorBlock }) {
                 ))}
               </select>
             ) : (
-              <input aria-label={`gap ${index + 1}`} defaultValue="" />
+              <input
+                aria-label={`gap ${index + 1}`}
+                onChange={(event) => updateItem(itemKey, event.target.value)}
+                value={answers[itemKey] ?? ""}
+              />
             )}
             {prompt.after ? <span>{prompt.after}</span> : null}
           </label>
@@ -3055,8 +3211,26 @@ function RenderedFillGapExercise({ block }: { block: MaterialEditorBlock }) {
   );
 }
 
-function RenderedChoiceExercise({ block }: { block: MaterialEditorBlock }) {
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+function RenderedChoiceExercise({
+  answer,
+  block,
+  onAnswerChange,
+}: {
+  answer?: MaterialAnswerBlock;
+  block: MaterialEditorBlock;
+  onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
+}) {
+  const answers = materialAnswerItems(answer);
+
+  function updateItem(itemKey: string, value: string) {
+    onAnswerChange?.(block.id, {
+      type: "multipleChoice",
+      items: {
+        ...answers,
+        [itemKey]: value,
+      },
+    });
+  }
 
   return (
     <div className="playsay-choice-list">
@@ -3071,7 +3245,7 @@ function RenderedChoiceExercise({ block }: { block: MaterialEditorBlock }) {
               <select
                 aria-label={`choice ${index + 1}`}
                 className="playsay-inline-select"
-                onChange={(event) => setAnswers((current) => ({ ...current, [itemKey]: event.target.value }))}
+                onChange={(event) => updateItem(itemKey, event.target.value)}
                 value={answers[itemKey] ?? ""}
               >
                 <option value="">Выбрать</option>
@@ -3083,7 +3257,7 @@ function RenderedChoiceExercise({ block }: { block: MaterialEditorBlock }) {
               <input
                 aria-label={`choice ${index + 1}`}
                 className="playsay-inline-input"
-                onChange={(event) => setAnswers((current) => ({ ...current, [itemKey]: event.target.value }))}
+                onChange={(event) => updateItem(itemKey, event.target.value)}
                 value={answers[itemKey] ?? ""}
               />
             )}
@@ -3095,18 +3269,23 @@ function RenderedChoiceExercise({ block }: { block: MaterialEditorBlock }) {
 }
 
 function RenderedMatchingPairsExercise({
+  answer,
   assetUrls,
   block,
   mode,
+  onAnswerChange,
 }: {
+  answer?: MaterialAnswerBlock;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
   mode: MaterialRenderMode;
+  onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
   const pairs = block.pairs ?? emptyMaterialMatchingPairs;
   const rightOptions = mode === "teacherPreview" ? pairs : matchingRightOptions(pairs);
   const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
-  const [matches, setMatches] = useState<Record<string, string>>({});
+  const matches = materialAnswerMatches(answer);
+  const matchesKey = Object.entries(matches).map(([leftId, rightId]) => `${leftId}:${rightId}`).sort().join("|");
   const [lines, setLines] = useState<Array<{ id: string; x1: number; x2: number; y1: number; y2: number }>>([]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const leftRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -3144,14 +3323,20 @@ function RenderedMatchingPairsExercise({
     updateLines();
     window.addEventListener("resize", updateLines);
     return () => window.removeEventListener("resize", updateLines);
-  }, [matches, pairs]);
+  }, [matchesKey, pairs]);
 
   function connectPair(rightId: string) {
     if (!activeLeftId) {
       return;
     }
 
-    setMatches((current) => ({ ...current, [activeLeftId]: rightId }));
+    onAnswerChange?.(block.id, {
+      type: "matchingPairs",
+      matches: {
+        ...matches,
+        [activeLeftId]: rightId,
+      },
+    });
     setActiveLeftId(null);
   }
 
@@ -4193,6 +4378,44 @@ function materialAssetUrlMap(assets: LessonMaterialAsset[]): Record<string, stri
     }
     return result;
   }, {});
+}
+
+function materialAnswersFromSubmission(submission: LessonMaterialSubmission | null): MaterialAnswerState {
+  const content = asJsonObject(submission?.content);
+  const answers = asJsonObject(content.answers);
+  return Object.entries(answers).reduce<MaterialAnswerState>((result, [blockId, value]) => {
+    const answer = asJsonObject(value);
+    if (Object.keys(answer).length > 0) {
+      result[blockId] = answer;
+    }
+    return result;
+  }, {});
+}
+
+function materialAnswerItems(answer: MaterialAnswerBlock | undefined): Record<string, string> {
+  const items = asJsonObject(answer?.items);
+  return Object.entries(items).reduce<Record<string, string>>((result, [key, value]) => {
+    const itemValue = asString(value);
+    if (itemValue) {
+      result[key] = itemValue;
+    }
+    return result;
+  }, {});
+}
+
+function materialAnswerMatches(answer: MaterialAnswerBlock | undefined): Record<string, string> {
+  const matches = asJsonObject(answer?.matches);
+  return Object.entries(matches).reduce<Record<string, string>>((result, [key, value]) => {
+    const matchValue = asString(value);
+    if (matchValue) {
+      result[key] = matchValue;
+    }
+    return result;
+  }, {});
+}
+
+function materialAnswerText(answer: MaterialAnswerBlock | undefined): string {
+  return asString(answer?.text);
 }
 
 function materialDocumentBlocks(material: LessonMaterial): MaterialEditorBlock[] {

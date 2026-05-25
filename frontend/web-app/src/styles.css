@@ -1063,6 +1063,15 @@ textarea {
   white-space: nowrap;
 }
 
+.playsay-task-submit-status {
+  min-width: 0;
+  color: hsl(var(--foreground));
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
   .playsay-live-room [data-lk-theme="default"] {
     min-height: 24rem;

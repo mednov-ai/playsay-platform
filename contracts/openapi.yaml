@@ -151,6 +151,69 @@ paths:
           description: Scheduled lesson not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/material-submission:
+    get:
+      tags:
+      - Materials
+      summary: Get current material answer snapshot
+      description: Returns the current user's saved answers for the material attached
+        to a scheduled lesson.
+      operationId: getScheduledLessonMaterialSubmission
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Material submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialSubmissionResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: "Submission, lesson, or material not found"
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Materials
+      summary: Save current material answer snapshot
+      description: Creates or updates the current user's answers for the material
+        attached to a scheduled lesson.
+      operationId: saveScheduledLessonMaterialSubmission
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialSubmissionRequest"
+        required: true
+      responses:
+        "200":
+          description: Material submission saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialSubmissionResponse"
+        "400":
+          description: Invalid submission payload
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Scheduled lesson or material not found
+      security:
+      - bearerAuth: []
   /materials/{materialId}:
     get:
       tags:
@@ -1098,6 +1161,56 @@ components:
       - type
       - updatedAt
     JsonNode: {}
+    MaterialSubmissionRequest:
+      type: object
+      properties:
+        content:
+          $ref: "#/components/schemas/JsonNode"
+        submitted:
+          type: boolean
+      required:
+      - content
+      - submitted
+    MaterialSubmissionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        assignmentId:
+          type: string
+          format: uuid
+        lessonId:
+          type: string
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        content:
+          $ref: "#/components/schemas/JsonNode"
+        submittedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - assignmentId
+      - content
+      - createdAt
+      - id
+      - lessonId
+      - materialId
+      - updatedAt
+      - userId
     LessonMaterialRequest:
       type: object
       properties:

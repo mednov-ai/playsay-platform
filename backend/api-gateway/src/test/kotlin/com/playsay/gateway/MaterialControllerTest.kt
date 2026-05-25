@@ -148,6 +148,34 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals(material.id, scheduledMaterial.id)
         assertEquals("Private classroom material", scheduledMaterial.title)
         assertEquals(listOf(asset.id), materialController.listAssets(student, material.id).map { item -> item.id })
+        val submission = materialController.saveScheduledLessonMaterialSubmission(
+            student,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${material.id}",
+                      "answers": {
+                        "warmup": {
+                          "type": "fillGaps",
+                          "items": {
+                            "gap-1": "an"
+                          }
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+            ),
+        )
+        assertEquals(material.id, submission.materialId)
+        assertEquals(lesson.id, submission.lessonId)
+        assertNotNull(submission.submittedAt)
+        assertEquals("an", submission.content["answers"]["warmup"]["items"]["gap-1"].asText())
+        assertEquals(submission.id, materialController.scheduledLessonMaterialSubmission(student, lesson.id).id)
         val directReadError = assertFailsWith<ResponseStatusException> {
             materialController.get(student, material.id)
         }

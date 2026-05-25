@@ -1234,6 +1234,11 @@ textarea {
     padding: 0.875rem;
   }
 
+  .playsay-material-preview {
+    overflow: hidden;
+    padding: 0.75rem;
+  }
+
   .playsay-flashcards {
     grid-template-columns: 1fr;
   }
@@ -1243,25 +1248,32 @@ textarea {
   }
 
   .playsay-matching-exercise {
-    grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
-    gap: 1.25rem;
+    width: min(100%, calc(100vw - 3.5rem));
+    max-width: 100%;
+    grid-template-columns: minmax(4.75rem, 0.8fr) minmax(0, 1.2fr);
+    gap: 0.625rem;
   }
 
   .playsay-match-word {
     min-height: 2.75rem;
-    padding: 0.55rem 0.625rem;
-    font-size: 0.875rem;
+    padding: 0.5rem 0.55rem;
+    font-size: 0.8125rem;
   }
 
   .playsay-match-picture {
-    grid-template-columns: 3.25rem minmax(0, 1fr);
+    grid-template-columns: 2.75rem minmax(0, 1fr);
     min-height: 4.25rem;
-    padding: 0.5rem;
+    gap: 0.45rem;
+    padding: 0.45rem;
   }
 
   .playsay-match-picture img,
   .playsay-match-generated-thumb {
-    width: 3.25rem;
+    width: 2.75rem;
+  }
+
+  .playsay-match-picture span:not(.playsay-match-generated-thumb) {
+    font-size: 0.8125rem;
   }
 
   .playsay-match-picture small {

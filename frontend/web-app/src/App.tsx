@@ -40,6 +40,7 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  ScreenShare,
   Send,
   ShieldCheck,
   Sparkles,
@@ -148,9 +149,12 @@ type LessonRoomSession = LiveKitRoomToken & {
   courseTitle: string | null;
   lessonId: string;
   lessonEndsAt: string | null;
+  lessonTemplateId: string | null;
   lessonStartsAt: string | null;
+  lessonStatus: string;
   lessonTitle: string;
   lessonType: string;
+  materialId: string | null;
   participants: ScheduledLesson["participants"];
   teacherName: string | null;
 };
@@ -170,6 +174,8 @@ type AnnotationStroke = {
 
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
 type ClassroomStripLayout = "single" | "row";
+type ClassroomVideoMode = "lesson" | "videoOnly";
+type WorkspaceTab = "schedule" | "materials" | "courses";
 
 type MaterialBlockType =
   | "text"
@@ -274,6 +280,7 @@ export function App() {
   const [roomLoadingLessonId, setRoomLoadingLessonId] = useState<string | null>(null);
   const [roomMessage, setRoomMessage] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("schedule");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const routeLessonId = classroomLessonIdFromPath(currentPath);
 
@@ -349,6 +356,7 @@ export function App() {
   const isAuthenticated = status === "authenticated" && profile !== null;
   const isAdmin = profile?.roles.includes("ADMIN") ?? false;
   const isClassroomOpen = roomSession !== null;
+  const workspaceTabs = workspaceTabsForProfile(profile);
   const nextJoinableLesson = [...scheduledLessons]
     .filter((lesson) => isJoinableScheduledLesson(lesson, nowMs))
     .sort((left, right) => compareJoinableLessons(left, right, nowMs))[0] ?? null;
@@ -359,6 +367,12 @@ export function App() {
     const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!workspaceTabs.some((tab) => tab.id === workspaceTab)) {
+      setWorkspaceTab("schedule");
+    }
+  }, [workspaceTab, workspaceTabs]);
 
   useEffect(() => {
     if (!routeLessonId && roomSession) {
@@ -706,6 +720,50 @@ export function App() {
     }
   }
 
+  async function assignMaterialToScheduledLesson(lessonId: string, materialId: string | null): Promise<ScheduledLesson | null> {
+    const lesson = scheduledLessons.find((item) => item.id === lessonId);
+    if (!lesson) {
+      setRoomMessage("Занятие не найдено в расписании");
+      return null;
+    }
+
+    setMaterialLoading(true);
+    setRoomMessage(null);
+    try {
+      const updated = await editScheduledLesson(lessonId, {
+        lessonTemplateId: lesson.lessonTemplateId ?? null,
+        materialId,
+        scheduledStart: lesson.scheduledStart ?? null,
+        scheduledEnd: lesson.scheduledEnd ?? null,
+        status: lesson.status as ScheduledLessonInput["status"],
+        type: lesson.type === "INDIVIDUAL" ? "INDIVIDUAL" : "GROUP",
+        participantSubjects: lesson.participants.map((participant) => participant.subject),
+      });
+      setScheduledLessons((current) => current.map((item) => (item.id === lessonId ? updated : item)));
+      setRoomSession((current) => (
+        current?.lessonId === lessonId
+          ? {
+              ...current,
+              lessonEndsAt: updated.scheduledEnd ?? current.lessonEndsAt,
+              lessonStartsAt: updated.scheduledStart ?? current.lessonStartsAt,
+              lessonStatus: updated.status,
+              lessonTitle: updated.lessonTitle ?? current.lessonTitle,
+              lessonType: updated.type,
+              materialId: updated.materialId ?? null,
+              participants: updated.participants,
+            }
+          : current
+      ));
+      setRoomMessage(materialId ? "Материал назначен" : "Материал снят");
+      return updated;
+    } catch (caught) {
+      setRoomMessage(applySessionError(caught, "Не удалось назначить материал"));
+      return null;
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
   async function cancelScheduledLesson(lesson: ScheduledLesson) {
     setScheduleLoading(true);
     setScheduleMessage(null);
@@ -759,9 +817,12 @@ export function App() {
         courseTitle: lesson.courseTitle ?? null,
         lessonId: lesson.id,
         lessonEndsAt: lesson.scheduledEnd ?? null,
+        lessonTemplateId: lesson.lessonTemplateId ?? null,
         lessonStartsAt: lesson.scheduledStart ?? null,
+        lessonStatus: lesson.status,
         lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? "Занятие",
         lessonType: lesson.type,
+        materialId: lesson.materialId ?? null,
         participants: lesson.participants,
         teacherName: lesson.teacherName ?? null,
       });
@@ -843,7 +904,13 @@ export function App() {
         )}
 
         {roomSession ? (
-          <LiveLessonExperience onLeave={leaveScheduledLessonRoom} profile={profile} session={roomSession} />
+          <LiveLessonExperience
+            materials={materials}
+            onAssignMaterial={(lessonId, materialId) => assignMaterialToScheduledLesson(lessonId, materialId)}
+            onLeave={leaveScheduledLessonRoom}
+            profile={profile}
+            session={roomSession}
+          />
         ) : (
           <div className="grid flex-1 gap-5">
             {profileOpen ? (
@@ -865,55 +932,65 @@ export function App() {
               />
             ) : null}
 
-            <SchedulePanel
-              courses={courses}
-              disabled={!isAuthenticated || scheduleLoading}
-              lessons={courseLessons}
-              loading={scheduleLoading}
-              message={scheduleMessage}
-              nowMs={nowMs}
-              onCancel={(lesson) => void cancelScheduledLesson(lesson)}
-              onCreate={(input) => void createScheduledLesson(input)}
-              onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
-              onJoin={(lesson) => void joinScheduledLesson(lesson)}
-              onRefresh={() => void refreshSchedule()}
-              profile={profile}
-              roomLoadingLessonId={roomLoadingLessonId}
-              roomMessage={roomMessage}
-              scheduledLessons={scheduledLessons}
-              studentUsers={studentUsers}
-            />
+            {workspaceTabs.length > 1 ? (
+              <WorkspaceTabs activeTab={workspaceTab} onSelect={setWorkspaceTab} tabs={workspaceTabs} />
+            ) : null}
 
-            <MaterialLibraryPanel
-              courses={courses}
-              disabled={!isAuthenticated || materialLoading}
-              lessons={courseLessons}
-              loading={materialLoading}
-              materials={materials}
-              message={materialMessage}
-              onArchive={(materialId) => void deleteMaterial(materialId)}
-              onDraft={(input) => generateMaterialDraft(input)}
-              onDraftFromUrl={(input) => generateMaterialDraftFromUrl(input)}
-              onGenerateImages={(materialId, input) => generateImagesForMaterial(materialId, input)}
-              onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
-              onRefresh={() => void refreshMaterials()}
-              onSave={(input, materialId) => upsertMaterial(input, materialId)}
-              profile={profile}
-            />
+            {workspaceTab === "schedule" ? (
+              <SchedulePanel
+                courses={courses}
+                disabled={!isAuthenticated || scheduleLoading}
+                lessons={courseLessons}
+                loading={scheduleLoading}
+                message={scheduleMessage}
+                nowMs={nowMs}
+                onCancel={(lesson) => void cancelScheduledLesson(lesson)}
+                onCreate={(input) => void createScheduledLesson(input)}
+                onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
+                onJoin={(lesson) => void joinScheduledLesson(lesson)}
+                onRefresh={() => void refreshSchedule()}
+                profile={profile}
+                roomLoadingLessonId={roomLoadingLessonId}
+                roomMessage={roomMessage}
+                scheduledLessons={scheduledLessons}
+                studentUsers={studentUsers}
+              />
+            ) : null}
 
-            <CourseWorkspacePanel
-              courses={courses}
-              disabled={!isAuthenticated || courseLoading}
-              lessons={courseLessons}
-              loading={courseLoading}
-              message={courseMessage}
-              onCreateCourse={(input) => void createCourse(input)}
-              onCreateLesson={(courseId, input) => void createLesson(courseId, input)}
-              onDeleteCourse={(courseId) => void deleteCourse(courseId)}
-              onDeleteLesson={(courseId, lessonId) => void deleteLesson(courseId, lessonId)}
-              onRefresh={() => void refreshCourses()}
-              profile={profile}
-            />
+            {workspaceTab === "materials" ? (
+              <MaterialLibraryPanel
+                courses={courses}
+                disabled={!isAuthenticated || materialLoading}
+                lessons={courseLessons}
+                loading={materialLoading}
+                materials={materials}
+                message={materialMessage}
+                onArchive={(materialId) => void deleteMaterial(materialId)}
+                onDraft={(input) => generateMaterialDraft(input)}
+                onDraftFromUrl={(input) => generateMaterialDraftFromUrl(input)}
+                onGenerateImages={(materialId, input) => generateImagesForMaterial(materialId, input)}
+                onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
+                onRefresh={() => void refreshMaterials()}
+                onSave={(input, materialId) => upsertMaterial(input, materialId)}
+                profile={profile}
+              />
+            ) : null}
+
+            {workspaceTab === "courses" ? (
+              <CourseWorkspacePanel
+                courses={courses}
+                disabled={!isAuthenticated || courseLoading}
+                lessons={courseLessons}
+                loading={courseLoading}
+                message={courseMessage}
+                onCreateCourse={(input) => void createCourse(input)}
+                onCreateLesson={(courseId, input) => void createLesson(courseId, input)}
+                onDeleteCourse={(courseId) => void deleteCourse(courseId)}
+                onDeleteLesson={(courseId, lessonId) => void deleteLesson(courseId, lessonId)}
+                onRefresh={() => void refreshCourses()}
+                profile={profile}
+              />
+            ) : null}
           </div>
         )}
       </section>
@@ -934,6 +1011,36 @@ function BrandMark() {
         <div className="text-xs font-bold text-muted-foreground">english studio</div>
       </div>
     </div>
+  );
+}
+
+function WorkspaceTabs({
+  activeTab,
+  onSelect,
+  tabs,
+}: {
+  activeTab: WorkspaceTab;
+  onSelect: (tab: WorkspaceTab) => void;
+  tabs: Array<{ id: WorkspaceTab; label: string; description: string }>;
+}) {
+  return (
+    <nav className="playsay-workspace-tabs" aria-label="Рабочие разделы">
+      {tabs.map((tab) => (
+        <button
+          className="playsay-workspace-tab"
+          data-active={activeTab === tab.id ? "true" : "false"}
+          key={tab.id}
+          onClick={() => onSelect(tab.id)}
+          type="button"
+        >
+          {workspaceTabIcon(tab.id)}
+          <span>
+            <strong>{tab.label}</strong>
+            <small>{tab.description}</small>
+          </span>
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -2401,10 +2508,14 @@ function ScheduledLessonCard({
 }
 
 function LiveLessonExperience({
+  materials,
+  onAssignMaterial,
   onLeave,
   profile,
   session,
 }: {
+  materials: LessonMaterial[];
+  onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   onLeave: () => void;
   profile: MeProfile | null;
   session: LessonRoomSession;
@@ -2412,9 +2523,11 @@ function LiveLessonExperience({
   const displayName = profile?.name ?? profile?.username ?? "Участник";
   const roleLabel = profile?.roles[0] ?? "STUDENT";
   const lessonTypeLabel = formatLessonType(session.lessonType);
+  const canManageLesson = canAssignLessons(profile);
+  const videoOnly = !session.materialId && !canManageLesson;
 
   return (
-    <div className="playsay-classroom-shell">
+    <div className="playsay-classroom-shell" data-video-only={videoOnly ? "true" : "false"}>
       <section className="playsay-video-rail">
         <div className="playsay-video-header">
           <div className="min-w-0">
@@ -2447,30 +2560,44 @@ function LiveLessonExperience({
             token={session.token}
             video
           >
-            <ClassroomVideoStage />
+            <ClassroomVideoStage mode={videoOnly ? "videoOnly" : "lesson"} />
           </LiveKitRoom>
         </div>
       </section>
 
-      <LessonWorkspace displayName={displayName} profile={profile} roleLabel={roleLabel} session={session} />
+      {videoOnly ? null : (
+        <LessonWorkspace
+          displayName={displayName}
+          materials={materials}
+          onAssignMaterial={onAssignMaterial}
+          profile={profile}
+          roleLabel={roleLabel}
+          session={session}
+        />
+      )}
     </div>
   );
 }
 
-function ClassroomVideoStage() {
+function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
   const controlsRef = useRef<HTMLDivElement | null>(null);
   const focusRef = useRef<HTMLDivElement | null>(null);
   const singlePipInitializedRef = useRef(false);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const [pipPosition, setPipPosition] = useState({ x: 12, y: 120 });
-  const tracks = useTracks(
+  const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
   );
-  const orderedTracks = [...tracks].sort((left, right) => Number(left.participant.isLocal) - Number(right.participant.isLocal));
-  const featuredTrack = orderedTracks[0];
-  const stripTracks = orderedTracks.slice(1);
+  const screenShareTracks = useTracks(
+    [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
+    { onlySubscribed: false },
+  );
+  const orderedCameraTracks = [...cameraTracks].sort((left, right) => Number(left.participant.isLocal) - Number(right.participant.isLocal));
+  const remoteScreenShareTrack = screenShareTracks.find((trackRef) => !trackRef.participant.isLocal);
+  const featuredTrack = remoteScreenShareTrack ?? orderedCameraTracks[0];
+  const stripTracks = remoteScreenShareTrack ? orderedCameraTracks : orderedCameraTracks.slice(1);
   const hasStrip = stripTracks.length > 0;
   const stripLayout = stripTracks.length > 1 ? "row" : "single";
   const canDragStrip = hasStrip && stripLayout === "single";
@@ -2565,6 +2692,11 @@ function ClassroomVideoStage() {
   }
 
   useEffect(() => {
+    if (mode === "videoOnly") {
+      singlePipInitializedRef.current = false;
+      return undefined;
+    }
+
     if (!hasStrip) {
       singlePipInitializedRef.current = false;
       return undefined;
@@ -2591,12 +2723,40 @@ function ClassroomVideoStage() {
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", keepPipInBounds);
     };
-  }, [hasStrip, stripLayout, stripTracks.length]);
+  }, [hasStrip, mode, stripLayout, stripTracks.length]);
+
+  if (mode === "videoOnly" && !remoteScreenShareTrack) {
+    return (
+      <div className="playsay-classroom-conference" data-layout="grid" data-mode="video-only">
+        <div className="playsay-video-grid" data-count={orderedCameraTracks.length || 1}>
+          {orderedCameraTracks.length > 0
+            ? orderedCameraTracks.map((trackRef) => (
+              <ClassroomGridVideoTile key={classroomTrackKey(trackRef)} trackRef={trackRef} />
+            ))
+            : (
+              <div className="playsay-video-grid-empty">
+                <Video className="h-6 w-6" />
+                <span>Участники появятся здесь</span>
+              </div>
+            )}
+        </div>
+        <ClassroomControlBar setControlsRef={(node) => { controlsRef.current = node; }} />
+        <RoomAudioRenderer />
+        <ConnectionStateToast />
+      </div>
+    );
+  }
 
   return (
-    <div className="playsay-classroom-conference" data-layout={stripLayout}>
+    <div className="playsay-classroom-conference" data-layout={stripLayout} data-screen-share={remoteScreenShareTrack ? "true" : "false"}>
       <div className="playsay-video-focus" ref={focusRef}>
         {featuredTrack ? <ParticipantTile trackRef={featuredTrack} /> : null}
+        {remoteScreenShareTrack ? (
+          <div className="playsay-screen-share-label">
+            <ScreenShare className="h-4 w-4" />
+            {participantDisplayName(remoteScreenShareTrack)}
+          </div>
+        ) : null}
         <div
           className="playsay-video-strip"
           data-draggable={canDragStrip ? "true" : "false"}
@@ -2620,13 +2780,36 @@ function ClassroomVideoStage() {
             : null}
         </div>
       </div>
-      <div className="lk-control-bar playsay-classroom-controls" ref={controlsRef}>
-        <TrackToggle source={Track.Source.Microphone}>Микрофон</TrackToggle>
-        <TrackToggle source={Track.Source.Camera}>Камера</TrackToggle>
-        <StartMediaButton label="Включить медиа" />
-      </div>
+      <ClassroomControlBar setControlsRef={(node) => { controlsRef.current = node; }} />
       <RoomAudioRenderer />
       <ConnectionStateToast />
+    </div>
+  );
+}
+
+function ClassroomControlBar({ setControlsRef }: { setControlsRef: (node: HTMLDivElement | null) => void }) {
+  return (
+    <div className="lk-control-bar playsay-classroom-controls" ref={setControlsRef}>
+      <TrackToggle source={Track.Source.Microphone}>Микрофон</TrackToggle>
+      <TrackToggle source={Track.Source.Camera}>Камера</TrackToggle>
+      <TrackToggle source={Track.Source.ScreenShare}>
+        <ScreenShare className="h-4 w-4" />
+        Экран
+      </TrackToggle>
+      <StartMediaButton label="Включить медиа" />
+    </div>
+  );
+}
+
+function ClassroomGridVideoTile({ trackRef }: { trackRef: ClassroomTrackReference }) {
+  const label = participantDisplayName(trackRef);
+
+  return (
+    <div className="playsay-video-grid-card">
+      <ParticipantTile trackRef={trackRef} />
+      <div className="playsay-video-card-label" title={label}>
+        {label}
+      </div>
     </div>
   );
 }
@@ -2652,11 +2835,15 @@ function ClassroomMiniVideoTile({
 
 function LessonWorkspace({
   displayName,
+  materials,
+  onAssignMaterial,
   profile,
   roleLabel,
   session,
 }: {
   displayName: string;
+  materials: LessonMaterial[];
+  onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   profile: MeProfile | null;
   roleLabel: string;
   session: LessonRoomSession;
@@ -2664,13 +2851,22 @@ function LessonWorkspace({
   const [material, setMaterial] = useState<LessonMaterial | null>(null);
   const [materialLoading, setMaterialLoading] = useState(false);
   const [materialError, setMaterialError] = useState<string | null>(null);
+  const [selectedMaterialId, setSelectedMaterialId] = useState(session.materialId ?? "");
+  const [assigningMaterial, setAssigningMaterial] = useState(false);
+  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
   const [submission, setSubmission] = useState<LessonMaterialSubmission | null>(null);
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [submissionSaving, setSubmissionSaving] = useState(false);
   const [submissionSnapshots, setSubmissionSnapshots] = useState<LessonMaterialSubmission[]>([]);
   const [submissionMonitorError, setSubmissionMonitorError] = useState<string | null>(null);
   const canMonitorSubmissions = canAssignLessons(profile);
+  const canManageMaterial = canAssignLessons(profile);
+  const selectableMaterials = materials.filter((item) => item.status !== "ARCHIVED");
   const lessonScore = canMonitorSubmissions ? averageSubmissionScore(submissionSnapshots) : submission?.score ?? null;
+
+  useEffect(() => {
+    setSelectedMaterialId(session.materialId ?? "");
+  }, [session.materialId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2699,7 +2895,7 @@ function LessonWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [session.lessonId]);
+  }, [session.lessonId, session.materialId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2776,6 +2972,34 @@ function LessonWorkspace({
     }
   }
 
+  async function assignMaterial() {
+    setAssigningMaterial(true);
+    setAssignmentMessage(null);
+    try {
+      const updated = await onAssignMaterial(session.lessonId, selectedMaterialId || null);
+      if (!updated) {
+        setAssignmentMessage("Материал не назначен");
+        return;
+      }
+
+      if (!updated.materialId) {
+        setMaterial(null);
+        setMaterialError(null);
+        setAssignmentMessage("Материал снят");
+        return;
+      }
+
+      const lessonMaterial = await fetchScheduledLessonMaterial(session.lessonId);
+      setMaterial(lessonMaterial);
+      setMaterialError(null);
+      setAssignmentMessage("Материал назначен");
+    } catch (caught) {
+      setAssignmentMessage(caught instanceof Error ? caught.message : "Не удалось назначить материал");
+    } finally {
+      setAssigningMaterial(false);
+    }
+  }
+
   return (
     <section className="playsay-workbench">
       <header className="playsay-workbench-topbar">
@@ -2817,13 +3041,39 @@ function LessonWorkspace({
               {session.courseTitle ?? "Play&Say"} · {session.roomName}
             </p>
           </div>
-          {canAssignLessons(profile) ? (
-            <Button disabled type="button" variant="outline">
-              <Plus className="h-4 w-4" />
-              Назначить
-            </Button>
+          {canManageMaterial ? (
+            <div className="playsay-lesson-material-picker">
+              <select
+                className="playsay-input"
+                disabled={assigningMaterial || selectableMaterials.length === 0}
+                onChange={(event) => setSelectedMaterialId(event.target.value)}
+                value={selectedMaterialId}
+              >
+                <option value="">Материал не выбран</option>
+                {selectableMaterials.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+              <Button
+                disabled={assigningMaterial || selectedMaterialId === (session.materialId ?? "")}
+                onClick={() => void assignMaterial()}
+                type="button"
+                variant="outline"
+              >
+                {assigningMaterial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Назначить
+              </Button>
+            </div>
           ) : null}
         </div>
+
+        {assignmentMessage ? (
+          <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+            {assignmentMessage}
+          </div>
+        ) : null}
 
         {material ? (
           <div className="playsay-assignment-strip" aria-label="Назначенные задания">
@@ -2838,9 +3088,7 @@ function LessonWorkspace({
           </div>
         ) : (
           <div className="playsay-assignment-strip" aria-label="Назначенные задания">
-            <AssignmentStub active title="Speaking warm-up" tag="Speaking" />
-            <AssignmentStub title="Favourite game" tag="Writing" />
-            <AssignmentStub title="Mini dialogue" tag="Grammar" />
+            <AssignmentStub active title="Материал не назначен" tag="Урок" />
           </div>
         )}
 
@@ -2864,6 +3112,11 @@ function LessonWorkspace({
             submissionSaving={submissionSaving}
             teacherName={session.teacherName ?? displayName}
           />
+        ) : canManageMaterial ? (
+          <div className="playsay-task-board playsay-material-loading">
+            <BookOpen className="h-5 w-5 text-primary" />
+            <span>Выберите материал для урока</span>
+          </div>
         ) : (
           <>
             {materialError ? (
@@ -5144,6 +5397,36 @@ function pointsToSvgPath(points: AnnotationPoint[]): string {
 
 function canAssignLessons(profile: MeProfile | null): boolean {
   return profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+}
+
+function workspaceTabsForProfile(profile: MeProfile | null): Array<{ id: WorkspaceTab; label: string; description: string }> {
+  const scheduleTab = {
+    id: "schedule" as const,
+    label: canAssignLessons(profile) ? "Уроки" : "Мои уроки",
+    description: canAssignLessons(profile) ? "расписание и вход" : "ближайшие занятия",
+  };
+
+  if (!canAssignLessons(profile)) {
+    return [scheduleTab];
+  }
+
+  return [
+    scheduleTab,
+    { id: "materials", label: "Материалы", description: "конструктор уроков" },
+    { id: "courses", label: "Курсы", description: "программы и шаблоны" },
+  ];
+}
+
+function workspaceTabIcon(tab: WorkspaceTab): ReactNode {
+  switch (tab) {
+    case "materials":
+      return <BookOpen className="h-4 w-4" />;
+    case "courses":
+      return <Layers3 className="h-4 w-4" />;
+    case "schedule":
+    default:
+      return <CalendarDays className="h-4 w-4" />;
+  }
 }
 
 function materialSubmissionUserLabel(submission: LessonMaterialSubmission): string {

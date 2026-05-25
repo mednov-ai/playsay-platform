@@ -492,7 +492,9 @@ textarea {
 }
 
 .playsay-submission-pill time {
+  flex: 0 0 auto;
   color: hsl(var(--foreground));
+  white-space: nowrap;
 }
 
 .playsay-submission-monitor-error {
@@ -1348,7 +1350,7 @@ textarea {
   .playsay-submission-pill,
   .playsay-submission-monitor-empty,
   .playsay-submission-monitor-error {
-    max-width: 10rem;
+    max-width: 100%;
   }
 
   .playsay-task-board {

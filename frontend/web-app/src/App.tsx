@@ -300,6 +300,7 @@ type MaterialAnswerState = Record<string, MaterialAnswerBlock>;
 
 type MaterialFormState = {
   id: string | null;
+  updatedAt: string | null;
   title: string;
   description: string;
   language: string;
@@ -1431,10 +1432,8 @@ function MaterialLibraryPanel({
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
   const canGenerateUrlDraft = draftUrl.trim().length > 0;
-  const missingImageTargetsCount = countMaterialImageTargets(form.document);
   const allImageTargetsCount = countMaterialImageTargets(form.document, { includeExisting: true });
-  const canGenerateImages = missingImageTargetsCount > 0;
-  const canRegenerateImages = allImageTargetsCount > 0;
+  const canGenerateImages = allImageTargetsCount > 0;
 
   useEffect(() => {
     if (selectedLessonKey || lessonOptions.length === 0) {
@@ -1600,7 +1599,7 @@ function MaterialLibraryPanel({
     }
     const targetCount = regenerate
       ? countMaterialImageTargets(form.document, { includeExisting: true })
-      : generateMissing ? countMaterialImageTargets(form.document) : 0;
+      : generateMissing ? countMaterialImageTargets(form.document, { includeExisting: true }) : 0;
     if (targetCount === 0) {
       return saved;
     }
@@ -1613,13 +1612,18 @@ function MaterialLibraryPanel({
 
       let currentMaterial = saved;
       for (let index = 1; index <= targetCount; index += 1) {
-        setImageGenerationProgress({ current: index, label: "Генерируем картинки", total: targetCount });
+        setImageGenerationProgress({ current: index, label: "Генерируем/обновляем картинки", total: targetCount });
         const generated = await onGenerateImages(currentMaterial.id, { maxImages: 1 });
         if (!generated) {
           return currentMaterial;
         }
+        const changed = generated.updatedAt !== currentMaterial.updatedAt ||
+          JSON.stringify(generated.document) !== JSON.stringify(currentMaterial.document);
         currentMaterial = generated;
         setForm(materialToForm(generated));
+        if (!changed) {
+          break;
+        }
       }
       return currentMaterial;
     } finally {
@@ -1632,21 +1636,6 @@ function MaterialLibraryPanel({
     if (saved) {
       setForm(materialToForm(saved));
       setAuthorMode("preview");
-    }
-  }
-
-  async function generateImagesForBlock(blockId: string) {
-    const saved = await onSave(materialFormToInput(form), form.id ?? undefined);
-    if (!saved) {
-      return;
-    }
-    setImageGenerationProgress({ current: 1, label: "Обновляем картинку", total: 1 });
-    try {
-      const generated = await onGenerateImages(saved.id, { blockId, maxImages: 1, regenerate: true });
-      setForm(materialToForm(generated ?? saved));
-      setAuthorMode("preview");
-    } finally {
-      setImageGenerationProgress(null);
     }
   }
 
@@ -1890,8 +1879,8 @@ function MaterialLibraryPanel({
                       Текст
                     </Button>
                     <Button
-                      disabled={disabled || !canRegenerateImages || form.title.trim().length === 0}
-                      onClick={() => void generateCurrentImages(true)}
+                      disabled={disabled || !canGenerateImages || form.title.trim().length === 0}
+                      onClick={() => void generateCurrentImages()}
                       type="button"
                       variant="outline"
                     >
@@ -1920,7 +1909,6 @@ function MaterialLibraryPanel({
                     onAssetTagsChange={updatePreviewAssetTags}
                     onBlockPatchCommit={(blockId, patch) => void persistMaterialBlockPatch(blockId, patch)}
                     onBlockPatch={updateMaterialBlock}
-                    onGenerateImagesForBlock={(blockId) => void generateImagesForBlock(blockId)}
                   />
                 </div>
                 {message ? (
@@ -4018,7 +4006,6 @@ function LessonMaterialDocumentView({
   onAssetTagsChange,
   onBlockPatchCommit,
   onBlockPatch,
-  onGenerateImagesForBlock,
   score,
 }: {
   answers?: MaterialAnswerState;
@@ -4028,7 +4015,6 @@ function LessonMaterialDocumentView({
   onAssetTagsChange?: (assetId: string, tags: string[]) => Promise<LessonMaterialAsset | null>;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
-  onGenerateImagesForBlock?: (blockId: string) => void;
   score?: number | null;
 }) {
   const document = editorDocumentFromJson(material.document);
@@ -4091,7 +4077,7 @@ function LessonMaterialDocumentView({
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.clear();
     };
-  }, [assetKey, material.id]);
+  }, [assetKey, material.id, material.updatedAt]);
 
   return (
     <div className="playsay-rendered-material">
@@ -4121,7 +4107,6 @@ function LessonMaterialDocumentView({
             }}
             onBlockPatchCommit={onBlockPatchCommit}
             onBlockPatch={onBlockPatch}
-            onGenerateImagesForBlock={onGenerateImagesForBlock}
           />
         ))}
       </div>
@@ -4139,7 +4124,6 @@ function RenderedMaterialBlock({
   onAssetTagsChange,
   onBlockPatchCommit,
   onBlockPatch,
-  onGenerateImagesForBlock,
 }: {
   answer?: MaterialAnswerBlock;
   assetTags: Record<string, string[]>;
@@ -4150,7 +4134,6 @@ function RenderedMaterialBlock({
   onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
-  onGenerateImagesForBlock?: (blockId: string) => void;
 }) {
   const contextLabel = materialBlockContextLabel(block);
   const blockSection = (children: ReactNode, className = "playsay-render-block") => (
@@ -4221,7 +4204,6 @@ function RenderedMaterialBlock({
                     assetId={assetId}
                     block={block}
                     onAssetTagsChange={onAssetTagsChange}
-                    onGenerate={() => onGenerateImagesForBlock?.(block.id)}
                     onResizeCommit={(height) => onBlockPatchCommit?.(block.id, { height })}
                     onResize={(height) => onBlockPatch?.(block.id, { height })}
                     tags={assetId ? assetTags[assetId] ?? [] : []}
@@ -4234,7 +4216,7 @@ function RenderedMaterialBlock({
                 <ImageIcon className="h-6 w-6 text-primary" />
                 <figcaption><RenderedMarkdown className="playsay-caption-markdown" value={block.caption || block.prompt || block.url || "Изображение"} /></figcaption>
                 {mode === "teacherPreview" ? (
-                  <MaterialImagePromptPopover block={block} onGenerate={() => onGenerateImagesForBlock?.(block.id)} />
+                  <MaterialImagePromptPopover block={block} />
                 ) : null}
               </figure>
             )}
@@ -4324,7 +4306,6 @@ function MaterialImageInlineTools({
   assetId,
   block,
   onAssetTagsChange,
-  onGenerate,
   onResizeCommit,
   onResize,
   tags,
@@ -4332,7 +4313,6 @@ function MaterialImageInlineTools({
   assetId: string | null;
   block: MaterialEditorBlock;
   onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
-  onGenerate?: () => void;
   onResizeCommit?: (height: number) => void;
   onResize?: (height: number) => void;
   tags: string[];
@@ -4366,7 +4346,7 @@ function MaterialImageInlineTools({
 
   return (
     <div className="playsay-image-tools">
-      <MaterialImagePromptPopover block={block} onGenerate={onGenerate} />
+      <MaterialImagePromptPopover block={block} />
       {assetId ? (
         <MaterialAssetTags
           assetId={assetId}
@@ -4387,13 +4367,7 @@ function MaterialImageInlineTools({
   );
 }
 
-function MaterialImagePromptPopover({
-  block,
-  onGenerate,
-}: {
-  block: MaterialEditorBlock;
-  onGenerate?: () => void;
-}) {
+function MaterialImagePromptPopover({ block }: { block: MaterialEditorBlock }) {
   const [open, setOpen] = useState(false);
   const prompt = block.prompt?.trim() || block.caption?.trim() || block.title || "Сгенерировать картинку для этого блока.";
 
@@ -4413,17 +4387,6 @@ function MaterialImagePromptPopover({
         <span className="playsay-image-prompt-popover" role="dialog">
           <strong>Промпт</strong>
           <span>{prompt}</span>
-          <Button
-            disabled={!onGenerate}
-            onClick={() => {
-              setOpen(false);
-              onGenerate?.();
-            }}
-            type="button"
-          >
-            <Sparkles className="h-4 w-4" />
-            Сгенерить
-          </Button>
         </span>
       ) : null}
     </span>
@@ -6068,6 +6031,7 @@ async function fetchCourseBundle(): Promise<{ courses: Course[]; lessons: Course
 function defaultMaterialForm(): MaterialFormState {
   return {
     id: null,
+    updatedAt: null,
     title: "",
     description: "",
     language: "en",
@@ -6267,6 +6231,7 @@ function materialToForm(material: LessonMaterial): MaterialFormState {
 
   return {
     id: material.id,
+    updatedAt: material.updatedAt,
     title: material.title,
     description: material.description ?? "",
     language: material.language || "en",
@@ -6285,6 +6250,7 @@ function materialDraftToForm(draft: LessonMaterialDraft): MaterialFormState {
 
   return {
     id: null,
+    updatedAt: null,
     title: draft.title,
     description: draft.description ?? "",
     language: draft.language || "en",
@@ -6307,6 +6273,7 @@ function duplicateMaterialForm(form: MaterialFormState): MaterialFormState {
   return {
     ...form,
     id: null,
+    updatedAt: null,
     title: form.title.trim() ? `Копия ${form.title.trim()}` : "Копия материала",
     visibility: "PRIVATE",
     status: "DRAFT",
@@ -6391,7 +6358,7 @@ function materialPreviewFromForm(form: MaterialFormState): LessonMaterial {
     ...form,
     title: form.title.trim() || "Новый материал",
   });
-  const now = new Date().toISOString();
+  const now = form.updatedAt ?? new Date().toISOString();
 
   return {
     id: form.id ?? "preview",

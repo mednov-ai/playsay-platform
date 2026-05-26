@@ -1,5 +1,6 @@
 package com.playsay.gateway
 
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
 import java.time.Instant
@@ -619,6 +620,8 @@ class MaterialControllerTest @Autowired constructor(
         assertTrue(assets.all { asset -> asset.externalUrl == null })
         assertTrue(assets.all { asset -> asset.storageKey?.startsWith("material-assets/${material.id}/") == true })
         assertTrue(assets.all { asset -> asset.contentUrl?.startsWith("/api/materials/${material.id}/assets/") == true })
+        assertTrue(assets.all { asset -> asset.metadata["tags"].isArray && asset.metadata["tags"].size() > 0 })
+        assertTrue(assets.all { asset -> asset.metadata["sourcePrompt"].asText().isNotBlank() })
         val owlAsset = assets.single { asset -> asset.metadata["targetId"].asText() == "pair-owl" }
         assertTrue(owlAsset.metadata["tags"].isArray)
         assertTrue(owlAsset.metadata["tags"].any { tag -> tag.asText() == "owl" })
@@ -643,6 +646,32 @@ class MaterialControllerTest @Autowired constructor(
             MaterialAssetUpdateRequest(tags = listOf("Bird", "custom tag", "a", "custom tag")),
         )
         assertEquals(listOf("bird", "custom-tag"), updatedAsset.metadata["tags"].map { tag -> tag.asText() })
+
+        val editedDocument = regenerated.document.deepCopy<ObjectNode>()
+        (editedDocument["pages"][0]["blocks"][1]["pairs"][0] as ObjectNode)
+            .put("imagePrompt", "child-friendly workbook snowy owl illustration")
+        materialController.update(
+            teacher,
+            material.id,
+            LessonMaterialRequest(
+                title = "Birds",
+                document = editedDocument,
+            ),
+        )
+
+        val promptChanged = materialController.generateImages(
+            teacher,
+            material.id,
+            MaterialGenerateImagesRequest(maxImages = 12),
+        )
+        val promptChangedPairs = promptChanged.document["pages"][0]["blocks"][1]["pairs"]
+        val promptChangedAssets = materialController.listAssets(teacher, material.id)
+        val promptChangedOwlAsset = promptChangedAssets.single { asset -> asset.metadata["targetId"].asText() == "pair-owl" }
+        assertEquals(regeneratedAssets.map { asset -> asset.id }.toSet(), promptChangedAssets.map { asset -> asset.id }.toSet())
+        assertEquals(pairs[0]["imageUrl"].asText(), promptChangedPairs[0]["imageUrl"].asText())
+        assertEquals("child-friendly workbook snowy owl illustration", promptChangedOwlAsset.metadata["sourcePrompt"].asText())
+        assertTrue(promptChangedOwlAsset.metadata["tags"].any { tag -> tag.asText() == "custom-tag" })
+        assertTrue(promptChangedOwlAsset.metadata["tags"].any { tag -> tag.asText() == "snowy" })
     }
 
     private fun authentication(

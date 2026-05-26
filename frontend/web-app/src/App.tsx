@@ -4037,40 +4037,46 @@ function RenderedFillGapExercise({
             <label>
               {prompt.before ? <span>{prompt.before}</span> : null}
               {options.length > 0 ? (
-                <select
-                  aria-label={`gap ${index + 1}`}
-                  className="playsay-inline-select"
-                  data-status={status.kind}
-                  disabled={status.locked}
-                  onChange={(event) => checkItem(itemKey, event.target.value)}
-                  value={answers[itemKey] ?? ""}
-                >
-                  <option value="">Выбрать</option>
-                  {options.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="playsay-inline-answer" data-status={status.kind}>
-                  <input
+                <span className="playsay-inline-answer-wrap">
+                  <select
                     aria-label={`gap ${index + 1}`}
-                    disabled={status.locked}
-                    onChange={(event) => updateItemValue(itemKey, event.target.value)}
-                    onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
-                    placeholder={!answers[itemKey]?.trim() ? hintPreview || undefined : undefined}
+                    className="playsay-inline-select"
+                    data-status={status.kind}
+                    disabled={status.locked || status.correct}
+                    onChange={(event) => checkItem(itemKey, event.target.value)}
                     value={answers[itemKey] ?? ""}
-                  />
-                  {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
-                  <button
-                    aria-label="Проверить ответ"
-                    className="playsay-inline-check"
-                    disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
-                    onClick={() => checkItem(itemKey)}
-                    title="Проверить ответ (Enter)"
-                    type="button"
                   >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  </button>
+                    <option value="">Выбрать</option>
+                    {options.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                  <MaterialAttemptBar status={status} />
+                </span>
+              ) : (
+                <span className="playsay-inline-answer-wrap">
+                  <span className="playsay-inline-answer" data-status={status.kind}>
+                    <input
+                      aria-label={`gap ${index + 1}`}
+                      disabled={status.locked || status.correct}
+                      onChange={(event) => updateItemValue(itemKey, event.target.value)}
+                      onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
+                      placeholder={!answers[itemKey]?.trim() ? hintPreview || undefined : undefined}
+                      value={answers[itemKey] ?? ""}
+                    />
+                    {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
+                    <button
+                      aria-label="Проверить ответ"
+                      className="playsay-inline-check"
+                      disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
+                      onClick={() => checkItem(itemKey)}
+                      title="Проверить ответ (Enter)"
+                      type="button"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                  <MaterialAttemptBar status={status} />
                 </span>
               )}
               {prompt.after ? <span>{prompt.after}</span> : null}
@@ -4170,41 +4176,47 @@ function RenderedChoiceExercise({
             <label className="playsay-choice-row" data-status={status.kind}>
               <span>{item.prompt}</span>
               {options.length > 0 ? (
-                <select
-                  aria-label={`choice ${index + 1}`}
-                  className="playsay-inline-select"
-                  data-status={status.kind}
-                  disabled={status.locked}
-                  onChange={(event) => checkItem(itemKey, event.target.value)}
-                  value={answers[itemKey] ?? ""}
-                >
-                  <option value="">Выбрать</option>
-                  {options.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="playsay-inline-answer" data-status={status.kind}>
-                  <input
+                <span className="playsay-inline-answer-wrap">
+                  <select
                     aria-label={`choice ${index + 1}`}
-                    className="playsay-inline-input"
-                    disabled={status.locked}
-                    onChange={(event) => updateItemValue(itemKey, event.target.value)}
-                    onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
-                    placeholder={!answers[itemKey]?.trim() ? hintPreview || undefined : undefined}
+                    className="playsay-inline-select"
+                    data-status={status.kind}
+                    disabled={status.locked || status.correct}
+                    onChange={(event) => checkItem(itemKey, event.target.value)}
                     value={answers[itemKey] ?? ""}
-                  />
-                  {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
-                  <button
-                    aria-label="Проверить ответ"
-                    className="playsay-inline-check"
-                    disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
-                    onClick={() => checkItem(itemKey)}
-                    title="Проверить ответ (Enter)"
-                    type="button"
                   >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  </button>
+                    <option value="">Выбрать</option>
+                    {options.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                  <MaterialAttemptBar status={status} />
+                </span>
+              ) : (
+                <span className="playsay-inline-answer-wrap">
+                  <span className="playsay-inline-answer" data-status={status.kind}>
+                    <input
+                      aria-label={`choice ${index + 1}`}
+                      className="playsay-inline-input"
+                      disabled={status.locked || status.correct}
+                      onChange={(event) => updateItemValue(itemKey, event.target.value)}
+                      onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
+                      placeholder={!answers[itemKey]?.trim() ? hintPreview || undefined : undefined}
+                      value={answers[itemKey] ?? ""}
+                    />
+                    {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
+                    <button
+                      aria-label="Проверить ответ"
+                      className="playsay-inline-check"
+                      disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
+                      onClick={() => checkItem(itemKey)}
+                      title="Проверить ответ (Enter)"
+                      type="button"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                  <MaterialAttemptBar status={status} />
                 </span>
               )}
             </label>
@@ -4229,40 +4241,54 @@ function MaterialAnswerTools({
   onHint: () => void;
   status: MaterialAnswerStatus;
 }) {
-  const Icon = status.icon;
-  const showStatus = status.kind !== "empty";
   const nextHintNumber = Math.min(status.hintsUsed + 1, MAX_MANUAL_INPUT_HINTS);
-  if (!showStatus && !canRequestHint) {
+  if (!canRequestHint) {
     return null;
   }
 
   return (
     <div className="playsay-answer-tools">
-      {showStatus ? (
-        <span className="playsay-answer-status" data-kind={status.kind} title={status.label}>
-          <Icon className="h-3.5 w-3.5" />
-          {status.label}
-          {status.incorrectAttempts > 0 && status.kind !== "wrong" && status.kind !== "locked" ? (
-            <small className="playsay-answer-marker" data-kind="attempt">{status.incorrectAttempts}</small>
-          ) : null}
-          {status.hintsUsed > 0 ? (
-            <small className="playsay-answer-marker" data-kind="hint">{status.hintsUsed}</small>
-          ) : null}
-        </span>
-      ) : null}
-      {canRequestHint ? (
-        <button
-          aria-label={`Подсказка ${nextHintNumber} из ${MAX_MANUAL_INPUT_HINTS}`}
-          className="playsay-hint-button"
-          onClick={onHint}
-          title={`Подсказка ${nextHintNumber} из ${MAX_MANUAL_INPUT_HINTS}`}
-          type="button"
-        >
-          <FileText className="h-3.5 w-3.5" />
-          {nextHintNumber}/{MAX_MANUAL_INPUT_HINTS}
-        </button>
-      ) : null}
+      <button
+        aria-label={`Подсказка ${nextHintNumber} из ${MAX_MANUAL_INPUT_HINTS}`}
+        className="playsay-hint-button"
+        onClick={onHint}
+        title={`Подсказка ${nextHintNumber} из ${MAX_MANUAL_INPUT_HINTS}`}
+        type="button"
+      >
+        <FileText className="h-3.5 w-3.5" />
+        {nextHintNumber}/{MAX_MANUAL_INPUT_HINTS}
+      </button>
     </div>
+  );
+}
+
+function MaterialAttemptBar({ status }: { status: MaterialAnswerStatus }) {
+  if (status.kind === "empty" || status.kind === "draft") {
+    return null;
+  }
+
+  const maxAttempts = Math.max(1, status.maxAttempts);
+  const redPercent = status.locked
+    ? 100
+    : Math.min(100, Math.max(0, (status.incorrectAttempts / maxAttempts) * 100));
+  const label = status.locked
+    ? `Попытки закончились: ${status.incorrectAttempts} из ${maxAttempts}`
+    : status.correct
+      ? `Ответ принят: ошибок до ответа ${status.incorrectAttempts} из ${maxAttempts}`
+      : `Ошибок ${status.incorrectAttempts} из ${maxAttempts}`;
+  const style = {
+    "--playsay-answer-red": `${redPercent}%`,
+  } as CSSProperties;
+
+  return (
+    <span
+      aria-label={label}
+      className="playsay-answer-attempt-bar"
+      data-kind={status.kind}
+      role="img"
+      style={style}
+      title={label}
+    />
   );
 }
 
@@ -4635,19 +4661,19 @@ function materialAnswerStatus(
     return { ...baseStatus, icon: AlertCircle, kind: "empty", label: "Нет ответа" };
   }
   if (locked) {
-    return { ...baseStatus, icon: LockKeyhole, kind: "locked", label: "Закрыто", locked: true };
+    return { ...baseStatus, icon: LockKeyhole, kind: "locked", label: "Попытки закончились", locked: true };
   }
   if (requiresExplicitCheck && !currentValueChecked) {
     return { ...baseStatus, icon: CheckCircle2, kind: "draft", label: "Проверить" };
   }
   if (visibleCorrect && hints.length > 0) {
-    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "hint", label: "Верно" };
+    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "hint", label: "Ответ принят" };
   }
   if (visibleCorrect && incorrectAttempts > 0) {
-    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "retry", label: "Верно" };
+    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "retry", label: "Ответ принят" };
   }
   if (visibleCorrect) {
-    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "correct", label: "Верно" };
+    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "correct", label: "Ответ принят" };
   }
   return { ...baseStatus, icon: AlertCircle, kind: "wrong", label: `${Math.max(1, incorrectAttempts)} ошибка` };
 }

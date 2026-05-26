@@ -4043,10 +4043,15 @@ function RenderedFillGapExercise({
                     className="playsay-inline-select"
                     data-status={status.kind}
                     disabled={status.locked || status.correct}
-                    onChange={(event) => checkItem(itemKey, event.target.value)}
+                    onChange={(event) => {
+                      if (!event.target.value) {
+                        return;
+                      }
+                      checkItem(itemKey, event.target.value);
+                    }}
                     value={answers[itemKey] ?? ""}
                   >
-                    <option value="">Выбрать</option>
+                    <option disabled hidden value="">Выбрать</option>
                     {options.map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
@@ -4182,10 +4187,15 @@ function RenderedChoiceExercise({
                     className="playsay-inline-select"
                     data-status={status.kind}
                     disabled={status.locked || status.correct}
-                    onChange={(event) => checkItem(itemKey, event.target.value)}
+                    onChange={(event) => {
+                      if (!event.target.value) {
+                        return;
+                      }
+                      checkItem(itemKey, event.target.value);
+                    }}
                     value={answers[itemKey] ?? ""}
                   >
-                    <option value="">Выбрать</option>
+                    <option disabled hidden value="">Выбрать</option>
                     {options.map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}

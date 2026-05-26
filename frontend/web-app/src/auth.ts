@@ -125,6 +125,9 @@ export type LessonMaterialGenerateImagesInput = {
   maxImages?: number | null;
   regenerate?: boolean | null;
 };
+export type LessonMaterialAssetUpdateInput = {
+  tags?: string[] | null;
+};
 export type LessonMaterialDraft = Omit<LessonMaterialInput, "title"> & {
   title: string;
   description?: string | null;
@@ -621,6 +624,22 @@ export async function fetchMaterialAssetObjectUrl(
   }
 
   return URL.createObjectURL(await response.blob());
+}
+
+export async function updateMaterialAsset(
+  materialId: string,
+  assetId: string,
+  input: LessonMaterialAssetUpdateInput,
+  config = authConfig,
+): Promise<LessonMaterialAsset> {
+  return apiJson<LessonMaterialAsset>(
+    `/api/materials/${materialId}/assets/${assetId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+    config,
+  );
 }
 
 export async function fetchScheduledLessonMaterial(

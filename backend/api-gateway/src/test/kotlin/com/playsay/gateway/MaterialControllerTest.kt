@@ -624,6 +624,25 @@ class MaterialControllerTest @Autowired constructor(
         assertTrue(owlAsset.metadata["tags"].any { tag -> tag.asText() == "owl" })
         assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(pairs[0]["imageUrl"].asText()))
         assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(generatedImageBlock["url"].asText()))
+
+        val regenerated = materialController.generateImages(
+            teacher,
+            material.id,
+            MaterialGenerateImagesRequest(maxImages = 12, regenerate = true),
+        )
+        val regeneratedPairs = regenerated.document["pages"][0]["blocks"][1]["pairs"]
+        val regeneratedAssets = materialController.listAssets(teacher, material.id)
+        assertEquals(assets.map { asset -> asset.id }.toSet(), regeneratedAssets.map { asset -> asset.id }.toSet())
+        assertEquals(pairs[0]["imageUrl"].asText(), regeneratedPairs[0]["imageUrl"].asText())
+        assertEquals(generatedImageBlock["url"].asText(), regenerated.document["pages"][0]["blocks"][0]["url"].asText())
+
+        val updatedAsset = materialController.updateAsset(
+            teacher,
+            material.id,
+            owlAsset.id,
+            MaterialAssetUpdateRequest(tags = listOf("Bird", "custom tag", "a", "custom tag")),
+        )
+        assertEquals(listOf("bird", "custom-tag"), updatedAsset.metadata["tags"].map { tag -> tag.asText() })
     }
 
     private fun authentication(

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.ArraySchema
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -31,6 +32,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -85,6 +87,11 @@ data class MaterialAssetResponse(
     val provider: String,
     val metadata: JsonNode,
     val createdAt: Instant,
+)
+
+data class MaterialAssetUpdateRequest(
+    @field:ArraySchema(maxItems = 16, schema = Schema(maxLength = 40), arraySchema = Schema(nullable = true))
+    val tags: List<String>? = null,
 )
 
 data class MaterialAiDraftRequest(
@@ -956,6 +963,7 @@ class LessonMaterialStore(
             return material.toResponse(objectMapper)
         }
 
+        val replacedAssetIds = mutableListOf<UUID>()
         targets.forEach { target ->
             val generated = materialImageGenerationService.generate(
                 MaterialImageGenerationInput(
@@ -963,7 +971,10 @@ class LessonMaterialStore(
                     alt = target.imageAlt,
                 ),
             )
-            val assetId = insertGeneratedImageAsset(materialId, target, generated)
+            val assetId = upsertGeneratedImageAsset(materialId, target, generated)
+            if (target.previousAssetId != null && target.previousAssetId != assetId) {
+                replacedAssetIds.add(target.previousAssetId)
+            }
             target.node.put(target.imageUrlField, "material-asset:$assetId")
             target.node.put("imageAlt", target.imageAlt)
         }
@@ -981,7 +992,7 @@ class LessonMaterialStore(
             .param("updatedAt", Instant.now().toMaterialOffsetDateTime())
             .update()
 
-        cleanupReplacedGeneratedAssets(materialId, targets.mapNotNull { target -> target.previousAssetId }.distinct())
+        cleanupReplacedGeneratedAssets(materialId, replacedAssetIds.distinct())
 
         return requireNotNull(find(materialId)).toResponse(objectMapper)
     }
@@ -1046,6 +1057,54 @@ class LessonMaterialStore(
             .body(content.bytes)
     }
 
+    @Transactional
+    fun updateAsset(authentication: JwtAuthenticationToken, materialId: UUID, assetId: UUID, request: MaterialAssetUpdateRequest): MaterialAssetResponse {
+        val material = find(materialId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found.")
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        if (!material.canEdit(authentication, currentUserId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit assets.")
+        }
+        val asset = findAsset(assetId)
+            ?.takeIf { found -> found.materialId == materialId }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Material asset not found.")
+        val metadata = runCatching { objectMapper.readTree(asset.metadata).deepCopy<ObjectNode>() }
+            .getOrElse { objectMapper.createObjectNode() }
+
+        request.tags?.let { tags ->
+            metadata.replace("tags", normalizeMaterialImageTags(tags))
+        }
+
+        jdbcClient.sql(
+            """
+            UPDATE material_asset
+               SET metadata = :metadata
+             WHERE id = :id
+               AND material_id = :materialId
+            """.trimIndent(),
+        )
+            .param("id", assetId)
+            .param("materialId", materialId)
+            .param("metadata", objectMapper.writeValueAsString(metadata))
+            .update()
+
+        return requireNotNull(findAsset(assetId)).toResponse(objectMapper)
+    }
+
+    private fun upsertGeneratedImageAsset(
+        materialId: UUID,
+        target: MaterialImageTarget,
+        generated: GeneratedMaterialImage,
+    ): UUID {
+        val previousAsset = target.previousAssetId
+            ?.let(::findAsset)
+            ?.takeIf { asset -> asset.materialId == materialId && asset.storageKey?.isNotBlank() == true }
+        if (previousAsset != null) {
+            replaceGeneratedImageAsset(previousAsset, target, generated)
+            return previousAsset.id
+        }
+        return insertGeneratedImageAsset(materialId, target, generated)
+    }
+
     private fun insertGeneratedImageAsset(
         materialId: UUID,
         target: MaterialImageTarget,
@@ -1093,6 +1152,34 @@ class LessonMaterialStore(
         return id
     }
 
+    private fun replaceGeneratedImageAsset(
+        asset: StoredMaterialAsset,
+        target: MaterialImageTarget,
+        generated: GeneratedMaterialImage,
+    ) {
+        val storageKey = requireNotNull(asset.storageKey).trim()
+        try {
+            materialObjectStorage.putObject(storageKey, generated.bytes, generated.mimeType)
+            jdbcClient.sql(
+                """
+                UPDATE material_asset
+                   SET kind = 'GENERATED_IMAGE',
+                       external_url = NULL,
+                       provider = 'AI',
+                       metadata = :metadata
+                 WHERE id = :id
+                   AND material_id = :materialId
+                """.trimIndent(),
+            )
+                .param("id", asset.id)
+                .param("materialId", asset.materialId)
+                .param("metadata", objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey)))
+                .update()
+        } catch (exception: MaterialObjectStorageException) {
+            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Material asset storage failed.")
+        }
+    }
+
     private fun generatedImageMetadata(target: MaterialImageTarget, generated: GeneratedMaterialImage, storageKey: String): ObjectNode =
         objectMapper.createObjectNode().apply {
             put("targetType", target.targetType)
@@ -1107,7 +1194,7 @@ class LessonMaterialStore(
             put("mimeType", generated.mimeType)
             put("storageKey", storageKey)
             put("byteSize", generated.bytes.size)
-            set<ArrayNode>("tags", generatedImageTags(target, generated))
+            replace("tags", generatedImageTags(target, generated))
             generated.revisedPrompt?.let { value -> put("revisedPrompt", value) }
         }
 
@@ -1128,9 +1215,7 @@ class LessonMaterialStore(
         materialImageTagCandidates(target.imagePrompt).forEach(::addTag)
         materialImageTagCandidates(generated.revisedPrompt).forEach(::addTag)
 
-        return objectMapper.createArrayNode().apply {
-            tags.take(16).forEach { tag -> add(tag) }
-        }
+        return normalizeMaterialImageTags(tags)
     }
 
     private fun materialImageTagCandidates(value: String?): List<String> =
@@ -1138,6 +1223,19 @@ class LessonMaterialStore(
             .split(Regex("""[^\p{L}\p{N}-]+"""))
             .map { token -> token.trim() }
             .filter { token -> token.length in 2..40 }
+
+    private fun normalizeMaterialImageTags(values: Iterable<String>): ArrayNode {
+        val tags = linkedSetOf<String>()
+        values.forEach { value ->
+            val clean = value.trim().lowercase().replace(Regex("""[^\p{L}\p{N}-]+"""), "-").trim('-')
+            if (clean.length in 2..40 && clean !in materialImageTagStopWords) {
+                tags.add(clean)
+            }
+        }
+        return objectMapper.createArrayNode().apply {
+            tags.take(16).forEach { tag -> add(tag) }
+        }
+    }
 
     private fun cleanupReplacedGeneratedAssets(materialId: UUID, assetIds: List<UUID>) {
         assetIds.forEach { assetId ->
@@ -1866,6 +1964,33 @@ class MaterialController(
         @PathVariable assetId: UUID,
     ): ResponseEntity<ByteArray> =
         store.assetContent(authentication, materialId, assetId)
+
+    @PatchMapping(
+        "/materials/{materialId}/assets/{assetId}",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "updateMaterialAsset",
+        summary = "Update material asset metadata",
+        description = "Updates editable metadata for a material asset, currently tags. Requires material owner or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Updated material asset"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot edit material", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Material or asset not found", content = [Content()]),
+        ],
+    )
+    fun updateAsset(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @PathVariable assetId: UUID,
+        @RequestBody request: MaterialAssetUpdateRequest,
+    ): MaterialAssetResponse =
+        store.updateAsset(authentication, materialId, assetId, request)
 }
 
 private data class ScheduledMaterialLookup(

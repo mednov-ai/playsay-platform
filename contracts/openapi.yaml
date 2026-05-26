@@ -869,6 +869,48 @@ paths:
           description: Course not found
       security:
       - bearerAuth: []
+  /materials/{materialId}/assets/{assetId}:
+    patch:
+      tags:
+      - Materials
+      summary: Update material asset metadata
+      description: "Updates editable metadata for a material asset, currently tags.\
+        \ Requires material owner or ADMIN role."
+      operationId: updateMaterialAsset
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialAssetUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: Updated material asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAssetResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot edit material
+        "404":
+          description: Material or asset not found
+      security:
+      - bearerAuth: []
   /users/students:
     get:
       tags:
@@ -1765,30 +1807,17 @@ components:
       required:
       - language
       - prompt
-    MeResponse:
+    MaterialAssetUpdateRequest:
       type: object
       properties:
-        subject:
-          type: string
-        username:
+        tags:
           type:
-          - string
+          - array
           - "null"
-        email:
-          type:
-          - string
-          - "null"
-        name:
-          type:
-          - string
-          - "null"
-        roles:
-          type: array
           items:
             type: string
-      required:
-      - roles
-      - subject
+            maxLength: 40
+          maxItems: 16
     MaterialAssetResponse:
       type: object
       properties:
@@ -1826,6 +1855,30 @@ components:
       - materialId
       - metadata
       - provider
+    MeResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        username:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+        name:
+          type:
+          - string
+          - "null"
+        roles:
+          type: array
+          items:
+            type: string
+      required:
+      - roles
+      - subject
     HelloResponse:
       type: object
       properties:

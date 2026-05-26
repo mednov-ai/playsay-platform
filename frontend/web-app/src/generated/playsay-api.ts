@@ -404,15 +404,13 @@ export interface MaterialAiDraftRequest {
   sourceFileName?: string | null;
 }
 
-export interface MeResponse {
-  subject: string;
-  /** @nullable */
-  username?: string | null;
-  /** @nullable */
-  email?: string | null;
-  /** @nullable */
-  name?: string | null;
-  roles: string[];
+export interface MaterialAssetUpdateRequest {
+  /**
+     * @maxItems 16
+     * @nullable
+     * @items.maxLength 40
+     */
+  tags?: string[] | null;
 }
 
 export interface MaterialAssetResponse {
@@ -428,6 +426,17 @@ export interface MaterialAssetResponse {
   provider: string;
   metadata: JsonNode;
   createdAt: string;
+}
+
+export interface MeResponse {
+  subject: string;
+  /** @nullable */
+  username?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  name?: string | null;
+  roles: string[];
 }
 
 export interface HelloResponse {
@@ -2219,6 +2228,70 @@ export const createCourseLesson = async (courseId: string,
 
   const data: createCourseLessonResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createCourseLessonResponse
+}
+
+
+
+export type updateMaterialAssetResponse200 = {
+  data: MaterialAssetResponse
+  status: 200
+}
+
+export type updateMaterialAssetResponse401 = {
+  data: void
+  status: 401
+}
+
+export type updateMaterialAssetResponse403 = {
+  data: void
+  status: 403
+}
+
+export type updateMaterialAssetResponse404 = {
+  data: void
+  status: 404
+}
+
+export type updateMaterialAssetResponseSuccess = (updateMaterialAssetResponse200) & {
+  headers: Headers;
+};
+export type updateMaterialAssetResponseError = (updateMaterialAssetResponse401 | updateMaterialAssetResponse403 | updateMaterialAssetResponse404) & {
+  headers: Headers;
+};
+
+export type updateMaterialAssetResponse = (updateMaterialAssetResponseSuccess | updateMaterialAssetResponseError)
+
+export const getUpdateMaterialAssetUrl = (materialId: string,
+    assetId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}`
+}
+
+/**
+ * Updates editable metadata for a material asset, currently tags. Requires material owner or ADMIN role.
+ * @summary Update material asset metadata
+ */
+export const updateMaterialAsset = async (materialId: string,
+    assetId: string,
+    materialAssetUpdateRequest: MaterialAssetUpdateRequest, options?: RequestInit): Promise<updateMaterialAssetResponse> => {
+
+  const res = await fetch(getUpdateMaterialAssetUrl(materialId,assetId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialAssetUpdateRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateMaterialAssetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateMaterialAssetResponse
 }
 
 

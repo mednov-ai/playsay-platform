@@ -92,6 +92,7 @@ import {
   saveScheduledLesson,
   saveUserProfile,
   startLogin,
+  updateMaterialAsset,
   type AdminUserProfile,
   type AppUserProfile,
   type Course,
@@ -99,7 +100,9 @@ import {
   type CourseLesson,
   type CourseLessonInput,
   type LessonMaterial,
+  type LessonMaterialAsset,
   type LessonMaterialDraft,
+  type LessonMaterialAssetUpdateInput,
   type LessonMaterialGenerateImagesInput,
   type LessonMaterialDraftInput,
   type LessonMaterialInput,
@@ -286,6 +289,7 @@ type MaterialEditorDocument = {
 };
 
 type MaterialRenderMode = "classroom" | "teacherPreview";
+type MaterialAuthorMode = "preview" | "edit";
 type MaterialAnswerBlock = Record<string, unknown>;
 type MaterialAnswerState = Record<string, MaterialAnswerBlock>;
 
@@ -889,6 +893,25 @@ export function App() {
     }
   }
 
+  async function updateMaterialAssetMetadata(
+    materialId: string,
+    assetId: string,
+    input: LessonMaterialAssetUpdateInput,
+  ): Promise<LessonMaterialAsset | null> {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      const asset = await updateMaterialAsset(materialId, assetId, input);
+      setMaterialMessage("Теги картинки обновлены");
+      return asset;
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, "Не удалось обновить теги картинки"));
+      return null;
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
   async function deleteMaterial(materialId: string) {
     setMaterialLoading(true);
     setMaterialMessage(null);
@@ -1209,6 +1232,7 @@ export function App() {
                 onDraft={(input) => generateMaterialDraft(input)}
                 onDraftFromUrl={(input) => generateMaterialDraftFromUrl(input)}
                 onGenerateImages={(materialId, input) => generateImagesForMaterial(materialId, input)}
+                onUpdateAsset={(materialId, assetId, input) => updateMaterialAssetMetadata(materialId, assetId, input)}
                 onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
                 onRefresh={() => void refreshMaterials()}
                 onSave={(input, materialId) => upsertMaterial(input, materialId)}
@@ -1367,6 +1391,7 @@ function MaterialLibraryPanel({
   onDraft,
   onDraftFromUrl,
   onGenerateImages,
+  onUpdateAsset,
   onLinkLesson,
   onRefresh,
   onSave,
@@ -1382,6 +1407,7 @@ function MaterialLibraryPanel({
   onDraft: (input: LessonMaterialDraftInput) => Promise<LessonMaterialDraft | null>;
   onDraftFromUrl: (input: LessonMaterialUrlDraftInput) => Promise<LessonMaterialDraft | null>;
   onGenerateImages: (materialId: string, input: LessonMaterialGenerateImagesInput) => Promise<LessonMaterial | null>;
+  onUpdateAsset: (materialId: string, assetId: string, input: LessonMaterialAssetUpdateInput) => Promise<LessonMaterialAsset | null>;
   onLinkLesson: (courseId: string, lesson: CourseLesson, materialId: string | null) => void;
   onRefresh: () => void;
   onSave: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
@@ -1395,7 +1421,7 @@ function MaterialLibraryPanel({
   const [draftUrl, setDraftUrl] = useState("");
   const [draftImage, setDraftImage] = useState<MaterialDraftSourceImage | null>(null);
   const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [authorMode, setAuthorMode] = useState<MaterialAuthorMode>("preview");
   const [selectedLessonKey, setSelectedLessonKey] = useState("");
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
@@ -1421,6 +1447,7 @@ function MaterialLibraryPanel({
     setForm(materialToForm(firstMaterial));
     setDraftPrompt(readPromptFromSourceMeta(firstMaterial.sourceMeta));
     setDraftUrl(readUrlFromSourceMeta(firstMaterial.sourceMeta));
+    setAuthorMode("preview");
     setAutoSelectedMaterialId(firstMaterial.id);
   }, [autoSelectedMaterialId, form.id, form.title, materials]);
 
@@ -1434,6 +1461,7 @@ function MaterialLibraryPanel({
     setDraftUrl("");
     setDraftImage(null);
     setDraftImageMessage(null);
+    setAuthorMode("edit");
   }
 
   function selectMaterial(material: LessonMaterial) {
@@ -1442,9 +1470,11 @@ function MaterialLibraryPanel({
     setDraftUrl(readUrlFromSourceMeta(material.sourceMeta));
     setDraftImage(null);
     setDraftImageMessage(null);
+    setAuthorMode("preview");
   }
 
   function addBlock(type: MaterialBlockType) {
+    setAuthorMode("edit");
     setForm((current) => ({
       ...current,
       document: {
@@ -1459,16 +1489,7 @@ function MaterialLibraryPanel({
   }
 
   function updateBlock(blockId: string, patch: Partial<MaterialEditorBlock>) {
-    setForm((current) => ({
-      ...current,
-      document: {
-        ...current.document,
-        pages: current.document.pages.map((page) => ({
-          ...page,
-          blocks: page.blocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block)),
-        })),
-      },
-    }));
+    setForm((current) => materialFormWithBlockPatch(current, blockId, patch));
   }
 
   function removeBlock(blockId: string) {
@@ -1489,6 +1510,7 @@ function MaterialLibraryPanel({
     const saved = await saveMaterialAndMaybeGenerate({ generateMissing: true });
     if (saved) {
       setForm(materialToForm(saved));
+      setAuthorMode("preview");
     }
   }
 
@@ -1505,6 +1527,7 @@ function MaterialLibraryPanel({
     if (draft) {
       setForm(materialDraftToForm(draft));
       setDraftPrompt(readPromptFromSourceMeta(draft.sourceMeta) || prompt);
+      setAuthorMode("edit");
     }
   }
 
@@ -1524,6 +1547,7 @@ function MaterialLibraryPanel({
       setForm(materialDraftToForm(draft));
       setDraftPrompt(readPromptFromSourceMeta(draft.sourceMeta));
       setDraftUrl(readUrlFromSourceMeta(draft.sourceMeta) || url);
+      setAuthorMode("edit");
     }
   }
 
@@ -1555,6 +1579,7 @@ function MaterialLibraryPanel({
 
   function duplicateCurrentMaterial() {
     setForm((current) => duplicateMaterialForm(current));
+    setAuthorMode("edit");
   }
 
   async function saveMaterialAndMaybeGenerate({
@@ -1601,7 +1626,40 @@ function MaterialLibraryPanel({
     const saved = await saveMaterialAndMaybeGenerate({ generateMissing: !regenerate, regenerate });
     if (saved) {
       setForm(materialToForm(saved));
+      setAuthorMode("preview");
     }
+  }
+
+  async function generateImagesForBlock(blockId: string) {
+    const saved = await onSave(materialFormToInput(form), form.id ?? undefined);
+    if (!saved) {
+      return;
+    }
+    setImageGenerationProgress({ current: 1, label: "Обновляем картинку", total: 1 });
+    try {
+      const generated = await onGenerateImages(saved.id, { blockId, maxImages: 1, regenerate: true });
+      setForm(materialToForm(generated ?? saved));
+      setAuthorMode("preview");
+    } finally {
+      setImageGenerationProgress(null);
+    }
+  }
+
+  function updateMaterialBlock(blockId: string, patch: Partial<MaterialEditorBlock>) {
+    updateBlock(blockId, patch);
+  }
+
+  async function updatePreviewAssetTags(assetId: string, tags: string[]): Promise<LessonMaterialAsset | null> {
+    if (!form.id) {
+      return null;
+    }
+    return onUpdateAsset(form.id, assetId, { tags });
+  }
+
+  async function persistMaterialBlockPatch(blockId: string, patch: Partial<MaterialEditorBlock>) {
+    const nextForm = materialFormWithBlockPatch(form, blockId, patch);
+    setForm(nextForm);
+    await onSave(materialFormToInput(nextForm), nextForm.id ?? undefined);
   }
 
   if (!profile) {
@@ -1809,6 +1867,65 @@ function MaterialLibraryPanel({
           </aside>
 
           <form className="grid gap-4" onSubmit={submit}>
+            {authorMode === "preview" && form.title.trim() ? (
+              <>
+                <div className="playsay-material-reader-toolbar">
+                  <div className="min-w-0">
+                    <div className="truncate text-lg font-extrabold">{form.title}</div>
+                    <div className="mt-1 flex flex-wrap gap-1.5 text-[0.7rem] font-black uppercase text-muted-foreground">
+                      <span>{form.cefrLevel}</span>
+                      <span>{form.status}</span>
+                      <span>{form.visibility}</span>
+                      <span>{form.document.pages[0]?.blocks.length ?? 0} blocks</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button disabled={disabled} onClick={() => setAuthorMode("edit")} type="button" variant="outline">
+                      <PenLine className="h-4 w-4" />
+                      Текст
+                    </Button>
+                    <Button
+                      disabled={disabled || !canRegenerateImages || form.title.trim().length === 0}
+                      onClick={() => void generateCurrentImages(true)}
+                      type="button"
+                      variant="outline"
+                    >
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      Обновить картинки
+                    </Button>
+                    <Button disabled={disabled || form.title.trim().length === 0} onClick={duplicateCurrentMaterial} type="button" variant="outline">
+                      <Copy className="h-4 w-4" />
+                      Дублировать
+                    </Button>
+                    {form.id ? (
+                      <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
+                        <Archive className="h-4 w-4" />
+                        Архив
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                {imageGenerationProgress ? (
+                  <MaterialImageProgress value={imageGenerationProgress} />
+                ) : null}
+                <div className="playsay-material-preview playsay-material-reader">
+                  <LessonMaterialDocumentView
+                    material={materialPreviewFromForm(form)}
+                    mode="teacherPreview"
+                    onAssetTagsChange={updatePreviewAssetTags}
+                    onBlockPatchCommit={(blockId, patch) => void persistMaterialBlockPatch(blockId, patch)}
+                    onBlockPatch={updateMaterialBlock}
+                    onGenerateImagesForBlock={(blockId) => void generateImagesForBlock(blockId)}
+                  />
+                </div>
+                {message ? (
+                  <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+                    {message}
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <>
             <div className="rounded-2xl border border-border bg-white p-4">
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_7rem_8rem_8rem]">
                 <ProfileField label="Название">
@@ -1892,9 +2009,9 @@ function MaterialLibraryPanel({
                     <Copy className="h-4 w-4" />
                     Дублировать
                   </Button>
-                  <Button disabled={disabled || form.title.trim().length === 0} onClick={() => setPreviewOpen((current) => !current)} type="button" variant="outline">
+                  <Button disabled={disabled || form.title.trim().length === 0} onClick={() => setAuthorMode("preview")} type="button" variant="outline">
                     <Eye className="h-4 w-4" />
-                    {previewOpen ? "Скрыть" : "Просмотр"}
+                    Просмотр
                   </Button>
                   <Button disabled={disabled || !canGenerateImages || form.title.trim().length === 0} onClick={() => void generateCurrentImages()} type="button" variant="outline">
                     <Sparkles className="h-4 w-4" />
@@ -1936,32 +2053,13 @@ function MaterialLibraryPanel({
               )}
             </div>
 
-            {previewOpen ? (
-              <div className="playsay-material-preview">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-sm font-extrabold text-muted-foreground">
-                    <Eye className="h-4 w-4 text-primary" />
-                    Предпросмотр
-                  </div>
-                  <Button
-                    disabled={disabled || !canRegenerateImages || form.title.trim().length === 0}
-                    onClick={() => void generateCurrentImages(true)}
-                    type="button"
-                    variant="outline"
-                  >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    Обновить картинки
-                  </Button>
-                </div>
-                <LessonMaterialDocumentView material={materialPreviewFromForm(form)} mode="teacherPreview" />
-              </div>
-            ) : null}
-
             {message ? (
               <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
                 {message}
               </div>
             ) : null}
+              </>
+            )}
           </form>
         </div>
       )}
@@ -3879,12 +3977,20 @@ function LessonMaterialDocumentView({
   material,
   mode = "classroom",
   onAnswerChange,
+  onAssetTagsChange,
+  onBlockPatchCommit,
+  onBlockPatch,
+  onGenerateImagesForBlock,
   score,
 }: {
   answers?: MaterialAnswerState;
   material: LessonMaterial;
   mode?: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
+  onAssetTagsChange?: (assetId: string, tags: string[]) => Promise<LessonMaterialAsset | null>;
+  onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
+  onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
+  onGenerateImagesForBlock?: (blockId: string) => void;
   score?: number | null;
 }) {
   const document = editorDocumentFromJson(material.document);
@@ -3893,6 +3999,7 @@ function LessonMaterialDocumentView({
   const assetIds = materialDocumentAssetIds(document);
   const assetKey = assetIds.join("|");
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     let active = true;
@@ -3900,6 +4007,7 @@ function LessonMaterialDocumentView({
 
     if (material.id === "preview" || assetKey.length === 0) {
       setAssetUrls({});
+      setAssetTags({});
       return () => {
         active = false;
       };
@@ -3928,6 +4036,7 @@ function LessonMaterialDocumentView({
 
         if (active) {
           setAssetUrls(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null)));
+          setAssetTags(materialAssetTagsMap(assets));
         }
       })
       .catch(() => {
@@ -3935,6 +4044,7 @@ function LessonMaterialDocumentView({
         objectUrls.clear();
         if (active) {
           setAssetUrls({});
+          setAssetTags({});
         }
       });
 
@@ -3961,11 +4071,19 @@ function LessonMaterialDocumentView({
         {page.blocks.map((block) => (
           <RenderedMaterialBlock
             answer={answers[block.id]}
+            assetTags={assetTags}
             assetUrls={assetUrls}
             block={block}
             key={block.id}
             mode={mode}
             onAnswerChange={onAnswerChange}
+            onAssetTagsChange={async (assetId, tags) => {
+              setAssetTags((current) => ({ ...current, [assetId]: tags }));
+              await onAssetTagsChange?.(assetId, tags);
+            }}
+            onBlockPatchCommit={onBlockPatchCommit}
+            onBlockPatch={onBlockPatch}
+            onGenerateImagesForBlock={onGenerateImagesForBlock}
           />
         ))}
       </div>
@@ -3975,16 +4093,26 @@ function LessonMaterialDocumentView({
 
 function RenderedMaterialBlock({
   answer,
+  assetTags,
   assetUrls,
   block,
   mode,
   onAnswerChange,
+  onAssetTagsChange,
+  onBlockPatchCommit,
+  onBlockPatch,
+  onGenerateImagesForBlock,
 }: {
   answer?: MaterialAnswerBlock;
+  assetTags: Record<string, string[]>;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
+  onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
+  onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
+  onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
+  onGenerateImagesForBlock?: (blockId: string) => void;
 }) {
   const contextLabel = materialBlockContextLabel(block);
   const blockSection = (children: ReactNode, className = "playsay-render-block") => (
@@ -4021,19 +4149,39 @@ function RenderedMaterialBlock({
     case "image":
     case "generatedImage":
       {
+        const assetId = materialAssetIdFromUrl(block.url);
         const imageUrl = resolveMaterialImageUrl(block.url, assetUrls);
+        const imageHeight = block.height ? `${block.height}px` : undefined;
         return blockSection(
           <>
             <h4>{block.title}</h4>
             {imageUrl ? (
-              <figure className="playsay-rendered-image">
+              <figure
+                className="playsay-rendered-image"
+                data-editable={mode === "teacherPreview" && Boolean(onBlockPatch) ? "true" : "false"}
+                style={{ "--playsay-image-height": imageHeight } as CSSProperties}
+              >
                 <img alt={block.caption || block.prompt || block.title} src={imageUrl} />
+                {mode === "teacherPreview" ? (
+                  <MaterialImageInlineTools
+                    assetId={assetId}
+                    block={block}
+                    onAssetTagsChange={onAssetTagsChange}
+                    onGenerate={() => onGenerateImagesForBlock?.(block.id)}
+                    onResizeCommit={(height) => onBlockPatchCommit?.(block.id, { height })}
+                    onResize={(height) => onBlockPatch?.(block.id, { height })}
+                    tags={assetId ? assetTags[assetId] ?? [] : []}
+                  />
+                ) : null}
                 {block.caption ? <figcaption>{block.caption}</figcaption> : null}
               </figure>
             ) : (
               <figure className="playsay-image-placeholder">
                 <ImageIcon className="h-6 w-6 text-primary" />
                 <figcaption>{block.caption || block.prompt || block.url || "Изображение"}</figcaption>
+                {mode === "teacherPreview" ? (
+                  <MaterialImagePromptPopover block={block} onGenerate={() => onGenerateImagesForBlock?.(block.id)} />
+                ) : null}
               </figure>
             )}
           </>,
@@ -4116,6 +4264,175 @@ function RenderedMaterialBlock({
     default:
       return null;
   }
+}
+
+function MaterialImageInlineTools({
+  assetId,
+  block,
+  onAssetTagsChange,
+  onGenerate,
+  onResizeCommit,
+  onResize,
+  tags,
+}: {
+  assetId: string | null;
+  block: MaterialEditorBlock;
+  onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
+  onGenerate?: () => void;
+  onResizeCommit?: (height: number) => void;
+  onResize?: (height: number) => void;
+  tags: string[];
+}) {
+  function startResize(event: PointerEvent<HTMLButtonElement>) {
+    if (!onResize) {
+      return;
+    }
+
+    event.preventDefault();
+    const resize = onResize;
+    const startY = event.clientY;
+    const startHeight = block.height ?? event.currentTarget.closest("figure")?.querySelector("img")?.getBoundingClientRect().height ?? 320;
+    let latestHeight = Math.round(startHeight);
+
+    function handlePointerMove(moveEvent: globalThis.PointerEvent) {
+      latestHeight = Math.round(clampNumber(startHeight + moveEvent.clientY - startY, 120, 720));
+      resize(latestHeight);
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      resize(latestHeight);
+      onResizeCommit?.(latestHeight);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }
+
+  return (
+    <div className="playsay-image-tools">
+      <MaterialImagePromptPopover block={block} onGenerate={onGenerate} />
+      {assetId ? (
+        <MaterialAssetTags
+          assetId={assetId}
+          onChange={onAssetTagsChange}
+          tags={tags}
+        />
+      ) : null}
+      {onResize ? (
+        <button
+          aria-label="Изменить размер картинки"
+          className="playsay-image-resize-handle"
+          onPointerDown={startResize}
+          title="Изменить размер картинки"
+          type="button"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function MaterialImagePromptPopover({
+  block,
+  onGenerate,
+}: {
+  block: MaterialEditorBlock;
+  onGenerate?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const prompt = block.prompt?.trim() || block.caption?.trim() || block.title || "Сгенерировать картинку для этого блока.";
+
+  return (
+    <span className="playsay-image-prompt">
+      <button
+        aria-expanded={open}
+        aria-label="Показать промпт картинки"
+        className="playsay-image-prompt-button"
+        onClick={() => setOpen((current) => !current)}
+        title="Промпт картинки"
+        type="button"
+      >
+        <Sparkles className="h-4 w-4" />
+      </button>
+      {open ? (
+        <span className="playsay-image-prompt-popover" role="dialog">
+          <strong>Промпт</strong>
+          <span>{prompt}</span>
+          <Button
+            disabled={!onGenerate}
+            onClick={() => {
+              setOpen(false);
+              onGenerate?.();
+            }}
+            type="button"
+          >
+            <Sparkles className="h-4 w-4" />
+            Сгенерить
+          </Button>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function MaterialAssetTags({
+  assetId,
+  onChange,
+  tags,
+}: {
+  assetId: string;
+  onChange?: (assetId: string, tags: string[]) => void | Promise<void>;
+  tags: string[];
+}) {
+  const [draftTag, setDraftTag] = useState("");
+
+  function commitTag(value: string) {
+    const normalized = normalizeMaterialTag(value);
+    if (!normalized || !onChange) {
+      setDraftTag("");
+      return;
+    }
+    void onChange(assetId, uniqueMaterialTags([...tags, normalized]));
+    setDraftTag("");
+  }
+
+  function removeTag(tag: string) {
+    if (!onChange) {
+      return;
+    }
+    void onChange(assetId, tags.filter((current) => current !== tag));
+  }
+
+  return (
+    <span className="playsay-image-tags" aria-label="Теги картинки">
+      {tags.slice(0, 8).map((tag) => (
+        <button
+          className="playsay-image-tag"
+          key={tag}
+          onClick={() => removeTag(tag)}
+          title="Убрать тег"
+          type="button"
+        >
+          {tag}
+        </button>
+      ))}
+      <input
+        className="playsay-image-tag-input"
+        disabled={!onChange}
+        maxLength={40}
+        onChange={(event) => setDraftTag(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commitTag(draftTag);
+          }
+        }}
+        placeholder="+ тег"
+        value={draftTag}
+      />
+    </span>
+  );
 }
 
 function RenderedFillGapExercise({
@@ -4563,8 +4880,9 @@ function RenderedMatchingPairsExercise({
         {pairs.map((leftPair, index) => {
           const pair = rightOptions[index] ?? leftPair;
           const pairTargetKind = materialMatchingPairTargetKind(pair);
+          const assetId = materialAssetIdFromUrl(pair.imageUrl);
           const imageUrl = pairTargetKind === "IMAGE" ? resolveMaterialImageUrl(pair.imageUrl, assetUrls) : undefined;
-          const hasPendingAsset = Boolean(pairTargetKind === "IMAGE" && materialAssetIdFromUrl(pair.imageUrl) && !imageUrl);
+          const hasPendingAsset = Boolean(pairTargetKind === "IMAGE" && assetId && !imageUrl);
           const connected = Object.values(matches).includes(pair.id);
           return (
             <div className="playsay-match-row" key={leftPair.id}>
@@ -4597,7 +4915,6 @@ function RenderedMatchingPairsExercise({
                         {hasPendingAsset ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
                       </span>
                     )}
-                    <span>Картинка {index + 1}</span>
                     {!imageUrl ? (
                       <small>{hasPendingAsset ? "Загружаем картинку" : pair.imagePrompt || pair.imageAlt || pair.right}</small>
                     ) : null}
@@ -5010,6 +5327,26 @@ function uniqueMaterialOptions(options: string[]): string[] {
     }
   });
   return result;
+}
+
+function uniqueMaterialTags(tags: string[]): string[] {
+  const result: string[] = [];
+  tags.forEach((tag) => {
+    const normalized = normalizeMaterialTag(tag);
+    if (normalized && !result.includes(normalized)) {
+      result.push(normalized);
+    }
+  });
+  return result.slice(0, 16);
+}
+
+function normalizeMaterialTag(value: string): string {
+  const clean = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}-]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  return clean.length >= 2 && clean.length <= 40 ? clean : "";
 }
 
 function normalizeMaterialAnswer(value: string | undefined): string {
@@ -5627,6 +5964,23 @@ function duplicateMaterialForm(form: MaterialFormState): MaterialFormState {
   };
 }
 
+function materialFormWithBlockPatch(
+  form: MaterialFormState,
+  blockId: string,
+  patch: Partial<MaterialEditorBlock>,
+): MaterialFormState {
+  return {
+    ...form,
+    document: {
+      ...form.document,
+      pages: form.document.pages.map((page) => ({
+        ...page,
+        blocks: page.blocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block)),
+      })),
+    },
+  };
+}
+
 function cloneMaterialDocument(document: MaterialEditorDocument): MaterialEditorDocument {
   return {
     schemaVersion: 1,
@@ -5986,6 +6340,19 @@ function materialDocumentAssetIds(document: MaterialEditorDocument): string[] {
     });
   });
   return [...ids].sort();
+}
+
+function materialAssetTagsMap(assets: LessonMaterialAsset[]): Record<string, string[]> {
+  return assets.reduce<Record<string, string[]>>((result, asset) => {
+    const metadata = asJsonObject(asset.metadata);
+    const tags = Array.isArray(metadata.tags)
+      ? uniqueMaterialTags(metadata.tags.map(asString))
+      : [];
+    if (tags.length > 0) {
+      result[asset.id] = tags;
+    }
+    return result;
+  }, {});
 }
 
 function materialAssetIdFromUrl(value: string | undefined): string | null {

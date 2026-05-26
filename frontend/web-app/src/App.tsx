@@ -2809,7 +2809,7 @@ function LiveLessonExperience({
                 <Radio className="h-3.5 w-3.5" />
                 В эфире
               </span>
-              <span className="rounded-full border border-white/15 px-2.5 py-1 text-xs font-extrabold text-white/80">
+              <span className="playsay-video-type-badge rounded-full border border-white/15 px-2.5 py-1 text-xs font-extrabold text-white/80">
                 {lessonTypeLabel}
               </span>
             </div>
@@ -2910,7 +2910,11 @@ function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
       return pipPosition;
     }
 
-    return clampPipPosition(inset, focusRect.height - stripRect.height - inset);
+    const isCompactVideo = focusRect.width <= 640;
+    const xInset = isCompactVideo ? 58 : inset;
+    const yInset = isCompactVideo ? 48 : inset;
+
+    return clampPipPosition(xInset, focusRect.height - stripRect.height - yInset);
   }
 
   function getPipPositionFromPointer(event: PointerEvent<HTMLDivElement>) {
@@ -3298,10 +3302,6 @@ function LessonWorkspace({
         <nav className="playsay-lesson-tabs" aria-label="Разделы урока">
           <button className="playsay-lesson-tab" data-active="true" type="button">
             Урок
-          </button>
-          <button className="playsay-lesson-tab" type="button">
-            <Paperclip className="h-4 w-4" />
-            Вложения
           </button>
         </nav>
 

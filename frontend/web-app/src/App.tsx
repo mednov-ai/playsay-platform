@@ -3590,6 +3590,13 @@ function LessonTaskCanvas({
     });
   }
 
+  const savedAnswersKey = JSON.stringify(materialAnswersFromSubmission(submission));
+  const answersKey = JSON.stringify(answers);
+  const liveScore = material ? materialLiveScore(material, answers) : null;
+  const displayScore = answersKey !== savedAnswersKey && liveScore !== null
+    ? liveScore
+    : score ?? liveScore;
+
   function beginAnnotation(event: PointerEvent<SVGSVGElement>) {
     if (annotationTool === "pointer") {
       return;
@@ -3684,7 +3691,7 @@ function LessonTaskCanvas({
               material={material}
               mode="classroom"
               onAnswerChange={updateAnswer}
-              score={score}
+              score={displayScore}
             />
           ) : (
             <FallbackLessonDocument />
@@ -4686,6 +4693,114 @@ function materialAnswerStatus(
     return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "correct", label: "Ответ принят" };
   }
   return { ...baseStatus, icon: AlertCircle, kind: "wrong", label: `${Math.max(1, incorrectAttempts)} ошибка` };
+}
+
+function materialLiveScore(material: LessonMaterial, answers: MaterialAnswerState): number | null {
+  const document = editorDocumentFromJson(material.document, material.title);
+  let touchedWeight = 0;
+  let earnedWeight = 0;
+
+  document.pages.forEach((page) => {
+    page.blocks.forEach((block) => {
+      const answerBlock = answers[block.id];
+
+      if (block.type === "fillGaps" || block.type === "multipleChoice") {
+        const answerItems = materialAnswerItems(answerBlock);
+        const attempts = materialAnswerAttempts(answerBlock);
+        const hints = materialAnswerHints(answerBlock);
+
+        (block.items ?? []).forEach((item, index) => {
+          if (!item.answer?.trim()) {
+            return;
+          }
+
+          const itemKey = `${item.prompt}-${index}`;
+          const actual = answerItems[itemKey] ?? "";
+          const itemAttempts = attempts[itemKey] ?? [];
+          const itemHints = hints[itemKey] ?? [];
+          const isManualInput = (item.options ?? []).length === 0;
+          const checkedManualValue = itemAttempts.some((attempt) => (
+            normalizeMaterialAnswer(attempt.value) === normalizeMaterialAnswer(actual)
+          ));
+          const touched = itemAttempts.length > 0 || itemHints.length > 0 || (!isManualInput && actual.trim().length > 0);
+
+          if (!touched) {
+            return;
+          }
+
+          const policy = materialAssessmentForItem(block, item);
+          const correct = materialItemAnswerMatches(item, actual) && (!isManualInput || checkedManualValue);
+          const attemptsUsed = itemAttempts.length || (actual.trim() ? 1 : 0);
+          const scoreFactor = materialLiveScoreFactor(correct, attemptsUsed, itemHints, policy);
+
+          touchedWeight += policy.weight ?? 1;
+          earnedWeight += (policy.weight ?? 1) * scoreFactor;
+        });
+        return;
+      }
+
+      if (block.type === "matchingPairs") {
+        const matches = materialAnswerMatches(answerBlock);
+        const attempts = materialAnswerAttempts(answerBlock);
+        const hints = materialAnswerHints(answerBlock);
+
+        (block.pairs ?? []).forEach((pair) => {
+          const actual = matches[pair.id] ?? "";
+          const itemAttempts = attempts[pair.id] ?? [];
+          const itemHints = hints[pair.id] ?? [];
+          const touched = itemAttempts.length > 0 || itemHints.length > 0 || actual.trim().length > 0;
+
+          if (!touched) {
+            return;
+          }
+
+          const policy = materialAssessmentForItem(block);
+          const correct = actual === pair.id;
+          const attemptsUsed = itemAttempts.length || (actual.trim() ? 1 : 0);
+          const scoreFactor = materialLiveScoreFactor(correct, attemptsUsed, itemHints, policy);
+
+          touchedWeight += policy.weight ?? 1;
+          earnedWeight += (policy.weight ?? 1) * scoreFactor;
+        });
+      }
+    });
+  });
+
+  if (touchedWeight <= 0) {
+    return null;
+  }
+
+  const maxScore = materialMaxScore(material.scoringRubric);
+  return Math.round((maxScore * earnedWeight / touchedWeight) * 100) / 100;
+}
+
+function materialAssessmentForItem(
+  block: MaterialEditorBlock,
+  item?: NonNullable<MaterialEditorBlock["items"]>[number],
+): MaterialAssessmentPolicy {
+  return cleanMaterialAssessment({
+    ...defaultObjectiveAssessmentPolicy(),
+    ...block.assessment,
+    weight: item?.weight ?? block.assessment?.weight ?? defaultObjectiveAssessmentPolicy().weight,
+  });
+}
+
+function materialLiveScoreFactor(
+  correct: boolean,
+  attemptsUsed: number,
+  hints: MaterialHintEntry[],
+  policy: MaterialAssessmentPolicy,
+): number {
+  if (!correct) {
+    return 0;
+  }
+
+  const attemptPenalty = policy.attemptPenalty ?? 0.3;
+  const hintPenalty = policy.hintPenalty ?? 0.15;
+  const attemptFactor = Math.max(1 - attemptPenalty * Math.max(0, attemptsUsed - 1), 0.4);
+  const hintFactor = Math.max(1 - hints.reduce((total, hint) => total + (hint.penalty ?? hintPenalty), 0), 0.4);
+
+  return clampNumber(Math.min(attemptFactor, hintFactor), 0, 1);
 }
 
 function materialMatchingStatus(

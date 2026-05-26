@@ -553,6 +553,13 @@ class MaterialControllerTest @Autowired constructor(
                           "layout": "FLOW",
                           "blocks": [
                             {
+                              "id": "block-hero",
+                              "type": "generatedImage",
+                              "title": "Bird classroom picture",
+                              "prompt": "child-friendly workbook bird classroom picture, white background",
+                              "caption": "Birds"
+                            },
+                            {
                               "id": "block-birds",
                               "type": "matchingPairs",
                               "title": "Birds matching",
@@ -588,18 +595,21 @@ class MaterialControllerTest @Autowired constructor(
             MaterialGenerateImagesRequest(maxImages = 12),
         )
 
-        val pairs = generated.document["pages"][0]["blocks"][0]["pairs"]
+        val generatedImageBlock = generated.document["pages"][0]["blocks"][0]
+        assertTrue(generatedImageBlock["url"].asText().startsWith("material-asset:"))
+        val pairs = generated.document["pages"][0]["blocks"][1]["pairs"]
         assertEquals("owl", pairs[0]["left"].asText())
         assertEquals("duck", pairs[1]["left"].asText())
         assertTrue(pairs[0]["imageUrl"].asText().startsWith("material-asset:"))
         assertTrue(pairs[1]["imageUrl"].asText().startsWith("material-asset:"))
         val assets = materialController.listAssets(teacher, material.id)
-        assertEquals(2, assets.size)
+        assertEquals(3, assets.size)
         assertEquals("GENERATED_IMAGE", assets[0].kind)
         assertTrue(assets.all { asset -> asset.externalUrl == null })
         assertTrue(assets.all { asset -> asset.storageKey?.startsWith("material-assets/${material.id}/") == true })
         assertTrue(assets.all { asset -> asset.contentUrl?.startsWith("/api/materials/${material.id}/assets/") == true })
         assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(pairs[0]["imageUrl"].asText()))
+        assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(generatedImageBlock["url"].asText()))
     }
 
     private fun authentication(

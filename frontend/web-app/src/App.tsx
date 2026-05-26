@@ -1390,7 +1390,8 @@ function MaterialLibraryPanel({
   const [selectedLessonKey, setSelectedLessonKey] = useState("");
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
   const canGenerateUrlDraft = draftUrl.trim().length > 0;
-  const canGenerateImages = hasMissingMatchingPairImages(form.document);
+  const canGenerateImages = hasMaterialImageTargets(form.document);
+  const canRegenerateImages = hasMaterialImageTargets(form.document, { includeExisting: true });
 
   useEffect(() => {
     if (selectedLessonKey || lessonOptions.length === 0) {
@@ -1473,7 +1474,7 @@ function MaterialLibraryPanel({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const saved = await onSave(materialFormToInput(form), form.id ?? undefined);
+    const saved = await saveMaterialAndMaybeGenerate({ generateMissing: true });
     if (saved) {
       setForm(materialToForm(saved));
     }
@@ -1544,15 +1545,35 @@ function MaterialLibraryPanel({
     setForm((current) => duplicateMaterialForm(current));
   }
 
-  async function generateCurrentImages() {
+  async function saveMaterialAndMaybeGenerate({
+    generateMissing = false,
+    regenerate = false,
+  }: {
+    generateMissing?: boolean;
+    regenerate?: boolean;
+  } = {}): Promise<LessonMaterial | null> {
     const saved = await onSave(materialFormToInput(form), form.id ?? undefined);
     if (!saved) {
-      return;
+      return null;
     }
-    setForm(materialToForm(saved));
-    const generated = await onGenerateImages(saved.id, { maxImages: 12 });
+    const shouldGenerate = regenerate
+      ? hasMaterialImageTargets(form.document, { includeExisting: true })
+      : generateMissing && hasMaterialImageTargets(form.document);
+    if (!shouldGenerate) {
+      return saved;
+    }
+
+    const generated = await onGenerateImages(saved.id, { maxImages: 12, regenerate });
     if (generated) {
-      setForm(materialToForm(generated));
+      return generated;
+    }
+    return saved;
+  }
+
+  async function generateCurrentImages(regenerate = false) {
+    const saved = await saveMaterialAndMaybeGenerate({ generateMissing: !regenerate, regenerate });
+    if (saved) {
+      setForm(materialToForm(saved));
     }
   }
 
@@ -1850,7 +1871,7 @@ function MaterialLibraryPanel({
                   </Button>
                   <Button disabled={disabled || !canGenerateImages || form.title.trim().length === 0} onClick={() => void generateCurrentImages()} type="button" variant="outline">
                     <Sparkles className="h-4 w-4" />
-                    Картинки
+                    Сгенерировать
                   </Button>
                   {form.id ? (
                     <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
@@ -1887,9 +1908,20 @@ function MaterialLibraryPanel({
 
             {previewOpen ? (
               <div className="playsay-material-preview">
-                <div className="mb-3 flex items-center gap-2 text-sm font-extrabold text-muted-foreground">
-                  <Eye className="h-4 w-4 text-primary" />
-                  Предпросмотр
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-extrabold text-muted-foreground">
+                    <Eye className="h-4 w-4 text-primary" />
+                    Предпросмотр
+                  </div>
+                  <Button
+                    disabled={disabled || !canRegenerateImages || form.title.trim().length === 0}
+                    onClick={() => void generateCurrentImages(true)}
+                    type="button"
+                    variant="outline"
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Обновить картинки
+                  </Button>
                 </div>
                 <LessonMaterialDocumentView material={materialPreviewFromForm(form)} mode="teacherPreview" />
               </div>
@@ -5947,10 +5979,24 @@ function materialDocumentBlocks(material: LessonMaterial): MaterialEditorBlock[]
   return editorDocumentFromJson(material.document, material.title).pages.flatMap((page) => page.blocks);
 }
 
-function hasMissingMatchingPairImages(document: MaterialEditorDocument): boolean {
+function hasMaterialImageTargets(
+  document: MaterialEditorDocument,
+  options: { includeExisting?: boolean } = {},
+): boolean {
+  const includeExisting = options.includeExisting ?? false;
   return document.pages.some((page) => page.blocks.some((block) => (
-    block.type === "matchingPairs" &&
-    (block.pairs ?? []).some((pair) => !pair.imageUrl?.trim() && (pair.imagePrompt?.trim() || pair.imageAlt?.trim() || pair.right.trim()))
+    (
+      block.type === "generatedImage" &&
+      Boolean(block.prompt?.trim()) &&
+      (includeExisting || !block.url?.trim())
+    ) ||
+    (
+      block.type === "matchingPairs" &&
+      (block.pairs ?? []).some((pair) => (
+        (includeExisting || !pair.imageUrl?.trim()) &&
+        Boolean(pair.imagePrompt?.trim() || pair.imageAlt?.trim() || pair.right.trim())
+      ))
+    )
   )));
 }
 

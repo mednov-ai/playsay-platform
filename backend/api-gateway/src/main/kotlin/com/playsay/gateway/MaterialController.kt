@@ -124,6 +124,8 @@ data class MaterialGenerateImagesRequest(
     val blockId: String? = null,
     @field:Schema(minimum = "1", maximum = "12", nullable = true)
     val maxImages: Int? = null,
+    @field:Schema(nullable = true)
+    val regenerate: Boolean? = null,
 )
 
 data class LessonMaterialDraftResponse(
@@ -931,7 +933,8 @@ class LessonMaterialStore(
         val blockId = request.blockId.optionalClean("blockId", 80)
         val maxImages = (request.maxImages ?: 12).coerceIn(1, 12)
         val document = objectMapper.readTree(material.document).deepCopy<ObjectNode>()
-        val targets = matchingImageTargets(document, blockId, maxImages)
+        val regenerate = request.regenerate == true
+        val targets = materialImageTargets(document, blockId, maxImages, regenerate)
         if (targets.isEmpty()) {
             return material.toResponse(objectMapper)
         }
@@ -944,8 +947,8 @@ class LessonMaterialStore(
                 ),
             )
             val assetId = insertGeneratedImageAsset(materialId, target, generated)
-            target.pair.put("imageUrl", "material-asset:$assetId")
-            target.pair.put("imageAlt", target.imageAlt)
+            target.node.put(target.imageUrlField, "material-asset:$assetId")
+            target.node.put("imageAlt", target.imageAlt)
         }
 
         jdbcClient.sql(
@@ -960,6 +963,8 @@ class LessonMaterialStore(
             .param("document", objectMapper.writeValueAsString(document))
             .param("updatedAt", Instant.now().toMaterialOffsetDateTime())
             .update()
+
+        cleanupReplacedGeneratedAssets(materialId, targets.mapNotNull { target -> target.previousAssetId }.distinct())
 
         return requireNotNull(find(materialId)).toResponse(objectMapper)
     }
@@ -1026,7 +1031,7 @@ class LessonMaterialStore(
 
     private fun insertGeneratedImageAsset(
         materialId: UUID,
-        target: MatchingImageTarget,
+        target: MaterialImageTarget,
         generated: GeneratedMaterialImage,
     ): UUID {
         val id = UUID.randomUUID()
@@ -1071,12 +1076,14 @@ class LessonMaterialStore(
         return id
     }
 
-    private fun generatedImageMetadata(target: MatchingImageTarget, generated: GeneratedMaterialImage, storageKey: String): ObjectNode =
+    private fun generatedImageMetadata(target: MaterialImageTarget, generated: GeneratedMaterialImage, storageKey: String): ObjectNode =
         objectMapper.createObjectNode().apply {
+            put("targetType", target.targetType)
             put("blockId", target.blockId)
-            put("pairId", target.pairId)
-            put("left", target.left)
-            put("right", target.right)
+            put("targetId", target.targetId)
+            put("title", target.title)
+            target.left?.let { value -> put("left", value) }
+            target.right?.let { value -> put("right", value) }
             put("imageAlt", target.imageAlt)
             put("prompt", generated.prompt)
             put("model", generated.model)
@@ -1085,6 +1092,21 @@ class LessonMaterialStore(
             put("byteSize", generated.bytes.size)
             generated.revisedPrompt?.let { value -> put("revisedPrompt", value) }
         }
+
+    private fun cleanupReplacedGeneratedAssets(materialId: UUID, assetIds: List<UUID>) {
+        assetIds.forEach { assetId ->
+            val asset = findAsset(assetId)?.takeIf { found -> found.materialId == materialId } ?: return@forEach
+            asset.storageKey?.trim()?.takeIf { key -> key.isNotEmpty() }?.let { key ->
+                runCatching { materialObjectStorage.deleteObject(key) }
+            }
+            runCatching {
+                jdbcClient.sql("DELETE FROM material_asset WHERE id = :id AND material_id = :materialId")
+                    .param("id", assetId)
+                    .param("materialId", materialId)
+                    .update()
+            }
+        }
+    }
 
     private fun find(materialId: UUID): StoredLessonMaterial? =
         jdbcClient.sql(materialSelect("WHERE m.id = :materialId"))
@@ -1377,14 +1399,18 @@ class LessonMaterialStore(
         """.trimIndent()
 }
 
-private data class MatchingImageTarget(
+private data class MaterialImageTarget(
+    val targetType: String,
     val blockId: String,
-    val pairId: String,
-    val left: String,
-    val right: String,
+    val targetId: String,
+    val title: String,
+    val left: String?,
+    val right: String?,
     val imagePrompt: String,
     val imageAlt: String,
-    val pair: ObjectNode,
+    val imageUrlField: String,
+    val node: ObjectNode,
+    val previousAssetId: UUID?,
 )
 
 private data class MaterialSubmissionScore(
@@ -1742,8 +1768,8 @@ class MaterialController(
     )
     @Operation(
         operationId = "generateMaterialImages",
-        summary = "Generate missing material images",
-        description = "Generates new AI illustrations for matching-pairs material blocks and updates the material document. Requires material owner or ADMIN role.",
+        summary = "Generate material images",
+        description = "Generates missing or regenerated AI illustrations for generated-image and matching-pairs material blocks, stores bytes in object storage, and updates the material document. Requires material owner or ADMIN role.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(
@@ -2100,56 +2126,108 @@ private fun ObjectiveItemScore.toJson(objectMapper: ObjectMapper): ObjectNode =
         put("errorsCount", errorsCount)
     }
 
-private fun matchingImageTargets(document: ObjectNode, blockId: String?, maxImages: Int): List<MatchingImageTarget> {
+private fun materialImageTargets(
+    document: ObjectNode,
+    blockId: String?,
+    maxImages: Int,
+    regenerate: Boolean,
+): List<MaterialImageTarget> {
     val pages = document.get("pages") as? ArrayNode ?: return emptyList()
-    val targets = mutableListOf<MatchingImageTarget>()
+    val targets = mutableListOf<MaterialImageTarget>()
     pages.forEach { page ->
         val blocks = page.get("blocks") as? ArrayNode ?: return@forEach
         blocks.forEach { block ->
             val blockObject = block as? ObjectNode ?: return@forEach
-            if (blockObject.get("type")?.asText() != "matchingPairs") {
-                return@forEach
-            }
-            val currentBlockId = blockObject.get("id")?.asText()?.takeIf { value -> value.isNotBlank() } ?: "matchingPairs"
+            val blockType = blockObject.get("type")?.asText()?.trim().orEmpty()
+            val currentBlockId = blockObject.get("id")?.asText()?.takeIf { value -> value.isNotBlank() } ?: blockType.ifBlank { "block" }
             if (blockId != null && currentBlockId != blockId) {
                 return@forEach
             }
-            val pairs = blockObject.get("pairs") as? ArrayNode ?: return@forEach
-            pairs.forEach { pair ->
-                if (targets.size >= maxImages) {
-                    return@forEach
+
+            when (blockType) {
+                "generatedImage" -> {
+                    if (targets.size >= maxImages) {
+                        return@forEach
+                    }
+                    val imageUrl = blockObject.get("url")?.asText()?.trim().orEmpty()
+                    if (!regenerate && imageUrl.isNotEmpty()) {
+                        return@forEach
+                    }
+                    val imagePrompt = blockObject.get("prompt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                        ?: return@forEach
+                    val title = blockObject.get("title")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                        ?: "AI-картинка"
+                    val imageAlt = blockObject.get("caption")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                        ?: title
+                    targets.add(
+                        MaterialImageTarget(
+                            targetType = "generatedImage",
+                            blockId = currentBlockId,
+                            targetId = currentBlockId,
+                            title = title,
+                            left = null,
+                            right = null,
+                            imagePrompt = imagePrompt,
+                            imageAlt = imageAlt,
+                            imageUrlField = "url",
+                            node = blockObject,
+                            previousAssetId = if (regenerate) materialAssetIdFromReference(imageUrl) else null,
+                        ),
+                    )
                 }
-                val pairObject = pair as? ObjectNode ?: return@forEach
-                val imageUrl = pairObject.get("imageUrl")?.asText()?.trim().orEmpty()
-                if (imageUrl.isNotEmpty()) {
-                    return@forEach
+                "matchingPairs" -> {
+                    val pairs = blockObject.get("pairs") as? ArrayNode ?: return@forEach
+                    pairs.forEach { pair ->
+                        if (targets.size >= maxImages) {
+                            return@forEach
+                        }
+                        val pairObject = pair as? ObjectNode ?: return@forEach
+                        val imageUrl = pairObject.get("imageUrl")?.asText()?.trim().orEmpty()
+                        if (!regenerate && imageUrl.isNotEmpty()) {
+                            return@forEach
+                        }
+                        val left = pairObject.get("left")?.asText()?.trim().orEmpty()
+                        val right = pairObject.get("right")?.asText()?.trim().orEmpty()
+                        if (left.isEmpty() || right.isEmpty()) {
+                            return@forEach
+                        }
+                        val pairId = pairObject.get("id")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                            ?: "pair-${targets.size + 1}"
+                        val imageAlt = pairObject.get("imageAlt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                            ?: right
+                        val imagePrompt = pairObject.get("imagePrompt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                            ?: "child-friendly workbook illustration of $imageAlt, white background"
+                        targets.add(
+                            MaterialImageTarget(
+                                targetType = "matchingPair",
+                                blockId = currentBlockId,
+                                targetId = pairId,
+                                title = right,
+                                left = left,
+                                right = right,
+                                imagePrompt = imagePrompt,
+                                imageAlt = imageAlt,
+                                imageUrlField = "imageUrl",
+                                node = pairObject,
+                                previousAssetId = if (regenerate) materialAssetIdFromReference(imageUrl) else null,
+                            ),
+                        )
+                    }
                 }
-                val left = pairObject.get("left")?.asText()?.trim().orEmpty()
-                val right = pairObject.get("right")?.asText()?.trim().orEmpty()
-                if (left.isEmpty() || right.isEmpty()) {
-                    return@forEach
-                }
-                val pairId = pairObject.get("id")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                    ?: "pair-${targets.size + 1}"
-                val imageAlt = pairObject.get("imageAlt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                    ?: right
-                val imagePrompt = pairObject.get("imagePrompt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                    ?: "child-friendly workbook illustration of $imageAlt, white background"
-                targets.add(
-                    MatchingImageTarget(
-                        blockId = currentBlockId,
-                        pairId = pairId,
-                        left = left,
-                        right = right,
-                        imagePrompt = imagePrompt,
-                        imageAlt = imageAlt,
-                        pair = pairObject,
-                    ),
-                )
+                else -> Unit
             }
         }
     }
     return targets
+}
+
+private fun materialAssetIdFromReference(value: String?): UUID? {
+    val marker = "material-asset:"
+    val clean = value?.trim().orEmpty()
+    if (!clean.startsWith(marker)) {
+        return null
+    }
+    return runCatching { UUID.fromString(clean.removePrefix(marker).trim()) }.getOrNull()
 }
 
 private fun mapMaterial(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredLessonMaterial =

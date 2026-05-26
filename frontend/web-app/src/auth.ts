@@ -123,6 +123,7 @@ export type LessonMaterialUrlDraftInput = {
 export type LessonMaterialGenerateImagesInput = {
   blockId?: string | null;
   maxImages?: number | null;
+  regenerate?: boolean | null;
 };
 export type LessonMaterialDraft = Omit<LessonMaterialInput, "title"> & {
   title: string;

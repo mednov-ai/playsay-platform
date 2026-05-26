@@ -313,6 +313,8 @@ export interface MaterialGenerateImagesRequest {
      * @nullable
      */
   maxImages?: number | null;
+  /** @nullable */
+  regenerate?: boolean | null;
 }
 
 /**
@@ -1835,8 +1837,8 @@ export const getGenerateMaterialImagesUrl = (materialId: string,) => {
 }
 
 /**
- * Generates new AI illustrations for matching-pairs material blocks and updates the material document. Requires material owner or ADMIN role.
- * @summary Generate missing material images
+ * Generates missing or regenerated AI illustrations for generated-image and matching-pairs material blocks, stores bytes in object storage, and updates the material document. Requires material owner or ADMIN role.
+ * @summary Generate material images
  */
 export const generateMaterialImages = async (materialId: string,
     materialGenerateImagesRequest: MaterialGenerateImagesRequest, options?: RequestInit): Promise<generateMaterialImagesResponse> => {

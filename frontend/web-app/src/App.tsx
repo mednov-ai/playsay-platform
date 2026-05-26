@@ -15,6 +15,7 @@ import {
   BookOpen,
   Bot,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -258,6 +259,7 @@ type MaterialEditorBlock = {
 };
 
 const MAX_MANUAL_INPUT_HINTS = 3;
+const SCHEDULE_VISIBLE_LESSON_LIMIT = 10;
 const emptyMaterialMatchingPairs: MaterialMatchingPair[] = [];
 
 type MaterialExerciseItem = NonNullable<MaterialEditorBlock["items"]>[number];
@@ -2480,6 +2482,24 @@ function SchedulePanel({
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const lessonOptions = flattenCourseLessonOptions(courses, lessons);
   const orderedLessons = [...scheduledLessons].sort((left, right) => compareScheduleLessons(left, right, nowMs));
+  const visibleLessons = orderedLessons.slice(0, SCHEDULE_VISIBLE_LESSON_LIMIT);
+  const archivedLessons = orderedLessons.slice(SCHEDULE_VISIBLE_LESSON_LIMIT);
+  const archiveTitle = archivedLessons.every((lesson) => !isJoinableScheduledLesson(lesson, nowMs))
+    ? "Старые занятия"
+    : "Ещё занятия";
+  const renderLessonCard = (lesson: ScheduledLesson) => (
+    <ScheduledLessonCard
+      canManage={canManage}
+      disabled={disabled}
+      key={lesson.id}
+      lesson={lesson}
+      nowMs={nowMs}
+      onCancel={() => onCancel(lesson)}
+      onDelete={() => onDelete(lesson.id)}
+      onJoin={() => onJoin(lesson)}
+      roomLoading={roomLoadingLessonId === lesson.id}
+    />
+  );
 
   return (
     <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
@@ -2527,19 +2547,21 @@ function SchedulePanel({
             </div>
           ) : (
             <div className="grid gap-3">
-              {orderedLessons.map((lesson) => (
-                <ScheduledLessonCard
-                  canManage={canManage}
-                  disabled={disabled}
-                  key={lesson.id}
-                  lesson={lesson}
-                  nowMs={nowMs}
-                  onCancel={() => onCancel(lesson)}
-                  onDelete={() => onDelete(lesson.id)}
-                  onJoin={() => onJoin(lesson)}
-                  roomLoading={roomLoadingLessonId === lesson.id}
-                />
-              ))}
+              {visibleLessons.map(renderLessonCard)}
+              {archivedLessons.length > 0 ? (
+                <details className="group rounded-2xl border border-border bg-muted/45">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-extrabold text-foreground">
+                    <span>{archiveTitle}</span>
+                    <span className="inline-flex items-center gap-2 text-xs font-extrabold text-muted-foreground">
+                      скрыто {archivedLessons.length}
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                    </span>
+                  </summary>
+                  <div className="grid gap-3 border-t border-border p-3">
+                    {archivedLessons.map(renderLessonCard)}
+                  </div>
+                </details>
+              ) : null}
             </div>
           )}
         </div>
@@ -6343,14 +6365,22 @@ function scheduleSortRank(lesson: ScheduledLesson, nowMs: number): number {
 }
 
 function compareScheduleLessons(left: ScheduledLesson, right: ScheduledLesson, nowMs: number): number {
-  const rankDiff = scheduleSortRank(left, nowMs) - scheduleSortRank(right, nowMs);
+  const leftRank = scheduleSortRank(left, nowMs);
+  const rightRank = scheduleSortRank(right, nowMs);
+  const rankDiff = leftRank - rightRank;
   if (rankDiff !== 0) {
     return rankDiff;
   }
 
-  const leftStart = dateValueMs(left.scheduledStart) ?? Number.MAX_SAFE_INTEGER;
-  const rightStart = dateValueMs(right.scheduledStart) ?? Number.MAX_SAFE_INTEGER;
+  const leftStartValue = dateValueMs(left.scheduledStart);
+  const rightStartValue = dateValueMs(right.scheduledStart);
+  const leftStart = leftStartValue ?? Number.MAX_SAFE_INTEGER;
+  const rightStart = rightStartValue ?? Number.MAX_SAFE_INTEGER;
   if (leftStart !== rightStart) {
+    if (leftRank === 3 && rightRank === 3) {
+      return (rightStartValue ?? Number.MIN_SAFE_INTEGER) - (leftStartValue ?? Number.MIN_SAFE_INTEGER);
+    }
+
     return leftStart - rightStart;
   }
 

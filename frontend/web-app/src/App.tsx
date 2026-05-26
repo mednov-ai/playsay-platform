@@ -220,6 +220,16 @@ type MaterialImageGenerationProgress = {
   total: number;
 };
 
+type MaterialAssetLibraryItem = {
+  alt: string;
+  asset: LessonMaterialAsset;
+  materialId: string;
+  materialTitle: string;
+  prompt: string;
+  searchText: string;
+  tags: string[];
+};
+
 type MaterialVideoEmbedFrame = {
   src: string;
   title: string;
@@ -1430,6 +1440,7 @@ function MaterialLibraryPanel({
   const [authorMode, setAuthorMode] = useState<MaterialAuthorMode>("preview");
   const [selectedLessonKey, setSelectedLessonKey] = useState("");
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
+  const [assetLibrary, setAssetLibrary] = useState<MaterialAssetLibraryItem[]>([]);
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
   const canGenerateUrlDraft = draftUrl.trim().length > 0;
   const allImageTargetsCount = countMaterialImageTargets(form.document, { includeExisting: true });
@@ -1454,6 +1465,36 @@ function MaterialLibraryPanel({
     setAuthorMode("preview");
     setAutoSelectedMaterialId(firstMaterial.id);
   }, [autoSelectedMaterialId, form.id, form.title, materials]);
+
+  useEffect(() => {
+    if (!canManage || materials.length === 0) {
+      setAssetLibrary([]);
+      return;
+    }
+
+    let active = true;
+
+    Promise.allSettled(
+      materials.slice(0, 40).map(async (material) => {
+        const assets = await fetchMaterialAssets(material.id);
+        return assets
+          .map((asset) => materialAssetLibraryItemFromAsset(material, asset))
+          .filter((item): item is MaterialAssetLibraryItem => item !== null);
+      }),
+    ).then((results) => {
+      if (!active) {
+        return;
+      }
+
+      setAssetLibrary(results.flatMap((result) => (
+        result.status === "fulfilled" ? result.value : []
+      )));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [canManage, materials]);
 
   function updateForm<Key extends keyof MaterialFormState>(field: Key, value: MaterialFormState[Key]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -2035,7 +2076,9 @@ function MaterialLibraryPanel({
               ) : (
                 form.document.pages[0]?.blocks.map((block, index) => (
                   <MaterialBlockEditor
+                    assetLibrary={assetLibrary}
                     block={block}
+                    currentMaterialId={form.id}
                     disabled={disabled}
                     index={index}
                     key={block.id}
@@ -2081,13 +2124,17 @@ function MaterialImageProgress({ value }: { value: MaterialImageGenerationProgre
 }
 
 function MaterialBlockEditor({
+  assetLibrary,
   block,
+  currentMaterialId,
   disabled,
   index,
   onRemove,
   onUpdate,
 }: {
+  assetLibrary: MaterialAssetLibraryItem[];
   block: MaterialEditorBlock;
+  currentMaterialId: string | null;
   disabled: boolean;
   index: number;
   onRemove: () => void;
@@ -2096,12 +2143,10 @@ function MaterialBlockEditor({
   const exerciseType = block.type === "multipleChoice" ? "multipleChoice" : "fillGaps";
   const [flashcardsSource, setFlashcardsSource] = useState(() => formatFlashcards(block.cards));
   const [exerciseSource, setExerciseSource] = useState(() => formatExerciseItems(block.items, exerciseType));
-  const [matchingSource, setMatchingSource] = useState(() => formatMatchingPairs(block.pairs));
 
   useEffect(() => {
     setFlashcardsSource(formatFlashcards(block.cards));
     setExerciseSource(formatExerciseItems(block.items, exerciseType));
-    setMatchingSource(formatMatchingPairs(block.pairs));
   }, [block.id, block.type, exerciseType]);
 
   return (
@@ -2217,21 +2262,13 @@ function MaterialBlockEditor({
         ) : null}
 
         {block.type === "matchingPairs" ? (
-          <div className="grid gap-2">
-            <p className="text-xs font-bold text-muted-foreground">
-              Формат строки: left | right | text или left | right | image | prompt | alt. Markdown поддержан в текстовых полях, символ | внутри текста пишите как \|.
-            </p>
-            <textarea
-              className="playsay-input min-h-36 resize-y py-3"
-              disabled={disabled}
-              onChange={(event) => {
-                const value = event.target.value;
-                setMatchingSource(value);
-                onUpdate({ pairs: parseMatchingPairs(value, block.pairs) });
-              }}
-              value={matchingSource}
-            />
-          </div>
+          <MatchingPairsEditor
+            assetLibrary={assetLibrary}
+            block={block}
+            currentMaterialId={currentMaterialId}
+            disabled={disabled}
+            onUpdate={onUpdate}
+          />
         ) : null}
 
         {isObjectiveMaterialBlockType(block.type) ? (
@@ -2309,6 +2346,192 @@ function MaterialBlockEditor({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function MatchingPairsEditor({
+  assetLibrary,
+  block,
+  currentMaterialId,
+  disabled,
+  onUpdate,
+}: {
+  assetLibrary: MaterialAssetLibraryItem[];
+  block: MaterialEditorBlock;
+  currentMaterialId: string | null;
+  disabled: boolean;
+  onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
+}) {
+  const draftRowsRef = useRef<MaterialMatchingPair[]>([
+    emptyMatchingPair(),
+    emptyMatchingPair(),
+  ]);
+  const [assetQueries, setAssetQueries] = useState<Record<string, string>>({});
+  const pairs = editableMatchingPairs(block.pairs ?? [], draftRowsRef.current);
+
+  function updatePairs(nextPairs: MaterialMatchingPair[]) {
+    onUpdate({ pairs: nextPairs });
+  }
+
+  function updatePair(pairId: string, patch: Partial<MaterialMatchingPair>) {
+    updatePairs(pairs.map((pair) => (pair.id === pairId ? { ...pair, ...patch } : pair)));
+  }
+
+  function toggleImage(pair: MaterialMatchingPair, checked: boolean) {
+    if (checked) {
+      const imageAlt = pair.right.trim() || pair.left.trim();
+      updatePair(pair.id, {
+        targetKind: "IMAGE",
+        imageAlt: imageAlt || undefined,
+        imagePrompt: pair.imagePrompt?.trim() || (imageAlt ? defaultMatchingImagePrompt(imageAlt) : ""),
+      });
+      return;
+    }
+
+    updatePair(pair.id, {
+      targetKind: "TEXT",
+      imagePrompt: undefined,
+      imageAlt: undefined,
+      imageUrl: undefined,
+    });
+  }
+
+  function chooseAsset(pair: MaterialMatchingPair, item: MaterialAssetLibraryItem) {
+    const nextRight = pair.right.trim() || item.alt || item.tags[0] || item.materialTitle;
+    const imageUrl = currentMaterialId && currentMaterialId === item.materialId
+      ? `material-asset:${item.asset.id}`
+      : undefined;
+
+    updatePair(pair.id, {
+      right: nextRight,
+      targetKind: "IMAGE",
+      imageAlt: nextRight,
+      imagePrompt: item.prompt || pair.imagePrompt || defaultMatchingImagePrompt(nextRight || pair.left),
+      imageUrl,
+    });
+  }
+
+  function addRow() {
+    updatePairs([...pairs, emptyMatchingPair()]);
+  }
+
+  function removeRow(pairId: string) {
+    updatePairs(editableMatchingPairs(pairs.filter((pair) => pair.id !== pairId), []));
+  }
+
+  return (
+    <div className="playsay-matching-editor">
+      <div className="playsay-matching-editor-head" aria-hidden="true">
+        <span>Слева</span>
+        <span>Справа</span>
+        <span />
+      </div>
+      {pairs.map((pair, index) => {
+        const isImage = materialMatchingPairTargetKind(pair) === "IMAGE";
+        const assetQuery = assetQueries[pair.id] ?? "";
+        const assetResults = isImage ? matchingAssetSearchResults(assetLibrary, assetQuery).slice(0, 5) : [];
+        return (
+          <div className="playsay-matching-editor-row" key={pair.id}>
+            <input
+              aria-label={`Слева ${index + 1}`}
+              className="playsay-input"
+              disabled={disabled}
+              maxLength={240}
+              onChange={(event) => updatePair(pair.id, { left: event.target.value })}
+              placeholder="слово / фраза"
+              value={pair.left}
+            />
+            <input
+              aria-label={`Справа ${index + 1}`}
+              className="playsay-input"
+              disabled={disabled}
+              maxLength={240}
+              onChange={(event) => {
+                const value = event.target.value;
+                updatePair(pair.id, {
+                  right: value,
+                  imageAlt: isImage ? value : undefined,
+                });
+              }}
+              placeholder={isImage ? "что на картинке" : "ответ / перевод"}
+              value={pair.right}
+            />
+            <div className="playsay-matching-row-tools">
+              <label className="playsay-image-checkbox">
+                <input
+                  checked={isImage}
+                  disabled={disabled}
+                  onChange={(event) => toggleImage(pair, event.target.checked)}
+                  type="checkbox"
+                />
+                <span>image</span>
+              </label>
+              <Button
+                aria-label="Удалить строку"
+                disabled={disabled || pairs.length <= 2}
+                onClick={() => removeRow(pair.id)}
+                type="button"
+                variant="outline"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {isImage ? (
+              <div className="playsay-matching-image-fields">
+                <input
+                  aria-label={`Поиск картинки по тегу ${index + 1}`}
+                  className="playsay-input"
+                  disabled={disabled}
+                  maxLength={80}
+                  onChange={(event) => setAssetQueries((current) => ({ ...current, [pair.id]: event.target.value }))}
+                  placeholder="поиск существующей картинки по тегу"
+                  value={assetQuery}
+                />
+                {assetQuery.trim() ? (
+                  <div className="playsay-matching-asset-results">
+                    {assetResults.length > 0 ? (
+                      assetResults.map((item) => (
+                        <button
+                          className="playsay-matching-asset-chip"
+                          disabled={disabled}
+                          key={`${item.materialId}:${item.asset.id}`}
+                          onClick={() => chooseAsset(pair, item)}
+                          type="button"
+                        >
+                          <span>{item.alt || item.prompt || "AI image"}</span>
+                          <small>
+                            {currentMaterialId === item.materialId ? "asset" : "prompt"} · {item.tags.slice(0, 3).join(", ") || item.materialTitle}
+                          </small>
+                        </button>
+                      ))
+                    ) : (
+                      <span className="playsay-matching-asset-empty">Нет картинок с таким тегом</span>
+                    )}
+                  </div>
+                ) : null}
+                <textarea
+                  aria-label={`Prompt картинки ${index + 1}`}
+                  className="playsay-input min-h-20 resize-y py-3"
+                  disabled={disabled}
+                  maxLength={1_000}
+                  onChange={(event) => updatePair(pair.id, {
+                    imagePrompt: event.target.value,
+                    imageUrl: undefined,
+                  })}
+                  placeholder="prompt для AI-картинки без текста внутри"
+                  value={pair.imagePrompt ?? ""}
+                />
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+      <Button disabled={disabled} onClick={addRow} type="button" variant="outline">
+        <Plus className="h-4 w-4" />
+        Добавить строку
+      </Button>
+    </div>
   );
 }
 
@@ -5246,13 +5469,34 @@ function RenderedMatchingPairsExercise({
 }
 
 function matchingRightOptions(pairs: MaterialMatchingPair[]): MaterialMatchingPair[] {
-  return [...pairs].sort((left, right) => matchingPairSortKey(left) - matchingPairSortKey(right));
+  if (pairs.length <= 1) {
+    return [...pairs];
+  }
+
+  const ordered = [...pairs].sort((left, right) => matchingPairSortKey(left) - matchingPairSortKey(right));
+
+  for (let offset = 0; offset < ordered.length; offset += 1) {
+    const candidate = rotateMatchingOptions(ordered, offset);
+    if (candidate.every((pair, index) => pair.id !== pairs[index]?.id)) {
+      return candidate;
+    }
+  }
+
+  return rotateMatchingOptions(pairs, 1);
 }
 
 function matchingPairSortKey(pair: MaterialMatchingPair): number {
   return `${pair.id}:${pair.right}`.split("").reduce((hash, char) => (
     (hash * 31 + char.charCodeAt(0)) % 10_000
   ), 7);
+}
+
+function rotateMatchingOptions(pairs: MaterialMatchingPair[], offset: number): MaterialMatchingPair[] {
+  if (pairs.length === 0) {
+    return [];
+  }
+  const normalizedOffset = offset % pairs.length;
+  return [...pairs.slice(normalizedOffset), ...pairs.slice(0, normalizedOffset)];
 }
 
 function materialExerciseOptions(item: MaterialExerciseItem, block: MaterialEditorBlock): string[] {
@@ -6117,22 +6361,8 @@ function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
         ...base,
         assessment: defaultObjectiveAssessmentPolicy(),
         pairs: [
-          {
-            id: createClientId("pair"),
-            left: "owl",
-            right: "owl",
-            targetKind: "IMAGE",
-            imagePrompt: "child-friendly workbook illustration of an owl, white background",
-            imageAlt: "owl",
-          },
-          {
-            id: createClientId("pair"),
-            left: "penguin",
-            right: "penguin",
-            targetKind: "IMAGE",
-            imagePrompt: "child-friendly workbook illustration of a penguin, white background",
-            imageAlt: "penguin",
-          },
+          emptyMatchingPair(),
+          emptyMatchingPair(),
         ],
       };
     case "freeWriting":
@@ -6155,6 +6385,35 @@ function defaultObjectiveAssessmentPolicy(): MaterialAssessmentPolicy {
     hintPenalty: 0.15,
     lockAfterAttempts: true,
   };
+}
+
+function emptyMatchingPair(): MaterialMatchingPair {
+  return {
+    id: createClientId("pair"),
+    left: "",
+    right: "",
+    targetKind: "TEXT",
+  };
+}
+
+function editableMatchingPairs(
+  pairs: MaterialMatchingPair[],
+  draftRows: MaterialMatchingPair[] = [],
+): MaterialMatchingPair[] {
+  const next = [...pairs];
+  let draftIndex = 0;
+
+  while (next.length < 2) {
+    next.push(draftRows[draftIndex] ?? emptyMatchingPair());
+    draftIndex += 1;
+  }
+
+  return next;
+}
+
+function defaultMatchingImagePrompt(value: string): string {
+  const subject = value.trim() || "the target word";
+  return `child-friendly workbook illustration of ${subject}, white background, no text`;
 }
 
 async function prepareMaterialDraftSourceImage(file: File): Promise<MaterialDraftSourceImage> {
@@ -6660,17 +6919,66 @@ function materialDocumentAssetIds(document: MaterialEditorDocument): string[] {
   return [...ids].sort();
 }
 
+function materialAssetLibraryItemFromAsset(material: LessonMaterial, asset: LessonMaterialAsset): MaterialAssetLibraryItem | null {
+  if (asset.kind !== "GENERATED_IMAGE") {
+    return null;
+  }
+
+  const metadata = asJsonObject(asset.metadata);
+  const tags = materialAssetTags(metadata);
+  const prompt = asString(metadata.sourcePrompt) || asString(metadata.prompt);
+  const alt = asString(metadata.sourceAlt) || asString(metadata.alt) || asString(metadata.title);
+  const searchText = [
+    material.title,
+    asset.kind,
+    prompt,
+    alt,
+    tags.join(" "),
+  ].join(" ").toLowerCase();
+
+  return {
+    alt,
+    asset,
+    materialId: material.id,
+    materialTitle: material.title,
+    prompt,
+    searchText,
+    tags,
+  };
+}
+
+function matchingAssetSearchResults(
+  assetLibrary: MaterialAssetLibraryItem[],
+  query: string,
+): MaterialAssetLibraryItem[] {
+  const terms = query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (terms.length === 0) {
+    return [];
+  }
+
+  return assetLibrary.filter((item) => terms.every((term) => item.searchText.includes(term)));
+}
+
 function materialAssetTagsMap(assets: LessonMaterialAsset[]): Record<string, string[]> {
   return assets.reduce<Record<string, string[]>>((result, asset) => {
-    const metadata = asJsonObject(asset.metadata);
-    const tags = Array.isArray(metadata.tags)
-      ? uniqueMaterialTags(metadata.tags.map(asString))
-      : [];
+    const tags = materialAssetTags(asset.metadata);
     if (tags.length > 0) {
       result[asset.id] = tags;
     }
     return result;
   }, {});
+}
+
+function materialAssetTags(metadataValue: LessonMaterialJson | unknown): string[] {
+  const metadata = asJsonObject(metadataValue);
+  return Array.isArray(metadata.tags)
+    ? uniqueMaterialTags(metadata.tags.map(asString))
+    : [];
 }
 
 function materialAssetIdFromUrl(value: string | undefined): string | null {
@@ -6977,46 +7285,6 @@ function formatExerciseItems(items: MaterialEditorBlock["items"], type: "fillGap
     .join("\n");
 }
 
-function parseMatchingPairs(value: string, previousPairs: MaterialMatchingPair[] = []): MaterialMatchingPair[] {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [left = "", right = "", kindOrPrompt = "", promptOrAlt = "", alt = ""] = splitMaterialLine(line, 5);
-      const cleanLeft = left.trim();
-      const cleanRight = (right || left).trim();
-      const explicitKind = normalizeMatchingTargetKind(kindOrPrompt);
-      const targetKind = explicitKind ?? (kindOrPrompt.trim() || promptOrAlt.trim() ? "IMAGE" : "TEXT");
-      const previousPair = findPreviousMatchingPair(previousPairs, index, cleanLeft, cleanRight);
-      const pair: MaterialMatchingPair = {
-        id: previousPair?.id ?? createClientId("pair"),
-        left: cleanLeft,
-        right: cleanRight,
-        targetKind,
-      };
-      if (targetKind === "IMAGE") {
-        pair.imagePrompt = explicitKind
-          ? promptOrAlt.trim() || `child-friendly workbook illustration of ${cleanRight}, white background`
-          : kindOrPrompt.trim() || `child-friendly workbook illustration of ${cleanRight}, white background`;
-        pair.imageAlt = explicitKind ? alt.trim() || cleanRight : promptOrAlt.trim() || cleanRight;
-        pair.imageUrl = previousPair?.imageUrl;
-      }
-      return pair;
-    })
-    .filter((pair) => pair.left && pair.right);
-}
-
-function formatMatchingPairs(pairs: MaterialEditorBlock["pairs"]): string {
-  return (pairs ?? [])
-    .map((pair) => (
-      materialMatchingPairTargetKind(pair) === "IMAGE"
-        ? [pair.left, pair.right, "image", pair.imagePrompt, pair.imageAlt].filter(Boolean).map(escapeMaterialCell).join(" | ")
-        : [pair.left, pair.right, "text"].map(escapeMaterialCell).join(" | ")
-    ))
-    .join("\n");
-}
-
 function splitMaterialLine(value: string, maxParts: number): string[] {
   const separator = findMaterialSeparator(value);
   const parts: string[] = [];
@@ -7106,10 +7374,6 @@ function escapeMaterialCell(value: unknown): string {
 
 function escapeMaterialListItem(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/,/g, "\\,");
-}
-
-function findPreviousMatchingPair(pairs: MaterialMatchingPair[], index: number, left: string, right: string): MaterialMatchingPair | undefined {
-  return pairs.find((pair) => pair.left === left && pair.right === right) ?? pairs[index];
 }
 
 function normalizeMaterialBlockType(value: string): MaterialBlockType | null {

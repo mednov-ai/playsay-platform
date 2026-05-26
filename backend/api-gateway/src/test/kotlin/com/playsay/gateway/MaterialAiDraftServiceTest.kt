@@ -68,6 +68,7 @@ class MaterialAiDraftServiceTest {
         assertTrue(transport.requestBody.contains("Preserve every visible worksheet blank"))
         assertTrue(transport.requestBody.contains("classify the worksheet type"))
         assertTrue(transport.requestBody.contains("use matchingPairs blocks"))
+        assertTrue(transport.requestBody.contains("targetKind"))
         assertTrue(transport.requestBody.contains("\"matchingPairs\""))
         assertTrue(transport.requestBody.contains("\"pairs\""))
         assertTrue(transport.requestBody.contains("each blank item must provide choices"))

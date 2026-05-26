@@ -243,6 +243,23 @@ private data class ValidatedLessonMaterialRequest(
 private const val materialAiSourceImageDataUrlMaxLength = 2_500_000
 private const val materialUrlImportPromptLimit = 8_000
 private const val materialUrlImportPromptTextLimit = 6_000
+private val materialImageTagStopWords = setOf(
+    "a",
+    "an",
+    "and",
+    "background",
+    "child",
+    "children",
+    "friendly",
+    "for",
+    "image",
+    "illustration",
+    "of",
+    "picture",
+    "the",
+    "white",
+    "workbook",
+)
 
 @Component
 class LessonMaterialStore(
@@ -1090,8 +1107,37 @@ class LessonMaterialStore(
             put("mimeType", generated.mimeType)
             put("storageKey", storageKey)
             put("byteSize", generated.bytes.size)
+            set<ArrayNode>("tags", generatedImageTags(target, generated))
             generated.revisedPrompt?.let { value -> put("revisedPrompt", value) }
         }
+
+    private fun generatedImageTags(target: MaterialImageTarget, generated: GeneratedMaterialImage): ArrayNode {
+        val tags = linkedSetOf<String>()
+        fun addTag(value: String?) {
+            val clean = value?.trim()?.lowercase()?.replace(Regex("""[^\p{L}\p{N}-]+"""), "-")?.trim('-').orEmpty()
+            if (clean.length in 2..40 && clean !in materialImageTagStopWords) {
+                tags.add(clean)
+            }
+        }
+
+        addTag(target.targetType)
+        addTag(target.title)
+        addTag(target.left)
+        addTag(target.right)
+        addTag(target.imageAlt)
+        materialImageTagCandidates(target.imagePrompt).forEach(::addTag)
+        materialImageTagCandidates(generated.revisedPrompt).forEach(::addTag)
+
+        return objectMapper.createArrayNode().apply {
+            tags.take(16).forEach { tag -> add(tag) }
+        }
+    }
+
+    private fun materialImageTagCandidates(value: String?): List<String> =
+        value.orEmpty()
+            .split(Regex("""[^\p{L}\p{N}-]+"""))
+            .map { token -> token.trim() }
+            .filter { token -> token.length in 2..40 }
 
     private fun cleanupReplacedGeneratedAssets(materialId: UUID, assetIds: List<UUID>) {
         assetIds.forEach { assetId ->
@@ -2191,12 +2237,18 @@ private fun materialImageTargets(
                         if (left.isEmpty() || right.isEmpty()) {
                             return@forEach
                         }
+                        val imagePromptValue = pairObject.get("imagePrompt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                        val imageAltValue = pairObject.get("imageAlt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                        val targetKind = pairObject.get("targetKind")?.asText()?.trim()?.uppercase().orEmpty()
+                        val isImageTarget = targetKind == "IMAGE" ||
+                            (targetKind.isEmpty() && (imagePromptValue != null || imageAltValue != null || imageUrl.isNotEmpty()))
+                        if (!isImageTarget) {
+                            return@forEach
+                        }
                         val pairId = pairObject.get("id")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
                             ?: "pair-${targets.size + 1}"
-                        val imageAlt = pairObject.get("imageAlt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                            ?: right
-                        val imagePrompt = pairObject.get("imagePrompt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                            ?: "child-friendly workbook illustration of $imageAlt, white background"
+                        val imageAlt = imageAltValue ?: right
+                        val imagePrompt = imagePromptValue ?: "child-friendly workbook illustration of $imageAlt, white background"
                         targets.add(
                             MaterialImageTarget(
                                 targetType = "matchingPair",

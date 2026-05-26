@@ -7,6 +7,7 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeAll
@@ -568,6 +569,7 @@ class MaterialControllerTest @Autowired constructor(
                                   "id": "pair-owl",
                                   "left": "owl",
                                   "right": "owl",
+                                  "targetKind": "IMAGE",
                                   "imagePrompt": "child-friendly workbook owl illustration",
                                   "imageAlt": "owl"
                                 },
@@ -575,8 +577,15 @@ class MaterialControllerTest @Autowired constructor(
                                   "id": "pair-duck",
                                   "left": "duck",
                                   "right": "duck",
+                                  "targetKind": "IMAGE",
                                   "imagePrompt": "child-friendly workbook duck illustration",
                                   "imageAlt": "duck"
+                                },
+                                {
+                                  "id": "pair-word",
+                                  "left": "hello",
+                                  "right": "привет",
+                                  "targetKind": "TEXT"
                                 }
                               ]
                             }
@@ -602,12 +611,17 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals("duck", pairs[1]["left"].asText())
         assertTrue(pairs[0]["imageUrl"].asText().startsWith("material-asset:"))
         assertTrue(pairs[1]["imageUrl"].asText().startsWith("material-asset:"))
+        assertEquals("TEXT", pairs[2]["targetKind"].asText())
+        assertFalse(pairs[2].has("imageUrl"))
         val assets = materialController.listAssets(teacher, material.id)
         assertEquals(3, assets.size)
         assertEquals("GENERATED_IMAGE", assets[0].kind)
         assertTrue(assets.all { asset -> asset.externalUrl == null })
         assertTrue(assets.all { asset -> asset.storageKey?.startsWith("material-assets/${material.id}/") == true })
         assertTrue(assets.all { asset -> asset.contentUrl?.startsWith("/api/materials/${material.id}/assets/") == true })
+        val owlAsset = assets.single { asset -> asset.metadata["targetId"].asText() == "pair-owl" }
+        assertTrue(owlAsset.metadata["tags"].isArray)
+        assertTrue(owlAsset.metadata["tags"].any { tag -> tag.asText() == "owl" })
         assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(pairs[0]["imageUrl"].asText()))
         assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(generatedImageBlock["url"].asText()))
     }

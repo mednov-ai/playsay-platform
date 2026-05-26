@@ -60,6 +60,7 @@ import {
   draftMaterial,
   draftMaterialFromUrl,
   enterScheduledLessonRoom,
+  fetchMaterialAssetObjectUrl,
   editCourseLesson,
   editScheduledLesson,
   fetchAdminUserProfiles,
@@ -98,7 +99,6 @@ import {
   type CourseLesson,
   type CourseLessonInput,
   type LessonMaterial,
-  type LessonMaterialAsset,
   type LessonMaterialDraft,
   type LessonMaterialGenerateImagesInput,
   type LessonMaterialDraftInput,
@@ -199,13 +199,22 @@ type MaterialBlockType =
   | "drawingArea"
   | "generatedImage";
 
+type MaterialMatchingTargetKind = "TEXT" | "IMAGE";
+
 type MaterialMatchingPair = {
   id: string;
   left: string;
   right: string;
+  targetKind?: MaterialMatchingTargetKind;
   imagePrompt?: string;
   imageAlt?: string;
   imageUrl?: string;
+};
+
+type MaterialImageGenerationProgress = {
+  current?: number;
+  label: string;
+  total: number;
 };
 
 type MaterialAssessmentPolicy = {
@@ -1388,10 +1397,13 @@ function MaterialLibraryPanel({
   const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedLessonKey, setSelectedLessonKey] = useState("");
+  const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
   const canGenerateUrlDraft = draftUrl.trim().length > 0;
-  const canGenerateImages = hasMaterialImageTargets(form.document);
-  const canRegenerateImages = hasMaterialImageTargets(form.document, { includeExisting: true });
+  const missingImageTargetsCount = countMaterialImageTargets(form.document);
+  const allImageTargetsCount = countMaterialImageTargets(form.document, { includeExisting: true });
+  const canGenerateImages = missingImageTargetsCount > 0;
+  const canRegenerateImages = allImageTargetsCount > 0;
 
   useEffect(() => {
     if (selectedLessonKey || lessonOptions.length === 0) {
@@ -1556,18 +1568,33 @@ function MaterialLibraryPanel({
     if (!saved) {
       return null;
     }
-    const shouldGenerate = regenerate
-      ? hasMaterialImageTargets(form.document, { includeExisting: true })
-      : generateMissing && hasMaterialImageTargets(form.document);
-    if (!shouldGenerate) {
+    const targetCount = regenerate
+      ? countMaterialImageTargets(form.document, { includeExisting: true })
+      : generateMissing ? countMaterialImageTargets(form.document) : 0;
+    if (targetCount === 0) {
       return saved;
     }
 
-    const generated = await onGenerateImages(saved.id, { maxImages: 12, regenerate });
-    if (generated) {
-      return generated;
+    try {
+      if (regenerate) {
+        setImageGenerationProgress({ label: "Обновляем картинки", total: targetCount });
+        return (await onGenerateImages(saved.id, { maxImages: Math.min(12, targetCount), regenerate: true })) ?? saved;
+      }
+
+      let currentMaterial = saved;
+      for (let index = 1; index <= targetCount; index += 1) {
+        setImageGenerationProgress({ current: index, label: "Генерируем картинки", total: targetCount });
+        const generated = await onGenerateImages(currentMaterial.id, { maxImages: 1 });
+        if (!generated) {
+          return currentMaterial;
+        }
+        currentMaterial = generated;
+        setForm(materialToForm(generated));
+      }
+      return currentMaterial;
+    } finally {
+      setImageGenerationProgress(null);
     }
-    return saved;
   }
 
   async function generateCurrentImages(regenerate = false) {
@@ -1885,6 +1912,9 @@ function MaterialLibraryPanel({
                   </Button>
                 </div>
               </div>
+              {imageGenerationProgress ? (
+                <MaterialImageProgress value={imageGenerationProgress} />
+              ) : null}
             </div>
 
             <div className="playsay-material-editor">
@@ -1936,6 +1966,26 @@ function MaterialLibraryPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function MaterialImageProgress({ value }: { value: MaterialImageGenerationProgress }) {
+  const ratio = value.current ? value.current / Math.max(1, value.total) : 1;
+  const progressText = value.current ? `${value.current} из ${value.total}` : `${value.total} картинок`;
+
+  return (
+    <div className="mt-3 rounded-xl border border-primary/20 bg-[#fff7f1] px-3 py-2">
+      <div className="flex items-center justify-between gap-3 text-xs font-extrabold text-primary">
+        <span>{value.label}</span>
+        <span>{progressText}</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white">
+        <div
+          className="h-full rounded-full bg-primary transition-[width] duration-300"
+          style={{ width: `${Math.round(clampNumber(ratio, 0.08, 1) * 100)}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -2047,12 +2097,17 @@ function MaterialBlockEditor({
         ) : null}
 
         {block.type === "matchingPairs" ? (
-          <textarea
-            className="playsay-input min-h-36 resize-none py-3"
-            disabled={disabled}
-            onChange={(event) => onUpdate({ pairs: parseMatchingPairs(event.target.value) })}
-            value={formatMatchingPairs(block.pairs)}
-          />
+          <div className="grid gap-2">
+            <p className="text-xs font-bold text-muted-foreground">
+              Формат строки: left | right | text или left | right | image | prompt | alt
+            </p>
+            <textarea
+              className="playsay-input min-h-36 resize-none py-3"
+              disabled={disabled}
+              onChange={(event) => onUpdate({ pairs: parseMatchingPairs(event.target.value) })}
+              value={formatMatchingPairs(block.pairs)}
+            />
+          </div>
         ) : null}
 
         {isObjectiveMaterialBlockType(block.type) ? (
@@ -2516,17 +2571,34 @@ function SchedulePanel({
   const orderedLessons = [...scheduledLessons].sort((left, right) => compareScheduleLessons(left, right, nowMs));
   const visibleLessons = orderedLessons.slice(0, SCHEDULE_VISIBLE_LESSON_LIMIT);
   const archivedLessons = orderedLessons.slice(SCHEDULE_VISIBLE_LESSON_LIMIT);
+  const [copiedLessonId, setCopiedLessonId] = useState<string | null>(null);
   const archiveTitle = archivedLessons.every((lesson) => !isJoinableScheduledLesson(lesson, nowMs))
     ? "Старые занятия"
     : "Ещё занятия";
+
+  async function copyLessonLink(lessonId: string) {
+    const url = new URL(classroomPath(lessonId), window.location.origin).toString();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLessonId(lessonId);
+      window.setTimeout(() => {
+        setCopiedLessonId((current) => (current === lessonId ? null : current));
+      }, 1800);
+    } catch {
+      window.prompt("Ссылка на урок", url);
+    }
+  }
+
   const renderLessonCard = (lesson: ScheduledLesson) => (
     <ScheduledLessonCard
       canManage={canManage}
       disabled={disabled}
       key={lesson.id}
       lesson={lesson}
+      linkCopied={copiedLessonId === lesson.id}
       nowMs={nowMs}
       onCancel={() => onCancel(lesson)}
+      onCopyLink={() => void copyLessonLink(lesson.id)}
       onDelete={() => onDelete(lesson.id)}
       onJoin={() => onJoin(lesson)}
       roomLoading={roomLoadingLessonId === lesson.id}
@@ -2752,8 +2824,10 @@ function ScheduledLessonCard({
   canManage,
   disabled,
   lesson,
+  linkCopied,
   nowMs,
   onCancel,
+  onCopyLink,
   onDelete,
   onJoin,
   roomLoading,
@@ -2761,8 +2835,10 @@ function ScheduledLessonCard({
   canManage: boolean;
   disabled: boolean;
   lesson: ScheduledLesson;
+  linkCopied: boolean;
   nowMs: number;
   onCancel: () => void;
+  onCopyLink: () => void;
   onDelete: () => void;
   onJoin: () => void;
   roomLoading: boolean;
@@ -2822,6 +2898,10 @@ function ScheduledLessonCard({
           >
             {roomLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
             Войти в урок
+          </Button>
+          <Button disabled={disabled} onClick={onCopyLink} type="button" variant="outline">
+            <Copy className="h-4 w-4" />
+            {linkCopied ? "Скопировано" : "Ссылка"}
           </Button>
           {canManage ? (
             <>
@@ -3816,6 +3896,7 @@ function LessonMaterialDocumentView({
 
   useEffect(() => {
     let active = true;
+    const objectUrls = new Set<string>();
 
     if (material.id === "preview" || assetKey.length === 0) {
       setAssetUrls({});
@@ -3825,12 +3906,33 @@ function LessonMaterialDocumentView({
     }
 
     fetchMaterialAssets(material.id)
-      .then((assets) => {
+      .then(async (assets) => {
+        const entries = await Promise.all(assets.map(async (asset) => {
+          const externalUrl = asset.externalUrl?.trim();
+          if (externalUrl) {
+            return [asset.id, externalUrl] as const;
+          }
+
+          if (!asset.contentUrl?.trim()) {
+            return null;
+          }
+
+          const objectUrl = await fetchMaterialAssetObjectUrl(material.id, asset.id);
+          if (!active) {
+            URL.revokeObjectURL(objectUrl);
+            return null;
+          }
+          objectUrls.add(objectUrl);
+          return [asset.id, objectUrl] as const;
+        }));
+
         if (active) {
-          setAssetUrls(materialAssetUrlMap(assets));
+          setAssetUrls(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null)));
         }
       })
       .catch(() => {
+        objectUrls.forEach((url) => URL.revokeObjectURL(url));
+        objectUrls.clear();
         if (active) {
           setAssetUrls({});
         }
@@ -3838,6 +3940,8 @@ function LessonMaterialDocumentView({
 
     return () => {
       active = false;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.clear();
     };
   }, [assetKey, material.id]);
 
@@ -4458,8 +4562,9 @@ function RenderedMatchingPairsExercise({
       <div className="playsay-match-rows">
         {pairs.map((leftPair, index) => {
           const pair = rightOptions[index] ?? leftPair;
-          const imageUrl = resolveMaterialImageUrl(pair.imageUrl, assetUrls);
-          const hasPendingAsset = Boolean(materialAssetIdFromUrl(pair.imageUrl) && !imageUrl);
+          const pairTargetKind = materialMatchingPairTargetKind(pair);
+          const imageUrl = pairTargetKind === "IMAGE" ? resolveMaterialImageUrl(pair.imageUrl, assetUrls) : undefined;
+          const hasPendingAsset = Boolean(pairTargetKind === "IMAGE" && materialAssetIdFromUrl(pair.imageUrl) && !imageUrl);
           const connected = Object.values(matches).includes(pair.id);
           return (
             <div className="playsay-match-row" key={leftPair.id}>
@@ -4475,24 +4580,31 @@ function RenderedMatchingPairsExercise({
                 {leftPair.left}
               </button>
               <button
-                aria-label={`picture ${index + 1}`}
+                aria-label={pairTargetKind === "IMAGE" ? `picture ${index + 1}` : pair.right}
                 className="playsay-match-picture"
                 data-connected={connected ? "true" : "false"}
+                data-kind={pairTargetKind.toLowerCase()}
                 onClick={() => connectPair(pair.id)}
                 ref={(node) => { rightRefs.current[pair.id] = node; }}
                 type="button"
               >
-                {imageUrl ? (
-                  <img alt={pair.imageAlt || pair.right} src={imageUrl} />
+                {pairTargetKind === "IMAGE" ? (
+                  <>
+                    {imageUrl ? (
+                      <img alt={pair.imageAlt || pair.right} src={imageUrl} />
+                    ) : (
+                      <span className="playsay-match-generated-thumb" aria-hidden="true">
+                        {hasPendingAsset ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                      </span>
+                    )}
+                    <span>Картинка {index + 1}</span>
+                    {!imageUrl ? (
+                      <small>{hasPendingAsset ? "Загружаем картинку" : pair.imagePrompt || pair.imageAlt || pair.right}</small>
+                    ) : null}
+                  </>
                 ) : (
-                  <span className="playsay-match-generated-thumb" aria-hidden="true">
-                    {hasPendingAsset ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                  </span>
+                  <span className="playsay-match-text-target">{pair.right}</span>
                 )}
-                <span>Картинка {index + 1}</span>
-                {!imageUrl ? (
-                  <small>{hasPendingAsset ? "Загружаем картинку" : pair.imagePrompt || pair.imageAlt || pair.right}</small>
-                ) : null}
               </button>
             </div>
           );
@@ -5357,6 +5469,7 @@ function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
             id: createClientId("pair"),
             left: "owl",
             right: "owl",
+            targetKind: "IMAGE",
             imagePrompt: "child-friendly workbook illustration of an owl, white background",
             imageAlt: "owl",
           },
@@ -5364,6 +5477,7 @@ function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
             id: createClientId("pair"),
             left: "penguin",
             right: "penguin",
+            targetKind: "IMAGE",
             imagePrompt: "child-friendly workbook illustration of a penguin, white background",
             imageAlt: "penguin",
           },
@@ -5738,14 +5852,22 @@ function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBlock {
   if (block.pairs?.length) {
     clean.pairs = block.pairs
       .filter((pair) => pair.left.trim() && pair.right.trim())
-      .map((pair) => ({
-        id: pair.id || createClientId("pair"),
-        left: pair.left.trim(),
-        right: pair.right.trim(),
-        imagePrompt: pair.imagePrompt?.trim() || undefined,
-        imageAlt: pair.imageAlt?.trim() || pair.right.trim(),
-        imageUrl: pair.imageUrl?.trim() || undefined,
-      }));
+      .map((pair) => {
+        const right = pair.right.trim();
+        const targetKind = materialMatchingPairTargetKind(pair);
+        const cleanPair: MaterialMatchingPair = {
+          id: pair.id || createClientId("pair"),
+          left: pair.left.trim(),
+          right,
+          targetKind,
+        };
+        if (targetKind === "IMAGE") {
+          cleanPair.imagePrompt = pair.imagePrompt?.trim() || `child-friendly workbook illustration of ${right}, white background`;
+          cleanPair.imageAlt = pair.imageAlt?.trim() || right;
+          cleanPair.imageUrl = pair.imageUrl?.trim() || undefined;
+        }
+        return cleanPair;
+      });
   }
 
   return clean;
@@ -5815,15 +5937,36 @@ function materialMatchingPairFromJson(value: unknown): MaterialMatchingPair | nu
   if (!left || !right) {
     return null;
   }
+  const imagePrompt = asString(pair.imagePrompt) || asString(pair.promptForImage) || asString(pair.generatedImagePrompt) || undefined;
+  const imageAlt = asString(pair.imageAlt) || asString(pair.alt) || undefined;
+  const imageUrl = asString(pair.imageUrl) || asString(pair.url) || undefined;
+  const targetKind = normalizeMatchingTargetKind(asString(pair.targetKind) || asString(pair.kind) || asString(pair.mediaKind)) ??
+    (imagePrompt || imageAlt || imageUrl ? "IMAGE" : "TEXT");
 
   return {
     id: asString(pair.id) || createClientId("pair"),
     left,
     right,
-    imagePrompt: asString(pair.imagePrompt) || asString(pair.promptForImage) || asString(pair.generatedImagePrompt) || undefined,
-    imageAlt: asString(pair.imageAlt) || asString(pair.alt) || right,
-    imageUrl: asString(pair.imageUrl) || asString(pair.url) || undefined,
+    targetKind,
+    imagePrompt: targetKind === "IMAGE" ? imagePrompt : undefined,
+    imageAlt: targetKind === "IMAGE" ? imageAlt ?? right : undefined,
+    imageUrl: targetKind === "IMAGE" ? imageUrl : undefined,
   };
+}
+
+function materialMatchingPairTargetKind(pair: MaterialMatchingPair): MaterialMatchingTargetKind {
+  return pair.targetKind ?? (pair.imagePrompt?.trim() || pair.imageAlt?.trim() || pair.imageUrl?.trim() ? "IMAGE" : "TEXT");
+}
+
+function normalizeMatchingTargetKind(value: string): MaterialMatchingTargetKind | null {
+  const clean = value.trim().toLowerCase();
+  if (["image", "img", "picture", "photo", "картинка", "рисунок", "изображение"].includes(clean)) {
+    return "IMAGE";
+  }
+  if (["text", "word", "label", "текст", "слово", "надпись"].includes(clean)) {
+    return "TEXT";
+  }
+  return null;
 }
 
 function materialDocumentAssetIds(document: MaterialEditorDocument): string[] {
@@ -5860,21 +6003,6 @@ function resolveMaterialImageUrl(value: string | undefined, assetUrls: Record<st
     return assetUrls[assetId];
   }
   return value?.trim() || undefined;
-}
-
-function materialAssetUrlMap(assets: LessonMaterialAsset[]): Record<string, string> {
-  return assets.reduce<Record<string, string>>((result, asset) => {
-    const contentUrl = asset.contentUrl?.trim();
-    if (contentUrl) {
-      result[asset.id] = contentUrl;
-      return result;
-    }
-    const externalUrl = asset.externalUrl?.trim();
-    if (externalUrl) {
-      result[asset.id] = externalUrl;
-    }
-    return result;
-  }, {});
 }
 
 function materialAnswersFromSubmission(submission: LessonMaterialSubmission | null): MaterialAnswerState {
@@ -5979,25 +6107,32 @@ function materialDocumentBlocks(material: LessonMaterial): MaterialEditorBlock[]
   return editorDocumentFromJson(material.document, material.title).pages.flatMap((page) => page.blocks);
 }
 
-function hasMaterialImageTargets(
+function countMaterialImageTargets(
   document: MaterialEditorDocument,
   options: { includeExisting?: boolean } = {},
-): boolean {
+): number {
   const includeExisting = options.includeExisting ?? false;
-  return document.pages.some((page) => page.blocks.some((block) => (
-    (
-      block.type === "generatedImage" &&
-      Boolean(block.prompt?.trim()) &&
-      (includeExisting || !block.url?.trim())
-    ) ||
-    (
-      block.type === "matchingPairs" &&
-      (block.pairs ?? []).some((pair) => (
+  return document.pages.reduce((total, page) => (
+    total + page.blocks.reduce((pageTotal, block) => {
+      if (
+        block.type === "generatedImage" &&
+        Boolean(block.prompt?.trim()) &&
+        (includeExisting || !block.url?.trim())
+      ) {
+        return pageTotal + 1;
+      }
+
+      if (block.type !== "matchingPairs") {
+        return pageTotal;
+      }
+
+      return pageTotal + (block.pairs ?? []).filter((pair) => (
+        materialMatchingPairTargetKind(pair) === "IMAGE" &&
         (includeExisting || !pair.imageUrl?.trim()) &&
         Boolean(pair.imagePrompt?.trim() || pair.imageAlt?.trim() || pair.right.trim())
-      ))
-    )
-  )));
+      )).length;
+    }, 0)
+  ), 0);
 }
 
 function materialMaxScore(rubric: LessonMaterialJson): number {
@@ -6163,23 +6298,35 @@ function parseMatchingPairs(value: string): MaterialMatchingPair[] {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [left = "", right = "", imagePrompt = "", imageAlt = ""] = splitMaterialLine(line, 4);
+      const [left = "", right = "", kindOrPrompt = "", promptOrAlt = "", alt = ""] = splitMaterialLine(line, 5);
       const cleanLeft = left.trim();
       const cleanRight = (right || left).trim();
-      return {
+      const explicitKind = normalizeMatchingTargetKind(kindOrPrompt);
+      const targetKind = explicitKind ?? (kindOrPrompt.trim() || promptOrAlt.trim() ? "IMAGE" : "TEXT");
+      const pair: MaterialMatchingPair = {
         id: createClientId("pair"),
         left: cleanLeft,
         right: cleanRight,
-        imagePrompt: imagePrompt.trim() || `child-friendly workbook illustration of ${cleanRight}, white background`,
-        imageAlt: imageAlt.trim() || cleanRight,
+        targetKind,
       };
+      if (targetKind === "IMAGE") {
+        pair.imagePrompt = explicitKind
+          ? promptOrAlt.trim() || `child-friendly workbook illustration of ${cleanRight}, white background`
+          : kindOrPrompt.trim() || `child-friendly workbook illustration of ${cleanRight}, white background`;
+        pair.imageAlt = explicitKind ? alt.trim() || cleanRight : promptOrAlt.trim() || cleanRight;
+      }
+      return pair;
     })
     .filter((pair) => pair.left && pair.right);
 }
 
 function formatMatchingPairs(pairs: MaterialEditorBlock["pairs"]): string {
   return (pairs ?? [])
-    .map((pair) => [pair.left, pair.right, pair.imagePrompt, pair.imageAlt].filter(Boolean).join(" | "))
+    .map((pair) => (
+      materialMatchingPairTargetKind(pair) === "IMAGE"
+        ? [pair.left, pair.right, "image", pair.imagePrompt, pair.imageAlt].filter(Boolean).join(" | ")
+        : [pair.left, pair.right, "text"].join(" | ")
+    ))
     .join("\n");
 }
 

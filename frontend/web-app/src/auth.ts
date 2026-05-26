@@ -602,6 +602,27 @@ export async function fetchMaterialAssets(
   return apiJson<LessonMaterialAsset[]>(`/api/materials/${materialId}/assets`, { method: "GET" }, config);
 }
 
+export async function fetchMaterialAssetObjectUrl(
+  materialId: string,
+  assetId: string,
+  config = authConfig,
+): Promise<string> {
+  const authorized = await authorizedOptions(config);
+  const response = await fetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
+    headers: authorized.headers,
+  });
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`Material asset content request failed with HTTP ${response.status}.`);
+  }
+
+  return URL.createObjectURL(await response.blob());
+}
+
 export async function fetchScheduledLessonMaterial(
   lessonId: string,
   config = authConfig,

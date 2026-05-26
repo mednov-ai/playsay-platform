@@ -353,7 +353,9 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     - Preserve every visible worksheet blank as an interactive item, grouped by the original section order, before adding any invented follow-up activity.
     - Do not drop later worksheet sections and do not replace the worksheet with a shorter practice set unless the scan is unreadable.
     - For "match words to pictures", "draw lines", "connect", or two-column matching worksheets, use matchingPairs blocks.
-    - For matchingPairs, preserve every visible word/picture pair. Put the word in left, the correct target in right, and create a fresh child-friendly imagePrompt for the target picture. Do not crop, reuse, embed, or describe copying the original scan picture. Set imageUrl null until a generated asset exists.
+    - For matchingPairs, preserve every visible pair. Put the source item in left and the correct target in right. Set targetKind "IMAGE" only when the target should be a generated picture; set targetKind "TEXT" when both sides are text.
+    - For IMAGE matchingPairs, create a fresh child-friendly imagePrompt for the target picture. Do not crop, reuse, embed, or describe copying the original scan picture. Set imageUrl null until a generated asset exists.
+    - For TEXT matchingPairs, set imagePrompt and imageAlt to empty strings and imageUrl null.
     - For fill-in-article or grammar worksheet scans, use fillGaps or multipleChoice items with concise prompts, the correct answer, and choices.
     - For a/an article tasks, each blank item must provide choices ["a", "an", "-"] and an answer such as "a", "an", or "-".
     - Solve a/an tasks with English article rules: singular countable nouns use a/an by sound; plural nouns, uncountable nouns, numbers, and adjectives without a following noun use "-".
@@ -693,11 +695,12 @@ private val materialDraftJsonSchemaJson = """
         "id": { "type": "string", "maxLength": 80 },
         "left": { "type": "string", "maxLength": 160 },
         "right": { "type": "string", "maxLength": 160 },
+        "targetKind": { "type": "string", "enum": ["TEXT", "IMAGE"] },
         "imagePrompt": { "type": "string", "maxLength": 500 },
         "imageAlt": { "type": "string", "maxLength": 200 },
         "imageUrl": { "type": ["string", "null"], "maxLength": 4000 }
       },
-      "required": ["id", "left", "right", "imagePrompt", "imageAlt", "imageUrl"],
+      "required": ["id", "left", "right", "targetKind", "imagePrompt", "imageAlt", "imageUrl"],
       "additionalProperties": false
     },
     "criterion": {

@@ -2100,6 +2100,17 @@ function MaterialBlockEditor({
   onRemove: () => void;
   onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
 }) {
+  const exerciseType = block.type === "multipleChoice" ? "multipleChoice" : "fillGaps";
+  const [flashcardsSource, setFlashcardsSource] = useState(() => formatFlashcards(block.cards));
+  const [exerciseSource, setExerciseSource] = useState(() => formatExerciseItems(block.items, exerciseType));
+  const [matchingSource, setMatchingSource] = useState(() => formatMatchingPairs(block.pairs));
+
+  useEffect(() => {
+    setFlashcardsSource(formatFlashcards(block.cards));
+    setExerciseSource(formatExerciseItems(block.items, exerciseType));
+    setMatchingSource(formatMatchingPairs(block.pairs));
+  }, [block.id, block.type, exerciseType]);
+
   return (
     <article className="rounded-2xl border border-border bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2157,17 +2168,27 @@ function MaterialBlockEditor({
         {block.type === "image" || block.type === "generatedImage" ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <ProfileField label={block.type === "generatedImage" ? "Prompt" : "Ссылка на изображение"}>
-              <input
-                className="playsay-input"
-                disabled={disabled}
-                onChange={(event) => onUpdate(block.type === "generatedImage" ? { prompt: event.target.value } : { url: event.target.value })}
-                placeholder={block.type === "generatedImage" ? "friendly classroom picture" : "https://..."}
-                value={block.type === "generatedImage" ? block.prompt ?? "" : block.url ?? ""}
-              />
+              {block.type === "generatedImage" ? (
+                <textarea
+                  className="playsay-input min-h-20 resize-y py-3"
+                  disabled={disabled}
+                  onChange={(event) => onUpdate({ prompt: event.target.value })}
+                  placeholder="friendly classroom picture"
+                  value={block.prompt ?? ""}
+                />
+              ) : (
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => onUpdate({ url: event.target.value })}
+                  placeholder="https://..."
+                  value={block.url ?? ""}
+                />
+              )}
             </ProfileField>
             <ProfileField label="Подпись">
-              <input
-                className="playsay-input"
+              <textarea
+                className="playsay-input min-h-20 resize-y py-3"
                 disabled={disabled}
                 onChange={(event) => onUpdate({ caption: event.target.value })}
                 value={block.caption ?? ""}
@@ -2178,32 +2199,44 @@ function MaterialBlockEditor({
 
         {block.type === "flashcards" ? (
           <textarea
-            className="playsay-input min-h-28 resize-none py-3"
+            className="playsay-input min-h-28 resize-y py-3"
             disabled={disabled}
-            onChange={(event) => onUpdate({ cards: parseFlashcards(event.target.value) })}
-            value={formatFlashcards(block.cards)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setFlashcardsSource(value);
+              onUpdate({ cards: parseFlashcards(value, block.cards) });
+            }}
+            value={flashcardsSource}
           />
         ) : null}
 
         {block.type === "fillGaps" || block.type === "multipleChoice" ? (
           <textarea
-            className="playsay-input min-h-28 resize-none py-3"
+            className="playsay-input min-h-28 resize-y py-3"
             disabled={disabled}
-            onChange={(event) => onUpdate({ items: parseExerciseItems(event.target.value, block.type as "fillGaps" | "multipleChoice") })}
-            value={formatExerciseItems(block.items, block.type as "fillGaps" | "multipleChoice")}
+            onChange={(event) => {
+              const value = event.target.value;
+              setExerciseSource(value);
+              onUpdate({ items: parseExerciseItems(value, exerciseType) });
+            }}
+            value={exerciseSource}
           />
         ) : null}
 
         {block.type === "matchingPairs" ? (
           <div className="grid gap-2">
             <p className="text-xs font-bold text-muted-foreground">
-              Формат строки: left | right | text или left | right | image | prompt | alt
+              Формат строки: left | right | text или left | right | image | prompt | alt. Markdown поддержан в текстовых полях, символ | внутри текста пишите как \|.
             </p>
             <textarea
-              className="playsay-input min-h-36 resize-none py-3"
+              className="playsay-input min-h-36 resize-y py-3"
               disabled={disabled}
-              onChange={(event) => onUpdate({ pairs: parseMatchingPairs(event.target.value) })}
-              value={formatMatchingPairs(block.pairs)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setMatchingSource(value);
+                onUpdate({ pairs: parseMatchingPairs(value, block.pairs) });
+              }}
+              value={matchingSource}
             />
           </div>
         ) : null}
@@ -2261,7 +2294,7 @@ function MaterialBlockEditor({
 
         {block.type === "text" || block.type === "freeWriting" || block.type === "speakingPrompt" ? (
           <textarea
-            className="playsay-input min-h-28 resize-none py-3"
+            className="playsay-input min-h-28 resize-y py-3"
             disabled={disabled}
             onChange={(event) => onUpdate(block.type === "text" ? { body: event.target.value } : { prompt: event.target.value })}
             value={block.type === "text" ? block.body ?? "" : block.prompt ?? ""}
@@ -4132,7 +4165,7 @@ function RenderedMaterialBlock({
       return blockSection(
         <>
           <h4>{block.title}</h4>
-          <p>{block.body}</p>
+          <RenderedMarkdown value={block.body} />
         </>,
       );
     case "videoEmbed":
@@ -4173,12 +4206,12 @@ function RenderedMaterialBlock({
                     tags={assetId ? assetTags[assetId] ?? [] : []}
                   />
                 ) : null}
-                {block.caption ? <figcaption>{block.caption}</figcaption> : null}
+                {block.caption ? <figcaption><RenderedMarkdown className="playsay-caption-markdown" value={block.caption} /></figcaption> : null}
               </figure>
             ) : (
               <figure className="playsay-image-placeholder">
                 <ImageIcon className="h-6 w-6 text-primary" />
-                <figcaption>{block.caption || block.prompt || block.url || "Изображение"}</figcaption>
+                <figcaption><RenderedMarkdown className="playsay-caption-markdown" value={block.caption || block.prompt || block.url || "Изображение"} /></figcaption>
                 {mode === "teacherPreview" ? (
                   <MaterialImagePromptPopover block={block} onGenerate={() => onGenerateImagesForBlock?.(block.id)} />
                 ) : null}
@@ -4194,9 +4227,9 @@ function RenderedMaterialBlock({
           <div className="playsay-flashcards">
             {(block.cards ?? []).map((card) => (
               <article key={card.id}>
-                <strong>{card.front}</strong>
-                <span>{card.back}</span>
-                {card.example ? <small>{card.example}</small> : null}
+                <strong><MarkdownInline value={card.front} /></strong>
+                <span><MarkdownInline value={card.back} /></span>
+                {card.example ? <small><MarkdownInline value={card.example} /></small> : null}
               </article>
             ))}
           </div>
@@ -4233,7 +4266,7 @@ function RenderedMaterialBlock({
       return blockSection(
         <>
           <h4>{block.title}</h4>
-          <p>{block.prompt}</p>
+          <RenderedMarkdown value={block.prompt} />
           <textarea
             className="playsay-student-answer"
             onChange={(event) => onAnswerChange?.(block.id, {
@@ -4250,7 +4283,7 @@ function RenderedMaterialBlock({
       return blockSection(
         <>
           <h4>{block.title}</h4>
-          <p>{block.prompt}</p>
+          <RenderedMarkdown value={block.prompt} />
         </>,
         "playsay-render-block playsay-speaking-prompt",
       );
@@ -4435,6 +4468,178 @@ function MaterialAssetTags({
   );
 }
 
+function RenderedMarkdown({ className, value }: { className?: string; value?: string | null }) {
+  const text = normalizeMarkdownText(value);
+  if (!text) {
+    return null;
+  }
+
+  const lines = text.split("\n");
+  const nodes: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    const heading = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+    if (heading) {
+      const children = renderMarkdownInline(heading[2], `heading-${index}`);
+      nodes.push(heading[1].length === 1
+        ? <h5 key={`heading-${index}`}>{children}</h5>
+        : <h6 key={`heading-${index}`}>{children}</h6>);
+      index += 1;
+      continue;
+    }
+
+    const unorderedItems: string[] = [];
+    while (index < lines.length) {
+      const match = /^\s*[-*]\s+(.+)$/.exec(lines[index]);
+      if (!match) {
+        break;
+      }
+      unorderedItems.push(match[1]);
+      index += 1;
+    }
+    if (unorderedItems.length > 0) {
+      nodes.push(
+        <ul key={`ul-${index}`}>
+          {unorderedItems.map((item, itemIndex) => (
+            <li key={`${item}-${itemIndex}`}>{renderMarkdownInline(item, `ul-${index}-${itemIndex}`)}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    const orderedItems: string[] = [];
+    while (index < lines.length) {
+      const match = /^\s*\d+\.\s+(.+)$/.exec(lines[index]);
+      if (!match) {
+        break;
+      }
+      orderedItems.push(match[1]);
+      index += 1;
+    }
+    if (orderedItems.length > 0) {
+      nodes.push(
+        <ol key={`ol-${index}`}>
+          {orderedItems.map((item, itemIndex) => (
+            <li key={`${item}-${itemIndex}`}>{renderMarkdownInline(item, `ol-${index}-${itemIndex}`)}</li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (index < lines.length) {
+      const current = lines[index];
+      const currentTrimmed = current.trim();
+      if (!currentTrimmed || /^(#{1,3})\s+/.test(currentTrimmed) || /^\s*[-*]\s+/.test(current) || /^\s*\d+\.\s+/.test(current)) {
+        break;
+      }
+      paragraphLines.push(currentTrimmed);
+      index += 1;
+    }
+    nodes.push(<p key={`p-${index}`}>{renderMarkdownLineBreaks(paragraphLines, `p-${index}`)}</p>);
+  }
+
+  return <div className={mergeClassName("playsay-markdown", className)}>{nodes}</div>;
+}
+
+function MarkdownInline({ className, value }: { className?: string; value?: string | null }) {
+  const text = normalizeMarkdownText(value);
+  if (!text) {
+    return null;
+  }
+
+  return <span className={mergeClassName("playsay-markdown-inline", className)}>{renderMarkdownInline(text)}</span>;
+}
+
+function normalizeMarkdownText(value?: string | null): string {
+  return (value ?? "").replace(/\r\n/g, "\n").trim();
+}
+
+function mergeClassName(base: string, extra?: string): string {
+  return extra ? `${base} ${extra}` : base;
+}
+
+function renderMarkdownLineBreaks(lines: string[], keyPrefix: string): ReactNode[] {
+  return lines.flatMap((line, index) => {
+    const nodes = renderMarkdownInline(line, `${keyPrefix}-${index}`);
+    return index === lines.length - 1 ? nodes : [...nodes, <br key={`${keyPrefix}-br-${index}`} />];
+  });
+}
+
+function renderMarkdownInline(value: string, keyPrefix = "inline"): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let buffer = "";
+  let index = 0;
+  let nodeIndex = 0;
+
+  function pushText() {
+    if (!buffer) {
+      return;
+    }
+    nodes.push(buffer);
+    buffer = "";
+  }
+
+  while (index < value.length) {
+    if (value[index] === "`") {
+      const end = value.indexOf("`", index + 1);
+      if (end > index + 1) {
+        pushText();
+        nodes.push(<code key={`${keyPrefix}-code-${nodeIndex}`}>{value.slice(index + 1, end)}</code>);
+        nodeIndex += 1;
+        index = end + 1;
+        continue;
+      }
+    }
+
+    if (value.startsWith("**", index)) {
+      const end = value.indexOf("**", index + 2);
+      if (end > index + 2) {
+        pushText();
+        nodes.push(
+          <strong key={`${keyPrefix}-strong-${nodeIndex}`}>
+            {renderMarkdownInline(value.slice(index + 2, end), `${keyPrefix}-strong-${nodeIndex}`)}
+          </strong>,
+        );
+        nodeIndex += 1;
+        index = end + 2;
+        continue;
+      }
+    }
+
+    if (value[index] === "*" && value[index + 1] !== "*") {
+      const end = value.indexOf("*", index + 1);
+      if (end > index + 1) {
+        pushText();
+        nodes.push(
+          <em key={`${keyPrefix}-em-${nodeIndex}`}>
+            {renderMarkdownInline(value.slice(index + 1, end), `${keyPrefix}-em-${nodeIndex}`)}
+          </em>,
+        );
+        nodeIndex += 1;
+        index = end + 1;
+        continue;
+      }
+    }
+
+    buffer += value[index];
+    index += 1;
+  }
+
+  pushText();
+  return nodes;
+}
+
 function RenderedFillGapExercise({
   answer,
   block,
@@ -4517,7 +4722,7 @@ function RenderedFillGapExercise({
         return (
           <div className="playsay-answer-row" data-input-mode={isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
             <label>
-              {prompt.before ? <span>{prompt.before}</span> : null}
+              {prompt.before ? <MarkdownInline value={prompt.before} /> : null}
               {options.length > 0 ? (
                 <span className="playsay-inline-answer-wrap">
                   <select
@@ -4566,7 +4771,7 @@ function RenderedFillGapExercise({
                   <MaterialAttemptBar status={status} />
                 </span>
               )}
-              {prompt.after ? <span>{prompt.after}</span> : null}
+              {prompt.after ? <MarkdownInline value={prompt.after} /> : null}
             </label>
             <MaterialAnswerTools
               canRequestHint={canRequestHint}
@@ -4661,7 +4866,7 @@ function RenderedChoiceExercise({
         return (
           <div className="playsay-answer-row" data-input-mode={isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
             <label className="playsay-choice-row" data-status={status.kind}>
-              <span>{item.prompt}</span>
+              <MarkdownInline value={item.prompt} />
               {options.length > 0 ? (
                 <span className="playsay-inline-answer-wrap">
                   <select
@@ -4895,7 +5100,7 @@ function RenderedMatchingPairsExercise({
                 ref={(node) => { leftRefs.current[leftPair.id] = node; }}
                 type="button"
               >
-                {leftPair.left}
+                <MarkdownInline className="playsay-match-markdown" value={leftPair.left} />
               </button>
               <button
                 aria-label={pairTargetKind === "IMAGE" ? `picture ${index + 1}` : pair.right}
@@ -4920,7 +5125,7 @@ function RenderedMatchingPairsExercise({
                     ) : null}
                   </>
                 ) : (
-                  <span className="playsay-match-text-target">{pair.right}</span>
+                  <MarkdownInline className="playsay-match-text-target playsay-match-markdown" value={pair.right} />
                 )}
               </button>
             </div>
@@ -6597,15 +6802,15 @@ function isObjectiveMaterialBlockType(type: MaterialBlockType): boolean {
   return type === "fillGaps" || type === "multipleChoice" || type === "matchingPairs";
 }
 
-function parseFlashcards(value: string): MaterialEditorBlock["cards"] {
+function parseFlashcards(value: string, previousCards: MaterialEditorBlock["cards"] = []): MaterialEditorBlock["cards"] {
   return value
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => {
+    .map((line, index) => {
       const [front = "", back = "", example = ""] = splitMaterialLine(line, 3);
       return {
-        id: createClientId("card"),
+        id: previousCards?.[index]?.id ?? createClientId("card"),
         front: front.trim(),
         back: back.trim(),
         example: example.trim() || undefined,
@@ -6616,7 +6821,7 @@ function parseFlashcards(value: string): MaterialEditorBlock["cards"] {
 
 function formatFlashcards(cards: MaterialEditorBlock["cards"]): string {
   return (cards ?? [])
-    .map((card) => [card.front, card.back, card.example].filter(Boolean).join(" | "))
+    .map((card) => [card.front, card.back, card.example].filter(Boolean).map(escapeMaterialCell).join(" | "))
     .join("\n");
 }
 
@@ -6631,7 +6836,7 @@ function parseExerciseItems(value: string, type: "fillGaps" | "multipleChoice"):
       if (type === "multipleChoice") {
         return {
           prompt: prompt.trim(),
-          options: optionsOrAnswer.split(",").map((option) => option.trim()).filter(Boolean),
+          options: splitMaterialList(optionsOrAnswer).map((option) => option.trim()).filter(Boolean),
           answer: answer.trim() || undefined,
           weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
         };
@@ -6639,7 +6844,7 @@ function parseExerciseItems(value: string, type: "fillGaps" | "multipleChoice"):
 
       return {
         prompt: prompt.trim(),
-        options: answer ? optionsOrAnswer.split(",").map((option) => option.trim()).filter(Boolean) : undefined,
+        options: answer ? splitMaterialList(optionsOrAnswer).map((option) => option.trim()).filter(Boolean) : undefined,
         answer: (answer || optionsOrAnswer).trim() || undefined,
         weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
       };
@@ -6651,27 +6856,28 @@ function formatExerciseItems(items: MaterialEditorBlock["items"], type: "fillGap
   return (items ?? [])
     .map((item) => {
       if (type === "multipleChoice") {
-        return [item.prompt, item.options?.join(", "), item.answer, item.weight].filter(Boolean).join(" | ");
+        return [item.prompt, formatMaterialList(item.options), item.answer, item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");
       }
 
-      return [item.prompt, item.options?.join(", "), item.answer, item.weight].filter(Boolean).join(" | ");
+      return [item.prompt, formatMaterialList(item.options), item.answer, item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");
     })
     .join("\n");
 }
 
-function parseMatchingPairs(value: string): MaterialMatchingPair[] {
+function parseMatchingPairs(value: string, previousPairs: MaterialMatchingPair[] = []): MaterialMatchingPair[] {
   return value
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => {
+    .map((line, index) => {
       const [left = "", right = "", kindOrPrompt = "", promptOrAlt = "", alt = ""] = splitMaterialLine(line, 5);
       const cleanLeft = left.trim();
       const cleanRight = (right || left).trim();
       const explicitKind = normalizeMatchingTargetKind(kindOrPrompt);
       const targetKind = explicitKind ?? (kindOrPrompt.trim() || promptOrAlt.trim() ? "IMAGE" : "TEXT");
+      const previousPair = findPreviousMatchingPair(previousPairs, index, cleanLeft, cleanRight);
       const pair: MaterialMatchingPair = {
-        id: createClientId("pair"),
+        id: previousPair?.id ?? createClientId("pair"),
         left: cleanLeft,
         right: cleanRight,
         targetKind,
@@ -6681,6 +6887,7 @@ function parseMatchingPairs(value: string): MaterialMatchingPair[] {
           ? promptOrAlt.trim() || `child-friendly workbook illustration of ${cleanRight}, white background`
           : kindOrPrompt.trim() || `child-friendly workbook illustration of ${cleanRight}, white background`;
         pair.imageAlt = explicitKind ? alt.trim() || cleanRight : promptOrAlt.trim() || cleanRight;
+        pair.imageUrl = previousPair?.imageUrl;
       }
       return pair;
     })
@@ -6691,15 +6898,105 @@ function formatMatchingPairs(pairs: MaterialEditorBlock["pairs"]): string {
   return (pairs ?? [])
     .map((pair) => (
       materialMatchingPairTargetKind(pair) === "IMAGE"
-        ? [pair.left, pair.right, "image", pair.imagePrompt, pair.imageAlt].filter(Boolean).join(" | ")
-        : [pair.left, pair.right, "text"].join(" | ")
+        ? [pair.left, pair.right, "image", pair.imagePrompt, pair.imageAlt].filter(Boolean).map(escapeMaterialCell).join(" | ")
+        : [pair.left, pair.right, "text"].map(escapeMaterialCell).join(" | ")
     ))
     .join("\n");
 }
 
 function splitMaterialLine(value: string, maxParts: number): string[] {
-  const separator = value.includes("|") ? "|" : ";";
-  return value.split(separator).slice(0, maxParts);
+  const separator = findMaterialSeparator(value);
+  const parts: string[] = [];
+  let current = "";
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    const next = value[index + 1];
+    if (char === "\\" && (next === "|" || next === ";" || next === "\\")) {
+      current += next;
+      index += 1;
+      continue;
+    }
+    if (char === separator && parts.length < maxParts - 1) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  parts.push(current);
+  return parts;
+}
+
+function splitMaterialList(value?: string): string[] {
+  if (!value) {
+    return [];
+  }
+  const parts: string[] = [];
+  let current = "";
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    const next = value[index + 1];
+    if (char === "\\" && (next === "," || next === "\\")) {
+      current += next;
+      index += 1;
+      continue;
+    }
+    if (char === ",") {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  parts.push(current);
+  return parts;
+}
+
+function formatMaterialList(value?: string[]): string | undefined {
+  if (!value?.length) {
+    return undefined;
+  }
+  return value.map(escapeMaterialListItem).join(", ");
+}
+
+function findMaterialSeparator(value: string): "|" | ";" {
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "\\" && value[index + 1]) {
+      index += 1;
+      continue;
+    }
+    if (value[index] === "|") {
+      return "|";
+    }
+  }
+
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "\\" && value[index + 1]) {
+      index += 1;
+      continue;
+    }
+    if (value[index] === ";") {
+      return ";";
+    }
+  }
+
+  return "|";
+}
+
+function escapeMaterialCell(value: unknown): string {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+}
+
+function escapeMaterialListItem(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/,/g, "\\,");
+}
+
+function findPreviousMatchingPair(pairs: MaterialMatchingPair[], index: number, left: string, right: string): MaterialMatchingPair | undefined {
+  return pairs.find((pair) => pair.left === left && pair.right === right) ?? pairs[index];
 }
 
 function normalizeMaterialBlockType(value: string): MaterialBlockType | null {

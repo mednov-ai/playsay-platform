@@ -936,6 +936,78 @@ textarea {
   line-height: 1.65;
 }
 
+.playsay-markdown {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 750;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.playsay-markdown p,
+.playsay-markdown ul,
+.playsay-markdown ol,
+.playsay-markdown h5,
+.playsay-markdown h6 {
+  margin: 0;
+}
+
+.playsay-markdown h5,
+.playsay-markdown h6 {
+  color: hsl(var(--foreground));
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.playsay-markdown h5 {
+  font-size: 0.98rem;
+}
+
+.playsay-markdown h6 {
+  font-size: 0.88rem;
+}
+
+.playsay-markdown ul,
+.playsay-markdown ol {
+  display: grid;
+  gap: 0.25rem;
+  padding-left: 1.15rem;
+}
+
+.playsay-markdown-inline {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.playsay-markdown code,
+.playsay-markdown-inline code {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  background: #fff7f1;
+  color: hsl(var(--foreground));
+  font-size: 0.9em;
+  font-weight: 850;
+  padding: 0.05rem 0.25rem;
+}
+
+.playsay-caption-markdown {
+  justify-items: center;
+  gap: 0.2rem;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: inherit;
+}
+
+.playsay-match-markdown {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .playsay-video-embed-placeholder,
 .playsay-image-placeholder {
   display: grid;
@@ -1124,7 +1196,7 @@ textarea {
   font-weight: 950;
 }
 
-.playsay-flashcards span,
+.playsay-flashcards article > span,
 .playsay-flashcards small {
   color: hsl(var(--muted-foreground));
   font-weight: 800;
@@ -1289,9 +1361,7 @@ textarea {
 
 .playsay-match-picture span:not(.playsay-match-generated-thumb) {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .playsay-match-text-target {

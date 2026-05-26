@@ -282,6 +282,126 @@ class MaterialControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `submission scoring applies weights attempts and hints`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = materialController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "Attempt scoring",
+                status = "PUBLISHED",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Attempts",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "gaps",
+                              "type": "fillGaps",
+                              "title": "Fill gaps",
+                              "assessment": {
+                                "attemptPenalty": 0.30,
+                                "hintPenalty": 0.15,
+                                "minimumCorrectFactor": 0.40
+                              },
+                              "items": [
+                                {
+                                  "prompt": "It is ___ cat.",
+                                  "answer": "a",
+                                  "options": ["a", "an", "-"],
+                                  "weight": 2
+                                },
+                                {
+                                  "prompt": "It is ___ apple.",
+                                  "answer": "an",
+                                  "options": ["a", "an", "-"],
+                                  "weight": 1
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                scoringRubric = objectMapper.readTree("""{"maxScore":10}"""),
+            ),
+        ).body!!
+        val course = courseController.create(teacher, CourseRequest(title = "Course", isPublished = true)).body!!
+        val lessonTemplate = courseController.createLesson(
+            teacher,
+            course.id,
+            CourseLessonRequest(title = "Lesson", materialId = material.id),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplate.id,
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val submission = materialController.saveScheduledLessonMaterialSubmission(
+            student,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${material.id}",
+                      "answers": {
+                        "gaps": {
+                          "type": "fillGaps",
+                          "items": {
+                            "It is ___ cat.-0": "a",
+                            "It is ___ apple.-1": "an"
+                          },
+                          "attempts": {
+                            "It is ___ cat.-0": [
+                              { "value": "an", "correct": false },
+                              { "value": "a", "correct": true }
+                            ],
+                            "It is ___ apple.-1": [
+                              { "value": "an", "correct": true }
+                            ]
+                          },
+                          "hints": {
+                            "It is ___ cat.-0": [
+                              { "type": "firstLetter", "penalty": 0.15 }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+            ),
+        )
+
+        assertEquals(0, BigDecimal("8.00").compareTo(assertNotNull(submission.score)))
+        assertEquals(1, submission.errorsCount)
+        val assessment = submission.content["assessment"]
+        assertEquals(1, assessment["errorsCount"].asInt())
+        assertEquals(2, assessment["items"].size())
+        val firstItem = assessment["items"][0]
+        assertEquals("CORRECT_WITH_HINT", firstItem["status"].asText())
+        assertEquals(2, firstItem["attemptsUsed"].asInt())
+        assertEquals(1, firstItem["hintsUsed"].asInt())
+        assertEquals(0, BigDecimal("0.70").compareTo(firstItem["scoreFactor"].decimalValue()))
+    }
+
+    @Test
     fun `non participant cannot read scheduled lesson material`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")

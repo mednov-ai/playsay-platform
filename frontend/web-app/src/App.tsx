@@ -207,17 +207,47 @@ type MaterialMatchingPair = {
   imageUrl?: string;
 };
 
+type MaterialAssessmentPolicy = {
+  weight?: number;
+  maxAttempts?: number;
+  attemptPenalty?: number;
+  hintPenalty?: number;
+  lockAfterAttempts?: boolean;
+};
+
+type MaterialAttemptEntry = {
+  at: string;
+  correct?: boolean;
+  value: string;
+};
+
+type MaterialHintEntry = {
+  at: string;
+  label: string;
+  penalty: number;
+  type: string;
+  value?: string;
+};
+
+type MaterialAnswerStatus = {
+  icon: typeof CheckCircle2;
+  kind: "empty" | "correct" | "retry" | "hint" | "wrong" | "locked";
+  label: string;
+  locked: boolean;
+};
+
 type MaterialEditorBlock = {
   id: string;
   type: MaterialBlockType;
   title: string;
+  assessment?: MaterialAssessmentPolicy;
   body?: string;
   prompt?: string;
   url?: string;
   provider?: string;
   caption?: string;
   cards?: Array<{ id: string; front: string; back: string; example?: string }>;
-  items?: Array<{ prompt: string; answer?: string; options?: string[] }>;
+  items?: Array<{ prompt: string; answer?: string; options?: string[]; weight?: number }>;
   pairs?: MaterialMatchingPair[];
   height?: number;
 };
@@ -1985,6 +2015,57 @@ function MaterialBlockEditor({
           />
         ) : null}
 
+        {isObjectiveMaterialBlockType(block.type) ? (
+          <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-4">
+            <ProfileField label="Вес">
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                min={0.1}
+                onChange={(event) => onUpdate({ assessment: { ...defaultObjectiveAssessmentPolicy(), ...block.assessment, weight: Number(event.target.value) } })}
+                step={0.1}
+                type="number"
+                value={block.assessment?.weight ?? 1}
+              />
+            </ProfileField>
+            <ProfileField label="Попытки">
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                min={1}
+                max={10}
+                onChange={(event) => onUpdate({ assessment: { ...defaultObjectiveAssessmentPolicy(), ...block.assessment, maxAttempts: Number(event.target.value) } })}
+                type="number"
+                value={block.assessment?.maxAttempts ?? 3}
+              />
+            </ProfileField>
+            <ProfileField label="Штраф за попытку">
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                min={0}
+                max={1}
+                onChange={(event) => onUpdate({ assessment: { ...defaultObjectiveAssessmentPolicy(), ...block.assessment, attemptPenalty: Number(event.target.value) } })}
+                step={0.05}
+                type="number"
+                value={block.assessment?.attemptPenalty ?? 0.3}
+              />
+            </ProfileField>
+            <ProfileField label="Штраф за hint">
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                min={0}
+                max={1}
+                onChange={(event) => onUpdate({ assessment: { ...defaultObjectiveAssessmentPolicy(), ...block.assessment, hintPenalty: Number(event.target.value) } })}
+                step={0.05}
+                type="number"
+                value={block.assessment?.hintPenalty ?? 0.15}
+              />
+            </ProfileField>
+          </div>
+        ) : null}
+
         {block.type === "text" || block.type === "freeWriting" || block.type === "speakingPrompt" ? (
           <textarea
             className="playsay-input min-h-28 resize-none py-3"
@@ -3361,16 +3442,21 @@ function MaterialSubmissionsMonitor({
         ) : latestSubmissions.length === 0 ? (
           <span className="playsay-submission-monitor-empty">пока нет ответов</span>
         ) : (
-          latestSubmissions.map((submission) => (
-            <span className="playsay-submission-pill" key={submission.id} title={materialSubmissionUserLabel(submission)}>
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>{materialSubmissionUserLabel(submission)}</span>
-              {typeof submission.score === "number" ? <strong>{formatMaterialScore(submission.score)}</strong> : null}
-              <time dateTime={submission.submittedAt ?? submission.updatedAt}>
-                {formatSubmissionTime(submission.submittedAt ?? submission.updatedAt)}
-              </time>
-            </span>
-          ))
+          latestSubmissions.map((submission) => {
+            const assessment = materialSubmissionAssessmentSummary(submission);
+            return (
+              <span className="playsay-submission-pill" key={submission.id} title={`${materialSubmissionUserLabel(submission)} · ${assessment.label}`}>
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>{materialSubmissionUserLabel(submission)}</span>
+                {typeof submission.score === "number" ? <strong>{formatMaterialScore(submission.score)}</strong> : null}
+                {assessment.hints > 0 ? <small>{assessment.hints} hint</small> : null}
+                {assessment.retries > 0 ? <small>{assessment.retries} retry</small> : null}
+                <time dateTime={submission.submittedAt ?? submission.updatedAt}>
+                  {formatSubmissionTime(submission.submittedAt ?? submission.updatedAt)}
+                </time>
+              </span>
+            );
+          })
         )}
       </div>
     </section>
@@ -3853,14 +3939,29 @@ function RenderedFillGapExercise({
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
   const answers = materialAnswerItems(answer);
+  const attempts = materialAnswerAttempts(answer);
+  const hints = materialAnswerHints(answer);
 
   function updateItem(itemKey: string, value: string) {
+    const item = (block.items ?? []).find((candidate, index) => `${candidate.prompt}-${index}` === itemKey);
+    const nextAttempts = appendMaterialAttempt(attempts, itemKey, value, materialItemAnswerMatches(item, value));
     onAnswerChange?.(block.id, {
       type: "fillGaps",
       items: {
         ...answers,
         [itemKey]: value,
       },
+      attempts: nextAttempts,
+      hints,
+    });
+  }
+
+  function requestHint(itemKey: string, item: MaterialExerciseItem) {
+    onAnswerChange?.(block.id, {
+      type: "fillGaps",
+      items: answers,
+      attempts,
+      hints: appendMaterialHint(hints, itemKey, materialHintForExerciseItem(item, block)),
     });
   }
 
@@ -3870,31 +3971,42 @@ function RenderedFillGapExercise({
         const itemKey = `${item.prompt}-${index}`;
         const options = materialExerciseOptions(item, block);
         const prompt = splitGapPrompt(item.prompt);
+        const itemHints = hints[itemKey] ?? [];
+        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment);
 
         return (
-          <label key={itemKey}>
-            {prompt.before ? <span>{prompt.before}</span> : null}
-            {options.length > 0 ? (
-              <select
-                aria-label={`gap ${index + 1}`}
-                className="playsay-inline-select"
-                onChange={(event) => updateItem(itemKey, event.target.value)}
-                value={answers[itemKey] ?? ""}
-              >
-                <option value="">Выбрать</option>
-                {options.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            ) : (
-              <input
-                aria-label={`gap ${index + 1}`}
-                onChange={(event) => updateItem(itemKey, event.target.value)}
-                value={answers[itemKey] ?? ""}
-              />
-            )}
-            {prompt.after ? <span>{prompt.after}</span> : null}
-          </label>
+          <div className="playsay-answer-row" data-status={status.kind} key={itemKey}>
+            <label>
+              {prompt.before ? <span>{prompt.before}</span> : null}
+              {options.length > 0 ? (
+                <select
+                  aria-label={`gap ${index + 1}`}
+                  className="playsay-inline-select"
+                  disabled={status.locked}
+                  onChange={(event) => updateItem(itemKey, event.target.value)}
+                  value={answers[itemKey] ?? ""}
+                >
+                  <option value="">Выбрать</option>
+                  {options.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  aria-label={`gap ${index + 1}`}
+                  disabled={status.locked}
+                  onChange={(event) => updateItem(itemKey, event.target.value)}
+                  value={answers[itemKey] ?? ""}
+                />
+              )}
+              {prompt.after ? <span>{prompt.after}</span> : null}
+            </label>
+            <MaterialAnswerTools
+              hint={itemHints[itemHints.length - 1]}
+              onHint={() => requestHint(itemKey, item)}
+              status={status}
+            />
+          </div>
         );
       })}
     </div>
@@ -3911,14 +4023,29 @@ function RenderedChoiceExercise({
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
   const answers = materialAnswerItems(answer);
+  const attempts = materialAnswerAttempts(answer);
+  const hints = materialAnswerHints(answer);
 
   function updateItem(itemKey: string, value: string) {
+    const item = (block.items ?? []).find((candidate, index) => `${candidate.prompt}-${index}` === itemKey);
+    const nextAttempts = appendMaterialAttempt(attempts, itemKey, value, materialItemAnswerMatches(item, value));
     onAnswerChange?.(block.id, {
       type: "multipleChoice",
       items: {
         ...answers,
         [itemKey]: value,
       },
+      attempts: nextAttempts,
+      hints,
+    });
+  }
+
+  function requestHint(itemKey: string, item: MaterialExerciseItem) {
+    onAnswerChange?.(block.id, {
+      type: "multipleChoice",
+      items: answers,
+      attempts,
+      hints: appendMaterialHint(hints, itemKey, materialHintForExerciseItem(item, block)),
     });
   }
 
@@ -3927,33 +4054,74 @@ function RenderedChoiceExercise({
       {(block.items ?? []).map((item, index) => {
         const itemKey = `${item.prompt}-${index}`;
         const options = materialExerciseOptions(item, block);
+        const itemHints = hints[itemKey] ?? [];
+        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment);
 
         return (
-          <label className="playsay-choice-row" key={itemKey}>
-            <span>{item.prompt}</span>
-            {options.length > 0 ? (
-              <select
-                aria-label={`choice ${index + 1}`}
-                className="playsay-inline-select"
-                onChange={(event) => updateItem(itemKey, event.target.value)}
-                value={answers[itemKey] ?? ""}
-              >
-                <option value="">Выбрать</option>
-                {options.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            ) : (
-              <input
-                aria-label={`choice ${index + 1}`}
-                className="playsay-inline-input"
-                onChange={(event) => updateItem(itemKey, event.target.value)}
-                value={answers[itemKey] ?? ""}
-              />
-            )}
-          </label>
+          <div className="playsay-answer-row" data-status={status.kind} key={itemKey}>
+            <label className="playsay-choice-row">
+              <span>{item.prompt}</span>
+              {options.length > 0 ? (
+                <select
+                  aria-label={`choice ${index + 1}`}
+                  className="playsay-inline-select"
+                  disabled={status.locked}
+                  onChange={(event) => updateItem(itemKey, event.target.value)}
+                  value={answers[itemKey] ?? ""}
+                >
+                  <option value="">Выбрать</option>
+                  {options.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  aria-label={`choice ${index + 1}`}
+                  className="playsay-inline-input"
+                  disabled={status.locked}
+                  onChange={(event) => updateItem(itemKey, event.target.value)}
+                  value={answers[itemKey] ?? ""}
+                />
+              )}
+            </label>
+            <MaterialAnswerTools
+              hint={itemHints[itemHints.length - 1]}
+              onHint={() => requestHint(itemKey, item)}
+              status={status}
+            />
+          </div>
         );
       })}
+    </div>
+  );
+}
+
+function MaterialAnswerTools({
+  hint,
+  onHint,
+  status,
+}: {
+  hint?: MaterialHintEntry;
+  onHint: () => void;
+  status: MaterialAnswerStatus;
+}) {
+  const Icon = status.icon;
+  return (
+    <div className="playsay-answer-tools">
+      <span className="playsay-answer-status" data-kind={status.kind}>
+        <Icon className="h-3.5 w-3.5" />
+        {status.label}
+      </span>
+      <button
+        className="playsay-hint-button"
+        disabled={status.locked}
+        onClick={onHint}
+        type="button"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        Подсказка
+      </button>
+      {hint ? <small className="playsay-hint-text">{hint.label}</small> : null}
     </div>
   );
 }
@@ -3975,6 +4143,8 @@ function RenderedMatchingPairsExercise({
   const rightOptions = mode === "teacherPreview" ? pairs : matchingRightOptions(pairs);
   const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
   const matches = materialAnswerMatches(answer);
+  const attempts = materialAnswerAttempts(answer);
+  const hints = materialAnswerHints(answer);
   const matchesKey = Object.entries(matches).map(([leftId, rightId]) => `${leftId}:${rightId}`).sort().join("|");
   const [lines, setLines] = useState<Array<{ id: string; x1: number; x2: number; y1: number; y2: number }>>([]);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -4026,6 +4196,8 @@ function RenderedMatchingPairsExercise({
         ...matches,
         [activeLeftId]: rightId,
       },
+      attempts: appendMaterialAttempt(attempts, activeLeftId, rightId, activeLeftId === rightId),
+      hints,
     });
     setActiveLeftId(null);
   }
@@ -4058,6 +4230,7 @@ function RenderedMatchingPairsExercise({
                 className="playsay-match-word"
                 data-active={activeLeftId === leftPair.id ? "true" : "false"}
                 data-connected={matches[leftPair.id] ? "true" : "false"}
+                data-status={materialMatchingStatus(leftPair.id, matches[leftPair.id], attempts[leftPair.id], block.assessment)}
                 onClick={() => setActiveLeftId((current) => (current === leftPair.id ? null : leftPair.id))}
                 ref={(node) => { leftRefs.current[leftPair.id] = node; }}
                 type="button"
@@ -4119,6 +4292,135 @@ function materialExerciseOptions(item: MaterialExerciseItem, block: MaterialEdit
   }
 
   return [];
+}
+
+function appendMaterialAttempt(
+  attempts: Record<string, MaterialAttemptEntry[]>,
+  itemKey: string,
+  value: string,
+  correct: boolean,
+): Record<string, MaterialAttemptEntry[]> {
+  const cleanValue = value.trim();
+  if (!cleanValue) {
+    return attempts;
+  }
+  const current = attempts[itemKey] ?? [];
+  const latest = current[current.length - 1];
+  if (latest?.value === cleanValue) {
+    return attempts;
+  }
+  return {
+    ...attempts,
+    [itemKey]: [
+      ...current,
+      {
+        at: new Date().toISOString(),
+        correct,
+        value: cleanValue,
+      },
+    ],
+  };
+}
+
+function appendMaterialHint(
+  hints: Record<string, MaterialHintEntry[]>,
+  itemKey: string,
+  hint: MaterialHintEntry,
+): Record<string, MaterialHintEntry[]> {
+  const current = hints[itemKey] ?? [];
+  return {
+    ...hints,
+    [itemKey]: [...current, hint],
+  };
+}
+
+function materialHintForExerciseItem(item: MaterialExerciseItem, block: MaterialEditorBlock): MaterialHintEntry {
+  const answer = item.answer?.trim() ?? "";
+  const options = materialExerciseOptions(item, block);
+  const penalty = cleanMaterialAssessment(block.assessment ?? defaultObjectiveAssessmentPolicy()).hintPenalty ?? 0.15;
+  const wrongOption = options.find((option) => normalizeMaterialAnswer(option) !== normalizeMaterialAnswer(answer));
+  if (wrongOption && options.length > 2) {
+    return {
+      at: new Date().toISOString(),
+      label: `Уберите вариант "${wrongOption}".`,
+      penalty,
+      type: "eliminateOption",
+      value: wrongOption,
+    };
+  }
+  if (answer) {
+    return {
+      at: new Date().toISOString(),
+      label: `Ответ начинается с "${answer[0]}".`,
+      penalty,
+      type: "firstLetter",
+      value: answer[0],
+    };
+  }
+  return {
+    at: new Date().toISOString(),
+    label: "Посмотри на инструкцию и попробуй ещё раз.",
+    penalty,
+    type: "rule",
+  };
+}
+
+function materialItemAnswerMatches(item: MaterialExerciseItem | undefined, value: string): boolean {
+  const expected = normalizeMaterialAnswer(item?.answer);
+  if (!expected || !value.trim()) {
+    return false;
+  }
+  return normalizeMaterialAnswer(value) === expected;
+}
+
+function materialAnswerStatus(
+  item: MaterialExerciseItem,
+  value: string | undefined,
+  attempts: MaterialAttemptEntry[] | undefined,
+  hints: MaterialHintEntry[],
+  policy?: MaterialAssessmentPolicy,
+): MaterialAnswerStatus {
+  const cleanPolicy = cleanMaterialAssessment(policy ?? defaultObjectiveAssessmentPolicy());
+  const attemptCount = attempts?.length ?? (value?.trim() ? 1 : 0);
+  const incorrectAttempts = attempts?.filter((attempt) => attempt.correct === false).length ?? 0;
+  const correct = materialItemAnswerMatches(item, value ?? "");
+  const locked = !correct && cleanPolicy.lockAfterAttempts === true && incorrectAttempts >= (cleanPolicy.maxAttempts ?? 3);
+  if (!value?.trim() && hints.length === 0) {
+    return { icon: AlertCircle, kind: "empty", label: "Нет ответа", locked: false };
+  }
+  if (locked) {
+    return { icon: LockKeyhole, kind: "locked", label: "Заблокировано", locked: true };
+  }
+  if (correct && hints.length > 0) {
+    return { icon: Sparkles, kind: "hint", label: `${hints.length} hint`, locked: false };
+  }
+  if (correct && attemptCount > 1) {
+    return { icon: CheckCircle2, kind: "retry", label: `${attemptCount} попытки`, locked: false };
+  }
+  if (correct) {
+    return { icon: CheckCircle2, kind: "correct", label: "Верно", locked: false };
+  }
+  return { icon: AlertCircle, kind: "wrong", label: `${Math.max(1, incorrectAttempts)} ошибка`, locked: false };
+}
+
+function materialMatchingStatus(
+  leftId: string,
+  value: string | undefined,
+  attempts: MaterialAttemptEntry[] | undefined,
+  policy?: MaterialAssessmentPolicy,
+): MaterialAnswerStatus["kind"] {
+  const cleanPolicy = cleanMaterialAssessment(policy ?? defaultObjectiveAssessmentPolicy());
+  const incorrectAttempts = attempts?.filter((attempt) => attempt.correct === false).length ?? 0;
+  if (!value) {
+    return "empty";
+  }
+  if (value === leftId) {
+    return incorrectAttempts > 0 ? "retry" : "correct";
+  }
+  if (cleanPolicy.lockAfterAttempts === true && incorrectAttempts >= (cleanPolicy.maxAttempts ?? 3)) {
+    return "locked";
+  }
+  return "wrong";
 }
 
 function splitGapPrompt(prompt: string): { before: string; after: string } {
@@ -4583,16 +4885,19 @@ function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
     case "fillGaps":
       return {
         ...base,
+        assessment: defaultObjectiveAssessmentPolicy(),
         items: [{ prompt: "I am ___ the airport.", answer: "at" }],
       };
     case "multipleChoice":
       return {
         ...base,
+        assessment: defaultObjectiveAssessmentPolicy(),
         items: [{ prompt: "Choose the correct answer.", answer: "at", options: ["at", "in", "on"] }],
       };
     case "matchingPairs":
       return {
         ...base,
+        assessment: defaultObjectiveAssessmentPolicy(),
         pairs: [
           {
             id: createClientId("pair"),
@@ -4620,6 +4925,16 @@ function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
     default:
       return { ...base, body: "Введите текст задания." };
   }
+}
+
+function defaultObjectiveAssessmentPolicy(): MaterialAssessmentPolicy {
+  return {
+    weight: 1,
+    maxAttempts: 3,
+    attemptPenalty: 0.3,
+    hintPenalty: 0.15,
+    lockAfterAttempts: true,
+  };
 }
 
 async function prepareMaterialDraftSourceImage(file: File): Promise<MaterialDraftSourceImage> {
@@ -4869,6 +5184,10 @@ function materialBlockFromJson(value: unknown): MaterialEditorBlock | null {
     type,
     title: asString(block.title) || materialBlockLabel(type),
   };
+  const assessment = materialAssessmentFromJson(block.assessment);
+  if (assessment || isObjectiveMaterialBlockType(type)) {
+    result.assessment = assessment ?? defaultObjectiveAssessmentPolicy();
+  }
 
   const body = asString(block.body);
   const prompt = asString(block.prompt);
@@ -4920,6 +5239,9 @@ function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBlock {
     type: block.type,
     title,
   };
+  if (block.assessment || isObjectiveMaterialBlockType(block.type)) {
+    clean.assessment = cleanMaterialAssessment(block.assessment ?? defaultObjectiveAssessmentPolicy());
+  }
 
   if (block.body?.trim()) {
     clean.body = block.body.trim();
@@ -4956,6 +5278,7 @@ function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBlock {
         prompt: item.prompt.trim(),
         answer: item.answer?.trim() || undefined,
         options: item.options?.map((option) => option.trim()).filter(Boolean),
+        weight: item.weight && item.weight > 0 ? item.weight : undefined,
       }));
   }
   if (block.pairs?.length) {
@@ -5003,6 +5326,31 @@ function materialItemFromJson(value: unknown): NonNullable<MaterialEditorBlock["
     prompt,
     answer: asString(item.answer) || asString(item.correct) || undefined,
     options: uniqueMaterialOptions([...options, ...choices]),
+    weight: asPositiveNumber(item.weight) ?? asPositiveNumber(asJsonObject(item.assessment).weight) ?? undefined,
+  };
+}
+
+function materialAssessmentFromJson(value: unknown): MaterialAssessmentPolicy | undefined {
+  const assessment = asJsonObject(value);
+  if (Object.keys(assessment).length === 0) {
+    return undefined;
+  }
+  return cleanMaterialAssessment({
+    weight: asPositiveNumber(assessment.weight) ?? undefined,
+    maxAttempts: asPositiveNumber(assessment.maxAttempts) ?? undefined,
+    attemptPenalty: asNumber(assessment.attemptPenalty) ?? undefined,
+    hintPenalty: asNumber(assessment.hintPenalty) ?? undefined,
+    lockAfterAttempts: typeof assessment.lockAfterAttempts === "boolean" ? assessment.lockAfterAttempts : undefined,
+  });
+}
+
+function cleanMaterialAssessment(value: MaterialAssessmentPolicy): MaterialAssessmentPolicy {
+  return {
+    weight: clampNumber(value.weight ?? 1, 0.1, 20),
+    maxAttempts: Math.round(clampNumber(value.maxAttempts ?? 3, 1, 10)),
+    attemptPenalty: clampNumber(value.attemptPenalty ?? 0.3, 0, 1),
+    hintPenalty: clampNumber(value.hintPenalty ?? 0.15, 0, 1),
+    lockAfterAttempts: value.lockAfterAttempts ?? true,
   };
 }
 
@@ -5104,6 +5452,66 @@ function materialAnswerMatches(answer: MaterialAnswerBlock | undefined): Record<
     const matchValue = asString(value);
     if (matchValue) {
       result[key] = matchValue;
+    }
+    return result;
+  }, {});
+}
+
+function materialAnswerAttempts(answer: MaterialAnswerBlock | undefined): Record<string, MaterialAttemptEntry[]> {
+  const attempts = asJsonObject(answer?.attempts);
+  return Object.entries(attempts).reduce<Record<string, MaterialAttemptEntry[]>>((result, [key, value]) => {
+    const rawAttempts = Array.isArray(value) ? value : [];
+    const parsed = rawAttempts
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return { at: "", value: entry };
+        }
+        const object = asJsonObject(entry);
+        const valueText = asString(object.value);
+        if (!valueText) {
+          return null;
+        }
+        return {
+          at: asString(object.at),
+          correct: typeof object.correct === "boolean" ? object.correct : undefined,
+          value: valueText,
+        };
+      })
+      .filter((entry): entry is MaterialAttemptEntry => entry !== null);
+    if (parsed.length > 0) {
+      result[key] = parsed;
+    }
+    return result;
+  }, {});
+}
+
+function materialAnswerHints(answer: MaterialAnswerBlock | undefined): Record<string, MaterialHintEntry[]> {
+  const hints = asJsonObject(answer?.hints);
+  return Object.entries(hints).reduce<Record<string, MaterialHintEntry[]>>((result, [key, value]) => {
+    const rawHints = Array.isArray(value) ? value : [];
+    const parsed = rawHints
+      .map((entry) => {
+        const object = asJsonObject(entry);
+        const type = asString(object.type) || "hint";
+        const label = asString(object.label) || asString(object.value);
+        if (!label) {
+          return null;
+        }
+        const hintEntry: MaterialHintEntry = {
+          at: asString(object.at),
+          label,
+          penalty: asNumber(object.penalty) ?? 0.15,
+          type,
+        };
+        const hintValue = asString(object.value);
+        if (hintValue) {
+          hintEntry.value = hintValue;
+        }
+        return hintEntry;
+      })
+      .filter((entry): entry is MaterialHintEntry => entry !== null);
+    if (parsed.length > 0) {
+      result[key] = parsed;
     }
     return result;
   }, {});
@@ -5215,6 +5623,10 @@ function materialBlockLabel(type: MaterialBlockType): string {
   }
 }
 
+function isObjectiveMaterialBlockType(type: MaterialBlockType): boolean {
+  return type === "fillGaps" || type === "multipleChoice" || type === "matchingPairs";
+}
+
 function parseFlashcards(value: string): MaterialEditorBlock["cards"] {
   return value
     .split(/\r?\n/)
@@ -5244,12 +5656,14 @@ function parseExerciseItems(value: string, type: "fillGaps" | "multipleChoice"):
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [prompt = "", optionsOrAnswer = "", answer = ""] = splitMaterialLine(line, 3);
+      const [prompt = "", optionsOrAnswer = "", answer = "", weight = ""] = splitMaterialLine(line, 4);
+      const parsedWeight = parseOptionalNumber(weight);
       if (type === "multipleChoice") {
         return {
           prompt: prompt.trim(),
           options: optionsOrAnswer.split(",").map((option) => option.trim()).filter(Boolean),
           answer: answer.trim() || undefined,
+          weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
         };
       }
 
@@ -5257,6 +5671,7 @@ function parseExerciseItems(value: string, type: "fillGaps" | "multipleChoice"):
         prompt: prompt.trim(),
         options: answer ? optionsOrAnswer.split(",").map((option) => option.trim()).filter(Boolean) : undefined,
         answer: (answer || optionsOrAnswer).trim() || undefined,
+        weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
       };
     })
     .filter((item) => item.prompt);
@@ -5266,10 +5681,10 @@ function formatExerciseItems(items: MaterialEditorBlock["items"], type: "fillGap
   return (items ?? [])
     .map((item) => {
       if (type === "multipleChoice") {
-        return [item.prompt, item.options?.join(", "), item.answer].filter(Boolean).join(" | ");
+        return [item.prompt, item.options?.join(", "), item.answer, item.weight].filter(Boolean).join(" | ");
       }
 
-      return [item.prompt, item.options?.join(", "), item.answer].filter(Boolean).join(" | ");
+      return [item.prompt, item.options?.join(", "), item.answer, item.weight].filter(Boolean).join(" | ");
     })
     .join("\n");
 }
@@ -5346,6 +5761,18 @@ function asNumber(value: unknown): number | null {
   }
 
   return null;
+}
+
+function asPositiveNumber(value: unknown): number | null {
+  const parsed = asNumber(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
 }
 
 function createClientId(prefix: string): string {
@@ -5686,6 +6113,19 @@ function averageSubmissionScore(submissions: LessonMaterialSubmission[]): number
   }
 
   return scores.reduce((total, score) => total + score, 0) / scores.length;
+}
+
+function materialSubmissionAssessmentSummary(submission: LessonMaterialSubmission): { hints: number; label: string; retries: number } {
+  const assessment = asJsonObject(asJsonObject(submission.content).assessment);
+  const items = Array.isArray(assessment.items) ? assessment.items.map(asJsonObject) : [];
+  const hints = items.reduce((total, item) => total + (asNumber(item.hintsUsed) ?? 0), 0);
+  const retries = items.reduce((total, item) => total + Math.max(0, (asNumber(item.attemptsUsed) ?? 0) - 1), 0);
+  const errors = asNumber(assessment.errorsCount) ?? submission.errorsCount ?? 0;
+  return {
+    hints,
+    retries,
+    label: `${errors} ошибок, ${hints} подсказок, ${retries} дополнительных попыток`,
+  };
 }
 
 function formatMaterialScore(value: number | string | null | undefined): string {

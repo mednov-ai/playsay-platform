@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import {
   ConnectionStateToast,
   LiveKitRoom,
@@ -230,10 +230,15 @@ type MaterialHintEntry = {
 };
 
 type MaterialAnswerStatus = {
+  attemptsUsed: number;
+  correct: boolean;
   icon: typeof CheckCircle2;
-  kind: "empty" | "correct" | "retry" | "hint" | "wrong" | "locked";
+  incorrectAttempts: number;
+  hintsUsed: number;
+  kind: "empty" | "draft" | "correct" | "retry" | "hint" | "wrong" | "locked";
   label: string;
   locked: boolean;
+  maxAttempts: number;
 };
 
 type MaterialEditorBlock = {
@@ -252,6 +257,7 @@ type MaterialEditorBlock = {
   height?: number;
 };
 
+const MAX_MANUAL_INPUT_HINTS = 3;
 const emptyMaterialMatchingPairs: MaterialMatchingPair[] = [];
 
 type MaterialExerciseItem = NonNullable<MaterialEditorBlock["items"]>[number];
@@ -3942,7 +3948,19 @@ function RenderedFillGapExercise({
   const attempts = materialAnswerAttempts(answer);
   const hints = materialAnswerHints(answer);
 
-  function updateItem(itemKey: string, value: string) {
+  function updateItemValue(itemKey: string, value: string) {
+    onAnswerChange?.(block.id, {
+      type: "fillGaps",
+      items: {
+        ...answers,
+        [itemKey]: value,
+      },
+      attempts,
+      hints,
+    });
+  }
+
+  function checkItem(itemKey: string, value = answers[itemKey] ?? "") {
     const item = (block.items ?? []).find((candidate, index) => `${candidate.prompt}-${index}` === itemKey);
     const nextAttempts = appendMaterialAttempt(attempts, itemKey, value, materialItemAnswerMatches(item, value));
     onAnswerChange?.(block.id, {
@@ -3957,12 +3975,27 @@ function RenderedFillGapExercise({
   }
 
   function requestHint(itemKey: string, item: MaterialExerciseItem) {
+    const itemHints = hints[itemKey] ?? [];
+    const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, true);
+    if (!canRequestManualInputHint(item, itemHints, status)) {
+      return;
+    }
+
     onAnswerChange?.(block.id, {
       type: "fillGaps",
       items: answers,
       attempts,
-      hints: appendMaterialHint(hints, itemKey, materialHintForExerciseItem(item, block)),
+      hints: appendMaterialHint(hints, itemKey, materialHintForExerciseItem(item, block, itemHints.length + 1)),
     });
+  }
+
+  function handleManualInputKeyDown(event: KeyboardEvent<HTMLInputElement>, itemKey: string) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    checkItem(itemKey, event.currentTarget.value);
   }
 
   return (
@@ -3970,9 +4003,12 @@ function RenderedFillGapExercise({
       {(block.items ?? []).map((item, index) => {
         const itemKey = `${item.prompt}-${index}`;
         const options = materialExerciseOptions(item, block);
+        const isManualInput = options.length === 0;
         const prompt = splitGapPrompt(item.prompt);
         const itemHints = hints[itemKey] ?? [];
-        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment);
+        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, isManualInput);
+        const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
+        const canRequestHint = isManualInput && canRequestManualInputHint(item, itemHints, status);
 
         return (
           <div className="playsay-answer-row" data-status={status.kind} key={itemKey}>
@@ -3983,7 +4019,7 @@ function RenderedFillGapExercise({
                   aria-label={`gap ${index + 1}`}
                   className="playsay-inline-select"
                   disabled={status.locked}
-                  onChange={(event) => updateItem(itemKey, event.target.value)}
+                  onChange={(event) => checkItem(itemKey, event.target.value)}
                   value={answers[itemKey] ?? ""}
                 >
                   <option value="">Выбрать</option>
@@ -3992,17 +4028,32 @@ function RenderedFillGapExercise({
                   ))}
                 </select>
               ) : (
-                <input
-                  aria-label={`gap ${index + 1}`}
-                  disabled={status.locked}
-                  onChange={(event) => updateItem(itemKey, event.target.value)}
-                  value={answers[itemKey] ?? ""}
-                />
+                <span className="playsay-inline-answer" data-status={status.kind}>
+                  <input
+                    aria-label={`gap ${index + 1}`}
+                    disabled={status.locked}
+                    onChange={(event) => updateItemValue(itemKey, event.target.value)}
+                    onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
+                    placeholder={hintPreview || undefined}
+                    value={answers[itemKey] ?? ""}
+                  />
+                  <button
+                    aria-label="Проверить ответ"
+                    className="playsay-inline-check"
+                    disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
+                    onClick={() => checkItem(itemKey)}
+                    title="Проверить ответ (Enter)"
+                    type="button"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </button>
+                </span>
               )}
               {prompt.after ? <span>{prompt.after}</span> : null}
             </label>
             <MaterialAnswerTools
-              hint={itemHints[itemHints.length - 1]}
+              canRequestHint={canRequestHint}
+              hintPreview={hintPreview}
               onHint={() => requestHint(itemKey, item)}
               status={status}
             />
@@ -4026,7 +4077,19 @@ function RenderedChoiceExercise({
   const attempts = materialAnswerAttempts(answer);
   const hints = materialAnswerHints(answer);
 
-  function updateItem(itemKey: string, value: string) {
+  function updateItemValue(itemKey: string, value: string) {
+    onAnswerChange?.(block.id, {
+      type: "multipleChoice",
+      items: {
+        ...answers,
+        [itemKey]: value,
+      },
+      attempts,
+      hints,
+    });
+  }
+
+  function checkItem(itemKey: string, value = answers[itemKey] ?? "") {
     const item = (block.items ?? []).find((candidate, index) => `${candidate.prompt}-${index}` === itemKey);
     const nextAttempts = appendMaterialAttempt(attempts, itemKey, value, materialItemAnswerMatches(item, value));
     onAnswerChange?.(block.id, {
@@ -4041,12 +4104,27 @@ function RenderedChoiceExercise({
   }
 
   function requestHint(itemKey: string, item: MaterialExerciseItem) {
+    const itemHints = hints[itemKey] ?? [];
+    const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, true);
+    if (!canRequestManualInputHint(item, itemHints, status)) {
+      return;
+    }
+
     onAnswerChange?.(block.id, {
       type: "multipleChoice",
       items: answers,
       attempts,
-      hints: appendMaterialHint(hints, itemKey, materialHintForExerciseItem(item, block)),
+      hints: appendMaterialHint(hints, itemKey, materialHintForExerciseItem(item, block, itemHints.length + 1)),
     });
+  }
+
+  function handleManualInputKeyDown(event: KeyboardEvent<HTMLInputElement>, itemKey: string) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    checkItem(itemKey, event.currentTarget.value);
   }
 
   return (
@@ -4054,8 +4132,11 @@ function RenderedChoiceExercise({
       {(block.items ?? []).map((item, index) => {
         const itemKey = `${item.prompt}-${index}`;
         const options = materialExerciseOptions(item, block);
+        const isManualInput = options.length === 0;
         const itemHints = hints[itemKey] ?? [];
-        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment);
+        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, isManualInput);
+        const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
+        const canRequestHint = isManualInput && canRequestManualInputHint(item, itemHints, status);
 
         return (
           <div className="playsay-answer-row" data-status={status.kind} key={itemKey}>
@@ -4066,7 +4147,7 @@ function RenderedChoiceExercise({
                   aria-label={`choice ${index + 1}`}
                   className="playsay-inline-select"
                   disabled={status.locked}
-                  onChange={(event) => updateItem(itemKey, event.target.value)}
+                  onChange={(event) => checkItem(itemKey, event.target.value)}
                   value={answers[itemKey] ?? ""}
                 >
                   <option value="">Выбрать</option>
@@ -4075,17 +4156,32 @@ function RenderedChoiceExercise({
                   ))}
                 </select>
               ) : (
-                <input
-                  aria-label={`choice ${index + 1}`}
-                  className="playsay-inline-input"
-                  disabled={status.locked}
-                  onChange={(event) => updateItem(itemKey, event.target.value)}
-                  value={answers[itemKey] ?? ""}
-                />
+                <span className="playsay-inline-answer" data-status={status.kind}>
+                  <input
+                    aria-label={`choice ${index + 1}`}
+                    className="playsay-inline-input"
+                    disabled={status.locked}
+                    onChange={(event) => updateItemValue(itemKey, event.target.value)}
+                    onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
+                    placeholder={hintPreview || undefined}
+                    value={answers[itemKey] ?? ""}
+                  />
+                  <button
+                    aria-label="Проверить ответ"
+                    className="playsay-inline-check"
+                    disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
+                    onClick={() => checkItem(itemKey)}
+                    title="Проверить ответ (Enter)"
+                    type="button"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </button>
+                </span>
               )}
             </label>
             <MaterialAnswerTools
-              hint={itemHints[itemHints.length - 1]}
+              canRequestHint={canRequestHint}
+              hintPreview={hintPreview}
               onHint={() => requestHint(itemKey, item)}
               status={status}
             />
@@ -4097,31 +4193,50 @@ function RenderedChoiceExercise({
 }
 
 function MaterialAnswerTools({
-  hint,
+  canRequestHint,
+  hintPreview,
   onHint,
   status,
 }: {
-  hint?: MaterialHintEntry;
+  canRequestHint: boolean;
+  hintPreview?: string;
   onHint: () => void;
   status: MaterialAnswerStatus;
 }) {
   const Icon = status.icon;
+  const showStatus = status.kind !== "empty";
+  const nextHintNumber = Math.min(status.hintsUsed + 1, MAX_MANUAL_INPUT_HINTS);
+  if (!showStatus && !canRequestHint && !hintPreview) {
+    return null;
+  }
+
   return (
     <div className="playsay-answer-tools">
-      <span className="playsay-answer-status" data-kind={status.kind}>
-        <Icon className="h-3.5 w-3.5" />
-        {status.label}
-      </span>
-      <button
-        className="playsay-hint-button"
-        disabled={status.locked}
-        onClick={onHint}
-        type="button"
-      >
-        <Sparkles className="h-3.5 w-3.5" />
-        Подсказка
-      </button>
-      {hint ? <small className="playsay-hint-text">{hint.label}</small> : null}
+      {showStatus ? (
+        <span className="playsay-answer-status" data-kind={status.kind} title={status.label}>
+          <Icon className="h-3.5 w-3.5" />
+          {status.label}
+          {status.incorrectAttempts > 0 && status.kind !== "wrong" && status.kind !== "locked" ? (
+            <small className="playsay-answer-marker" data-kind="attempt">{status.incorrectAttempts}</small>
+          ) : null}
+          {status.hintsUsed > 0 ? (
+            <small className="playsay-answer-marker" data-kind="hint">{status.hintsUsed}</small>
+          ) : null}
+        </span>
+      ) : null}
+      {canRequestHint ? (
+        <button
+          aria-label={`Подсказка ${nextHintNumber} из ${MAX_MANUAL_INPUT_HINTS}`}
+          className="playsay-hint-button"
+          onClick={onHint}
+          title={`Подсказка ${nextHintNumber} из ${MAX_MANUAL_INPUT_HINTS}`}
+          type="button"
+        >
+          <FileText className="h-3.5 w-3.5" />
+          {nextHintNumber}/{MAX_MANUAL_INPUT_HINTS}
+        </button>
+      ) : null}
+      {hintPreview ? <small className="playsay-hint-text">{hintPreview}</small> : null}
     </div>
   );
 }
@@ -4334,35 +4449,64 @@ function appendMaterialHint(
   };
 }
 
-function materialHintForExerciseItem(item: MaterialExerciseItem, block: MaterialEditorBlock): MaterialHintEntry {
+function canRequestManualInputHint(
+  item: MaterialExerciseItem,
+  hints: MaterialHintEntry[],
+  status: MaterialAnswerStatus,
+): boolean {
+  return Boolean(item.answer?.trim()) && hints.length < MAX_MANUAL_INPUT_HINTS && !status.locked && !status.correct;
+}
+
+function materialManualInputHintPreview(item: MaterialExerciseItem, hints: MaterialHintEntry[]): string {
+  const latestHint = hints[hints.length - 1];
+  if (latestHint?.value) {
+    return latestHint.value;
+  }
+  if (hints.length === 0) {
+    return "";
+  }
+  return materialProgressiveHintValue(item.answer ?? "", hints.length);
+}
+
+function materialHintForExerciseItem(item: MaterialExerciseItem, block: MaterialEditorBlock, hintNumber: number): MaterialHintEntry {
   const answer = item.answer?.trim() ?? "";
-  const options = materialExerciseOptions(item, block);
   const penalty = cleanMaterialAssessment(block.assessment ?? defaultObjectiveAssessmentPolicy()).hintPenalty ?? 0.15;
-  const wrongOption = options.find((option) => normalizeMaterialAnswer(option) !== normalizeMaterialAnswer(answer));
-  if (wrongOption && options.length > 2) {
-    return {
-      at: new Date().toISOString(),
-      label: `Уберите вариант "${wrongOption}".`,
-      penalty,
-      type: "eliminateOption",
-      value: wrongOption,
-    };
-  }
-  if (answer) {
-    return {
-      at: new Date().toISOString(),
-      label: `Ответ начинается с "${answer[0]}".`,
-      penalty,
-      type: "firstLetter",
-      value: answer[0],
-    };
-  }
+  const level = Math.min(Math.max(hintNumber, 1), MAX_MANUAL_INPUT_HINTS);
+  const value = materialProgressiveHintValue(answer, level);
+  const type = level === 1 ? "firstLetter" : level === 2 ? "partialAnswer" : "fullAnswer";
   return {
     at: new Date().toISOString(),
-    label: "Посмотри на инструкцию и попробуй ещё раз.",
+    label: level >= MAX_MANUAL_INPUT_HINTS ? `Ответ: ${value}` : `Подсказка ${level}: ${value}`,
     penalty,
-    type: "rule",
+    type,
+    value,
   };
+}
+
+function materialProgressiveHintValue(answer: string, level: number): string {
+  const cleanAnswer = answer.trim();
+  if (!cleanAnswer) {
+    return "";
+  }
+  if (level >= MAX_MANUAL_INPUT_HINTS) {
+    return cleanAnswer;
+  }
+
+  return cleanAnswer
+    .split(/(\s+)/)
+    .map((part) => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      }
+      const characters = Array.from(part);
+      if (characters.length === 0) {
+        return "";
+      }
+      const revealCount = level === 1 ? 1 : Math.min(characters.length, Math.max(2, Math.ceil(characters.length / 2)));
+      const preview = characters.slice(0, revealCount).join("");
+      return revealCount >= characters.length ? preview : `${preview}...`;
+    })
+    .join("");
 }
 
 function materialItemAnswerMatches(item: MaterialExerciseItem | undefined, value: string): boolean {
@@ -4379,28 +4523,50 @@ function materialAnswerStatus(
   attempts: MaterialAttemptEntry[] | undefined,
   hints: MaterialHintEntry[],
   policy?: MaterialAssessmentPolicy,
+  requiresExplicitCheck = false,
 ): MaterialAnswerStatus {
   const cleanPolicy = cleanMaterialAssessment(policy ?? defaultObjectiveAssessmentPolicy());
-  const attemptCount = attempts?.length ?? (value?.trim() ? 1 : 0);
-  const incorrectAttempts = attempts?.filter((attempt) => attempt.correct === false).length ?? 0;
-  const correct = materialItemAnswerMatches(item, value ?? "");
-  const locked = !correct && cleanPolicy.lockAfterAttempts === true && incorrectAttempts >= (cleanPolicy.maxAttempts ?? 3);
-  if (!value?.trim() && hints.length === 0) {
-    return { icon: AlertCircle, kind: "empty", label: "Нет ответа", locked: false };
+  const cleanValue = value?.trim() ?? "";
+  const currentAttempts = attempts ?? [];
+  const latestAttempt = currentAttempts[currentAttempts.length - 1];
+  const currentValueChecked = Boolean(cleanValue && latestAttempt?.value.trim() === cleanValue);
+  const checkedByPolicy = !requiresExplicitCheck || currentValueChecked;
+  const maxAttempts = cleanPolicy.maxAttempts ?? 3;
+  const attemptCount = currentAttempts.length || (!requiresExplicitCheck && cleanValue ? 1 : 0);
+  const incorrectAttempts = currentAttempts.filter((attempt) => (
+    attempt.correct === false || (attempt.correct !== true && !materialItemAnswerMatches(item, attempt.value))
+  )).length;
+  const answerIsCorrect = materialItemAnswerMatches(item, cleanValue);
+  const visibleCorrect = answerIsCorrect && checkedByPolicy;
+  const locked = !visibleCorrect && cleanPolicy.lockAfterAttempts === true && incorrectAttempts >= maxAttempts;
+  const baseStatus = {
+    attemptsUsed: attemptCount,
+    correct: false,
+    incorrectAttempts,
+    hintsUsed: hints.length,
+    locked: false,
+    maxAttempts,
+  };
+
+  if (!cleanValue) {
+    return { ...baseStatus, icon: AlertCircle, kind: "empty", label: "Нет ответа" };
   }
   if (locked) {
-    return { icon: LockKeyhole, kind: "locked", label: "Заблокировано", locked: true };
+    return { ...baseStatus, icon: LockKeyhole, kind: "locked", label: "Закрыто", locked: true };
   }
-  if (correct && hints.length > 0) {
-    return { icon: Sparkles, kind: "hint", label: `${hints.length} hint`, locked: false };
+  if (requiresExplicitCheck && !currentValueChecked) {
+    return { ...baseStatus, icon: CheckCircle2, kind: "draft", label: "Проверить" };
   }
-  if (correct && attemptCount > 1) {
-    return { icon: CheckCircle2, kind: "retry", label: `${attemptCount} попытки`, locked: false };
+  if (visibleCorrect && hints.length > 0) {
+    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "hint", label: "Верно" };
   }
-  if (correct) {
-    return { icon: CheckCircle2, kind: "correct", label: "Верно", locked: false };
+  if (visibleCorrect && incorrectAttempts > 0) {
+    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "retry", label: "Верно" };
   }
-  return { icon: AlertCircle, kind: "wrong", label: `${Math.max(1, incorrectAttempts)} ошибка`, locked: false };
+  if (visibleCorrect) {
+    return { ...baseStatus, correct: true, icon: CheckCircle2, kind: "correct", label: "Верно" };
+  }
+  return { ...baseStatus, icon: AlertCircle, kind: "wrong", label: `${Math.max(1, incorrectAttempts)} ошибка` };
 }
 
 function materialMatchingStatus(

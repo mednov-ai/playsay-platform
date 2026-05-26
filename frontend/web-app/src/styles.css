@@ -1007,6 +1007,24 @@ textarea {
   padding: 0.45rem 0.55rem;
 }
 
+.playsay-choice-row[data-status="correct"],
+.playsay-choice-row[data-status="hint"] {
+  border-color: rgb(0 168 120 / 0.26);
+  background: rgb(223 248 238 / 0.48);
+}
+
+.playsay-choice-row[data-status="retry"] {
+  border-color: rgb(0 168 120 / 0.26);
+  background: rgb(223 248 238 / 0.48);
+  box-shadow: inset 0.1875rem 0 0 #f04438;
+}
+
+.playsay-choice-row[data-status="wrong"],
+.playsay-choice-row[data-status="locked"] {
+  border-color: rgb(180 35 24 / 0.24);
+  background: rgb(254 243 242 / 0.62);
+}
+
 .playsay-matching-exercise {
   position: relative;
   width: min(100%, 48rem);
@@ -1199,6 +1217,21 @@ textarea {
   color: hsl(var(--primary) / 0.7);
 }
 
+.playsay-inline-hint-ghost {
+  flex: 0 0 auto;
+  max-width: 5.5rem;
+  overflow: hidden;
+  border-left: 1px solid hsl(var(--border));
+  color: hsl(var(--primary) / 0.72);
+  font-size: 0.82rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 0.3rem 0.45rem 0.3rem 0.35rem;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .playsay-inline-answer:focus-within {
   border-color: hsl(var(--primary));
   box-shadow: 0 0 0 3px rgb(255 92 0 / 0.14);
@@ -1213,6 +1246,25 @@ textarea {
 .playsay-inline-answer[data-status="hint"],
 .playsay-inline-answer[data-status="retry"] {
   border-color: rgb(0 168 120 / 0.3);
+}
+
+.playsay-inline-select[data-status="correct"],
+.playsay-inline-select[data-status="hint"],
+.playsay-inline-select[data-status="retry"] {
+  border-color: rgb(0 168 120 / 0.35);
+  background: #a6d96a;
+  color: #ffffff;
+}
+
+.playsay-inline-select[data-status="retry"] {
+  box-shadow: inset 0.1875rem 0 0 #f04438;
+}
+
+.playsay-inline-select[data-status="wrong"],
+.playsay-inline-select[data-status="locked"] {
+  border-color: rgb(180 35 24 / 0.32);
+  background: rgb(254 243 242 / 0.78);
+  color: #b42318;
 }
 
 .playsay-inline-check {
@@ -1369,40 +1421,56 @@ textarea {
   width: auto;
 }
 
+.playsay-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .playsay-answer-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
-  gap: 0.4rem;
+  gap: 0.35rem;
   align-items: center;
   border: 1px solid transparent;
   border-radius: 0.625rem;
-  padding: 0.2rem 0.25rem;
+  padding: 0.15rem 0.2rem;
 }
 
-.playsay-answer-row[data-status="draft"] {
+.playsay-answer-row[data-input-mode="select"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.playsay-answer-row[data-input-mode="manual"][data-status="draft"] {
   border-color: rgb(255 182 72 / 0.22);
   background: rgb(255 247 241 / 0.42);
 }
 
-.playsay-answer-row[data-status="wrong"],
-.playsay-answer-row[data-status="locked"] {
+.playsay-answer-row[data-input-mode="manual"][data-status="wrong"],
+.playsay-answer-row[data-input-mode="manual"][data-status="locked"] {
   border-color: rgb(180 35 24 / 0.2);
   background: rgb(254 243 242 / 0.65);
 }
 
-.playsay-answer-row[data-status="retry"] {
+.playsay-answer-row[data-input-mode="manual"][data-status="retry"] {
   border-color: rgb(0 168 120 / 0.22);
   background: rgb(223 248 238 / 0.42);
   box-shadow: inset 0.1875rem 0 0 #f04438;
 }
 
-.playsay-answer-row[data-status="hint"],
-.playsay-answer-row[data-status="correct"] {
+.playsay-answer-row[data-input-mode="manual"][data-status="hint"],
+.playsay-answer-row[data-input-mode="manual"][data-status="correct"] {
   border-color: rgb(0 168 120 / 0.22);
   background: rgb(223 248 238 / 0.42);
 }
 
-.playsay-answer-row[data-status="hint"] {
+.playsay-answer-row[data-input-mode="manual"][data-status="hint"] {
   box-shadow: inset 0.1875rem 0 0 hsl(var(--primary));
 }
 
@@ -1883,7 +1951,8 @@ textarea {
   }
 
   .playsay-choice-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(5.2rem, 7.5rem);
+    gap: 0.4rem;
   }
 
   .playsay-matching-exercise {
@@ -1946,6 +2015,12 @@ textarea {
 
   .playsay-inline-answer {
     width: min(13rem, 64vw);
+  }
+
+  .playsay-inline-hint-ghost {
+    max-width: 3.25rem;
+    padding-inline: 0.3rem;
+    font-size: 0.78rem;
   }
 
   .playsay-answer-status {

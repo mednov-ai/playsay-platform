@@ -3821,31 +3821,44 @@ function RenderedMaterialBlock({
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
+  const contextLabel = materialBlockContextLabel(block);
+  const blockSection = (children: ReactNode, className = "playsay-render-block") => (
+    <section
+      className={className}
+      data-playsay-block-id={block.id}
+      data-playsay-block-type={block.type}
+      data-playsay-context-label={contextLabel}
+    >
+      <span className="playsay-visually-hidden">{contextLabel}</span>
+      {children}
+    </section>
+  );
+
   switch (block.type) {
     case "text":
-      return (
-        <section className="playsay-render-block">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <p>{block.body}</p>
-        </section>
+        </>,
       );
     case "videoEmbed":
-      return (
-        <section className="playsay-render-block">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <div className="playsay-video-embed-placeholder">
             <Video className="h-5 w-5 text-primary" />
             <span>{block.provider ?? "VIDEO"}</span>
             <small>{block.url || "Ссылка на видео будет здесь"}</small>
           </div>
-        </section>
+        </>,
       );
     case "image":
     case "generatedImage":
       {
         const imageUrl = resolveMaterialImageUrl(block.url, assetUrls);
-        return (
-          <section className="playsay-render-block">
+        return blockSection(
+          <>
             <h4>{block.title}</h4>
             {imageUrl ? (
               <figure className="playsay-rendered-image">
@@ -3858,12 +3871,12 @@ function RenderedMaterialBlock({
                 <figcaption>{block.caption || block.prompt || block.url || "Изображение"}</figcaption>
               </figure>
             )}
-          </section>
+          </>,
         );
       }
     case "flashcards":
-      return (
-        <section className="playsay-render-block">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <div className="playsay-flashcards">
             {(block.cards ?? []).map((card) => (
@@ -3874,25 +3887,25 @@ function RenderedMaterialBlock({
               </article>
             ))}
           </div>
-        </section>
+        </>,
       );
     case "fillGaps":
-      return (
-        <section className="playsay-render-block">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <RenderedFillGapExercise answer={answer} block={block} onAnswerChange={onAnswerChange} />
-        </section>
+        </>,
       );
     case "multipleChoice":
-      return (
-        <section className="playsay-render-block">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <RenderedChoiceExercise answer={answer} block={block} onAnswerChange={onAnswerChange} />
-        </section>
+        </>,
       );
     case "matchingPairs":
-      return (
-        <section className="playsay-render-block">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <RenderedMatchingPairsExercise
             answer={answer}
@@ -3901,34 +3914,39 @@ function RenderedMaterialBlock({
             mode={mode}
             onAnswerChange={onAnswerChange}
           />
-        </section>
+        </>,
       );
     case "freeWriting":
-      return (
-        <section className="playsay-render-block">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <p>{block.prompt}</p>
           <textarea
             className="playsay-student-answer"
-            onChange={(event) => onAnswerChange?.(block.id, { type: "freeWriting", text: event.target.value })}
+            onChange={(event) => onAnswerChange?.(block.id, {
+              type: "freeWriting",
+              text: event.target.value,
+              context: materialAnswerContextForBlock(block),
+            })}
             placeholder="Ответ ученика"
             value={materialAnswerText(answer)}
           />
-        </section>
+        </>,
       );
     case "speakingPrompt":
-      return (
-        <section className="playsay-render-block playsay-speaking-prompt">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <p>{block.prompt}</p>
-        </section>
+        </>,
+        "playsay-render-block playsay-speaking-prompt",
       );
     case "drawingArea":
-      return (
-        <section className="playsay-render-block">
+      return blockSection(
+        <>
           <h4>{block.title}</h4>
           <div className="playsay-drawing-area" style={{ minHeight: block.height ?? 220 }} />
-        </section>
+        </>,
       );
     default:
       return null;
@@ -3956,6 +3974,7 @@ function RenderedFillGapExercise({
         [itemKey]: value,
       },
       attempts,
+      context: materialAnswerContextForBlock(block),
       hints,
     });
   }
@@ -3970,6 +3989,7 @@ function RenderedFillGapExercise({
         [itemKey]: value,
       },
       attempts: nextAttempts,
+      context: materialAnswerContextForBlock(block),
       hints,
     });
   }
@@ -3985,6 +4005,7 @@ function RenderedFillGapExercise({
       type: "fillGaps",
       items: answers,
       attempts,
+      context: materialAnswerContextForBlock(block),
       hints: appendMaterialHint(hints, itemKey, materialHintForExerciseItem(item, block, itemHints.length + 1)),
     });
   }
@@ -4008,16 +4029,18 @@ function RenderedFillGapExercise({
         const itemHints = hints[itemKey] ?? [];
         const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, isManualInput);
         const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
+        const inlineHint = isManualInput ? materialManualInputInlineHint(item, itemHints, answers[itemKey] ?? "") : "";
         const canRequestHint = isManualInput && canRequestManualInputHint(item, itemHints, status);
 
         return (
-          <div className="playsay-answer-row" data-status={status.kind} key={itemKey}>
+          <div className="playsay-answer-row" data-input-mode={isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
             <label>
               {prompt.before ? <span>{prompt.before}</span> : null}
               {options.length > 0 ? (
                 <select
                   aria-label={`gap ${index + 1}`}
                   className="playsay-inline-select"
+                  data-status={status.kind}
                   disabled={status.locked}
                   onChange={(event) => checkItem(itemKey, event.target.value)}
                   value={answers[itemKey] ?? ""}
@@ -4034,9 +4057,10 @@ function RenderedFillGapExercise({
                     disabled={status.locked}
                     onChange={(event) => updateItemValue(itemKey, event.target.value)}
                     onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
-                    placeholder={hintPreview || undefined}
+                    placeholder={!answers[itemKey]?.trim() ? hintPreview || undefined : undefined}
                     value={answers[itemKey] ?? ""}
                   />
+                  {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
                   <button
                     aria-label="Проверить ответ"
                     className="playsay-inline-check"
@@ -4053,7 +4077,6 @@ function RenderedFillGapExercise({
             </label>
             <MaterialAnswerTools
               canRequestHint={canRequestHint}
-              hintPreview={hintPreview}
               onHint={() => requestHint(itemKey, item)}
               status={status}
             />
@@ -4085,6 +4108,7 @@ function RenderedChoiceExercise({
         [itemKey]: value,
       },
       attempts,
+      context: materialAnswerContextForBlock(block),
       hints,
     });
   }
@@ -4099,6 +4123,7 @@ function RenderedChoiceExercise({
         [itemKey]: value,
       },
       attempts: nextAttempts,
+      context: materialAnswerContextForBlock(block),
       hints,
     });
   }
@@ -4114,6 +4139,7 @@ function RenderedChoiceExercise({
       type: "multipleChoice",
       items: answers,
       attempts,
+      context: materialAnswerContextForBlock(block),
       hints: appendMaterialHint(hints, itemKey, materialHintForExerciseItem(item, block, itemHints.length + 1)),
     });
   }
@@ -4136,16 +4162,18 @@ function RenderedChoiceExercise({
         const itemHints = hints[itemKey] ?? [];
         const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, isManualInput);
         const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
+        const inlineHint = isManualInput ? materialManualInputInlineHint(item, itemHints, answers[itemKey] ?? "") : "";
         const canRequestHint = isManualInput && canRequestManualInputHint(item, itemHints, status);
 
         return (
-          <div className="playsay-answer-row" data-status={status.kind} key={itemKey}>
-            <label className="playsay-choice-row">
+          <div className="playsay-answer-row" data-input-mode={isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
+            <label className="playsay-choice-row" data-status={status.kind}>
               <span>{item.prompt}</span>
               {options.length > 0 ? (
                 <select
                   aria-label={`choice ${index + 1}`}
                   className="playsay-inline-select"
+                  data-status={status.kind}
                   disabled={status.locked}
                   onChange={(event) => checkItem(itemKey, event.target.value)}
                   value={answers[itemKey] ?? ""}
@@ -4163,9 +4191,10 @@ function RenderedChoiceExercise({
                     disabled={status.locked}
                     onChange={(event) => updateItemValue(itemKey, event.target.value)}
                     onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
-                    placeholder={hintPreview || undefined}
+                    placeholder={!answers[itemKey]?.trim() ? hintPreview || undefined : undefined}
                     value={answers[itemKey] ?? ""}
                   />
+                  {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
                   <button
                     aria-label="Проверить ответ"
                     className="playsay-inline-check"
@@ -4181,7 +4210,6 @@ function RenderedChoiceExercise({
             </label>
             <MaterialAnswerTools
               canRequestHint={canRequestHint}
-              hintPreview={hintPreview}
               onHint={() => requestHint(itemKey, item)}
               status={status}
             />
@@ -4194,19 +4222,17 @@ function RenderedChoiceExercise({
 
 function MaterialAnswerTools({
   canRequestHint,
-  hintPreview,
   onHint,
   status,
 }: {
   canRequestHint: boolean;
-  hintPreview?: string;
   onHint: () => void;
   status: MaterialAnswerStatus;
 }) {
   const Icon = status.icon;
   const showStatus = status.kind !== "empty";
   const nextHintNumber = Math.min(status.hintsUsed + 1, MAX_MANUAL_INPUT_HINTS);
-  if (!showStatus && !canRequestHint && !hintPreview) {
+  if (!showStatus && !canRequestHint) {
     return null;
   }
 
@@ -4236,7 +4262,6 @@ function MaterialAnswerTools({
           {nextHintNumber}/{MAX_MANUAL_INPUT_HINTS}
         </button>
       ) : null}
-      {hintPreview ? <small className="playsay-hint-text">{hintPreview}</small> : null}
     </div>
   );
 }
@@ -4468,6 +4493,33 @@ function materialManualInputHintPreview(item: MaterialExerciseItem, hints: Mater
   return materialProgressiveHintValue(item.answer ?? "", hints.length);
 }
 
+function materialManualInputInlineHint(item: MaterialExerciseItem, hints: MaterialHintEntry[], value: string): string {
+  const hint = materialManualInputHintPreview(item, hints);
+  const cleanValue = value.trim();
+  if (!hint || !cleanValue) {
+    return "";
+  }
+
+  if (materialItemAnswerMatches(item, cleanValue)) {
+    return "";
+  }
+
+  if (hint.toLowerCase().startsWith(cleanValue.toLowerCase()) && cleanValue.length < hint.length) {
+    return hint.slice(cleanValue.length);
+  }
+
+  const hintPrefix = hint.replace(/\.\.\.$/, "");
+  if (hintPrefix && cleanValue.toLowerCase().startsWith(hintPrefix.toLowerCase())) {
+    return "";
+  }
+
+  if (normalizeMaterialAnswer(hint) === normalizeMaterialAnswer(cleanValue)) {
+    return "";
+  }
+
+  return hint;
+}
+
 function materialHintForExerciseItem(item: MaterialExerciseItem, block: MaterialEditorBlock, hintNumber: number): MaterialHintEntry {
   const answer = item.answer?.trim() ?? "";
   const penalty = cleanMaterialAssessment(block.assessment ?? defaultObjectiveAssessmentPolicy()).hintPenalty ?? 0.15;
@@ -4507,6 +4559,37 @@ function materialProgressiveHintValue(answer: string, level: number): string {
       return revealCount >= characters.length ? preview : `${preview}...`;
     })
     .join("");
+}
+
+function materialBlockContextLabel(block: MaterialEditorBlock): string {
+  const parts = [
+    `block:${block.type}`,
+    `title:${block.title}`,
+    block.body ? `body:${block.body}` : "",
+    block.prompt ? `prompt:${block.prompt}` : "",
+    ...(block.items ?? []).map((item, index) => `item${index + 1}:${item.prompt}`),
+  ].filter(Boolean);
+  return parts.join(" | ").slice(0, 900);
+}
+
+function materialAnswerContextForBlock(block: MaterialEditorBlock): LessonMaterialJson {
+  const items = (block.items ?? []).map((item, index, allItems) => ({
+    key: `${item.prompt}-${index}`,
+    prompt: item.prompt,
+    previousPrompt: allItems[index - 1]?.prompt ?? null,
+    nextPrompt: allItems[index + 1]?.prompt ?? null,
+    options: item.options ?? [],
+  }));
+
+  return {
+    blockId: block.id,
+    blockType: block.type,
+    title: block.title,
+    label: materialBlockContextLabel(block),
+    body: block.body ?? null,
+    prompt: block.prompt ?? null,
+    items,
+  };
 }
 
 function materialItemAnswerMatches(item: MaterialExerciseItem | undefined, value: string): boolean {

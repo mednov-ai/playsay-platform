@@ -647,7 +647,32 @@ class MaterialControllerTest @Autowired constructor(
         )
         assertEquals(listOf("bird", "custom-tag"), updatedAsset.metadata["tags"].map { tag -> tag.asText() })
 
-        val editedDocument = regenerated.document.deepCopy<ObjectNode>()
+        val altEditedDocument = regenerated.document.deepCopy<ObjectNode>()
+        (altEditedDocument["pages"][0]["blocks"][1]["pairs"][0] as ObjectNode)
+            .put("imageAlt", "teacher-facing label only")
+        materialController.update(
+            teacher,
+            material.id,
+            LessonMaterialRequest(
+                title = "Birds",
+                document = altEditedDocument,
+            ),
+        )
+
+        val altOnlyGenerated = materialController.generateImages(
+            teacher,
+            material.id,
+            MaterialGenerateImagesRequest(maxImages = 12),
+        )
+        val altOnlyPairs = altOnlyGenerated.document["pages"][0]["blocks"][1]["pairs"]
+        val altOnlyAssets = materialController.listAssets(teacher, material.id)
+        val altOnlyOwlAsset = altOnlyAssets.single { asset -> asset.metadata["targetId"].asText() == "pair-owl" }
+        assertEquals(regeneratedAssets.map { asset -> asset.id }.toSet(), altOnlyAssets.map { asset -> asset.id }.toSet())
+        assertEquals(regeneratedPairs[0]["imageUrl"].asText(), altOnlyPairs[0]["imageUrl"].asText())
+        assertEquals("child-friendly workbook owl illustration", altOnlyOwlAsset.metadata["sourcePrompt"].asText())
+        assertTrue(altOnlyOwlAsset.metadata["tags"].any { tag -> tag.asText() == "custom-tag" })
+
+        val editedDocument = altOnlyGenerated.document.deepCopy<ObjectNode>()
         (editedDocument["pages"][0]["blocks"][1]["pairs"][0] as ObjectNode)
             .put("imagePrompt", "child-friendly workbook snowy owl illustration")
         materialController.update(

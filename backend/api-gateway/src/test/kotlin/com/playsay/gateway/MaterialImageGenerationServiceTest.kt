@@ -7,6 +7,7 @@ import java.util.Base64
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MaterialImageGenerationServiceTest {
@@ -22,7 +23,7 @@ class MaterialImageGenerationServiceTest {
 
         val image = provider.generate(
             MaterialImageGenerationInput(
-                prompt = "child-friendly workbook illustration of an owl",
+                prompt = "child-friendly workbook illustration of a fox",
                 alt = "owl",
             ),
         )
@@ -33,8 +34,10 @@ class MaterialImageGenerationServiceTest {
         assertTrue(transport.requestBody.contains("\"/images/generations\"").not())
         assertTrue(transport.requestBody.contains("\"model\":\"gpt-image-1-mini\""))
         assertTrue(transport.requestBody.contains("\"quality\":\"low\""))
-        assertTrue(transport.requestBody.contains("Do not include text"))
-        assertTrue(transport.requestBody.contains("owl"))
+        assertTrue(transport.requestBody.contains("\"prompt\":\"child-friendly workbook illustration of a fox\""))
+        assertFalse(transport.requestBody.contains("owl"))
+        assertFalse(transport.requestBody.contains("Create a new original illustration"))
+        assertFalse(transport.requestBody.contains("Do not include text"))
     }
 
     private class RecordingOpenAiImagesTransport(

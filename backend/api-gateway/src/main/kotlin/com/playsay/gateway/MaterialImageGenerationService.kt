@@ -167,18 +167,8 @@ class JavaOpenAiImagesTransport : OpenAiImagesTransport {
     }
 }
 
-private fun materialImageGenerationPrompt(prompt: String, alt: String): String {
-    val subject = alt.trim().ifBlank { "the target vocabulary word" }
-    val basePrompt = prompt.trim().ifBlank { "A child-friendly workbook picture of $subject." }
-    return """
-        $basePrompt
-
-        Create a new original illustration for a children's English workbook matching exercise.
-        Show one clear centered object or character for: $subject.
-        Use a bright friendly vector-like style, white or very light background, simple silhouette, no clutter.
-        Do not include text, letters, numbers, labels, logos, watermarks, copied worksheet art, or realistic photo backgrounds.
-    """.trimIndent()
-}
+private fun materialImageGenerationPrompt(prompt: String, _alt: String): String =
+    prompt.trim().ifBlank { "A child-friendly workbook picture." }
 
 private fun compactJpegBytes(base64Image: String): ByteArray {
     val sourceBytes = Base64.getDecoder().decode(base64Image)

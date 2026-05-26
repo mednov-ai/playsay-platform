@@ -2377,7 +2377,6 @@ private fun materialImageTargets(
                     val decision = materialImageTargetDecision(
                         imageUrl = imageUrl,
                         imagePrompt = imagePrompt,
-                        imageAlt = imageAlt,
                         regenerate = regenerate,
                         existingAssets = existingAssets,
                         objectMapper = objectMapper,
@@ -2422,11 +2421,10 @@ private fun materialImageTargets(
                         val pairId = pairObject.get("id")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
                             ?: "pair-${targets.size + 1}"
                         val imageAlt = imageAltValue ?: right
-                        val imagePrompt = imagePromptValue ?: "child-friendly workbook illustration of $imageAlt, white background"
+                        val imagePrompt = imagePromptValue ?: return@forEach
                         val decision = materialImageTargetDecision(
                             imageUrl = imageUrl,
                             imagePrompt = imagePrompt,
-                            imageAlt = imageAlt,
                             regenerate = regenerate,
                             existingAssets = existingAssets,
                             objectMapper = objectMapper,
@@ -2458,7 +2456,6 @@ private fun materialImageTargets(
 private fun materialImageTargetDecision(
     imageUrl: String,
     imagePrompt: String,
-    imageAlt: String,
     regenerate: Boolean,
     existingAssets: Map<UUID, StoredMaterialAsset>,
     objectMapper: ObjectMapper,
@@ -2480,7 +2477,7 @@ private fun materialImageTargetDecision(
     if (asset.kind != "GENERATED_IMAGE") {
         return null
     }
-    if (materialGeneratedImageAssetMatches(asset, imagePrompt, imageAlt, objectMapper)) {
+    if (materialGeneratedImageAssetMatches(asset, imagePrompt, objectMapper)) {
         return null
     }
     return MaterialImageTargetDecision(previousAssetId = assetId)
@@ -2489,16 +2486,12 @@ private fun materialImageTargetDecision(
 private fun materialGeneratedImageAssetMatches(
     asset: StoredMaterialAsset,
     imagePrompt: String,
-    imageAlt: String,
     objectMapper: ObjectMapper,
 ): Boolean {
     val metadata = runCatching { objectMapper.readTree(asset.metadata) }.getOrNull() ?: return false
     val storedPrompt = metadata.get("sourcePrompt")?.takeIf { node -> node.isTextual }?.asText()
         ?: metadata.get("prompt")?.takeIf { node -> node.isTextual }?.asText()?.substringBefore("\n\nCreate a new original illustration")
-    val storedAlt = metadata.get("sourceAlt")?.takeIf { node -> node.isTextual }?.asText()
-        ?: metadata.get("imageAlt")?.takeIf { node -> node.isTextual }?.asText()
-    return normalizeMaterialImageSource(storedPrompt) == normalizeMaterialImageSource(imagePrompt) &&
-        normalizeMaterialImageSource(storedAlt) == normalizeMaterialImageSource(imageAlt)
+    return normalizeMaterialImageSource(storedPrompt) == normalizeMaterialImageSource(imagePrompt)
 }
 
 private fun normalizeMaterialImageSource(value: String?): String =

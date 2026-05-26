@@ -1443,8 +1443,11 @@ function MaterialLibraryPanel({
   const [assetLibrary, setAssetLibrary] = useState<MaterialAssetLibraryItem[]>([]);
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
   const canGenerateUrlDraft = draftUrl.trim().length > 0;
-  const allImageTargetsCount = countMaterialImageTargets(form.document, { includeExisting: true });
-  const canGenerateImages = allImageTargetsCount > 0;
+  const currentMaterialAssets = form.id
+    ? assetLibrary.filter((item) => item.materialId === form.id).map((item) => item.asset)
+    : [];
+  const pendingImageTargetsCount = countPendingMaterialImageTargets(form.document, currentMaterialAssets);
+  const canGenerateImages = pendingImageTargetsCount > 0;
 
   useEffect(() => {
     if (selectedLessonKey || lessonOptions.length === 0) {
@@ -1627,42 +1630,59 @@ function MaterialLibraryPanel({
     setAuthorMode("edit");
   }
 
+  function syncMaterialAssets(material: LessonMaterial, assets: LessonMaterialAsset[]) {
+    const nextItems = assets
+      .map((asset) => materialAssetLibraryItemFromAsset(material, asset))
+      .filter((item): item is MaterialAssetLibraryItem => item !== null);
+    setAssetLibrary((current) => [
+      ...current.filter((item) => item.materialId !== material.id),
+      ...nextItems,
+    ]);
+  }
+
   async function saveMaterialAndMaybeGenerate({
     generateMissing = false,
-    regenerate = false,
   }: {
     generateMissing?: boolean;
-    regenerate?: boolean;
   } = {}): Promise<LessonMaterial | null> {
     const saved = await onSave(materialFormToInput(form), form.id ?? undefined);
     if (!saved) {
       return null;
     }
-    const targetCount = regenerate
-      ? countMaterialImageTargets(form.document, { includeExisting: true })
-      : generateMissing ? countMaterialImageTargets(form.document, { includeExisting: true }) : 0;
+    if (!generateMissing) {
+      return saved;
+    }
+
+    let currentMaterial = saved;
+    let currentAssets: LessonMaterialAsset[] = [];
+    try {
+      currentAssets = await fetchMaterialAssets(saved.id);
+      syncMaterialAssets(saved, currentAssets);
+    } catch {
+      currentAssets = [];
+    }
+    const targetCount = countPendingMaterialImageTargets(materialToForm(currentMaterial).document, currentAssets);
     if (targetCount === 0) {
       return saved;
     }
 
     try {
-      if (regenerate) {
-        setImageGenerationProgress({ label: "Обновляем картинки", total: targetCount });
-        return (await onGenerateImages(saved.id, { maxImages: Math.min(12, targetCount), regenerate: true })) ?? saved;
-      }
-
-      let currentMaterial = saved;
       for (let index = 1; index <= targetCount; index += 1) {
-        setImageGenerationProgress({ current: index, label: "Генерируем/обновляем картинки", total: targetCount });
+        setImageGenerationProgress({ current: index, label: "Генерируем картинки", total: targetCount });
         const generated = await onGenerateImages(currentMaterial.id, { maxImages: 1 });
         if (!generated) {
           return currentMaterial;
         }
-        const changed = generated.updatedAt !== currentMaterial.updatedAt ||
-          JSON.stringify(generated.document) !== JSON.stringify(currentMaterial.document);
         currentMaterial = generated;
         setForm(materialToForm(generated));
-        if (!changed) {
+        try {
+          currentAssets = await fetchMaterialAssets(generated.id);
+          syncMaterialAssets(generated, currentAssets);
+        } catch {
+          currentAssets = [];
+        }
+        const remaining = countPendingMaterialImageTargets(materialToForm(generated).document, currentAssets);
+        if (remaining === 0) {
           break;
         }
       }
@@ -1672,8 +1692,8 @@ function MaterialLibraryPanel({
     }
   }
 
-  async function generateCurrentImages(regenerate = false) {
-    const saved = await saveMaterialAndMaybeGenerate({ generateMissing: !regenerate, regenerate });
+  async function generateCurrentImages() {
+    const saved = await saveMaterialAndMaybeGenerate({ generateMissing: true });
     if (saved) {
       setForm(materialToForm(saved));
       setAuthorMode("preview");
@@ -1919,15 +1939,6 @@ function MaterialLibraryPanel({
                       <PenLine className="h-4 w-4" />
                       Текст
                     </Button>
-                    <Button
-                      disabled={disabled || !canGenerateImages || form.title.trim().length === 0}
-                      onClick={() => void generateCurrentImages()}
-                      type="button"
-                      variant="outline"
-                    >
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                      Обновить картинки
-                    </Button>
                     <Button disabled={disabled || form.title.trim().length === 0} onClick={duplicateCurrentMaterial} type="button" variant="outline">
                       <Copy className="h-4 w-4" />
                       Дублировать
@@ -2049,7 +2060,7 @@ function MaterialLibraryPanel({
                   </Button>
                   <Button disabled={disabled || !canGenerateImages || form.title.trim().length === 0} onClick={() => void generateCurrentImages()} type="button" variant="outline">
                     <Sparkles className="h-4 w-4" />
-                    Сгенерировать
+                    {pendingImageTargetsCount > 0 ? `Сгенерировать (${pendingImageTargetsCount})` : "Сгенерировать"}
                   </Button>
                   {form.id ? (
                     <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
@@ -7100,17 +7111,16 @@ function materialDocumentBlocks(material: LessonMaterial): MaterialEditorBlock[]
   return editorDocumentFromJson(material.document, material.title).pages.flatMap((page) => page.blocks);
 }
 
-function countMaterialImageTargets(
+function countPendingMaterialImageTargets(
   document: MaterialEditorDocument,
-  options: { includeExisting?: boolean } = {},
+  assets: LessonMaterialAsset[] = [],
 ): number {
-  const includeExisting = options.includeExisting ?? false;
+  const assetsById = materialAssetsById(assets);
   return document.pages.reduce((total, page) => (
     total + page.blocks.reduce((pageTotal, block) => {
       if (
         block.type === "generatedImage" &&
-        Boolean(block.prompt?.trim()) &&
-        (includeExisting || !block.url?.trim())
+        materialImagePromptNeedsGeneration(block.url, block.prompt, assetsById)
       ) {
         return pageTotal + 1;
       }
@@ -7121,11 +7131,58 @@ function countMaterialImageTargets(
 
       return pageTotal + (block.pairs ?? []).filter((pair) => (
         materialMatchingPairTargetKind(pair) === "IMAGE" &&
-        (includeExisting || !pair.imageUrl?.trim()) &&
-        Boolean(pair.imagePrompt?.trim() || pair.imageAlt?.trim() || pair.right.trim())
+        materialImagePromptNeedsGeneration(pair.imageUrl, pair.imagePrompt, assetsById)
       )).length;
     }, 0)
   ), 0);
+}
+
+function materialAssetsById(assets: LessonMaterialAsset[]): Record<string, LessonMaterialAsset> {
+  return assets.reduce<Record<string, LessonMaterialAsset>>((result, asset) => {
+    result[asset.id] = asset;
+    return result;
+  }, {});
+}
+
+function materialImagePromptNeedsGeneration(
+  imageUrl: string | undefined,
+  prompt: string | undefined,
+  assetsById: Record<string, LessonMaterialAsset>,
+): boolean {
+  const cleanPrompt = normalizeMaterialImagePrompt(prompt);
+  if (!cleanPrompt) {
+    return false;
+  }
+
+  const cleanUrl = imageUrl?.trim() ?? "";
+  if (!cleanUrl) {
+    return true;
+  }
+
+  const assetId = materialAssetIdFromUrl(cleanUrl);
+  if (!assetId) {
+    return false;
+  }
+
+  const asset = assetsById[assetId];
+  if (!asset) {
+    return true;
+  }
+  if (asset.kind !== "GENERATED_IMAGE") {
+    return false;
+  }
+
+  return normalizeMaterialImagePrompt(materialAssetSourcePrompt(asset)) !== cleanPrompt;
+}
+
+function materialAssetSourcePrompt(asset: LessonMaterialAsset): string {
+  const metadata = asJsonObject(asset.metadata);
+  return asString(metadata.sourcePrompt) ||
+    asString(metadata.prompt).split("\n\nCreate a new original illustration")[0];
+}
+
+function normalizeMaterialImagePrompt(value: string | undefined): string {
+  return value?.trim().replace(/\s+/g, " ").toLowerCase() ?? "";
 }
 
 function materialMaxScore(rubric: LessonMaterialJson): number {

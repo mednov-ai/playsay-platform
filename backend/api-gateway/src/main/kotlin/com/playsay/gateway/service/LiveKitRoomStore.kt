@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.service
 
 import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
@@ -20,7 +20,7 @@ import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.jdbc.core.simple.JdbcClient
+import com.playsay.gateway.repo.LegacyJdbcDataRepo
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -28,14 +28,9 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
-
-data class LiveKitRoomTokenResponse(
-    val serverUrl: String,
-    val token: String,
-    val roomName: String,
-    val identity: String,
-    val expiresAt: Instant,
-)
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.error.ProjectResponseException
 
 private data class LiveKitLesson(
     val id: UUID,
@@ -55,7 +50,7 @@ class LiveKitTokenService(
         val cleanApiSecret = apiSecret.trim()
         val secretBytes = cleanApiSecret.toByteArray(StandardCharsets.UTF_8)
         if (cleanServerUrl.isEmpty() || cleanApiKey.isEmpty() || secretBytes.size < 32) {
-            throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "LiveKit is not configured.")
+            throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "LiveKit is not configured.")
         }
 
         val now = Instant.now()
@@ -101,13 +96,13 @@ class LiveKitTokenService(
 
 @Component
 class LiveKitRoomStore(
-    private val jdbcClient: JdbcClient,
+    private val dataRepo: LegacyJdbcDataRepo,
     private val tokenService: LiveKitTokenService,
 ) {
     @Transactional
     fun createToken(authentication: JwtAuthenticationToken, lessonId: UUID): LiveKitRoomTokenResponse {
         val lesson = findJoinableLesson(authentication, lessonId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
         val roomName = lesson.roomName?.trim()?.takeIf { room -> room.isNotEmpty() }
             ?: ensureRoomName(lesson.id)
 
@@ -144,7 +139,7 @@ class LiveKitRoomStore(
             params["subject"] = authentication.token.subject
         }
 
-        return jdbcClient.sql(
+        return dataRepo.sql(
             """
             SELECT l.id,
                    l.livekit_room_name
@@ -160,7 +155,7 @@ class LiveKitRoomStore(
 
     private fun ensureRoomName(lessonId: UUID): String {
         val roomName = "lesson-$lessonId"
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             UPDATE lesson
                SET livekit_room_name = :roomName,
@@ -176,38 +171,8 @@ class LiveKitRoomStore(
     }
 }
 
-@RestController
-@Tag(name = "Schedule")
-class LiveKitRoomController(
-    private val store: LiveKitRoomStore,
-) {
-    @PostMapping(
-        "/schedule/lessons/{lessonId}/room-token",
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
-    @Operation(
-        operationId = "createScheduledLessonRoomToken",
-        summary = "Create scheduled lesson video token",
-        description = "Returns a short-lived LiveKit join token for a scheduled lesson visible to the current user.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "LiveKit room token"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Scheduled lesson not found", content = [Content()]),
-            ApiResponse(responseCode = "503", description = "LiveKit is not configured", content = [Content()]),
-        ],
-    )
-    fun createToken(
-        authentication: JwtAuthenticationToken,
-        @PathVariable lessonId: UUID,
-    ): LiveKitRoomTokenResponse =
-        store.createToken(authentication, lessonId)
-}
-
 private fun JwtAuthenticationToken.canJoinAnyLiveKitLesson(): Boolean =
-    authorities.any { authority -> authority.authority == "ROLE_TEACHER" || authority.authority == "ROLE_ADMIN" }
+    authorities.any { authority -> authority.authority == MetaData.Authorities.TEACHER || authority.authority == MetaData.Authorities.ADMIN }
 
 private fun mapLiveKitLesson(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): LiveKitLesson =
     LiveKitLesson(

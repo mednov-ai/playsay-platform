@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.service
 
 import java.io.InputStream
 import java.net.IDN
@@ -16,6 +16,8 @@ import java.util.Locale
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ResponseStatusException
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.error.ProjectResponseException
 
 data class ImportedMaterialUrlContent(
     val requestedUrl: String,
@@ -45,18 +47,18 @@ class MaterialUrlImportService {
                 break
             }
             val redirectTarget = response.headers().firstValue("location").orElse(null)
-                ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "External URL redirected without a Location header.")
+                ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "External URL redirected without a Location header.")
             response.body().close()
             currentUri = validateImportUri(currentUri.resolve(redirectTarget).toString())
             if (redirectCount == materialUrlImportMaxRedirects) {
-                throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "External URL redirected too many times.")
+                throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "External URL redirected too many times.")
             }
         }
 
         val finalResponse = requireNotNull(response)
         if (finalResponse.statusCode() !in 200..299) {
             finalResponse.body().close()
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "External URL returned HTTP ${finalResponse.statusCode()}.")
+            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "External URL returned HTTP ${finalResponse.statusCode()}.")
         }
 
         val contentType = finalResponse.headers().firstValue("content-type").orElse(null)
@@ -65,7 +67,7 @@ class MaterialUrlImportService {
             mediaType in setOf("text/html", "application/xhtml+xml", "text/plain")
         if (!looksReadable) {
             finalResponse.body().close()
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL is not a readable HTML or text page.")
+            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL is not a readable HTML or text page.")
         }
 
         val bytes = finalResponse.body().use { body -> body.readLimitedBytes(materialUrlImportMaxBytes) }
@@ -78,7 +80,7 @@ class MaterialUrlImportService {
         }
 
         if (extracted.text.length < 40) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL did not contain enough readable text.")
+            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL did not contain enough readable text.")
         }
 
         return ImportedMaterialUrlContent(
@@ -104,7 +106,7 @@ class MaterialUrlImportService {
         return try {
             httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream())
         } catch (exception: Exception) {
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "External URL could not be read.")
+            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "External URL could not be read.")
         }
     }
 }
@@ -119,33 +121,33 @@ fun validateImportUri(rawUrl: String): URI {
     val uri = try {
         URI(rawUrl.trim())
     } catch (exception: Exception) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL is invalid.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL is invalid.")
     }
 
     val scheme = uri.scheme?.lowercase(Locale.ROOT)
     if (scheme !in setOf("http", "https") || uri.userInfo != null) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL must use http or https.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL must use http or https.")
     }
 
     val host = uri.host?.trim()?.trimEnd('.')?.takeIf { value -> value.isNotEmpty() }
-        ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL host is invalid.")
+        ?: throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL host is invalid.")
     val asciiHost = try {
         IDN.toASCII(host).lowercase(Locale.ROOT)
     } catch (exception: Exception) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL host is invalid.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL host is invalid.")
     }
 
     if (asciiHost == "localhost" || asciiHost.endsWith(".localhost") || asciiHost.endsWith(".local")) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL host is not allowed.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL host is not allowed.")
     }
 
     val addresses = try {
         InetAddress.getAllByName(asciiHost)
     } catch (exception: Exception) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL host could not be resolved.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL host could not be resolved.")
     }
     if (addresses.isEmpty() || addresses.any { address -> address.isPrivateImportAddress() }) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL host is not allowed.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL host is not allowed.")
     }
 
     return uri
@@ -183,7 +185,7 @@ fun extractPlainText(text: String): ExtractedMaterialUrlText =
 private fun InputStream.readLimitedBytes(maxBytes: Int): ByteArray {
     val bytes = readNBytes(maxBytes + 1)
     if (bytes.size > maxBytes) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "External URL content is too large.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "External URL content is too large.")
     }
     return bytes
 }

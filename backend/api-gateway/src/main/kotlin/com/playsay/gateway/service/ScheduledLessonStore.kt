@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.service
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -18,7 +18,7 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.jdbc.core.simple.JdbcClient
+import com.playsay.gateway.repo.LegacyJdbcDataRepo
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -30,45 +30,9 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
-
-data class ScheduledLessonRequest(
-    val lessonTemplateId: UUID? = null,
-    val materialId: UUID? = null,
-    val scheduledStart: Instant? = null,
-    val scheduledEnd: Instant? = null,
-    @field:Schema(allowableValues = ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
-    val status: String = "SCHEDULED",
-    @field:Schema(allowableValues = ["INDIVIDUAL", "GROUP"])
-    val type: String = "GROUP",
-    val participantSubjects: List<String> = emptyList(),
-)
-
-data class ScheduledLessonParticipantResponse(
-    val subject: String,
-    val username: String?,
-    val displayName: String?,
-    val attendanceStatus: String?,
-)
-
-data class ScheduledLessonResponse(
-    val id: UUID,
-    val lessonTemplateId: UUID?,
-    val materialId: UUID?,
-    val materialTitle: String?,
-    val courseId: UUID?,
-    val courseTitle: String?,
-    val lessonTitle: String?,
-    val teacherSubject: String?,
-    val teacherName: String?,
-    val scheduledStart: Instant?,
-    val scheduledEnd: Instant?,
-    val status: String,
-    val type: String,
-    val livekitRoomName: String?,
-    val participants: List<ScheduledLessonParticipantResponse>,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.error.ProjectResponseException
 
 private data class StoredScheduledLesson(
     val id: UUID,
@@ -100,7 +64,7 @@ private data class StoredLessonParticipant(
 
 @Component
 class ScheduledLessonStore(
-    private val jdbcClient: JdbcClient,
+    private val dataRepo: LegacyJdbcDataRepo,
     private val userProfileStore: UserProfileStore,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
@@ -125,7 +89,7 @@ class ScheduledLessonStore(
             """.trimIndent()
         }
 
-        return jdbcClient.sql(lessonSelect(whereClause))
+        return dataRepo.sql(lessonSelect(whereClause))
             .params(params)
             .query(::mapScheduledLesson)
             .list()
@@ -135,7 +99,7 @@ class ScheduledLessonStore(
     @Transactional(readOnly = true)
     fun get(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse =
         findVisible(authentication, lessonId)?.withParticipants()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
 
     @Transactional
     fun create(authentication: JwtAuthenticationToken, request: ScheduledLessonRequest): ScheduledLessonResponse {
@@ -148,7 +112,7 @@ class ScheduledLessonStore(
         val id = UUID.randomUUID()
         val now = Instant.now()
 
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             INSERT INTO lesson (
                 id,
@@ -203,13 +167,13 @@ class ScheduledLessonStore(
         request: ScheduledLessonRequest,
     ): ScheduledLessonResponse {
         authentication.requireScheduleManager()
-        find(lessonId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+        find(lessonId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
         val values = request.validated()
         validateLessonTemplate(values.lessonTemplateId)
         validateMaterialId(authentication, values.materialId)
         val participantIds = participantIds(values.participantSubjects)
 
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             UPDATE lesson
                SET lesson_template_id = :lessonTemplateId,
@@ -241,12 +205,12 @@ class ScheduledLessonStore(
     @Transactional
     fun delete(authentication: JwtAuthenticationToken, lessonId: UUID) {
         authentication.requireScheduleManager()
-        val deleted = jdbcClient.sql("DELETE FROM lesson WHERE id = :lessonId")
+        val deleted = dataRepo.sql("DELETE FROM lesson WHERE id = :lessonId")
             .param("lessonId", lessonId)
             .update()
 
         if (deleted == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
         }
 
         eventPublisher.publishEvent(LessonDeletedEvent(lessonId))
@@ -262,7 +226,7 @@ class ScheduledLessonStore(
             return null
         }
 
-        val isParticipant = jdbcClient.sql(
+        val isParticipant = dataRepo.sql(
             """
             SELECT COUNT(*)
               FROM lesson_participant lp
@@ -280,7 +244,7 @@ class ScheduledLessonStore(
     }
 
     private fun find(lessonId: UUID): StoredScheduledLesson? =
-        jdbcClient.sql(lessonSelect("WHERE l.id = :lessonId"))
+        dataRepo.sql(lessonSelect("WHERE l.id = :lessonId"))
             .param("lessonId", lessonId)
             .query(::mapScheduledLesson)
             .optional()
@@ -303,7 +267,7 @@ class ScheduledLessonStore(
             return emptyList()
         }
 
-        return jdbcClient.sql(
+        return dataRepo.sql(
             """
             SELECT lp.lesson_id,
                    lp.student_user_id,
@@ -328,7 +292,7 @@ class ScheduledLessonStore(
             return emptyList()
         }
 
-        val users = jdbcClient.sql(
+        val users = dataRepo.sql(
             """
             SELECT id, keycloak_subject
               FROM app_user
@@ -342,19 +306,19 @@ class ScheduledLessonStore(
 
         val missingSubjects = cleanedSubjects.filter { subject -> subject !in users }
         if (missingSubjects.isNotEmpty()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown participant subject: ${missingSubjects.first()}.")
+            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unknown participant subject: ${missingSubjects.first()}.")
         }
 
         return cleanedSubjects.map { subject -> requireNotNull(users[subject]) }
     }
 
     private fun replaceParticipants(lessonId: UUID, participantIds: List<UUID>) {
-        jdbcClient.sql("DELETE FROM lesson_participant WHERE lesson_id = :lessonId")
+        dataRepo.sql("DELETE FROM lesson_participant WHERE lesson_id = :lessonId")
             .param("lessonId", lessonId)
             .update()
 
         participantIds.forEach { participantId ->
-            jdbcClient.sql(
+            dataRepo.sql(
                 """
                 INSERT INTO lesson_participant (
                     id,
@@ -382,13 +346,13 @@ class ScheduledLessonStore(
             return
         }
 
-        val exists = jdbcClient.sql("SELECT COUNT(*) FROM lesson_template WHERE id = :lessonTemplateId")
+        val exists = dataRepo.sql("SELECT COUNT(*) FROM lesson_template WHERE id = :lessonTemplateId")
             .param("lessonTemplateId", lessonTemplateId)
             .query(Int::class.java)
             .single() > 0
 
         if (!exists) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "lessonTemplateId does not exist.")
+            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "lessonTemplateId does not exist.")
         }
     }
 
@@ -410,7 +374,7 @@ class ScheduledLessonStore(
             """.trimIndent()
         }
 
-        val exists = jdbcClient.sql(
+        val exists = dataRepo.sql(
             """
             SELECT COUNT(*)
               FROM lesson_material
@@ -424,7 +388,7 @@ class ScheduledLessonStore(
             .single() > 0
 
         if (!exists) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
+            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
         }
     }
 
@@ -458,123 +422,6 @@ class ScheduledLessonStore(
         """.trimIndent()
 }
 
-@RestController
-@Tag(name = "Schedule")
-class ScheduledLessonController(
-    private val store: ScheduledLessonStore,
-) {
-    @GetMapping("/schedule/lessons", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(
-        operationId = "listScheduledLessons",
-        summary = "List scheduled lessons",
-        description = "Returns scheduled lessons. Teachers/admins see all, students see lessons where they are participants.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Scheduled lessons"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-        ],
-    )
-    fun list(authentication: JwtAuthenticationToken): List<ScheduledLessonResponse> =
-        store.list(authentication)
-
-    @GetMapping("/schedule/lessons/{lessonId}", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(
-        operationId = "getScheduledLesson",
-        summary = "Get scheduled lesson",
-        description = "Returns a scheduled lesson visible to the current user.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Scheduled lesson"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Scheduled lesson not found", content = [Content()]),
-        ],
-    )
-    fun get(
-        authentication: JwtAuthenticationToken,
-        @PathVariable lessonId: UUID,
-    ): ScheduledLessonResponse =
-        store.get(authentication, lessonId)
-
-    @PostMapping(
-        "/schedule/lessons",
-        consumes = [MediaType.APPLICATION_JSON_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
-    @Operation(
-        operationId = "createScheduledLesson",
-        summary = "Create scheduled lesson",
-        description = "Creates a calendar lesson. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "201", description = "Scheduled lesson created"),
-            ApiResponse(responseCode = "400", description = "Invalid scheduled lesson payload", content = [Content()]),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage schedule", content = [Content()]),
-        ],
-    )
-    fun create(
-        authentication: JwtAuthenticationToken,
-        @RequestBody request: ScheduledLessonRequest,
-    ): ResponseEntity<ScheduledLessonResponse> =
-        ResponseEntity.status(HttpStatus.CREATED).body(store.create(authentication, request))
-
-    @PutMapping(
-        "/schedule/lessons/{lessonId}",
-        consumes = [MediaType.APPLICATION_JSON_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
-    @Operation(
-        operationId = "updateScheduledLesson",
-        summary = "Update scheduled lesson",
-        description = "Updates a calendar lesson. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Scheduled lesson updated"),
-            ApiResponse(responseCode = "400", description = "Invalid scheduled lesson payload", content = [Content()]),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage schedule", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Scheduled lesson not found", content = [Content()]),
-        ],
-    )
-    fun update(
-        authentication: JwtAuthenticationToken,
-        @PathVariable lessonId: UUID,
-        @RequestBody request: ScheduledLessonRequest,
-    ): ScheduledLessonResponse =
-        store.update(authentication, lessonId, request)
-
-    @DeleteMapping("/schedule/lessons/{lessonId}")
-    @Operation(
-        operationId = "deleteScheduledLesson",
-        summary = "Delete scheduled lesson",
-        description = "Deletes a calendar lesson. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "204", description = "Scheduled lesson deleted"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage schedule", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Scheduled lesson not found", content = [Content()]),
-        ],
-    )
-    fun delete(
-        authentication: JwtAuthenticationToken,
-        @PathVariable lessonId: UUID,
-    ): ResponseEntity<Void> {
-        store.delete(authentication, lessonId)
-        return ResponseEntity.noContent().build()
-    }
-}
-
 private data class ValidatedScheduledLessonRequest(
     val lessonTemplateId: UUID?,
     val materialId: UUID?,
@@ -587,17 +434,17 @@ private data class ValidatedScheduledLessonRequest(
 
 private fun ScheduledLessonRequest.validated(): ValidatedScheduledLessonRequest {
     if (scheduledStart != null && scheduledEnd != null && !scheduledEnd.isAfter(scheduledStart)) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "scheduledEnd must be after scheduledStart.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "scheduledEnd must be after scheduledStart.")
     }
 
     val cleanedStatus = status.trim().uppercase()
     if (cleanedStatus !in scheduleStatuses) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported lesson status.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unsupported lesson status.")
     }
 
     val cleanedType = type.trim().uppercase()
     if (cleanedType !in scheduleTypes) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported lesson type.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unsupported lesson type.")
     }
 
     return ValidatedScheduledLessonRequest(
@@ -613,15 +460,15 @@ private fun ScheduledLessonRequest.validated(): ValidatedScheduledLessonRequest 
 
 private fun JwtAuthenticationToken.requireScheduleManager() {
     if (!canManageSchedule()) {
-        throw ResponseStatusException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
+        throw ProjectResponseException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
     }
 }
 
 private fun JwtAuthenticationToken.canManageSchedule(): Boolean =
-    authorities.any { authority -> authority.authority == "ROLE_TEACHER" || authority.authority == "ROLE_ADMIN" }
+    authorities.any { authority -> authority.authority == MetaData.Authorities.TEACHER || authority.authority == MetaData.Authorities.ADMIN }
 
 private fun JwtAuthenticationToken.isScheduleAdmin(): Boolean =
-    authorities.any { authority -> authority.authority == "ROLE_ADMIN" }
+    authorities.any { authority -> authority.authority == MetaData.Authorities.ADMIN }
 
 private fun StoredScheduledLesson.toResponse(participants: List<StoredLessonParticipant>): ScheduledLessonResponse =
     ScheduledLessonResponse(

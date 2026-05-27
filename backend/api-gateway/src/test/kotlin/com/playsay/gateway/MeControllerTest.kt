@@ -1,5 +1,8 @@
 package com.playsay.gateway
 
+import com.playsay.gateway.controller.*
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.service.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.springframework.security.core.authority.SimpleGrantedAuthority

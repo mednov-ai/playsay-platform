@@ -2,7 +2,7 @@ package com.playsay.gateway.realtime
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.playsay.gateway.ScheduledLessonStore
+import com.playsay.gateway.service.ScheduledLessonStore
 import java.util.UUID
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
@@ -12,6 +12,7 @@ import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import org.springframework.web.server.ResponseStatusException
+import com.playsay.gateway.utils.MetaData
 
 @Component
 class LessonRealtimeWebSocketHandler(
@@ -33,7 +34,7 @@ class LessonRealtimeWebSocketHandler(
             LessonRealtimePrincipal(
                 subject = authentication.token.subject,
                 roles = authentication.authorities.mapNotNull { authority ->
-                    authority.authority?.removePrefix("ROLE_")?.takeIf { it in applicationRoles }
+                    authority.authority?.removePrefix(MetaData.Authorities.PREFIX)?.takeIf { it in applicationRoles }
                 }.toSet(),
             ),
         )
@@ -92,7 +93,7 @@ class LessonRealtimeWebSocketHandler(
         attributes[authenticationAttribute] as? JwtAuthenticationToken
 
     private companion object {
-        val applicationRoles = setOf("STUDENT", "TEACHER", "ADMIN")
+        val applicationRoles = setOf("STUDENT", MetaData.Roles.TEACHER, MetaData.Roles.ADMIN)
     }
 }
 

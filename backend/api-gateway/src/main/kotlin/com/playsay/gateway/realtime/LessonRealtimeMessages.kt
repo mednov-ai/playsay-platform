@@ -1,9 +1,10 @@
 package com.playsay.gateway.realtime
 
 import com.fasterxml.jackson.annotation.JsonInclude
-import com.playsay.gateway.ScheduledLessonResponse
+import com.playsay.gateway.dto.ScheduledLessonResponse
 import java.time.Instant
 import java.util.UUID
+import com.playsay.gateway.utils.MetaData
 
 data class LessonRealtimeInboundMessage(
     val type: String? = null,
@@ -23,7 +24,7 @@ data class LessonRealtimePrincipal(
     val roles: Set<String>,
 ) {
     fun canSee(lesson: ScheduledLessonResponse, now: Instant = Instant.now()): Boolean {
-        if (roles.any { role -> role == "TEACHER" || role == "ADMIN" }) {
+        if (roles.any { role -> role == MetaData.Roles.TEACHER || role == MetaData.Roles.ADMIN }) {
             return true
         }
 

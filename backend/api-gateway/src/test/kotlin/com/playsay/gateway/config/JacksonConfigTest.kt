@@ -2,8 +2,8 @@ package com.playsay.gateway.config
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.playsay.gateway.LessonMaterialDraftResponse
-import com.playsay.gateway.ScheduledLessonResponse
+import com.playsay.gateway.dto.LessonMaterialDraftResponse
+import com.playsay.gateway.dto.ScheduledLessonResponse
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test

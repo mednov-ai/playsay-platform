@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    kotlin("plugin.jpa")
     kotlin("plugin.spring")
     id("org.springframework.boot")
     id("io.spring.dependency-management")
@@ -12,6 +13,7 @@ kotlin {
 dependencies {
     implementation(project(":shared-kotlin"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-jackson")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")

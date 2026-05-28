@@ -187,9 +187,9 @@ class LessonMaterialStore(
     @Transactional
     fun get(authentication: JwtAuthenticationToken, materialId: UUID): LessonMaterialResponse {
         val currentUserId = authentication.currentUserIdIfNeeded()
-        val material = find(materialId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         if (!material.canRead(authentication, currentUserId)) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         }
         return material.toResponse(objectMapper)
     }
@@ -259,7 +259,7 @@ class LessonMaterialStore(
         materialId: UUID,
         request: LessonMaterialRequest,
     ): LessonMaterialResponse {
-        val material = find(materialId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
             throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit this material.")
@@ -300,7 +300,7 @@ class LessonMaterialStore(
 
     @Transactional
     fun archive(authentication: JwtAuthenticationToken, materialId: UUID) {
-        val material = find(materialId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
             throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can archive this material.")
@@ -343,19 +343,19 @@ class LessonMaterialStore(
             }
             .optional()
             .orElse(null)
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
         if (!authentication.canManageMaterials() && !lesson.isVisibleToParticipant(Instant.now())) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
         if (!authentication.canManageMaterials() && !isLessonParticipant(lessonId, authentication.token.subject)) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
-        val materialId = lesson.materialId ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val materialId = lesson.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val material = find(materialId)?.takeIf { it.status != "ARCHIVED" }
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         return material.toResponse(objectMapper)
     }
 
@@ -365,9 +365,9 @@ class LessonMaterialStore(
         lessonId: UUID,
     ): MaterialSubmissionResponse {
         val lookup = accessibleScheduledMaterial(authentication, lessonId)
-        val materialId = lookup.materialId ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val materialId = lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val material = find(materialId)?.takeIf { it.status != "ARCHIVED" }
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val userId = userProfileStore.currentUserId(authentication)
         val assignmentId = findOrCreateMaterialSubmissionAssignment(lessonId, material)
         val submission = findMaterialSubmission(assignmentId, lessonId, userId)
@@ -382,7 +382,7 @@ class LessonMaterialStore(
     ): List<MaterialSubmissionResponse> {
         authentication.requireMaterialManager()
         val lookup = accessibleScheduledMaterial(authentication, lessonId)
-        val materialId = lookup.materialId ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val materialId = lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val assignmentId = findMaterialSubmissionAssignment(lessonId, materialId) ?: return emptyList()
 
         return dataRepo.sql(
@@ -422,9 +422,9 @@ class LessonMaterialStore(
         request: MaterialSubmissionRequest,
     ): MaterialSubmissionResponse {
         val lookup = accessibleScheduledMaterial(authentication, lessonId)
-        val materialId = lookup.materialId ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val materialId = lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val material = find(materialId)?.takeIf { it.status != "ARCHIVED" }
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         validateJsonSize("content", request.content, objectMapper, 1_000_000)
 
         val userId = userProfileStore.currentUserId(authentication)
@@ -510,9 +510,9 @@ class LessonMaterialStore(
         lessonId: UUID,
     ): MaterialAnnotationResponse {
         val lookup = accessibleScheduledMaterial(authentication, lessonId)
-        val materialId = lookup.materialId ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val materialId = lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         find(materialId)?.takeIf { it.status != "ARCHIVED" }
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val annotation = findMaterialAnnotation(lessonId, materialId)
             ?: createEmptyMaterialAnnotation(lessonId, materialId)
         return annotation.toResponse(objectMapper)
@@ -525,9 +525,9 @@ class LessonMaterialStore(
         request: MaterialAnnotationRequest,
     ): MaterialAnnotationResponse {
         val lookup = accessibleScheduledMaterial(authentication, lessonId)
-        val materialId = lookup.materialId ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val materialId = lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         find(materialId)?.takeIf { it.status != "ARCHIVED" }
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         validateJsonSize("content", request.content, objectMapper, 1_000_000)
 
         val existing = findMaterialAnnotation(lessonId, materialId)
@@ -814,7 +814,7 @@ class LessonMaterialStore(
         materialId: UUID,
         request: MaterialGenerateImagesRequest,
     ): LessonMaterialResponse {
-        val material = find(materialId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
             throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit generated images.")
@@ -866,12 +866,12 @@ class LessonMaterialStore(
 
     @Transactional
     fun listAssets(authentication: JwtAuthenticationToken, materialId: UUID): List<MaterialAssetResponse> {
-        val material = find(materialId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         val canRead = material.canRead(authentication, currentUserId) ||
             isActiveMaterialParticipant(materialId, authentication.token.subject, Instant.now())
         if (!canRead) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         }
         return dataRepo.sql(
             """
@@ -896,12 +896,12 @@ class LessonMaterialStore(
 
     @Transactional
     fun assetContent(authentication: JwtAuthenticationToken, materialId: UUID, assetId: UUID): ResponseEntity<ByteArray> {
-        val material = find(materialId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         val canRead = material.canRead(authentication, currentUserId) ||
             isActiveMaterialParticipant(materialId, authentication.token.subject, Instant.now())
         if (!canRead) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         }
         val asset = findAsset(assetId)
             ?.takeIf { found -> found.materialId == materialId }
@@ -926,7 +926,7 @@ class LessonMaterialStore(
 
     @Transactional
     fun updateAsset(authentication: JwtAuthenticationToken, materialId: UUID, assetId: UUID, request: MaterialAssetUpdateRequest): MaterialAssetResponse {
-        val material = find(materialId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
             throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit assets.")
@@ -1188,18 +1188,18 @@ class LessonMaterialStore(
 
     private fun accessibleScheduledMaterial(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledMaterialLookup {
         val lookup = scheduledMaterialLookup(lessonId)
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
         if (!authentication.canManageMaterials() && !lookup.isVisibleToParticipant(Instant.now())) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
         if (!authentication.canManageMaterials() && !isLessonParticipant(lessonId, authentication.token.subject)) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
         if (lookup.materialId == null) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         }
         return lookup
     }
@@ -2141,7 +2141,7 @@ private fun mapMaterialAnnotation(rs: ResultSet, @Suppress("UNUSED_PARAMETER") r
 
 private fun JwtAuthenticationToken.requireMaterialManager() {
     if (!canManageMaterials()) {
-        throw ProjectResponseException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
+        throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED)
     }
 }
 

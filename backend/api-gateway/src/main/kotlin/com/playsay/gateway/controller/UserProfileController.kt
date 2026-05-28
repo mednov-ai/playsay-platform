@@ -108,7 +108,7 @@ class UserProfileController(
     )
     fun list(authentication: JwtAuthenticationToken): List<UserProfileResponse> {
         if (authentication.authorities.none { authority -> authority.authority == MetaData.Authorities.ADMIN }) {
-            throw ProjectResponseException(HttpStatus.FORBIDDEN, "ADMIN role is required.")
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.ADMIN_ROLE_REQUIRED)
         }
         return store.list()
     }
@@ -131,7 +131,10 @@ class UserProfileController(
         if (authentication.authorities.none { authority ->
             authority.authority == MetaData.Authorities.TEACHER || authority.authority == MetaData.Authorities.ADMIN
         }) {
-            throw ProjectResponseException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
+            throw ProjectResponseException.localized(
+                HttpStatus.FORBIDDEN,
+                MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED,
+            )
         }
         return store.listStudents()
     }

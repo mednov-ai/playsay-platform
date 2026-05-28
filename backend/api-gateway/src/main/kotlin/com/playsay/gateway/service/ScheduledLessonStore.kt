@@ -99,7 +99,7 @@ class ScheduledLessonStore(
     @Transactional(readOnly = true)
     fun get(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse =
         findVisible(authentication, lessonId)?.withParticipants()
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
     @Transactional
     fun create(authentication: JwtAuthenticationToken, request: ScheduledLessonRequest): ScheduledLessonResponse {
@@ -167,7 +167,7 @@ class ScheduledLessonStore(
         request: ScheduledLessonRequest,
     ): ScheduledLessonResponse {
         authentication.requireScheduleManager()
-        find(lessonId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+        find(lessonId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         val values = request.validated()
         validateLessonTemplate(values.lessonTemplateId)
         validateMaterialId(authentication, values.materialId)
@@ -210,7 +210,7 @@ class ScheduledLessonStore(
             .update()
 
         if (deleted == 0) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
         eventPublisher.publishEvent(LessonDeletedEvent(lessonId))
@@ -460,7 +460,7 @@ private fun ScheduledLessonRequest.validated(): ValidatedScheduledLessonRequest 
 
 private fun JwtAuthenticationToken.requireScheduleManager() {
     if (!canManageSchedule()) {
-        throw ProjectResponseException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
+        throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED)
     }
 }
 

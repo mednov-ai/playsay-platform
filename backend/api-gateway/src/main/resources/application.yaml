@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: api-gateway
+  messages:
+    fallback-to-system-locale: false
   datasource:
     url: ${PLAYSAY_DB_JDBC_URL:jdbc:postgresql://playsay-postgres-rw.playsay-data.svc.cluster.local:5432/playsay}
     username: ${PLAYSAY_DB_USERNAME:playsay_app}

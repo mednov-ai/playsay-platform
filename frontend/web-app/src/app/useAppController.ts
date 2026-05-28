@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { type WorkspaceTab, workspaceTabsForProfile } from "../entities/workspace/model";
 import { compareJoinableLessons, isJoinableScheduledLesson, type CourseLessonMap } from "../entities/schedule/model";
 import {
+  ApiError,
   archiveMaterial,
   buildLogoutUrl,
   clearTokens,
@@ -420,7 +421,11 @@ export function useAppController(): AppShellProps {
 
   function applySessionError(caught: unknown, fallback: string): string {
     const message = caught instanceof Error ? caught.message : fallback;
-    if (message.includes("Not authenticated") || message.includes("HTTP 401")) {
+    if (
+      (caught instanceof ApiError && caught.status === 401) ||
+      message.includes("Not authenticated") ||
+      message.includes("HTTP 401")
+    ) {
       clearTokens();
       setProfile(null);
       setAppProfile(null);

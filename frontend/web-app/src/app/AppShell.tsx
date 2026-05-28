@@ -33,6 +33,7 @@ import type { LessonRoomSession } from "../features/classroom";
 import { MaterialLibraryPanel } from "../features/materials/ui/MaterialLibraryPanel";
 import { LiveLessonExperience } from "../features/classroom/ui/LiveLessonExperience";
 import { useAppTranslation } from "../shared/i18n";
+import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -173,6 +174,11 @@ export function AppShell(props: AppShellProps) {
           <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <BrandMark />
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <LanguageSwitcher
+                disabled={profileSaving}
+                onSaveProfile={isAuthenticated ? saveProfile : undefined}
+                profile={appProfile}
+              />
               {isAuthenticated ? (
                 <>
                   <Button

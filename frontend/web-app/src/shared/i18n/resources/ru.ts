@@ -15,6 +15,7 @@ export const ru = {
       error: "Ошибка",
       unavailable: "Недоступно",
     },
+    language: "Язык",
   },
   auth: {
     login: "Войти",

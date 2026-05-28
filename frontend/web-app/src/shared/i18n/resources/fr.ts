@@ -15,6 +15,7 @@ export const fr = {
       error: "Erreur",
       unavailable: "Indisponible",
     },
+    language: "Langue",
   },
   auth: {
     login: "Se connecter",

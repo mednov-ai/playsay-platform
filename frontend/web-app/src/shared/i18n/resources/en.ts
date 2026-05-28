@@ -15,6 +15,7 @@ export const en = {
       error: "Error",
       unavailable: "Unavailable",
     },
+    language: "Language",
   },
   auth: {
     login: "Sign in",

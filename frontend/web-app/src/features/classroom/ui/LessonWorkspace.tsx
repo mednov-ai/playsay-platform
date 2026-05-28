@@ -1,0 +1,178 @@
+import { BookOpen, Clock3, Loader2, Plus, Users } from "lucide-react";
+import { Button } from "../../../components/ui/button";
+import { canAssignLessons } from "../../../entities/workspace/model";
+import { formatLessonRange, formatParticipantCount } from "../../../entities/schedule/model";
+import {
+  type LessonMaterial,
+  type MeProfile,
+  type ScheduledLesson,
+} from "../../../shared/api/playsay";
+import { useLessonMaterial } from "../hooks/useLessonMaterial";
+import { useLessonSubmission } from "../hooks/useLessonSubmission";
+import type { LessonRoomSession } from "../model/session";
+import {
+  AssignmentStub,
+  averageSubmissionScore,
+  materialBlockLabel,
+  materialDocumentBlocks,
+} from "../../materials";
+import { LessonTaskCanvas } from "./LessonTaskCanvas";
+import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
+
+export function LessonWorkspace({
+  displayName,
+  materials,
+  onAssignMaterial,
+  profile,
+  session,
+}: {
+  displayName: string;
+  materials: LessonMaterial[];
+  onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
+  profile: MeProfile | null;
+  session: LessonRoomSession;
+}) {
+  const {
+    assigningMaterial,
+    assignmentMessage,
+    assignMaterial,
+    material,
+    materialError,
+    materialLoading,
+    selectedMaterialId,
+    setSelectedMaterialId,
+  } = useLessonMaterial({ onAssignMaterial, session });
+  const canMonitorSubmissions = canAssignLessons(profile);
+  const canManageMaterial = canAssignLessons(profile);
+  const {
+    saveMaterialAnswers,
+    submission,
+    submissionMessage,
+    submissionMonitorError,
+    submissionSaving,
+    submissionSnapshots,
+  } = useLessonSubmission({ canMonitorSubmissions, material, session });
+  const selectableMaterials = materials.filter((item) => item.status !== "ARCHIVED");
+  const lessonScore = canMonitorSubmissions ? averageSubmissionScore(submissionSnapshots) : submission?.score ?? null;
+
+  return (
+    <section className="playsay-workbench">
+      <header className="playsay-workbench-topbar">
+        <nav className="playsay-lesson-tabs" aria-label="Разделы урока">
+          <button className="playsay-lesson-tab" data-active="true" type="button">
+            Урок
+          </button>
+        </nav>
+
+        <div className="playsay-workbench-tools">
+          {canManageMaterial ? (
+            <div className="playsay-lesson-material-picker">
+              <select
+                className="playsay-input"
+                disabled={assigningMaterial || selectableMaterials.length === 0}
+                onChange={(event) => setSelectedMaterialId(event.target.value)}
+                value={selectedMaterialId}
+              >
+                <option value="">Материал не выбран</option>
+                {selectableMaterials.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+              <Button
+                disabled={assigningMaterial || selectedMaterialId === (session.materialId ?? "")}
+                onClick={() => void assignMaterial()}
+                type="button"
+                variant="outline"
+              >
+                {assigningMaterial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Назначить
+              </Button>
+            </div>
+          ) : null}
+          <div className="playsay-lesson-statusline">
+            <span className="inline-flex items-center gap-1.5">
+              <Clock3 className="h-4 w-4 text-primary" />
+              {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="h-4 w-4 text-primary" />
+              {formatParticipantCount(session.participants.length)}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <div className="playsay-workbench-body">
+
+        {assignmentMessage ? (
+          <div className="playsay-lesson-inline-message">
+            {assignmentMessage}
+          </div>
+        ) : null}
+
+        {material ? (
+          <div className="playsay-assignment-strip" aria-label="Назначенные задания">
+            {materialDocumentBlocks(material).slice(0, 6).map((block, index) => (
+              <AssignmentStub
+                active={index === 0}
+                key={block.id}
+                tag={materialBlockLabel(block.type)}
+                title={block.title}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="playsay-assignment-strip" aria-label="Назначенные задания">
+            <AssignmentStub active title="Материал не назначен" tag="Урок" />
+          </div>
+        )}
+
+        {canMonitorSubmissions && material ? (
+          <MaterialSubmissionsMonitor error={submissionMonitorError} submissions={submissionSnapshots} />
+        ) : null}
+
+        {materialLoading ? (
+          <div className="playsay-task-board playsay-material-loading">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span>Материал загружается</span>
+          </div>
+        ) : material ? (
+          <LessonTaskCanvas
+            lessonId={session.lessonId}
+            material={material}
+            onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+            score={lessonScore}
+            submission={submission}
+            submissionMessage={submissionMessage}
+            submissionSaving={submissionSaving}
+            teacherName={session.teacherName ?? displayName}
+          />
+        ) : canManageMaterial ? (
+          <div className="playsay-task-board playsay-material-loading">
+            <BookOpen className="h-5 w-5 text-primary" />
+            <span>Выберите материал для урока</span>
+          </div>
+        ) : (
+          <>
+            {materialError ? (
+              <div className="mb-2 rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+                {materialError}
+              </div>
+            ) : null}
+            <LessonTaskCanvas
+              lessonId={session.lessonId}
+              onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              score={lessonScore}
+              submission={submission}
+              submissionMessage={submissionMessage}
+              submissionSaving={submissionSaving}
+              teacherName={session.teacherName ?? displayName}
+            />
+          </>
+        )}
+      </div>
+    </section>
+  );
+}

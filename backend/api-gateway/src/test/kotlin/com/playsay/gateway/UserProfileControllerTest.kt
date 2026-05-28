@@ -2,6 +2,7 @@ package com.playsay.gateway
 
 import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
+import com.playsay.gateway.repo.*
 import com.playsay.gateway.service.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpStatus
-import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -33,7 +33,7 @@ import liquibase.integration.spring.SpringLiquibase
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UserProfileControllerTest @Autowired constructor(
     private val controller: UserProfileController,
-    private val jdbcClient: JdbcClient,
+    private val appUserRepo: AppUserRepo,
     private val dataSource: DataSource,
 ) {
     @BeforeAll
@@ -46,7 +46,7 @@ class UserProfileControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
-        jdbcClient.sql("DELETE FROM app_user").update()
+        appUserRepo.deleteAllInBatch()
     }
 
     @Test
@@ -92,16 +92,19 @@ class UserProfileControllerTest @Autowired constructor(
     fun `admin can list known profiles`() {
         controller.current(authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT"))
         controller.current(authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER"))
+        val admin = authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN")
+        controller.current(admin)
 
-        val users = controller.list(authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN"))
+        val users = controller.list(admin)
 
-        assertEquals(listOf("student.one", "teacher.one"), users.map { user -> user.username })
+        assertEquals(listOf("admin.one", "student.one", "teacher.one"), users.map { user -> user.username })
     }
 
     @Test
     fun `teacher can list known student profiles`() {
         controller.current(authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT"))
         controller.current(authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER"))
+        controller.current(authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN"))
 
         val users = controller.listStudents(authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER"))
 

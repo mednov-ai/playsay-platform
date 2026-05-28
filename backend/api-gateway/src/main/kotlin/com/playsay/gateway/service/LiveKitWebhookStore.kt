@@ -5,29 +5,20 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.SignedJWT
-import io.swagger.v3.oas.annotations.Hidden
+import com.playsay.gateway.dto.LiveKitWebhookEvent
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.repo.LessonParticipantRepo
+import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.utils.MetaData
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.util.Base64
 import java.util.Date
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
-import org.springframework.http.ResponseEntity
-import com.playsay.gateway.repo.LegacyJdbcDataRepo
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
-import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
-import com.playsay.gateway.dto.*
-import com.playsay.gateway.error.ProjectResponseException
 
 @Component
 class LiveKitWebhookVerifier(
@@ -78,7 +69,8 @@ class LiveKitWebhookVerifier(
 
 @Component
 class LiveKitWebhookAttendanceStore(
-    private val dataRepo: LegacyJdbcDataRepo,
+    private val lessonRepo: LessonRepo,
+    private val lessonParticipantRepo: LessonParticipantRepo,
 ) {
     @Transactional
     fun record(event: LiveKitWebhookEvent) {
@@ -93,43 +85,22 @@ class LiveKitWebhookAttendanceStore(
         val identity = event.participantIdentity() ?: return
         val seenAt = event.seenAt()
 
-        dataRepo.sql(
-            """
-            UPDATE lesson
-               SET actual_start = COALESCE(actual_start, :seenAt),
-                   status = CASE WHEN status = 'SCHEDULED' THEN 'IN_PROGRESS' ELSE status END,
-                   updated_at = :seenAt
-             WHERE livekit_room_name = :roomName
-            """.trimIndent(),
-        )
-            .param("seenAt", seenAt.toOffsetDateTime())
-            .param("roomName", roomName)
-            .update()
+        val lesson = lessonRepo.findByLivekitRoomName(roomName)
+        if (lesson != null) {
+            lesson.actualStart = lesson.actualStart ?: seenAt
+            if (lesson.status == MetaData.LessonStatuses.SCHEDULED) {
+                lesson.status = MetaData.LessonStatuses.IN_PROGRESS
+            }
+            lesson.updatedAt = seenAt
+            lessonRepo.save(lesson)
+        }
 
-        dataRepo.sql(
-            """
-            UPDATE lesson_participant lp
-               SET joined_at = COALESCE(lp.joined_at, :seenAt),
-                   attendance_status = CASE
-                       WHEN lp.attendance_status IS NULL OR lp.attendance_status = 'PLANNED' THEN 'PRESENT'
-                       ELSE lp.attendance_status
-                   END
-             WHERE lp.lesson_id = (
-                   SELECT l.id
-                     FROM lesson l
-                    WHERE l.livekit_room_name = :roomName
-             )
-               AND lp.student_user_id = (
-                   SELECT student.id
-                     FROM app_user student
-                    WHERE student.keycloak_subject = :identity
-             )
-            """.trimIndent(),
-        )
-            .param("seenAt", seenAt.toOffsetDateTime())
-            .param("roomName", roomName)
-            .param("identity", identity)
-            .update()
+        val participant = lessonParticipantRepo.findByRoomNameAndStudentSubject(roomName, identity) ?: return
+        participant.joinedAt = participant.joinedAt ?: seenAt
+        if (participant.attendanceStatus == null || participant.attendanceStatus == MetaData.AttendanceStatuses.PLANNED) {
+            participant.attendanceStatus = MetaData.AttendanceStatuses.PRESENT
+        }
+        lessonParticipantRepo.save(participant)
     }
 
     private fun recordParticipantLeft(event: LiveKitWebhookEvent) {
@@ -137,26 +108,9 @@ class LiveKitWebhookAttendanceStore(
         val identity = event.participantIdentity() ?: return
         val seenAt = event.seenAt()
 
-        dataRepo.sql(
-            """
-            UPDATE lesson_participant lp
-               SET left_at = :seenAt
-             WHERE lp.lesson_id = (
-                   SELECT l.id
-                     FROM lesson l
-                    WHERE l.livekit_room_name = :roomName
-             )
-               AND lp.student_user_id = (
-                   SELECT student.id
-                     FROM app_user student
-                    WHERE student.keycloak_subject = :identity
-             )
-            """.trimIndent(),
-        )
-            .param("seenAt", seenAt.toOffsetDateTime())
-            .param("roomName", roomName)
-            .param("identity", identity)
-            .update()
+        val participant = lessonParticipantRepo.findByRoomNameAndStudentSubject(roomName, identity) ?: return
+        participant.leftAt = seenAt
+        lessonParticipantRepo.save(participant)
     }
 }
 
@@ -168,6 +122,3 @@ private fun LiveKitWebhookEvent.participantIdentity(): String? =
 
 private fun LiveKitWebhookEvent.seenAt(): Instant =
     createdAt?.let { value -> Instant.ofEpochSecond(value) } ?: Instant.now()
-
-private fun Instant.toOffsetDateTime(): OffsetDateTime =
-    atOffset(ZoneOffset.UTC)

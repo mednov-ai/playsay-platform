@@ -2,6 +2,7 @@ package com.playsay.gateway
 
 import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
+import com.playsay.gateway.repo.*
 import com.playsay.gateway.service.*
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
@@ -11,7 +12,6 @@ import com.nimbusds.jwt.SignedJWT
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Instant
-import java.time.OffsetDateTime
 import java.util.Base64
 import java.util.Date
 import java.util.UUID
@@ -25,7 +25,6 @@ import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpStatus
-import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -52,8 +51,14 @@ class ScheduledLessonControllerTest @Autowired constructor(
     private val liveKitRoomController: LiveKitRoomController,
     private val liveKitWebhookController: LiveKitWebhookController,
     private val courseController: CourseController,
+    private val materialController: MaterialController,
     private val userProfileStore: UserProfileStore,
-    private val jdbcClient: JdbcClient,
+    private val lessonParticipantRepo: LessonParticipantRepo,
+    private val lessonRepo: LessonRepo,
+    private val lessonTemplateRepo: LessonTemplateRepo,
+    private val courseRepo: CourseRepo,
+    private val lessonMaterialRepo: LessonMaterialRepo,
+    private val appUserRepo: AppUserRepo,
     private val dataSource: DataSource,
 ) {
     @BeforeAll
@@ -66,11 +71,12 @@ class ScheduledLessonControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
-        jdbcClient.sql("DELETE FROM lesson_participant").update()
-        jdbcClient.sql("DELETE FROM lesson").update()
-        jdbcClient.sql("DELETE FROM lesson_template").update()
-        jdbcClient.sql("DELETE FROM course").update()
-        jdbcClient.sql("DELETE FROM app_user").update()
+        lessonParticipantRepo.deleteAllInBatch()
+        lessonRepo.deleteAllInBatch()
+        lessonTemplateRepo.deleteAllInBatch()
+        courseRepo.deleteAllInBatch()
+        lessonMaterialRepo.deleteAllInBatch()
+        appUserRepo.deleteAllInBatch()
     }
 
     @Test
@@ -200,6 +206,39 @@ class ScheduledLessonControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher updates scheduled lesson with the same participant`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lessonTemplateId = courseLessonId(teacher)
+
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val updated = scheduleController.update(
+            teacher,
+            lesson.id,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = futureStart(90),
+                scheduledEnd = futureEnd(90),
+                status = "CANCELLED",
+                participantSubjects = listOf("student-1"),
+            ),
+        )
+
+        assertEquals("CANCELLED", updated.status)
+        assertEquals(listOf("student-1"), updated.participants.map { participant -> participant.subject })
+    }
+
+    @Test
     fun `teacher updates and deletes scheduled lesson`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val lesson = scheduleController.create(
@@ -226,6 +265,53 @@ class ScheduledLessonControllerTest @Autowired constructor(
 
         assertEquals(HttpStatus.NO_CONTENT, scheduleController.delete(teacher, lesson.id).statusCode)
         assertEquals(emptyList(), scheduleController.list(teacher))
+    }
+
+    @Test
+    fun `scheduled lesson uses direct material before template material and inherits template material when direct is absent`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val templateMaterial = materialController.create(
+            teacher,
+            LessonMaterialRequest(title = "Template material", status = "PUBLISHED"),
+        ).body!!
+        val directMaterial = materialController.create(
+            teacher,
+            LessonMaterialRequest(title = "Direct material", status = "PUBLISHED"),
+        ).body!!
+        val course = courseController.create(teacher, CourseRequest(title = "Course", isPublished = true)).body!!
+        val lessonTemplate = courseController.createLesson(
+            teacher,
+            course.id,
+            CourseLessonRequest(title = "Lesson", materialId = templateMaterial.id),
+        ).body!!
+
+        val inherited = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplate.id,
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        val direct = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplate.id,
+                materialId = directMaterial.id,
+                scheduledStart = futureStart(120),
+                scheduledEnd = futureEnd(120),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        assertEquals(templateMaterial.id, inherited.materialId)
+        assertEquals("Template material", inherited.materialTitle)
+        assertEquals(directMaterial.id, direct.materialId)
+        assertEquals("Direct material", direct.materialTitle)
+        assertEquals(directMaterial.id, scheduleController.get(student, direct.id).materialId)
     }
 
     @Test
@@ -392,29 +478,16 @@ class ScheduledLessonControllerTest @Autowired constructor(
     }
 
     private fun attendanceRow(lessonId: UUID): AttendanceRow =
-        jdbcClient.sql(
-            """
-            SELECT l.status,
-                   l.actual_start,
-                   lp.joined_at,
-                   lp.left_at,
-                   lp.attendance_status
-              FROM lesson l
-              JOIN lesson_participant lp ON lp.lesson_id = l.id
-             WHERE l.id = :lessonId
-            """.trimIndent(),
-        )
-            .param("lessonId", lessonId)
-            .query { rs, _ ->
-                AttendanceRow(
-                    status = rs.getString("status"),
-                    actualStart = rs.getObject("actual_start", OffsetDateTime::class.java)?.toInstant(),
-                    joinedAt = rs.getObject("joined_at", OffsetDateTime::class.java)?.toInstant(),
-                    leftAt = rs.getObject("left_at", OffsetDateTime::class.java)?.toInstant(),
-                    attendanceStatus = rs.getString("attendance_status"),
-                )
-            }
-            .single()
+        lessonRepo.findById(lessonId).orElseThrow().let { lesson ->
+            val participant = lessonParticipantRepo.findByLessonId(lessonId).single()
+            AttendanceRow(
+                status = lesson.status,
+                actualStart = lesson.actualStart,
+                joinedAt = participant.joinedAt,
+                leftAt = participant.leftAt,
+                attendanceStatus = participant.attendanceStatus,
+            )
+        }
 
     private fun futureStart(minutesFromNow: Long): Instant =
         Instant.now().plusSeconds(minutesFromNow * 60)

@@ -1,77 +1,41 @@
 package com.playsay.gateway.service
 
-import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.media.Content
-import io.swagger.v3.oas.annotations.media.Schema
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.responses.ApiResponses
-import io.swagger.v3.oas.annotations.security.SecurityRequirement
-import io.swagger.v3.oas.annotations.tags.Tag
-import java.sql.ResultSet
+import com.playsay.gateway.dto.CourseLessonRequest
+import com.playsay.gateway.dto.CourseLessonResponse
+import com.playsay.gateway.dto.CourseRequest
+import com.playsay.gateway.dto.CourseResponse
+import com.playsay.gateway.entity.CourseEntity
+import com.playsay.gateway.entity.LessonTemplateEntity
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.repo.CourseLessonRow
+import com.playsay.gateway.repo.CourseRepo
+import com.playsay.gateway.repo.CourseSummaryRow
+import com.playsay.gateway.repo.LessonMaterialRepo
+import com.playsay.gateway.repo.LessonTemplateRepo
+import com.playsay.gateway.utils.MetaData
 import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.util.UUID
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
-import org.springframework.http.ResponseEntity
-import com.playsay.gateway.repo.LegacyJdbcDataRepo
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
-import com.playsay.gateway.dto.*
-import com.playsay.gateway.utils.MetaData
-import com.playsay.gateway.error.ProjectResponseException
-
-private data class StoredCourse(
-    val id: UUID,
-    val title: String,
-    val description: String?,
-    val level: String?,
-    val language: String,
-    val createdByUserId: UUID?,
-    val isPublished: Boolean,
-    val lessonCount: Int,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
-
-private data class StoredCourseLesson(
-    val id: UUID,
-    val courseId: UUID,
-    val title: String,
-    val orderIndex: Int?,
-    val plannedDurationMin: Int?,
-    val materialId: UUID?,
-    val materialTitle: String?,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
 
 @Component
 class CourseStore(
-    private val dataRepo: LegacyJdbcDataRepo,
+    private val courseRepo: CourseRepo,
+    private val lessonTemplateRepo: LessonTemplateRepo,
+    private val lessonMaterialRepo: LessonMaterialRepo,
     private val userProfileStore: UserProfileStore,
 ) {
     @Transactional(readOnly = true)
     fun listCourses(authentication: JwtAuthenticationToken): List<CourseResponse> {
-        val sql = if (authentication.canManageCourses()) {
-            courseSelect() + " ORDER BY c.created_at DESC, c.title"
+        val rows = if (authentication.canManageCourses()) {
+            courseRepo.findCourseSummaries()
         } else {
-            courseSelect("WHERE c.is_published = TRUE") + " ORDER BY c.created_at DESC, c.title"
+            courseRepo.findPublishedCourseSummaries()
         }
 
-        return dataRepo.sql(sql)
-            .query(::mapCourse)
-            .list()
+        return rows
             .map { course -> course.toResponse() }
     }
 
@@ -85,74 +49,39 @@ class CourseStore(
         authentication.requireCourseManager()
         val creatorId = userProfileStore.currentUserId(authentication)
         val now = Instant.now()
-        val id = UUID.randomUUID()
         val values = request.validated()
 
-        dataRepo.sql(
-            """
-            INSERT INTO course (
-                id,
-                title,
-                description,
-                level,
-                language,
-                created_by_user_id,
-                is_published,
-                created_at,
-                updated_at
-            ) VALUES (
-                :id,
-                :title,
-                :description,
-                :level,
-                :language,
-                :createdByUserId,
-                :isPublished,
-                :createdAt,
-                :updatedAt
-            )
-            """.trimIndent(),
+        val course = courseRepo.save(
+            CourseEntity(
+                id = UUID.randomUUID(),
+                title = values.title,
+                description = values.description,
+                level = values.level,
+                language = values.language,
+                createdByUserId = creatorId,
+                isPublished = values.isPublished,
+                createdAt = now,
+                updatedAt = now,
+            ),
         )
-            .param("id", id)
-            .param("title", values.title)
-            .param("description", values.description)
-            .param("level", values.level)
-            .param("language", values.language)
-            .param("createdByUserId", creatorId)
-            .param("isPublished", values.isPublished)
-            .param("createdAt", now.toCourseOffsetDateTime())
-            .param("updatedAt", now.toCourseOffsetDateTime())
-            .update()
 
-        return requireNotNull(findCourse(id)).toResponse()
+        return requireNotNull(findCourse(course.id)).toResponse()
     }
 
     @Transactional
     fun updateCourse(authentication: JwtAuthenticationToken, courseId: UUID, request: CourseRequest): CourseResponse {
         authentication.requireCourseManager()
-        findCourse(courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
+        val course = courseRepo.findById(courseId).orElse(null)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         val values = request.validated()
 
-        dataRepo.sql(
-            """
-            UPDATE course
-               SET title = :title,
-                   description = :description,
-                   level = :level,
-                   language = :language,
-                   is_published = :isPublished,
-                   updated_at = :updatedAt
-             WHERE id = :id
-            """.trimIndent(),
-        )
-            .param("id", courseId)
-            .param("title", values.title)
-            .param("description", values.description)
-            .param("level", values.level)
-            .param("language", values.language)
-            .param("isPublished", values.isPublished)
-            .param("updatedAt", Instant.now().toCourseOffsetDateTime())
-            .update()
+        course.title = values.title
+        course.description = values.description
+        course.level = values.level
+        course.language = values.language
+        course.isPublished = values.isPublished
+        course.updatedAt = Instant.now()
+        courseRepo.save(course)
 
         return requireNotNull(findCourse(courseId)).toResponse()
     }
@@ -160,54 +89,19 @@ class CourseStore(
     @Transactional
     fun deleteCourse(authentication: JwtAuthenticationToken, courseId: UUID) {
         authentication.requireCourseManager()
-        dataRepo.sql("DELETE FROM lesson_template WHERE course_id = :courseId")
-            .param("courseId", courseId)
-            .update()
-
-        val deleted = dataRepo.sql("DELETE FROM course WHERE id = :courseId")
-            .param("courseId", courseId)
-            .update()
-
-        if (deleted == 0) {
+        if (!courseRepo.existsById(courseId)) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         }
+
+        lessonTemplateRepo.deleteByCourseId(courseId)
+        courseRepo.deleteById(courseId)
     }
 
     @Transactional(readOnly = true)
     fun listCourseLessons(authentication: JwtAuthenticationToken, courseId: UUID): List<CourseLessonResponse> {
         findVisibleCourse(authentication, courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
 
-        return dataRepo.sql(
-            """
-            SELECT id,
-                   course_id,
-                   title,
-                   order_index,
-                   planned_duration_min,
-                   material_id,
-                   material_title,
-                   created_at,
-                   updated_at
-              FROM (
-                SELECT lt.id,
-                       lt.course_id,
-                       lt.title,
-                       lt.order_index,
-                       lt.planned_duration_min,
-                       lt.material_id,
-                       lm.title AS material_title,
-                       lt.created_at,
-                       lt.updated_at
-                  FROM lesson_template lt
-                  LEFT JOIN lesson_material lm ON lm.id = lt.material_id
-                 WHERE lt.course_id = :courseId
-              ) lesson_template_with_material
-             ORDER BY COALESCE(order_index, 2147483647), created_at, title
-            """.trimIndent(),
-        )
-            .param("courseId", courseId)
-            .query(::mapCourseLesson)
-            .list()
+        return lessonTemplateRepo.findLessonRowsByCourseId(courseId)
             .map { lesson -> lesson.toResponse() }
     }
 
@@ -222,42 +116,21 @@ class CourseStore(
         val values = request.validated()
         validateMaterialId(authentication, values.materialId)
         val now = Instant.now()
-        val id = UUID.randomUUID()
 
-        dataRepo.sql(
-            """
-            INSERT INTO lesson_template (
-                id,
-                course_id,
-                title,
-                order_index,
-                planned_duration_min,
-                material_id,
-                created_at,
-                updated_at
-            ) VALUES (
-                :id,
-                :courseId,
-                :title,
-                :orderIndex,
-                :plannedDurationMin,
-                :materialId,
-                :createdAt,
-                :updatedAt
-            )
-            """.trimIndent(),
+        val lesson = lessonTemplateRepo.save(
+            LessonTemplateEntity(
+                id = UUID.randomUUID(),
+                courseId = courseId,
+                title = values.title,
+                orderIndex = values.orderIndex,
+                plannedDurationMin = values.plannedDurationMin,
+                materialId = values.materialId,
+                createdAt = now,
+                updatedAt = now,
+            ),
         )
-            .param("id", id)
-            .param("courseId", courseId)
-            .param("title", values.title)
-            .param("orderIndex", values.orderIndex)
-            .param("plannedDurationMin", values.plannedDurationMin)
-            .param("materialId", values.materialId)
-            .param("createdAt", now.toCourseOffsetDateTime())
-            .param("updatedAt", now.toCourseOffsetDateTime())
-            .update()
 
-        return requireNotNull(findCourseLesson(courseId, id)).toResponse()
+        return requireNotNull(findCourseLesson(courseId, lesson.id)).toResponse()
     }
 
     @Transactional
@@ -271,30 +144,15 @@ class CourseStore(
         findCourse(courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         val values = request.validated()
         validateMaterialId(authentication, values.materialId)
-        val updated = dataRepo.sql(
-            """
-            UPDATE lesson_template
-               SET title = :title,
-                   order_index = :orderIndex,
-                   planned_duration_min = :plannedDurationMin,
-                   material_id = :materialId,
-                   updated_at = :updatedAt
-             WHERE id = :lessonId
-               AND course_id = :courseId
-            """.trimIndent(),
-        )
-            .param("courseId", courseId)
-            .param("lessonId", lessonId)
-            .param("title", values.title)
-            .param("orderIndex", values.orderIndex)
-            .param("plannedDurationMin", values.plannedDurationMin)
-            .param("materialId", values.materialId)
-            .param("updatedAt", Instant.now().toCourseOffsetDateTime())
-            .update()
+        val lesson = lessonTemplateRepo.findByIdAndCourseId(lessonId, courseId)
+            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course lesson not found.")
 
-        if (updated == 0) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course lesson not found.")
-        }
+        lesson.title = values.title
+        lesson.orderIndex = values.orderIndex
+        lesson.plannedDurationMin = values.plannedDurationMin
+        lesson.materialId = values.materialId
+        lesson.updatedAt = Instant.now()
+        lessonTemplateRepo.save(lesson)
 
         return requireNotNull(findCourseLesson(courseId, lessonId)).toResponse()
     }
@@ -302,129 +160,43 @@ class CourseStore(
     @Transactional
     fun deleteCourseLesson(authentication: JwtAuthenticationToken, courseId: UUID, lessonId: UUID) {
         authentication.requireCourseManager()
-        val deleted = dataRepo.sql(
-            """
-            DELETE FROM lesson_template
-             WHERE id = :lessonId
-               AND course_id = :courseId
-            """.trimIndent(),
-        )
-            .param("courseId", courseId)
-            .param("lessonId", lessonId)
-            .update()
+        val deleted = lessonTemplateRepo.deleteByIdAndCourseId(lessonId, courseId)
 
-        if (deleted == 0) {
+        if (deleted == 0L) {
             throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course lesson not found.")
         }
     }
 
-    private fun findVisibleCourse(authentication: JwtAuthenticationToken, courseId: UUID): StoredCourse? {
+    private fun findVisibleCourse(authentication: JwtAuthenticationToken, courseId: UUID): CourseSummaryRow? {
         val course = findCourse(courseId) ?: return null
-        if (course.isPublished || authentication.canManageCourses()) {
+        if (course.course.isPublished || authentication.canManageCourses()) {
             return course
         }
         return null
     }
 
-    private fun findCourse(courseId: UUID): StoredCourse? =
-        dataRepo.sql(courseSelect("WHERE c.id = :courseId"))
-            .param("courseId", courseId)
-            .query(::mapCourse)
-            .optional()
-            .orElse(null)
+    private fun findCourse(courseId: UUID): CourseSummaryRow? =
+        courseRepo.findCourseSummaryById(courseId)
 
-    private fun findCourseLesson(courseId: UUID, lessonId: UUID): StoredCourseLesson? =
-        dataRepo.sql(
-            """
-            SELECT id,
-                   course_id,
-                   title,
-                   order_index,
-                   planned_duration_min,
-                   material_id,
-                   material_title,
-                   created_at,
-                   updated_at
-              FROM (
-                SELECT lt.id,
-                       lt.course_id,
-                       lt.title,
-                       lt.order_index,
-                       lt.planned_duration_min,
-                       lt.material_id,
-                       lm.title AS material_title,
-                       lt.created_at,
-                       lt.updated_at
-                  FROM lesson_template lt
-                  LEFT JOIN lesson_material lm ON lm.id = lt.material_id
-                 WHERE lt.course_id = :courseId
-                   AND lt.id = :lessonId
-              ) lesson_template_with_material
-            """.trimIndent(),
-        )
-            .param("courseId", courseId)
-            .param("lessonId", lessonId)
-            .query(::mapCourseLesson)
-            .optional()
-            .orElse(null)
-
-    private fun courseSelect(whereClause: String = ""): String =
-        """
-        SELECT c.id,
-               c.title,
-               c.description,
-               c.level,
-               c.language,
-               c.created_by_user_id,
-               c.is_published,
-               c.created_at,
-               c.updated_at,
-               COUNT(lt.id) AS lesson_count
-          FROM course c
-          LEFT JOIN lesson_template lt ON lt.course_id = c.id
-          $whereClause
-         GROUP BY c.id,
-                  c.title,
-                  c.description,
-                  c.level,
-                  c.language,
-                  c.created_by_user_id,
-                  c.is_published,
-                  c.created_at,
-                  c.updated_at
-        """.trimIndent() +
-            "\n"
+    private fun findCourseLesson(courseId: UUID, lessonId: UUID): CourseLessonRow? =
+        lessonTemplateRepo.findLessonRowByCourseIdAndId(courseId, lessonId)
 
     private fun validateMaterialId(authentication: JwtAuthenticationToken, materialId: UUID?) {
         if (materialId == null) {
             return
         }
 
-        val params = mutableMapOf<String, Any?>("materialId" to materialId)
-        val visibilityClause = if (authentication.isCourseAdmin()) {
-            ""
+        val exists = if (authentication.isCourseAdmin()) {
+            lessonMaterialRepo.existsByIdAndStatusNot(materialId, MetaData.MaterialStatuses.ARCHIVED)
         } else {
-            params["currentUserId"] = userProfileStore.currentUserId(authentication)
-            """
-               AND (
-                     owner_teacher_user_id = :currentUserId
-                  OR (visibility = 'PUBLIC' AND status = 'PUBLISHED')
-               )
-            """.trimIndent()
+            lessonMaterialRepo.countVisibleActiveForUser(
+                materialId = materialId,
+                currentUserId = userProfileStore.currentUserId(authentication),
+                archivedStatus = MetaData.MaterialStatuses.ARCHIVED,
+                publicVisibility = MetaData.MaterialVisibility.PUBLIC,
+                publishedStatus = MetaData.MaterialStatuses.PUBLISHED,
+            ) > 0
         }
-
-        val exists = dataRepo.sql(
-            """
-            SELECT COUNT(*)
-              FROM lesson_material
-             WHERE id = :materialId
-               AND status <> 'ARCHIVED'
-             $visibilityClause
-            """.trimIndent(),
-        )
-            .params(params)
-            .query(Int::class.java)
-            .single() > 0
 
         if (!exists) {
             throw ProjectResponseException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
@@ -496,24 +268,24 @@ private fun JwtAuthenticationToken.canManageCourses(): Boolean =
 private fun JwtAuthenticationToken.isCourseAdmin(): Boolean =
     authorities.any { authority -> authority.authority == MetaData.Authorities.ADMIN }
 
-private fun StoredCourse.toResponse(): CourseResponse =
+private fun CourseSummaryRow.toResponse(): CourseResponse =
     CourseResponse(
-        id = id,
-        title = title,
-        description = description,
-        level = level,
-        language = language,
-        createdByUserId = createdByUserId,
-        isPublished = isPublished,
-        lessonCount = lessonCount,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
+        id = course.id,
+        title = course.title,
+        description = course.description,
+        level = course.level,
+        language = course.language,
+        createdByUserId = course.createdByUserId,
+        isPublished = course.isPublished,
+        lessonCount = lessonCount.toInt(),
+        createdAt = course.createdAt,
+        updatedAt = course.updatedAt,
     )
 
-private fun StoredCourseLesson.toResponse(): CourseLessonResponse =
+private fun CourseLessonRow.toResponse(): CourseLessonResponse =
     CourseLessonResponse(
         id = id,
-        courseId = courseId,
+        courseId = requireNotNull(courseId),
         title = title,
         orderIndex = orderIndex,
         plannedDurationMin = plannedDurationMin,
@@ -522,41 +294,3 @@ private fun StoredCourseLesson.toResponse(): CourseLessonResponse =
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
-
-private fun mapCourse(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredCourse =
-    StoredCourse(
-        id = rs.getObject("id", UUID::class.java),
-        title = rs.getString("title"),
-        description = rs.getString("description"),
-        level = rs.getString("level"),
-        language = rs.getString("language"),
-        createdByUserId = rs.getObject("created_by_user_id", UUID::class.java),
-        isPublished = rs.getBoolean("is_published"),
-        lessonCount = rs.getInt("lesson_count"),
-        createdAt = rs.getCourseInstant("created_at"),
-        updatedAt = rs.getCourseInstant("updated_at"),
-    )
-
-private fun mapCourseLesson(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredCourseLesson =
-    StoredCourseLesson(
-        id = rs.getObject("id", UUID::class.java),
-        courseId = rs.getObject("course_id", UUID::class.java),
-        title = rs.getString("title"),
-        orderIndex = rs.getNullableInt("order_index"),
-        plannedDurationMin = rs.getNullableInt("planned_duration_min"),
-        materialId = rs.getObject("material_id", UUID::class.java),
-        materialTitle = rs.getString("material_title"),
-        createdAt = rs.getCourseInstant("created_at"),
-        updatedAt = rs.getCourseInstant("updated_at"),
-    )
-
-private fun ResultSet.getNullableInt(columnName: String): Int? {
-    val value = getInt(columnName)
-    return if (wasNull()) null else value
-}
-
-private fun ResultSet.getCourseInstant(columnName: String): Instant =
-    getObject(columnName, OffsetDateTime::class.java).toInstant()
-
-private fun Instant.toCourseOffsetDateTime(): OffsetDateTime =
-    atOffset(ZoneOffset.UTC)

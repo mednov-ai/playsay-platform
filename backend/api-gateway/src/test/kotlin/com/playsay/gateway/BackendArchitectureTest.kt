@@ -100,15 +100,60 @@ class BackendArchitectureTest {
     }
 
     @Test
-    fun `controller and service layers do not use jdbc client directly`() {
-        val directJdbcUsage = kotlinSources()
-            .filter { source -> ".controller" in source.packageName || ".service" in source.packageName }
-            .filter { source -> source.text.contains("JdbcClient") || source.text.contains("jdbcClient.sql") }
+    fun `jdbc client is not used in production code`() {
+        val springJdbcType = "Jdbc" + "Client"
+        val springJdbcSqlCall = "jdbc" + "Client.sql"
+        val springJdbcUsage = kotlinSources()
+            .filter { source -> source.text.contains(springJdbcType) || source.text.contains(springJdbcSqlCall) }
             .map { source -> source.relativePath }
 
         assertTrue(
-            directJdbcUsage.isEmpty(),
-            "Controller/service layers must access persistence through repo classes: $directJdbcUsage",
+            springJdbcUsage.isEmpty(),
+            "Production persistence must use Spring Data repositories instead of Spring JDBC client: $springJdbcUsage",
+        )
+    }
+
+    @Test
+    fun `legacy sql access is not used in production code`() {
+        val legacySqlCall = "dataRepo." + "sql("
+        val legacyJdbcRepo = "Legacy" + "Jdbc" + "DataRepo"
+        val legacySqlUsage = kotlinSources()
+            .filter { source ->
+                source.text.contains(legacySqlCall) ||
+                    source.text.contains(legacyJdbcRepo)
+            }
+            .map { source -> source.relativePath }
+
+        assertTrue(
+            legacySqlUsage.isEmpty(),
+            "Legacy SQL access must not be used in production code: $legacySqlUsage",
+        )
+    }
+
+    @Test
+    fun `jpql queries are declared in data repo`() {
+        val queryAnnotationsOutsideDataRepo = kotlinSources()
+            .filter { source -> source.text.contains("@Query") }
+            .filterNot { source -> source.relativePath == "repo/DataRepo.kt" }
+            .map { source -> source.relativePath }
+
+        assertTrue(
+            queryAnnotationsOutsideDataRepo.isEmpty(),
+            "Repository JPQL/native queries must be declared in repo/DataRepo.kt: $queryAnnotationsOutsideDataRepo",
+        )
+    }
+
+    @Test
+    fun `service layer does not contain raw sql statements`() {
+        val rawSqlKeyword = Regex("""\b(SELECT|INSERT|UPDATE|DELETE|FROM|JOIN|WHERE)\b""")
+        val serviceSqlUsage = kotlinSources()
+            .filter { source -> ".service" in source.packageName }
+            .filter { source -> rawSqlKeyword.containsMatchIn(source.text) }
+            .map { source -> source.relativePath }
+
+        assertTrue(
+            serviceSqlUsage.isEmpty(),
+            "Service layer database access must go through repository APIs: $serviceSqlUsage",
         )
     }
 

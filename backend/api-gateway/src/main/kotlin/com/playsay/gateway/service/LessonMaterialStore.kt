@@ -504,7 +504,7 @@ class LessonMaterialStore(
         return requireNotNull(findMaterialSubmission(submissionId)).toResponse(objectMapper)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun getAnnotationForScheduledLesson(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,

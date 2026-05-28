@@ -24,6 +24,7 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import javax.sql.DataSource
 import liquibase.integration.spring.SpringLiquibase
@@ -322,6 +323,17 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals(lesson.id, annotation.lessonId)
         assertEquals(1, annotation.content["schemaVersion"].asInt())
         assertEquals(0, annotation.content["strokes"].size())
+    }
+
+    @Test
+    fun `first classroom annotation lookup uses writable transaction`() {
+        val method = LessonMaterialStore::class.java.getDeclaredMethod(
+            "getAnnotationForScheduledLesson",
+            JwtAuthenticationToken::class.java,
+            UUID::class.java,
+        )
+
+        assertFalse(method.getAnnotation(Transactional::class.java).readOnly)
     }
 
     @Test

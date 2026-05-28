@@ -4,6 +4,7 @@ import type { AppUserProfile, UpdateUserProfileInput } from "../../api/playsay";
 import {
   changeAppLanguage,
   normalizeLanguage,
+  rememberPendingLoginLanguage,
   supportedLanguages,
   useAppTranslation,
   type SupportedLanguage,
@@ -31,6 +32,8 @@ export function LanguageSwitcher({
       const normalized = await changeAppLanguage(language);
       if (profile && onSaveProfile) {
         await onSaveProfile(profileInputWithLanguage(profile, normalized));
+      } else {
+        rememberPendingLoginLanguage(normalized);
       }
     } finally {
       setSaving(false);

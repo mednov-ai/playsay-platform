@@ -6,5 +6,12 @@ export {
   supportedLanguages,
   type SupportedLanguage,
 } from "./languages";
+export {
+  consumePendingLoginLanguage,
+  pendingLoginLanguageStorageKey,
+  rememberPendingLoginLanguage,
+  resolveAuthenticatedLanguage,
+  type AuthenticatedLanguageResolution,
+} from "./sessionLanguage";
 export { translationDomains, type TranslationDomain } from "./keys";
 export { useAppTranslation } from "./hooks/useAppTranslation";

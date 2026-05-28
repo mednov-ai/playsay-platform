@@ -29,7 +29,7 @@ import {
   type UpdateUserProfileRequest,
   type UserProfileResponse,
 } from "../../generated/playsay-api";
-import { i18n, normalizeLanguage } from "../i18n";
+import { i18n, normalizeLanguage, rememberPendingLoginLanguage } from "../i18n";
 
 export type AuthConfig = {
   issuer: string;
@@ -241,8 +241,10 @@ export async function startLogin(config = authConfig): Promise<void> {
   const codeVerifier = createCodeVerifier();
   const codeChallenge = await createCodeChallenge(codeVerifier);
   const state = createCodeVerifier();
+  const language = currentApiLanguage();
   const flow: LoginFlow = { codeVerifier, state, redirectUri };
 
+  rememberPendingLoginLanguage(language);
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
   window.location.assign(
     buildAuthorizeUrl({
@@ -250,6 +252,7 @@ export async function startLogin(config = authConfig): Promise<void> {
       redirectUri,
       state,
       codeChallenge,
+      uiLocales: language,
     }).toString(),
   );
 }
@@ -914,6 +917,7 @@ export function buildAuthorizeUrl(input: {
   redirectUri: string;
   state: string;
   codeChallenge: string;
+  uiLocales?: string;
 }): URL {
   const url = new URL(`${trimTrailingSlash(input.config.issuer)}/protocol/openid-connect/auth`);
   url.searchParams.set("client_id", input.config.clientId);
@@ -923,6 +927,9 @@ export function buildAuthorizeUrl(input: {
   url.searchParams.set("state", input.state);
   url.searchParams.set("code_challenge", input.codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
+  if (input.uiLocales) {
+    url.searchParams.set("ui_locales", normalizeLanguage(input.uiLocales));
+  }
   return url;
 }
 

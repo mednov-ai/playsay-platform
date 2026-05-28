@@ -64,7 +64,13 @@ import {
   upsertScheduledLesson,
 } from "../features/classroom";
 import type { AppShellProps } from "./AppShell";
-import { changeAppLanguage, useAppTranslation } from "../shared/i18n";
+import {
+  changeAppLanguage,
+  consumePendingLoginLanguage,
+  resolveAuthenticatedLanguage,
+  useAppTranslation,
+  type SupportedLanguage,
+} from "../shared/i18n";
 
 type LessonRealtimeMessage = {
   type?: string;
@@ -138,12 +144,38 @@ export function useAppController(): AppShellProps {
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
         ]);
         if (!cancelled) {
-          if (currentAppProfile.locale) {
-            void changeAppLanguage(currentAppProfile.locale);
+          let authenticatedAppProfile = currentAppProfile;
+          const languageResolution = resolveAuthenticatedLanguage({
+            pendingLanguage: consumePendingLoginLanguage(),
+            profileLocale: currentAppProfile.locale,
+          });
+
+          if (languageResolution.language) {
+            await changeAppLanguage(languageResolution.language);
           }
+
+          if (languageResolution.language && languageResolution.shouldSaveProfile) {
+            try {
+              authenticatedAppProfile = await saveUserProfile(
+                userProfileInputWithLanguage(currentAppProfile, languageResolution.language),
+              );
+            } catch (caught) {
+              if (caught instanceof ApiError && caught.status === 401) {
+                throw caught;
+              }
+              setProfileMessage(
+                caught instanceof Error ? caught.message : i18n.t("profile.messages.saveFailed"),
+              );
+            }
+          }
+
           setProfile(me);
-          setAppProfile(currentAppProfile);
-          setAdminUsers(currentAdminUsers);
+          setAppProfile(authenticatedAppProfile);
+          setAdminUsers(
+            currentAdminUsers.map((user) =>
+              user.subject === authenticatedAppProfile.subject ? authenticatedAppProfile : user,
+            ),
+          );
           setCourses(currentCourseBundle.courses);
           setCourseLessons(currentCourseBundle.lessons);
           setMaterials(currentMaterials);
@@ -945,5 +977,14 @@ export function useAppController(): AppShellProps {
     upsertMaterial,
     workspaceTab,
     workspaceTabs,
+  };
+}
+
+function userProfileInputWithLanguage(profile: AppUserProfile, language: SupportedLanguage): UpdateUserProfileInput {
+  return {
+    displayName: profile.displayName ?? null,
+    learningGoal: profile.learningGoal ?? null,
+    locale: language,
+    timezone: profile.timezone ?? null,
   };
 }

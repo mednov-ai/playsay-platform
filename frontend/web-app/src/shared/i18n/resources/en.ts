@@ -16,6 +16,7 @@ export const en = {
       unavailable: "Unavailable",
     },
     language: "Language",
+    languageNativeName: "English",
   },
   auth: {
     login: "Sign in",
@@ -50,6 +51,7 @@ export const en = {
       editLoginRequired: "Sign in to edit",
       updatedAt: "Updated {{date}}",
       noAdminProfiles: "There are no known app profiles yet.",
+      noRole: "No role",
     },
     messages: {
       saved: "Profile saved",
@@ -287,6 +289,7 @@ export const en = {
       platform: "Platform",
       link: "Link",
       imageUrl: "Image link",
+      prompt: "Prompt",
       caption: "Caption",
       weight: "Weight",
       attempts: "Attempts",

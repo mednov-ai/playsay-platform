@@ -16,6 +16,7 @@ export const de = {
       unavailable: "Nicht verfügbar",
     },
     language: "Sprache",
+    languageNativeName: "Deutsch",
   },
   auth: {
     login: "Anmelden",
@@ -50,6 +51,7 @@ export const de = {
       editLoginRequired: "Zum Bearbeiten bitte anmelden",
       updatedAt: "Aktualisiert {{date}}",
       noAdminProfiles: "Es gibt noch keine bekannten App-Profile.",
+      noRole: "Keine Rolle",
     },
     messages: {
       saved: "Profil gespeichert",
@@ -287,6 +289,7 @@ export const de = {
       platform: "Plattform",
       link: "Link",
       imageUrl: "Bildlink",
+      prompt: "Prompt",
       caption: "Bildunterschrift",
       weight: "Gewicht",
       attempts: "Versuche",

@@ -2,7 +2,6 @@ import { Languages } from "lucide-react";
 import type { AppUserProfile, UpdateUserProfileInput } from "../../api/playsay";
 import {
   changeAppLanguage,
-  languageNames,
   normalizeLanguage,
   supportedLanguages,
   useAppTranslation,
@@ -48,7 +47,7 @@ export function LanguageSwitcher({
       >
         {supportedLanguages.map((language) => (
           <option key={language} value={language}>
-            {languageNames[language]}
+            {i18n.t("common.languageNativeName", { lng: language })}
           </option>
         ))}
       </select>

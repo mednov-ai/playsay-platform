@@ -16,6 +16,7 @@ export const fr = {
       unavailable: "Indisponible",
     },
     language: "Langue",
+    languageNativeName: "Français",
   },
   auth: {
     login: "Se connecter",
@@ -50,6 +51,7 @@ export const fr = {
       editLoginRequired: "Connectez-vous pour modifier",
       updatedAt: "Mis à jour le {{date}}",
       noAdminProfiles: "Aucun profil d'application connu pour le moment.",
+      noRole: "Sans rôle",
     },
     messages: {
       saved: "Profil enregistré",
@@ -287,6 +289,7 @@ export const fr = {
       platform: "Plateforme",
       link: "Lien",
       imageUrl: "Lien de l'image",
+      prompt: "Prompt",
       caption: "Légende",
       weight: "Poids",
       attempts: "Tentatives",

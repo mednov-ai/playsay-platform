@@ -100,7 +100,7 @@ export function MaterialBlockEditor({
 
         {block.type === "image" || block.type === "generatedImage" ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            <FormField label={block.type === "generatedImage" ? "Prompt" : t("materials.blockEditor.imageUrl")}>
+            <FormField label={block.type === "generatedImage" ? t("materials.blockEditor.prompt") : t("materials.blockEditor.imageUrl")}>
               {block.type === "generatedImage" ? (
                 <textarea
                   className="playsay-input min-h-20 resize-y py-3"

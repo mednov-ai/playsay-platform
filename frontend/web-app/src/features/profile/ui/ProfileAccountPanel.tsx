@@ -312,6 +312,8 @@ function AdminUsersPanel({
 }
 
 function AdminUserRow({ user }: { user: AdminUserProfile }) {
+  const { t } = useAppTranslation();
+
   return (
     <article className="rounded-2xl border border-border bg-muted/60 p-3">
       <div className="flex items-start justify-between gap-3">
@@ -324,7 +326,7 @@ function AdminUserRow({ user }: { user: AdminUserProfile }) {
           </div>
         </div>
         <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-extrabold text-primary">
-          {user.roles[0] ?? "NO_ROLE"}
+          {user.roles[0] ?? t("profile.status.noRole")}
         </span>
       </div>
       {user.learningGoal ? (

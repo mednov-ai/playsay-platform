@@ -96,7 +96,7 @@ export function materialBlockLabel(type: MaterialBlockType): string {
     case "freeWriting":
       return i18n.t("materials.blockTypes.freeWriting");
     case "speakingPrompt":
-      return "Speaking";
+      return i18n.t("materials.blockTypes.speakingPrompt");
     case "drawingArea":
       return i18n.t("materials.blockTypes.drawingArea");
     default:

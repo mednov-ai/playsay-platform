@@ -164,7 +164,7 @@ export function MatchingPairsEditor({
                           onClick={() => chooseAsset(pair, item)}
                           type="button"
                         >
-                          <span>{item.alt || item.prompt || "AI image"}</span>
+                          <span>{item.alt || item.prompt || t("materials.blockTypes.generatedImage")}</span>
                           <small>
                             {currentMaterialId === item.materialId ? t("materials.matching.assetSource") : t("materials.matching.promptSource")} · {item.tags.slice(0, 3).join(", ") || item.materialTitle}
                           </small>

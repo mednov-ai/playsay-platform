@@ -2,7 +2,6 @@ export { changeAppLanguage, i18n } from "./config";
 export {
   defaultLanguage,
   i18nStorageKey,
-  languageNames,
   normalizeLanguage,
   supportedLanguages,
   type SupportedLanguage,

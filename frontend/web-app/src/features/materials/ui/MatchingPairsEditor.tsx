@@ -11,6 +11,7 @@ import {
   type MaterialEditorBlock,
   type MaterialMatchingPair,
 } from "../model/materialDocument";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function MatchingPairsEditor({
   assetLibrary,
@@ -25,6 +26,7 @@ export function MatchingPairsEditor({
   disabled: boolean;
   onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
 }) {
+  const { t } = useAppTranslation();
   const draftRowsRef = useRef<MaterialMatchingPair[]>([
     emptyMatchingPair(),
     emptyMatchingPair(),
@@ -85,8 +87,8 @@ export function MatchingPairsEditor({
   return (
     <div className="playsay-matching-editor">
       <div className="playsay-matching-editor-head" aria-hidden="true">
-        <span>Слева</span>
-        <span>Справа</span>
+        <span>{t("materials.matching.left")}</span>
+        <span>{t("materials.matching.right")}</span>
         <span />
       </div>
       {pairs.map((pair, index) => {
@@ -96,16 +98,16 @@ export function MatchingPairsEditor({
         return (
           <div className="playsay-matching-editor-row" key={pair.id}>
             <input
-              aria-label={`Слева ${index + 1}`}
+              aria-label={t("materials.matching.leftAria", { index: index + 1 })}
               className="playsay-input"
               disabled={disabled}
               maxLength={240}
               onChange={(event) => updatePair(pair.id, { left: event.target.value })}
-              placeholder="слово / фраза"
+              placeholder={t("materials.matching.leftPlaceholder")}
               value={pair.left}
             />
             <input
-              aria-label={`Справа ${index + 1}`}
+              aria-label={t("materials.matching.rightAria", { index: index + 1 })}
               className="playsay-input"
               disabled={disabled}
               maxLength={240}
@@ -116,7 +118,7 @@ export function MatchingPairsEditor({
                   imageAlt: isImage ? value : undefined,
                 });
               }}
-              placeholder={isImage ? "что на картинке" : "ответ / перевод"}
+              placeholder={isImage ? t("materials.matching.imageRightPlaceholder") : t("materials.matching.textRightPlaceholder")}
               value={pair.right}
             />
             <div className="playsay-matching-row-tools">
@@ -130,7 +132,7 @@ export function MatchingPairsEditor({
                 <span>image</span>
               </label>
               <Button
-                aria-label="Удалить строку"
+                aria-label={t("materials.matching.removeRow")}
                 disabled={disabled || pairs.length <= 2}
                 onClick={() => removeRow(pair.id)}
                 type="button"
@@ -143,12 +145,12 @@ export function MatchingPairsEditor({
             {isImage ? (
               <div className="playsay-matching-image-fields">
                 <input
-                  aria-label={`Поиск картинки по тегу ${index + 1}`}
+                  aria-label={t("materials.matching.assetSearchAria", { index: index + 1 })}
                   className="playsay-input"
                   disabled={disabled}
                   maxLength={80}
                   onChange={(event) => setAssetQueries((current) => ({ ...current, [pair.id]: event.target.value }))}
-                  placeholder="поиск существующей картинки по тегу"
+                  placeholder={t("materials.matching.assetSearchPlaceholder")}
                   value={assetQuery}
                 />
                 {assetQuery.trim() ? (
@@ -164,17 +166,17 @@ export function MatchingPairsEditor({
                         >
                           <span>{item.alt || item.prompt || "AI image"}</span>
                           <small>
-                            {currentMaterialId === item.materialId ? "asset" : "prompt"} · {item.tags.slice(0, 3).join(", ") || item.materialTitle}
+                            {currentMaterialId === item.materialId ? t("materials.matching.assetSource") : t("materials.matching.promptSource")} · {item.tags.slice(0, 3).join(", ") || item.materialTitle}
                           </small>
                         </button>
                       ))
                     ) : (
-                      <span className="playsay-matching-asset-empty">Нет картинок с таким тегом</span>
+                      <span className="playsay-matching-asset-empty">{t("materials.matching.assetEmpty")}</span>
                     )}
                   </div>
                 ) : null}
                 <textarea
-                  aria-label={`Prompt картинки ${index + 1}`}
+                  aria-label={t("materials.matching.imagePromptAria", { index: index + 1 })}
                   className="playsay-input min-h-20 resize-y py-3"
                   disabled={disabled}
                   maxLength={1_000}
@@ -182,7 +184,7 @@ export function MatchingPairsEditor({
                     imagePrompt: event.target.value,
                     imageUrl: undefined,
                   })}
-                  placeholder="prompt для AI-картинки без текста внутри"
+                  placeholder={t("materials.matching.imagePromptPlaceholder")}
                   value={pair.imagePrompt ?? ""}
                 />
               </div>
@@ -192,7 +194,7 @@ export function MatchingPairsEditor({
       })}
       <Button disabled={disabled} onClick={addRow} type="button" variant="outline">
         <Plus className="h-4 w-4" />
-        Добавить строку
+        {t("materials.matching.addRow")}
       </Button>
     </div>
   );

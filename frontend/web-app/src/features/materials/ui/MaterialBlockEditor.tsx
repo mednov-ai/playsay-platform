@@ -15,6 +15,7 @@ import {
 } from "../model/materialDocument";
 import { materialBlockIcon } from "./materialBlockIcon";
 import { MatchingPairsEditor } from "./MatchingPairsEditor";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialBlockEditor({
   assetLibrary,
@@ -33,6 +34,7 @@ export function MaterialBlockEditor({
   onRemove: () => void;
   onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
 }) {
+  const { t } = useAppTranslation();
   const exerciseType = block.type === "multipleChoice" ? "multipleChoice" : "fillGaps";
   const [flashcardsSource, setFlashcardsSource] = useState(() => formatFlashcards(block.cards));
   const [exerciseSource, setExerciseSource] = useState(() => formatExerciseItems(block.items, exerciseType));
@@ -65,14 +67,14 @@ export function MaterialBlockEditor({
         </div>
         <Button disabled={disabled} onClick={onRemove} type="button" variant="outline">
           <Trash2 className="h-4 w-4" />
-          Удалить
+          {t("materials.actions.delete")}
         </Button>
       </div>
 
       <div className="mt-3 grid gap-3">
         {block.type === "videoEmbed" ? (
           <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
-            <FormField label="Платформа">
+            <FormField label={t("materials.blockEditor.platform")}>
               <select
                 className="playsay-input"
                 disabled={disabled}
@@ -84,7 +86,7 @@ export function MaterialBlockEditor({
                 <option value="RUTUBE">Rutube</option>
               </select>
             </FormField>
-            <FormField label="Ссылка">
+            <FormField label={t("materials.blockEditor.link")}>
               <input
                 className="playsay-input"
                 disabled={disabled}
@@ -98,7 +100,7 @@ export function MaterialBlockEditor({
 
         {block.type === "image" || block.type === "generatedImage" ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            <FormField label={block.type === "generatedImage" ? "Prompt" : "Ссылка на изображение"}>
+            <FormField label={block.type === "generatedImage" ? "Prompt" : t("materials.blockEditor.imageUrl")}>
               {block.type === "generatedImage" ? (
                 <textarea
                   className="playsay-input min-h-20 resize-y py-3"
@@ -117,7 +119,7 @@ export function MaterialBlockEditor({
                 />
               )}
             </FormField>
-            <FormField label="Подпись">
+            <FormField label={t("materials.blockEditor.caption")}>
               <textarea
                 className="playsay-input min-h-20 resize-y py-3"
                 disabled={disabled}
@@ -166,7 +168,7 @@ export function MaterialBlockEditor({
 
         {isObjectiveMaterialBlockType(block.type) ? (
           <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-4">
-            <FormField label="Вес">
+            <FormField label={t("materials.blockEditor.weight")}>
               <input
                 className="playsay-input"
                 disabled={disabled}
@@ -177,7 +179,7 @@ export function MaterialBlockEditor({
                 value={block.assessment?.weight ?? 1}
               />
             </FormField>
-            <FormField label="Попытки">
+            <FormField label={t("materials.blockEditor.attempts")}>
               <input
                 className="playsay-input"
                 disabled={disabled}
@@ -188,7 +190,7 @@ export function MaterialBlockEditor({
                 value={block.assessment?.maxAttempts ?? 3}
               />
             </FormField>
-            <FormField label="Штраф за попытку">
+            <FormField label={t("materials.blockEditor.attemptPenalty")}>
               <input
                 className="playsay-input"
                 disabled={disabled}
@@ -200,7 +202,7 @@ export function MaterialBlockEditor({
                 value={block.assessment?.attemptPenalty ?? 0.3}
               />
             </FormField>
-            <FormField label="Штраф за hint">
+            <FormField label={t("materials.blockEditor.hintPenalty")}>
               <input
                 className="playsay-input"
                 disabled={disabled}
@@ -225,7 +227,7 @@ export function MaterialBlockEditor({
         ) : null}
 
         {block.type === "drawingArea" ? (
-          <FormField label="Высота области">
+          <FormField label={t("materials.blockEditor.drawingHeight")}>
             <input
               className="playsay-input"
               disabled={disabled}

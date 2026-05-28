@@ -55,6 +55,8 @@ import { MaterialDraftPanel } from "./MaterialDraftPanel";
 import { MaterialEditorForm } from "./MaterialEditorForm";
 import { MaterialImageProgress } from "./MaterialImageProgress";
 import { MaterialLessonLinkPanel } from "./MaterialLessonLinkPanel";
+import { useAppTranslation } from "../../../shared/i18n";
+
 export function MaterialLibraryPanel({
   courses,
   disabled,
@@ -88,6 +90,7 @@ export function MaterialLibraryPanel({
   onSave: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
   profile: MeProfile | null;
 }) {
+  const { t } = useAppTranslation();
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const { lessonOptions, selectedLessonKey, setSelectedLessonKey } = useMaterialLibraryState({ courses, lessons });
   const [form, setForm] = useState<MaterialFormState>(() => defaultMaterialForm());
@@ -214,7 +217,7 @@ export function MaterialLibraryPanel({
   }
 
   async function generateDraft() {
-    const prompt = draftPrompt.trim() || "Создай редактируемый материал Play&Say по приложенному скану или фото задания.";
+    const prompt = draftPrompt.trim() || t("materials.draft.defaultPrompt");
     const draft = await onDraft({
       title: form.title || null,
       prompt,
@@ -260,11 +263,11 @@ export function MaterialLibraryPanel({
       const image = await prepareMaterialDraftSourceImage(file);
       setDraftImage(image);
       if (draftPrompt.trim().length === 0) {
-        setDraftPrompt("Создай редактируемый материал Play&Say по приложенному скану: выдели упражнения, ответы и добавь speaking follow-up.");
+        setDraftPrompt(t("materials.draft.defaultScanPrompt"));
       }
     } catch (caught) {
       setDraftImage(null);
-      setDraftImageMessage(caught instanceof Error ? caught.message : "Не удалось подготовить изображение.");
+      setDraftImageMessage(caught instanceof Error ? caught.message : t("materials.draft.imagePrepareFailed"));
     }
   }
 
@@ -319,7 +322,7 @@ export function MaterialLibraryPanel({
 
     try {
       for (let index = 1; index <= targetCount; index += 1) {
-        setImageGenerationProgress({ current: index, label: "Генерируем картинки", total: targetCount });
+        setImageGenerationProgress({ current: index, label: t("materials.progress.generatingImages"), total: targetCount });
         const generated = await onGenerateImages(currentMaterial.id, { maxImages: 1 });
         if (!generated) {
           return currentMaterial;
@@ -373,10 +376,10 @@ export function MaterialLibraryPanel({
       <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">Материалы</h2>
+          <h2 className="text-lg font-extrabold">{t("materials.title")}</h2>
         </div>
         <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-          Войдите, чтобы создавать и открывать материалы уроков.
+          {t("materials.loginRequired")}
         </div>
       </section>
     );
@@ -387,32 +390,32 @@ export function MaterialLibraryPanel({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">Материалы</h2>
+          <h2 className="text-lg font-extrabold">{t("materials.title")}</h2>
         </div>
         <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Обновить
+          {t("common.actions.refresh")}
         </Button>
       </div>
 
       {!canManage ? (
         <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-          Сейчас ученику доступны опубликованные материалы только внутри назначенного урока.
+          {t("materials.studentAvailability")}
         </div>
       ) : (
         <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(18rem,0.72fr)_minmax(0,1.28fr)]">
           <aside className="grid content-start gap-3">
             <div className="rounded-2xl border border-border bg-muted/45 p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-sm font-extrabold">Библиотека</div>
+                <div className="text-sm font-extrabold">{t("materials.library.title")}</div>
                 <Button disabled={disabled} onClick={resetForm} type="button" variant="outline">
                   <Plus className="h-4 w-4" />
-                  Новый
+                  {t("materials.library.new")}
                 </Button>
               </div>
               {materials.length === 0 ? (
                 <div className="rounded-xl border border-border bg-white p-3 text-sm font-semibold text-muted-foreground">
-                  Материалов пока нет.
+                  {t("materials.library.empty")}
                 </div>
               ) : (
                 <div className="grid max-h-[30rem] gap-2 overflow-auto pr-1">
@@ -430,7 +433,7 @@ export function MaterialLibraryPanel({
                           <span>{material.cefrLevel}</span>
                           <span>{material.status}</span>
                           <span>{material.visibility}</span>
-                          <span>{material.blockCount} blocks</span>
+                          <span>{t("materials.library.blocks", { count: material.blockCount })}</span>
                         </span>
                       </span>
                       {material.visibility === "PUBLIC" ? (
@@ -486,22 +489,22 @@ export function MaterialLibraryPanel({
                       <span>{form.cefrLevel}</span>
                       <span>{form.status}</span>
                       <span>{form.visibility}</span>
-                      <span>{form.document.pages[0]?.blocks.length ?? 0} blocks</span>
+                      <span>{t("materials.library.blocks", { count: form.document.pages[0]?.blocks.length ?? 0 })}</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
                     <Button disabled={disabled} onClick={() => setAuthorMode("edit")} type="button" variant="outline">
                       <PenLine className="h-4 w-4" />
-                      Текст
+                      {t("materials.actions.textMode")}
                     </Button>
                     <Button disabled={disabled || form.title.trim().length === 0} onClick={duplicateCurrentMaterial} type="button" variant="outline">
                       <Copy className="h-4 w-4" />
-                      Дублировать
+                      {t("materials.actions.duplicate")}
                     </Button>
                     {form.id ? (
                       <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
                         <Archive className="h-4 w-4" />
-                        Архив
+                        {t("materials.actions.archive")}
                       </Button>
                     ) : null}
                   </div>

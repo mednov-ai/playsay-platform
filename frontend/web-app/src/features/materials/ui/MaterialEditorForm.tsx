@@ -12,6 +12,7 @@ import {
 import { MaterialBlockEditor } from "./MaterialBlockEditor";
 import { MaterialImageProgress } from "./MaterialImageProgress";
 import { materialBlockIcon } from "./materialBlockIcon";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialEditorForm({
   assetLibrary,
@@ -46,11 +47,13 @@ export function MaterialEditorForm({
   onUpdateForm: <Key extends keyof MaterialFormState>(field: Key, value: MaterialFormState[Key]) => void;
   pendingImageTargetsCount: number;
 }) {
+  const { t } = useAppTranslation();
+
   return (
     <>
       <div className="rounded-2xl border border-border bg-white p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_7rem_8rem_8rem]">
-          <FormField label="Название">
+          <FormField label={t("materials.form.title")}>
             <input
               className="playsay-input"
               disabled={disabled}
@@ -60,7 +63,7 @@ export function MaterialEditorForm({
               value={form.title}
             />
           </FormField>
-          <FormField label="Уровень">
+          <FormField label={t("materials.form.level")}>
             <select
               className="playsay-input"
               disabled={disabled}
@@ -72,31 +75,31 @@ export function MaterialEditorForm({
               ))}
             </select>
           </FormField>
-          <FormField label="Доступ">
+          <FormField label={t("materials.form.visibility")}>
             <select
               className="playsay-input"
               disabled={disabled}
               onChange={(event) => onUpdateForm("visibility", event.target.value as MaterialFormState["visibility"])}
               value={form.visibility}
             >
-              <option value="PRIVATE">Приватный</option>
-              <option value="PUBLIC">Публичный</option>
+              <option value="PRIVATE">{t("materials.form.visibilityPrivate")}</option>
+              <option value="PUBLIC">{t("materials.form.visibilityPublic")}</option>
             </select>
           </FormField>
-          <FormField label="Статус">
+          <FormField label={t("materials.form.status")}>
             <select
               className="playsay-input"
               disabled={disabled}
               onChange={(event) => onUpdateForm("status", event.target.value as MaterialFormState["status"])}
               value={form.status}
             >
-              <option value="DRAFT">Черновик</option>
-              <option value="PUBLISHED">Опубликован</option>
+              <option value="DRAFT">{t("materials.form.statusDraft")}</option>
+              <option value="PUBLISHED">{t("materials.form.statusPublished")}</option>
             </select>
           </FormField>
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-[8rem_minmax(0,1fr)]">
-          <FormField label="Язык">
+          <FormField label={t("materials.form.language")}>
             <input
               className="playsay-input"
               disabled={disabled}
@@ -105,13 +108,13 @@ export function MaterialEditorForm({
               value={form.language}
             />
           </FormField>
-          <FormField label="Описание">
+          <FormField label={t("materials.form.description")}>
             <input
               className="playsay-input"
               disabled={disabled}
               maxLength={2_000}
               onChange={(event) => onUpdateForm("description", event.target.value)}
-              placeholder="Короткая заметка для себя"
+              placeholder={t("materials.form.descriptionPlaceholder")}
               value={form.description}
             />
           </FormField>
@@ -129,25 +132,27 @@ export function MaterialEditorForm({
           <div className="flex gap-2">
             <Button disabled={disabled || form.title.trim().length === 0} onClick={onDuplicate} type="button" variant="outline">
               <Copy className="h-4 w-4" />
-              Дублировать
+              {t("materials.actions.duplicate")}
             </Button>
             <Button disabled={disabled || form.title.trim().length === 0} onClick={onPreview} type="button" variant="outline">
               <Eye className="h-4 w-4" />
-              Просмотр
+              {t("materials.actions.preview")}
             </Button>
             <Button disabled={disabled || !canGenerateImages || form.title.trim().length === 0} onClick={onGenerateCurrentImages} type="button" variant="outline">
               <Sparkles className="h-4 w-4" />
-              {pendingImageTargetsCount > 0 ? `Сгенерировать (${pendingImageTargetsCount})` : "Сгенерировать"}
+              {pendingImageTargetsCount > 0
+                ? t("materials.actions.generateWithCount", { count: pendingImageTargetsCount })
+                : t("materials.actions.generate")}
             </Button>
             {form.id ? (
               <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
                 <Archive className="h-4 w-4" />
-                Архив
+                {t("materials.actions.archive")}
               </Button>
             ) : null}
             <Button disabled={disabled || form.title.trim().length === 0} type="submit">
               <Save className="h-4 w-4" />
-              Сохранить
+              {t("materials.actions.save")}
             </Button>
           </div>
         </div>
@@ -159,7 +164,7 @@ export function MaterialEditorForm({
       <div className="playsay-material-editor">
         {form.document.pages[0]?.blocks.length === 0 ? (
           <div className="rounded-2xl border border-border bg-muted/60 p-4 text-sm font-semibold text-muted-foreground">
-            Добавьте первый блок материала.
+            {t("materials.form.emptyBlocks")}
           </div>
         ) : (
           form.document.pages[0]?.blocks.map((block, index) => (

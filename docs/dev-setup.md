@@ -19,9 +19,8 @@ gradle :api-gateway:test
 gradle :api-gateway:bootRun
 ```
 
-Health endpoints:
+Health endpoint:
 
-- `GET http://localhost:8080/hello`
 - `GET http://localhost:8080/actuator/health`
 
 ## Frontend
@@ -42,4 +41,3 @@ From `playsay-platform`:
 docker buildx build --platform linux/arm64 -f backend/api-gateway/Dockerfile -t playsay-api-gateway:local backend
 docker run --rm -p 8080:8080 playsay-api-gateway:local
 ```
-

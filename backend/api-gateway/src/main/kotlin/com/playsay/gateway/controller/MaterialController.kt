@@ -188,7 +188,7 @@ class MaterialController(
         value = [
             ApiResponse(responseCode = "200", description = "Material submission"),
             ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Submission, lesson, or material not found", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
         ],
     )
     fun scheduledLessonMaterialSubmission(
@@ -229,7 +229,7 @@ class MaterialController(
         value = [
             ApiResponse(responseCode = "200", description = "Material annotation"),
             ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Annotation, scheduled lesson, or material not found", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
         ],
     )
     fun scheduledLessonMaterialAnnotation(

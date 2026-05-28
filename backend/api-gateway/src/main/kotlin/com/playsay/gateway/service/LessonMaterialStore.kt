@@ -366,11 +366,12 @@ class LessonMaterialStore(
     ): MaterialSubmissionResponse {
         val lookup = accessibleScheduledMaterial(authentication, lessonId)
         val materialId = lookup.materialId ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        val material = find(materialId)?.takeIf { it.status != "ARCHIVED" }
+            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
         val userId = userProfileStore.currentUserId(authentication)
-        val assignmentId = findMaterialSubmissionAssignment(lessonId, materialId)
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material submission not found.")
+        val assignmentId = findOrCreateMaterialSubmissionAssignment(lessonId, material)
         val submission = findMaterialSubmission(assignmentId, lessonId, userId)
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material submission not found.")
+            ?: createEmptyMaterialSubmission(assignmentId, lessonId, materialId, userId)
         return submission.toResponse(objectMapper)
     }
 
@@ -503,15 +504,17 @@ class LessonMaterialStore(
         return requireNotNull(findMaterialSubmission(submissionId)).toResponse(objectMapper)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun getAnnotationForScheduledLesson(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,
     ): MaterialAnnotationResponse {
         val lookup = accessibleScheduledMaterial(authentication, lessonId)
         val materialId = lookup.materialId ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
+        find(materialId)?.takeIf { it.status != "ARCHIVED" }
+            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material not found.")
         val annotation = findMaterialAnnotation(lessonId, materialId)
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material annotation not found.")
+            ?: createEmptyMaterialAnnotation(lessonId, materialId)
         return annotation.toResponse(objectMapper)
     }
 
@@ -1268,6 +1271,99 @@ class LessonMaterialStore(
                 .update()
             id
         }
+
+    private fun createEmptyMaterialSubmission(
+        assignmentId: UUID,
+        lessonId: UUID,
+        materialId: UUID,
+        userId: UUID,
+    ): StoredMaterialSubmission {
+        val id = UUID.randomUUID()
+        val now = Instant.now()
+        dataRepo.sql(
+            """
+            INSERT INTO submission (
+                id,
+                assignment_id,
+                student_user_id,
+                lesson_id,
+                content,
+                score,
+                errors_count,
+                submitted_at,
+                created_at,
+                updated_at
+            ) VALUES (
+                :id,
+                :assignmentId,
+                :userId,
+                :lessonId,
+                :content,
+                NULL,
+                NULL,
+                NULL,
+                :createdAt,
+                :updatedAt
+            )
+            """.trimIndent(),
+        )
+            .param("id", id)
+            .param("assignmentId", assignmentId)
+            .param("userId", userId)
+            .param("lessonId", lessonId)
+            .param("content", emptyMaterialSubmissionContent(materialId))
+            .param("createdAt", now.toMaterialOffsetDateTime())
+            .param("updatedAt", now.toMaterialOffsetDateTime())
+            .update()
+        return requireNotNull(findMaterialSubmission(id))
+    }
+
+    private fun createEmptyMaterialAnnotation(lessonId: UUID, materialId: UUID): StoredMaterialAnnotation {
+        val id = UUID.randomUUID()
+        val now = Instant.now()
+        dataRepo.sql(
+            """
+            INSERT INTO lesson_material_annotation (
+                id,
+                lesson_id,
+                material_id,
+                content,
+                created_at,
+                updated_at
+            ) VALUES (
+                :id,
+                :lessonId,
+                :materialId,
+                :content,
+                :createdAt,
+                :updatedAt
+            )
+            """.trimIndent(),
+        )
+            .param("id", id)
+            .param("lessonId", lessonId)
+            .param("materialId", materialId)
+            .param("content", emptyMaterialAnnotationContent())
+            .param("createdAt", now.toMaterialOffsetDateTime())
+            .param("updatedAt", now.toMaterialOffsetDateTime())
+            .update()
+        return requireNotNull(findMaterialAnnotation(id))
+    }
+
+    private fun emptyMaterialSubmissionContent(materialId: UUID): String {
+        val root = objectMapper.createObjectNode()
+        root.put("schemaVersion", 1)
+        root.put("materialId", materialId.toString())
+        root.set<ObjectNode>("answers", objectMapper.createObjectNode())
+        return objectMapper.writeValueAsString(root)
+    }
+
+    private fun emptyMaterialAnnotationContent(): String {
+        val root = objectMapper.createObjectNode()
+        root.put("schemaVersion", 1)
+        root.set<ArrayNode>("strokes", objectMapper.createArrayNode())
+        return objectMapper.writeValueAsString(root)
+    }
 
     private fun findMaterialSubmissionAssignment(lessonId: UUID, materialId: UUID): UUID? =
         dataRepo.sql(

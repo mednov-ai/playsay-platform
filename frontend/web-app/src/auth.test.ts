@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAuthorizeUrl, mapTokenResponse, type AuthConfig } from "./auth";
+import { buildAuthorizeUrl, mapTokenResponse, type AuthConfig } from "./shared/auth/oidc";
 
 const config: AuthConfig = {
   issuer: "https://ops.play-and-say.ru:18443/keycloak/realms/playsay/",

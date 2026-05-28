@@ -1,0 +1,120 @@
+import { Globe2, Paperclip, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Button } from "../../../components/ui/button";
+import { formatFileSize, type MaterialDraftSourceImage } from "../model/materialDocument";
+
+export function MaterialDraftPanel({
+  canGenerateDraft,
+  canGenerateUrlDraft,
+  disabled,
+  draftImage,
+  draftImageMessage,
+  draftPrompt,
+  draftUrl,
+  onDraftFromUrl,
+  onDraftImageChange,
+  onGenerateDraft,
+  onRemoveDraftImage,
+  onUpdateDraftPrompt,
+  onUpdateDraftUrl,
+}: {
+  canGenerateDraft: boolean;
+  canGenerateUrlDraft: boolean;
+  disabled: boolean;
+  draftImage: MaterialDraftSourceImage | null;
+  draftImageMessage: string | null;
+  draftPrompt: string;
+  draftUrl: string;
+  onDraftFromUrl: () => void;
+  onDraftImageChange: (file: File | null) => void;
+  onGenerateDraft: () => void;
+  onRemoveDraftImage: () => void;
+  onUpdateDraftPrompt: (value: string) => void;
+  onUpdateDraftUrl: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm font-extrabold">
+        <Wand2 className="h-4 w-4 text-primary" />
+        Черновик с AI
+      </div>
+      <textarea
+        className="playsay-input min-h-28 resize-none py-3"
+        disabled={disabled}
+        maxLength={4_000}
+        onChange={(event) => onUpdateDraftPrompt(event.target.value)}
+        placeholder="Например: A2, travelling, 45 минут, warm-up, слова, speaking и короткое письмо"
+        value={draftPrompt}
+      />
+      <label className="mt-2 block">
+        <span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase text-muted-foreground">
+          <Globe2 className="h-3.5 w-3.5 text-primary" />
+          Внешняя страница
+        </span>
+        <input
+          className="playsay-input"
+          disabled={disabled}
+          maxLength={2_000}
+          onChange={(event) => onUpdateDraftUrl(event.target.value)}
+          placeholder="https://..."
+          type="url"
+          value={draftUrl}
+        />
+      </label>
+      <label className="mt-2 block">
+        <span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase text-muted-foreground">
+          <Paperclip className="h-3.5 w-3.5 text-primary" />
+          Фото или скан
+        </span>
+        <input
+          accept="image/jpeg,image/png,image/webp"
+          className="playsay-file-input"
+          disabled={disabled}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0] ?? null;
+            event.currentTarget.value = "";
+            onDraftImageChange(file);
+          }}
+          type="file"
+        />
+      </label>
+      {draftImage ? (
+        <div className="playsay-draft-image-preview">
+          <img alt="" src={draftImage.dataUrl} />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-extrabold">{draftImage.fileName}</div>
+            <div className="text-xs font-bold text-muted-foreground">
+              {formatFileSize(draftImage.originalSize)} · подготовлено для AI
+            </div>
+          </div>
+          <Button disabled={disabled} onClick={onRemoveDraftImage} type="button" variant="outline">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : null}
+      {draftImageMessage ? (
+        <div className="mt-2 rounded-xl border border-border bg-muted/60 p-2 text-xs font-bold text-muted-foreground">
+          {draftImageMessage}
+        </div>
+      ) : null}
+      <Button
+        className="mt-2 w-full"
+        disabled={disabled || !canGenerateDraft}
+        onClick={onGenerateDraft}
+        type="button"
+      >
+        <Sparkles className="h-4 w-4" />
+        Подготовить черновик
+      </Button>
+      <Button
+        className="mt-2 w-full"
+        disabled={disabled || !canGenerateUrlDraft}
+        onClick={onDraftFromUrl}
+        type="button"
+        variant="outline"
+      >
+        <Globe2 className="h-4 w-4" />
+        Черновик из ссылки
+      </Button>
+    </div>
+  );
+}

@@ -73,7 +73,7 @@ type LessonRealtimeMessage = {
 };
 
 export function useAppController(): AppShellProps {
-  const { t } = useAppTranslation();
+  const { i18n, t } = useAppTranslation();
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [appProfile, setAppProfile] = useState<AppUserProfile | null>(null);
   const [status, setStatus] = useState<SessionStatus>("checking");
@@ -452,7 +452,7 @@ export function useAppController(): AppShellProps {
       if (updated.locale) {
         void changeAppLanguage(updated.locale);
       }
-      setProfileMessage(t("profile.messages.saved"));
+      setProfileMessage(i18n.t("profile.messages.saved", { lng: updated.locale || i18n.resolvedLanguage || i18n.language }));
     } catch (caught) {
       setProfileMessage(applySessionError(caught, t("profile.messages.saveFailed")));
     } finally {
@@ -473,7 +473,7 @@ export function useAppController(): AppShellProps {
       if (recreated.locale) {
         void changeAppLanguage(recreated.locale);
       }
-      setProfileMessage(t("profile.messages.reset"));
+      setProfileMessage(i18n.t("profile.messages.reset", { lng: recreated.locale || i18n.resolvedLanguage || i18n.language }));
     } catch (caught) {
       setProfileMessage(applySessionError(caught, t("profile.messages.resetFailed")));
     } finally {

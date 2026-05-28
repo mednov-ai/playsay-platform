@@ -4,6 +4,7 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
+import { ruMessages } from "../../shared/i18n/messages.ru";
 
 export type PlaySayRole = "STUDENT" | "TEACHER" | "ADMIN";
 
@@ -19,11 +20,7 @@ export type RoleWorkspace = {
 
 const fallbackWorkspace: RoleWorkspace = {
   role: "STUDENT",
-  label: "Ученик",
-  title: "Мои занятия",
-  description: "Здесь появятся ближайшие уроки, домашние задания и быстрый вход в online-класс.",
-  primaryAction: "Открыть урок",
-  secondaryAction: "Моё задание",
+  ...ruMessages.roles.workspaces.student,
   icon: GraduationCap,
 };
 
@@ -31,20 +28,12 @@ const workspaces: Record<PlaySayRole, RoleWorkspace> = {
   STUDENT: fallbackWorkspace,
   TEACHER: {
     role: "TEACHER",
-    label: "Преподаватель",
-    title: "Группы",
-    description: "Каркас рабочего места преподавателя: группы, ученики и быстрый переход к занятию.",
-    primaryAction: "Открыть группу",
-    secondaryAction: "Задание группе",
+    ...ruMessages.roles.workspaces.teacher,
     icon: BookOpen,
   },
   ADMIN: {
     role: "ADMIN",
-    label: "Администратор",
-    title: "Пользователи",
-    description: "Admin-only проверка ролей и известных app-профилей из временного Sprint 1 store.",
-    primaryAction: "Проверить список",
-    secondaryAction: "Настройки доступа",
+    ...ruMessages.roles.workspaces.admin,
     icon: ShieldCheck,
   },
 };
@@ -65,7 +54,7 @@ export function getRoleWorkspace(roles: string[]): RoleWorkspace {
 
 export function getRoleSummary(roles: string[]): string {
   if (roles.length === 0) {
-    return "роль ещё не назначена";
+    return ruMessages.roles.unassigned;
   }
   return roles.join(", ");
 }

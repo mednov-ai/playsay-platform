@@ -1,0 +1,55 @@
+.playsay-workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.playsay-workspace-tab {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.82);
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  padding: 0.875rem 1rem;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.playsay-workspace-tab svg {
+  flex: 0 0 auto;
+  color: hsl(var(--primary));
+}
+
+.playsay-workspace-tab span {
+  min-width: 0;
+}
+
+.playsay-workspace-tab strong,
+.playsay-workspace-tab small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-workspace-tab strong {
+  color: hsl(var(--foreground));
+  font-size: 0.925rem;
+  font-weight: 950;
+}
+
+.playsay-workspace-tab small {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.playsay-workspace-tab[data-active="true"] {
+  border-color: rgb(255 92 0 / 0.45);
+  background: #fff7f1;
+  box-shadow: inset 0 0 0 1px rgb(255 92 0 / 0.08);
+}

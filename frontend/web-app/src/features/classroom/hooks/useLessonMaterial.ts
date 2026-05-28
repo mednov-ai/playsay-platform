@@ -4,6 +4,7 @@ import {
   type LessonMaterial,
   type ScheduledLesson,
 } from "../../../shared/api/playsay";
+import { useAppTranslation } from "../../../shared/i18n";
 import type { LessonRoomSession } from "../model/session";
 
 export function useLessonMaterial({
@@ -13,6 +14,7 @@ export function useLessonMaterial({
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   session: LessonRoomSession;
 }) {
+  const { t } = useAppTranslation();
   const [material, setMaterial] = useState<LessonMaterial | null>(null);
   const [materialLoading, setMaterialLoading] = useState(false);
   const [materialError, setMaterialError] = useState<string | null>(null);
@@ -25,13 +27,16 @@ export function useLessonMaterial({
   }, [session.materialId]);
 
   useEffect(() => {
-    if (assignmentMessage !== "Материал назначен" && assignmentMessage !== "Материал снят") {
+    if (
+      assignmentMessage !== t("classroom.messages.materialAssigned") &&
+      assignmentMessage !== t("classroom.messages.materialUnassigned")
+    ) {
       return undefined;
     }
 
     const timeoutId = window.setTimeout(() => setAssignmentMessage(null), 2_500);
     return () => window.clearTimeout(timeoutId);
-  }, [assignmentMessage]);
+  }, [assignmentMessage, t]);
 
   useEffect(() => {
     if (!session.materialId) {
@@ -54,7 +59,7 @@ export function useLessonMaterial({
       } catch (caught) {
         if (!cancelled) {
           setMaterial(null);
-          setMaterialError(caught instanceof Error ? caught.message : "Не удалось загрузить материал");
+          setMaterialError(caught instanceof Error ? caught.message : t("classroom.messages.materialLoadFailed"));
         }
       } finally {
         if (!cancelled) {
@@ -75,23 +80,23 @@ export function useLessonMaterial({
     try {
       const updated = await onAssignMaterial(session.lessonId, selectedMaterialId || null);
       if (!updated) {
-        setAssignmentMessage("Материал не назначен");
+        setAssignmentMessage(t("classroom.messages.materialNotAssigned"));
         return;
       }
 
       if (!updated.materialId) {
         setMaterial(null);
         setMaterialError(null);
-        setAssignmentMessage("Материал снят");
+        setAssignmentMessage(t("classroom.messages.materialUnassigned"));
         return;
       }
 
       const lessonMaterial = await fetchScheduledLessonMaterial(session.lessonId);
       setMaterial(lessonMaterial);
       setMaterialError(null);
-      setAssignmentMessage("Материал назначен");
+      setAssignmentMessage(t("classroom.messages.materialAssigned"));
     } catch (caught) {
-      setAssignmentMessage(caught instanceof Error ? caught.message : "Не удалось назначить материал");
+      setAssignmentMessage(caught instanceof Error ? caught.message : t("classroom.messages.materialAssignFailed"));
     } finally {
       setAssigningMaterial(false);
     }

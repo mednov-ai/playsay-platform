@@ -14,6 +14,8 @@ import { Button } from "../../../components/ui/button";
 import type { LessonRoomSession } from "../model/session";
 import { ClassroomVideoStage } from "./ClassroomVideoStage";
 import { LessonWorkspace } from "./LessonWorkspace";
+import { useAppTranslation } from "../../../shared/i18n";
+
 export function LiveLessonExperience({
   materials,
   onAssignMaterial,
@@ -27,8 +29,10 @@ export function LiveLessonExperience({
   profile: MeProfile | null;
   session: LessonRoomSession;
 }) {
-  const displayName = profile?.name ?? profile?.username ?? "Участник";
-  const lessonTypeLabel = formatLessonType(session.lessonType);
+  const { t } = useAppTranslation();
+  const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
+  const displayName = profile?.name ?? profile?.username ?? t("classroom.participantFallback");
+  const lessonTypeLabel = formatLessonType(session.lessonType, translate);
   const canManageLesson = canAssignLessons(profile);
   const videoOnly = !session.materialId && !canManageLesson;
 
@@ -40,7 +44,7 @@ export function LiveLessonExperience({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-extrabold text-primary-foreground">
                 <Radio className="h-3.5 w-3.5" />
-                В эфире
+                {t("classroom.live")}
               </span>
               <span className="playsay-video-type-badge rounded-full border border-white/15 px-2.5 py-1 text-xs font-extrabold text-white/80">
                 {lessonTypeLabel}
@@ -48,12 +52,12 @@ export function LiveLessonExperience({
             </div>
             <h1 className="mt-2 truncate text-2xl font-black tracking-normal">{session.lessonTitle}</h1>
             <p className="mt-1 truncate text-sm font-semibold text-white/60">
-              {session.courseTitle ?? "Play&Say"} · {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
+              {session.courseTitle ?? "Play&Say"} · {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt, translate)}
             </p>
           </div>
           <Button className="playsay-lesson-exit" onClick={onLeave} type="button" variant="outline">
             <PhoneOff className="h-4 w-4" />
-            Выйти
+            {t("classroom.actions.leave")}
           </Button>
         </div>
 

@@ -1,8 +1,9 @@
 import type { LessonMaterial, LessonMaterialDraft, LessonMaterialInput, LessonMaterialJson } from "../../../shared/api/playsay";
+import { i18n } from "../../../shared/i18n";
 import type { MaterialAssessmentPolicy, MaterialEditorBlock, MaterialEditorDocument, MaterialEditorPage, MaterialFormState, MaterialMatchingPair, MaterialMatchingTargetKind } from "./types";
 import { defaultMaterialDocument } from "./documentFactory";
 import { cleanMaterialAssessment, defaultObjectiveAssessmentPolicy } from "./scoring";
-import { asJsonObject, asNumber, asPositiveNumber, asString, createClientId, isObjectiveMaterialBlockType, materialBlockLabel, normalizeMaterialBlockType, readPromptFromSourceMeta, uniqueMaterialOptions } from "./formatters";
+import { asJsonObject, asNumber, asPositiveNumber, asString, createClientId, isMaterialNormalizationTerm, isObjectiveMaterialBlockType, materialBlockLabel, normalizeMaterialBlockType, readPromptFromSourceMeta, uniqueMaterialOptions } from "./formatters";
 
 export function materialToForm(material: LessonMaterial): MaterialFormState {
   const sourceMeta = asJsonObject(material.sourceMeta);
@@ -72,7 +73,7 @@ export function materialFormToInput(form: MaterialFormState): LessonMaterialInpu
 export function materialPreviewFromForm(form: MaterialFormState): LessonMaterial {
   const input = materialFormToInput({
     ...form,
-    title: form.title.trim() || "Новый материал",
+    title: form.title.trim() || i18n.t("materials.defaults.materialTitle"),
   });
   const now = form.updatedAt ?? new Date().toISOString();
 
@@ -96,7 +97,7 @@ export function materialPreviewFromForm(form: MaterialFormState): LessonMaterial
   };
 }
 
-export function editorDocumentFromJson(value: LessonMaterialJson | unknown, fallbackTitle = "Материал"): MaterialEditorDocument {
+export function editorDocumentFromJson(value: LessonMaterialJson | unknown, fallbackTitle = i18n.t("materials.defaults.fallbackTitle")): MaterialEditorDocument {
   const root = asJsonObject(value);
   const rawPages = Array.isArray(root.pages) ? root.pages : [];
   const pages = rawPages
@@ -122,7 +123,7 @@ export function materialPageFromJson(value: unknown, index: number, fallbackTitl
 
   return {
     id: asString(page.id) || createClientId("page"),
-    title: asString(page.title) || (index === 0 ? fallbackTitle : `Страница ${index + 1}`),
+    title: asString(page.title) || (index === 0 ? fallbackTitle : i18n.t("materials.defaults.pageTitleNumber", { number: index + 1 })),
     layout: page.layout === "WORKSHEET" ? "WORKSHEET" : "FLOW",
     blocks,
   };
@@ -338,10 +339,10 @@ export function materialMatchingPairTargetKind(pair: MaterialMatchingPair): Mate
 
 export function normalizeMatchingTargetKind(value: string): MaterialMatchingTargetKind | null {
   const clean = value.trim().toLowerCase();
-  if (["image", "img", "picture", "photo", "картинка", "рисунок", "изображение"].includes(clean)) {
+  if (isMaterialNormalizationTerm("imageTarget", clean)) {
     return "IMAGE";
   }
-  if (["text", "word", "label", "текст", "слово", "надпись"].includes(clean)) {
+  if (isMaterialNormalizationTerm("textTarget", clean)) {
     return "TEXT";
   }
   return null;

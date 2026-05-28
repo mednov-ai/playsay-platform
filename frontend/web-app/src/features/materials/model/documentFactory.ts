@@ -1,6 +1,7 @@
 import type { MaterialBlockType, MaterialDraftSourceImage, MaterialEditorBlock, MaterialEditorDocument, MaterialEditorPage, MaterialFormState, MaterialMatchingPair } from "./types";
 import { asJsonObject, createClientId, materialBlockLabel } from "./formatters";
 import { defaultObjectiveAssessmentPolicy } from "./scoring";
+import { i18n } from "../../../shared/i18n";
 
 export function defaultMaterialForm(): MaterialFormState {
   return {
@@ -30,14 +31,14 @@ export function defaultMaterialForm(): MaterialFormState {
   };
 }
 
-export function defaultMaterialDocument(title = "Новый материал"): MaterialEditorDocument {
+export function defaultMaterialDocument(title = i18n.t("materials.defaults.materialTitle")): MaterialEditorDocument {
   return {
     schemaVersion: 1,
     pages: [defaultMaterialPage(title)],
   };
 }
 
-export function defaultMaterialPage(title = "Новый материал"): MaterialEditorPage {
+export function defaultMaterialPage(title = i18n.t("materials.defaults.pageTitle")): MaterialEditorPage {
   return {
     id: createClientId("page"),
     title,
@@ -46,8 +47,8 @@ export function defaultMaterialPage(title = "Новый материал"): Mate
       {
         id: createClientId("block"),
         type: "text",
-        title: "Цель урока",
-        body: "Добавьте короткую инструкцию, упражнение, видео или карточки.",
+        title: i18n.t("materials.defaults.lessonGoalTitle"),
+        body: i18n.t("materials.defaults.lessonGoalBody"),
       },
     ],
   };
@@ -71,7 +72,7 @@ export function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
       return {
         ...base,
         cards: [
-          { id: createClientId("card"), front: "boarding pass", back: "посадочный талон", example: "Show your boarding pass at the gate." },
+          { id: createClientId("card"), front: "boarding pass", back: i18n.t("materials.defaults.flashcardBack"), example: "Show your boarding pass at the gate." },
         ],
       };
     case "fillGaps":
@@ -103,7 +104,7 @@ export function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
       return { ...base, height: 240 };
     case "text":
     default:
-      return { ...base, body: "Введите текст задания." };
+      return { ...base, body: i18n.t("materials.defaults.textBody") };
   }
 }
 
@@ -138,10 +139,10 @@ export function defaultMatchingImagePrompt(value: string): string {
 
 export async function prepareMaterialDraftSourceImage(file: File): Promise<MaterialDraftSourceImage> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-    throw new Error("Поддерживаются JPEG, PNG и WebP.");
+    throw new Error(i18n.t("materials.errors.imageType"));
   }
   if (file.size > 12 * 1024 * 1024) {
-    throw new Error("Изображение должно быть меньше 12 МБ.");
+    throw new Error(i18n.t("materials.errors.imageSize"));
   }
 
   const rawDataUrl = await readFileAsDataUrl(file);
@@ -154,7 +155,7 @@ export async function prepareMaterialDraftSourceImage(file: File): Promise<Mater
 
   const context = canvas.getContext("2d");
   if (!context) {
-    throw new Error("Браузер не смог подготовить изображение.");
+    throw new Error(i18n.t("materials.errors.imagePrepare"));
   }
 
   context.fillStyle = "#ffffff";
@@ -170,7 +171,7 @@ export async function prepareMaterialDraftSourceImage(file: File): Promise<Mater
     dataUrl = canvas.toDataURL("image/jpeg", quality);
   }
   if (dataUrl.length > 2_400_000) {
-    throw new Error("Изображение слишком большое после сжатия. Попробуйте обрезать фото ближе к заданию.");
+    throw new Error(i18n.t("materials.errors.imageCompressedSize"));
   }
 
   return {
@@ -188,10 +189,10 @@ export function readFileAsDataUrl(file: File): Promise<string> {
       if (result) {
         resolve(result);
       } else {
-        reject(new Error("Не удалось прочитать файл."));
+        reject(new Error(i18n.t("materials.errors.fileRead")));
       }
     };
-    reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
+    reader.onerror = () => reject(new Error(i18n.t("materials.errors.fileRead")));
     reader.readAsDataURL(file);
   });
 }
@@ -200,7 +201,7 @@ export function loadHtmlImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Не удалось открыть изображение."));
+    image.onerror = () => reject(new Error(i18n.t("materials.errors.imageOpen")));
     image.src = src;
   });
 }
@@ -215,7 +216,9 @@ export function duplicateMaterialForm(form: MaterialFormState): MaterialFormStat
     ...form,
     id: null,
     updatedAt: null,
-    title: form.title.trim() ? `Копия ${form.title.trim()}` : "Копия материала",
+    title: form.title.trim()
+      ? i18n.t("materials.defaults.copyTitle", { title: form.title.trim() })
+      : i18n.t("materials.defaults.copyFallback"),
     visibility: "PRIVATE",
     status: "DRAFT",
     document: cloneMaterialDocument(form.document),

@@ -11,6 +11,7 @@ import type {
   CourseLessonInput,
   MeProfile,
 } from "../../../shared/api/playsay";
+import { useAppTranslation } from "../../../shared/i18n";
 
 type CourseFormState = {
   title: string;
@@ -51,6 +52,7 @@ export function CourseWorkspacePanel({
   onRefresh: () => void;
   profile: MeProfile | null;
 }) {
+  const { t } = useAppTranslation();
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
 
   return (
@@ -58,17 +60,17 @@ export function CourseWorkspacePanel({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">Курсы и уроки</h2>
+          <h2 className="text-lg font-extrabold">{t("courses.title")}</h2>
         </div>
         <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Обновить
+          {t("common.actions.refresh")}
         </Button>
       </div>
 
       {!profile ? (
         <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-          Войдите, чтобы увидеть учебные программы.
+          {t("courses.loginRequired")}
         </div>
       ) : (
         <div className="mt-4 grid gap-4">
@@ -84,7 +86,7 @@ export function CourseWorkspacePanel({
 
           {courses.length === 0 ? (
             <div className="rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-              {canManage ? "Курсов пока нет. Создайте первую программу." : "Опубликованных курсов пока нет."}
+              {canManage ? t("courses.empty.manager") : t("courses.empty.student")}
             </div>
           ) : (
             <div className="grid gap-3">
@@ -115,6 +117,7 @@ function CourseCreateForm({
   disabled: boolean;
   onCreate: (input: CourseInput) => void;
 }) {
+  const { t } = useAppTranslation();
   const [form, setForm] = useState<CourseFormState>({
     title: "",
     description: "",
@@ -142,18 +145,18 @@ function CourseCreateForm({
   return (
     <form className="grid gap-3 rounded-2xl border border-border bg-muted/50 p-3" onSubmit={submit}>
       <div className="grid gap-3 sm:grid-cols-[1fr_7rem_7rem]">
-        <FormField label="Название курса">
+        <FormField label={t("courses.form.courseTitle")}>
           <input
             className="playsay-input"
             disabled={disabled}
             maxLength={160}
             onChange={(event) => updateField("title", event.target.value)}
-            placeholder="English A1"
+            placeholder={t("courses.form.courseTitlePlaceholder")}
             required
             value={form.title}
           />
         </FormField>
-        <FormField label="Уровень">
+        <FormField label={t("courses.form.level")}>
           <input
             className="playsay-input"
             disabled={disabled}
@@ -162,7 +165,7 @@ function CourseCreateForm({
             value={form.level}
           />
         </FormField>
-        <FormField label="Язык">
+        <FormField label={t("courses.form.language")}>
           <input
             className="playsay-input"
             disabled={disabled}
@@ -172,13 +175,13 @@ function CourseCreateForm({
           />
         </FormField>
       </div>
-      <FormField label="Описание">
+      <FormField label={t("courses.form.description")}>
         <textarea
           className="playsay-input min-h-20 resize-none py-3"
           disabled={disabled}
           maxLength={2_000}
           onChange={(event) => updateField("description", event.target.value)}
-          placeholder="Короткое описание программы"
+          placeholder={t("courses.form.descriptionPlaceholder")}
           value={form.description}
         />
       </FormField>
@@ -190,11 +193,11 @@ function CourseCreateForm({
             onChange={(event) => updateField("isPublished", event.target.checked)}
             type="checkbox"
           />
-          Опубликован
+          {t("courses.form.published")}
         </label>
         <Button disabled={disabled || form.title.trim().length === 0} type="submit">
           <Plus className="h-4 w-4" />
-          Создать курс
+          {t("courses.form.createCourse")}
         </Button>
       </div>
     </form>
@@ -218,6 +221,8 @@ function CourseCard({
   onDeleteCourse: () => void;
   onDeleteLesson: (lessonId: string) => void;
 }) {
+  const { t } = useAppTranslation();
+
   return (
     <article className="rounded-2xl border border-border bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -225,23 +230,24 @@ function CourseCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-extrabold">{course.title}</h3>
             <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground">
-              {course.level ?? "level later"}
+              {course.level ?? t("courses.status.levelLater")}
             </span>
             <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground">
-              {course.isPublished ? "published" : "draft"}
+              {course.isPublished ? t("courses.status.published") : t("courses.status.draft")}
             </span>
           </div>
           {course.description ? (
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{course.description}</p>
           ) : null}
           <p className="mt-2 text-xs font-bold text-muted-foreground">
-            {course.lessonCount} уроков · обновлено {new Date(course.updatedAt).toLocaleString()}
+            {t("courses.summary.lessonCount", { count: course.lessonCount })} ·{" "}
+            {t("courses.summary.updatedAt", { date: new Date(course.updatedAt).toLocaleString() })}
           </p>
         </div>
         {canManage ? (
           <Button disabled={disabled} onClick={onDeleteCourse} type="button" variant="outline">
             <Trash2 className="h-4 w-4" />
-            Удалить
+            {t("courses.actions.delete")}
           </Button>
         ) : null}
       </div>
@@ -249,7 +255,7 @@ function CourseCard({
       <div className="mt-4 grid gap-2">
         {lessons.length === 0 ? (
           <div className="rounded-xl border border-border bg-muted/50 p-3 text-sm font-semibold text-muted-foreground">
-            Уроки ещё не добавлены.
+            {t("courses.empty.lessons")}
           </div>
         ) : (
           lessons.map((lesson) => (
@@ -280,12 +286,16 @@ function CourseLessonRow({
   lesson: CourseLesson;
   onDelete: () => void;
 }) {
+  const { t } = useAppTranslation();
+  const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/45 p-3">
       <div>
         <div className="text-sm font-extrabold">{lesson.title}</div>
         <div className="mt-1 text-xs font-bold text-muted-foreground">
-          № {lesson.orderIndex ?? "?"} · {formatDuration(lesson.plannedDurationMin)}
+          {t("courses.summary.lessonOrder", { order: lesson.orderIndex ?? "?" })} ·{" "}
+          {formatDuration(lesson.plannedDurationMin, translate)}
         </div>
         {lesson.materialTitle ? (
           <div className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-[#fff3eb] px-2 py-1 text-xs font-extrabold text-primary">
@@ -297,7 +307,7 @@ function CourseLessonRow({
       {canManage ? (
         <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
           <Trash2 className="h-4 w-4" />
-          Удалить
+          {t("courses.actions.delete")}
         </Button>
       ) : null}
     </div>
@@ -311,6 +321,7 @@ function CourseLessonCreateForm({
   disabled: boolean;
   onCreate: (input: CourseLessonInput) => void;
 }) {
+  const { t } = useAppTranslation();
   const [form, setForm] = useState<LessonFormState>({
     title: "",
     orderIndex: "",
@@ -338,7 +349,7 @@ function CourseLessonCreateForm({
         disabled={disabled}
         maxLength={160}
         onChange={(event) => updateField("title", event.target.value)}
-        placeholder="Название урока"
+        placeholder={t("courses.form.lessonTitlePlaceholder")}
         required
         value={form.title}
       />
@@ -347,7 +358,7 @@ function CourseLessonCreateForm({
         disabled={disabled}
         min={0}
         onChange={(event) => updateField("orderIndex", event.target.value)}
-        placeholder="№"
+        placeholder={t("courses.form.orderPlaceholder")}
         type="number"
         value={form.orderIndex}
       />
@@ -357,15 +368,14 @@ function CourseLessonCreateForm({
         max={480}
         min={1}
         onChange={(event) => updateField("plannedDurationMin", event.target.value)}
-        placeholder="мин"
+        placeholder={t("courses.form.durationPlaceholder")}
         type="number"
         value={form.plannedDurationMin}
       />
       <Button disabled={disabled || form.title.trim().length === 0} type="submit">
         <Plus className="h-4 w-4" />
-        Урок
+        {t("courses.form.addLesson")}
       </Button>
     </form>
   );
 }
-

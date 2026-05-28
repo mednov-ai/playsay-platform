@@ -1,8 +1,12 @@
 import { clampNumber, type MaterialImageGenerationProgress } from "../model/materialDocument";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialImageProgress({ value }: { value: MaterialImageGenerationProgress }) {
+  const { t } = useAppTranslation();
   const ratio = value.current ? value.current / Math.max(1, value.total) : 1;
-  const progressText = value.current ? `${value.current} из ${value.total}` : `${value.total} картинок`;
+  const progressText = value.current
+    ? t("materials.progress.currentOfTotal", { current: value.current, total: value.total })
+    : t("materials.progress.imageCount", { count: value.total });
 
   return (
     <div className="mt-3 rounded-xl border border-primary/20 bg-[#fff7f1] px-3 py-2">

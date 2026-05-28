@@ -3,12 +3,14 @@ import { ConnectionStateToast, ParticipantTile, RoomAudioRenderer, useTracks } f
 import { Track } from "livekit-client";
 import { ScreenShare, Video } from "lucide-react";
 import { ClassroomControlBar } from "./ClassroomControlBar";
+import { useAppTranslation } from "../../../shared/i18n";
 
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
 type ClassroomStripLayout = "single" | "row";
 type ClassroomVideoMode = "lesson" | "videoOnly";
 
 export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
+  const { t } = useAppTranslation();
   const controlsRef = useRef<HTMLDivElement | null>(null);
   const focusRef = useRef<HTMLDivElement | null>(null);
   const singlePipInitializedRef = useRef(false);
@@ -169,7 +171,7 @@ export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
             : (
               <div className="playsay-video-grid-empty">
                 <Video className="h-6 w-6" />
-                <span>Участники появятся здесь</span>
+                <span>{t("classroom.video.emptyParticipants")}</span>
               </div>
             )}
         </div>
@@ -187,7 +189,7 @@ export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
         {remoteScreenShareTrack ? (
           <div className="playsay-screen-share-label">
             <ScreenShare className="h-4 w-4" />
-            {participantDisplayName(remoteScreenShareTrack)}
+            {participantDisplayName(remoteScreenShareTrack, t("classroom.participantFallback"))}
           </div>
         ) : null}
         <div
@@ -221,7 +223,8 @@ export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
 }
 
 function ClassroomGridVideoTile({ trackRef }: { trackRef: ClassroomTrackReference }) {
-  const label = participantDisplayName(trackRef);
+  const { t } = useAppTranslation();
+  const label = participantDisplayName(trackRef, t("classroom.participantFallback"));
 
   return (
     <div className="playsay-video-grid-card">
@@ -240,7 +243,8 @@ function ClassroomMiniVideoTile({
   layout: ClassroomStripLayout;
   trackRef: ClassroomTrackReference;
 }) {
-  const label = participantDisplayName(trackRef);
+  const { t } = useAppTranslation();
+  const label = participantDisplayName(trackRef, t("classroom.participantFallback"));
 
   return (
     <div className="playsay-video-card" data-layout={layout}>
@@ -252,11 +256,11 @@ function ClassroomMiniVideoTile({
   );
 }
 
-function participantDisplayName(trackRef: ClassroomTrackReference): string {
+function participantDisplayName(trackRef: ClassroomTrackReference, fallback: string): string {
   return (
     trackRef.participant.name?.trim()
     || trackRef.participant.identity?.trim()
-    || "Участник"
+    || fallback
   );
 }
 

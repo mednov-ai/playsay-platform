@@ -16,6 +16,7 @@ import { MaterialImageInlineTools, MaterialImagePromptPopover } from "./Material
 import { RenderedChoiceExercise } from "./RenderedChoiceExercise";
 import { RenderedFillGapExercise } from "./RenderedFillGapExercise";
 import { RenderedMatchingPairsExercise } from "./RenderedMatchingPairsExercise";
+import { useAppTranslation } from "../../../../shared/i18n";
 
 export function RenderedMaterialBlock({
   answer,
@@ -38,6 +39,7 @@ export function RenderedMaterialBlock({
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
 }) {
+  const { t } = useAppTranslation();
   const contextLabel = materialBlockContextLabel(block);
   const blockSection = (children: ReactNode, className = "playsay-render-block") => (
     <section
@@ -80,7 +82,7 @@ export function RenderedMaterialBlock({
               <div className="playsay-video-embed-placeholder">
                 <Video className="h-5 w-5 text-primary" />
                 <span>{block.provider ?? "VIDEO"}</span>
-                <small>{block.url || "Ссылка на видео будет здесь"}</small>
+                <small>{block.url || t("materials.renderer.videoLinkPlaceholder")}</small>
               </div>
             )}
           </>,
@@ -117,7 +119,7 @@ export function RenderedMaterialBlock({
             ) : (
               <figure className="playsay-image-placeholder">
                 <ImageIcon className="h-6 w-6 text-primary" />
-                <figcaption><RenderedMarkdown className="playsay-caption-markdown" value={block.caption || block.prompt || block.url || "Изображение"} /></figcaption>
+                <figcaption><RenderedMarkdown className="playsay-caption-markdown" value={block.caption || block.prompt || block.url || t("materials.renderer.imageFallback")} /></figcaption>
                 {mode === "teacherPreview" ? (
                   <MaterialImagePromptPopover block={block} />
                 ) : null}
@@ -180,7 +182,7 @@ export function RenderedMaterialBlock({
               text: event.target.value,
               context: materialAnswerContextForBlock(block),
             })}
-            placeholder="Ответ ученика"
+            placeholder={t("materials.renderer.studentAnswerPlaceholder")}
             value={materialAnswerText(answer)}
           />
         </>,

@@ -32,6 +32,8 @@ import { SchedulePanel } from "../features/schedule/ui/SchedulePanel";
 import type { LessonRoomSession } from "../features/classroom";
 import { MaterialLibraryPanel } from "../features/materials/ui/MaterialLibraryPanel";
 import { LiveLessonExperience } from "../features/classroom/ui/LiveLessonExperience";
+import { useAppTranslation } from "../shared/i18n";
+import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -96,6 +98,7 @@ export type AppShellProps = {
 };
 
 export function AppShell(props: AppShellProps) {
+  const { t } = useAppTranslation();
   const {
     adminLoading,
     adminMessage,
@@ -184,7 +187,7 @@ export function AppShell(props: AppShellProps) {
                     type="button"
                   >
                     {nextLessonLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-                    Войти в урок
+                    {t("shell.actions.joinLesson")}
                   </Button>
                   <Button
                     aria-expanded={profileOpen}
@@ -193,22 +196,25 @@ export function AppShell(props: AppShellProps) {
                     variant="outline"
                   >
                     <User className="h-4 w-4" />
-                    Профиль
+                    {t("shell.actions.profile")}
                   </Button>
-                  <Button aria-label="Выйти" variant="outline" onClick={logout}>
+                  <Button aria-label={t("shell.aria.logout")} variant="outline" onClick={logout}>
                     <LogOut className="h-4 w-4" />
-                    Выйти
+                    {t("auth.logout")}
                   </Button>
                 </>
               ) : (
-                <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
-                  {status === "checking" || status === "loggingOut" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <LogIn className="h-4 w-4" />
-                  )}
-                  Войти
-                </Button>
+                <>
+                  <LanguageSwitcher disabled={profileSaving} />
+                  <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
+                    {status === "checking" || status === "loggingOut" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <LogIn className="h-4 w-4" />
+                    )}
+                    {t("auth.login")}
+                  </Button>
+                </>
               )}
             </div>
           </header>
@@ -235,7 +241,7 @@ export function AppShell(props: AppShellProps) {
                 isAuthenticated={isAuthenticated}
                 onRefreshAdminUsers={() => void refreshAdminUsers()}
                 onResetProfile={() => void resetProfile()}
-                onSaveProfile={(input) => void saveProfile(input)}
+                onSaveProfile={saveProfile}
                 profile={profile}
                 profileMessage={profileMessage}
                 profileSaving={profileSaving}

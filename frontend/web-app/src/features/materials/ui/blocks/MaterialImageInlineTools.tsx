@@ -1,6 +1,7 @@
 import { useState, type PointerEvent } from "react";
 import { Sparkles } from "lucide-react";
 import { clampNumber, type MaterialEditorBlock } from "../../model/materialDocument";
+import { useAppTranslation } from "../../../../shared/i18n";
 
 export function MaterialImageInlineTools({
   assetId,
@@ -17,6 +18,8 @@ export function MaterialImageInlineTools({
   onResize?: (height: number) => void;
   tags: string[];
 }) {
+  const { t } = useAppTranslation();
+
   function startResize(event: PointerEvent<HTMLButtonElement>) {
     if (!onResize) {
       return;
@@ -56,10 +59,10 @@ export function MaterialImageInlineTools({
       ) : null}
       {onResize ? (
         <button
-          aria-label="Изменить размер картинки"
+          aria-label={t("materials.renderer.resizeImage")}
           className="playsay-image-resize-handle"
           onPointerDown={startResize}
-          title="Изменить размер картинки"
+          title={t("materials.renderer.resizeImage")}
           type="button"
         />
       ) : null}
@@ -68,24 +71,25 @@ export function MaterialImageInlineTools({
 }
 
 export function MaterialImagePromptPopover({ block }: { block: MaterialEditorBlock }) {
+  const { t } = useAppTranslation();
   const [open, setOpen] = useState(false);
-  const prompt = block.prompt?.trim() || block.caption?.trim() || block.title || "Сгенерировать картинку для этого блока.";
+  const prompt = block.prompt?.trim() || block.caption?.trim() || block.title || t("materials.renderer.imagePromptFallback");
 
   return (
     <span className="playsay-image-prompt">
       <button
         aria-expanded={open}
-        aria-label="Показать промпт картинки"
+        aria-label={t("materials.renderer.showImagePrompt")}
         className="playsay-image-prompt-button"
         onClick={() => setOpen((current) => !current)}
-        title="Промпт картинки"
+        title={t("materials.renderer.imagePromptTitle")}
         type="button"
       >
         <Sparkles className="h-4 w-4" />
       </button>
       {open ? (
         <span className="playsay-image-prompt-popover" role="dialog">
-          <strong>Промпт</strong>
+          <strong>{t("materials.renderer.imagePromptHeading")}</strong>
           <span>{prompt}</span>
         </span>
       ) : null}
@@ -102,6 +106,7 @@ function MaterialAssetTags({
   onChange?: (assetId: string, tags: string[]) => void | Promise<void>;
   tags: string[];
 }) {
+  const { t } = useAppTranslation();
   const [draftTag, setDraftTag] = useState("");
 
   function commitTag(value: string) {
@@ -122,13 +127,13 @@ function MaterialAssetTags({
   }
 
   return (
-    <span className="playsay-image-tags" aria-label="Теги картинки">
+    <span className="playsay-image-tags" aria-label={t("materials.renderer.imageTags")}>
       {tags.slice(0, 8).map((tag) => (
         <button
           className="playsay-image-tag"
           key={tag}
           onClick={() => removeTag(tag)}
-          title="Убрать тег"
+          title={t("materials.renderer.removeTag")}
           type="button"
         >
           {tag}
@@ -145,7 +150,7 @@ function MaterialAssetTags({
             commitTag(draftTag);
           }
         }}
-        placeholder="+ тег"
+        placeholder={t("materials.renderer.tagPlaceholder")}
         value={draftTag}
       />
     </span>

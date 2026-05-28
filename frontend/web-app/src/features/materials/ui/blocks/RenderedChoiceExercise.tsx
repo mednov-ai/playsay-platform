@@ -23,6 +23,7 @@ import {
   materialManualInputHintPreview,
   materialManualInputInlineHint,
 } from "./RenderedFillGapExercise";
+import { useAppTranslation } from "../../../../shared/i18n";
 
 export function RenderedChoiceExercise({
   answer,
@@ -33,6 +34,7 @@ export function RenderedChoiceExercise({
   block: MaterialEditorBlock;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
+  const { t } = useAppTranslation();
   const answers = materialAnswerItems(answer);
   const attempts = materialAnswerAttempts(answer);
   const hints = materialAnswerHints(answer);
@@ -121,7 +123,7 @@ export function RenderedChoiceExercise({
                     }}
                     value={answers[itemKey] ?? ""}
                   >
-                    <option disabled hidden value="">Выбрать</option>
+                    <option disabled hidden value="">{t("materials.renderer.selectPlaceholder")}</option>
                     {options.map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
@@ -142,11 +144,11 @@ export function RenderedChoiceExercise({
                     />
                     {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
                     <button
-                      aria-label="Проверить ответ"
+                      aria-label={t("materials.renderer.checkAnswer")}
                       className="playsay-inline-check"
                       disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
                       onClick={() => checkItem(itemKey)}
-                      title="Проверить ответ (Enter)"
+                      title={t("materials.renderer.checkAnswerTitle")}
                       type="button"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" />

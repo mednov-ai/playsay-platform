@@ -7,6 +7,7 @@ import {
   type LessonMaterialJson,
   type LessonMaterialSubmission,
 } from "../../../shared/api/playsay";
+import { useAppTranslation } from "../../../shared/i18n";
 import type { LessonRoomSession } from "../model/session";
 
 export function useLessonSubmission({
@@ -18,6 +19,7 @@ export function useLessonSubmission({
   material: LessonMaterial | null;
   session: LessonRoomSession;
 }) {
+  const { t } = useAppTranslation();
   const [submission, setSubmission] = useState<LessonMaterialSubmission | null>(null);
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [submissionSaving, setSubmissionSaving] = useState(false);
@@ -42,7 +44,7 @@ export function useLessonSubmission({
       } catch (caught) {
         if (!cancelled) {
           setSubmission(null);
-          setSubmissionMessage(caught instanceof Error ? caught.message : "Не удалось загрузить ответы");
+          setSubmissionMessage(caught instanceof Error ? caught.message : t("classroom.messages.submissionLoadFailed"));
         }
       }
     }
@@ -72,7 +74,7 @@ export function useLessonSubmission({
       } catch (caught) {
         if (!cancelled) {
           setSubmissionSnapshots([]);
-          setSubmissionMonitorError(caught instanceof Error ? caught.message : "Не удалось загрузить ответы учеников");
+          setSubmissionMonitorError(caught instanceof Error ? caught.message : t("classroom.messages.submissionsLoadFailed"));
         }
       }
     }
@@ -97,9 +99,9 @@ export function useLessonSubmission({
         submitted: true,
       });
       setSubmission(savedSubmission);
-      setSubmissionMessage("Ответ отправлен");
+      setSubmissionMessage(t("classroom.messages.answerSent"));
     } catch (caught) {
-      setSubmissionMessage(caught instanceof Error ? caught.message : "Не удалось отправить ответ");
+      setSubmissionMessage(caught instanceof Error ? caught.message : t("classroom.messages.answerSendFailed"));
     } finally {
       setSubmissionSaving(false);
     }

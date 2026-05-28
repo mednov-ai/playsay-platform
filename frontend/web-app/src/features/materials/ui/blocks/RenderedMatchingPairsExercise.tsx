@@ -16,6 +16,7 @@ import {
 } from "../../model/materialDocument";
 import { MarkdownInline } from "../markdown/RenderedMarkdown";
 import { appendMaterialAttempt } from "./RenderedFillGapExercise";
+import { useAppTranslation } from "../../../../shared/i18n";
 
 export function RenderedMatchingPairsExercise({
   answer,
@@ -30,6 +31,7 @@ export function RenderedMatchingPairsExercise({
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
+  const { t } = useAppTranslation();
   const pairs = block.pairs ?? emptyMaterialMatchingPairs;
   const rightOptions = mode === "teacherPreview" ? pairs : matchingRightOptions(pairs);
   const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
@@ -131,7 +133,7 @@ export function RenderedMatchingPairsExercise({
                 <MarkdownInline className="playsay-match-markdown" value={leftPair.left} />
               </button>
               <button
-                aria-label={pairTargetKind === "IMAGE" ? `picture ${index + 1}` : pair.right}
+                aria-label={pairTargetKind === "IMAGE" ? t("materials.renderer.pictureAria", { index: index + 1 }) : pair.right}
                 className="playsay-match-picture"
                 data-connected={connected ? "true" : "false"}
                 data-kind={pairTargetKind.toLowerCase()}
@@ -149,7 +151,7 @@ export function RenderedMatchingPairsExercise({
                       </span>
                     )}
                     {!imageUrl ? (
-                      <small>{hasPendingAsset ? "Загружаем картинку" : pair.imagePrompt || pair.imageAlt || pair.right}</small>
+                      <small>{hasPendingAsset ? t("materials.renderer.loadingImage") : pair.imagePrompt || pair.imageAlt || pair.right}</small>
                     ) : null}
                   </>
                 ) : (

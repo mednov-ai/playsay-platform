@@ -6,6 +6,7 @@ import {
   materialSubmissionAssessmentSummary,
   materialSubmissionUserLabel,
 } from "../../materials";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialSubmissionsMonitor({
   error,
@@ -14,22 +15,23 @@ export function MaterialSubmissionsMonitor({
   error: string | null;
   submissions: LessonMaterialSubmission[];
 }) {
+  const { t } = useAppTranslation();
   const latestSubmissions = submissions.slice(0, 4);
 
   return (
-    <section className="playsay-submission-monitor" aria-label="Ответы учеников">
+    <section className="playsay-submission-monitor" aria-label={t("classroom.submissions.aria")}>
       <div className="playsay-submission-monitor-summary">
-        <span>Ответы учеников</span>
+        <span>{t("classroom.submissions.title")}</span>
         <strong>{submissions.length}</strong>
       </div>
       <div className="playsay-submission-monitor-list">
         {error ? (
           <span className="playsay-submission-monitor-error">
             <AlertCircle className="h-3.5 w-3.5" />
-            Ошибка загрузки
+            {t("classroom.submissions.loadError")}
           </span>
         ) : latestSubmissions.length === 0 ? (
-          <span className="playsay-submission-monitor-empty">пока нет ответов</span>
+          <span className="playsay-submission-monitor-empty">{t("classroom.submissions.empty")}</span>
         ) : (
           latestSubmissions.map((submission) => {
             const assessment = materialSubmissionAssessmentSummary(submission);
@@ -38,8 +40,8 @@ export function MaterialSubmissionsMonitor({
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>{materialSubmissionUserLabel(submission)}</span>
                 {typeof submission.score === "number" ? <strong>{formatMaterialScore(submission.score)}</strong> : null}
-                {assessment.hints > 0 ? <small>{assessment.hints} hint</small> : null}
-                {assessment.retries > 0 ? <small>{assessment.retries} retry</small> : null}
+                {assessment.hints > 0 ? <small>{t("classroom.submissions.hint", { count: assessment.hints })}</small> : null}
+                {assessment.retries > 0 ? <small>{t("classroom.submissions.retry", { count: assessment.retries })}</small> : null}
                 <time dateTime={submission.submittedAt ?? submission.updatedAt}>
                   {formatSubmissionTime(submission.submittedAt ?? submission.updatedAt)}
                 </time>

@@ -1,5 +1,6 @@
 import { type CSSProperties, type KeyboardEvent } from "react";
 import { CheckCircle2, FileText } from "lucide-react";
+import { i18n, useAppTranslation } from "../../../../shared/i18n";
 import {
   MAX_MANUAL_INPUT_HINTS,
   cleanMaterialAssessment,
@@ -9,7 +10,9 @@ import {
   materialAnswerHints,
   materialAnswerItems,
   materialAnswerStatus,
+  isMaterialNormalizationTerm,
   materialItemAnswerMatches,
+  materialNormalizationTerms,
   type MaterialAnswerBlock,
   type MaterialAnswerStatus,
   type MaterialAttemptEntry,
@@ -28,6 +31,7 @@ export function RenderedFillGapExercise({
   block: MaterialEditorBlock;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
+  const { t } = useAppTranslation();
   const answers = materialAnswerItems(answer);
   const attempts = materialAnswerAttempts(answer);
   const hints = materialAnswerHints(answer);
@@ -117,7 +121,7 @@ export function RenderedFillGapExercise({
                     }}
                     value={answers[itemKey] ?? ""}
                   >
-                    <option disabled hidden value="">Выбрать</option>
+                    <option disabled hidden value="">{t("materials.renderer.selectPlaceholder")}</option>
                     {options.map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
@@ -137,11 +141,11 @@ export function RenderedFillGapExercise({
                     />
                     {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
                     <button
-                      aria-label="Проверить ответ"
+                      aria-label={t("materials.renderer.checkAnswer")}
                       className="playsay-inline-check"
                       disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
                       onClick={() => checkItem(itemKey)}
-                      title="Проверить ответ (Enter)"
+                      title={t("materials.renderer.checkAnswerTitle")}
                       type="button"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -173,6 +177,7 @@ export function MaterialAnswerTools({
   onHint: () => void;
   status: MaterialAnswerStatus;
 }) {
+  const { t } = useAppTranslation();
   const nextHintNumber = Math.min(status.hintsUsed + 1, MAX_MANUAL_INPUT_HINTS);
   if (!canRequestHint) {
     return null;
@@ -181,10 +186,10 @@ export function MaterialAnswerTools({
   return (
     <div className="playsay-answer-tools">
       <button
-        aria-label={`Подсказка ${nextHintNumber} из ${MAX_MANUAL_INPUT_HINTS}`}
+        aria-label={t("materials.renderer.hintProgress", { current: nextHintNumber, total: MAX_MANUAL_INPUT_HINTS })}
         className="playsay-hint-button"
         onClick={onHint}
-        title={`Подсказка ${nextHintNumber} из ${MAX_MANUAL_INPUT_HINTS}`}
+        title={t("materials.renderer.hintProgress", { current: nextHintNumber, total: MAX_MANUAL_INPUT_HINTS })}
         type="button"
       >
         <FileText className="h-3.5 w-3.5" />
@@ -195,6 +200,8 @@ export function MaterialAnswerTools({
 }
 
 export function MaterialAttemptBar({ status }: { status: MaterialAnswerStatus }) {
+  const { t } = useAppTranslation();
+
   if (status.kind === "empty" || status.kind === "draft") {
     return null;
   }
@@ -204,10 +211,10 @@ export function MaterialAttemptBar({ status }: { status: MaterialAnswerStatus })
     ? 100
     : Math.min(100, Math.max(0, (status.incorrectAttempts / maxAttempts) * 100));
   const label = status.locked
-    ? `Попытки закончились: ${status.incorrectAttempts} из ${maxAttempts}`
+    ? t("materials.renderer.attemptsFinished", { used: status.incorrectAttempts, total: maxAttempts })
     : status.correct
-      ? `Ответ принят: ошибок до ответа ${status.incorrectAttempts} из ${maxAttempts}`
-      : `Ошибок ${status.incorrectAttempts} из ${maxAttempts}`;
+      ? t("materials.renderer.acceptedAttempts", { used: status.incorrectAttempts, total: maxAttempts })
+      : t("materials.renderer.errorAttempts", { used: status.incorrectAttempts, total: maxAttempts });
   const style = {
     "--playsay-answer-red": `${redPercent}%`,
   } as CSSProperties;
@@ -234,8 +241,7 @@ export function materialExerciseOptions(item: MaterialExerciseItem, block: Mater
   const articleContext = `${block.title} ${block.body ?? ""} ${block.prompt ?? ""} ${item.prompt}`.toLowerCase();
   if (
     ["a", "an", "-"].includes(answer) ||
-    articleContext.includes("article") ||
-    articleContext.includes("артик")
+    materialNormalizationTerms("articleContext").some((term) => articleContext.includes(term))
   ) {
     return ["a", "an", "-"];
   }
@@ -337,7 +343,9 @@ export function materialHintForExerciseItem(item: MaterialExerciseItem, block: M
   const type = level === 1 ? "firstLetter" : level === 2 ? "partialAnswer" : "fullAnswer";
   return {
     at: new Date().toISOString(),
-    label: level >= MAX_MANUAL_INPUT_HINTS ? `Ответ: ${value}` : `Подсказка ${level}: ${value}`,
+    label: level >= MAX_MANUAL_INPUT_HINTS
+      ? i18n.t("materials.renderer.answerHint", { value })
+      : i18n.t("materials.renderer.hintValue", { level, value }),
     penalty,
     type,
     value,
@@ -395,7 +403,7 @@ function uniqueMaterialOptions(options: string[]): string[] {
 
 function normalizeMaterialAnswer(value: string | undefined): string {
   const normalized = value?.trim().toLowerCase() ?? "";
-  if (["no article", "no article needed", "zero article", "нет артикля"].includes(normalized)) {
+  if (isMaterialNormalizationTerm("noArticle", normalized)) {
     return "-";
   }
   return normalized;

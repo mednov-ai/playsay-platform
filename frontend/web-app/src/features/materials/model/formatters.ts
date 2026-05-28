@@ -1,6 +1,7 @@
 import type { CourseLessonMap } from "../../../entities/schedule/model";
 import type { Course, CourseLesson, LessonMaterialJson, LessonMaterialSubmission } from "../../../shared/api/playsay";
 import { parseOptionalNumber } from "../../../shared/utils/number";
+import { i18n, supportedLanguages } from "../../../shared/i18n";
 import type { MaterialBlockType, MaterialEditorBlock } from "./types";
 
 export function uniqueMaterialOptions(options: string[]): string[] {
@@ -36,6 +37,20 @@ export function normalizeMaterialAnswer(value: string | undefined): string {
   return value?.trim().replace(/\s+/g, " ").toLowerCase() ?? "";
 }
 
+export function materialNormalizationTerms(key: "articleContext" | "imageTarget" | "noArticle" | "textTarget"): string[] {
+  return supportedLanguages.flatMap((language) => {
+    const value = i18n.t(`materials.normalization.${key}`, {
+      lng: language,
+      returnObjects: true,
+    });
+    return Array.isArray(value) ? value.map((item) => String(item).toLowerCase()) : [];
+  });
+}
+
+export function isMaterialNormalizationTerm(key: "imageTarget" | "noArticle" | "textTarget", value: string): boolean {
+  return materialNormalizationTerms(key).includes(value.trim().toLowerCase());
+}
+
 export function readPromptFromSourceMeta(value: LessonMaterialJson | unknown): string {
   const sourceMeta = asJsonObject(value);
   return asString(sourceMeta.prompt) || asString(sourceMeta.sourceText) || "";
@@ -63,29 +78,29 @@ export function flattenCourseLessonMaterialOptions(
 export function materialBlockLabel(type: MaterialBlockType): string {
   switch (type) {
     case "text":
-      return "Текст";
+      return i18n.t("materials.blockTypes.text");
     case "image":
-      return "Картинка";
+      return i18n.t("materials.blockTypes.image");
     case "generatedImage":
-      return "AI-картинка";
+      return i18n.t("materials.blockTypes.generatedImage");
     case "videoEmbed":
-      return "Видео";
+      return i18n.t("materials.blockTypes.videoEmbed");
     case "flashcards":
-      return "Карточки";
+      return i18n.t("materials.blockTypes.flashcards");
     case "fillGaps":
-      return "Пропуски";
+      return i18n.t("materials.blockTypes.fillGaps");
     case "multipleChoice":
-      return "Тест";
+      return i18n.t("materials.blockTypes.multipleChoice");
     case "matchingPairs":
-      return "Соответствия";
+      return i18n.t("materials.blockTypes.matchingPairs");
     case "freeWriting":
-      return "Письмо";
+      return i18n.t("materials.blockTypes.freeWriting");
     case "speakingPrompt":
-      return "Speaking";
+      return i18n.t("materials.blockTypes.speakingPrompt");
     case "drawingArea":
-      return "Поле";
+      return i18n.t("materials.blockTypes.drawingArea");
     default:
-      return "Блок";
+      return i18n.t("materials.blockTypes.fallback");
   }
 }
 
@@ -308,16 +323,16 @@ export function createClientId(prefix: string): string {
 
 export function formatFileSize(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) {
-    return "0 КБ";
+    return i18n.t("materials.fileSize.kb", { value: 0 });
   }
   if (bytes < 1024 * 1024) {
-    return `${Math.ceil(bytes / 1024)} КБ`;
+    return i18n.t("materials.fileSize.kb", { value: Math.ceil(bytes / 1024) });
   }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  return i18n.t("materials.fileSize.mb", { value: (bytes / (1024 * 1024)).toFixed(1) });
 }
 
 export function materialSubmissionUserLabel(submission: LessonMaterialSubmission): string {
-  return submission.userName?.trim() || submission.userSubject?.trim() || "Ученик";
+  return submission.userName?.trim() || submission.userSubject?.trim() || i18n.t("materials.submissions.studentFallback");
 }
 
 export function averageSubmissionScore(submissions: LessonMaterialSubmission[]): number | null {
@@ -341,7 +356,7 @@ export function materialSubmissionAssessmentSummary(submission: LessonMaterialSu
   return {
     hints,
     retries,
-    label: `${errors} ошибок, ${hints} подсказок, ${retries} дополнительных попыток`,
+    label: i18n.t("materials.submissions.assessmentSummary", { errors, hints, retries }),
   };
 }
 
@@ -360,7 +375,7 @@ export function formatMaterialScore(value: number | string | null | undefined): 
 
 export function formatSubmissionTime(value: string | null | undefined): string {
   if (!value) {
-    return "черновик";
+    return i18n.t("materials.submissions.draft");
   }
 
   return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });

@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./app/App";
 import "@livekit/components-styles";
+import "./shared/i18n/config";
 import "./styles.css";
 import "./styles/workspace.css";
 import "./styles/classroom.css";

@@ -1,6 +1,7 @@
 import { Globe2, Paperclip, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { formatFileSize, type MaterialDraftSourceImage } from "../model/materialDocument";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialDraftPanel({
   canGenerateDraft,
@@ -31,24 +32,26 @@ export function MaterialDraftPanel({
   onUpdateDraftPrompt: (value: string) => void;
   onUpdateDraftUrl: (value: string) => void;
 }) {
+  const { t } = useAppTranslation();
+
   return (
     <div className="rounded-2xl border border-border bg-white p-3">
       <div className="mb-2 flex items-center gap-2 text-sm font-extrabold">
         <Wand2 className="h-4 w-4 text-primary" />
-        Черновик с AI
+        {t("materials.draft.title")}
       </div>
       <textarea
         className="playsay-input min-h-28 resize-none py-3"
         disabled={disabled}
         maxLength={4_000}
         onChange={(event) => onUpdateDraftPrompt(event.target.value)}
-        placeholder="Например: A2, travelling, 45 минут, warm-up, слова, speaking и короткое письмо"
+        placeholder={t("materials.draft.promptPlaceholder")}
         value={draftPrompt}
       />
       <label className="mt-2 block">
         <span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase text-muted-foreground">
           <Globe2 className="h-3.5 w-3.5 text-primary" />
-          Внешняя страница
+          {t("materials.draft.externalPage")}
         </span>
         <input
           className="playsay-input"
@@ -63,7 +66,7 @@ export function MaterialDraftPanel({
       <label className="mt-2 block">
         <span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase text-muted-foreground">
           <Paperclip className="h-3.5 w-3.5 text-primary" />
-          Фото или скан
+          {t("materials.draft.photoOrScan")}
         </span>
         <input
           accept="image/jpeg,image/png,image/webp"
@@ -83,7 +86,7 @@ export function MaterialDraftPanel({
           <div className="min-w-0">
             <div className="truncate text-sm font-extrabold">{draftImage.fileName}</div>
             <div className="text-xs font-bold text-muted-foreground">
-              {formatFileSize(draftImage.originalSize)} · подготовлено для AI
+              {formatFileSize(draftImage.originalSize)} · {t("materials.draft.preparedForAi")}
             </div>
           </div>
           <Button disabled={disabled} onClick={onRemoveDraftImage} type="button" variant="outline">
@@ -103,7 +106,7 @@ export function MaterialDraftPanel({
         type="button"
       >
         <Sparkles className="h-4 w-4" />
-        Подготовить черновик
+        {t("materials.draft.generate")}
       </Button>
       <Button
         className="mt-2 w-full"
@@ -113,7 +116,7 @@ export function MaterialDraftPanel({
         variant="outline"
       >
         <Globe2 className="h-4 w-4" />
-        Черновик из ссылки
+        {t("materials.draft.fromUrl")}
       </Button>
     </div>
   );

@@ -2,6 +2,8 @@ import type { Course, CourseLesson, ScheduledLesson } from "../../shared/api/pla
 
 export type CourseLessonMap = Record<string, CourseLesson[]>;
 
+export type ScheduleTranslate = (key: string, options?: Record<string, unknown>) => string;
+
 export type ScheduleFormState = {
   lessonTemplateId: string;
   scheduledStart: string;
@@ -10,8 +12,8 @@ export type ScheduleFormState = {
   participantSubjects: string;
 };
 
-export function formatDuration(value: number | null | undefined): string {
-  return value ? `${value} мин` : "длительность позже";
+export function formatDuration(value: number | null | undefined, t: ScheduleTranslate): string {
+  return value ? t("schedule.duration.minutes", { count: value }) : t("schedule.duration.pending");
 }
 
 export function flattenCourseLessonOptions(
@@ -51,8 +53,8 @@ export function localDateTimeToIso(value: string): string | null {
   return value ? new Date(value).toISOString() : null;
 }
 
-export function formatDateTime(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleString() : "время позже";
+export function formatDateTime(value: string | null | undefined, t: ScheduleTranslate): string {
+  return value ? new Date(value).toLocaleString() : t("schedule.time.pending");
 }
 
 export function isClosedScheduleStatus(status: string): boolean {
@@ -83,20 +85,20 @@ export function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.
   return !isClosedScheduleStatus(lesson.status) && !isScheduleExpired(lesson, nowMs);
 }
 
-export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number): string {
+export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number, t: ScheduleTranslate): string {
   if (lesson.status === "CANCELLED") {
-    return "Отменён";
+    return t("schedule.state.cancelled");
   }
 
   if (lesson.status === "COMPLETED" || isScheduleExpired(lesson, nowMs)) {
-    return "Истёк";
+    return t("schedule.state.expired");
   }
 
   if (lesson.status === "IN_PROGRESS" || isLessonCurrent(lesson, nowMs)) {
-    return "В эфире";
+    return t("schedule.state.live");
   }
 
-  return "Запланирован";
+  return t("schedule.state.planned");
 }
 
 export function scheduleSortRank(lesson: ScheduledLesson, nowMs: number): number {
@@ -138,40 +140,39 @@ export function compareJoinableLessons(left: ScheduledLesson, right: ScheduledLe
   return compareScheduleLessons(left, right, nowMs);
 }
 
-export function formatLessonRange(start: string | null | undefined, end: string | null | undefined): string {
+export function formatLessonRange(
+  start: string | null | undefined,
+  end: string | null | undefined,
+  t: ScheduleTranslate,
+): string {
   if (!start && !end) {
-    return "время позже";
+    return t("schedule.time.pending");
   }
 
   if (!start) {
-    return `до ${formatDateTime(end)}`;
+    return t("schedule.time.until", { time: formatDateTime(end, t) });
   }
 
   if (!end) {
-    return `с ${formatDateTime(start)}`;
+    return t("schedule.time.from", { time: formatDateTime(start, t) });
   }
 
-  return `${formatDateTime(start)} - ${new Date(end).toLocaleTimeString()}`;
+  return t("schedule.time.range", {
+    start: formatDateTime(start, t),
+    end: new Date(end).toLocaleTimeString(),
+  });
 }
 
-export function formatLessonType(value: string): string {
-  return value === "INDIVIDUAL" ? "Индивидуально" : "Группа";
+export function formatLessonType(value: string, t: ScheduleTranslate): string {
+  return value === "INDIVIDUAL" ? t("schedule.lessonType.individual") : t("schedule.lessonType.group");
 }
 
-export function formatParticipantCount(value: number): string {
+export function formatParticipantCount(value: number, t: ScheduleTranslate): string {
   if (value === 0) {
-    return "ученики позже";
+    return t("schedule.participants.none");
   }
 
-  if (value === 1) {
-    return "1 ученик";
-  }
-
-  if (value > 1 && value < 5) {
-    return `${value} ученика`;
-  }
-
-  return `${value} учеников`;
+  return t("schedule.participants.count", { count: value });
 }
 
 export function selectedParticipantSubjects(value: string): string[] {

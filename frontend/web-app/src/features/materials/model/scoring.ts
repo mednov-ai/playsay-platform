@@ -1,4 +1,5 @@
 import type { LessonMaterial, LessonMaterialJson } from "../../../shared/api/playsay";
+import { i18n } from "../../../shared/i18n";
 import {
   materialAnswerAttempts,
   materialAnswerHints,
@@ -6,7 +7,7 @@ import {
   materialAnswerMatches,
 } from "./answers";
 import { editorDocumentFromJson } from "./documentSerde";
-import { asJsonObject, asNumber, clampNumber } from "./formatters";
+import { asJsonObject, asNumber, clampNumber, isMaterialNormalizationTerm } from "./formatters";
 import type {
   MaterialAnswerState,
   MaterialAnswerStatus,
@@ -108,24 +109,24 @@ export function materialAnswerStatus(
   };
 
   if (!cleanValue) {
-    return { ...baseStatus, kind: "empty", label: "Нет ответа" };
+    return { ...baseStatus, kind: "empty", label: i18n.t("materials.answerStatus.empty") };
   }
   if (locked) {
-    return { ...baseStatus, kind: "locked", label: "Попытки закончились", locked: true };
+    return { ...baseStatus, kind: "locked", label: i18n.t("materials.answerStatus.locked"), locked: true };
   }
   if (requiresExplicitCheck && !currentValueChecked) {
-    return { ...baseStatus, kind: "draft", label: "Проверить" };
+    return { ...baseStatus, kind: "draft", label: i18n.t("materials.answerStatus.check") };
   }
   if (visibleCorrect && hints.length > 0) {
-    return { ...baseStatus, correct: true, kind: "hint", label: "Ответ принят" };
+    return { ...baseStatus, correct: true, kind: "hint", label: i18n.t("materials.answerStatus.accepted") };
   }
   if (visibleCorrect && incorrectAttempts > 0) {
-    return { ...baseStatus, correct: true, kind: "retry", label: "Ответ принят" };
+    return { ...baseStatus, correct: true, kind: "retry", label: i18n.t("materials.answerStatus.accepted") };
   }
   if (visibleCorrect) {
-    return { ...baseStatus, correct: true, kind: "correct", label: "Ответ принят" };
+    return { ...baseStatus, correct: true, kind: "correct", label: i18n.t("materials.answerStatus.accepted") };
   }
-  return { ...baseStatus, kind: "wrong", label: `${Math.max(1, incorrectAttempts)} ошибка` };
+  return { ...baseStatus, kind: "wrong", label: i18n.t("materials.answerStatus.wrong", { count: Math.max(1, incorrectAttempts) }) };
 }
 
 export function materialLiveScore(material: LessonMaterial, answers: MaterialAnswerState): number | null {
@@ -269,7 +270,7 @@ export function materialBlockContextLabel(block: MaterialEditorBlock): string {
 
 function normalizeScoredMaterialAnswer(value: string | undefined): string {
   const normalized = value?.trim().toLowerCase() ?? "";
-  if (["no article", "no article needed", "zero article", "нет артикля"].includes(normalized)) {
+  if (isMaterialNormalizationTerm("noArticle", normalized)) {
     return "-";
   }
   return normalized;

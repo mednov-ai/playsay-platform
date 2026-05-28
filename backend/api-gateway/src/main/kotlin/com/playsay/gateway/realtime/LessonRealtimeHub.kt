@@ -1,7 +1,7 @@
 package com.playsay.gateway.realtime
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.playsay.gateway.ScheduledLessonResponse
+import com.playsay.gateway.dto.ScheduledLessonResponse
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import org.springframework.stereotype.Component

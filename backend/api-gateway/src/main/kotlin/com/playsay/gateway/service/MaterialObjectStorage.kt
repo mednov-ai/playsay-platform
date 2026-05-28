@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.service
 
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
@@ -39,38 +39,6 @@ interface MaterialObjectStorage {
 
 class MaterialObjectStorageException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 class MaterialObjectNotFoundException(key: String, cause: Throwable? = null) : RuntimeException("Object not found: $key", cause)
-
-@Configuration
-class MaterialObjectStorageConfig {
-    @Bean
-    @ConditionalOnProperty(prefix = "playsay.storage", name = ["provider"], havingValue = "s3")
-    fun s3MaterialObjectStorage(
-        @Value("\${playsay.storage.s3.endpoint:}") endpoint: String,
-        @Value("\${playsay.storage.s3.region:us-east-1}") region: String,
-        @Value("\${playsay.storage.s3.bucket:playsay-material-assets}") bucket: String,
-        @Value("\${playsay.storage.s3.access-key:}") accessKey: String,
-        @Value("\${playsay.storage.s3.secret-key:}") secretKey: String,
-        @Value("\${playsay.storage.s3.path-style-access:true}") pathStyleAccess: Boolean,
-        @Value("\${playsay.storage.s3.create-bucket:false}") createBucket: Boolean,
-    ): MaterialObjectStorage {
-        if (accessKey.isBlank() || secretKey.isBlank()) {
-            throw MaterialObjectStorageException("S3 object storage credentials are not configured.")
-        }
-        val s3Region = Region.of(region.ifBlank { "us-east-1" })
-        val clientBuilder = S3Client.builder()
-            .region(s3Region)
-            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
-            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(pathStyleAccess).build())
-        endpoint.trim().takeIf { value -> value.isNotEmpty() }?.let { value ->
-            clientBuilder.endpointOverride(URI.create(value))
-        }
-        return S3MaterialObjectStorage(clientBuilder.build(), bucket, createBucket)
-    }
-
-    @Bean
-    @ConditionalOnProperty(prefix = "playsay.storage", name = ["provider"], havingValue = "memory", matchIfMissing = true)
-    fun inMemoryMaterialObjectStorage(): MaterialObjectStorage = InMemoryMaterialObjectStorage()
-}
 
 class S3MaterialObjectStorage(
     private val s3Client: S3Client,

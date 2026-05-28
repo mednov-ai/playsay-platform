@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.service
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -15,7 +15,7 @@ import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.jdbc.core.simple.JdbcClient
+import com.playsay.gateway.repo.LegacyJdbcDataRepo
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -25,30 +25,9 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
-
-data class UserProfileResponse(
-    val subject: String,
-    val username: String?,
-    val email: String?,
-    val name: String?,
-    val roles: List<String>,
-    val displayName: String?,
-    val locale: String?,
-    val timezone: String?,
-    val learningGoal: String?,
-    val updatedAt: Instant,
-)
-
-data class UpdateUserProfileRequest(
-    @field:Schema(maxLength = 120)
-    val displayName: String? = null,
-    @field:Schema(maxLength = 16)
-    val locale: String? = null,
-    @field:Schema(maxLength = 64)
-    val timezone: String? = null,
-    @field:Schema(maxLength = 500)
-    val learningGoal: String? = null,
-)
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.error.ProjectResponseException
 
 private data class StoredUserProfile(
     val id: UUID,
@@ -66,7 +45,7 @@ private data class StoredUserProfile(
 
 @Component
 class UserProfileStore(
-    private val jdbcClient: JdbcClient,
+    private val dataRepo: LegacyJdbcDataRepo,
 ) {
     @Transactional
     fun current(authentication: JwtAuthenticationToken): UserProfileResponse {
@@ -88,7 +67,7 @@ class UserProfileStore(
         val profile = findBySubject(identity.subject) ?: insertProfile(identity)
         val updatedAt = Instant.now()
 
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             UPDATE app_user
                SET username = :username,
@@ -123,7 +102,7 @@ class UserProfileStore(
         val identity = authentication.toIdentity()
         val profile = findBySubject(identity.subject) ?: return
 
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             UPDATE app_user
                SET username = :username,
@@ -150,7 +129,7 @@ class UserProfileStore(
 
     @Transactional(readOnly = true)
     fun list(): List<UserProfileResponse> =
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             SELECT id,
                    keycloak_subject,
@@ -173,7 +152,7 @@ class UserProfileStore(
 
     @Transactional(readOnly = true)
     fun listStudents(): List<UserProfileResponse> =
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             SELECT id,
                    keycloak_subject,
@@ -211,7 +190,7 @@ class UserProfileStore(
     private fun clean(value: String?, maxLength: Int): String? {
         val cleaned = value?.trim()?.takeIf { it.isNotEmpty() }
         if (cleaned != null && cleaned.length > maxLength) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Field length must be at most $maxLength characters.")
+            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Field length must be at most $maxLength characters.")
         }
         return cleaned
     }
@@ -233,7 +212,7 @@ class UserProfileStore(
             updatedAt = now,
         )
 
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             INSERT INTO app_user (
                 id,
@@ -282,7 +261,7 @@ class UserProfileStore(
     }
 
     private fun updateIdentity(id: UUID, identity: CurrentIdentity) {
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             UPDATE app_user
                SET username = :username,
@@ -301,7 +280,7 @@ class UserProfileStore(
     }
 
     private fun findBySubject(subject: String): StoredUserProfile? =
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             SELECT id,
                    keycloak_subject,
@@ -324,114 +303,6 @@ class UserProfileStore(
             .orElse(null)
 }
 
-@RestController
-@Tag(name = "Users")
-class UserProfileController(
-    private val store: UserProfileStore,
-) {
-    @GetMapping("/users/me/profile", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(
-        operationId = "getMyUserProfile",
-        summary = "Current application user profile",
-        description = "Returns the app-level profile for the current Keycloak user.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Current app-level user profile"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-        ],
-    )
-    fun current(authentication: JwtAuthenticationToken): UserProfileResponse =
-        store.current(authentication)
-
-    @PutMapping(
-        "/users/me/profile",
-        consumes = [MediaType.APPLICATION_JSON_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
-    @Operation(
-        operationId = "updateMyUserProfile",
-        summary = "Update current application user profile",
-        description = "Updates editable profile fields for the current Keycloak user.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Updated app-level user profile"),
-            ApiResponse(responseCode = "400", description = "Invalid profile payload", content = [Content()]),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-        ],
-    )
-    fun update(
-        authentication: JwtAuthenticationToken,
-        @RequestBody request: UpdateUserProfileRequest,
-    ): UserProfileResponse =
-        store.update(authentication, request)
-
-    @DeleteMapping("/users/me/profile")
-    @Operation(
-        operationId = "deleteMyUserProfile",
-        summary = "Delete current application user profile",
-        description = "Deletes editable app-level profile data for the current Keycloak user.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "204", description = "Current app-level user profile deleted"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-        ],
-    )
-    fun delete(authentication: JwtAuthenticationToken): ResponseEntity<Void> {
-        store.deleteCurrent(authentication)
-        return ResponseEntity.noContent().build()
-    }
-
-    @GetMapping("/admin/users", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(
-        operationId = "listUserProfiles",
-        summary = "List application user profiles",
-        description = "Returns known app-level user profiles. Requires the ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Known app-level user profiles"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user is not an admin", content = [Content()]),
-        ],
-    )
-    fun list(authentication: JwtAuthenticationToken): List<UserProfileResponse> {
-        if (authentication.authorities.none { authority -> authority.authority == "ROLE_ADMIN" }) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "ADMIN role is required.")
-        }
-        return store.list()
-    }
-
-    @GetMapping("/users/students", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(
-        operationId = "listStudentProfiles",
-        summary = "List student user profiles",
-        description = "Returns known app-level student profiles. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Known student user profiles"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user is not a teacher/admin", content = [Content()]),
-        ],
-    )
-    fun listStudents(authentication: JwtAuthenticationToken): List<UserProfileResponse> {
-        if (authentication.authorities.none { authority ->
-            authority.authority == "ROLE_TEACHER" || authority.authority == "ROLE_ADMIN"
-        }) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
-        }
-        return store.listStudents()
-    }
-}
-
 private data class CurrentIdentity(
     val subject: String,
     val username: String?,
@@ -452,8 +323,8 @@ private fun JwtAuthenticationToken.toIdentity(): CurrentIdentity =
 private fun JwtAuthenticationToken.applicationRoles(): List<String> =
     authorities
         .mapNotNull { authority -> authority.authority }
-        .filter { authority -> authority.startsWith("ROLE_") }
-        .map { authority -> authority.removePrefix("ROLE_") }
+        .filter { authority -> authority.startsWith(MetaData.Authorities.PREFIX) }
+        .map { authority -> authority.removePrefix(MetaData.Authorities.PREFIX) }
         .sorted()
 
 private fun StoredUserProfile.toResponse(): UserProfileResponse =

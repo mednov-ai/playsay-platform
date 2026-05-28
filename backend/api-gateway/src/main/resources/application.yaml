@@ -11,6 +11,10 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.xml
     enabled: ${PLAYSAY_LIQUIBASE_ENABLED:false}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
   security:
     oauth2:
       resourceserver:

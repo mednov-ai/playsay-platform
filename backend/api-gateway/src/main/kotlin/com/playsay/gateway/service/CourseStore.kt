@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.service
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -15,7 +15,7 @@ import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.jdbc.core.simple.JdbcClient
+import com.playsay.gateway.repo.LegacyJdbcDataRepo
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -27,54 +27,9 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
-
-data class CourseRequest(
-    @field:Schema(maxLength = 160)
-    val title: String,
-    @field:Schema(maxLength = 2_000, nullable = true)
-    val description: String? = null,
-    @field:Schema(maxLength = 16, nullable = true)
-    val level: String? = null,
-    @field:Schema(maxLength = 16)
-    val language: String = "en",
-    val isPublished: Boolean = false,
-)
-
-data class CourseResponse(
-    val id: UUID,
-    val title: String,
-    val description: String?,
-    val level: String?,
-    val language: String,
-    val createdByUserId: UUID?,
-    val isPublished: Boolean,
-    val lessonCount: Int,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
-
-data class CourseLessonRequest(
-    @field:Schema(maxLength = 160)
-    val title: String,
-    @field:Schema(nullable = true)
-    val orderIndex: Int? = null,
-    @field:Schema(nullable = true)
-    val plannedDurationMin: Int? = null,
-    @field:Schema(nullable = true)
-    val materialId: UUID? = null,
-)
-
-data class CourseLessonResponse(
-    val id: UUID,
-    val courseId: UUID,
-    val title: String,
-    val orderIndex: Int?,
-    val plannedDurationMin: Int?,
-    val materialId: UUID?,
-    val materialTitle: String?,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.error.ProjectResponseException
 
 private data class StoredCourse(
     val id: UUID,
@@ -103,7 +58,7 @@ private data class StoredCourseLesson(
 
 @Component
 class CourseStore(
-    private val jdbcClient: JdbcClient,
+    private val dataRepo: LegacyJdbcDataRepo,
     private val userProfileStore: UserProfileStore,
 ) {
     @Transactional(readOnly = true)
@@ -114,7 +69,7 @@ class CourseStore(
             courseSelect("WHERE c.is_published = TRUE") + " ORDER BY c.created_at DESC, c.title"
         }
 
-        return jdbcClient.sql(sql)
+        return dataRepo.sql(sql)
             .query(::mapCourse)
             .list()
             .map { course -> course.toResponse() }
@@ -123,7 +78,7 @@ class CourseStore(
     @Transactional(readOnly = true)
     fun getCourse(authentication: JwtAuthenticationToken, courseId: UUID): CourseResponse =
         findVisibleCourse(authentication, courseId)?.toResponse()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found.")
+            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
 
     @Transactional
     fun createCourse(authentication: JwtAuthenticationToken, request: CourseRequest): CourseResponse {
@@ -133,7 +88,7 @@ class CourseStore(
         val id = UUID.randomUUID()
         val values = request.validated()
 
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             INSERT INTO course (
                 id,
@@ -175,10 +130,10 @@ class CourseStore(
     @Transactional
     fun updateCourse(authentication: JwtAuthenticationToken, courseId: UUID, request: CourseRequest): CourseResponse {
         authentication.requireCourseManager()
-        findCourse(courseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found.")
+        findCourse(courseId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
         val values = request.validated()
 
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             UPDATE course
                SET title = :title,
@@ -205,24 +160,24 @@ class CourseStore(
     @Transactional
     fun deleteCourse(authentication: JwtAuthenticationToken, courseId: UUID) {
         authentication.requireCourseManager()
-        jdbcClient.sql("DELETE FROM lesson_template WHERE course_id = :courseId")
+        dataRepo.sql("DELETE FROM lesson_template WHERE course_id = :courseId")
             .param("courseId", courseId)
             .update()
 
-        val deleted = jdbcClient.sql("DELETE FROM course WHERE id = :courseId")
+        val deleted = dataRepo.sql("DELETE FROM course WHERE id = :courseId")
             .param("courseId", courseId)
             .update()
 
         if (deleted == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found.")
+            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
         }
     }
 
     @Transactional(readOnly = true)
     fun listCourseLessons(authentication: JwtAuthenticationToken, courseId: UUID): List<CourseLessonResponse> {
-        findVisibleCourse(authentication, courseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found.")
+        findVisibleCourse(authentication, courseId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
 
-        return jdbcClient.sql(
+        return dataRepo.sql(
             """
             SELECT id,
                    course_id,
@@ -263,13 +218,13 @@ class CourseStore(
         request: CourseLessonRequest,
     ): CourseLessonResponse {
         authentication.requireCourseManager()
-        findCourse(courseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found.")
+        findCourse(courseId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
         val values = request.validated()
         validateMaterialId(authentication, values.materialId)
         val now = Instant.now()
         val id = UUID.randomUUID()
 
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             INSERT INTO lesson_template (
                 id,
@@ -313,10 +268,10 @@ class CourseStore(
         request: CourseLessonRequest,
     ): CourseLessonResponse {
         authentication.requireCourseManager()
-        findCourse(courseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found.")
+        findCourse(courseId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
         val values = request.validated()
         validateMaterialId(authentication, values.materialId)
-        val updated = jdbcClient.sql(
+        val updated = dataRepo.sql(
             """
             UPDATE lesson_template
                SET title = :title,
@@ -338,7 +293,7 @@ class CourseStore(
             .update()
 
         if (updated == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course lesson not found.")
+            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course lesson not found.")
         }
 
         return requireNotNull(findCourseLesson(courseId, lessonId)).toResponse()
@@ -347,7 +302,7 @@ class CourseStore(
     @Transactional
     fun deleteCourseLesson(authentication: JwtAuthenticationToken, courseId: UUID, lessonId: UUID) {
         authentication.requireCourseManager()
-        val deleted = jdbcClient.sql(
+        val deleted = dataRepo.sql(
             """
             DELETE FROM lesson_template
              WHERE id = :lessonId
@@ -359,7 +314,7 @@ class CourseStore(
             .update()
 
         if (deleted == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Course lesson not found.")
+            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course lesson not found.")
         }
     }
 
@@ -372,14 +327,14 @@ class CourseStore(
     }
 
     private fun findCourse(courseId: UUID): StoredCourse? =
-        jdbcClient.sql(courseSelect("WHERE c.id = :courseId"))
+        dataRepo.sql(courseSelect("WHERE c.id = :courseId"))
             .param("courseId", courseId)
             .query(::mapCourse)
             .optional()
             .orElse(null)
 
     private fun findCourseLesson(courseId: UUID, lessonId: UUID): StoredCourseLesson? =
-        jdbcClient.sql(
+        dataRepo.sql(
             """
             SELECT id,
                    course_id,
@@ -458,7 +413,7 @@ class CourseStore(
             """.trimIndent()
         }
 
-        val exists = jdbcClient.sql(
+        val exists = dataRepo.sql(
             """
             SELECT COUNT(*)
               FROM lesson_material
@@ -472,224 +427,8 @@ class CourseStore(
             .single() > 0
 
         if (!exists) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
+            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
         }
-    }
-}
-
-@RestController
-@Tag(name = "Courses")
-class CourseController(
-    private val store: CourseStore,
-) {
-    @GetMapping("/courses", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(
-        operationId = "listCourses",
-        summary = "List courses",
-        description = "Returns published courses for students and all courses for teachers/admins.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Courses"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-        ],
-    )
-    fun list(authentication: JwtAuthenticationToken): List<CourseResponse> =
-        store.listCourses(authentication)
-
-    @GetMapping("/courses/{courseId}", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(
-        operationId = "getCourse",
-        summary = "Get course",
-        description = "Returns a single course. Unpublished courses are visible only to teachers/admins.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Course"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Course not found", content = [Content()]),
-        ],
-    )
-    fun get(
-        authentication: JwtAuthenticationToken,
-        @PathVariable courseId: UUID,
-    ): CourseResponse =
-        store.getCourse(authentication, courseId)
-
-    @PostMapping(
-        "/courses",
-        consumes = [MediaType.APPLICATION_JSON_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
-    @Operation(
-        operationId = "createCourse",
-        summary = "Create course",
-        description = "Creates a course. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "201", description = "Course created"),
-            ApiResponse(responseCode = "400", description = "Invalid course payload", content = [Content()]),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage courses", content = [Content()]),
-        ],
-    )
-    fun create(
-        authentication: JwtAuthenticationToken,
-        @RequestBody request: CourseRequest,
-    ): ResponseEntity<CourseResponse> =
-        ResponseEntity.status(HttpStatus.CREATED).body(store.createCourse(authentication, request))
-
-    @PutMapping(
-        "/courses/{courseId}",
-        consumes = [MediaType.APPLICATION_JSON_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
-    @Operation(
-        operationId = "updateCourse",
-        summary = "Update course",
-        description = "Updates a course. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Course updated"),
-            ApiResponse(responseCode = "400", description = "Invalid course payload", content = [Content()]),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage courses", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Course not found", content = [Content()]),
-        ],
-    )
-    fun update(
-        authentication: JwtAuthenticationToken,
-        @PathVariable courseId: UUID,
-        @RequestBody request: CourseRequest,
-    ): CourseResponse =
-        store.updateCourse(authentication, courseId, request)
-
-    @DeleteMapping("/courses/{courseId}")
-    @Operation(
-        operationId = "deleteCourse",
-        summary = "Delete course",
-        description = "Deletes a course and its draft lesson templates. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "204", description = "Course deleted"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage courses", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Course not found", content = [Content()]),
-        ],
-    )
-    fun delete(
-        authentication: JwtAuthenticationToken,
-        @PathVariable courseId: UUID,
-    ): ResponseEntity<Void> {
-        store.deleteCourse(authentication, courseId)
-        return ResponseEntity.noContent().build()
-    }
-
-    @GetMapping("/courses/{courseId}/lessons", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(
-        operationId = "listCourseLessons",
-        summary = "List course lessons",
-        description = "Returns lesson templates inside a course. Unpublished courses are visible only to teachers/admins.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Course lessons"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Course not found", content = [Content()]),
-        ],
-    )
-    fun listLessons(
-        authentication: JwtAuthenticationToken,
-        @PathVariable courseId: UUID,
-    ): List<CourseLessonResponse> =
-        store.listCourseLessons(authentication, courseId)
-
-    @PostMapping(
-        "/courses/{courseId}/lessons",
-        consumes = [MediaType.APPLICATION_JSON_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
-    @Operation(
-        operationId = "createCourseLesson",
-        summary = "Create course lesson",
-        description = "Creates a lesson template inside a course. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "201", description = "Course lesson created"),
-            ApiResponse(responseCode = "400", description = "Invalid course lesson payload", content = [Content()]),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage courses", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Course not found", content = [Content()]),
-        ],
-    )
-    fun createLesson(
-        authentication: JwtAuthenticationToken,
-        @PathVariable courseId: UUID,
-        @RequestBody request: CourseLessonRequest,
-    ): ResponseEntity<CourseLessonResponse> =
-        ResponseEntity.status(HttpStatus.CREATED).body(store.createCourseLesson(authentication, courseId, request))
-
-    @PutMapping(
-        "/courses/{courseId}/lessons/{lessonId}",
-        consumes = [MediaType.APPLICATION_JSON_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE],
-    )
-    @Operation(
-        operationId = "updateCourseLesson",
-        summary = "Update course lesson",
-        description = "Updates a lesson template inside a course. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Course lesson updated"),
-            ApiResponse(responseCode = "400", description = "Invalid course lesson payload", content = [Content()]),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage courses", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Course lesson not found", content = [Content()]),
-        ],
-    )
-    fun updateLesson(
-        authentication: JwtAuthenticationToken,
-        @PathVariable courseId: UUID,
-        @PathVariable lessonId: UUID,
-        @RequestBody request: CourseLessonRequest,
-    ): CourseLessonResponse =
-        store.updateCourseLesson(authentication, courseId, lessonId, request)
-
-    @DeleteMapping("/courses/{courseId}/lessons/{lessonId}")
-    @Operation(
-        operationId = "deleteCourseLesson",
-        summary = "Delete course lesson",
-        description = "Deletes a lesson template inside a course. Requires TEACHER or ADMIN role.",
-        security = [SecurityRequirement(name = "bearerAuth")],
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "204", description = "Course lesson deleted"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
-            ApiResponse(responseCode = "403", description = "Current user cannot manage courses", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "Course lesson not found", content = [Content()]),
-        ],
-    )
-    fun deleteLesson(
-        authentication: JwtAuthenticationToken,
-        @PathVariable courseId: UUID,
-        @PathVariable lessonId: UUID,
-    ): ResponseEntity<Void> {
-        store.deleteCourseLesson(authentication, courseId, lessonId)
-        return ResponseEntity.noContent().build()
     }
 }
 
@@ -719,10 +458,10 @@ private fun CourseRequest.validated(): ValidatedCourseRequest =
 
 private fun CourseLessonRequest.validated(): ValidatedCourseLessonRequest {
     if (orderIndex != null && orderIndex < 0) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "orderIndex must be greater than or equal to 0.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "orderIndex must be greater than or equal to 0.")
     }
     if (plannedDurationMin != null && plannedDurationMin !in 1..480) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "plannedDurationMin must be between 1 and 480.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "plannedDurationMin must be between 1 and 480.")
     }
 
     return ValidatedCourseLessonRequest(
@@ -735,27 +474,27 @@ private fun CourseLessonRequest.validated(): ValidatedCourseLessonRequest {
 
 private fun String.requiredClean(fieldName: String, maxLength: Int): String =
     optionalClean(fieldName, maxLength)
-        ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$fieldName is required.")
+        ?: throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName is required.")
 
 private fun String?.optionalClean(fieldName: String, maxLength: Int): String? {
     val cleaned = this?.trim()?.takeIf { it.isNotEmpty() }
     if (cleaned != null && cleaned.length > maxLength) {
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$fieldName must be at most $maxLength characters.")
+        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName must be at most $maxLength characters.")
     }
     return cleaned
 }
 
 private fun JwtAuthenticationToken.requireCourseManager() {
     if (!canManageCourses()) {
-        throw ResponseStatusException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
+        throw ProjectResponseException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
     }
 }
 
 private fun JwtAuthenticationToken.canManageCourses(): Boolean =
-    authorities.any { authority -> authority.authority == "ROLE_TEACHER" || authority.authority == "ROLE_ADMIN" }
+    authorities.any { authority -> authority.authority == MetaData.Authorities.TEACHER || authority.authority == MetaData.Authorities.ADMIN }
 
 private fun JwtAuthenticationToken.isCourseAdmin(): Boolean =
-    authorities.any { authority -> authority.authority == "ROLE_ADMIN" }
+    authorities.any { authority -> authority.authority == MetaData.Authorities.ADMIN }
 
 private fun StoredCourse.toResponse(): CourseResponse =
     CourseResponse(

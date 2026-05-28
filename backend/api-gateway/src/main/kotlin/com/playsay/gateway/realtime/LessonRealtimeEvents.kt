@@ -1,6 +1,6 @@
 package com.playsay.gateway.realtime
 
-import com.playsay.gateway.ScheduledLessonResponse
+import com.playsay.gateway.dto.ScheduledLessonResponse
 import java.util.UUID
 
 data class LessonChangedEvent(

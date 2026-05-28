@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.controller
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -10,14 +10,9 @@ import org.springframework.http.MediaType
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
-
-data class MeResponse(
-    val subject: String,
-    val username: String?,
-    val email: String?,
-    val name: String?,
-    val roles: List<String>,
-)
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.service.*
+import com.playsay.gateway.utils.MetaData
 
 @RestController
 @Tag(name = "Auth")
@@ -43,8 +38,8 @@ class MeController {
         val jwt = authentication.token
         val roles = authentication.authorities
             .mapNotNull { authority -> authority.authority }
-            .filter { authority -> authority.startsWith("ROLE_") }
-            .map { authority -> authority.removePrefix("ROLE_") }
+            .filter { authority -> authority.startsWith(MetaData.Authorities.PREFIX) }
+            .map { authority -> authority.removePrefix(MetaData.Authorities.PREFIX) }
             .sorted()
 
         return MeResponse(

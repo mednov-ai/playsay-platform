@@ -1,4 +1,4 @@
-package com.playsay.gateway
+package com.playsay.gateway.service
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -15,6 +15,9 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ResponseStatusException
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.utils.MetaData
 
 data class MaterialAiDraftInput(
     val title: String,
@@ -39,12 +42,14 @@ class MaterialAiDraftService(
         when (provider.trim().lowercase()) {
             "", "stub" -> stubProvider.draft(input)
             "openai" -> openAiProvider.draft(input)
-            else -> throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unknown AI material provider.")
+            else -> throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "Unknown AI material provider.")
         }
 }
 
 @Component
-class StubMaterialAiDraftProvider {
+class StubMaterialAiDraftProvider(
+    private val messageProvider: MessageProvider,
+) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
     fun draft(input: MaterialAiDraftInput): LessonMaterialDraftResponse {
@@ -61,14 +66,14 @@ class StubMaterialAiDraftProvider {
 
         return LessonMaterialDraftResponse(
             title = input.title,
-            description = "Черновик по описанию: ${input.prompt.take(180)}",
+            description = messageProvider.get(MetaData.Messages.MATERIAL_DRAFT_DESCRIPTION, input.prompt.take(180)),
             language = input.language,
             cefrLevel = input.cefrLevel,
             visibility = "PRIVATE",
             status = "DRAFT",
-            document = stubAiDraftDocument(input, objectMapper),
+            document = stubAiDraftDocument(input, objectMapper, messageProvider),
             sourceMeta = sourceMeta,
-            scoringRubric = materialAiDefaultScoringRubric(objectMapper),
+            scoringRubric = materialAiDefaultScoringRubric(objectMapper, messageProvider),
         )
     }
 }
@@ -87,7 +92,7 @@ class OpenAiMaterialAiDraftProvider(
         val cleanModel = model.trim().ifEmpty { "gpt-5.4-mini" }
         val cleanBaseUrl = baseUrl.trim().ifEmpty { "https://api.openai.com/v1" }
         if (cleanApiKey.isEmpty()) {
-            throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "OpenAI API key is not configured.")
+            throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "OpenAI API key is not configured.")
         }
 
         val requestBody = objectMapper.writeValueAsString(openAiRequest(input, cleanModel))
@@ -99,17 +104,17 @@ class OpenAiMaterialAiDraftProvider(
             } else {
                 HttpStatus.BAD_GATEWAY
             }
-            throw ResponseStatusException(status, "OpenAI material generation failed.")
+            throw ProjectResponseException(status, "OpenAI material generation failed.")
         } catch (exception: Exception) {
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI material generation failed.")
+            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI material generation failed.")
         }
 
         val responseNode = parseJson(rawResponse)
         val outputText = responseNode.outputText()
-            ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI response did not contain generated material.")
+            ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response did not contain generated material.")
         val draftNode = parseJson(outputText)
         val draft = runCatching { objectMapper.treeToValue(draftNode, LessonMaterialDraftResponse::class.java) }
-            .getOrElse { throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI response did not match material schema.") }
+            .getOrElse { throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response did not match material schema.") }
             .withNormalizedArticleAnswers()
 
         validateDraft(draft)
@@ -163,7 +168,7 @@ class OpenAiMaterialAiDraftProvider(
 
     private fun parseJson(raw: String): JsonNode =
         runCatching { objectMapper.readTree(raw) }
-            .getOrElse { throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI response was not valid JSON.") }
+            .getOrElse { throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response was not valid JSON.") }
 
     private fun materialDraftJsonSchema(): JsonNode =
         objectMapper.readTree(materialDraftJsonSchemaJson)
@@ -304,25 +309,25 @@ private fun takesAnArticle(word: String): Boolean =
 
 private fun validateDraft(draft: LessonMaterialDraftResponse) {
     if (draft.title.isBlank() || draft.title.length > 160) {
-        throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid material title.")
+        throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid material title.")
     }
     if (draft.language.isBlank() || draft.language.length > 16 || draft.cefrLevel !in materialAiCefrLevels) {
-        throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI generated invalid material metadata.")
+        throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated invalid material metadata.")
     }
     if (draft.document.get("schemaVersion")?.asInt() != 1 || draft.document.get("pages") !is ArrayNode) {
-        throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid material document.")
+        throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid material document.")
     }
     if (draft.scoringRubric.get("maxScore")?.asInt() != 10) {
-        throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid scoring rubric.")
+        throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid scoring rubric.")
     }
 
     (draft.document.get("pages") as ArrayNode).forEach { page ->
         val blocks = page.get("blocks") as? ArrayNode
-            ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI generated a material page without blocks.")
+            ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated a material page without blocks.")
         blocks.forEach { block ->
             val type = block.get("type")?.asText()
             if (type !in materialAiBlockTypes) {
-                throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "OpenAI generated an unsupported material block.")
+                throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated an unsupported material block.")
             }
         }
     }
@@ -386,7 +391,11 @@ private val materialAiSystemPrompt = """
     Materials are used in live individual and group video lessons, so tasks must be easy for a teacher to run during a lesson.
 """.trimIndent()
 
-private fun stubAiDraftDocument(input: MaterialAiDraftInput, objectMapper: ObjectMapper): ObjectNode =
+private fun stubAiDraftDocument(
+    input: MaterialAiDraftInput,
+    objectMapper: ObjectMapper,
+    messageProvider: MessageProvider,
+): ObjectNode =
     objectMapper.createObjectNode().apply {
         put("schemaVersion", 1)
         putArray("pages").add(
@@ -395,16 +404,16 @@ private fun stubAiDraftDocument(input: MaterialAiDraftInput, objectMapper: Objec
                 put("title", input.title)
                 put("layout", "FLOW")
                 val blocks = putArray("blocks")
-                blocks.add(materialAiTextBlock(objectMapper, "block-goal", "Цель урока", input.prompt))
+                blocks.add(materialAiTextBlock(objectMapper, "block-goal", messageProvider[MetaData.Messages.MATERIAL_GOAL_TITLE], input.prompt))
                 blocks.add(
                     objectMapper.createObjectNode().apply {
                         put("id", "block-vocab")
                         put("type", "flashcards")
                         put("title", "Useful words")
                         putArray("cards")
-                            .add(materialAiFlashcard(objectMapper, "topic", "topic", "тема", "Let's discuss this topic."))
-                            .add(materialAiFlashcard(objectMapper, "opinion", "opinion", "мнение", "I think it is useful."))
-                            .add(materialAiFlashcard(objectMapper, "because", "because", "потому что", "I agree because..."))
+                            .add(materialAiFlashcard(objectMapper, "topic", "topic", messageProvider[MetaData.Messages.FLASHCARD_TOPIC_TRANSLATION], "Let's discuss this topic."))
+                            .add(materialAiFlashcard(objectMapper, "opinion", "opinion", messageProvider[MetaData.Messages.FLASHCARD_OPINION_TRANSLATION], "I think it is useful."))
+                            .add(materialAiFlashcard(objectMapper, "because", "because", messageProvider[MetaData.Messages.FLASHCARD_BECAUSE_TRANSLATION], "I agree because..."))
                     },
                 )
                 blocks.add(
@@ -471,14 +480,17 @@ private fun materialAiGapItem(objectMapper: ObjectMapper, prompt: String, answer
         put("answer", answer)
     }
 
-private fun materialAiDefaultScoringRubric(objectMapper: ObjectMapper): ObjectNode =
+private fun materialAiDefaultScoringRubric(
+    objectMapper: ObjectMapper,
+    messageProvider: MessageProvider,
+): ObjectNode =
     objectMapper.createObjectNode().apply {
         put("maxScore", 10)
         putArray("criteria")
-            .add(materialAiCriteria(objectMapper, "taskCompletion", "Выполнение задания", 4))
-            .add(materialAiCriteria(objectMapper, "grammar", "Грамматика", 2))
-            .add(materialAiCriteria(objectMapper, "vocabulary", "Лексика", 2))
-            .add(materialAiCriteria(objectMapper, "fluency", "Беглость/самостоятельность", 2))
+            .add(materialAiCriteria(objectMapper, "taskCompletion", messageProvider[MetaData.Messages.RUBRIC_TASK_COMPLETION], 4))
+            .add(materialAiCriteria(objectMapper, "grammar", messageProvider[MetaData.Messages.RUBRIC_GRAMMAR], 2))
+            .add(materialAiCriteria(objectMapper, "vocabulary", messageProvider[MetaData.Messages.RUBRIC_VOCABULARY], 2))
+            .add(materialAiCriteria(objectMapper, "fluency", messageProvider[MetaData.Messages.RUBRIC_FLUENCY], 2))
         putArray("analysisFlags")
             .add("taskCompletion")
             .add("grammar")

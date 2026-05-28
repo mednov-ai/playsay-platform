@@ -1,5 +1,8 @@
 package com.playsay.gateway
 
+import com.playsay.gateway.controller.*
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.service.*
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path

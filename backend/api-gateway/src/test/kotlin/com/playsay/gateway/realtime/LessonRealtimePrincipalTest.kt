@@ -1,7 +1,7 @@
 package com.playsay.gateway.realtime
 
-import com.playsay.gateway.ScheduledLessonParticipantResponse
-import com.playsay.gateway.ScheduledLessonResponse
+import com.playsay.gateway.dto.ScheduledLessonParticipantResponse
+import com.playsay.gateway.dto.ScheduledLessonResponse
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test

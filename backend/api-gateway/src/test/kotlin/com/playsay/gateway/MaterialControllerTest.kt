@@ -287,6 +287,44 @@ class MaterialControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `first classroom material state returns empty submission and annotation`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = materialController.create(
+            teacher,
+            LessonMaterialRequest(title = "First classroom state", status = "PUBLISHED"),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = material.id,
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val submission = materialController.scheduledLessonMaterialSubmission(student, lesson.id)
+        val annotation = materialController.scheduledLessonMaterialAnnotation(student, lesson.id)
+
+        assertEquals(material.id, submission.materialId)
+        assertEquals(lesson.id, submission.lessonId)
+        assertEquals("student-1", submission.userSubject)
+        assertEquals(1, submission.content["schemaVersion"].asInt())
+        assertEquals(material.id.toString(), submission.content["materialId"].asText())
+        assertTrue(submission.content["answers"].isObject)
+        assertEquals(0, submission.content["answers"].size())
+        assertEquals(null, submission.score)
+        assertEquals(null, submission.errorsCount)
+        assertEquals(null, submission.submittedAt)
+        assertEquals(material.id, annotation.materialId)
+        assertEquals(lesson.id, annotation.lessonId)
+        assertEquals(1, annotation.content["schemaVersion"].asInt())
+        assertEquals(0, annotation.content["strokes"].size())
+    }
+
+    @Test
     fun `submission scoring applies weights attempts and hints`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")

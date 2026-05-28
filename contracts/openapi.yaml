@@ -176,7 +176,7 @@ paths:
         "401":
           description: Missing or invalid bearer token
         "404":
-          description: "Submission, lesson, or material not found"
+          description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
     put:
@@ -239,7 +239,7 @@ paths:
         "401":
           description: Missing or invalid bearer token
         "404":
-          description: "Annotation, scheduled lesson, or material not found"
+          description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
     put:

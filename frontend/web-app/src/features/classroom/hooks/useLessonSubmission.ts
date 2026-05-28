@@ -25,7 +25,7 @@ export function useLessonSubmission({
   const [submissionMonitorError, setSubmissionMonitorError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!session.materialId) {
+    if (!session.materialId || canMonitorSubmissions) {
       setSubmission(null);
       setSubmissionMessage(null);
       return undefined;
@@ -51,7 +51,7 @@ export function useLessonSubmission({
     return () => {
       cancelled = true;
     };
-  }, [session.lessonId, session.materialId]);
+  }, [canMonitorSubmissions, session.lessonId, session.materialId]);
 
   useEffect(() => {
     if (!canMonitorSubmissions || !material?.id) {

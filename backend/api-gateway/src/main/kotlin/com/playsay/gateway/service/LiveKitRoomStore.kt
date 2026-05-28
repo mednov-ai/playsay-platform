@@ -102,7 +102,7 @@ class LiveKitRoomStore(
     @Transactional
     fun createToken(authentication: JwtAuthenticationToken, lessonId: UUID): LiveKitRoomTokenResponse {
         val lesson = findJoinableLesson(authentication, lessonId)
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Scheduled lesson not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         val roomName = lesson.roomName?.trim()?.takeIf { room -> room.isNotEmpty() }
             ?: ensureRoomName(lesson.id)
 

@@ -29,6 +29,7 @@ import {
   type UpdateUserProfileRequest,
   type UserProfileResponse,
 } from "../../generated/playsay-api";
+import { i18n, normalizeLanguage } from "../i18n";
 
 export type AuthConfig = {
   issuer: string;
@@ -195,6 +196,23 @@ const tokenStorageKey = "playsay.auth.tokens";
 const flowStorageKey = "playsay.auth.loginFlow";
 const expirySkewMs = 30_000;
 
+type ProjectErrorBody = {
+  status?: number;
+  errorCode?: string;
+  message?: string;
+};
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly errorCode: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export function isAuthCallback(url: URL): boolean {
   return url.pathname === authConfig.redirectPath && (url.searchParams.has("code") || url.searchParams.has("error"));
 }
@@ -310,7 +328,7 @@ export async function fetchMe(config = authConfig): Promise<MeProfile> {
   }
 
   if (response.status !== 200) {
-    throw new Error(`Profile request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Profile request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -324,7 +342,7 @@ export async function fetchUserProfile(config = authConfig): Promise<AppUserProf
   }
 
   if (response.status !== 200) {
-    throw new Error(`User profile request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `User profile request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -338,7 +356,7 @@ export async function fetchAdminUserProfiles(config = authConfig): Promise<Admin
   }
 
   if (response.status !== 200) {
-    throw new Error(`Admin users request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Admin users request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -352,7 +370,7 @@ export async function fetchStudentProfiles(config = authConfig): Promise<AdminUs
   }
 
   if (response.status !== 200) {
-    throw new Error(`Student profiles request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Student profiles request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -366,7 +384,7 @@ export async function fetchCourses(config = authConfig): Promise<Course[]> {
   }
 
   if (response.status !== 200) {
-    throw new Error(`Courses request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Courses request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -380,7 +398,7 @@ export async function fetchCourseLessons(courseId: string, config = authConfig):
   }
 
   if (response.status !== 200) {
-    throw new Error(`Course lessons request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Course lessons request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -394,7 +412,7 @@ export async function saveCourse(input: CourseInput, config = authConfig): Promi
   }
 
   if (response.status !== 201) {
-    throw new Error(`Course create failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Course create failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -408,7 +426,7 @@ export async function removeCourse(courseId: string, config = authConfig): Promi
   }
 
   if (response.status !== 204) {
-    throw new Error(`Course delete failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Course delete failed with HTTP ${response.status}.`);
   }
 }
 
@@ -424,7 +442,7 @@ export async function saveCourseLesson(
   }
 
   if (response.status !== 201) {
-    throw new Error(`Course lesson create failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Course lesson create failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -443,7 +461,7 @@ export async function editCourseLesson(
   }
 
   if (response.status !== 200) {
-    throw new Error(`Course lesson update failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Course lesson update failed with HTTP ${response.status}.`);
   }
 
   return response.data as CourseLesson;
@@ -461,7 +479,7 @@ export async function removeCourseLesson(
   }
 
   if (response.status !== 204) {
-    throw new Error(`Course lesson delete failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Course lesson delete failed with HTTP ${response.status}.`);
   }
 }
 
@@ -473,7 +491,7 @@ export async function fetchScheduledLessons(config = authConfig): Promise<Schedu
   }
 
   if (response.status !== 200) {
-    throw new Error(`Schedule request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Schedule request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -490,7 +508,7 @@ export async function fetchScheduledLesson(
   }
 
   if (response.status !== 200) {
-    throw new Error(`Scheduled lesson request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -507,7 +525,7 @@ export async function saveScheduledLesson(
   }
 
   if (response.status !== 201) {
-    throw new Error(`Scheduled lesson create failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson create failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -525,7 +543,7 @@ export async function editScheduledLesson(
   }
 
   if (response.status !== 200) {
-    throw new Error(`Scheduled lesson update failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson update failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -620,7 +638,10 @@ export async function fetchMaterialAssetObjectUrl(
   }
 
   if (response.status !== 200) {
-    throw new Error(`Material asset content request failed with HTTP ${response.status}.`);
+    throw await apiErrorFromResponse(
+      response,
+      `Material asset content request failed with HTTP ${response.status}.`,
+    );
   }
 
   return URL.createObjectURL(await response.blob());
@@ -649,7 +670,7 @@ export async function fetchScheduledLessonMaterial(
   try {
     return await apiJson<LessonMaterial>(`/api/schedule/lessons/${lessonId}/material`, { method: "GET" }, config);
   } catch (caught) {
-    if (caught instanceof Error && caught.message.includes("HTTP 404")) {
+    if (isApiStatus(caught, 404)) {
       return null;
     }
     throw caught;
@@ -667,7 +688,7 @@ export async function fetchScheduledLessonMaterialSubmission(
       config,
     );
   } catch (caught) {
-    if (caught instanceof Error && caught.message.includes("HTTP 404")) {
+    if (isApiStatus(caught, 404)) {
       return null;
     }
     throw caught;
@@ -696,7 +717,7 @@ export async function fetchScheduledLessonMaterialAnnotation(
       config,
     );
   } catch (caught) {
-    if (caught instanceof Error && caught.message.includes("HTTP 404")) {
+    if (isApiStatus(caught, 404)) {
       return null;
     }
     throw caught;
@@ -741,7 +762,7 @@ export async function removeScheduledLesson(lessonId: string, config = authConfi
   }
 
   if (response.status !== 204) {
-    throw new Error(`Scheduled lesson delete failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson delete failed with HTTP ${response.status}.`);
   }
 }
 
@@ -753,7 +774,7 @@ export async function enterScheduledLessonRoom(lessonId: string, config = authCo
   }
 
   if (response.status !== 200) {
-    throw new Error(`Video room token request failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `Video room token request failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -770,7 +791,7 @@ export async function saveUserProfile(
   }
 
   if (response.status !== 200) {
-    throw new Error(`User profile update failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `User profile update failed with HTTP ${response.status}.`);
   }
 
   return response.data;
@@ -784,7 +805,7 @@ export async function resetUserProfile(config = authConfig): Promise<void> {
   }
 
   if (response.status !== 204) {
-    throw new Error(`User profile reset failed with HTTP ${response.status}.`);
+    throw apiErrorFromData(response.status, response.data as unknown, `User profile reset failed with HTTP ${response.status}.`);
   }
 }
 
@@ -796,10 +817,55 @@ async function authorizedOptions(config: AuthConfig): Promise<RequestInit> {
 
   return {
     headers: {
+      "Accept-Language": currentApiLanguage(),
       Authorization: `Bearer ${accessToken}`,
     },
   };
 }
+
+function currentApiLanguage(): string {
+  return normalizeLanguage(i18n.resolvedLanguage ?? i18n.language);
+}
+
+function apiErrorFromData(status: number, data: unknown, fallbackMessage: string): ApiError {
+  if (isProjectErrorBody(data)) {
+    return new ApiError(
+      status,
+      data.errorCode ?? fallbackErrorCode,
+      data.message?.trim() || fallbackMessage,
+    );
+  }
+
+  return new ApiError(status, fallbackErrorCode, fallbackMessage);
+}
+
+async function apiErrorFromResponse(response: Response, fallbackMessage: string): Promise<ApiError> {
+  const body = await response.text().catch(() => "");
+  const data = body ? safeJsonParse(body) : null;
+  return apiErrorFromData(response.status, data, fallbackMessage);
+}
+
+function isApiStatus(caught: unknown, status: number): boolean {
+  if (caught instanceof ApiError) {
+    return caught.status === status;
+  }
+
+  return caught instanceof Error && caught.message.includes(`HTTP ${status}`);
+}
+
+function isProjectErrorBody(value: unknown): value is ProjectErrorBody {
+  return typeof value === "object" && value !== null && "message" in value;
+}
+
+function safeJsonParse(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+const fallbackErrorCode = "HTTP_ERROR";
 
 async function apiJson<T>(
   path: string,
@@ -822,7 +888,7 @@ async function apiJson<T>(
   }
 
   if (response.status !== expectedStatus) {
-    throw new Error(`API request ${path} failed with HTTP ${response.status}.`);
+    throw await apiErrorFromResponse(response, `API request ${path} failed with HTTP ${response.status}.`);
   }
 
   if (expectedStatus === 204) {
@@ -887,7 +953,7 @@ function writeTokens(tokens: TokenSet): void {
 
 async function parseTokenResponse(response: Response): Promise<TokenSet> {
   if (!response.ok) {
-    throw new Error(`Token request failed with HTTP ${response.status}.`);
+    throw await apiErrorFromResponse(response, `Token request failed with HTTP ${response.status}.`);
   }
 
   return mapTokenResponse((await response.json()) as TokenResponse);

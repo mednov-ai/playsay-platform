@@ -78,7 +78,7 @@ class CourseStore(
     @Transactional(readOnly = true)
     fun getCourse(authentication: JwtAuthenticationToken, courseId: UUID): CourseResponse =
         findVisibleCourse(authentication, courseId)?.toResponse()
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
 
     @Transactional
     fun createCourse(authentication: JwtAuthenticationToken, request: CourseRequest): CourseResponse {
@@ -130,7 +130,7 @@ class CourseStore(
     @Transactional
     fun updateCourse(authentication: JwtAuthenticationToken, courseId: UUID, request: CourseRequest): CourseResponse {
         authentication.requireCourseManager()
-        findCourse(courseId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
+        findCourse(courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         val values = request.validated()
 
         dataRepo.sql(
@@ -169,13 +169,13 @@ class CourseStore(
             .update()
 
         if (deleted == 0) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         }
     }
 
     @Transactional(readOnly = true)
     fun listCourseLessons(authentication: JwtAuthenticationToken, courseId: UUID): List<CourseLessonResponse> {
-        findVisibleCourse(authentication, courseId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
+        findVisibleCourse(authentication, courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
 
         return dataRepo.sql(
             """
@@ -218,7 +218,7 @@ class CourseStore(
         request: CourseLessonRequest,
     ): CourseLessonResponse {
         authentication.requireCourseManager()
-        findCourse(courseId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
+        findCourse(courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         val values = request.validated()
         validateMaterialId(authentication, values.materialId)
         val now = Instant.now()
@@ -268,7 +268,7 @@ class CourseStore(
         request: CourseLessonRequest,
     ): CourseLessonResponse {
         authentication.requireCourseManager()
-        findCourse(courseId) ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course not found.")
+        findCourse(courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         val values = request.validated()
         validateMaterialId(authentication, values.materialId)
         val updated = dataRepo.sql(
@@ -486,7 +486,7 @@ private fun String?.optionalClean(fieldName: String, maxLength: Int): String? {
 
 private fun JwtAuthenticationToken.requireCourseManager() {
     if (!canManageCourses()) {
-        throw ProjectResponseException(HttpStatus.FORBIDDEN, "TEACHER or ADMIN role is required.")
+        throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED)
     }
 }
 

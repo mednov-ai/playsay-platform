@@ -1,0 +1,367 @@
+import type { CourseLessonMap } from "../../../entities/schedule/model";
+import type { Course, CourseLesson, LessonMaterialJson, LessonMaterialSubmission } from "../../../shared/api/playsay";
+import { parseOptionalNumber } from "../../../shared/utils/number";
+import type { MaterialBlockType, MaterialEditorBlock } from "./types";
+
+export function uniqueMaterialOptions(options: string[]): string[] {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    const key = normalizeMaterialAnswer(option);
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+export function uniqueMaterialTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  return tags.reduce<string[]>((result, tag) => {
+    const normalized = normalizeMaterialTag(tag);
+    const key = normalized.toLowerCase();
+    if (!normalized || seen.has(key)) {
+      return result;
+    }
+    seen.add(key);
+    return [...result, normalized];
+  }, []);
+}
+
+export function normalizeMaterialTag(value: string): string {
+  return value.trim().replace(/^#/, "").replace(/\s+/g, "-").slice(0, 32);
+}
+
+export function normalizeMaterialAnswer(value: string | undefined): string {
+  return value?.trim().replace(/\s+/g, " ").toLowerCase() ?? "";
+}
+
+export function readPromptFromSourceMeta(value: LessonMaterialJson | unknown): string {
+  const sourceMeta = asJsonObject(value);
+  return asString(sourceMeta.prompt) || asString(sourceMeta.sourceText) || "";
+}
+
+export function readUrlFromSourceMeta(value: LessonMaterialJson | unknown): string {
+  const sourceMeta = asJsonObject(value);
+  return asString(sourceMeta.sourceUrl) || asString(sourceMeta.url) || "";
+}
+
+export function flattenCourseLessonMaterialOptions(
+  courses: Course[],
+  lessons: CourseLessonMap,
+): Array<{ key: string; label: string; courseId: string; lesson: CourseLesson }> {
+  return courses.flatMap((course) =>
+    (lessons[course.id] ?? []).map((lesson) => ({
+      key: `${course.id}:${lesson.id}`,
+      courseId: course.id,
+      lesson,
+      label: `${course.title} · ${lesson.orderIndex ?? "?"}. ${lesson.title}${lesson.materialTitle ? ` · ${lesson.materialTitle}` : ""}`,
+    })),
+  );
+}
+
+export function materialBlockLabel(type: MaterialBlockType): string {
+  switch (type) {
+    case "text":
+      return "Текст";
+    case "image":
+      return "Картинка";
+    case "generatedImage":
+      return "AI-картинка";
+    case "videoEmbed":
+      return "Видео";
+    case "flashcards":
+      return "Карточки";
+    case "fillGaps":
+      return "Пропуски";
+    case "multipleChoice":
+      return "Тест";
+    case "matchingPairs":
+      return "Соответствия";
+    case "freeWriting":
+      return "Письмо";
+    case "speakingPrompt":
+      return "Speaking";
+    case "drawingArea":
+      return "Поле";
+    default:
+      return "Блок";
+  }
+}
+
+export function isObjectiveMaterialBlockType(type: MaterialBlockType): boolean {
+  return type === "fillGaps" || type === "multipleChoice" || type === "matchingPairs";
+}
+
+export function parseFlashcards(value: string, previousCards: MaterialEditorBlock["cards"] = []): MaterialEditorBlock["cards"] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [front = "", back = "", example = ""] = splitMaterialLine(line, 3);
+      return {
+        id: previousCards?.[index]?.id ?? createClientId("card"),
+        front: front.trim(),
+        back: back.trim(),
+        example: example.trim() || undefined,
+      };
+    })
+    .filter((card) => card.front || card.back);
+}
+
+export function formatFlashcards(cards: MaterialEditorBlock["cards"]): string {
+  return (cards ?? [])
+    .map((card) => [card.front, card.back, card.example].filter(Boolean).map(escapeMaterialCell).join(" | "))
+    .join("\n");
+}
+
+export function parseExerciseItems(value: string, type: "fillGaps" | "multipleChoice"): MaterialEditorBlock["items"] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [prompt = "", optionsOrAnswer = "", answer = "", weight = ""] = splitMaterialLine(line, 4);
+      const parsedWeight = parseOptionalNumber(weight);
+      if (type === "multipleChoice") {
+        return {
+          prompt: prompt.trim(),
+          options: splitMaterialList(optionsOrAnswer).map((option) => option.trim()).filter(Boolean),
+          answer: answer.trim() || undefined,
+          weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
+        };
+      }
+
+      return {
+        prompt: prompt.trim(),
+        options: answer ? splitMaterialList(optionsOrAnswer).map((option) => option.trim()).filter(Boolean) : undefined,
+        answer: (answer || optionsOrAnswer).trim() || undefined,
+        weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
+      };
+    })
+    .filter((item) => item.prompt);
+}
+
+export function formatExerciseItems(items: MaterialEditorBlock["items"], type: "fillGaps" | "multipleChoice"): string {
+  return (items ?? [])
+    .map((item) => {
+      if (type === "multipleChoice") {
+        return [item.prompt, formatMaterialList(item.options), item.answer, item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");
+      }
+
+      return [item.prompt, formatMaterialList(item.options), item.answer, item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");
+    })
+    .join("\n");
+}
+
+export function splitMaterialLine(value: string, maxParts: number): string[] {
+  const separator = findMaterialSeparator(value);
+  const parts: string[] = [];
+  let current = "";
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    const next = value[index + 1];
+    if (char === "\\" && (next === "|" || next === ";" || next === "\\")) {
+      current += next;
+      index += 1;
+      continue;
+    }
+    if (char === separator && parts.length < maxParts - 1) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  parts.push(current);
+  return parts;
+}
+
+export function splitMaterialList(value?: string): string[] {
+  if (!value) {
+    return [];
+  }
+  const parts: string[] = [];
+  let current = "";
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    const next = value[index + 1];
+    if (char === "\\" && (next === "," || next === "\\")) {
+      current += next;
+      index += 1;
+      continue;
+    }
+    if (char === ",") {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  parts.push(current);
+  return parts;
+}
+
+export function formatMaterialList(value?: string[]): string | undefined {
+  if (!value?.length) {
+    return undefined;
+  }
+  return value.map(escapeMaterialListItem).join(", ");
+}
+
+export function findMaterialSeparator(value: string): "|" | ";" {
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "\\" && value[index + 1]) {
+      index += 1;
+      continue;
+    }
+    if (value[index] === "|") {
+      return "|";
+    }
+  }
+
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "\\" && value[index + 1]) {
+      index += 1;
+      continue;
+    }
+    if (value[index] === ";") {
+      return ";";
+    }
+  }
+
+  return "|";
+}
+
+export function escapeMaterialCell(value: unknown): string {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+}
+
+export function escapeMaterialListItem(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/,/g, "\\,");
+}
+
+export function normalizeMaterialBlockType(value: string): MaterialBlockType | null {
+  const allowed: MaterialBlockType[] = [
+    "text",
+    "image",
+    "videoEmbed",
+    "flashcards",
+    "fillGaps",
+    "multipleChoice",
+    "matchingPairs",
+    "freeWriting",
+    "speakingPrompt",
+    "drawingArea",
+    "generatedImage",
+  ];
+
+  return allowed.includes(value as MaterialBlockType) ? value as MaterialBlockType : null;
+}
+
+export function asJsonObject(value: unknown): LessonMaterialJson {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as LessonMaterialJson;
+  }
+
+  return {};
+}
+
+export function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+export function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+export function asPositiveNumber(value: unknown): number | null {
+  const parsed = asNumber(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
+}
+
+export function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+
+export function createClientId(prefix: string): string {
+  const randomId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
+  return `${prefix}-${randomId}`;
+}
+
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 КБ";
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.ceil(bytes / 1024)} КБ`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+export function materialSubmissionUserLabel(submission: LessonMaterialSubmission): string {
+  return submission.userName?.trim() || submission.userSubject?.trim() || "Ученик";
+}
+
+export function averageSubmissionScore(submissions: LessonMaterialSubmission[]): number | null {
+  const scores = submissions
+    .map((submission) => submission.score)
+    .filter((score): score is number => typeof score === "number" && Number.isFinite(score));
+
+  if (scores.length === 0) {
+    return null;
+  }
+
+  return scores.reduce((total, score) => total + score, 0) / scores.length;
+}
+
+export function materialSubmissionAssessmentSummary(submission: LessonMaterialSubmission): { hints: number; label: string; retries: number } {
+  const assessment = asJsonObject(asJsonObject(submission.content).assessment);
+  const items = Array.isArray(assessment.items) ? assessment.items.map(asJsonObject) : [];
+  const hints = items.reduce((total, item) => total + (asNumber(item.hintsUsed) ?? 0), 0);
+  const retries = items.reduce((total, item) => total + Math.max(0, (asNumber(item.attemptsUsed) ?? 0) - 1), 0);
+  const errors = asNumber(assessment.errorsCount) ?? submission.errorsCount ?? 0;
+  return {
+    hints,
+    retries,
+    label: `${errors} ошибок, ${hints} подсказок, ${retries} дополнительных попыток`,
+  };
+}
+
+export function formatMaterialScore(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "10";
+  }
+
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return String(value);
+  }
+
+  return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
+}
+
+export function formatSubmissionTime(value: string | null | undefined): string {
+  if (!value) {
+    return "черновик";
+  }
+
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}

@@ -59,7 +59,6 @@ import {
   isObjectiveMaterialBlockType,
   matchingAssetSearchResults,
   materialAssetLibraryItemFromAsset,
-  materialBlockIcon,
   materialBlockLabel,
   materialDraftToForm,
   materialFormToInput,
@@ -75,6 +74,7 @@ import {
   readUrlFromSourceMeta,
 } from "../model/materialDocument";
 import { LessonMaterialDocumentView } from "./LessonMaterialDocumentView";
+import { materialBlockIcon } from "./materialBlockIcon";
 export function MaterialLibraryPanel({
   courses,
   disabled,

@@ -32,6 +32,7 @@ import { SchedulePanel } from "../features/schedule/ui/SchedulePanel";
 import type { LessonRoomSession } from "../features/classroom";
 import { MaterialLibraryPanel } from "../features/materials/ui/MaterialLibraryPanel";
 import { LiveLessonExperience } from "../features/classroom/ui/LiveLessonExperience";
+import { useAppTranslation } from "../shared/i18n";
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -96,6 +97,7 @@ export type AppShellProps = {
 };
 
 export function AppShell(props: AppShellProps) {
+  const { t } = useAppTranslation();
   const {
     adminLoading,
     adminMessage,
@@ -184,7 +186,7 @@ export function AppShell(props: AppShellProps) {
                     type="button"
                   >
                     {nextLessonLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-                    Войти в урок
+                    {t("shell.actions.joinLesson")}
                   </Button>
                   <Button
                     aria-expanded={profileOpen}
@@ -193,11 +195,11 @@ export function AppShell(props: AppShellProps) {
                     variant="outline"
                   >
                     <User className="h-4 w-4" />
-                    Профиль
+                    {t("shell.actions.profile")}
                   </Button>
-                  <Button aria-label="Выйти" variant="outline" onClick={logout}>
+                  <Button aria-label={t("shell.aria.logout")} variant="outline" onClick={logout}>
                     <LogOut className="h-4 w-4" />
-                    Выйти
+                    {t("auth.logout")}
                   </Button>
                 </>
               ) : (
@@ -207,7 +209,7 @@ export function AppShell(props: AppShellProps) {
                   ) : (
                     <LogIn className="h-4 w-4" />
                   )}
-                  Войти
+                  {t("auth.login")}
                 </Button>
               )}
             </div>

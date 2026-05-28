@@ -1,6 +1,7 @@
 import { BookOpen, CalendarDays, Layers3 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { WorkspaceTab, WorkspaceTabDefinition } from "../../entities/workspace/model";
+import { useAppTranslation } from "../../shared/i18n";
 
 export function WorkspaceTabs({
   activeTab,
@@ -11,8 +12,10 @@ export function WorkspaceTabs({
   onSelect: (tab: WorkspaceTab) => void;
   tabs: WorkspaceTabDefinition[];
 }) {
+  const { t } = useAppTranslation();
+
   return (
-    <nav className="playsay-workspace-tabs" aria-label="Рабочие разделы">
+    <nav className="playsay-workspace-tabs" aria-label={t("workspace.tabs.aria")}>
       {tabs.map((tab) => (
         <button
           className="playsay-workspace-tab"
@@ -23,8 +26,8 @@ export function WorkspaceTabs({
         >
           {workspaceTabIcon(tab.id)}
           <span>
-            <strong>{tab.label}</strong>
-            <small>{tab.description}</small>
+            <strong>{t(tab.labelKey)}</strong>
+            <small>{t(tab.descriptionKey)}</small>
           </span>
         </button>
       ))}

@@ -1,26 +1,24 @@
-import {
-  BookOpen,
-  GraduationCap,
-  ShieldCheck,
-  type LucideIcon,
-} from "lucide-react";
-import { ruMessages } from "../../shared/i18n/messages.ru";
+import { BookOpen, GraduationCap, ShieldCheck, type LucideIcon } from "lucide-react";
 
 export type PlaySayRole = "STUDENT" | "TEACHER" | "ADMIN";
 
 export type RoleWorkspace = {
   role: PlaySayRole;
-  label: string;
-  title: string;
-  description: string;
-  primaryAction: string;
-  secondaryAction: string;
+  labelKey: string;
+  titleKey: string;
+  descriptionKey: string;
+  primaryActionKey: string;
+  secondaryActionKey: string;
   icon: LucideIcon;
 };
 
 const fallbackWorkspace: RoleWorkspace = {
   role: "STUDENT",
-  ...ruMessages.roles.workspaces.student,
+  labelKey: "workspace.roles.student.label",
+  titleKey: "workspace.roles.student.title",
+  descriptionKey: "workspace.roles.student.description",
+  primaryActionKey: "workspace.roles.student.primaryAction",
+  secondaryActionKey: "workspace.roles.student.secondaryAction",
   icon: GraduationCap,
 };
 
@@ -28,12 +26,20 @@ const workspaces: Record<PlaySayRole, RoleWorkspace> = {
   STUDENT: fallbackWorkspace,
   TEACHER: {
     role: "TEACHER",
-    ...ruMessages.roles.workspaces.teacher,
+    labelKey: "workspace.roles.teacher.label",
+    titleKey: "workspace.roles.teacher.title",
+    descriptionKey: "workspace.roles.teacher.description",
+    primaryActionKey: "workspace.roles.teacher.primaryAction",
+    secondaryActionKey: "workspace.roles.teacher.secondaryAction",
     icon: BookOpen,
   },
   ADMIN: {
     role: "ADMIN",
-    ...ruMessages.roles.workspaces.admin,
+    labelKey: "workspace.roles.admin.label",
+    titleKey: "workspace.roles.admin.title",
+    descriptionKey: "workspace.roles.admin.description",
+    primaryActionKey: "workspace.roles.admin.primaryAction",
+    secondaryActionKey: "workspace.roles.admin.secondaryAction",
     icon: ShieldCheck,
   },
 };
@@ -54,7 +60,7 @@ export function getRoleWorkspace(roles: string[]): RoleWorkspace {
 
 export function getRoleSummary(roles: string[]): string {
   if (roles.length === 0) {
-    return ruMessages.roles.unassigned;
+    return "workspace.roles.unassigned";
   }
   return roles.join(", ");
 }

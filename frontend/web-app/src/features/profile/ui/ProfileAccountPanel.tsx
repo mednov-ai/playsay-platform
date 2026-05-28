@@ -8,6 +8,7 @@ import type {
   MeProfile,
   UpdateUserProfileInput,
 } from "../../../shared/api/playsay";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggingOut" | "error";
 
@@ -49,13 +50,15 @@ export function ProfileAccountPanel({
   profileSaving: boolean;
   status: SessionStatus;
 }) {
+  const { t } = useAppTranslation();
+
   return (
     <section className="rounded-[1.5rem] border border-border bg-white/90 p-5 shadow-[0_22px_70px_rgba(35,25,15,0.08)]">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <section className="min-w-0">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-extrabold">Пользователь</h2>
+            <h2 className="text-lg font-extrabold">{t("profile.sections.user")}</h2>
           </div>
           <IdentityPanel error={error} profile={profile} status={status} />
         </section>
@@ -63,7 +66,7 @@ export function ProfileAccountPanel({
         <section className="min-w-0">
           <div className="mb-4 flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-extrabold">Профиль Play&Say</h2>
+            <h2 className="text-lg font-extrabold">{t("profile.sections.account")}</h2>
           </div>
           <ProfileEditor
             disabled={!isAuthenticated || profileSaving}
@@ -105,6 +108,7 @@ function ProfileEditor({
   profile: AppUserProfile | null;
   saving: boolean;
 }) {
+  const { t } = useAppTranslation();
   const [form, setForm] = useState<ProfileFormState>({
     displayName: "",
     locale: "",
@@ -138,7 +142,7 @@ function ProfileEditor({
   return (
     <form className="grid gap-3" onSubmit={submit}>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-        <FormField label="Имя">
+        <FormField label={t("profile.fields.name")}>
           <input
             className="playsay-input"
             disabled={disabled}
@@ -147,7 +151,7 @@ function ProfileEditor({
             value={form.displayName}
           />
         </FormField>
-        <FormField label="Язык">
+        <FormField label={t("profile.fields.language")}>
           <input
             className="playsay-input"
             disabled={disabled}
@@ -159,7 +163,7 @@ function ProfileEditor({
         </FormField>
       </div>
 
-      <FormField label="Часовой пояс">
+      <FormField label={t("profile.fields.timezone")}>
         <input
           className="playsay-input"
           disabled={disabled}
@@ -170,7 +174,7 @@ function ProfileEditor({
         />
       </FormField>
 
-      <FormField label="Цель обучения">
+      <FormField label={t("profile.fields.learningGoal")}>
         <textarea
           className="playsay-input min-h-24 resize-none py-3"
           disabled={disabled}
@@ -182,16 +186,19 @@ function ProfileEditor({
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
         <div className="text-xs font-semibold text-muted-foreground">
-          {message ?? (profile ? `Обновлено ${new Date(profile.updatedAt).toLocaleString()}` : "Войдите, чтобы редактировать")}
+          {message ??
+            (profile
+              ? t("profile.status.updatedAt", { date: new Date(profile.updatedAt).toLocaleString() })
+              : t("profile.status.editLoginRequired"))}
         </div>
         <div className="flex gap-2">
           <Button disabled={disabled || !profile} onClick={onReset} type="button" variant="outline">
             <RotateCcw className="h-4 w-4" />
-            Сбросить
+            {t("common.actions.reset")}
           </Button>
           <Button disabled={disabled} type="submit">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Сохранить
+            {t("common.actions.save")}
           </Button>
         </div>
       </div>
@@ -208,11 +215,13 @@ function IdentityPanel({
   profile: MeProfile | null;
   status: SessionStatus;
 }) {
+  const { t } = useAppTranslation();
+
   if (status === "checking") {
     return (
       <div className="mt-4 flex min-h-28 items-center gap-3 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin text-primary" />
-        Проверяем сессию
+        {t("profile.status.checkingSession")}
       </div>
     );
   }
@@ -221,7 +230,7 @@ function IdentityPanel({
     return (
       <div className="mt-4 flex min-h-28 items-center gap-3 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
         <AlertCircle className="h-4 w-4 text-primary" />
-        {error ?? "Ошибка сессии"}
+        {error ?? t("profile.status.sessionError")}
       </div>
     );
   }
@@ -230,7 +239,7 @@ function IdentityPanel({
     return (
       <div className="mt-4 flex min-h-28 items-center gap-3 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
         <User className="h-4 w-4 text-primary" />
-        Войдите, чтобы открыть кабинет
+        {t("profile.status.loginRequired")}
       </div>
     );
   }
@@ -268,16 +277,18 @@ function AdminUsersPanel({
   onRefresh: () => void;
   users: AdminUserProfile[];
 }) {
+  const { t } = useAppTranslation();
+
   return (
     <section className="rounded-[1.5rem] border border-border bg-white/90 p-5 shadow-[0_22px_70px_rgba(35,25,15,0.08)]">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">Admin users</h2>
+          <h2 className="text-lg font-extrabold">{t("profile.sections.adminUsers")}</h2>
         </div>
         <Button disabled={loading} onClick={onRefresh} type="button" variant="outline">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Обновить
+          {t("common.actions.refresh")}
         </Button>
       </div>
 
@@ -290,7 +301,7 @@ function AdminUsersPanel({
       <div className="mt-4 grid gap-3">
         {users.length === 0 ? (
           <div className="rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-            Известных app-профилей пока нет.
+            {t("profile.status.noAdminProfiles")}
           </div>
         ) : (
           users.map((user) => <AdminUserRow key={user.subject} user={user} />)
@@ -322,4 +333,3 @@ function AdminUserRow({ user }: { user: AdminUserProfile }) {
     </article>
   );
 }
-

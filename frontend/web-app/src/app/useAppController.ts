@@ -63,6 +63,7 @@ import {
   upsertScheduledLesson,
 } from "../features/classroom";
 import type { AppShellProps } from "./AppShell";
+import { changeAppLanguage, useAppTranslation } from "../shared/i18n";
 
 type LessonRealtimeMessage = {
   type?: string;
@@ -72,6 +73,7 @@ type LessonRealtimeMessage = {
 };
 
 export function useAppController(): AppShellProps {
+  const { t } = useAppTranslation();
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [appProfile, setAppProfile] = useState<AppUserProfile | null>(null);
   const [status, setStatus] = useState<SessionStatus>("checking");
@@ -135,6 +137,9 @@ export function useAppController(): AppShellProps {
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
         ]);
         if (!cancelled) {
+          if (currentAppProfile.locale) {
+            void changeAppLanguage(currentAppProfile.locale);
+          }
           setProfile(me);
           setAppProfile(currentAppProfile);
           setAdminUsers(currentAdminUsers);
@@ -148,7 +153,7 @@ export function useAppController(): AppShellProps {
       } catch (caught) {
         clearTokens();
         if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : "Auth failed.");
+          setError(caught instanceof Error ? caught.message : t("errors.authFailed"));
           setStatus("error");
         }
       }
@@ -204,7 +209,7 @@ export function useAppController(): AppShellProps {
     }
 
     if (roomSession && isRoomSessionExpired(roomSession, nowMs)) {
-      closeClassroom("Занятие завершено");
+      closeClassroom(t("schedule.messages.finished"));
     }
   }, [nowMs, profile?.roles, roomSession, status]);
 
@@ -290,7 +295,7 @@ export function useAppController(): AppShellProps {
         setScheduleMessage(options.message);
       }
     } catch (caught) {
-      applySessionError(caught, "Не удалось обновить расписание");
+      applySessionError(caught, t("schedule.messages.scheduleSyncFailed"));
     } finally {
       scheduleSyncInFlightRef.current = false;
     }
@@ -315,7 +320,7 @@ export function useAppController(): AppShellProps {
     }
 
     if (message.type === "lesson.deleted" && message.lessonId) {
-      removeRealtimeLesson(message.lessonId, "Занятие больше недоступно");
+      removeRealtimeLesson(message.lessonId, t("schedule.messages.unavailable"));
     }
   }
 
@@ -335,7 +340,7 @@ export function useAppController(): AppShellProps {
     }
 
     if (!isJoinableScheduledLesson(lesson, currentTimeMs)) {
-      closeClassroom("Занятие завершено или отменено");
+      closeClassroom(t("schedule.messages.finishedOrCancelled"));
       return;
     }
 
@@ -387,7 +392,7 @@ export function useAppController(): AppShellProps {
     const routeLesson = scheduledLessons.find((lesson) => lesson.id === routeLessonId);
     if (routeLesson) {
       if (!isJoinableScheduledLesson(routeLesson, nowMs)) {
-        setRoomMessage("Занятие уже завершено или отменено");
+        setRoomMessage(t("schedule.messages.alreadyClosed"));
         return;
       }
       void joinScheduledLesson(routeLesson, { updateRoute: false });
@@ -430,7 +435,7 @@ export function useAppController(): AppShellProps {
       setRoomMessage(null);
       setProfileOpen(false);
       setStatus("anonymous");
-      return "Сессия истекла, войдите снова";
+      return t("errors.sessionExpired");
     }
     return message;
   }
@@ -444,9 +449,12 @@ export function useAppController(): AppShellProps {
       setAdminUsers((current) =>
         current.map((user) => (user.subject === updated.subject ? updated : user)),
       );
-      setProfileMessage("Профиль сохранён");
+      if (updated.locale) {
+        void changeAppLanguage(updated.locale);
+      }
+      setProfileMessage(t("profile.messages.saved"));
     } catch (caught) {
-      setProfileMessage(applySessionError(caught, "Не удалось сохранить профиль"));
+      setProfileMessage(applySessionError(caught, t("profile.messages.saveFailed")));
     } finally {
       setProfileSaving(false);
     }
@@ -462,9 +470,12 @@ export function useAppController(): AppShellProps {
       setAdminUsers((current) =>
         current.map((user) => (user.subject === recreated.subject ? recreated : user)),
       );
-      setProfileMessage("Профиль сброшен");
+      if (recreated.locale) {
+        void changeAppLanguage(recreated.locale);
+      }
+      setProfileMessage(t("profile.messages.reset"));
     } catch (caught) {
-      setProfileMessage(applySessionError(caught, "Не удалось сбросить профиль"));
+      setProfileMessage(applySessionError(caught, t("profile.messages.resetFailed")));
     } finally {
       setProfileSaving(false);
     }
@@ -480,7 +491,7 @@ export function useAppController(): AppShellProps {
     try {
       setAdminUsers(await fetchAdminUserProfiles());
     } catch (caught) {
-      setAdminMessage(applySessionError(caught, "Не удалось загрузить пользователей"));
+      setAdminMessage(applySessionError(caught, t("profile.messages.adminUsersLoadFailed")));
     } finally {
       setAdminLoading(false);
     }
@@ -493,9 +504,9 @@ export function useAppController(): AppShellProps {
       const bundle = await fetchCourseBundle();
       setCourses(bundle.courses);
       setCourseLessons(bundle.lessons);
-      setCourseMessage("Курсы обновлены");
+      setCourseMessage(t("courses.messages.refreshed"));
     } catch (caught) {
-      setCourseMessage(applySessionError(caught, "Не удалось загрузить курсы"));
+      setCourseMessage(applySessionError(caught, t("courses.messages.refreshFailed")));
     } finally {
       setCourseLoading(false);
     }
@@ -509,9 +520,9 @@ export function useAppController(): AppShellProps {
       const bundle = await fetchCourseBundle();
       setCourses(bundle.courses);
       setCourseLessons(bundle.lessons);
-      setCourseMessage("Курс создан");
+      setCourseMessage(t("courses.messages.created"));
     } catch (caught) {
-      setCourseMessage(applySessionError(caught, "Не удалось создать курс"));
+      setCourseMessage(applySessionError(caught, t("courses.messages.createFailed")));
     } finally {
       setCourseLoading(false);
     }
@@ -528,9 +539,9 @@ export function useAppController(): AppShellProps {
         delete next[courseId];
         return next;
       });
-      setCourseMessage("Курс удалён");
+      setCourseMessage(t("courses.messages.deleted"));
     } catch (caught) {
-      setCourseMessage(applySessionError(caught, "Не удалось удалить курс"));
+      setCourseMessage(applySessionError(caught, t("courses.messages.deleteFailed")));
     } finally {
       setCourseLoading(false);
     }
@@ -544,9 +555,9 @@ export function useAppController(): AppShellProps {
       const [freshCourses, lessons] = await Promise.all([fetchCourses(), fetchCourseLessons(courseId)]);
       setCourses(freshCourses);
       setCourseLessons((current) => ({ ...current, [courseId]: lessons }));
-      setCourseMessage("Урок добавлен");
+      setCourseMessage(t("courses.messages.lessonCreated"));
     } catch (caught) {
-      setCourseMessage(applySessionError(caught, "Не удалось добавить урок"));
+      setCourseMessage(applySessionError(caught, t("courses.messages.lessonCreateFailed")));
     } finally {
       setCourseLoading(false);
     }
@@ -560,9 +571,9 @@ export function useAppController(): AppShellProps {
       const [freshCourses, lessons] = await Promise.all([fetchCourses(), fetchCourseLessons(courseId)]);
       setCourses(freshCourses);
       setCourseLessons((current) => ({ ...current, [courseId]: lessons }));
-      setCourseMessage("Урок удалён");
+      setCourseMessage(t("courses.messages.lessonDeleted"));
     } catch (caught) {
-      setCourseMessage(applySessionError(caught, "Не удалось удалить урок"));
+      setCourseMessage(applySessionError(caught, t("courses.messages.lessonDeleteFailed")));
     } finally {
       setCourseLoading(false);
     }
@@ -573,9 +584,9 @@ export function useAppController(): AppShellProps {
     setMaterialMessage(null);
     try {
       setMaterials(await fetchMaterials());
-      setMaterialMessage("Материалы обновлены");
+      setMaterialMessage(t("materials.messages.refreshed"));
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, "Не удалось загрузить материалы"));
+      setMaterialMessage(applySessionError(caught, t("materials.messages.refreshFailed")));
     } finally {
       setMaterialLoading(false);
     }
@@ -592,10 +603,10 @@ export function useAppController(): AppShellProps {
           ? current.map((material) => (material.id === saved.id ? saved : material))
           : [saved, ...current];
       });
-      setMaterialMessage(materialId ? "Материал сохранён" : "Материал создан");
+      setMaterialMessage(materialId ? t("materials.messages.saved") : t("materials.messages.created"));
       return saved;
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, "Не удалось сохранить материал"));
+      setMaterialMessage(applySessionError(caught, t("materials.messages.saveFailed")));
       return null;
     } finally {
       setMaterialLoading(false);
@@ -607,10 +618,10 @@ export function useAppController(): AppShellProps {
     setMaterialMessage(null);
     try {
       const draft = await draftMaterial(input);
-      setMaterialMessage("Черновик подготовлен");
+      setMaterialMessage(t("materials.messages.draftReady"));
       return draft;
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, "Не удалось подготовить черновик"));
+      setMaterialMessage(applySessionError(caught, t("materials.messages.draftFailed")));
       return null;
     } finally {
       setMaterialLoading(false);
@@ -622,10 +633,10 @@ export function useAppController(): AppShellProps {
     setMaterialMessage(null);
     try {
       const draft = await draftMaterialFromUrl(input);
-      setMaterialMessage("Черновик из ссылки подготовлен");
+      setMaterialMessage(t("materials.messages.urlDraftReady"));
       return draft;
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, "Не удалось подготовить черновик из ссылки"));
+      setMaterialMessage(applySessionError(caught, t("materials.messages.urlDraftFailed")));
       return null;
     } finally {
       setMaterialLoading(false);
@@ -641,10 +652,10 @@ export function useAppController(): AppShellProps {
     try {
       const material = await generateMaterialImages(materialId, input);
       setMaterials((current) => current.map((item) => (item.id === material.id ? material : item)));
-      setMaterialMessage("Картинки сгенерированы");
+      setMaterialMessage(t("materials.messages.imagesGenerated"));
       return material;
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, "Не удалось сгенерировать картинки"));
+      setMaterialMessage(applySessionError(caught, t("materials.messages.imagesGenerateFailed")));
       return null;
     } finally {
       setMaterialLoading(false);
@@ -660,10 +671,10 @@ export function useAppController(): AppShellProps {
     setMaterialMessage(null);
     try {
       const asset = await updateMaterialAsset(materialId, assetId, input);
-      setMaterialMessage("Теги картинки обновлены");
+      setMaterialMessage(t("materials.messages.imageTagsUpdated"));
       return asset;
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, "Не удалось обновить теги картинки"));
+      setMaterialMessage(applySessionError(caught, t("materials.messages.imageTagsUpdateFailed")));
       return null;
     } finally {
       setMaterialLoading(false);
@@ -676,9 +687,9 @@ export function useAppController(): AppShellProps {
     try {
       await archiveMaterial(materialId);
       setMaterials((current) => current.filter((material) => material.id !== materialId));
-      setMaterialMessage("Материал архивирован");
+      setMaterialMessage(t("materials.messages.archived"));
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, "Не удалось архивировать материал"));
+      setMaterialMessage(applySessionError(caught, t("materials.messages.archiveFailed")));
     } finally {
       setMaterialLoading(false);
     }
@@ -696,9 +707,9 @@ export function useAppController(): AppShellProps {
       });
       const lessons = await fetchCourseLessons(courseId);
       setCourseLessons((current) => ({ ...current, [courseId]: lessons }));
-      setMaterialMessage(materialId ? "Материал привязан к уроку" : "Материал отвязан от урока");
+      setMaterialMessage(materialId ? t("materials.messages.linkedToLesson") : t("materials.messages.unlinkedFromLesson"));
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, "Не удалось привязать материал"));
+      setMaterialMessage(applySessionError(caught, t("materials.messages.linkFailed")));
     } finally {
       setMaterialLoading(false);
     }
@@ -715,9 +726,9 @@ export function useAppController(): AppShellProps {
       ]);
       setScheduledLessons(freshSchedule);
       setStudentUsers(freshStudents);
-      setScheduleMessage("Расписание обновлено");
+      setScheduleMessage(t("schedule.messages.refreshed"));
     } catch (caught) {
-      setScheduleMessage(applySessionError(caught, "Не удалось загрузить расписание"));
+      setScheduleMessage(applySessionError(caught, t("schedule.messages.refreshFailed")));
     } finally {
       setScheduleLoading(false);
     }
@@ -729,9 +740,9 @@ export function useAppController(): AppShellProps {
     try {
       await saveScheduledLesson(input);
       setScheduledLessons(await fetchScheduledLessons());
-      setScheduleMessage("Занятие добавлено");
+      setScheduleMessage(t("schedule.messages.created"));
     } catch (caught) {
-      setScheduleMessage(applySessionError(caught, "Не удалось добавить занятие"));
+      setScheduleMessage(applySessionError(caught, t("schedule.messages.createFailed")));
     } finally {
       setScheduleLoading(false);
     }
@@ -740,7 +751,7 @@ export function useAppController(): AppShellProps {
   async function assignMaterialToScheduledLesson(lessonId: string, materialId: string | null): Promise<ScheduledLesson | null> {
     const lesson = scheduledLessons.find((item) => item.id === lessonId);
     if (!lesson) {
-      setRoomMessage("Занятие не найдено в расписании");
+      setRoomMessage(t("schedule.messages.notFound"));
       return null;
     }
 
@@ -771,10 +782,10 @@ export function useAppController(): AppShellProps {
             }
           : current
       ));
-      setRoomMessage(materialId ? "Материал назначен" : "Материал снят");
+      setRoomMessage(materialId ? t("classroom.messages.materialAssigned") : t("classroom.messages.materialUnassigned"));
       return updated;
     } catch (caught) {
-      setRoomMessage(applySessionError(caught, "Не удалось назначить материал"));
+      setRoomMessage(applySessionError(caught, t("classroom.messages.materialAssignFailed")));
       return null;
     } finally {
       setMaterialLoading(false);
@@ -795,9 +806,9 @@ export function useAppController(): AppShellProps {
         participantSubjects: lesson.participants.map((participant) => participant.subject),
       });
       setScheduledLessons(await fetchScheduledLessons());
-      setScheduleMessage("Занятие отменено");
+      setScheduleMessage(t("schedule.messages.cancelled"));
     } catch (caught) {
-      setScheduleMessage(applySessionError(caught, "Не удалось отменить занятие"));
+      setScheduleMessage(applySessionError(caught, t("schedule.messages.cancelFailed")));
     } finally {
       setScheduleLoading(false);
     }
@@ -810,9 +821,9 @@ export function useAppController(): AppShellProps {
       await removeScheduledLesson(lessonId);
       setScheduledLessons((current) => current.filter((lesson) => lesson.id !== lessonId));
       setRoomSession((current) => (current?.roomName === `lesson-${lessonId}` ? null : current));
-      setScheduleMessage("Занятие удалено");
+      setScheduleMessage(t("schedule.messages.deleted"));
     } catch (caught) {
-      setScheduleMessage(applySessionError(caught, "Не удалось удалить занятие"));
+      setScheduleMessage(applySessionError(caught, t("schedule.messages.deleteFailed")));
     } finally {
       setScheduleLoading(false);
     }
@@ -837,15 +848,15 @@ export function useAppController(): AppShellProps {
         lessonTemplateId: lesson.lessonTemplateId ?? null,
         lessonStartsAt: lesson.scheduledStart ?? null,
         lessonStatus: lesson.status,
-        lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? "Занятие",
+        lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? t("schedule.lessonFallbackTitle"),
         lessonType: lesson.type,
         materialId: lesson.materialId ?? null,
         participants: lesson.participants,
         teacherName: lesson.teacherName ?? null,
       });
-      setRoomMessage("Комната готова");
+      setRoomMessage(t("classroom.messages.roomReady"));
     } catch (caught) {
-      setRoomMessage(applySessionError(caught, "Не удалось открыть видеокомнату"));
+      setRoomMessage(applySessionError(caught, t("classroom.messages.roomOpenFailed")));
     } finally {
       setRoomLoadingLessonId(null);
     }

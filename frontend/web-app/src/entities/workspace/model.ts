@@ -4,8 +4,8 @@ export type WorkspaceTab = "schedule" | "materials" | "courses";
 
 export type WorkspaceTabDefinition = {
   id: WorkspaceTab;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
 };
 
 export function canAssignLessons(profile: MeProfile | null): boolean {
@@ -16,8 +16,8 @@ export function workspaceTabsForProfile(profile: MeProfile | null): WorkspaceTab
   const canAssign = canAssignLessons(profile);
   const scheduleTab: WorkspaceTabDefinition = {
     id: "schedule",
-    label: canAssign ? "Уроки" : "Мои уроки",
-    description: canAssign ? "расписание и вход" : "ближайшие занятия",
+    labelKey: canAssign ? "workspace.tabs.schedule.label" : "workspace.tabs.mySchedule.label",
+    descriptionKey: canAssign ? "workspace.tabs.schedule.description" : "workspace.tabs.mySchedule.description",
   };
 
   if (!canAssign) {
@@ -26,7 +26,15 @@ export function workspaceTabsForProfile(profile: MeProfile | null): WorkspaceTab
 
   return [
     scheduleTab,
-    { id: "materials", label: "Материалы", description: "конструктор уроков" },
-    { id: "courses", label: "Курсы", description: "программы и шаблоны" },
+    {
+      id: "materials",
+      labelKey: "workspace.tabs.materials.label",
+      descriptionKey: "workspace.tabs.materials.description",
+    },
+    {
+      id: "courses",
+      labelKey: "workspace.tabs.courses.label",
+      descriptionKey: "workspace.tabs.courses.description",
+    },
   ];
 }

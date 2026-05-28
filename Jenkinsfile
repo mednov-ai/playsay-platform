@@ -119,7 +119,7 @@ spec:
   }
 
   parameters {
-    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev, for example develop, feature/task-1, release/1.001.00', trim: true)
+    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev, for example develop, codex/task-1, feature/task-1, release/1.001.00', trim: true)
   }
 
   environment {
@@ -154,6 +154,8 @@ spec:
             buildPrefix = 'dev'
           } else if (env.CI_BRANCH.startsWith('feature/')) {
             buildPrefix = "f_${env.CI_BRANCH.substring('feature/'.length())}"
+          } else if (env.CI_BRANCH.startsWith('codex/')) {
+            buildPrefix = "codex_${env.CI_BRANCH.substring('codex/'.length())}"
           } else if (env.CI_BRANCH.startsWith('release/')) {
             buildPrefix = "rel_${env.CI_BRANCH.substring('release/'.length())}"
           } else if (env.CI_BRANCH.startsWith('hotfix/')) {
@@ -172,6 +174,7 @@ spec:
           env.BUILD_LABEL = "${buildPrefix}-${env.BUILD_NUMBER}"
           env.DEPLOY_TO_DEV = (
             env.CI_BRANCH == 'develop' ||
+            env.CI_BRANCH.startsWith('codex/') ||
             env.CI_BRANCH.startsWith('feature/') ||
             env.CI_BRANCH.startsWith('release/') ||
             env.CI_BRANCH.startsWith('hotfix/')

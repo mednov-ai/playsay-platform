@@ -59,6 +59,17 @@ class ProjectErrorLocalizationTest {
     }
 
     @Test
+    fun `localizes russian project error from explicit russian bundle`() {
+        LocaleContextHolder.setLocale(Locale.forLanguageTag("ru"))
+
+        val response = handler.handleProjectResponseException(
+            ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND),
+        )
+
+        assertEquals("Курс не найден.", response.body?.message)
+    }
+
+    @Test
     fun `project error falls back to russian bundle`() {
         LocaleContextHolder.setLocale(Locale.ITALIAN)
 

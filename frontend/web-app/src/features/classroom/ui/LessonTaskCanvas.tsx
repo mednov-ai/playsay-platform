@@ -19,6 +19,7 @@ import {
 import {
   pointsToSvgPath,
 } from "../model/annotation";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function LessonTaskCanvas({
   lessonId,
@@ -39,6 +40,7 @@ export function LessonTaskCanvas({
   submissionSaving: boolean;
   teacherName: string;
 }) {
+  const { t } = useAppTranslation();
   const {
     annotationColor,
     annotationStrokes,
@@ -83,25 +85,25 @@ export function LessonTaskCanvas({
 
   return (
     <div className="playsay-task-board">
-      <aside className="playsay-annotation-toolbar" aria-label="Инструменты задания">
-        <AnnotationToolButton active={annotationTool === "pointer"} label="Курсор" onClick={() => setAnnotationTool("pointer")}>
+      <aside className="playsay-annotation-toolbar" aria-label={t("classroom.annotation.toolbar")}>
+        <AnnotationToolButton active={annotationTool === "pointer"} label={t("classroom.annotation.pointer")} onClick={() => setAnnotationTool("pointer")}>
           <MousePointer2 className="h-4 w-4" />
         </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "pen"} label="Карандаш" onClick={() => setAnnotationTool("pen")}>
+        <AnnotationToolButton active={annotationTool === "pen"} label={t("classroom.annotation.pen")} onClick={() => setAnnotationTool("pen")}>
           <PenLine className="h-4 w-4" />
         </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "eraser"} label="Ластик" onClick={() => setAnnotationTool("eraser")}>
+        <AnnotationToolButton active={annotationTool === "eraser"} label={t("classroom.annotation.eraser")} onClick={() => setAnnotationTool("eraser")}>
           <Eraser className="h-4 w-4" />
         </AnnotationToolButton>
         <AnnotationToolButton
           active={false}
           disabled={annotationStrokes.length === 0}
-          label="Отменить"
+          label={t("classroom.annotation.undo")}
           onClick={() => setAnnotationStrokes((current) => current.slice(0, -1))}
         >
           <Undo2 className="h-4 w-4" />
         </AnnotationToolButton>
-        <div className="playsay-color-swatches" aria-label="Цвет">
+        <div className="playsay-color-swatches" aria-label={t("classroom.annotation.color")}>
           {["#ff5c00", "#00a878", "#2574ff"].map((color) => (
             <button
               aria-label={color}
@@ -155,16 +157,16 @@ export function LessonTaskCanvas({
       </div>
 
       <footer className="playsay-task-footer">
-        <button aria-label="Предыдущее задание" className="playsay-page-button" type="button">
+        <button aria-label={t("classroom.annotation.previousTask")} className="playsay-page-button" type="button">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span>1 из 14</span>
-        <button aria-label="Следующее задание" className="playsay-page-button" type="button">
+        <span>{t("classroom.annotation.pageIndicator", { current: 1, total: 14 })}</span>
+        <button aria-label={t("classroom.annotation.nextTask")} className="playsay-page-button" type="button">
           <ChevronRight className="h-4 w-4" />
         </button>
         <Button disabled={!material || submissionSaving} onClick={submitAnswers} type="button">
           {submissionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          {submissionSaving ? "Отправляем" : "Отправить"}
+          {submissionSaving ? t("classroom.actions.submitting") : t("classroom.actions.submit")}
         </Button>
         {submissionMessage ? <span className="playsay-task-submit-status">{submissionMessage}</span> : null}
         <span className="playsay-task-teacher">{teacherName}</span>

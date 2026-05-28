@@ -14,6 +14,7 @@ describe("auth helpers", () => {
       redirectUri: "https://online.play-and-say.ru/auth/callback",
       state: "state-1",
       codeChallenge: "challenge-1",
+      uiLocales: "en",
     });
 
     expect(url.toString()).toContain("/protocol/openid-connect/auth");
@@ -23,6 +24,7 @@ describe("auth helpers", () => {
     );
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
     expect(url.searchParams.get("scope")).toBe("openid profile email");
+    expect(url.searchParams.get("ui_locales")).toBe("en");
   });
 
   it("maps token expiration to an absolute timestamp", () => {

@@ -18,6 +18,7 @@ import {
 } from "../../materials";
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
 import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function LessonWorkspace({
   displayName,
@@ -32,6 +33,8 @@ export function LessonWorkspace({
   profile: MeProfile | null;
   session: LessonRoomSession;
 }) {
+  const { t } = useAppTranslation();
+  const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
   const {
     assigningMaterial,
     assignmentMessage,
@@ -58,9 +61,9 @@ export function LessonWorkspace({
   return (
     <section className="playsay-workbench">
       <header className="playsay-workbench-topbar">
-        <nav className="playsay-lesson-tabs" aria-label="Разделы урока">
+        <nav className="playsay-lesson-tabs" aria-label={t("classroom.tabs.aria")}>
           <button className="playsay-lesson-tab" data-active="true" type="button">
-            Урок
+            {t("classroom.tabs.lesson")}
           </button>
         </nav>
 
@@ -73,7 +76,7 @@ export function LessonWorkspace({
                 onChange={(event) => setSelectedMaterialId(event.target.value)}
                 value={selectedMaterialId}
               >
-                <option value="">Материал не выбран</option>
+                <option value="">{t("classroom.material.pickerEmpty")}</option>
                 {selectableMaterials.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.title}
@@ -87,18 +90,18 @@ export function LessonWorkspace({
                 variant="outline"
               >
                 {assigningMaterial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Назначить
+                {t("classroom.actions.assign")}
               </Button>
             </div>
           ) : null}
           <div className="playsay-lesson-statusline">
             <span className="inline-flex items-center gap-1.5">
               <Clock3 className="h-4 w-4 text-primary" />
-              {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt)}
+              {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt, translate)}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Users className="h-4 w-4 text-primary" />
-              {formatParticipantCount(session.participants.length)}
+              {formatParticipantCount(session.participants.length, translate)}
             </span>
           </div>
         </div>
@@ -113,7 +116,7 @@ export function LessonWorkspace({
         ) : null}
 
         {material ? (
-          <div className="playsay-assignment-strip" aria-label="Назначенные задания">
+          <div className="playsay-assignment-strip" aria-label={t("classroom.material.assignedAria")}>
             {materialDocumentBlocks(material).slice(0, 6).map((block, index) => (
               <AssignmentStub
                 active={index === 0}
@@ -124,8 +127,8 @@ export function LessonWorkspace({
             ))}
           </div>
         ) : (
-          <div className="playsay-assignment-strip" aria-label="Назначенные задания">
-            <AssignmentStub active title="Материал не назначен" tag="Урок" />
+          <div className="playsay-assignment-strip" aria-label={t("classroom.material.assignedAria")}>
+            <AssignmentStub active title={t("classroom.material.unassignedTitle")} tag={t("classroom.tabs.lesson")} />
           </div>
         )}
 
@@ -136,7 +139,7 @@ export function LessonWorkspace({
         {materialLoading ? (
           <div className="playsay-task-board playsay-material-loading">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <span>Материал загружается</span>
+            <span>{t("classroom.material.loading")}</span>
           </div>
         ) : material ? (
           <LessonTaskCanvas
@@ -152,7 +155,7 @@ export function LessonWorkspace({
         ) : canManageMaterial ? (
           <div className="playsay-task-board playsay-material-loading">
             <BookOpen className="h-5 w-5 text-primary" />
-            <span>Выберите материал для урока</span>
+            <span>{t("classroom.material.selectForLesson")}</span>
           </div>
         ) : (
           <>

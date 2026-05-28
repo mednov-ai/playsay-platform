@@ -104,7 +104,69 @@ export const en = {
     },
   },
   schedule: {
+    title: "Schedule",
     lessonFallbackTitle: "Lesson",
+    archive: {
+      old: "Past lessons",
+      more: "More lessons",
+      hiddenCount_one: "{{count}} hidden",
+      hiddenCount_other: "{{count}} hidden",
+    },
+    empty: {
+      manager: "There are no scheduled lessons yet.",
+      student: "You do not have planned lessons yet.",
+    },
+    loginRequired: "Sign in to see the schedule.",
+    clipboard: {
+      promptTitle: "Lesson link",
+      copied: "Copied",
+      link: "Link",
+    },
+    state: {
+      cancelled: "Cancelled",
+      expired: "Expired",
+      live: "Live",
+      planned: "Planned",
+    },
+    lessonType: {
+      individual: "Individual",
+      group: "Group",
+    },
+    time: {
+      pending: "time later",
+      until: "until {{time}}",
+      from: "from {{time}}",
+      range: "{{start}} - {{end}}",
+    },
+    duration: {
+      pending: "duration later",
+      minutes_one: "{{count}} min",
+      minutes_other: "{{count}} min",
+    },
+    participants: {
+      none: "students later",
+      count_one: "{{count}} student",
+      count_other: "{{count}} students",
+    },
+    fallback: {
+      course: "Course later",
+      teacher: "Teacher later",
+    },
+    form: {
+      lessonTemplate: "Course lesson",
+      noTemplate: "No template",
+      start: "Start",
+      end: "End",
+      format: "Format",
+      students: "Students",
+      studentsPlaceholder: "Students will appear after their first sign-in",
+      addLesson: "Add lesson",
+    },
+    actions: {
+      join: "Join lesson",
+      cancel: "Cancel",
+      delete: "Delete",
+    },
     messages: {
       refreshed: "Schedule updated",
       refreshFailed: "Could not load schedule",
@@ -123,6 +185,41 @@ export const en = {
     },
   },
   courses: {
+    title: "Courses and lessons",
+    loginRequired: "Sign in to see learning programs.",
+    empty: {
+      manager: "There are no courses yet. Create the first program.",
+      student: "There are no published courses yet.",
+      lessons: "No lessons have been added yet.",
+    },
+    form: {
+      courseTitle: "Course title",
+      courseTitlePlaceholder: "English A1",
+      level: "Level",
+      language: "Language",
+      description: "Description",
+      descriptionPlaceholder: "Short program description",
+      published: "Published",
+      createCourse: "Create course",
+      lessonTitlePlaceholder: "Lesson title",
+      orderPlaceholder: "No.",
+      durationPlaceholder: "min",
+      addLesson: "Lesson",
+    },
+    status: {
+      published: "published",
+      draft: "draft",
+      levelLater: "level later",
+    },
+    summary: {
+      lessonCount_one: "{{count}} lesson",
+      lessonCount_other: "{{count}} lessons",
+      updatedAt: "updated {{date}}",
+      lessonOrder: "No. {{order}}",
+    },
+    actions: {
+      delete: "Delete",
+    },
     messages: {
       refreshed: "Courses updated",
       refreshFailed: "Could not load courses",
@@ -159,6 +256,23 @@ export const en = {
     },
   },
   classroom: {
+    live: "Live",
+    participantFallback: "Participant",
+    actions: {
+      assign: "Assign",
+      leave: "Leave",
+    },
+    tabs: {
+      aria: "Lesson sections",
+      lesson: "Lesson",
+    },
+    material: {
+      pickerEmpty: "No material selected",
+      assignedAria: "Assigned tasks",
+      unassignedTitle: "No material assigned",
+      loading: "Material is loading",
+      selectForLesson: "Choose material for the lesson",
+    },
     messages: {
       materialAssigned: "Material assigned",
       materialUnassigned: "Material removed",

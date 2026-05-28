@@ -17,6 +17,7 @@ import type {
 } from "../../../shared/api/playsay";
 import { ScheduleCreateForm } from "./ScheduleCreateForm";
 import { ScheduledLessonCard } from "./ScheduledLessonCard";
+import { useAppTranslation } from "../../../shared/i18n";
 
 const SCHEDULE_VISIBLE_LESSON_LIMIT = 10;
 
@@ -55,6 +56,7 @@ export function SchedulePanel({
   scheduledLessons: ScheduledLesson[];
   studentUsers: AdminUserProfile[];
 }) {
+  const { t } = useAppTranslation();
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const lessonOptions = flattenCourseLessonOptions(courses, lessons);
   const orderedLessons = [...scheduledLessons].sort((left, right) => compareScheduleLessons(left, right, nowMs));
@@ -62,8 +64,8 @@ export function SchedulePanel({
   const archivedLessons = orderedLessons.slice(SCHEDULE_VISIBLE_LESSON_LIMIT);
   const [copiedLessonId, setCopiedLessonId] = useState<string | null>(null);
   const archiveTitle = archivedLessons.every((lesson) => !isJoinableScheduledLesson(lesson, nowMs))
-    ? "Старые занятия"
-    : "Ещё занятия";
+    ? t("schedule.archive.old")
+    : t("schedule.archive.more");
 
   async function copyLessonLink(lessonId: string) {
     const url = new URL(classroomPath(lessonId), window.location.origin).toString();
@@ -74,7 +76,7 @@ export function SchedulePanel({
         setCopiedLessonId((current) => (current === lessonId ? null : current));
       }, 1800);
     } catch {
-      window.prompt("Ссылка на урок", url);
+      window.prompt(t("schedule.clipboard.promptTitle"), url);
     }
   }
 
@@ -99,17 +101,17 @@ export function SchedulePanel({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div className="flex items-center gap-2">
           <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">Расписание</h2>
+          <h2 className="text-lg font-extrabold">{t("schedule.title")}</h2>
         </div>
         <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Обновить
+          {t("common.actions.refresh")}
         </Button>
       </div>
 
       {!profile ? (
         <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-          Войдите, чтобы увидеть расписание.
+          {t("schedule.loginRequired")}
         </div>
       ) : (
         <div className="mt-4 grid gap-4">
@@ -136,7 +138,7 @@ export function SchedulePanel({
 
           {scheduledLessons.length === 0 ? (
             <div className="rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-              {canManage ? "В расписании пока нет занятий." : "У вас пока нет запланированных занятий."}
+              {canManage ? t("schedule.empty.manager") : t("schedule.empty.student")}
             </div>
           ) : (
             <div className="grid gap-3">
@@ -146,7 +148,7 @@ export function SchedulePanel({
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-extrabold text-foreground">
                     <span>{archiveTitle}</span>
                     <span className="inline-flex items-center gap-2 text-xs font-extrabold text-muted-foreground">
-                      скрыто {archivedLessons.length}
+                      {t("schedule.archive.hiddenCount", { count: archivedLessons.length })}
                       <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                     </span>
                   </summary>

@@ -104,7 +104,75 @@ export const ru = {
     },
   },
   schedule: {
+    title: "Расписание",
     lessonFallbackTitle: "Занятие",
+    archive: {
+      old: "Старые занятия",
+      more: "Ещё занятия",
+      hiddenCount_one: "скрыто {{count}}",
+      hiddenCount_few: "скрыто {{count}}",
+      hiddenCount_many: "скрыто {{count}}",
+      hiddenCount_other: "скрыто {{count}}",
+    },
+    empty: {
+      manager: "В расписании пока нет занятий.",
+      student: "У вас пока нет запланированных занятий.",
+    },
+    loginRequired: "Войдите, чтобы увидеть расписание.",
+    clipboard: {
+      promptTitle: "Ссылка на урок",
+      copied: "Скопировано",
+      link: "Ссылка",
+    },
+    state: {
+      cancelled: "Отменён",
+      expired: "Истёк",
+      live: "В эфире",
+      planned: "Запланирован",
+    },
+    lessonType: {
+      individual: "Индивидуально",
+      group: "Группа",
+    },
+    time: {
+      pending: "время позже",
+      until: "до {{time}}",
+      from: "с {{time}}",
+      range: "{{start}} - {{end}}",
+    },
+    duration: {
+      pending: "длительность позже",
+      minutes_one: "{{count}} мин",
+      minutes_few: "{{count}} мин",
+      minutes_many: "{{count}} мин",
+      minutes_other: "{{count}} мин",
+    },
+    participants: {
+      none: "ученики позже",
+      count_one: "{{count}} ученик",
+      count_few: "{{count}} ученика",
+      count_many: "{{count}} учеников",
+      count_other: "{{count}} учеников",
+    },
+    fallback: {
+      course: "Курс позже",
+      teacher: "Преподаватель позже",
+    },
+    form: {
+      lessonTemplate: "Урок курса",
+      noTemplate: "Без шаблона",
+      start: "Начало",
+      end: "Конец",
+      format: "Формат",
+      students: "Ученики",
+      studentsPlaceholder: "Ученики появятся после первого входа",
+      addLesson: "Добавить занятие",
+    },
+    actions: {
+      join: "Войти в урок",
+      cancel: "Отменить",
+      delete: "Удалить",
+    },
     messages: {
       refreshed: "Расписание обновлено",
       refreshFailed: "Не удалось загрузить расписание",
@@ -123,6 +191,43 @@ export const ru = {
     },
   },
   courses: {
+    title: "Курсы и уроки",
+    loginRequired: "Войдите, чтобы увидеть учебные программы.",
+    empty: {
+      manager: "Курсов пока нет. Создайте первую программу.",
+      student: "Опубликованных курсов пока нет.",
+      lessons: "Уроки ещё не добавлены.",
+    },
+    form: {
+      courseTitle: "Название курса",
+      courseTitlePlaceholder: "English A1",
+      level: "Уровень",
+      language: "Язык",
+      description: "Описание",
+      descriptionPlaceholder: "Короткое описание программы",
+      published: "Опубликован",
+      createCourse: "Создать курс",
+      lessonTitlePlaceholder: "Название урока",
+      orderPlaceholder: "№",
+      durationPlaceholder: "мин",
+      addLesson: "Урок",
+    },
+    status: {
+      published: "published",
+      draft: "draft",
+      levelLater: "level later",
+    },
+    summary: {
+      lessonCount_one: "{{count}} урок",
+      lessonCount_few: "{{count}} урока",
+      lessonCount_many: "{{count}} уроков",
+      lessonCount_other: "{{count}} уроков",
+      updatedAt: "обновлено {{date}}",
+      lessonOrder: "№ {{order}}",
+    },
+    actions: {
+      delete: "Удалить",
+    },
     messages: {
       refreshed: "Курсы обновлены",
       refreshFailed: "Не удалось загрузить курсы",
@@ -159,6 +264,23 @@ export const ru = {
     },
   },
   classroom: {
+    live: "В эфире",
+    participantFallback: "Участник",
+    actions: {
+      assign: "Назначить",
+      leave: "Выйти",
+    },
+    tabs: {
+      aria: "Разделы урока",
+      lesson: "Урок",
+    },
+    material: {
+      pickerEmpty: "Материал не выбран",
+      assignedAria: "Назначенные задания",
+      unassignedTitle: "Материал не назначен",
+      loading: "Материал загружается",
+      selectForLesson: "Выберите материал для урока",
+    },
     messages: {
       materialAssigned: "Материал назначен",
       materialUnassigned: "Материал снят",

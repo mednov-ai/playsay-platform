@@ -104,7 +104,69 @@ export const fr = {
     },
   },
   schedule: {
+    title: "Planning",
     lessonFallbackTitle: "Cours",
+    archive: {
+      old: "Cours passés",
+      more: "Autres cours",
+      hiddenCount_one: "{{count}} masqué",
+      hiddenCount_other: "{{count}} masqués",
+    },
+    empty: {
+      manager: "Aucun cours n'est encore planifié.",
+      student: "Vous n'avez pas encore de cours planifiés.",
+    },
+    loginRequired: "Connectez-vous pour voir le planning.",
+    clipboard: {
+      promptTitle: "Lien du cours",
+      copied: "Copié",
+      link: "Lien",
+    },
+    state: {
+      cancelled: "Annulé",
+      expired: "Expiré",
+      live: "En direct",
+      planned: "Planifié",
+    },
+    lessonType: {
+      individual: "Individuel",
+      group: "Groupe",
+    },
+    time: {
+      pending: "horaire à venir",
+      until: "jusqu'à {{time}}",
+      from: "à partir de {{time}}",
+      range: "{{start}} - {{end}}",
+    },
+    duration: {
+      pending: "durée à venir",
+      minutes_one: "{{count}} min",
+      minutes_other: "{{count}} min",
+    },
+    participants: {
+      none: "élèves à venir",
+      count_one: "{{count}} élève",
+      count_other: "{{count}} élèves",
+    },
+    fallback: {
+      course: "Parcours à venir",
+      teacher: "Professeur à venir",
+    },
+    form: {
+      lessonTemplate: "Leçon du parcours",
+      noTemplate: "Sans modèle",
+      start: "Début",
+      end: "Fin",
+      format: "Format",
+      students: "Élèves",
+      studentsPlaceholder: "Les élèves apparaîtront après leur première connexion",
+      addLesson: "Ajouter un cours",
+    },
+    actions: {
+      join: "Entrer en cours",
+      cancel: "Annuler",
+      delete: "Supprimer",
+    },
     messages: {
       refreshed: "Planning mis à jour",
       refreshFailed: "Impossible de charger le planning",
@@ -123,6 +185,41 @@ export const fr = {
     },
   },
   courses: {
+    title: "Parcours et leçons",
+    loginRequired: "Connectez-vous pour voir les programmes.",
+    empty: {
+      manager: "Aucun parcours pour le moment. Créez le premier programme.",
+      student: "Aucun parcours publié pour le moment.",
+      lessons: "Aucune leçon n'a encore été ajoutée.",
+    },
+    form: {
+      courseTitle: "Titre du parcours",
+      courseTitlePlaceholder: "English A1",
+      level: "Niveau",
+      language: "Langue",
+      description: "Description",
+      descriptionPlaceholder: "Courte description du programme",
+      published: "Publié",
+      createCourse: "Créer le parcours",
+      lessonTitlePlaceholder: "Titre de la leçon",
+      orderPlaceholder: "N°",
+      durationPlaceholder: "min",
+      addLesson: "Leçon",
+    },
+    status: {
+      published: "publié",
+      draft: "brouillon",
+      levelLater: "niveau à venir",
+    },
+    summary: {
+      lessonCount_one: "{{count}} leçon",
+      lessonCount_other: "{{count}} leçons",
+      updatedAt: "mis à jour le {{date}}",
+      lessonOrder: "N° {{order}}",
+    },
+    actions: {
+      delete: "Supprimer",
+    },
     messages: {
       refreshed: "Parcours mis à jour",
       refreshFailed: "Impossible de charger les parcours",
@@ -159,6 +256,23 @@ export const fr = {
     },
   },
   classroom: {
+    live: "En direct",
+    participantFallback: "Participant",
+    actions: {
+      assign: "Attribuer",
+      leave: "Quitter",
+    },
+    tabs: {
+      aria: "Sections du cours",
+      lesson: "Cours",
+    },
+    material: {
+      pickerEmpty: "Aucun support sélectionné",
+      assignedAria: "Exercices attribués",
+      unassignedTitle: "Aucun support attribué",
+      loading: "Chargement du support",
+      selectForLesson: "Choisissez un support pour le cours",
+    },
     messages: {
       materialAssigned: "Support attribué",
       materialUnassigned: "Support retiré",

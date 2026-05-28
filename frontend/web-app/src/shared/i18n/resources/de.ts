@@ -104,7 +104,69 @@ export const de = {
     },
   },
   schedule: {
+    title: "Stundenplan",
     lessonFallbackTitle: "Stunde",
+    archive: {
+      old: "Frühere Stunden",
+      more: "Weitere Stunden",
+      hiddenCount_one: "{{count}} ausgeblendet",
+      hiddenCount_other: "{{count}} ausgeblendet",
+    },
+    empty: {
+      manager: "Es sind noch keine Stunden geplant.",
+      student: "Sie haben noch keine geplanten Stunden.",
+    },
+    loginRequired: "Melden Sie sich an, um den Stundenplan zu sehen.",
+    clipboard: {
+      promptTitle: "Link zur Stunde",
+      copied: "Kopiert",
+      link: "Link",
+    },
+    state: {
+      cancelled: "Abgesagt",
+      expired: "Abgelaufen",
+      live: "Live",
+      planned: "Geplant",
+    },
+    lessonType: {
+      individual: "Einzelstunde",
+      group: "Gruppe",
+    },
+    time: {
+      pending: "Zeit später",
+      until: "bis {{time}}",
+      from: "ab {{time}}",
+      range: "{{start}} - {{end}}",
+    },
+    duration: {
+      pending: "Dauer später",
+      minutes_one: "{{count}} Min.",
+      minutes_other: "{{count}} Min.",
+    },
+    participants: {
+      none: "Schüler später",
+      count_one: "{{count}} Schüler",
+      count_other: "{{count}} Schüler",
+    },
+    fallback: {
+      course: "Kurs später",
+      teacher: "Lehrkraft später",
+    },
+    form: {
+      lessonTemplate: "Kurslektion",
+      noTemplate: "Keine Vorlage",
+      start: "Start",
+      end: "Ende",
+      format: "Format",
+      students: "Schüler",
+      studentsPlaceholder: "Schüler erscheinen nach der ersten Anmeldung",
+      addLesson: "Stunde hinzufügen",
+    },
+    actions: {
+      join: "Stunde betreten",
+      cancel: "Absagen",
+      delete: "Löschen",
+    },
     messages: {
       refreshed: "Plan aktualisiert",
       refreshFailed: "Plan konnte nicht geladen werden",
@@ -123,6 +185,41 @@ export const de = {
     },
   },
   courses: {
+    title: "Kurse und Lektionen",
+    loginRequired: "Melden Sie sich an, um Lernprogramme zu sehen.",
+    empty: {
+      manager: "Es gibt noch keine Kurse. Erstellen Sie das erste Programm.",
+      student: "Es gibt noch keine veröffentlichten Kurse.",
+      lessons: "Es wurden noch keine Lektionen hinzugefügt.",
+    },
+    form: {
+      courseTitle: "Kurstitel",
+      courseTitlePlaceholder: "English A1",
+      level: "Niveau",
+      language: "Sprache",
+      description: "Beschreibung",
+      descriptionPlaceholder: "Kurze Programmbeschreibung",
+      published: "Veröffentlicht",
+      createCourse: "Kurs erstellen",
+      lessonTitlePlaceholder: "Lektionstitel",
+      orderPlaceholder: "Nr.",
+      durationPlaceholder: "Min.",
+      addLesson: "Lektion",
+    },
+    status: {
+      published: "veröffentlicht",
+      draft: "Entwurf",
+      levelLater: "Niveau später",
+    },
+    summary: {
+      lessonCount_one: "{{count}} Lektion",
+      lessonCount_other: "{{count}} Lektionen",
+      updatedAt: "aktualisiert {{date}}",
+      lessonOrder: "Nr. {{order}}",
+    },
+    actions: {
+      delete: "Löschen",
+    },
     messages: {
       refreshed: "Kurse aktualisiert",
       refreshFailed: "Kurse konnten nicht geladen werden",
@@ -159,6 +256,23 @@ export const de = {
     },
   },
   classroom: {
+    live: "Live",
+    participantFallback: "Teilnehmer",
+    actions: {
+      assign: "Zuweisen",
+      leave: "Verlassen",
+    },
+    tabs: {
+      aria: "Stundenbereiche",
+      lesson: "Stunde",
+    },
+    material: {
+      pickerEmpty: "Kein Material ausgewählt",
+      assignedAria: "Zugewiesene Aufgaben",
+      unassignedTitle: "Kein Material zugewiesen",
+      loading: "Material wird geladen",
+      selectForLesson: "Material für die Stunde auswählen",
+    },
     messages: {
       materialAssigned: "Material zugewiesen",
       materialUnassigned: "Material entfernt",

@@ -2,6 +2,7 @@ import { BookOpen, Copy, Loader2, RotateCcw, Trash2, Video } from "lucide-react"
 import { Button } from "../../../components/ui/button";
 import { formatDateTime, formatLessonType, isJoinableScheduledLesson, scheduleStateLabel } from "../../../entities/schedule/model";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function ScheduledLessonCard({
   canManage,
@@ -26,8 +27,10 @@ export function ScheduledLessonCard({
   onJoin: () => void;
   roomLoading: boolean;
 }) {
+  const { t } = useAppTranslation();
+  const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
   const joinable = isJoinableScheduledLesson(lesson, nowMs);
-  const stateLabel = scheduleStateLabel(lesson, nowMs);
+  const stateLabel = scheduleStateLabel(lesson, nowMs, translate);
 
   return (
     <article className="rounded-2xl border border-border bg-white p-4">
@@ -35,20 +38,20 @@ export function ScheduledLessonCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-extrabold">
-              {lesson.lessonTitle ?? lesson.courseTitle ?? "Занятие"}
+              {lesson.lessonTitle ?? lesson.courseTitle ?? t("schedule.lessonFallbackTitle")}
             </h3>
             <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground">
               {stateLabel}
             </span>
             <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground">
-              {formatLessonType(lesson.type)}
+              {formatLessonType(lesson.type, translate)}
             </span>
           </div>
           <p className="mt-2 text-sm font-semibold text-muted-foreground">
-            {formatDateTime(lesson.scheduledStart)} — {formatDateTime(lesson.scheduledEnd)}
+            {formatDateTime(lesson.scheduledStart, translate)} — {formatDateTime(lesson.scheduledEnd, translate)}
           </p>
           <p className="mt-1 text-xs font-bold text-muted-foreground">
-            {lesson.courseTitle ?? "Курс позже"} · {lesson.teacherName ?? "Преподаватель позже"}
+            {lesson.courseTitle ?? t("schedule.fallback.course")} · {lesson.teacherName ?? t("schedule.fallback.teacher")}
           </p>
           {lesson.materialTitle ? (
             <p className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-[#fff3eb] px-2.5 py-1 text-xs font-extrabold text-primary">
@@ -59,7 +62,7 @@ export function ScheduledLessonCard({
           <div className="mt-3 flex flex-wrap gap-2">
             {lesson.participants.length === 0 ? (
               <span className="rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-extrabold text-muted-foreground">
-                ученики позже
+                {t("schedule.participants.none")}
               </span>
             ) : (
               lesson.participants.map((participant) => (
@@ -80,22 +83,22 @@ export function ScheduledLessonCard({
             type="button"
           >
             {roomLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-            Войти в урок
+            {t("schedule.actions.join")}
           </Button>
           <Button disabled={disabled} onClick={onCopyLink} type="button" variant="outline">
             <Copy className="h-4 w-4" />
-            {linkCopied ? "Скопировано" : "Ссылка"}
+            {linkCopied ? t("schedule.clipboard.copied") : t("schedule.clipboard.link")}
           </Button>
           {canManage ? (
             <>
-            <Button disabled={disabled || lesson.status === "CANCELLED"} onClick={onCancel} type="button" variant="outline">
-              <RotateCcw className="h-4 w-4" />
-              Отменить
-            </Button>
-            <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
-              <Trash2 className="h-4 w-4" />
-              Удалить
-            </Button>
+              <Button disabled={disabled || lesson.status === "CANCELLED"} onClick={onCancel} type="button" variant="outline">
+                <RotateCcw className="h-4 w-4" />
+                {t("schedule.actions.cancel")}
+              </Button>
+              <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
+                <Trash2 className="h-4 w-4" />
+                {t("schedule.actions.delete")}
+              </Button>
             </>
           ) : null}
         </div>

@@ -9,6 +9,7 @@ import {
   type ScheduleFormState,
 } from "../../../entities/schedule/model";
 import type { AdminUserProfile, ScheduledLessonInput } from "../../../shared/api/playsay";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function ScheduleCreateForm({
   disabled,
@@ -21,6 +22,7 @@ export function ScheduleCreateForm({
   onCreate: (input: ScheduledLessonInput) => void;
   studentUsers: AdminUserProfile[];
 }) {
+  const { t } = useAppTranslation();
   const [form, setForm] = useState<ScheduleFormState>(() => defaultScheduleForm(lessonOptions[0]?.id ?? ""));
 
   useEffect(() => {
@@ -63,14 +65,14 @@ export function ScheduleCreateForm({
 
   return (
     <form className="grid gap-3 rounded-2xl border border-border bg-muted/50 p-3" onSubmit={submit}>
-      <FormField label="Урок курса">
+      <FormField label={t("schedule.form.lessonTemplate")}>
         <select
           className="playsay-input"
           disabled={disabled}
           onChange={(event) => updateField("lessonTemplateId", event.target.value)}
           value={form.lessonTemplateId}
         >
-          <option value="">Без шаблона</option>
+          <option value="">{t("schedule.form.noTemplate")}</option>
           {lessonOptions.map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}
@@ -80,7 +82,7 @@ export function ScheduleCreateForm({
       </FormField>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label="Начало">
+        <FormField label={t("schedule.form.start")}>
           <input
             className="playsay-input"
             disabled={disabled}
@@ -90,7 +92,7 @@ export function ScheduleCreateForm({
             value={form.scheduledStart}
           />
         </FormField>
-        <FormField label="Конец">
+        <FormField label={t("schedule.form.end")}>
           <input
             className="playsay-input"
             disabled={disabled}
@@ -103,24 +105,24 @@ export function ScheduleCreateForm({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[9rem_1fr]">
-        <FormField label="Формат">
+        <FormField label={t("schedule.form.format")}>
           <select
             className="playsay-input"
             disabled={disabled}
             onChange={(event) => updateField("type", event.target.value as ScheduleFormState["type"])}
             value={form.type}
           >
-            <option value="GROUP">Группа</option>
-            <option value="INDIVIDUAL">Индивидуально</option>
+            <option value="GROUP">{t("schedule.lessonType.group")}</option>
+            <option value="INDIVIDUAL">{t("schedule.lessonType.individual")}</option>
           </select>
         </FormField>
-        <FormField label="Ученики">
+        <FormField label={t("schedule.form.students")}>
           {studentUsers.length === 0 ? (
             <input
               className="playsay-input"
               disabled={disabled}
               onChange={(event) => updateField("participantSubjects", event.target.value)}
-              placeholder="Ученики появятся после первого входа"
+              placeholder={t("schedule.form.studentsPlaceholder")}
               value={form.participantSubjects}
             />
           ) : (
@@ -149,7 +151,7 @@ export function ScheduleCreateForm({
       <div className="flex justify-end">
         <Button disabled={disabled} type="submit">
           <Plus className="h-4 w-4" />
-          Добавить занятие
+          {t("schedule.form.addLesson")}
         </Button>
       </div>
     </form>

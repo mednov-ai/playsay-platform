@@ -6,36 +6,20 @@ import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.media.Content
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.responses.ApiResponses
-import io.swagger.v3.oas.annotations.security.SecurityRequirement
-import io.swagger.v3.oas.annotations.tags.Tag
+import com.playsay.gateway.dto.LiveKitRoomTokenResponse
+import com.playsay.gateway.entity.LessonEntity
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.utils.MetaData
 import java.nio.charset.StandardCharsets
-import java.sql.ResultSet
 import java.time.Instant
 import java.util.Date
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
-import com.playsay.gateway.repo.LegacyJdbcDataRepo
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
-import com.playsay.gateway.dto.*
-import com.playsay.gateway.utils.MetaData
-import com.playsay.gateway.error.ProjectResponseException
-
-private data class LiveKitLesson(
-    val id: UUID,
-    val roomName: String?,
-)
 
 @Component
 class LiveKitTokenService(
@@ -96,77 +80,42 @@ class LiveKitTokenService(
 
 @Component
 class LiveKitRoomStore(
-    private val dataRepo: LegacyJdbcDataRepo,
+    private val lessonRepo: LessonRepo,
     private val tokenService: LiveKitTokenService,
 ) {
     @Transactional
     fun createToken(authentication: JwtAuthenticationToken, lessonId: UUID): LiveKitRoomTokenResponse {
         val lesson = findJoinableLesson(authentication, lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        val roomName = lesson.roomName?.trim()?.takeIf { room -> room.isNotEmpty() }
-            ?: ensureRoomName(lesson.id)
+        val roomName = lesson.livekitRoomName?.trim()?.takeIf { room -> room.isNotEmpty() }
+            ?: ensureRoomName(lesson)
 
         return tokenService.createToken(authentication, roomName)
     }
 
-    private fun findJoinableLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LiveKitLesson? {
-        val whereClause = if (authentication.canJoinAnyLiveKitLesson()) {
-            """
-            WHERE l.id = :lessonId
-              AND l.status NOT IN ('CANCELLED', 'COMPLETED')
-              AND (l.scheduled_end IS NULL OR l.scheduled_end > :now)
-            """.trimIndent()
+    private fun findJoinableLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LessonEntity? {
+        val now = Instant.now()
+        return if (authentication.canJoinAnyLiveKitLesson()) {
+            lessonRepo.findJoinableForManager(
+                lessonId = lessonId,
+                now = now,
+                excludedStatuses = expiredLiveKitStatuses,
+            )
         } else {
-            """
-            WHERE l.id = :lessonId
-              AND l.status NOT IN ('CANCELLED', 'COMPLETED')
-              AND (l.scheduled_end IS NULL OR l.scheduled_end > :now)
-              AND EXISTS (
-                  SELECT 1
-                    FROM lesson_participant lp
-                    JOIN app_user student ON student.id = lp.student_user_id
-                   WHERE lp.lesson_id = l.id
-                     AND student.keycloak_subject = :subject
-              )
-            """.trimIndent()
+            lessonRepo.findJoinableForStudent(
+                lessonId = lessonId,
+                subject = authentication.token.subject,
+                now = now,
+                excludedStatuses = expiredLiveKitStatuses,
+            )
         }
-
-        val params = mutableMapOf<String, Any?>(
-            "lessonId" to lessonId,
-            "now" to Instant.now().atOffset(java.time.ZoneOffset.UTC),
-        )
-        if (!authentication.canJoinAnyLiveKitLesson()) {
-            params["subject"] = authentication.token.subject
-        }
-
-        return dataRepo.sql(
-            """
-            SELECT l.id,
-                   l.livekit_room_name
-              FROM lesson l
-              $whereClause
-            """.trimIndent(),
-        )
-            .params(params)
-            .query(::mapLiveKitLesson)
-            .optional()
-            .orElse(null)
     }
 
-    private fun ensureRoomName(lessonId: UUID): String {
-        val roomName = "lesson-$lessonId"
-        dataRepo.sql(
-            """
-            UPDATE lesson
-               SET livekit_room_name = :roomName,
-                   updated_at = :updatedAt
-             WHERE id = :lessonId
-            """.trimIndent(),
-        )
-            .param("lessonId", lessonId)
-            .param("roomName", roomName)
-            .param("updatedAt", Instant.now().atOffset(java.time.ZoneOffset.UTC))
-            .update()
+    private fun ensureRoomName(lesson: LessonEntity): String {
+        val roomName = "lesson-${lesson.id}"
+        lesson.livekitRoomName = roomName
+        lesson.updatedAt = Instant.now()
+        lessonRepo.save(lesson)
         return roomName
     }
 }
@@ -174,8 +123,4 @@ class LiveKitRoomStore(
 private fun JwtAuthenticationToken.canJoinAnyLiveKitLesson(): Boolean =
     authorities.any { authority -> authority.authority == MetaData.Authorities.TEACHER || authority.authority == MetaData.Authorities.ADMIN }
 
-private fun mapLiveKitLesson(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): LiveKitLesson =
-    LiveKitLesson(
-        id = rs.getObject("id", UUID::class.java),
-        roomName = rs.getString("livekit_room_name"),
-    )
+private val expiredLiveKitStatuses = setOf(MetaData.LessonStatuses.COMPLETED, MetaData.LessonStatuses.CANCELLED)

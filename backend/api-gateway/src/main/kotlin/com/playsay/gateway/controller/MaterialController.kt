@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.sql.ResultSet
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -37,7 +36,6 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.service.*
 

@@ -5,97 +5,54 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.media.ArraySchema
-import io.swagger.v3.oas.annotations.media.Content
-import io.swagger.v3.oas.annotations.media.Schema
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.responses.ApiResponses
-import io.swagger.v3.oas.annotations.security.SecurityRequirement
-import io.swagger.v3.oas.annotations.tags.Tag
+import com.playsay.gateway.dto.LessonMaterialDraftResponse
+import com.playsay.gateway.dto.LessonMaterialRequest
+import com.playsay.gateway.dto.LessonMaterialResponse
+import com.playsay.gateway.dto.MaterialAiDraftRequest
+import com.playsay.gateway.dto.MaterialAnnotationRequest
+import com.playsay.gateway.dto.MaterialAnnotationResponse
+import com.playsay.gateway.dto.MaterialAssetResponse
+import com.playsay.gateway.dto.MaterialAssetUpdateRequest
+import com.playsay.gateway.dto.MaterialGenerateImagesRequest
+import com.playsay.gateway.dto.MaterialSubmissionRequest
+import com.playsay.gateway.dto.MaterialSubmissionResponse
+import com.playsay.gateway.dto.MaterialUrlImportRequest
+import com.playsay.gateway.entity.AssignmentEntity
+import com.playsay.gateway.entity.LessonMaterialAnnotationEntity
+import com.playsay.gateway.entity.LessonMaterialEntity
+import com.playsay.gateway.entity.MaterialAssetEntity
+import com.playsay.gateway.entity.SubmissionEntity
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.repo.AssignmentRepo
+import com.playsay.gateway.repo.LessonMaterialAnnotationRepo
+import com.playsay.gateway.repo.LessonMaterialRepo
+import com.playsay.gateway.repo.LessonMaterialRow
+import com.playsay.gateway.repo.LessonParticipantRepo
+import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.MaterialAssetRepo
+import com.playsay.gateway.repo.MaterialSubmissionRow
+import com.playsay.gateway.repo.ScheduledMaterialLookupRow
+import com.playsay.gateway.repo.SubmissionRepo
+import com.playsay.gateway.utils.MetaData
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.sql.ResultSet
 import java.time.Duration
 import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.util.Base64
 import java.util.UUID
 import org.springframework.http.CacheControl
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import com.playsay.gateway.repo.LegacyJdbcDataRepo
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PatchMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
-import com.playsay.gateway.dto.*
-import com.playsay.gateway.utils.MetaData
-import com.playsay.gateway.error.ProjectResponseException
 
-private data class StoredLessonMaterial(
-    val id: UUID,
-    val ownerTeacherUserId: UUID?,
-    val ownerTeacherSubject: String?,
-    val ownerTeacherName: String?,
-    val title: String,
-    val description: String?,
-    val language: String,
-    val cefrLevel: String,
-    val visibility: String,
-    val status: String,
-    val document: String,
-    val sourceMeta: String,
-    val scoringRubric: String,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
-
-private data class StoredMaterialAsset(
-    val id: UUID,
-    val materialId: UUID,
-    val kind: String,
-    val storageKey: String?,
-    val externalUrl: String?,
-    val provider: String,
-    val metadata: String,
-    val createdAt: Instant,
-)
-
-private data class StoredMaterialSubmission(
-    val id: UUID,
-    val assignmentId: UUID,
-    val lessonId: UUID,
-    val materialId: UUID,
-    val userId: UUID,
-    val userSubject: String?,
-    val userName: String?,
-    val content: String,
-    val score: BigDecimal?,
-    val errorsCount: Int?,
-    val submittedAt: Instant?,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
-
-private data class StoredMaterialAnnotation(
-    val id: UUID,
-    val lessonId: UUID,
-    val materialId: UUID,
-    val content: String,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
+private typealias StoredLessonMaterial = LessonMaterialRow
+private typealias StoredMaterialAsset = MaterialAssetEntity
+private typealias StoredMaterialSubmission = MaterialSubmissionRow
+private typealias StoredMaterialAnnotation = LessonMaterialAnnotationEntity
+private typealias ScheduledMaterialLookup = ScheduledMaterialLookupRow
 
 private data class ValidatedLessonMaterialRequest(
     val title: String,
@@ -132,7 +89,13 @@ private val materialImageTagStopWords = setOf(
 
 @Component
 class LessonMaterialStore(
-    private val dataRepo: LegacyJdbcDataRepo,
+    private val lessonMaterialRepo: LessonMaterialRepo,
+    private val materialAssetRepo: MaterialAssetRepo,
+    private val lessonRepo: LessonRepo,
+    private val lessonParticipantRepo: LessonParticipantRepo,
+    private val assignmentRepo: AssignmentRepo,
+    private val submissionRepo: SubmissionRepo,
+    private val lessonMaterialAnnotationRepo: LessonMaterialAnnotationRepo,
     private val userProfileStore: UserProfileStore,
     private val materialAiDraftService: MaterialAiDraftService,
     private val materialImageGenerationService: MaterialImageGenerationService,
@@ -144,43 +107,27 @@ class LessonMaterialStore(
 
     @Transactional
     fun list(authentication: JwtAuthenticationToken): List<LessonMaterialResponse> {
-        val sql: String
-        val params = mutableMapOf<String, Any?>()
-
-        when {
+        val materials = when {
             authentication.isMaterialAdmin() -> {
-                sql = materialSelect("WHERE m.status <> 'ARCHIVED' ORDER BY m.updated_at DESC, m.title")
+                lessonMaterialRepo.findRowsForAdmin(MetaData.MaterialStatuses.ARCHIVED)
             }
             authentication.canManageMaterials() -> {
-                params["ownerTeacherUserId"] = userProfileStore.currentUserId(authentication)
-                sql = materialSelect(
-                    """
-                    WHERE m.status <> 'ARCHIVED'
-                      AND (
-                            m.owner_teacher_user_id = :ownerTeacherUserId
-                         OR (m.visibility = 'PUBLIC' AND m.status = 'PUBLISHED')
-                      )
-                    ORDER BY CASE WHEN m.owner_teacher_user_id = :ownerTeacherUserId THEN 0 ELSE 1 END,
-                             m.updated_at DESC,
-                             m.title
-                    """.trimIndent(),
+                lessonMaterialRepo.findRowsForTeacher(
+                    ownerTeacherUserId = userProfileStore.currentUserId(authentication),
+                    archivedStatus = MetaData.MaterialStatuses.ARCHIVED,
+                    publicVisibility = MetaData.MaterialVisibility.PUBLIC,
+                    publishedStatus = MetaData.MaterialStatuses.PUBLISHED,
                 )
             }
             else -> {
-                sql = materialSelect(
-                    """
-                    WHERE m.visibility = 'PUBLIC'
-                      AND m.status = 'PUBLISHED'
-                    ORDER BY m.updated_at DESC, m.title
-                    """.trimIndent(),
+                lessonMaterialRepo.findPublicPublishedRows(
+                    publicVisibility = MetaData.MaterialVisibility.PUBLIC,
+                    publishedStatus = MetaData.MaterialStatuses.PUBLISHED,
                 )
             }
         }
 
-        return dataRepo.sql(sql)
-            .params(params)
-            .query(::mapMaterial)
-            .list()
+        return materials
             .map { material -> material.toResponse(objectMapper) }
     }
 
@@ -199,58 +146,27 @@ class LessonMaterialStore(
         authentication.requireMaterialManager()
         val ownerTeacherUserId = userProfileStore.currentUserId(authentication)
         val values = request.validated(objectMapper, messageProvider)
-        val id = UUID.randomUUID()
         val now = Instant.now()
 
-        dataRepo.sql(
-            """
-            INSERT INTO lesson_material (
-                id,
-                owner_teacher_user_id,
-                title,
-                description,
-                language,
-                cefr_level,
-                visibility,
-                status,
-                document,
-                source_meta,
-                scoring_rubric,
-                created_at,
-                updated_at
-            ) VALUES (
-                :id,
-                :ownerTeacherUserId,
-                :title,
-                :description,
-                :language,
-                :cefrLevel,
-                :visibility,
-                :status,
-                :document,
-                :sourceMeta,
-                :scoringRubric,
-                :createdAt,
-                :updatedAt
-            )
-            """.trimIndent(),
+        val material = lessonMaterialRepo.save(
+            LessonMaterialEntity(
+                id = UUID.randomUUID(),
+                ownerTeacherUserId = ownerTeacherUserId,
+                title = values.title,
+                description = values.description,
+                language = values.language,
+                cefrLevel = values.cefrLevel,
+                visibility = values.visibility,
+                status = values.status,
+                document = objectMapper.writeValueAsString(values.document),
+                sourceMeta = objectMapper.writeValueAsString(values.sourceMeta),
+                scoringRubric = objectMapper.writeValueAsString(values.scoringRubric),
+                createdAt = now,
+                updatedAt = now,
+            ),
         )
-            .param("id", id)
-            .param("ownerTeacherUserId", ownerTeacherUserId)
-            .param("title", values.title)
-            .param("description", values.description)
-            .param("language", values.language)
-            .param("cefrLevel", values.cefrLevel)
-            .param("visibility", values.visibility)
-            .param("status", values.status)
-            .param("document", objectMapper.writeValueAsString(values.document))
-            .param("sourceMeta", objectMapper.writeValueAsString(values.sourceMeta))
-            .param("scoringRubric", objectMapper.writeValueAsString(values.scoringRubric))
-            .param("createdAt", now.toMaterialOffsetDateTime())
-            .param("updatedAt", now.toMaterialOffsetDateTime())
-            .update()
 
-        return requireNotNull(find(id)).toResponse(objectMapper)
+        return requireNotNull(find(material.id)).toResponse(objectMapper)
     }
 
     @Transactional
@@ -266,34 +182,19 @@ class LessonMaterialStore(
         }
 
         val values = request.validated(objectMapper, messageProvider)
-        dataRepo.sql(
-            """
-            UPDATE lesson_material
-               SET title = :title,
-                   description = :description,
-                   language = :language,
-                   cefr_level = :cefrLevel,
-                   visibility = :visibility,
-                   status = :status,
-                   document = :document,
-                   source_meta = :sourceMeta,
-                   scoring_rubric = :scoringRubric,
-                   updated_at = :updatedAt
-             WHERE id = :id
-            """.trimIndent(),
-        )
-            .param("id", materialId)
-            .param("title", values.title)
-            .param("description", values.description)
-            .param("language", values.language)
-            .param("cefrLevel", values.cefrLevel)
-            .param("visibility", values.visibility)
-            .param("status", values.status)
-            .param("document", objectMapper.writeValueAsString(values.document))
-            .param("sourceMeta", objectMapper.writeValueAsString(values.sourceMeta))
-            .param("scoringRubric", objectMapper.writeValueAsString(values.scoringRubric))
-            .param("updatedAt", Instant.now().toMaterialOffsetDateTime())
-            .update()
+        val entity = lessonMaterialRepo.findById(materialId).orElse(null)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        entity.title = values.title
+        entity.description = values.description
+        entity.language = values.language
+        entity.cefrLevel = values.cefrLevel
+        entity.visibility = values.visibility
+        entity.status = values.status
+        entity.document = objectMapper.writeValueAsString(values.document)
+        entity.sourceMeta = objectMapper.writeValueAsString(values.sourceMeta)
+        entity.scoringRubric = objectMapper.writeValueAsString(values.scoringRubric)
+        entity.updatedAt = Instant.now()
+        lessonMaterialRepo.save(entity)
 
         return requireNotNull(find(materialId)).toResponse(objectMapper)
     }
@@ -306,43 +207,16 @@ class LessonMaterialStore(
             throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can archive this material.")
         }
 
-        dataRepo.sql(
-            """
-            UPDATE lesson_material
-               SET status = 'ARCHIVED',
-                   updated_at = :updatedAt
-             WHERE id = :id
-            """.trimIndent(),
-        )
-            .param("id", materialId)
-            .param("updatedAt", Instant.now().toMaterialOffsetDateTime())
-            .update()
+        val entity = lessonMaterialRepo.findById(materialId).orElse(null)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        entity.status = MetaData.MaterialStatuses.ARCHIVED
+        entity.updatedAt = Instant.now()
+        lessonMaterialRepo.save(entity)
     }
 
     @Transactional(readOnly = true)
     fun getForScheduledLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LessonMaterialResponse {
-        val lesson = dataRepo.sql(
-            """
-            SELECT l.id,
-                   l.status,
-                   l.scheduled_end,
-                   COALESCE(l.material_id, lt.material_id) AS material_id
-              FROM lesson l
-              LEFT JOIN lesson_template lt ON lt.id = l.lesson_template_id
-             WHERE l.id = :lessonId
-            """.trimIndent(),
-        )
-            .param("lessonId", lessonId)
-            .query { rs, _ ->
-                ScheduledMaterialLookup(
-                    id = rs.getObject("id", UUID::class.java),
-                    status = rs.getString("status"),
-                    scheduledEnd = rs.getObject("scheduled_end", OffsetDateTime::class.java)?.toInstant(),
-                    materialId = rs.getObject("material_id", UUID::class.java),
-                )
-            }
-            .optional()
-            .orElse(null)
+        val lesson = scheduledMaterialLookup(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
         if (!authentication.canManageMaterials() && !lesson.isVisibleToParticipant(Instant.now())) {
@@ -385,33 +259,7 @@ class LessonMaterialStore(
         val materialId = lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val assignmentId = findMaterialSubmissionAssignment(lessonId, materialId) ?: return emptyList()
 
-        return dataRepo.sql(
-            """
-            SELECT s.id,
-                   s.assignment_id,
-                   s.lesson_id,
-                   a.material_id,
-                   s.student_user_id,
-                   student.keycloak_subject AS user_subject,
-                   COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
-                   s.content,
-                   s.score,
-                   s.errors_count,
-                   s.submitted_at,
-                   s.created_at,
-                   s.updated_at
-              FROM submission s
-              JOIN assignment a ON a.id = s.assignment_id
-              JOIN app_user student ON student.id = s.student_user_id
-             WHERE s.assignment_id = :assignmentId
-               AND s.lesson_id = :lessonId
-             ORDER BY s.updated_at DESC
-            """.trimIndent(),
-        )
-            .param("assignmentId", assignmentId)
-            .param("lessonId", lessonId)
-            .query(::mapMaterialSubmission)
-            .list()
+        return submissionRepo.findMaterialSubmissionRows(assignmentId, lessonId)
             .map { submission -> submission.toResponse(objectMapper) }
     }
 
@@ -435,69 +283,30 @@ class LessonMaterialStore(
         val existing = findMaterialSubmission(assignmentId, lessonId, userId)
 
         val submissionId = if (existing == null) {
-            val id = UUID.randomUUID()
-            dataRepo.sql(
-                """
-                INSERT INTO submission (
-                    id,
-                    assignment_id,
-                    student_user_id,
-                    lesson_id,
-                    content,
-                    score,
-                    errors_count,
-                    submitted_at,
-                    created_at,
-                    updated_at
-                ) VALUES (
-                    :id,
-                    :assignmentId,
-                    :userId,
-                    :lessonId,
-                    :content,
-                    :score,
-                    :errorsCount,
-                    :submittedAt,
-                    :createdAt,
-                    :updatedAt
-                )
-                """.trimIndent(),
-            )
-                .param("id", id)
-                .param("assignmentId", assignmentId)
-                .param("userId", userId)
-                .param("lessonId", lessonId)
-                .param("content", content)
-                .param("score", scoring?.score)
-                .param("errorsCount", scoring?.errorsCount)
-                .param("submittedAt", if (request.submitted) now.toMaterialOffsetDateTime() else null)
-                .param("createdAt", now.toMaterialOffsetDateTime())
-                .param("updatedAt", now.toMaterialOffsetDateTime())
-                .update()
-            id
+            submissionRepo.saveAndFlush(
+                SubmissionEntity(
+                    id = UUID.randomUUID(),
+                    assignmentId = assignmentId,
+                    studentUserId = userId,
+                    lessonId = lessonId,
+                    content = content,
+                    score = scoring?.score,
+                    errorsCount = scoring?.errorsCount,
+                    submittedAt = if (request.submitted) now else null,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            ).id
         } else {
-            dataRepo.sql(
-                """
-                UPDATE submission
-                   SET content = :content,
-                       score = :score,
-                       errors_count = :errorsCount,
-                       submitted_at = CASE
-                           WHEN :submitted = TRUE THEN :submittedAt
-                           ELSE submitted_at
-                       END,
-                       updated_at = :updatedAt
-                 WHERE id = :id
-                """.trimIndent(),
-            )
-                .param("id", existing.id)
-                .param("content", content)
-                .param("score", scoring?.score)
-                .param("errorsCount", scoring?.errorsCount)
-                .param("submitted", request.submitted)
-                .param("submittedAt", now.toMaterialOffsetDateTime())
-                .param("updatedAt", now.toMaterialOffsetDateTime())
-                .update()
+            val entity = submissionRepo.findById(existing.id).orElseThrow()
+            entity.content = content
+            entity.score = scoring?.score
+            entity.errorsCount = scoring?.errorsCount
+            if (request.submitted) {
+                entity.submittedAt = now
+            }
+            entity.updatedAt = now
+            submissionRepo.save(entity)
             existing.id
         }
 
@@ -534,47 +343,21 @@ class LessonMaterialStore(
         val now = Instant.now()
         val content = objectMapper.writeValueAsString(request.content)
         val annotationId = if (existing == null) {
-            val id = UUID.randomUUID()
-            dataRepo.sql(
-                """
-                INSERT INTO lesson_material_annotation (
-                    id,
-                    lesson_id,
-                    material_id,
-                    content,
-                    created_at,
-                    updated_at
-                ) VALUES (
-                    :id,
-                    :lessonId,
-                    :materialId,
-                    :content,
-                    :createdAt,
-                    :updatedAt
-                )
-                """.trimIndent(),
-            )
-                .param("id", id)
-                .param("lessonId", lessonId)
-                .param("materialId", materialId)
-                .param("content", content)
-                .param("createdAt", now.toMaterialOffsetDateTime())
-                .param("updatedAt", now.toMaterialOffsetDateTime())
-                .update()
-            id
+            lessonMaterialAnnotationRepo.saveAndFlush(
+                LessonMaterialAnnotationEntity(
+                    id = UUID.randomUUID(),
+                    lessonId = lessonId,
+                    materialId = materialId,
+                    content = content,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            ).id
         } else {
-            dataRepo.sql(
-                """
-                UPDATE lesson_material_annotation
-                   SET content = :content,
-                       updated_at = :updatedAt
-                 WHERE id = :id
-                """.trimIndent(),
-            )
-                .param("id", existing.id)
-                .param("content", content)
-                .param("updatedAt", now.toMaterialOffsetDateTime())
-                .update()
+            val entity = lessonMaterialAnnotationRepo.findById(existing.id).orElseThrow()
+            entity.content = content
+            entity.updatedAt = now
+            lessonMaterialAnnotationRepo.save(entity)
             existing.id
         }
 
@@ -846,18 +629,10 @@ class LessonMaterialStore(
             target.node.put("imageAlt", target.imageAlt)
         }
 
-        dataRepo.sql(
-            """
-            UPDATE lesson_material
-               SET document = :document,
-                   updated_at = :updatedAt
-             WHERE id = :id
-            """.trimIndent(),
-        )
-            .param("id", materialId)
-            .param("document", objectMapper.writeValueAsString(document))
-            .param("updatedAt", Instant.now().toMaterialOffsetDateTime())
-            .update()
+        val entity = lessonMaterialRepo.findById(materialId).orElseThrow()
+        entity.document = objectMapper.writeValueAsString(document)
+        entity.updatedAt = Instant.now()
+        lessonMaterialRepo.save(entity)
 
         cleanupReplacedGeneratedAssets(materialId, replacedAssetIds.distinct())
 
@@ -873,24 +648,7 @@ class LessonMaterialStore(
         if (!canRead) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         }
-        return dataRepo.sql(
-            """
-            SELECT id,
-                   material_id,
-                   kind,
-                   storage_key,
-                   external_url,
-                   provider,
-                   metadata,
-                   created_at
-              FROM material_asset
-             WHERE material_id = :materialId
-             ORDER BY created_at DESC
-            """.trimIndent(),
-        )
-            .param("materialId", materialId)
-            .query(::mapMaterialAsset)
-            .list()
+        return materialAssetRepo.findByMaterialIdOrderByCreatedAtDesc(materialId)
             .map { asset -> asset.toResponse(objectMapper) }
     }
 
@@ -941,18 +699,9 @@ class LessonMaterialStore(
             metadata.replace("tags", normalizeMaterialImageTags(tags))
         }
 
-        dataRepo.sql(
-            """
-            UPDATE material_asset
-               SET metadata = :metadata
-             WHERE id = :id
-               AND material_id = :materialId
-            """.trimIndent(),
-        )
-            .param("id", assetId)
-            .param("materialId", materialId)
-            .param("metadata", objectMapper.writeValueAsString(metadata))
-            .update()
+        val entity = materialAssetRepo.findById(assetId).orElseThrow()
+        entity.metadata = objectMapper.writeValueAsString(metadata)
+        materialAssetRepo.save(entity)
 
         return requireNotNull(findAsset(assetId)).toResponse(objectMapper)
     }
@@ -981,35 +730,18 @@ class LessonMaterialStore(
         val storageKey = "material-assets/$materialId/$id.${generated.mimeType.materialImageExtension()}"
         try {
             materialObjectStorage.putObject(storageKey, generated.bytes, generated.mimeType)
-            dataRepo.sql(
-                """
-                INSERT INTO material_asset (
-                    id,
-                    material_id,
-                    kind,
-                    storage_key,
-                    external_url,
-                    provider,
-                    metadata,
-                    created_at
-                ) VALUES (
-                    :id,
-                    :materialId,
-                    'GENERATED_IMAGE',
-                    :storageKey,
-                    NULL,
-                    'AI',
-                    :metadata,
-                    :createdAt
-                )
-                """.trimIndent(),
+            materialAssetRepo.saveAndFlush(
+                MaterialAssetEntity(
+                    id = id,
+                    materialId = materialId,
+                    kind = "GENERATED_IMAGE",
+                    storageKey = storageKey,
+                    externalUrl = null,
+                    provider = "AI",
+                    metadata = objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey)),
+                    createdAt = Instant.now(),
+                ),
             )
-                .param("id", id)
-                .param("materialId", materialId)
-                .param("storageKey", storageKey)
-                .param("metadata", objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey)))
-                .param("createdAt", Instant.now().toMaterialOffsetDateTime())
-                .update()
         } catch (exception: MaterialObjectStorageException) {
             throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "Material asset storage failed.")
         } catch (exception: RuntimeException) {
@@ -1028,21 +760,11 @@ class LessonMaterialStore(
         try {
             materialObjectStorage.putObject(storageKey, generated.bytes, generated.mimeType)
             val existingTags = materialAssetTags(asset)
-            dataRepo.sql(
-                """
-                UPDATE material_asset
-                   SET kind = 'GENERATED_IMAGE',
-                       external_url = NULL,
-                       provider = 'AI',
-                       metadata = :metadata
-                 WHERE id = :id
-                   AND material_id = :materialId
-                """.trimIndent(),
-            )
-                .param("id", asset.id)
-                .param("materialId", asset.materialId)
-                .param("metadata", objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey, existingTags)))
-                .update()
+            asset.kind = "GENERATED_IMAGE"
+            asset.externalUrl = null
+            asset.provider = "AI"
+            asset.metadata = objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey, existingTags))
+            materialAssetRepo.save(asset)
         } catch (exception: MaterialObjectStorageException) {
             throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "Material asset storage failed.")
         }
@@ -1131,60 +853,18 @@ class LessonMaterialStore(
             asset.storageKey?.trim()?.takeIf { key -> key.isNotEmpty() }?.let { key ->
                 runCatching { materialObjectStorage.deleteObject(key) }
             }
-            runCatching {
-                dataRepo.sql("DELETE FROM material_asset WHERE id = :id AND material_id = :materialId")
-                    .param("id", assetId)
-                    .param("materialId", materialId)
-                    .update()
-            }
+            runCatching { materialAssetRepo.deleteByIdAndMaterialId(assetId, materialId) }
         }
     }
 
     private fun find(materialId: UUID): StoredLessonMaterial? =
-        dataRepo.sql(materialSelect("WHERE m.id = :materialId"))
-            .param("materialId", materialId)
-            .query(::mapMaterial)
-            .optional()
-            .orElse(null)
+        lessonMaterialRepo.findRowById(materialId)
 
     private fun findAsset(assetId: UUID): StoredMaterialAsset? =
-        dataRepo.sql(
-            """
-            SELECT id,
-                   material_id,
-                   kind,
-                   storage_key,
-                   external_url,
-                   provider,
-                   metadata,
-                   created_at
-              FROM material_asset
-             WHERE id = :assetId
-            """.trimIndent(),
-        )
-            .param("assetId", assetId)
-            .query(::mapMaterialAsset)
-            .optional()
-            .orElse(null)
+        materialAssetRepo.findById(assetId).orElse(null)
 
     private fun findAssets(materialId: UUID): List<StoredMaterialAsset> =
-        dataRepo.sql(
-            """
-            SELECT id,
-                   material_id,
-                   kind,
-                   storage_key,
-                   external_url,
-                   provider,
-                   metadata,
-                   created_at
-              FROM material_asset
-             WHERE material_id = :materialId
-            """.trimIndent(),
-        )
-            .param("materialId", materialId)
-            .query(::mapMaterialAsset)
-            .list()
+        materialAssetRepo.findByMaterialId(materialId)
 
     private fun accessibleScheduledMaterial(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledMaterialLookup {
         val lookup = scheduledMaterialLookup(lessonId)
@@ -1205,71 +885,26 @@ class LessonMaterialStore(
     }
 
     private fun scheduledMaterialLookup(lessonId: UUID): ScheduledMaterialLookup? =
-        dataRepo.sql(
-            """
-            SELECT l.id,
-                   l.status,
-                   l.scheduled_end,
-                   COALESCE(l.material_id, lt.material_id) AS material_id
-              FROM lesson l
-              LEFT JOIN lesson_template lt ON lt.id = l.lesson_template_id
-             WHERE l.id = :lessonId
-            """.trimIndent(),
-        )
-            .param("lessonId", lessonId)
-            .query { rs, _ ->
-                ScheduledMaterialLookup(
-                    id = rs.getObject("id", UUID::class.java),
-                    status = rs.getString("status"),
-                    scheduledEnd = rs.getObject("scheduled_end", OffsetDateTime::class.java)?.toInstant(),
-                    materialId = rs.getObject("material_id", UUID::class.java),
-                )
-            }
-            .optional()
-            .orElse(null)
+        lessonRepo.findScheduledMaterialLookup(lessonId)
 
     private fun findOrCreateMaterialSubmissionAssignment(lessonId: UUID, material: StoredLessonMaterial): UUID =
         findMaterialSubmissionAssignment(lessonId, material.id) ?: run {
-            val id = UUID.randomUUID()
             val now = Instant.now()
-            dataRepo.sql(
-                """
-                INSERT INTO assignment (
-                    id,
-                    lesson_id,
-                    title,
-                    instructions,
-                    type,
-                    payload,
-                    max_score,
-                    material_id,
-                    created_at,
-                    updated_at
-                ) VALUES (
-                    :id,
-                    :lessonId,
-                    :title,
-                    :instructions,
-                    'MATERIAL_WORK',
-                    :payload,
-                    :maxScore,
-                    :materialId,
-                    :createdAt,
-                    :updatedAt
-                )
-                """.trimIndent(),
+            assignmentRepo.saveAndFlush(
+                AssignmentEntity(
+                    id = UUID.randomUUID(),
+                    lessonId = lessonId,
+                    title = material.title,
+                    instructions = "Play&Say material answer snapshot",
+                    type = "MATERIAL_WORK",
+                    payload = objectMapper.writeValueAsString(objectMapper.createObjectNode().put("source", "material")),
+                    maxScore = materialMaxScore(material.scoringRubric),
+                    materialId = material.id,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
             )
-                .param("id", id)
-                .param("lessonId", lessonId)
-                .param("title", material.title)
-                .param("instructions", "Play&Say material answer snapshot")
-                .param("payload", objectMapper.writeValueAsString(objectMapper.createObjectNode().put("source", "material")))
-                .param("maxScore", materialMaxScore(material.scoringRubric))
-                .param("materialId", material.id)
-                .param("createdAt", now.toMaterialOffsetDateTime())
-                .param("updatedAt", now.toMaterialOffsetDateTime())
-                .update()
-            id
+                .id
         }
 
     private fun createEmptyMaterialSubmission(
@@ -1278,76 +913,37 @@ class LessonMaterialStore(
         materialId: UUID,
         userId: UUID,
     ): StoredMaterialSubmission {
-        val id = UUID.randomUUID()
         val now = Instant.now()
-        dataRepo.sql(
-            """
-            INSERT INTO submission (
-                id,
-                assignment_id,
-                student_user_id,
-                lesson_id,
-                content,
-                score,
-                errors_count,
-                submitted_at,
-                created_at,
-                updated_at
-            ) VALUES (
-                :id,
-                :assignmentId,
-                :userId,
-                :lessonId,
-                :content,
-                NULL,
-                NULL,
-                NULL,
-                :createdAt,
-                :updatedAt
-            )
-            """.trimIndent(),
+        val submission = submissionRepo.saveAndFlush(
+            SubmissionEntity(
+                id = UUID.randomUUID(),
+                assignmentId = assignmentId,
+                studentUserId = userId,
+                lessonId = lessonId,
+                content = emptyMaterialSubmissionContent(materialId),
+                score = null,
+                errorsCount = null,
+                submittedAt = null,
+                createdAt = now,
+                updatedAt = now,
+            ),
         )
-            .param("id", id)
-            .param("assignmentId", assignmentId)
-            .param("userId", userId)
-            .param("lessonId", lessonId)
-            .param("content", emptyMaterialSubmissionContent(materialId))
-            .param("createdAt", now.toMaterialOffsetDateTime())
-            .param("updatedAt", now.toMaterialOffsetDateTime())
-            .update()
-        return requireNotNull(findMaterialSubmission(id))
+        return requireNotNull(findMaterialSubmission(submission.id))
     }
 
     private fun createEmptyMaterialAnnotation(lessonId: UUID, materialId: UUID): StoredMaterialAnnotation {
-        val id = UUID.randomUUID()
         val now = Instant.now()
-        dataRepo.sql(
-            """
-            INSERT INTO lesson_material_annotation (
-                id,
-                lesson_id,
-                material_id,
-                content,
-                created_at,
-                updated_at
-            ) VALUES (
-                :id,
-                :lessonId,
-                :materialId,
-                :content,
-                :createdAt,
-                :updatedAt
-            )
-            """.trimIndent(),
+        val annotation = lessonMaterialAnnotationRepo.saveAndFlush(
+            LessonMaterialAnnotationEntity(
+                id = UUID.randomUUID(),
+                lessonId = lessonId,
+                materialId = materialId,
+                content = emptyMaterialAnnotationContent(),
+                createdAt = now,
+                updatedAt = now,
+            ),
         )
-            .param("id", id)
-            .param("lessonId", lessonId)
-            .param("materialId", materialId)
-            .param("content", emptyMaterialAnnotationContent())
-            .param("createdAt", now.toMaterialOffsetDateTime())
-            .param("updatedAt", now.toMaterialOffsetDateTime())
-            .update()
-        return requireNotNull(findMaterialAnnotation(id))
+        return requireNotNull(findMaterialAnnotation(annotation.id))
     }
 
     private fun emptyMaterialSubmissionContent(materialId: UUID): String {
@@ -1366,181 +962,42 @@ class LessonMaterialStore(
     }
 
     private fun findMaterialSubmissionAssignment(lessonId: UUID, materialId: UUID): UUID? =
-        dataRepo.sql(
-            """
-            SELECT id
-              FROM assignment
-             WHERE lesson_id = :lessonId
-               AND material_id = :materialId
-               AND material_block_id IS NULL
-               AND type = 'MATERIAL_WORK'
-             ORDER BY created_at
-             LIMIT 1
-            """.trimIndent(),
-        )
-            .param("lessonId", lessonId)
-            .param("materialId", materialId)
-            .query(UUID::class.java)
-            .optional()
-            .orElse(null)
+        assignmentRepo.findFirstByLessonIdAndMaterialIdAndMaterialBlockIdIsNullAndTypeOrderByCreatedAtAsc(
+            lessonId = lessonId,
+            materialId = materialId,
+            type = "MATERIAL_WORK",
+        )?.id
 
     private fun findMaterialSubmission(assignmentId: UUID, lessonId: UUID, userId: UUID): StoredMaterialSubmission? =
-        dataRepo.sql(
-            """
-            SELECT s.id,
-                   s.assignment_id,
-                   s.lesson_id,
-                   a.material_id,
-                   s.student_user_id,
-                   student.keycloak_subject AS user_subject,
-                   COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
-                   s.content,
-                   s.score,
-                   s.errors_count,
-                   s.submitted_at,
-                   s.created_at,
-                   s.updated_at
-              FROM submission s
-              JOIN assignment a ON a.id = s.assignment_id
-              JOIN app_user student ON student.id = s.student_user_id
-             WHERE s.assignment_id = :assignmentId
-               AND s.lesson_id = :lessonId
-               AND s.student_user_id = :userId
-             ORDER BY s.updated_at DESC
-             LIMIT 1
-            """.trimIndent(),
-        )
-            .param("assignmentId", assignmentId)
-            .param("lessonId", lessonId)
-            .param("userId", userId)
-            .query(::mapMaterialSubmission)
-            .optional()
-            .orElse(null)
+        submissionRepo.findFirstByAssignmentIdAndLessonIdAndStudentUserIdOrderByUpdatedAtDesc(
+            assignmentId = assignmentId,
+            lessonId = lessonId,
+            studentUserId = userId,
+        )?.let { submission -> findMaterialSubmission(submission.id) }
 
     private fun findMaterialSubmission(submissionId: UUID): StoredMaterialSubmission? =
-        dataRepo.sql(
-            """
-            SELECT s.id,
-                   s.assignment_id,
-                   s.lesson_id,
-                   a.material_id,
-                   s.student_user_id,
-                   student.keycloak_subject AS user_subject,
-                   COALESCE(student.display_name, student.name, student.username, student.keycloak_subject) AS user_name,
-                   s.content,
-                   s.score,
-                   s.errors_count,
-                   s.submitted_at,
-                   s.created_at,
-                   s.updated_at
-              FROM submission s
-              JOIN assignment a ON a.id = s.assignment_id
-              JOIN app_user student ON student.id = s.student_user_id
-             WHERE s.id = :submissionId
-            """.trimIndent(),
-        )
-            .param("submissionId", submissionId)
-            .query(::mapMaterialSubmission)
-            .optional()
-            .orElse(null)
+        submissionRepo.findMaterialSubmissionRowById(submissionId)
 
     private fun findMaterialAnnotation(lessonId: UUID, materialId: UUID): StoredMaterialAnnotation? =
-        dataRepo.sql(
-            """
-            SELECT id,
-                   lesson_id,
-                   material_id,
-                   content,
-                   created_at,
-                   updated_at
-              FROM lesson_material_annotation
-             WHERE lesson_id = :lessonId
-               AND material_id = :materialId
-            """.trimIndent(),
-        )
-            .param("lessonId", lessonId)
-            .param("materialId", materialId)
-            .query(::mapMaterialAnnotation)
-            .optional()
-            .orElse(null)
+        lessonMaterialAnnotationRepo.findByLessonIdAndMaterialId(lessonId, materialId)
 
     private fun findMaterialAnnotation(annotationId: UUID): StoredMaterialAnnotation? =
-        dataRepo.sql(
-            """
-            SELECT id,
-                   lesson_id,
-                   material_id,
-                   content,
-                   created_at,
-                   updated_at
-              FROM lesson_material_annotation
-             WHERE id = :annotationId
-            """.trimIndent(),
-        )
-            .param("annotationId", annotationId)
-            .query(::mapMaterialAnnotation)
-            .optional()
-            .orElse(null)
+        lessonMaterialAnnotationRepo.findById(annotationId).orElse(null)
 
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
-        dataRepo.sql(
-            """
-            SELECT COUNT(*)
-              FROM lesson_participant lp
-              JOIN app_user student ON student.id = lp.student_user_id
-             WHERE lp.lesson_id = :lessonId
-               AND student.keycloak_subject = :subject
-            """.trimIndent(),
-        )
-            .param("lessonId", lessonId)
-            .param("subject", subject)
-            .query(Int::class.java)
-            .single() > 0
+        lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0
 
     private fun isActiveMaterialParticipant(materialId: UUID, subject: String, now: Instant): Boolean =
-        dataRepo.sql(
-            """
-            SELECT COUNT(*)
-              FROM lesson l
-              LEFT JOIN lesson_template lt ON lt.id = l.lesson_template_id
-              JOIN lesson_participant lp ON lp.lesson_id = l.id
-              JOIN app_user student ON student.id = lp.student_user_id
-             WHERE COALESCE(l.material_id, lt.material_id) = :materialId
-               AND student.keycloak_subject = :subject
-               AND l.status NOT IN ('COMPLETED', 'CANCELLED')
-               AND (l.scheduled_end IS NULL OR l.scheduled_end > :now)
-            """.trimIndent(),
-        )
-            .param("materialId", materialId)
-            .param("subject", subject)
-            .param("now", now.toMaterialOffsetDateTime())
-            .query(Int::class.java)
-            .single() > 0
+        lessonRepo.countActiveMaterialParticipant(
+            materialId = materialId,
+            subject = subject,
+            now = now,
+            excludedStatuses = expiredMaterialParticipantStatuses,
+        ) > 0
 
     private fun JwtAuthenticationToken.currentUserIdIfNeeded(): UUID? =
         if (canManageMaterials()) userProfileStore.currentUserId(this) else null
 
-    private fun materialSelect(whereClause: String): String =
-        """
-        SELECT m.id,
-               m.owner_teacher_user_id,
-               owner.keycloak_subject AS owner_teacher_subject,
-               COALESCE(owner.display_name, owner.name, owner.username) AS owner_teacher_name,
-               m.title,
-               m.description,
-               m.language,
-               m.cefr_level,
-               m.visibility,
-               m.status,
-               m.document,
-               m.source_meta,
-               m.scoring_rubric,
-               m.created_at,
-               m.updated_at
-          FROM lesson_material m
-          LEFT JOIN app_user owner ON owner.id = m.owner_teacher_user_id
-          $whereClause
-        """.trimIndent()
 }
 
 private data class MaterialImageTarget(
@@ -1608,16 +1065,6 @@ private data class ObjectiveItemScore(
     val errorsCount: Int,
     val status: String,
 )
-
-private data class ScheduledMaterialLookup(
-    val id: UUID,
-    val status: String,
-    val scheduledEnd: Instant?,
-    val materialId: UUID?,
-) {
-    fun isVisibleToParticipant(now: Instant): Boolean =
-        status !in setOf("COMPLETED", "CANCELLED") && scheduledEnd?.isAfter(now) != false
-}
 
 private fun LessonMaterialRequest.validated(
     objectMapper: ObjectMapper,
@@ -1713,12 +1160,12 @@ private fun StoredMaterialSubmission.toResponse(objectMapper: ObjectMapper): Mat
     MaterialSubmissionResponse(
         id = id,
         assignmentId = assignmentId,
-        lessonId = lessonId,
-        materialId = materialId,
+        lessonId = requireNotNull(lessonId),
+        materialId = requireNotNull(materialId),
         userId = userId,
         userSubject = userSubject,
         userName = userName,
-        content = objectMapper.readTree(content),
+        content = objectMapper.readTree(requireNotNull(content)),
         score = score,
         errorsCount = errorsCount,
         submittedAt = submittedAt,
@@ -2081,64 +1528,6 @@ private fun materialAssetIdFromReference(value: String?): UUID? {
     return runCatching { UUID.fromString(clean.removePrefix(marker).trim()) }.getOrNull()
 }
 
-private fun mapMaterial(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredLessonMaterial =
-    StoredLessonMaterial(
-        id = rs.getObject("id", UUID::class.java),
-        ownerTeacherUserId = rs.getObject("owner_teacher_user_id", UUID::class.java),
-        ownerTeacherSubject = rs.getString("owner_teacher_subject"),
-        ownerTeacherName = rs.getString("owner_teacher_name"),
-        title = rs.getString("title"),
-        description = rs.getString("description"),
-        language = rs.getString("language"),
-        cefrLevel = rs.getString("cefr_level"),
-        visibility = rs.getString("visibility"),
-        status = rs.getString("status"),
-        document = rs.getString("document"),
-        sourceMeta = rs.getString("source_meta"),
-        scoringRubric = rs.getString("scoring_rubric"),
-        createdAt = rs.getMaterialInstant("created_at"),
-        updatedAt = rs.getMaterialInstant("updated_at"),
-    )
-
-private fun mapMaterialAsset(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredMaterialAsset =
-    StoredMaterialAsset(
-        id = rs.getObject("id", UUID::class.java),
-        materialId = rs.getObject("material_id", UUID::class.java),
-        kind = rs.getString("kind"),
-        storageKey = rs.getString("storage_key"),
-        externalUrl = rs.getString("external_url"),
-        provider = rs.getString("provider"),
-        metadata = rs.getString("metadata"),
-        createdAt = rs.getMaterialInstant("created_at"),
-    )
-
-private fun mapMaterialSubmission(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredMaterialSubmission =
-    StoredMaterialSubmission(
-        id = rs.getObject("id", UUID::class.java),
-        assignmentId = rs.getObject("assignment_id", UUID::class.java),
-        lessonId = rs.getObject("lesson_id", UUID::class.java),
-        materialId = rs.getObject("material_id", UUID::class.java),
-        userId = rs.getObject("student_user_id", UUID::class.java),
-        userSubject = rs.getString("user_subject"),
-        userName = rs.getString("user_name"),
-        content = rs.getString("content"),
-        score = rs.getBigDecimal("score"),
-        errorsCount = rs.getNullableMaterialInt("errors_count"),
-        submittedAt = rs.getObject("submitted_at", OffsetDateTime::class.java)?.toInstant(),
-        createdAt = rs.getMaterialInstant("created_at"),
-        updatedAt = rs.getMaterialInstant("updated_at"),
-    )
-
-private fun mapMaterialAnnotation(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): StoredMaterialAnnotation =
-    StoredMaterialAnnotation(
-        id = rs.getObject("id", UUID::class.java),
-        lessonId = rs.getObject("lesson_id", UUID::class.java),
-        materialId = rs.getObject("material_id", UUID::class.java),
-        content = rs.getString("content"),
-        createdAt = rs.getMaterialInstant("created_at"),
-        updatedAt = rs.getMaterialInstant("updated_at"),
-    )
-
 private fun JwtAuthenticationToken.requireMaterialManager() {
     if (!canManageMaterials()) {
         throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED)
@@ -2347,20 +1736,13 @@ private fun inferCefrLevel(prompt: String): String {
     }
 }
 
-private fun ResultSet.getMaterialInstant(columnName: String): Instant =
-    getObject(columnName, OffsetDateTime::class.java).toInstant()
-
-private fun ResultSet.getNullableMaterialInt(columnName: String): Int? {
-    val value = getInt(columnName)
-    return if (wasNull()) null else value
-}
-
-private fun Instant.toMaterialOffsetDateTime(): OffsetDateTime =
-    atOffset(ZoneOffset.UTC)
+private fun ScheduledMaterialLookup.isVisibleToParticipant(now: Instant): Boolean =
+    status !in expiredMaterialParticipantStatuses && scheduledEnd?.isAfter(now) != false
 
 private val cefrLevels = setOf("A1", "A2", "B1", "B2", "C1", "C2")
 private val materialStatuses = setOf("DRAFT", "PUBLISHED", "ARCHIVED")
 private val materialVisibilities = setOf("PRIVATE", "PUBLIC")
+private val expiredMaterialParticipantStatuses = setOf(MetaData.LessonStatuses.COMPLETED, MetaData.LessonStatuses.CANCELLED)
 private val materialAiImageDataUrlPrefixes = listOf(
     "data:image/jpeg;base64,",
     "data:image/jpg;base64,",

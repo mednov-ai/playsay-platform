@@ -2,6 +2,7 @@ package com.playsay.gateway
 
 import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
+import com.playsay.gateway.repo.*
 import com.playsay.gateway.service.*
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpStatus
-import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -45,7 +45,16 @@ class MaterialControllerTest @Autowired constructor(
     private val courseController: CourseController,
     private val scheduleController: ScheduledLessonController,
     private val userProfileStore: UserProfileStore,
-    private val jdbcClient: JdbcClient,
+    private val lessonMaterialAnnotationRepo: LessonMaterialAnnotationRepo,
+    private val materialAssetRepo: MaterialAssetRepo,
+    private val submissionRepo: SubmissionRepo,
+    private val assignmentRepo: AssignmentRepo,
+    private val lessonParticipantRepo: LessonParticipantRepo,
+    private val lessonRepo: LessonRepo,
+    private val lessonTemplateRepo: LessonTemplateRepo,
+    private val courseRepo: CourseRepo,
+    private val lessonMaterialRepo: LessonMaterialRepo,
+    private val appUserRepo: AppUserRepo,
     private val dataSource: DataSource,
 ) {
     private val objectMapper = jacksonObjectMapper()
@@ -60,16 +69,16 @@ class MaterialControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
-        jdbcClient.sql("DELETE FROM lesson_material_annotation").update()
-        jdbcClient.sql("DELETE FROM material_asset").update()
-        jdbcClient.sql("DELETE FROM submission").update()
-        jdbcClient.sql("DELETE FROM assignment").update()
-        jdbcClient.sql("DELETE FROM lesson_participant").update()
-        jdbcClient.sql("DELETE FROM lesson").update()
-        jdbcClient.sql("DELETE FROM lesson_template").update()
-        jdbcClient.sql("DELETE FROM course").update()
-        jdbcClient.sql("DELETE FROM lesson_material").update()
-        jdbcClient.sql("DELETE FROM app_user").update()
+        lessonMaterialAnnotationRepo.deleteAllInBatch()
+        materialAssetRepo.deleteAllInBatch()
+        submissionRepo.deleteAllInBatch()
+        assignmentRepo.deleteAllInBatch()
+        lessonParticipantRepo.deleteAllInBatch()
+        lessonRepo.deleteAllInBatch()
+        lessonTemplateRepo.deleteAllInBatch()
+        courseRepo.deleteAllInBatch()
+        lessonMaterialRepo.deleteAllInBatch()
+        appUserRepo.deleteAllInBatch()
     }
 
     @Test
@@ -115,6 +124,50 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals("PUBLIC", published.visibility)
         assertEquals(listOf(created.id), materialController.list(student).map { material -> material.id })
         assertEquals(created.id, materialController.get(student, created.id).id)
+    }
+
+    @Test
+    fun `material list respects admin teacher student visibility and archive status`() {
+        val owner = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val otherTeacher = authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER")
+        val admin = authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val ownerPrivate = materialController.create(
+            owner,
+            LessonMaterialRequest(title = "Owner private", status = "PUBLISHED"),
+        ).body!!
+        val ownerDraft = materialController.create(
+            owner,
+            LessonMaterialRequest(title = "Owner draft", status = "DRAFT"),
+        ).body!!
+        val publicMaterial = materialController.create(
+            owner,
+            LessonMaterialRequest(title = "Public material", visibility = "PUBLIC", status = "PUBLISHED"),
+        ).body!!
+        val archived = materialController.create(
+            owner,
+            LessonMaterialRequest(title = "Archived material", visibility = "PUBLIC", status = "PUBLISHED"),
+        ).body!!
+        val otherPrivate = materialController.create(
+            otherTeacher,
+            LessonMaterialRequest(title = "Other private", status = "PUBLISHED"),
+        ).body!!
+
+        materialController.archive(owner, archived.id)
+
+        assertEquals(
+            setOf(ownerPrivate.id, ownerDraft.id, publicMaterial.id, otherPrivate.id),
+            materialController.list(admin).map { material -> material.id }.toSet(),
+        )
+        assertEquals(
+            setOf(ownerPrivate.id, ownerDraft.id, publicMaterial.id),
+            materialController.list(owner).map { material -> material.id }.toSet(),
+        )
+        assertEquals(listOf(publicMaterial.id), materialController.list(student).map { material -> material.id })
+        val studentPrivateError = assertFailsWith<ResponseStatusException> {
+            materialController.get(student, ownerPrivate.id)
+        }
+        assertEquals(HttpStatus.NOT_FOUND, studentPrivateError.statusCode)
     }
 
     @Test

@@ -4,7 +4,7 @@ Product monorepo for the Play&Say online English school platform.
 
 Sprint 0 contents:
 
-- `backend/api-gateway`: Kotlin/Spring Boot hello-world service
+- `backend/api-gateway`: Kotlin/Spring Boot API gateway service
 - `frontend/web-app`: single React SPA prepared for shadcn/ui-style components
 - `contracts`: generated OpenAPI and WebSocket schemas will live here
 - `docs/adr`: architecture decision records

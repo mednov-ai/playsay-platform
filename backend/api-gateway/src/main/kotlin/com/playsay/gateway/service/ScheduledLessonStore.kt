@@ -187,6 +187,7 @@ class ScheduledLessonStore(
 
     private fun replaceParticipants(lessonId: UUID, participantIds: List<UUID>) {
         lessonParticipantRepo.deleteByLessonId(lessonId)
+        lessonParticipantRepo.flush()
         lessonParticipantRepo.saveAll(
             participantIds.map { participantId ->
                 LessonParticipantEntity(

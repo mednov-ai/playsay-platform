@@ -206,6 +206,39 @@ class ScheduledLessonControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher updates scheduled lesson with the same participant`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lessonTemplateId = courseLessonId(teacher)
+
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val updated = scheduleController.update(
+            teacher,
+            lesson.id,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = futureStart(90),
+                scheduledEnd = futureEnd(90),
+                status = "CANCELLED",
+                participantSubjects = listOf("student-1"),
+            ),
+        )
+
+        assertEquals("CANCELLED", updated.status)
+        assertEquals(listOf("student-1"), updated.participants.map { participant -> participant.subject })
+    }
+
+    @Test
     fun `teacher updates and deletes scheduled lesson`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val lesson = scheduleController.create(

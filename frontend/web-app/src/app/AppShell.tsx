@@ -174,11 +174,6 @@ export function AppShell(props: AppShellProps) {
           <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <BrandMark />
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <LanguageSwitcher
-                disabled={profileSaving}
-                onSaveProfile={isAuthenticated ? saveProfile : undefined}
-                profile={appProfile}
-              />
               {isAuthenticated ? (
                 <>
                   <Button
@@ -209,14 +204,17 @@ export function AppShell(props: AppShellProps) {
                   </Button>
                 </>
               ) : (
-                <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
-                  {status === "checking" || status === "loggingOut" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <LogIn className="h-4 w-4" />
-                  )}
-                  {t("auth.login")}
-                </Button>
+                <>
+                  <LanguageSwitcher disabled={profileSaving} />
+                  <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
+                    {status === "checking" || status === "loggingOut" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <LogIn className="h-4 w-4" />
+                    )}
+                    {t("auth.login")}
+                  </Button>
+                </>
               )}
             </div>
           </header>
@@ -243,7 +241,7 @@ export function AppShell(props: AppShellProps) {
                 isAuthenticated={isAuthenticated}
                 onRefreshAdminUsers={() => void refreshAdminUsers()}
                 onResetProfile={() => void resetProfile()}
-                onSaveProfile={(input) => void saveProfile(input)}
+                onSaveProfile={saveProfile}
                 profile={profile}
                 profileMessage={profileMessage}
                 profileSaving={profileSaving}

@@ -1,4 +1,5 @@
 import { Languages } from "lucide-react";
+import type { HTMLAttributes } from "react";
 import type { AppUserProfile, UpdateUserProfileInput } from "../../api/playsay";
 import {
   changeAppLanguage,
@@ -10,10 +11,12 @@ import {
 import { useState } from "react";
 
 export function LanguageSwitcher({
+  className,
   disabled = false,
   onSaveProfile,
   profile,
 }: {
+  className?: HTMLAttributes<HTMLDivElement>["className"];
   disabled?: boolean;
   onSaveProfile?: (input: UpdateUserProfileInput) => Promise<void>;
   profile?: AppUserProfile | null;
@@ -35,7 +38,7 @@ export function LanguageSwitcher({
   }
 
   return (
-    <label className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground">
+    <div className={className ?? "inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground"}>
       <Languages className="h-4 w-4 text-primary" />
       <span className="sr-only">{t("common.language")}</span>
       <select
@@ -51,7 +54,7 @@ export function LanguageSwitcher({
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }
 

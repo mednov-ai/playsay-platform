@@ -8,13 +8,13 @@ import type {
   MeProfile,
   UpdateUserProfileInput,
 } from "../../../shared/api/playsay";
-import { useAppTranslation } from "../../../shared/i18n";
+import { normalizeLanguage, useAppTranslation } from "../../../shared/i18n";
+import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
 
 export type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggingOut" | "error";
 
 type ProfileFormState = {
   displayName: string;
-  locale: string;
   timezone: string;
   learningGoal: string;
 };
@@ -44,7 +44,7 @@ export function ProfileAccountPanel({
   isAuthenticated: boolean;
   onRefreshAdminUsers: () => void;
   onResetProfile: () => void;
-  onSaveProfile: (input: UpdateUserProfileInput) => void;
+  onSaveProfile: (input: UpdateUserProfileInput) => Promise<void>;
   profile: MeProfile | null;
   profileMessage: string | null;
   profileSaving: boolean;
@@ -104,14 +104,13 @@ function ProfileEditor({
   disabled: boolean;
   message: string | null;
   onReset: () => void;
-  onSave: (input: UpdateUserProfileInput) => void;
+  onSave: (input: UpdateUserProfileInput) => Promise<void>;
   profile: AppUserProfile | null;
   saving: boolean;
 }) {
-  const { t } = useAppTranslation();
+  const { i18n, t } = useAppTranslation();
   const [form, setForm] = useState<ProfileFormState>({
     displayName: "",
-    locale: "",
     timezone: "",
     learningGoal: "",
   });
@@ -119,7 +118,6 @@ function ProfileEditor({
   useEffect(() => {
     setForm({
       displayName: profile?.displayName ?? "",
-      locale: profile?.locale ?? "",
       timezone: profile?.timezone ?? "",
       learningGoal: profile?.learningGoal ?? "",
     });
@@ -133,7 +131,7 @@ function ProfileEditor({
     event.preventDefault();
     onSave({
       displayName: form.displayName,
-      locale: form.locale,
+      locale: normalizeLanguage(i18n.resolvedLanguage ?? i18n.language),
       timezone: form.timezone,
       learningGoal: form.learningGoal,
     });
@@ -152,13 +150,11 @@ function ProfileEditor({
           />
         </FormField>
         <FormField label={t("profile.fields.language")}>
-          <input
-            className="playsay-input"
+          <LanguageSwitcher
+            className="playsay-input flex items-center gap-2 px-3"
             disabled={disabled}
-            maxLength={16}
-            onChange={(event) => updateField("locale", event.target.value)}
-            placeholder="en"
-            value={form.locale}
+            onSaveProfile={onSave}
+            profile={profile}
           />
         </FormField>
       </div>

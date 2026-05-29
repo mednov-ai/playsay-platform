@@ -103,6 +103,7 @@ export type MaterialEditorBlock = {
     acceptedAnswers?: string[];
     aiSuggestedAnswers?: MaterialAnswerSuggestion[];
     options?: string[];
+    threadRootItemId?: string;
     weight?: number;
   }>;
   pairs?: MaterialMatchingPair[];

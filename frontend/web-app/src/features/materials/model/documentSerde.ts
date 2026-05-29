@@ -229,11 +229,18 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
       }));
   }
   if (block.items?.length) {
-    clean.items = block.items
+    const items = block.items
       .filter((item) => item.prompt.trim())
       .map((item) => ({
+        ...item,
         id: item.id?.trim() || createClientId("item"),
+      }));
+    const itemIds = new Set(items.map((item) => item.id));
+
+    clean.items = items
+      .map((item) => ({
         prompt: item.prompt.trim(),
+        id: item.id,
         answer: item.answer?.trim() || undefined,
         acceptedAnswers: uniqueMaterialOptions(item.acceptedAnswers ?? [])
           .filter((answer) => normalizeMaterialAnswer(answer) !== normalizeMaterialAnswer(item.answer))
@@ -247,6 +254,9 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
             confidence: Math.min(1, Math.max(0, suggestion.confidence)),
           })),
         options: item.options?.map((option) => option.trim()).filter(Boolean),
+        threadRootItemId: item.threadRootItemId && item.threadRootItemId !== item.id && itemIds.has(item.threadRootItemId)
+          ? item.threadRootItemId
+          : undefined,
         weight: item.weight && item.weight > 0 ? item.weight : undefined,
       }));
   }
@@ -325,6 +335,7 @@ export function materialItemFromJson(value: unknown): NonNullable<MaterialEditor
     acceptedAnswers,
     aiSuggestedAnswers,
     options: uniqueMaterialOptions([...options, ...choices]),
+    threadRootItemId: asString(item.threadRootItemId) || asString(item.continuationOfItemId) || undefined,
     weight: asPositiveNumber(item.weight) ?? asPositiveNumber(asJsonObject(item.assessment).weight) ?? undefined,
   };
 }

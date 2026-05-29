@@ -46,6 +46,38 @@ describe("material document accepted answers", () => {
     });
   });
 
+  it("keeps fill gap continuation threads through serde", () => {
+    const block = materialBlockFromJson({
+      id: "gaps",
+      type: "fillGaps",
+      title: "Threaded sentence",
+      items: [
+        {
+          id: "item-root",
+          prompt: "I am ␣ the airport.",
+          answer: "at",
+        },
+        {
+          id: "item-continuation",
+          threadRootItemId: "item-root",
+          prompt: "and I am waiting ␣ gate 4.",
+          answer: "at",
+        },
+      ],
+    });
+
+    expect(block?.items?.[1]).toMatchObject({
+      id: "item-continuation",
+      threadRootItemId: "item-root",
+    });
+
+    const clean = cleanMaterialBlock(block as MaterialEditorBlock);
+    expect(clean.items?.[1]).toMatchObject({
+      id: "item-continuation",
+      threadRootItemId: "item-root",
+    });
+  });
+
   it("matches primary and accepted answers with the same normalization", () => {
     const item = {
       id: "item-about",

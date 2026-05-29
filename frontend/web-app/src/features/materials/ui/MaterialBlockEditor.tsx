@@ -274,13 +274,14 @@ function ExerciseItemsEditor({
     });
   }
 
-  function createExerciseItem(): MaterialExerciseItem {
+  function createExerciseItem(patch: Partial<MaterialExerciseItem> = {}): MaterialExerciseItem {
     return {
       id: createClientId("item"),
       prompt: "",
       answer: "",
       acceptedAnswers: [],
       options: block.type === "multipleChoice" ? ["", "", ""] : [],
+      ...patch,
     };
   }
 
@@ -291,12 +292,24 @@ function ExerciseItemsEditor({
   }
 
   function insertItemAfter(index: number) {
+    const item = items[index];
+    if (!item) {
+      return;
+    }
+    const rootItemId = item.threadRootItemId ?? item.id ?? createClientId("item");
+    const currentItem = item.id ? item : { ...item, id: rootItemId };
+
     onUpdate({
-      items: [
-        ...items.slice(0, index + 1),
-        createExerciseItem(),
-        ...items.slice(index + 1),
-      ],
+      items: items.flatMap((candidate, itemIndex) => {
+        if (itemIndex !== index) {
+          return [candidate];
+        }
+
+        return [
+          currentItem,
+          createExerciseItem({ threadRootItemId: rootItemId }),
+        ];
+      }),
     });
   }
 
@@ -318,7 +331,12 @@ function ExerciseItemsEditor({
   }
 
   function removeItem(index: number) {
-    onUpdate({ items: items.filter((_, itemIndex) => itemIndex !== index) });
+    const removedItemId = items[index]?.id;
+    onUpdate({
+      items: items
+        .filter((_, itemIndex) => itemIndex !== index)
+        .map((item) => (removedItemId && item.threadRootItemId === removedItemId ? { ...item, threadRootItemId: undefined } : item)),
+    });
   }
 
   function acceptSuggestion(index: number, suggestionValue: string) {
@@ -364,8 +382,17 @@ function ExerciseItemsEditor({
 
       {items.map((item, index) => {
         const itemKey = item.id ?? `${index}`;
+        const threadRootItemId = materialItemThreadRootId(item, index);
+        const nextItem = items[index + 1];
+        const nextThreadRootItemId = nextItem ? materialItemThreadRootId(nextItem, index + 1) : null;
+        const isContinuation = Boolean(item.threadRootItemId);
+        const hasNextInThread = Boolean(nextItem && nextThreadRootItemId === threadRootItemId);
+        const isThreadTail = !hasNextInThread;
         return (
-        <div className="grid gap-1.5 rounded-lg border border-border bg-muted/20 p-2" key={item.id ?? `${block.id}-${index}`}>
+        <div className="grid gap-1" key={item.id ?? `${block.id}-${index}`}>
+          <div className={isContinuation ? "grid grid-cols-[1.5rem_minmax(0,1fr)] gap-1.5" : ""}>
+            {isContinuation ? <ThreadConnector /> : null}
+            <div className="grid gap-1.5 rounded-lg border border-border bg-muted/20 p-2">
           <div className={block.type === "fillGaps" ? "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_4.5rem_2.25rem]" : "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]"}>
             <FormField label={t("materials.blockEditor.itemPrompt")}>
               <div className="flex gap-1.5">
@@ -474,12 +501,17 @@ function ExerciseItemsEditor({
               ))}
             </div>
           ) : null}
-          {block.type === "fillGaps" ? (
-            <div className="flex items-center gap-2 pl-2">
-              <span aria-hidden="true" className="h-px w-5 bg-border" />
+            </div>
+          </div>
+          {!isContinuation && hasNextInThread ? (
+            <span aria-hidden="true" className="ml-3 h-1.5 w-px bg-border" />
+          ) : null}
+          {block.type === "fillGaps" && isThreadTail ? (
+            <div className={isContinuation ? "grid grid-cols-[1.5rem_minmax(0,1fr)] gap-1.5" : "flex items-center gap-2 pl-2"}>
+              {isContinuation ? <ThreadConnector compact /> : <span aria-hidden="true" className="h-px w-5 bg-border" />}
               <Button
                 aria-label={t("materials.blockEditor.continueSentenceAria")}
-                className="h-7 rounded-full px-2 text-xs"
+                className="h-7 w-fit rounded-full px-2 text-xs"
                 disabled={disabled}
                 onClick={() => insertItemAfter(index)}
                 type="button"
@@ -494,6 +526,19 @@ function ExerciseItemsEditor({
         );
       })}
     </div>
+  );
+}
+
+function materialItemThreadRootId(item: MaterialExerciseItem, index: number): string {
+  return item.threadRootItemId ?? item.id ?? `item-${index}`;
+}
+
+function ThreadConnector({ compact = false }: { compact?: boolean }) {
+  return (
+    <span aria-hidden="true" className="relative min-h-full">
+      <span className="absolute left-3 top-0 h-full w-px bg-border" />
+      {!compact ? <span className="absolute left-3 top-5 h-px w-3 bg-border" /> : null}
+    </span>
   );
 }
 

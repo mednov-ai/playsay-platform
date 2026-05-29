@@ -3,7 +3,7 @@ import { i18n } from "../../../shared/i18n";
 import type { MaterialAssessmentPolicy, MaterialEditorBlock, MaterialEditorDocument, MaterialEditorPage, MaterialFormState, MaterialMatchingPair, MaterialMatchingTargetKind } from "./types";
 import { defaultMaterialDocument } from "./documentFactory";
 import { cleanMaterialAssessment, defaultObjectiveAssessmentPolicy } from "./scoring";
-import { asJsonObject, asNumber, asPositiveNumber, asString, createClientId, isMaterialNormalizationTerm, isObjectiveMaterialBlockType, materialBlockLabel, normalizeMaterialBlockType, readPromptFromSourceMeta, uniqueMaterialOptions } from "./formatters";
+import { asJsonObject, asNumber, asPositiveNumber, asString, createClientId, isMaterialNormalizationTerm, isObjectiveMaterialBlockType, materialBlockLabel, normalizeMaterialAnswer, normalizeMaterialBlockType, readPromptFromSourceMeta, uniqueMaterialOptions } from "./formatters";
 
 export function materialToForm(material: LessonMaterial): MaterialFormState {
   const sourceMeta = asJsonObject(material.sourceMeta);
@@ -232,8 +232,20 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
     clean.items = block.items
       .filter((item) => item.prompt.trim())
       .map((item) => ({
+        id: item.id?.trim() || createClientId("item"),
         prompt: item.prompt.trim(),
         answer: item.answer?.trim() || undefined,
+        acceptedAnswers: uniqueMaterialOptions(item.acceptedAnswers ?? [])
+          .filter((answer) => normalizeMaterialAnswer(answer) !== normalizeMaterialAnswer(item.answer))
+          .map((answer) => answer.trim()),
+        aiSuggestedAnswers: (item.aiSuggestedAnswers ?? [])
+          .filter((suggestion) => suggestion.value.trim())
+          .slice(0, 8)
+          .map((suggestion) => ({
+            value: suggestion.value.trim(),
+            reason: suggestion.reason.trim(),
+            confidence: Math.min(1, Math.max(0, suggestion.confidence)),
+          })),
         options: item.options?.map((option) => option.trim()).filter(Boolean),
         weight: item.weight && item.weight > 0 ? item.weight : undefined,
       }));
@@ -286,10 +298,32 @@ export function materialItemFromJson(value: unknown): NonNullable<MaterialEditor
   }
   const options = Array.isArray(item.options) ? item.options.map(asString).filter(Boolean) : [];
   const choices = Array.isArray(item.choices) ? item.choices.map(asString).filter(Boolean) : [];
+  const answer = asString(item.answer) || asString(item.correct) || undefined;
+  const acceptedAnswers = uniqueMaterialOptions([
+    ...(Array.isArray(item.acceptedAnswers) ? item.acceptedAnswers.map(asString) : []),
+    ...(Array.isArray(item.variants) ? item.variants.map(asString) : []),
+  ]).filter((acceptedAnswer) => normalizeMaterialAnswer(acceptedAnswer) !== normalizeMaterialAnswer(answer));
+  const aiSuggestedAnswers = (Array.isArray(item.aiSuggestedAnswers) ? item.aiSuggestedAnswers : [])
+    .map((suggestion) => {
+      const suggestionObject = asJsonObject(suggestion);
+      const value = asString(suggestionObject.value);
+      if (!value) {
+        return null;
+      }
+      return {
+        value,
+        reason: asString(suggestionObject.reason),
+        confidence: asNumber(suggestionObject.confidence) ?? 0,
+      };
+    })
+    .filter((suggestion): suggestion is NonNullable<NonNullable<MaterialEditorBlock["items"]>[number]["aiSuggestedAnswers"]>[number] => suggestion !== null);
 
   return {
+    id: asString(item.id) || undefined,
     prompt,
-    answer: asString(item.answer) || asString(item.correct) || undefined,
+    answer,
+    acceptedAnswers,
+    aiSuggestedAnswers,
     options: uniqueMaterialOptions([...options, ...choices]),
     weight: asPositiveNumber(item.weight) ?? asPositiveNumber(asJsonObject(item.assessment).weight) ?? undefined,
   };

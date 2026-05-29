@@ -7,6 +7,7 @@ import {
   materialAnswerItems,
   materialAnswerStatus,
   materialItemAnswerMatches,
+  materialExerciseItemKey,
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
   type MaterialExerciseItem,
@@ -53,7 +54,7 @@ export function RenderedChoiceExercise({
   }
 
   function checkItem(itemKey: string, value = answers[itemKey] ?? "") {
-    const item = (block.items ?? []).find((candidate, index) => `${candidate.prompt}-${index}` === itemKey);
+    const item = (block.items ?? []).find((candidate, index) => materialExerciseItemKey(candidate, index) === itemKey);
     const nextAttempts = appendMaterialAttempt(attempts, itemKey, value, materialItemAnswerMatches(item, value));
     onAnswerChange?.(block.id, {
       type: "multipleChoice",
@@ -95,7 +96,7 @@ export function RenderedChoiceExercise({
   return (
     <div className="playsay-choice-list">
       {(block.items ?? []).map((item, index) => {
-        const itemKey = `${item.prompt}-${index}`;
+        const itemKey = materialExerciseItemKey(item, index);
         const options = materialExerciseOptions(item, block);
         const isManualInput = options.length === 0;
         const itemHints = hints[itemKey] ?? [];

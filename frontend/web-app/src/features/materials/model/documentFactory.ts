@@ -79,13 +79,13 @@ export function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
       return {
         ...base,
         assessment: defaultObjectiveAssessmentPolicy(),
-        items: [{ prompt: "I am ___ the airport.", answer: "at" }],
+        items: [{ id: createClientId("item"), prompt: "I am ___ the airport.", answer: "at" }],
       };
     case "multipleChoice":
       return {
         ...base,
         assessment: defaultObjectiveAssessmentPolicy(),
-        items: [{ prompt: "Choose the correct answer.", answer: "at", options: ["at", "in", "on"] }],
+        items: [{ id: createClientId("item"), prompt: "Choose the correct answer.", answer: "at", options: ["at", "in", "on"] }],
       };
     case "matchingPairs":
       return {

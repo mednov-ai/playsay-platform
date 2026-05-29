@@ -317,6 +317,36 @@ export interface MaterialGenerateImagesRequest {
   regenerate?: boolean | null;
 }
 
+export interface MaterialAnswerSuggestionsRequest {
+  /** @maxLength 80 */
+  blockId: string;
+  /**
+     * @maxItems 40
+     * @items.maxLength 120
+     */
+  itemIds: string[];
+}
+
+export interface MaterialAnswerSuggestion {
+  value: string;
+  reason: string;
+  confidence: number;
+}
+
+export interface MaterialAnswerSuggestionItem {
+  itemId: string;
+  prompt: string;
+  /** @nullable */
+  answer?: string | null;
+  suggestions: MaterialAnswerSuggestion[];
+}
+
+export interface MaterialAnswerSuggestionsResponse {
+  materialId: string;
+  blockId: string;
+  items: MaterialAnswerSuggestionItem[];
+}
+
 /**
  * @nullable
  */
@@ -1866,6 +1896,68 @@ export const generateMaterialImages = async (materialId: string,
 
   const data: generateMaterialImagesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as generateMaterialImagesResponse
+}
+
+
+
+export type suggestMaterialAcceptedAnswersResponse200 = {
+  data: MaterialAnswerSuggestionsResponse
+  status: 200
+}
+
+export type suggestMaterialAcceptedAnswersResponse401 = {
+  data: void
+  status: 401
+}
+
+export type suggestMaterialAcceptedAnswersResponse403 = {
+  data: void
+  status: 403
+}
+
+export type suggestMaterialAcceptedAnswersResponse404 = {
+  data: void
+  status: 404
+}
+
+export type suggestMaterialAcceptedAnswersResponseSuccess = (suggestMaterialAcceptedAnswersResponse200) & {
+  headers: Headers;
+};
+export type suggestMaterialAcceptedAnswersResponseError = (suggestMaterialAcceptedAnswersResponse401 | suggestMaterialAcceptedAnswersResponse403 | suggestMaterialAcceptedAnswersResponse404) & {
+  headers: Headers;
+};
+
+export type suggestMaterialAcceptedAnswersResponse = (suggestMaterialAcceptedAnswersResponseSuccess | suggestMaterialAcceptedAnswersResponseError)
+
+export const getSuggestMaterialAcceptedAnswersUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/answer-suggestions`
+}
+
+/**
+ * Suggests additional correct answer variants for selected objective material items. Requires material owner or ADMIN role; suggestions are not saved until the teacher accepts them.
+ * @summary Suggest accepted answer variants
+ */
+export const suggestMaterialAcceptedAnswers = async (materialId: string,
+    materialAnswerSuggestionsRequest: MaterialAnswerSuggestionsRequest, options?: RequestInit): Promise<suggestMaterialAcceptedAnswersResponse> => {
+
+  const res = await fetch(getSuggestMaterialAcceptedAnswersUrl(materialId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialAnswerSuggestionsRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: suggestMaterialAcceptedAnswersResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as suggestMaterialAcceptedAnswersResponse
 }
 
 

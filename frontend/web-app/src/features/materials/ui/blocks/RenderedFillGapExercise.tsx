@@ -10,6 +10,7 @@ import {
   materialAnswerHints,
   materialAnswerItems,
   materialAnswerStatus,
+  materialExerciseItemKey,
   isMaterialNormalizationTerm,
   materialItemAnswerMatches,
   materialNormalizationTerms,
@@ -50,7 +51,7 @@ export function RenderedFillGapExercise({
   }
 
   function checkItem(itemKey: string, value = answers[itemKey] ?? "") {
-    const item = (block.items ?? []).find((candidate, index) => `${candidate.prompt}-${index}` === itemKey);
+    const item = (block.items ?? []).find((candidate, index) => materialExerciseItemKey(candidate, index) === itemKey);
     const nextAttempts = appendMaterialAttempt(attempts, itemKey, value, materialItemAnswerMatches(item, value));
     onAnswerChange?.(block.id, {
       type: "fillGaps",
@@ -92,7 +93,7 @@ export function RenderedFillGapExercise({
   return (
     <div className="playsay-fill-exercise">
       {(block.items ?? []).map((item, index) => {
-        const itemKey = `${item.prompt}-${index}`;
+        const itemKey = materialExerciseItemKey(item, index);
         const options = materialExerciseOptions(item, block);
         const isManualInput = options.length === 0;
         const prompt = splitGapPrompt(item.prompt);

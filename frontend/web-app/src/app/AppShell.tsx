@@ -11,6 +11,8 @@ import {
   type CourseLesson,
   type CourseLessonInput,
   type LessonMaterial,
+  type LessonMaterialAnswerSuggestions,
+  type LessonMaterialAnswerSuggestionsInput,
   type LessonMaterialAsset,
   type LessonMaterialAssetUpdateInput,
   type LessonMaterialDraft,
@@ -91,6 +93,7 @@ export type AppShellProps = {
   setWorkspaceTab: Dispatch<SetStateAction<WorkspaceTab>>;
   status: SessionStatus;
   studentUsers: AdminUserProfile[];
+  suggestAcceptedAnswersForMaterial: (materialId: string, input: LessonMaterialAnswerSuggestionsInput) => Promise<LessonMaterialAnswerSuggestions | null>;
   updateMaterialAssetMetadata: (materialId: string, assetId: string, input: LessonMaterialAssetUpdateInput) => Promise<LessonMaterialAsset | null>;
   upsertMaterial: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
   workspaceTab: WorkspaceTab;
@@ -155,6 +158,7 @@ export function AppShell(props: AppShellProps) {
     setWorkspaceTab,
     status,
     studentUsers,
+    suggestAcceptedAnswersForMaterial,
     updateMaterialAssetMetadata,
     upsertMaterial,
     workspaceTab,
@@ -286,6 +290,7 @@ export function AppShell(props: AppShellProps) {
                 onDraft={(input) => generateMaterialDraft(input)}
                 onDraftFromUrl={(input) => generateMaterialDraftFromUrl(input)}
                 onGenerateImages={(materialId, input) => generateImagesForMaterial(materialId, input)}
+                onSuggestAcceptedAnswers={(materialId, input) => suggestAcceptedAnswersForMaterial(materialId, input)}
                 onUpdateAsset={(materialId, assetId, input) => updateMaterialAssetMetadata(materialId, assetId, input)}
                 onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
                 onRefresh={() => void refreshMaterials()}

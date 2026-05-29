@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link2, Loader2, Sparkles } from "lucide-react";
 import {
   emptyMaterialMatchingPairs,
@@ -8,10 +8,10 @@ import {
   materialAssetIdFromUrl,
   materialMatchingPairTargetKind,
   materialMatchingStatus,
+  matchingRightOptionsForMode,
   resolveMaterialImageUrl,
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
-  type MaterialMatchingPair,
   type MaterialRenderMode,
 } from "../../model/materialDocument";
 import { MarkdownInline } from "../markdown/RenderedMarkdown";
@@ -33,7 +33,7 @@ export function RenderedMatchingPairsExercise({
 }) {
   const { t } = useAppTranslation();
   const pairs = block.pairs ?? emptyMaterialMatchingPairs;
-  const rightOptions = mode === "teacherPreview" ? pairs : matchingRightOptions(pairs);
+  const rightOptions = useMemo(() => matchingRightOptionsForMode(pairs, mode), [mode, pairs]);
   const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
   const matches = materialAnswerMatches(answer);
   const attempts = materialAnswerAttempts(answer);
@@ -76,7 +76,7 @@ export function RenderedMatchingPairsExercise({
     updateLines();
     window.addEventListener("resize", updateLines);
     return () => window.removeEventListener("resize", updateLines);
-  }, [matchesKey, pairs]);
+  }, [matchesKey, rightOptions]);
 
   function connectPair(rightId: string) {
     if (!activeLeftId) {
@@ -164,35 +164,4 @@ export function RenderedMatchingPairsExercise({
       </div>
     </div>
   );
-}
-
-function matchingRightOptions(pairs: MaterialMatchingPair[]): MaterialMatchingPair[] {
-  if (pairs.length <= 1) {
-    return [...pairs];
-  }
-
-  const ordered = [...pairs].sort((left, right) => matchingPairSortKey(left) - matchingPairSortKey(right));
-
-  for (let offset = 0; offset < ordered.length; offset += 1) {
-    const candidate = rotateMatchingOptions(ordered, offset);
-    if (candidate.every((pair, index) => pair.id !== pairs[index]?.id)) {
-      return candidate;
-    }
-  }
-
-  return rotateMatchingOptions(pairs, 1);
-}
-
-function matchingPairSortKey(pair: MaterialMatchingPair): number {
-  return `${pair.id}:${pair.right}`.split("").reduce((hash, char) => (
-    (hash * 31 + char.charCodeAt(0)) % 10_000
-  ), 7);
-}
-
-function rotateMatchingOptions(pairs: MaterialMatchingPair[], offset: number): MaterialMatchingPair[] {
-  if (pairs.length === 0) {
-    return [];
-  }
-  const normalizedOffset = offset % pairs.length;
-  return [...pairs.slice(normalizedOffset), ...pairs.slice(0, normalizedOffset)];
 }

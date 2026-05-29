@@ -6,6 +6,7 @@ import {
   materialBlockFromJson,
   materialExerciseItemKey,
   materialItemAnswerMatches,
+  materialPromptWithInsertedGapMarker,
   materialPromptWithGapMarker,
   parseExerciseItems,
   formatExerciseItems,
@@ -81,6 +82,21 @@ describe("material document accepted answers", () => {
     expect(materialPromptWithGapMarker("I am ___ ready")).toBe("I am ___ ready");
     expect(splitFillGapPrompt("I am ␣ ready")).toEqual({ before: "I am", after: "ready" });
     expect(splitFillGapPrompt("I am ___ ready")).toEqual({ before: "I am", after: "ready" });
+  });
+
+  it("inserts the visible blank marker at the current cursor or selection", () => {
+    expect(materialPromptWithInsertedGapMarker("I am ready", 5, 5)).toEqual({
+      prompt: "I am ␣ ready",
+      cursor: 6,
+    });
+    expect(materialPromptWithInsertedGapMarker("I am at home", 5, 7)).toEqual({
+      prompt: "I am ␣ home",
+      cursor: 6,
+    });
+    expect(materialPromptWithInsertedGapMarker("I am ␣ ready", 12, 12)).toEqual({
+      prompt: "I am ␣ ready ␣ ",
+      cursor: 14,
+    });
   });
 
   it("adds manual and AI accepted answers as unique variants excluding the primary answer", () => {

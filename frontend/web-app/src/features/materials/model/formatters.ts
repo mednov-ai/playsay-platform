@@ -61,6 +61,25 @@ export function materialPromptWithGapMarker(prompt: string): string {
   return cleanPrompt ? `${cleanPrompt} ${FILL_GAP_MARKER} ` : `${FILL_GAP_MARKER} `;
 }
 
+export function materialPromptWithInsertedGapMarker(
+  prompt: string,
+  selectionStart: number | null | undefined,
+  selectionEnd: number | null | undefined,
+): { prompt: string; cursor: number } {
+  const start = clampInteger(selectionStart ?? prompt.length, 0, prompt.length);
+  const end = clampInteger(selectionEnd ?? start, start, prompt.length);
+  const before = prompt.slice(0, start).replace(/\s+$/, "");
+  const after = prompt.slice(end).replace(/^\s+/, "");
+  const prefix = before ? `${before} ` : "";
+  const suffix = after ? ` ${after}` : " ";
+  const nextPrompt = `${prefix}${FILL_GAP_MARKER}${suffix}`;
+
+  return {
+    prompt: nextPrompt,
+    cursor: `${prefix}${FILL_GAP_MARKER}`.length,
+  };
+}
+
 export function splitFillGapPrompt(prompt: string): { before: string; after: string } {
   const match = prompt.match(/^(.*?)(␣|___|__|…|\.\.\.)(.*)$/);
   if (!match) {
@@ -71,6 +90,13 @@ export function splitFillGapPrompt(prompt: string): { before: string; after: str
     before: match[1].trimEnd(),
     after: match[3].trimStart(),
   };
+}
+
+function clampInteger(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return max;
+  }
+  return Math.min(Math.max(Math.trunc(value), min), max);
 }
 
 export function materialNormalizationTerms(key: "articleContext" | "imageTarget" | "noArticle" | "textTarget"): string[] {

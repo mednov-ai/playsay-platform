@@ -871,7 +871,7 @@ class LessonMaterialStore(
         return requireNotNull(find(materialId)).toResponse(objectMapper)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun suggestAcceptedAnswers(
         authentication: JwtAuthenticationToken,
         materialId: UUID,

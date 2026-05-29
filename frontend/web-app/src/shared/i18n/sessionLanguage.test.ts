@@ -64,6 +64,21 @@ describe("session language handoff", () => {
     expect(consumePendingLoginLanguage()).toBe("en");
     expect(document.cookie).not.toContain(pendingLoginLanguageCookieName);
   });
+
+  it("prefers the Keycloak-selected cookie over the pre-login language", () => {
+    const sessionStorage = createMemoryStorage();
+    sessionStorage.setItem(pendingLoginLanguageStorageKey, "en");
+    const document = createCookieDocument(`${pendingLoginLanguageCookieName}=de`);
+    vi.stubGlobal("window", {
+      document,
+      location: { hostname: "online.play-and-say.ru", protocol: "https:" },
+      sessionStorage,
+    });
+
+    expect(consumePendingLoginLanguage()).toBe("de");
+    expect(sessionStorage.getItem(pendingLoginLanguageStorageKey)).toBeNull();
+    expect(document.cookie).not.toContain(pendingLoginLanguageCookieName);
+  });
 });
 
 function createMemoryStorage(): Storage {

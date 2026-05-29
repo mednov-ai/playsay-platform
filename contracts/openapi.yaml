@@ -693,6 +693,43 @@ paths:
           description: Material not found
       security:
       - bearerAuth: []
+  /materials/{materialId}/answer-suggestions:
+    post:
+      tags:
+      - Materials
+      summary: Suggest accepted answer variants
+      description: Suggests additional correct answer variants for selected objective
+        material items. Requires material owner or ADMIN role; suggestions are not
+        saved until the teacher accepts them.
+      operationId: suggestMaterialAcceptedAnswers
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialAnswerSuggestionsRequest"
+        required: true
+      responses:
+        "200":
+          description: Suggested accepted answer variants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAnswerSuggestionsResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot edit material
+        "404":
+          description: Material or block not found
+      security:
+      - bearerAuth: []
   /materials/import-url:
     post:
       tags:
@@ -1702,6 +1739,69 @@ components:
           type:
           - boolean
           - "null"
+    MaterialAnswerSuggestionsRequest:
+      type: object
+      properties:
+        blockId:
+          type: string
+          maxLength: 80
+        itemIds:
+          type: array
+          items:
+            type: string
+            maxLength: 120
+          maxItems: 40
+      required:
+      - blockId
+      - itemIds
+    MaterialAnswerSuggestion:
+      type: object
+      properties:
+        value:
+          type: string
+        reason:
+          type: string
+        confidence:
+          type: number
+      required:
+      - confidence
+      - reason
+      - value
+    MaterialAnswerSuggestionItem:
+      type: object
+      properties:
+        itemId:
+          type: string
+        prompt:
+          type: string
+        answer:
+          type:
+          - string
+          - "null"
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialAnswerSuggestion"
+      required:
+      - itemId
+      - prompt
+      - suggestions
+    MaterialAnswerSuggestionsResponse:
+      type: object
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        blockId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialAnswerSuggestionItem"
+      required:
+      - blockId
+      - items
+      - materialId
     MaterialUrlImportRequest:
       type: object
       properties:

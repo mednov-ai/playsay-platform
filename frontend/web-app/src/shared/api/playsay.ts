@@ -126,6 +126,26 @@ export type LessonMaterialGenerateImagesInput = {
   maxImages?: number | null;
   regenerate?: boolean | null;
 };
+export type LessonMaterialAnswerSuggestionsInput = {
+  blockId: string;
+  itemIds?: string[];
+};
+export type LessonMaterialAnswerSuggestion = {
+  value: string;
+  reason: string;
+  confidence: number;
+};
+export type LessonMaterialAnswerSuggestionItem = {
+  itemId: string;
+  prompt: string;
+  answer?: string | null;
+  suggestions: LessonMaterialAnswerSuggestion[];
+};
+export type LessonMaterialAnswerSuggestions = {
+  materialId: string;
+  blockId: string;
+  items: LessonMaterialAnswerSuggestionItem[];
+};
 export type LessonMaterialAssetUpdateInput = {
   tags?: string[] | null;
 };
@@ -611,6 +631,21 @@ export async function generateMaterialImages(
 ): Promise<LessonMaterial> {
   return apiJson<LessonMaterial>(
     `/api/materials/${materialId}/generate-images`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    config,
+  );
+}
+
+export async function suggestMaterialAcceptedAnswers(
+  materialId: string,
+  input: LessonMaterialAnswerSuggestionsInput,
+  config = authConfig,
+): Promise<LessonMaterialAnswerSuggestions> {
+  return apiJson<LessonMaterialAnswerSuggestions>(
+    `/api/materials/${materialId}/answer-suggestions`,
     {
       method: "POST",
       body: JSON.stringify(input),

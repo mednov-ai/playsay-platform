@@ -138,12 +138,24 @@ export function parseExerciseItems(value: string, type: "fillGaps" | "multipleCh
     .filter(Boolean)
     .map((line) => {
       const [prompt = "", optionsOrAnswer = "", answer = "", weight = ""] = splitMaterialLine(line, 4);
-      const parsedWeight = parseOptionalNumber(weight);
+      const fillGapAcceptedAnswers = splitMaterialList(answer).map((option) => option.trim()).filter(Boolean);
+      const secondCellOptions = splitMaterialList(optionsOrAnswer).map((option) => option.trim()).filter(Boolean);
+      const fillGapUsesAcceptedAnswers = type === "fillGaps" && answer.includes(",") && secondCellOptions.length <= 1;
+      const parsedWeight = parseOptionalNumber(fillGapUsesAcceptedAnswers ? weight : weight);
       if (type === "multipleChoice") {
         return {
           prompt: prompt.trim(),
           options: splitMaterialList(optionsOrAnswer).map((option) => option.trim()).filter(Boolean),
           answer: answer.trim() || undefined,
+          weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
+        };
+      }
+
+      if (fillGapUsesAcceptedAnswers) {
+        return {
+          prompt: prompt.trim(),
+          answer: optionsOrAnswer.trim() || undefined,
+          acceptedAnswers: fillGapAcceptedAnswers,
           weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
         };
       }
@@ -163,6 +175,10 @@ export function formatExerciseItems(items: MaterialEditorBlock["items"], type: "
     .map((item) => {
       if (type === "multipleChoice") {
         return [item.prompt, formatMaterialList(item.options), item.answer, item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");
+      }
+
+      if (item.acceptedAnswers?.length && !item.options?.length) {
+        return [item.prompt, item.answer, formatMaterialList(item.acceptedAnswers), item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");
       }
 
       return [item.prompt, formatMaterialList(item.options), item.answer, item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");

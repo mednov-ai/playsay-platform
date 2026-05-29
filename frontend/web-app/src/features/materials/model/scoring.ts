@@ -51,11 +51,12 @@ export function materialMaxScore(rubric: LessonMaterialJson): number {
 
 export function materialAnswerContextForBlock(block: MaterialEditorBlock): LessonMaterialJson {
   const items = (block.items ?? []).map((item, index, allItems) => ({
-    key: `${item.prompt}-${index}`,
+    key: materialExerciseItemKey(item, index),
     prompt: item.prompt,
     previousPrompt: allItems[index - 1]?.prompt ?? null,
     nextPrompt: allItems[index + 1]?.prompt ?? null,
     options: item.options ?? [],
+    acceptedAnswers: item.acceptedAnswers ?? [],
   }));
 
   return {
@@ -70,11 +71,31 @@ export function materialAnswerContextForBlock(block: MaterialEditorBlock): Lesso
 }
 
 export function materialItemAnswerMatches(item: MaterialExerciseItem | undefined, value: string): boolean {
-  const expected = normalizeScoredMaterialAnswer(item?.answer);
-  if (!expected || !value.trim()) {
+  const expectedAnswers = materialAcceptedAnswersForItem(item);
+  if (expectedAnswers.length === 0 || !value.trim()) {
     return false;
   }
-  return normalizeScoredMaterialAnswer(value) === expected;
+  const normalizedValue = normalizeScoredMaterialAnswer(value);
+  return expectedAnswers.some((expected) => normalizeScoredMaterialAnswer(expected) === normalizedValue);
+}
+
+export function materialAcceptedAnswersForItem(item: MaterialExerciseItem | undefined): string[] {
+  const answers = [item?.answer, ...(item?.acceptedAnswers ?? [])]
+    .map((answer) => answer?.trim() ?? "")
+    .filter(Boolean);
+  const seen = new Set<string>();
+  return answers.filter((answer) => {
+    const key = normalizeScoredMaterialAnswer(answer);
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+export function materialExerciseItemKey(item: MaterialExerciseItem, index: number): string {
+  return item.id?.trim() || `${item.prompt}-${index}`;
 }
 
 export function materialAnswerStatus(
@@ -148,7 +169,7 @@ export function materialLiveScore(material: LessonMaterial, answers: MaterialAns
             return;
           }
 
-          const itemKey = `${item.prompt}-${index}`;
+          const itemKey = materialExerciseItemKey(item, index);
           const actual = answerItems[itemKey] ?? "";
           const itemAttempts = attempts[itemKey] ?? [];
           const itemHints = hints[itemKey] ?? [];
@@ -269,7 +290,11 @@ export function materialBlockContextLabel(block: MaterialEditorBlock): string {
 }
 
 function normalizeScoredMaterialAnswer(value: string | undefined): string {
-  const normalized = value?.trim().toLowerCase() ?? "";
+  const normalized = value
+    ?.trim()
+    .toLowerCase()
+    .replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~-]+/g, "")
+    .replace(/\s+/g, " ") ?? "";
   if (isMaterialNormalizationTerm("noArticle", normalized)) {
     return "-";
   }

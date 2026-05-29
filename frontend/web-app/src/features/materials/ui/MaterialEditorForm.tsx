@@ -27,6 +27,7 @@ export function MaterialEditorForm({
   onGenerateCurrentImages,
   onPreview,
   onRemoveBlock,
+  onSuggestAcceptedAnswers,
   onUpdateBlock,
   onUpdateForm,
   pendingImageTargetsCount,
@@ -43,6 +44,7 @@ export function MaterialEditorForm({
   onGenerateCurrentImages: () => void;
   onPreview: () => void;
   onRemoveBlock: (blockId: string) => void;
+  onSuggestAcceptedAnswers: (blockId: string, itemIds: string[]) => void;
   onUpdateBlock: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onUpdateForm: <Key extends keyof MaterialFormState>(field: Key, value: MaterialFormState[Key]) => void;
   pendingImageTargetsCount: number;
@@ -176,6 +178,7 @@ export function MaterialEditorForm({
               index={index}
               key={block.id}
               onRemove={() => onRemoveBlock(block.id)}
+              onSuggestAcceptedAnswers={onSuggestAcceptedAnswers}
               onUpdate={(patch) => onUpdateBlock(block.id, patch)}
             />
           ))

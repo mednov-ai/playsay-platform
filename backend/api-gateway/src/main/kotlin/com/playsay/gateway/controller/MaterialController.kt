@@ -365,6 +365,32 @@ class MaterialController(
     ): LessonMaterialResponse =
         store.generateImages(authentication, materialId, request)
 
+    @PostMapping(
+        "/materials/{materialId}/answer-suggestions",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "suggestMaterialAcceptedAnswers",
+        summary = "Suggest accepted answer variants",
+        description = "Suggests additional correct answer variants for selected objective material items. Requires material owner or ADMIN role; suggestions are not saved until the teacher accepts them.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Suggested accepted answer variants"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot edit material", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Material or block not found", content = [Content()]),
+        ],
+    )
+    fun suggestAcceptedAnswers(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @RequestBody request: MaterialAnswerSuggestionsRequest,
+    ): MaterialAnswerSuggestionsResponse =
+        store.suggestAcceptedAnswers(authentication, materialId, request)
+
     @GetMapping("/materials/{materialId}/assets", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
         operationId = "listMaterialAssets",

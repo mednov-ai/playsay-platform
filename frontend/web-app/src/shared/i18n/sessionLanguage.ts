@@ -24,17 +24,16 @@ export function consumePendingLoginLanguage(): SupportedLanguage | null {
     return null;
   }
 
+  const cookieLanguage = readCookie(pendingLoginLanguageCookieName);
   const language = window.sessionStorage.getItem(pendingLoginLanguageStorageKey);
   window.sessionStorage.removeItem(pendingLoginLanguageStorageKey);
+  clearPendingLoginLanguageCookie();
 
-  if (language) {
-    clearPendingLoginLanguageCookie();
-    return normalizeLanguage(language);
+  if (cookieLanguage) {
+    return normalizeLanguage(cookieLanguage);
   }
 
-  const cookieLanguage = readCookie(pendingLoginLanguageCookieName);
-  clearPendingLoginLanguageCookie();
-  return cookieLanguage ? normalizeLanguage(cookieLanguage) : null;
+  return language ? normalizeLanguage(language) : null;
 }
 
 export function resolveAuthenticatedLanguage({

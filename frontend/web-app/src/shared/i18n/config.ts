@@ -12,15 +12,28 @@ function initialLanguage(): SupportedLanguage {
   return normalizeLanguage(storedLanguage ?? window.navigator.language);
 }
 
+function syncDocumentLanguage(language: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.document.documentElement.lang = normalizeLanguage(language);
+}
+
+const configuredInitialLanguage = initialLanguage();
+syncDocumentLanguage(configuredInitialLanguage);
+
 void i18n.use(initReactI18next).init({
   resources,
-  lng: initialLanguage(),
+  lng: configuredInitialLanguage,
   fallbackLng: defaultLanguage,
   interpolation: {
     escapeValue: false,
   },
   returnNull: false,
 });
+
+i18n.on("languageChanged", syncDocumentLanguage);
 
 export async function changeAppLanguage(language: string): Promise<SupportedLanguage> {
   const normalizedLanguage = normalizeLanguage(language);

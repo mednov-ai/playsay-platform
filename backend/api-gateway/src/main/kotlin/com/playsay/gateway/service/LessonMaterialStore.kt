@@ -11,6 +11,9 @@ import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.dto.MaterialAiDraftRequest
 import com.playsay.gateway.dto.MaterialAnnotationRequest
 import com.playsay.gateway.dto.MaterialAnnotationResponse
+import com.playsay.gateway.dto.MaterialAnswerSuggestionItem
+import com.playsay.gateway.dto.MaterialAnswerSuggestionsRequest
+import com.playsay.gateway.dto.MaterialAnswerSuggestionsResponse
 import com.playsay.gateway.dto.MaterialAssetResponse
 import com.playsay.gateway.dto.MaterialAssetUpdateRequest
 import com.playsay.gateway.dto.MaterialGenerateImagesRequest
@@ -646,7 +649,7 @@ class LessonMaterialStore(
         return requireNotNull(find(materialId)).toResponse(objectMapper)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun suggestAcceptedAnswers(
         authentication: JwtAuthenticationToken,
         materialId: UUID,

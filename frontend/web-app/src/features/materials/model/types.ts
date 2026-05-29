@@ -68,6 +68,12 @@ export type MaterialHintEntry = {
   value?: string;
 };
 
+export type MaterialAnswerSuggestion = {
+  confidence: number;
+  reason: string;
+  value: string;
+};
+
 export type MaterialAnswerStatus = {
   attemptsUsed: number;
   correct: boolean;
@@ -90,7 +96,15 @@ export type MaterialEditorBlock = {
   provider?: string;
   caption?: string;
   cards?: Array<{ id: string; front: string; back: string; example?: string }>;
-  items?: Array<{ prompt: string; answer?: string; options?: string[]; weight?: number }>;
+  items?: Array<{
+    id?: string;
+    prompt: string;
+    answer?: string;
+    acceptedAnswers?: string[];
+    aiSuggestedAnswers?: MaterialAnswerSuggestion[];
+    options?: string[];
+    weight?: number;
+  }>;
   pairs?: MaterialMatchingPair[];
   height?: number;
 };

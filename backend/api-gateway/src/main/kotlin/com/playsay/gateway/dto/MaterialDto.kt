@@ -135,6 +135,32 @@ data class MaterialGenerateImagesRequest(
     val regenerate: Boolean? = null,
 )
 
+data class MaterialAnswerSuggestionsRequest(
+    @field:Schema(maxLength = 80)
+    val blockId: String,
+    @field:ArraySchema(maxItems = 40, schema = Schema(maxLength = 120))
+    val itemIds: List<String> = emptyList(),
+)
+
+data class MaterialAnswerSuggestionsResponse(
+    val materialId: UUID,
+    val blockId: String,
+    val items: List<MaterialAnswerSuggestionItem>,
+)
+
+data class MaterialAnswerSuggestionItem(
+    val itemId: String,
+    val prompt: String,
+    val answer: String?,
+    val suggestions: List<MaterialAnswerSuggestion>,
+)
+
+data class MaterialAnswerSuggestion(
+    val value: String,
+    val reason: String,
+    val confidence: BigDecimal,
+)
+
 data class LessonMaterialDraftResponse(
     val title: String,
     val description: String?,

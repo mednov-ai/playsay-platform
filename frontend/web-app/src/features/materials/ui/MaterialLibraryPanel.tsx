@@ -16,6 +16,8 @@ import {
   type Course,
   type CourseLesson,
   type LessonMaterial,
+  type LessonMaterialAnswerSuggestionsInput,
+  type LessonMaterialAnswerSuggestions,
   type LessonMaterialAsset,
   type LessonMaterialAssetUpdateInput,
   type LessonMaterialDraft,
@@ -68,6 +70,7 @@ export function MaterialLibraryPanel({
   onDraft,
   onDraftFromUrl,
   onGenerateImages,
+  onSuggestAcceptedAnswers,
   onUpdateAsset,
   onLinkLesson,
   onRefresh,
@@ -84,6 +87,7 @@ export function MaterialLibraryPanel({
   onDraft: (input: LessonMaterialDraftInput) => Promise<LessonMaterialDraft | null>;
   onDraftFromUrl: (input: LessonMaterialUrlDraftInput) => Promise<LessonMaterialDraft | null>;
   onGenerateImages: (materialId: string, input: LessonMaterialGenerateImagesInput) => Promise<LessonMaterial | null>;
+  onSuggestAcceptedAnswers: (materialId: string, input: LessonMaterialAnswerSuggestionsInput) => Promise<LessonMaterialAnswerSuggestions | null>;
   onUpdateAsset: (materialId: string, assetId: string, input: LessonMaterialAssetUpdateInput) => Promise<LessonMaterialAsset | null>;
   onLinkLesson: (courseId: string, lesson: CourseLesson, materialId: string | null) => void;
   onRefresh: () => void;
@@ -251,6 +255,56 @@ export function MaterialLibraryPanel({
       setDraftUrl(readUrlFromSourceMeta(draft.sourceMeta) || url);
       setAuthorMode("edit");
     }
+  }
+
+  async function suggestAcceptedAnswers(blockId: string, itemIds: string[]) {
+    if (!form.id) {
+      return;
+    }
+    const result = await onSuggestAcceptedAnswers(form.id, { blockId, itemIds });
+    if (!result) {
+      return;
+    }
+    setAuthorMode("edit");
+    setForm((current) => ({
+      ...current,
+      document: {
+        ...current.document,
+        pages: current.document.pages.map((page) => ({
+          ...page,
+          blocks: page.blocks.map((block) => {
+            if (block.id !== result.blockId || !block.items?.length) {
+              return block;
+            }
+            return {
+              ...block,
+              items: block.items.map((item, index) => {
+                const itemId = item.id?.trim() || `${item.prompt}-${index}`;
+                const suggested = result.items.find((suggestionItem) => suggestionItem.itemId === itemId);
+                if (!suggested) {
+                  return item;
+                }
+                const existingValues = new Set([
+                  item.answer?.trim().toLowerCase(),
+                  ...(item.acceptedAnswers ?? []).map((answer) => answer.trim().toLowerCase()),
+                ].filter(Boolean));
+                const aiSuggestedAnswers = [
+                  ...(item.aiSuggestedAnswers ?? []),
+                  ...suggested.suggestions.filter((suggestion) => !existingValues.has(suggestion.value.trim().toLowerCase())),
+                ];
+                return {
+                  ...item,
+                  aiSuggestedAnswers: aiSuggestedAnswers.filter((suggestion, suggestionIndex, allSuggestions) => (
+                    suggestion.value.trim() &&
+                    allSuggestions.findIndex((candidate) => candidate.value.trim().toLowerCase() === suggestion.value.trim().toLowerCase()) === suggestionIndex
+                  )),
+                };
+              }),
+            };
+          }),
+        })),
+      },
+    }));
   }
 
   async function handleDraftImageChange(file: File | null) {
@@ -538,8 +592,9 @@ export function MaterialLibraryPanel({
                 onAddBlock={addBlock}
                 onArchive={onArchive}
                 onDuplicate={duplicateCurrentMaterial}
-                onGenerateCurrentImages={() => void generateCurrentImages()}
-                onPreview={() => setAuthorMode("preview")}
+              onGenerateCurrentImages={() => void generateCurrentImages()}
+              onSuggestAcceptedAnswers={(blockId, itemIds) => void suggestAcceptedAnswers(blockId, itemIds)}
+              onPreview={() => setAuthorMode("preview")}
                 onRemoveBlock={removeBlock}
                 onUpdateBlock={updateBlock}
                 onUpdateForm={updateForm}

@@ -135,6 +135,7 @@ class LessonMaterialStore(
     private val dataRepo: LegacyJdbcDataRepo,
     private val userProfileStore: UserProfileStore,
     private val materialAiDraftService: MaterialAiDraftService,
+    private val materialAnswerSuggestionService: MaterialAnswerSuggestionService,
     private val materialImageGenerationService: MaterialImageGenerationService,
     private val materialUrlImportService: MaterialUrlImportService,
     private val materialObjectStorage: MaterialObjectStorage,
@@ -611,14 +612,20 @@ class LessonMaterialStore(
                                 return@forEachIndexed
                             }
                             val prompt = item.get("prompt")?.asText().orEmpty()
-                            val key = "$prompt-$index"
-                            val actual = answerItems?.get(key)?.asText()
+                            val key = item.materialItemKey(index)
+                            val legacyKey = "$prompt-$index"
+                            val answerKey = when {
+                                answerItems?.has(key) == true -> key
+                                answerItems?.has(legacyKey) == true -> legacyKey
+                                else -> key
+                            }
+                            val actual = answerItems?.get(answerKey)?.asText()
                             val result = scoreObjectiveItem(
                                 block = block,
                                 item = item,
                                 blockId = blockId,
                                 blockType = blockType,
-                                itemKey = key,
+                                itemKey = answerKey,
                                 expectedAnswers = expected,
                                 actual = actual,
                                 answerBlock = answerBlock,
@@ -862,6 +869,65 @@ class LessonMaterialStore(
         cleanupReplacedGeneratedAssets(materialId, replacedAssetIds.distinct())
 
         return requireNotNull(find(materialId)).toResponse(objectMapper)
+    }
+
+    @Transactional(readOnly = true)
+    fun suggestAcceptedAnswers(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        request: MaterialAnswerSuggestionsRequest,
+    ): MaterialAnswerSuggestionsResponse {
+        val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        val currentUserId = authentication.currentUserIdIfNeeded()
+        if (!material.canEdit(authentication, currentUserId)) {
+            throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can request answer suggestions.")
+        }
+
+        val blockId = request.blockId.requiredClean("blockId", 80)
+        val requestedItemIds = request.itemIds
+            .mapNotNull { itemId -> itemId.optionalClean("itemIds", 120) }
+            .toSet()
+        val document = objectMapper.readTree(material.document)
+        val block = findMaterialBlock(document, blockId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        val items = block.get("items") as? ArrayNode
+            ?: throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Selected block does not contain answer items.")
+        val suggestions = items.mapIndexedNotNull { index, item ->
+            val itemId = item.materialItemKey(index)
+            if (requestedItemIds.isNotEmpty() && itemId !in requestedItemIds) {
+                return@mapIndexedNotNull null
+            }
+            val prompt = item.get("prompt")?.asText()?.trim().orEmpty()
+            val answer = item.get("answer")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                ?: item.get("correct")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+            MaterialAnswerSuggestionItem(
+                itemId = itemId,
+                prompt = prompt,
+                answer = answer,
+                suggestions = materialAnswerSuggestionService.suggest(
+                    MaterialAnswerSuggestionInput(
+                        materialTitle = material.title,
+                        language = material.language,
+                        cefrLevel = material.cefrLevel,
+                        blockTitle = block.get("title")?.asText()?.trim().orEmpty(),
+                        blockType = block.get("type")?.asText()?.trim().orEmpty(),
+                        itemId = itemId,
+                        prompt = prompt,
+                        answer = answer,
+                        acceptedAnswers = item.acceptedAnswers(),
+                        options = (item.get("options") as? ArrayNode)?.mapNotNull { option ->
+                            option.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                        } ?: emptyList(),
+                    ),
+                ),
+            )
+        }
+
+        return MaterialAnswerSuggestionsResponse(
+            materialId = materialId,
+            blockId = blockId,
+            items = suggestions,
+        )
     }
 
     @Transactional
@@ -1760,6 +1826,29 @@ private fun JsonNode.acceptedAnswers(): List<String> =
             }
         }
     }.distinct()
+
+private fun JsonNode.materialItemKey(index: Int): String {
+    val id = get("id")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+    if (id != null) {
+        return id
+    }
+    val prompt = get("prompt")?.asText()?.trim().orEmpty()
+    return "$prompt-$index"
+}
+
+private fun findMaterialBlock(document: JsonNode, blockId: String): ObjectNode? {
+    val pages = document.get("pages") as? ArrayNode ?: return null
+    pages.forEach { page ->
+        val blocks = page.get("blocks") as? ArrayNode ?: return@forEach
+        blocks.forEach { block ->
+            val blockObject = block as? ObjectNode ?: return@forEach
+            if (blockObject.get("id")?.asText()?.trim() == blockId) {
+                return blockObject
+            }
+        }
+    }
+    return null
+}
 
 private fun materialAssessmentPolicy(block: JsonNode, item: JsonNode): AssessmentPolicy {
     val blockAssessment = block.get("assessment")?.takeIf { node -> node.isObject }

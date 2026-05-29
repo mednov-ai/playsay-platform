@@ -457,6 +457,159 @@ class MaterialControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `submission scoring accepts stable item ids and additional accepted answers`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = materialController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "Accepted variants",
+                status = "PUBLISHED",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Verb forms",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "gaps",
+                              "type": "fillGaps",
+                              "title": "Complete the sentences",
+                              "items": [
+                                {
+                                  "id": "item-go-cinema",
+                                  "prompt": "I don't enjoy ___ to the cinema on my own.",
+                                  "answer": "going",
+                                  "acceptedAnswers": ["going out", "going alone"]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                scoringRubric = objectMapper.readTree("""{"maxScore":10}"""),
+            ),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = material.id,
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val submission = materialController.saveScheduledLessonMaterialSubmission(
+            student,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${material.id}",
+                      "answers": {
+                        "gaps": {
+                          "type": "fillGaps",
+                          "items": {
+                            "item-go-cinema": "going out"
+                          },
+                          "attempts": {
+                            "item-go-cinema": [
+                              { "value": "going out", "correct": true }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+            ),
+        )
+
+        assertEquals(0, BigDecimal.TEN.compareTo(assertNotNull(submission.score)))
+        assertEquals(0, submission.errorsCount)
+        val itemAssessment = submission.content["assessment"]["items"][0]
+        assertEquals("item-go-cinema", itemAssessment["itemKey"].asText())
+        assertEquals("CORRECT", itemAssessment["status"].asText())
+    }
+
+    @Test
+    fun `teacher requests AI accepted answer suggestions for selected material items`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val material = materialController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "AI accepted variants",
+                status = "DRAFT",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Travel",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "gaps",
+                              "type": "fillGaps",
+                              "title": "Correct the mistakes",
+                              "items": [
+                                {
+                                  "id": "item-about",
+                                  "prompt": "She said she's thinking ___ a bit.",
+                                  "answer": "about it",
+                                  "acceptedAnswers": ["about that"]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+            ),
+        ).body!!
+
+        val response = materialController.suggestAcceptedAnswers(
+            teacher,
+            material.id,
+            MaterialAnswerSuggestionsRequest(blockId = "gaps", itemIds = listOf("item-about")),
+        )
+
+        assertEquals(material.id, response.materialId)
+        assertEquals("gaps", response.blockId)
+        assertEquals(1, response.items.size)
+        assertEquals("item-about", response.items.single().itemId)
+        assertTrue(response.items.single().suggestions.isNotEmpty())
+        assertTrue(response.items.single().suggestions.none { suggestion -> suggestion.value == "about it" })
+        assertTrue(response.items.single().suggestions.none { suggestion -> suggestion.value == "about that" })
+
+        val error = assertFailsWith<ResponseStatusException> {
+            materialController.suggestAcceptedAnswers(
+                student,
+                material.id,
+                MaterialAnswerSuggestionsRequest(blockId = "gaps", itemIds = listOf("item-about")),
+            )
+        }
+        assertEquals(HttpStatus.FORBIDDEN, error.statusCode)
+    }
+
+    @Test
     fun `non participant cannot read scheduled lesson material`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")

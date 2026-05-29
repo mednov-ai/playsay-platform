@@ -33,6 +33,7 @@ import {
   saveMaterial,
   saveScheduledLesson,
   saveUserProfile,
+  suggestMaterialAcceptedAnswers,
   updateMaterialAsset,
   type AdminUserProfile,
   type AppUserProfile,
@@ -41,6 +42,8 @@ import {
   type CourseLesson,
   type CourseLessonInput,
   type LessonMaterial,
+  type LessonMaterialAnswerSuggestions,
+  type LessonMaterialAnswerSuggestionsInput,
   type LessonMaterialAsset,
   type LessonMaterialAssetUpdateInput,
   type LessonMaterialDraft,
@@ -699,6 +702,24 @@ export function useAppController(): AppShellProps {
     }
   }
 
+  async function suggestAcceptedAnswersForMaterial(
+    materialId: string,
+    input: LessonMaterialAnswerSuggestionsInput,
+  ): Promise<LessonMaterialAnswerSuggestions | null> {
+    setMaterialLoading(true);
+    setMaterialMessage(null);
+    try {
+      const suggestions = await suggestMaterialAcceptedAnswers(materialId, input);
+      setMaterialMessage(t("materials.messages.answerSuggestionsReady"));
+      return suggestions;
+    } catch (caught) {
+      setMaterialMessage(applySessionError(caught, t("materials.messages.answerSuggestionsFailed")));
+      return null;
+    } finally {
+      setMaterialLoading(false);
+    }
+  }
+
   async function updateMaterialAssetMetadata(
     materialId: string,
     assetId: string,
@@ -973,6 +994,7 @@ export function useAppController(): AppShellProps {
     setWorkspaceTab,
     status,
     studentUsers,
+    suggestAcceptedAnswersForMaterial,
     updateMaterialAssetMetadata,
     upsertMaterial,
     workspaceTab,

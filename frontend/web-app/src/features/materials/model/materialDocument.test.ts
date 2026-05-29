@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanMaterialBlock,
+  FILL_GAP_MARKER,
+  materialAcceptedAnswersWithCandidate,
   materialBlockFromJson,
   materialExerciseItemKey,
   materialItemAnswerMatches,
+  materialPromptWithGapMarker,
   parseExerciseItems,
   formatExerciseItems,
+  splitFillGapPrompt,
 } from "./materialDocument";
 import type { MaterialEditorBlock } from "./types";
 
@@ -69,5 +73,19 @@ describe("material document accepted answers", () => {
       weight: 2,
     });
     expect(formatExerciseItems(parsed, "fillGaps")).toBe("I enjoy ___ books. | reading | reading stories, reading novels | 2");
+  });
+
+  it("uses a visible blank marker while keeping legacy underscore prompts readable", () => {
+    expect(FILL_GAP_MARKER).toBe("␣");
+    expect(materialPromptWithGapMarker("I am")).toBe("I am ␣ ");
+    expect(materialPromptWithGapMarker("I am ___ ready")).toBe("I am ___ ready");
+    expect(splitFillGapPrompt("I am ␣ ready")).toEqual({ before: "I am", after: "ready" });
+    expect(splitFillGapPrompt("I am ___ ready")).toEqual({ before: "I am", after: "ready" });
+  });
+
+  it("adds manual and AI accepted answers as unique variants excluding the primary answer", () => {
+    expect(materialAcceptedAnswersWithCandidate(["going out"], "going", "going alone")).toEqual(["going out", "going alone"]);
+    expect(materialAcceptedAnswersWithCandidate(["going out"], "going", "Going out")).toEqual(["going out"]);
+    expect(materialAcceptedAnswersWithCandidate(["going out"], "going", " going ")).toEqual(["going out"]);
   });
 });

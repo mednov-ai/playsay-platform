@@ -4,6 +4,8 @@ import { parseOptionalNumber } from "../../../shared/utils/number";
 import { i18n, supportedLanguages } from "../../../shared/i18n";
 import type { MaterialBlockType, MaterialEditorBlock } from "./types";
 
+export const FILL_GAP_MARKER = "␣";
+
 export function uniqueMaterialOptions(options: string[]): string[] {
   const seen = new Set<string>();
   return options.filter((option) => {
@@ -35,6 +37,40 @@ export function normalizeMaterialTag(value: string): string {
 
 export function normalizeMaterialAnswer(value: string | undefined): string {
   return value?.trim().replace(/\s+/g, " ").toLowerCase() ?? "";
+}
+
+export function materialAcceptedAnswersWithCandidate(
+  acceptedAnswers: string[],
+  primaryAnswer: string | undefined,
+  candidate: string,
+): string[] {
+  const normalizedPrimary = normalizeMaterialAnswer(primaryAnswer);
+  return uniqueMaterialOptions([...acceptedAnswers, candidate])
+    .filter((answer) => normalizeMaterialAnswer(answer) !== normalizedPrimary);
+}
+
+export function materialPromptHasGapMarker(prompt: string): boolean {
+  return /(?:␣|___|__|…|\.\.\.)/.test(prompt);
+}
+
+export function materialPromptWithGapMarker(prompt: string): string {
+  if (materialPromptHasGapMarker(prompt)) {
+    return prompt;
+  }
+  const cleanPrompt = prompt.trimEnd();
+  return cleanPrompt ? `${cleanPrompt} ${FILL_GAP_MARKER} ` : `${FILL_GAP_MARKER} `;
+}
+
+export function splitFillGapPrompt(prompt: string): { before: string; after: string } {
+  const match = prompt.match(/^(.*?)(␣|___|__|…|\.\.\.)(.*)$/);
+  if (!match) {
+    return { before: prompt, after: "" };
+  }
+
+  return {
+    before: match[1].trimEnd(),
+    after: match[3].trimStart(),
+  };
 }
 
 export function materialNormalizationTerms(key: "articleContext" | "imageTarget" | "noArticle" | "textTarget"): string[] {

@@ -355,6 +355,22 @@ function ExerciseItemsEditor({
     });
   }
 
+  function suggestBlockAnswers() {
+    onSuggestAcceptedAnswers?.(block.id, items.map((item, index) => materialExerciseItemKey(item, index)));
+  }
+
+  function suggestSentenceAnswers(index: number) {
+    const threadRootItemId = materialItemThreadRootId(items[index], index);
+    const threadItemIds = items
+      .map((item, itemIndex) => ({
+        itemId: materialExerciseItemKey(item, itemIndex),
+        threadRootItemId: materialItemThreadRootId(item, itemIndex),
+      }))
+      .filter((item) => item.threadRootItemId === threadRootItemId)
+      .map((item) => item.itemId);
+    onSuggestAcceptedAnswers?.(block.id, threadItemIds.length ? threadItemIds : [materialExerciseItemKey(items[index], index)]);
+  }
+
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap items-center justify-between gap-1.5">
@@ -365,7 +381,7 @@ function ExerciseItemsEditor({
           <Button
             className="h-8 px-2 text-xs"
             disabled={disabled || !canSuggest}
-            onClick={() => onSuggestAcceptedAnswers?.(block.id, items.map((item, index) => materialExerciseItemKey(item, index)))}
+            onClick={suggestBlockAnswers}
             title={!canSuggestAcceptedAnswers ? t("materials.blockEditor.suggestAnswersSaveRequired") : undefined}
             type="button"
             variant="outline"
@@ -464,14 +480,30 @@ function ExerciseItemsEditor({
               </Button>
             </div>
           </div>
-          <FormField label={t("materials.blockEditor.acceptedAnswers")}>
+          <div className="grid gap-1">
+            <div className="flex items-center justify-between gap-2 text-xs font-extrabold text-muted-foreground">
+              <span>{t("materials.blockEditor.acceptedAnswers")}</span>
+              {block.type === "fillGaps" ? (
+                <Button
+                  aria-label={t("materials.blockEditor.suggestSentenceAnswers")}
+                  className="h-7 w-7 px-0"
+                  disabled={disabled || !canSuggest}
+                  onClick={() => suggestSentenceAnswers(index)}
+                  title={!canSuggestAcceptedAnswers ? t("materials.blockEditor.suggestAnswersSaveRequired") : t("materials.blockEditor.suggestSentenceAnswers")}
+                  type="button"
+                  variant="outline"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
+            </div>
             <AcceptedAnswersField
               acceptedAnswers={item.acceptedAnswers ?? []}
               disabled={disabled}
               onChange={(acceptedAnswers) => updateItem(index, { acceptedAnswers })}
               primaryAnswer={item.answer}
             />
-          </FormField>
+          </div>
           {item.aiSuggestedAnswers?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {item.aiSuggestedAnswers.map((suggestion) => (

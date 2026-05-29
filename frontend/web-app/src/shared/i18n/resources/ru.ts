@@ -308,6 +308,7 @@ export const ru = {
       drawingHeight: "Высота области",
       exerciseItems: "Ответы",
       suggestAnswers: "AI-варианты",
+      suggestSentenceAnswers: "AI-варианты для этого предложения",
       suggestAnswersSaveRequired: "Сначала сохраните материал",
       addItem: "Добавить строку",
       addGapItem: "Новое предложение",

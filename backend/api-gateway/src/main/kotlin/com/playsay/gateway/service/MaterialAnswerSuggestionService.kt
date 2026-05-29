@@ -20,6 +20,8 @@ data class MaterialAnswerSuggestionInput(
     val blockType: String,
     val itemId: String,
     val prompt: String,
+    val itemContextPrompt: String = prompt,
+    val blockContextPrompt: String = prompt,
     val answer: String?,
     val acceptedAnswers: List<String>,
     val options: List<String>,
@@ -46,8 +48,8 @@ class StubMaterialAnswerSuggestionProvider {
         val answer = input.answer?.trim()?.takeIf { value -> value.isNotEmpty() } ?: return emptyList()
         val candidates = buildList {
             addAll(pronounAnswerVariants(answer))
-            addAll(gerundAnswerVariants(answer, input.prompt))
-            addAll(shortAnswerVariants(answer, input.blockTitle, input.prompt))
+            addAll(gerundAnswerVariants(answer, input.itemContextPrompt.ifBlank { input.prompt }))
+            addAll(shortAnswerVariants(answer, input.blockTitle, input.itemContextPrompt.ifBlank { input.prompt }))
         }
         return candidates
             .map { candidate -> candidate.trim().replace(Regex("\\s+"), " ") }
@@ -189,12 +191,16 @@ private fun materialAnswerSuggestionUserPrompt(input: MaterialAnswerSuggestionIn
     Block: ${input.blockTitle} (${input.blockType})
     Item id: ${input.itemId}
     Prompt: ${input.prompt}
+    Sentence/thread context: ${input.itemContextPrompt.ifBlank { input.prompt }}
+    Block context: ${input.blockContextPrompt.ifBlank { input.prompt }}
     Primary answer: ${input.answer ?: ""}
     Already accepted answers: ${input.acceptedAnswers.joinToString(", ")}
     Visible options: ${input.options.joinToString(", ")}
 
     Requirements:
     - Return only variants that should be accepted as correct for the same grammar meaning.
+    - Treat continuation cards in the sentence/thread context as one connected sentence.
+    - Use the full block context to disambiguate topic, references, grammar pattern, and tricky English cases.
     - Do not return the primary answer or already accepted answers.
     - Do not invent answers that change the grammar target.
     - Keep variants short and teacher-review friendly.

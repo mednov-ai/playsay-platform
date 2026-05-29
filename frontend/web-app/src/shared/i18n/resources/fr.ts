@@ -298,6 +298,7 @@ export const fr = {
       drawingHeight: "Hauteur de la zone",
       exerciseItems: "Réponses",
       suggestAnswers: "Variantes AI",
+      suggestSentenceAnswers: "Variantes AI pour cette phrase",
       suggestAnswersSaveRequired: "Enregistrez d'abord le support",
       addItem: "Ajouter une ligne",
       addGapItem: "Nouvelle phrase",

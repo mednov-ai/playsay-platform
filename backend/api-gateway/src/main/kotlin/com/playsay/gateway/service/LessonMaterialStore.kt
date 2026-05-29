@@ -668,20 +668,17 @@ class LessonMaterialStore(
         val document = objectMapper.readTree(material.document)
         val block = findMaterialBlock(document, blockId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        val items = block.get("items") as? ArrayNode
+        val itemContexts = materialAnswerItemContexts(block)
+            .takeIf { items -> items.isNotEmpty() }
             ?: throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Selected block does not contain answer items.")
-        val suggestions = items.mapIndexedNotNull { index, item ->
-            val itemId = item.materialItemKey(index)
-            if (requestedItemIds.isNotEmpty() && itemId !in requestedItemIds) {
-                return@mapIndexedNotNull null
+        val suggestions = itemContexts.mapNotNull { item ->
+            if (requestedItemIds.isNotEmpty() && item.itemId !in requestedItemIds) {
+                return@mapNotNull null
             }
-            val prompt = item.get("prompt")?.asText()?.trim().orEmpty()
-            val answer = item.get("answer")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                ?: item.get("correct")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
             MaterialAnswerSuggestionItem(
-                itemId = itemId,
-                prompt = prompt,
-                answer = answer,
+                itemId = item.itemId,
+                prompt = item.prompt,
+                answer = item.answer,
                 suggestions = materialAnswerSuggestionService.suggest(
                     MaterialAnswerSuggestionInput(
                         materialTitle = material.title,
@@ -689,13 +686,13 @@ class LessonMaterialStore(
                         cefrLevel = material.cefrLevel,
                         blockTitle = block.get("title")?.asText()?.trim().orEmpty(),
                         blockType = block.get("type")?.asText()?.trim().orEmpty(),
-                        itemId = itemId,
-                        prompt = prompt,
-                        answer = answer,
-                        acceptedAnswers = item.acceptedAnswers(),
-                        options = (item.get("options") as? ArrayNode)?.mapNotNull { option ->
-                            option.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                        } ?: emptyList(),
+                        itemId = item.itemId,
+                        prompt = item.prompt,
+                        itemContextPrompt = item.itemContextPrompt,
+                        blockContextPrompt = item.blockContextPrompt,
+                        answer = item.answer,
+                        acceptedAnswers = item.acceptedAnswers,
+                        options = item.options,
                     ),
                 ),
             )
@@ -1285,6 +1282,77 @@ private fun JsonNode.materialItemKey(index: Int): String {
     val prompt = get("prompt")?.asText()?.trim().orEmpty()
     return "$prompt-$index"
 }
+
+internal data class MaterialAnswerItemContext(
+    val itemId: String,
+    val prompt: String,
+    val answer: String?,
+    val acceptedAnswers: List<String>,
+    val options: List<String>,
+    val itemContextPrompt: String,
+    val blockContextPrompt: String,
+)
+
+internal fun materialAnswerItemContexts(block: ObjectNode): List<MaterialAnswerItemContext> {
+    val items = block.get("items") as? ArrayNode ?: return emptyList()
+    val rawItems = items.mapIndexed { index, item ->
+        RawMaterialAnswerItemContext(
+            itemId = item.materialItemKey(index),
+            threadRootItemId = item.get("threadRootItemId")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() },
+            prompt = item.get("prompt")?.asText()?.trim().orEmpty(),
+            answer = item.get("answer")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+                ?: item.get("correct")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() },
+            acceptedAnswers = item.acceptedAnswers(),
+            options = ((item.get("options") ?: item.get("choices")) as? ArrayNode)?.mapNotNull { option ->
+                option.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+            } ?: emptyList(),
+        )
+    }
+    val itemIds = rawItems.map { item -> item.itemId }.toSet()
+    val rows = rawItems.map { item ->
+        item.copy(
+            threadRootItemId = item.threadRootItemId
+                ?.takeIf { rootItemId -> rootItemId != item.itemId && rootItemId in itemIds },
+        )
+    }
+    val blockContextPrompt = rows
+        .filter { item -> item.prompt.isNotBlank() || item.answer != null }
+        .joinToString("\n") { item ->
+            val prefix = if (item.threadRootItemId == null) "- " else "  continuation: "
+            val answer = item.answer?.let { value -> " [answer: ${materialAnswerContextText(value)}]" }.orEmpty()
+            "$prefix${materialAnswerContextText(item.prompt)}$answer".trim()
+        }
+
+    return rows.map { item ->
+        val threadRootItemId = item.threadRootItemId ?: item.itemId
+        val threadPrompt = rows
+            .filter { candidate -> candidate.itemId == threadRootItemId || candidate.threadRootItemId == threadRootItemId }
+            .map { candidate -> materialAnswerContextText(candidate.prompt) }
+            .filter { prompt -> prompt.isNotBlank() }
+            .joinToString(" ")
+        MaterialAnswerItemContext(
+            itemId = item.itemId,
+            prompt = item.prompt,
+            answer = item.answer,
+            acceptedAnswers = item.acceptedAnswers,
+            options = item.options,
+            itemContextPrompt = threadPrompt.ifBlank { materialAnswerContextText(item.prompt) },
+            blockContextPrompt = blockContextPrompt.ifBlank { materialAnswerContextText(item.prompt) },
+        )
+    }
+}
+
+private data class RawMaterialAnswerItemContext(
+    val itemId: String,
+    val threadRootItemId: String?,
+    val prompt: String,
+    val answer: String?,
+    val acceptedAnswers: List<String>,
+    val options: List<String>,
+)
+
+private fun materialAnswerContextText(value: String): String =
+    value.trim().replace(Regex("\\s+"), " ")
 
 private fun findMaterialBlock(document: JsonNode, blockId: String): ObjectNode? {
     val pages = document.get("pages") as? ArrayNode ?: return null

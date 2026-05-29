@@ -298,6 +298,7 @@ export const de = {
       drawingHeight: "Feldhöhe",
       exerciseItems: "Antworten",
       suggestAnswers: "AI-Varianten",
+      suggestSentenceAnswers: "AI-Varianten für diesen Satz",
       suggestAnswersSaveRequired: "Material zuerst speichern",
       addItem: "Zeile hinzufügen",
       addGapItem: "Neuer Satz",

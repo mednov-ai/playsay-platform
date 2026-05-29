@@ -298,6 +298,7 @@ export const en = {
       drawingHeight: "Canvas height",
       exerciseItems: "Answers",
       suggestAnswers: "AI variants",
+      suggestSentenceAnswers: "AI variants for this sentence",
       suggestAnswersSaveRequired: "Save the material first",
       addItem: "Add row",
       addGapItem: "New sentence",

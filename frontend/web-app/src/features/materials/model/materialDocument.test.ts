@@ -176,6 +176,28 @@ describe("material document accepted answers", () => {
     expect(materialAnswerStatus(item, "to", [], [], undefined, false, "bank-to-1").kind).toBe("wrong");
   });
 
+  it("keeps failed word bank attempts visible after the wrong token returns to the bank", () => {
+    const item = {
+      id: "item-arrive",
+      prompt: "I am going ␣ the airport.",
+      answer: "to",
+      answerOptionId: "bank-to-2",
+      gapMode: "wordBank" as const,
+    };
+
+    const status = materialAnswerStatus(
+      item,
+      "",
+      [{ at: "2026-05-30T00:00:00.000Z", value: "to", optionId: "bank-to-1", correct: false }],
+      [],
+      undefined,
+      false,
+    );
+
+    expect(status.kind).toBe("wrong");
+    expect(status.incorrectAttempts).toBe(1);
+  });
+
   it("tracks used word bank option ids separately from displayed duplicate words", () => {
     const answerBlock = {
       items: {

@@ -253,15 +253,15 @@ export function RenderedFillGapExercise({
                     </button>
                   </span>
                   <MaterialAttemptBar status={status} />
+                  <MaterialAnswerTools
+                    canRequestHint={canRequestHint}
+                    onHint={() => requestHint(itemKey, item)}
+                    status={status}
+                  />
                 </span>
               )}
               {prompt.after ? <MarkdownInline value={prompt.after} /> : null}
             </label>
-            <MaterialAnswerTools
-              canRequestHint={canRequestHint}
-              onHint={() => requestHint(itemKey, item)}
-              status={status}
-            />
           </div>
         );
       })}

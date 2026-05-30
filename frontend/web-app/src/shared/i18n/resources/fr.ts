@@ -396,6 +396,7 @@ export const fr = {
       pictureAria: "image {{index}}",
       loadingImage: "Chargement de l'image",
       gapNumber: "Trou {{number}}",
+      choiceNumber: "Choix {{number}}",
       wordBankLabel: "Banque de mots",
       wordBankOptionUsed: "{{value}} est déjà utilisé",
       wordBankOptionTitle: "Choisir {{value}}",

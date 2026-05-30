@@ -138,11 +138,14 @@ export function materialAnswerStatus(
     maxAttempts,
   };
 
-  if (!cleanValue) {
-    return { ...baseStatus, kind: "empty", label: i18n.t("materials.answerStatus.empty") };
-  }
   if (locked) {
     return { ...baseStatus, kind: "locked", label: i18n.t("materials.answerStatus.locked"), locked: true };
+  }
+  if (!cleanValue) {
+    if (incorrectAttempts > 0) {
+      return { ...baseStatus, kind: "wrong", label: i18n.t("materials.answerStatus.wrong", { count: incorrectAttempts }) };
+    }
+    return { ...baseStatus, kind: "empty", label: i18n.t("materials.answerStatus.empty") };
   }
   if (requiresExplicitCheck && !currentValueChecked) {
     return { ...baseStatus, kind: "draft", label: i18n.t("materials.answerStatus.check") };

@@ -112,7 +112,7 @@ export function RenderedChoiceExercise({
               {options.length > 0 ? (
                 <span className="playsay-inline-answer-wrap">
                   <select
-                    aria-label={`choice ${index + 1}`}
+                    aria-label={t("materials.renderer.choiceNumber", { number: index + 1 })}
                     className="playsay-inline-select"
                     data-status={status.kind}
                     disabled={status.locked || status.correct}
@@ -135,7 +135,7 @@ export function RenderedChoiceExercise({
                 <span className="playsay-inline-answer-wrap">
                   <span className="playsay-inline-answer" data-status={status.kind}>
                     <input
-                      aria-label={`choice ${index + 1}`}
+                      aria-label={t("materials.renderer.choiceNumber", { number: index + 1 })}
                       className="playsay-inline-input"
                       disabled={status.locked || status.correct}
                       onChange={(event) => updateItemValue(itemKey, event.target.value)}
@@ -156,14 +156,14 @@ export function RenderedChoiceExercise({
                     </button>
                   </span>
                   <MaterialAttemptBar status={status} />
+                  <MaterialAnswerTools
+                    canRequestHint={canRequestHint}
+                    onHint={() => requestHint(itemKey, item)}
+                    status={status}
+                  />
                 </span>
               )}
             </label>
-            <MaterialAnswerTools
-              canRequestHint={canRequestHint}
-              onHint={() => requestHint(itemKey, item)}
-              status={status}
-            />
           </div>
         );
       })}

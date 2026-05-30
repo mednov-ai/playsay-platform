@@ -408,6 +408,7 @@ export const ru = {
       pictureAria: "picture {{index}}",
       loadingImage: "Загружаем картинку",
       gapNumber: "Пропуск {{number}}",
+      choiceNumber: "Выбор {{number}}",
       wordBankLabel: "Облако вариантов",
       wordBankOptionUsed: "{{value}} уже использовано",
       wordBankOptionTitle: "Выбрать {{value}}",

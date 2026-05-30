@@ -3,9 +3,13 @@ import {
   cleanMaterialBlock,
   FILL_GAP_MARKER,
   materialAcceptedAnswersWithCandidate,
+  materialAnswerOptionIds,
+  materialAnswerStatus,
+  appendMaterialAttempt,
   materialBlockFromJson,
   materialExerciseItemKey,
   materialItemAnswerMatches,
+  materialWordBankUsedOptionIds,
   materialPromptWithInsertedGapMarker,
   materialPromptWithGapMarker,
   parseExerciseItems,
@@ -78,6 +82,60 @@ describe("material document accepted answers", () => {
     });
   });
 
+  it("keeps universal fill gap mode and shared word bank options through serde", () => {
+    const block = materialBlockFromJson({
+      id: "gaps",
+      type: "fillGaps",
+      title: "Airport prepositions",
+      wordBankOptions: [
+        { id: "bank-to-1", value: "to" },
+        { id: "bank-to-2", value: "to" },
+        { id: "bank-at", value: "at" },
+      ],
+      items: [
+        {
+          id: "item-arrive",
+          prompt: "I am going ␣ the airport.",
+          answer: "to",
+          answerOptionId: "bank-to-1",
+          gapMode: "wordBank",
+        },
+        {
+          id: "item-wait",
+          prompt: "I am waiting ␣ gate 4.",
+          answer: "at",
+          gapMode: "singleChoice",
+          options: ["in", "at", "on"],
+        },
+      ],
+    });
+
+    expect(block?.wordBankOptions).toEqual([
+      { id: "bank-to-1", value: "to" },
+      { id: "bank-to-2", value: "to" },
+      { id: "bank-at", value: "at" },
+    ]);
+    expect(block?.items?.[0]).toMatchObject({
+      answerOptionId: "bank-to-1",
+      gapMode: "wordBank",
+    });
+    expect(block?.items?.[1]).toMatchObject({
+      gapMode: "singleChoice",
+      options: ["in", "at", "on"],
+    });
+
+    const clean = cleanMaterialBlock(block as MaterialEditorBlock);
+    expect(clean.wordBankOptions).toEqual([
+      { id: "bank-to-1", value: "to" },
+      { id: "bank-to-2", value: "to" },
+      { id: "bank-at", value: "at" },
+    ]);
+    expect(clean.items?.[0]).toMatchObject({
+      answerOptionId: "bank-to-1",
+      gapMode: "wordBank",
+    });
+  });
+
   it("matches primary and accepted answers with the same normalization", () => {
     const item = {
       id: "item-about",
@@ -89,6 +147,62 @@ describe("material document accepted answers", () => {
     expect(materialItemAnswerMatches(item, "about it")).toBe(true);
     expect(materialItemAnswerMatches(item, "About that")).toBe(true);
     expect(materialItemAnswerMatches(item, "about them")).toBe(false);
+  });
+
+  it("matches word bank answers by option id so duplicate words remain distinct", () => {
+    const item = {
+      id: "item-arrive",
+      prompt: "I am going ␣ the airport.",
+      answer: "to",
+      answerOptionId: "bank-to-2",
+      gapMode: "wordBank" as const,
+    };
+
+    expect(materialItemAnswerMatches(item, "to", "bank-to-2")).toBe(true);
+    expect(materialItemAnswerMatches(item, "to", "bank-to-1")).toBe(false);
+    expect(materialItemAnswerMatches(item, "to")).toBe(false);
+  });
+
+  it("marks word bank answers correct only when the assigned option id matches", () => {
+    const item = {
+      id: "item-arrive",
+      prompt: "I am going ␣ the airport.",
+      answer: "to",
+      answerOptionId: "bank-to-2",
+      gapMode: "wordBank" as const,
+    };
+
+    expect(materialAnswerStatus(item, "to", [], [], undefined, false, "bank-to-2").kind).toBe("correct");
+    expect(materialAnswerStatus(item, "to", [], [], undefined, false, "bank-to-1").kind).toBe("wrong");
+  });
+
+  it("tracks used word bank option ids separately from displayed duplicate words", () => {
+    const answerBlock = {
+      items: {
+        "item-arrive": "to",
+        "item-go": "to",
+      },
+      optionIds: {
+        "item-arrive": "bank-to-1",
+        "item-go": "bank-to-2",
+      },
+    };
+
+    expect(materialAnswerOptionIds(answerBlock)).toEqual({
+      "item-arrive": "bank-to-1",
+      "item-go": "bank-to-2",
+    });
+    expect(materialWordBankUsedOptionIds(answerBlock)).toEqual(new Set(["bank-to-1", "bank-to-2"]));
+  });
+
+  it("keeps duplicate word bank attempts separate by option id", () => {
+    const afterWrong = appendMaterialAttempt({}, "item-arrive", "to", false, "bank-to-1");
+    const afterCorrect = appendMaterialAttempt(afterWrong, "item-arrive", "to", true, "bank-to-2");
+
+    expect(afterCorrect["item-arrive"]).toMatchObject([
+      { value: "to", correct: false, optionId: "bank-to-1" },
+      { value: "to", correct: true, optionId: "bank-to-2" },
+    ]);
   });
 
   it("uses stable item id as the answer key when available", () => {

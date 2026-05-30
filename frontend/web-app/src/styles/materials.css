@@ -733,7 +733,8 @@
 }
 
 .playsay-inline-answer-wrap > .playsay-inline-select,
-.playsay-inline-answer-wrap > .playsay-inline-answer {
+.playsay-inline-answer-wrap > .playsay-inline-answer,
+.playsay-inline-answer-wrap > .playsay-word-bank-drop {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -868,6 +869,63 @@
 .playsay-inline-input:focus {
   border-color: hsl(var(--primary));
   box-shadow: 0 0 0 3px rgb(255 92 0 / 0.14);
+}
+
+.playsay-word-bank {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: #fff7f1;
+  padding: 0.45rem;
+}
+
+.playsay-word-bank-chip,
+.playsay-word-bank-drop {
+  display: inline-flex;
+  min-height: 2.15rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 92 0 / 0.24);
+  border-radius: 999px;
+  background: #ffffff;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 0.35rem 0.7rem;
+  white-space: nowrap;
+}
+
+.playsay-word-bank-chip[data-selected="true"] {
+  border-color: hsl(var(--primary));
+  background: #ff5c00;
+  color: #ffffff;
+}
+
+.playsay-word-bank-chip:disabled {
+  cursor: default;
+  opacity: 0.42;
+  text-decoration: line-through;
+}
+
+.playsay-word-bank-drop {
+  min-width: 5.75rem;
+  border-radius: 0.75rem;
+  border-style: dashed;
+  color: hsl(var(--primary));
+}
+
+.playsay-word-bank-drop[data-status="correct"],
+.playsay-word-bank-drop[data-status="hint"],
+.playsay-word-bank-drop[data-status="retry"] {
+  border-style: solid;
+  border-color: rgb(0 168 120 / 0.35);
+  background: #a6d96a;
+  color: #ffffff;
 }
 
 .playsay-student-answer {

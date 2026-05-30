@@ -36,6 +36,21 @@ export function materialAnswerMatches(answer: MaterialAnswerBlock | undefined): 
   }, {});
 }
 
+export function materialAnswerOptionIds(answer: MaterialAnswerBlock | undefined): Record<string, string> {
+  const optionIds = asJsonObject(answer?.optionIds);
+  return Object.entries(optionIds).reduce<Record<string, string>>((result, [key, value]) => {
+    const optionId = asString(value);
+    if (optionId) {
+      result[key] = optionId;
+    }
+    return result;
+  }, {});
+}
+
+export function materialWordBankUsedOptionIds(answer: MaterialAnswerBlock | undefined): Set<string> {
+  return new Set(Object.values(materialAnswerOptionIds(answer)).filter(Boolean));
+}
+
 export function materialAnswerAttempts(answer: MaterialAnswerBlock | undefined): Record<string, MaterialAttemptEntry[]> {
   const attempts = asJsonObject(answer?.attempts);
   return Object.entries(attempts).reduce<Record<string, MaterialAttemptEntry[]>>((result, [key, value]) => {
@@ -53,6 +68,7 @@ export function materialAnswerAttempts(answer: MaterialAnswerBlock | undefined):
         return {
           at: asString(object.at),
           correct: typeof object.correct === "boolean" ? object.correct : undefined,
+          optionId: asString(object.optionId) || undefined,
           value: valueText,
         };
       })
@@ -94,6 +110,36 @@ export function materialAnswerHints(answer: MaterialAnswerBlock | undefined): Re
     }
     return result;
   }, {});
+}
+
+export function appendMaterialAttempt(
+  attempts: Record<string, MaterialAttemptEntry[]>,
+  itemKey: string,
+  value: string,
+  correct: boolean,
+  optionId?: string,
+): Record<string, MaterialAttemptEntry[]> {
+  const cleanValue = value.trim();
+  if (!cleanValue) {
+    return attempts;
+  }
+  const current = attempts[itemKey] ?? [];
+  const latest = current[current.length - 1];
+  if (latest?.value === cleanValue && latest.optionId === optionId && latest.correct === correct) {
+    return attempts;
+  }
+  return {
+    ...attempts,
+    [itemKey]: [
+      ...current,
+      {
+        at: new Date().toISOString(),
+        correct,
+        optionId,
+        value: cleanValue,
+      },
+    ],
+  };
 }
 
 export function materialAnswerText(answer: MaterialAnswerBlock | undefined): string {

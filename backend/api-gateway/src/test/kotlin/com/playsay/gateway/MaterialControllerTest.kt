@@ -598,6 +598,102 @@ class MaterialControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `submission scoring keeps duplicate word bank options distinct by option id`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = materialController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "Word bank duplicates",
+                status = "PUBLISHED",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Prepositions",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "gaps",
+                              "type": "fillGaps",
+                              "title": "Complete the sentences",
+                              "wordBankOptions": [
+                                { "id": "bank-to-1", "value": "to" },
+                                { "id": "bank-to-2", "value": "to" }
+                              ],
+                              "items": [
+                                {
+                                  "id": "item-arrive",
+                                  "prompt": "I am going ___ the airport.",
+                                  "answer": "to",
+                                  "answerOptionId": "bank-to-2",
+                                  "gapMode": "wordBank"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                scoringRubric = objectMapper.readTree("""{"maxScore":10}"""),
+            ),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = material.id,
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val submission = materialController.saveScheduledLessonMaterialSubmission(
+            student,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${material.id}",
+                      "answers": {
+                        "gaps": {
+                          "type": "fillGaps",
+                          "items": {
+                            "item-arrive": "to"
+                          },
+                          "optionIds": {
+                            "item-arrive": "bank-to-1"
+                          },
+                          "attempts": {
+                            "item-arrive": [
+                              { "value": "to", "correct": false, "optionId": "bank-to-1" }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+            ),
+        )
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(assertNotNull(submission.score)))
+        assertEquals(1, submission.errorsCount)
+        val itemAssessment = submission.content["assessment"]["items"][0]
+        assertEquals("INCORRECT", itemAssessment["status"].asText())
+        assertEquals(1, itemAssessment["incorrectAttempts"].asInt())
+    }
+
+    @Test
     fun `teacher requests AI accepted answer suggestions for selected material items`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")

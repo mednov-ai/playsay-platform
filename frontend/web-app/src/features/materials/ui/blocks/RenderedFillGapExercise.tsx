@@ -1,28 +1,33 @@
-import { type CSSProperties, type KeyboardEvent } from "react";
+import { type CSSProperties, type DragEvent, type KeyboardEvent, useMemo, useState } from "react";
 import { CheckCircle2, FileText } from "lucide-react";
 import { i18n, useAppTranslation } from "../../../../shared/i18n";
 import {
   MAX_MANUAL_INPUT_HINTS,
+  appendMaterialAttempt,
   cleanMaterialAssessment,
   defaultObjectiveAssessmentPolicy,
   materialAnswerAttempts,
   materialAnswerContextForBlock,
   materialAnswerHints,
   materialAnswerItems,
+  materialAnswerOptionIds,
   materialAnswerStatus,
   materialExerciseItemKey,
+  materialFillGapMode,
   isMaterialNormalizationTerm,
   materialItemAnswerMatches,
   materialNormalizationTerms,
+  materialWordBankUsedOptionIds,
   splitFillGapPrompt,
   type MaterialAnswerBlock,
   type MaterialAnswerStatus,
-  type MaterialAttemptEntry,
   type MaterialEditorBlock,
   type MaterialExerciseItem,
   type MaterialHintEntry,
 } from "../../model/materialDocument";
 import { MarkdownInline } from "../markdown/RenderedMarkdown";
+
+export { appendMaterialAttempt } from "../../model/materialDocument";
 
 export function RenderedFillGapExercise({
   answer,
@@ -35,8 +40,13 @@ export function RenderedFillGapExercise({
 }) {
   const { t } = useAppTranslation();
   const answers = materialAnswerItems(answer);
+  const answerOptionIds = materialAnswerOptionIds(answer);
   const attempts = materialAnswerAttempts(answer);
   const hints = materialAnswerHints(answer);
+  const usedWordBankOptionIds = materialWordBankUsedOptionIds(answer);
+  const wordBankItems = (block.items ?? []).filter((item) => materialFillGapMode(item) === "wordBank");
+  const wordBankOptions = useMemo(() => materialFillGapWordBankOptions(block), [block]);
+  const [selectedWordBankOptionId, setSelectedWordBankOptionId] = useState<string | null>(null);
 
   function updateItemValue(itemKey: string, value: string) {
     onAnswerChange?.(block.id, {
@@ -45,21 +55,23 @@ export function RenderedFillGapExercise({
         ...answers,
         [itemKey]: value,
       },
+      optionIds: omitMaterialAnswerKey(answerOptionIds, itemKey),
       attempts,
       context: materialAnswerContextForBlock(block),
       hints,
     });
   }
 
-  function checkItem(itemKey: string, value = answers[itemKey] ?? "") {
+  function checkItem(itemKey: string, value = answers[itemKey] ?? "", answerOptionId = answerOptionIds[itemKey]) {
     const item = (block.items ?? []).find((candidate, index) => materialExerciseItemKey(candidate, index) === itemKey);
-    const nextAttempts = appendMaterialAttempt(attempts, itemKey, value, materialItemAnswerMatches(item, value));
+    const nextAttempts = appendMaterialAttempt(attempts, itemKey, value, materialItemAnswerMatches(item, value, answerOptionId), answerOptionId);
     onAnswerChange?.(block.id, {
       type: "fillGaps",
       items: {
         ...answers,
         [itemKey]: value,
       },
+      optionIds: answerOptionId ? { ...answerOptionIds, [itemKey]: answerOptionId } : omitMaterialAnswerKey(answerOptionIds, itemKey),
       attempts: nextAttempts,
       context: materialAnswerContextForBlock(block),
       hints,
@@ -68,7 +80,7 @@ export function RenderedFillGapExercise({
 
   function requestHint(itemKey: string, item: MaterialExerciseItem) {
     const itemHints = hints[itemKey] ?? [];
-    const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, true);
+    const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, true, answerOptionIds[itemKey]);
     if (!canRequestManualInputHint(item, itemHints, status)) {
       return;
     }
@@ -82,6 +94,40 @@ export function RenderedFillGapExercise({
     });
   }
 
+  function assignWordBankOption(itemKey: string, item: MaterialExerciseItem, optionId: string) {
+    const option = wordBankOptions.find((candidate) => candidate.id === optionId);
+    if (!option || usedWordBankOptionIds.has(option.id)) {
+      return;
+    }
+
+    const correct = materialItemAnswerMatches(item, option.value, option.id);
+    const nextAttempts = appendMaterialAttempt(attempts, itemKey, option.value, correct, option.id);
+    const nextItems = correct
+      ? { ...answers, [itemKey]: option.value }
+      : omitMaterialAnswerKey(answers, itemKey);
+    const nextOptionIds = correct
+      ? { ...answerOptionIds, [itemKey]: option.id }
+      : omitMaterialAnswerKey(answerOptionIds, itemKey);
+
+    setSelectedWordBankOptionId(null);
+    onAnswerChange?.(block.id, {
+      type: "fillGaps",
+      items: nextItems,
+      optionIds: nextOptionIds,
+      attempts: nextAttempts,
+      context: materialAnswerContextForBlock(block),
+      hints,
+    });
+  }
+
+  function handleWordBankDrop(event: DragEvent<HTMLElement>, itemKey: string, item: MaterialExerciseItem) {
+    event.preventDefault();
+    const optionId = event.dataTransfer.getData("text/plain");
+    if (optionId) {
+      assignWordBankOption(itemKey, item, optionId);
+    }
+  }
+
   function handleManualInputKeyDown(event: KeyboardEvent<HTMLInputElement>, itemKey: string) {
     if (event.key !== "Enter") {
       return;
@@ -93,25 +139,78 @@ export function RenderedFillGapExercise({
 
   return (
     <div className="playsay-fill-exercise">
+      {wordBankItems.length > 0 ? (
+        <div className="playsay-word-bank" aria-label={t("materials.renderer.wordBankLabel")}>
+          {wordBankOptions.map((option) => {
+            const used = usedWordBankOptionIds.has(option.id);
+            const selected = selectedWordBankOptionId === option.id;
+            return (
+              <button
+                aria-pressed={selected}
+                className="playsay-word-bank-chip"
+                data-selected={selected || undefined}
+                disabled={used}
+                draggable={!used}
+                key={option.id}
+                onClick={() => setSelectedWordBankOptionId(selected ? null : option.id)}
+                onDragStart={(event) => {
+                  event.dataTransfer.setData("text/plain", option.id);
+                  event.dataTransfer.effectAllowed = "move";
+                }}
+                title={used ? t("materials.renderer.wordBankOptionUsed", { value: option.value }) : t("materials.renderer.wordBankOptionTitle", { value: option.value })}
+                type="button"
+              >
+                {option.value}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       {(block.items ?? []).map((item, index) => {
         const itemKey = materialExerciseItemKey(item, index);
+        const gapMode = materialFillGapMode(item);
         const options = materialExerciseOptions(item, block);
-        const isManualInput = options.length === 0;
+        const isWordBank = gapMode === "wordBank";
+        const isManualInput = gapMode === "typed" && options.length === 0;
         const prompt = splitFillGapPrompt(item.prompt);
         const itemHints = hints[itemKey] ?? [];
-        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, isManualInput);
+        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, isManualInput, answerOptionIds[itemKey]);
         const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
         const inlineHint = isManualInput ? materialManualInputInlineHint(item, itemHints, answers[itemKey] ?? "") : "";
         const canRequestHint = isManualInput && canRequestManualInputHint(item, itemHints, status);
+        const selectedWordBankOption = selectedWordBankOptionId
+          ? wordBankOptions.find((option) => option.id === selectedWordBankOptionId)
+          : null;
 
         return (
-          <div className="playsay-answer-row" data-input-mode={isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
+          <div className="playsay-answer-row" data-input-mode={isWordBank ? "wordBank" : isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
             <label>
               {prompt.before ? <MarkdownInline value={prompt.before} /> : null}
-              {options.length > 0 ? (
+              {isWordBank ? (
+                <span className="playsay-inline-answer-wrap">
+                  <button
+                    aria-label={answers[itemKey] ? t("materials.renderer.wordBankFilledGap", { value: answers[itemKey] }) : t("materials.renderer.wordBankEmptyGap", { number: index + 1 })}
+                    className="playsay-word-bank-drop"
+                    data-status={status.kind}
+                    disabled={status.locked || status.correct}
+                    onClick={() => {
+                      if (selectedWordBankOption) {
+                        assignWordBankOption(itemKey, item, selectedWordBankOption.id);
+                      }
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => handleWordBankDrop(event, itemKey, item)}
+                    title={selectedWordBankOption ? t("materials.renderer.wordBankPlaceSelected", { value: selectedWordBankOption.value }) : t("materials.renderer.wordBankDropTitle")}
+                    type="button"
+                  >
+                    {answers[itemKey] || t("materials.renderer.wordBankGapPlaceholder")}
+                  </button>
+                  <MaterialAttemptBar status={status} />
+                </span>
+              ) : options.length > 0 ? (
                 <span className="playsay-inline-answer-wrap">
                   <select
-                    aria-label={`gap ${index + 1}`}
+                    aria-label={t("materials.renderer.gapNumber", { number: index + 1 })}
                     className="playsay-inline-select"
                     data-status={status.kind}
                     disabled={status.locked || status.correct}
@@ -124,8 +223,8 @@ export function RenderedFillGapExercise({
                     value={answers[itemKey] ?? ""}
                   >
                     <option disabled hidden value="">{t("materials.renderer.selectPlaceholder")}</option>
-                    {options.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                    {options.map((option, optionIndex) => (
+                      <option key={`${option}-${optionIndex}`} value={option}>{option}</option>
                     ))}
                   </select>
                   <MaterialAttemptBar status={status} />
@@ -134,7 +233,7 @@ export function RenderedFillGapExercise({
                 <span className="playsay-inline-answer-wrap">
                   <span className="playsay-inline-answer" data-status={status.kind}>
                     <input
-                      aria-label={`gap ${index + 1}`}
+                      aria-label={t("materials.renderer.gapNumber", { number: index + 1 })}
                       disabled={status.locked || status.correct}
                       onChange={(event) => updateItemValue(itemKey, event.target.value)}
                       onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
@@ -168,6 +267,12 @@ export function RenderedFillGapExercise({
       })}
     </div>
   );
+}
+
+function omitMaterialAnswerKey(record: Record<string, string>, key: string): Record<string, string> {
+  const next = { ...record };
+  delete next[key];
+  return next;
 }
 
 export function MaterialAnswerTools({
@@ -234,6 +339,9 @@ export function MaterialAttemptBar({ status }: { status: MaterialAnswerStatus })
 }
 
 export function materialExerciseOptions(item: MaterialExerciseItem, block: MaterialEditorBlock): string[] {
+  if (materialFillGapMode(item) === "wordBank") {
+    return [];
+  }
   const configuredOptions = uniqueMaterialOptions(item.options ?? []);
   if (configuredOptions.length > 0) {
     return configuredOptions;
@@ -251,32 +359,18 @@ export function materialExerciseOptions(item: MaterialExerciseItem, block: Mater
   return [];
 }
 
-export function appendMaterialAttempt(
-  attempts: Record<string, MaterialAttemptEntry[]>,
-  itemKey: string,
-  value: string,
-  correct: boolean,
-): Record<string, MaterialAttemptEntry[]> {
-  const cleanValue = value.trim();
-  if (!cleanValue) {
-    return attempts;
+function materialFillGapWordBankOptions(block: MaterialEditorBlock): NonNullable<MaterialEditorBlock["wordBankOptions"]> {
+  if (block.wordBankOptions?.length) {
+    return block.wordBankOptions;
   }
-  const current = attempts[itemKey] ?? [];
-  const latest = current[current.length - 1];
-  if (latest?.value === cleanValue) {
-    return attempts;
-  }
-  return {
-    ...attempts,
-    [itemKey]: [
-      ...current,
-      {
-        at: new Date().toISOString(),
-        correct,
-        value: cleanValue,
-      },
-    ],
-  };
+
+  return (block.items ?? [])
+    .filter((item) => materialFillGapMode(item) === "wordBank")
+    .map((item, index) => ({
+      id: item.answerOptionId || materialExerciseItemKey(item, index),
+      value: item.answer?.trim() ?? "",
+    }))
+    .filter((option) => option.value);
 }
 
 export function appendMaterialHint(

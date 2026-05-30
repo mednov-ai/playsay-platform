@@ -12,12 +12,15 @@ import {
   createClientId,
   FILL_GAP_MARKER,
   formatMaterialList,
+  materialFillGapMode,
   materialExerciseItemKey,
   materialPromptWithInsertedGapMarker,
   splitMaterialList,
   type MaterialAssetLibraryItem,
   type MaterialEditorBlock,
   type MaterialExerciseItem,
+  type MaterialFillGapMode,
+  type MaterialWordBankOption,
 } from "../model/materialDocument";
 import { materialBlockIcon } from "./materialBlockIcon";
 import { MatchingPairsEditor } from "./MatchingPairsEditor";
@@ -265,6 +268,8 @@ function ExerciseItemsEditor({
   const items = block.items ?? [];
   const canSuggest = Boolean(onSuggestAcceptedAnswers && canSuggestAcceptedAnswers && items.length > 0);
   const promptInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const hasWordBankItems = block.type === "fillGaps" && items.some((item) => materialFillGapMode(item) === "wordBank");
+  const wordBankOptions = block.wordBankOptions ?? [];
 
   function updateItem(index: number, patch: Partial<MaterialExerciseItem>) {
     onUpdate({
@@ -280,7 +285,7 @@ function ExerciseItemsEditor({
       prompt: "",
       answer: "",
       acceptedAnswers: [],
-      options: block.type === "multipleChoice" ? ["", "", ""] : [],
+      options: block.type === "multipleChoice" || patch.gapMode === "singleChoice" ? ["", "", ""] : [],
       ...patch,
     };
   }
@@ -307,9 +312,85 @@ function ExerciseItemsEditor({
 
         return [
           currentItem,
-          createExerciseItem({ threadRootItemId: rootItemId }),
+          createExerciseItem({
+            gapMode: block.type === "fillGaps" ? materialFillGapMode(currentItem) : undefined,
+            threadRootItemId: rootItemId,
+          }),
         ];
       }),
+    });
+  }
+
+  function setItemGapMode(index: number, gapMode: MaterialFillGapMode) {
+    const item = items[index];
+    if (!item) {
+      return;
+    }
+
+    if (gapMode === "wordBank") {
+      const matchingOption = wordBankOptions.find((option) => option.value.trim() && option.value.trim() === item.answer?.trim());
+      const createdOption = matchingOption ?? (item.answer?.trim()
+        ? { id: createClientId("bank"), value: item.answer.trim() }
+        : null);
+      onUpdate({
+        items: items.map((candidate, itemIndex) => (
+          itemIndex === index
+            ? {
+              ...candidate,
+              acceptedAnswers: [],
+              answerOptionId: createdOption?.id,
+              gapMode,
+              options: [],
+            }
+            : candidate
+        )),
+        wordBankOptions: createdOption && !matchingOption
+          ? [...wordBankOptions, createdOption]
+          : wordBankOptions,
+      });
+      return;
+    }
+
+    updateItem(index, {
+      answerOptionId: undefined,
+      gapMode: gapMode === "typed" ? undefined : gapMode,
+      options: gapMode === "singleChoice" ? (item.options?.length ? item.options : ["", "", ""]) : [],
+    });
+  }
+
+  function addWordBankOption() {
+    onUpdate({
+      wordBankOptions: [...wordBankOptions, { id: createClientId("bank"), value: "" }],
+    });
+  }
+
+  function updateWordBankOption(optionId: string, patch: Partial<MaterialWordBankOption>) {
+    const nextOptions = wordBankOptions.map((option) => (
+      option.id === optionId ? { ...option, ...patch } : option
+    ));
+    const nextOption = nextOptions.find((option) => option.id === optionId);
+    onUpdate({
+      wordBankOptions: nextOptions,
+      items: items.map((item) => (
+        item.answerOptionId === optionId ? { ...item, answer: nextOption?.value ?? item.answer } : item
+      )),
+    });
+  }
+
+  function removeWordBankOption(optionId: string) {
+    onUpdate({
+      wordBankOptions: wordBankOptions.filter((option) => option.id !== optionId),
+      items: items.map((item) => (
+        item.answerOptionId === optionId ? { ...item, answerOptionId: undefined } : item
+      )),
+    });
+  }
+
+  function setWordBankAnswer(index: number, optionId: string) {
+    const option = wordBankOptions.find((candidate) => candidate.id === optionId);
+    updateItem(index, {
+      answer: option?.value ?? "",
+      answerOptionId: option?.id,
     });
   }
 
@@ -396,8 +477,46 @@ function ExerciseItemsEditor({
         </div>
       </div>
 
+      {hasWordBankItems ? (
+        <div className="grid gap-1.5 rounded-lg border border-border bg-white p-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-extrabold uppercase text-muted-foreground">
+              {t("materials.blockEditor.wordBank")}
+            </span>
+            <Button className="h-7 px-2 text-xs" disabled={disabled} onClick={addWordBankOption} type="button" variant="outline">
+              <Plus className="h-3.5 w-3.5" />
+              {t("materials.blockEditor.addWordBankOption")}
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {wordBankOptions.map((option) => (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/20 px-2 py-1" key={option.id}>
+                <input
+                  aria-label={t("materials.blockEditor.wordBankOption")}
+                  className="w-24 border-0 bg-transparent text-sm font-bold outline-none"
+                  disabled={disabled}
+                  onChange={(event) => updateWordBankOption(option.id, { value: event.target.value })}
+                  value={option.value}
+                />
+                <button
+                  aria-label={t("materials.blockEditor.removeWordBankOption", { value: option.value || t("materials.blockEditor.emptyWordBankOption") })}
+                  className="text-muted-foreground"
+                  disabled={disabled}
+                  onClick={() => removeWordBankOption(option.id)}
+                  title={t("materials.blockEditor.removeWordBankOption", { value: option.value || t("materials.blockEditor.emptyWordBankOption") })}
+                  type="button"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {items.map((item, index) => {
         const itemKey = item.id ?? `${index}`;
+        const gapMode = block.type === "fillGaps" ? materialFillGapMode(item) : "singleChoice";
         const threadRootItemId = materialItemThreadRootId(item, index);
         const nextItem = items[index + 1];
         const nextThreadRootItemId = nextItem ? materialItemThreadRootId(nextItem, index + 1) : null;
@@ -409,7 +528,21 @@ function ExerciseItemsEditor({
           <div className={isContinuation ? "grid grid-cols-[1.5rem_minmax(0,1fr)] gap-1.5" : ""}>
             {isContinuation ? <ThreadConnector /> : null}
             <div className="grid gap-1.5 rounded-lg border border-border bg-muted/20 p-2">
-          <div className={block.type === "fillGaps" ? "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_4.5rem_2.25rem]" : "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]"}>
+          <div className={block.type === "fillGaps" ? "grid gap-2 lg:grid-cols-[7rem_minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]" : "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]"}>
+            {block.type === "fillGaps" ? (
+              <FormField label={t("materials.blockEditor.gapMode")}>
+                <select
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => setItemGapMode(index, event.target.value as MaterialFillGapMode)}
+                  value={gapMode}
+                >
+                  <option value="typed">{t("materials.blockEditor.gapModeTyped")}</option>
+                  <option value="singleChoice">{t("materials.blockEditor.gapModeSingleChoice")}</option>
+                  <option value="wordBank">{t("materials.blockEditor.gapModeWordBank")}</option>
+                </select>
+              </FormField>
+            ) : null}
             <FormField label={t("materials.blockEditor.itemPrompt")}>
               <div className="flex gap-1.5">
                 <input
@@ -437,15 +570,29 @@ function ExerciseItemsEditor({
                 ) : null}
               </div>
             </FormField>
-            <FormField label={t("materials.blockEditor.primaryAnswer")}>
-              <input
-                className="playsay-input"
-                disabled={disabled}
-                onChange={(event) => updateItem(index, { answer: event.target.value })}
-                value={item.answer ?? ""}
-              />
+            <FormField label={gapMode === "wordBank" ? t("materials.blockEditor.correctWordBankOption") : t("materials.blockEditor.primaryAnswer")}>
+              {gapMode === "wordBank" ? (
+                <select
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => setWordBankAnswer(index, event.target.value)}
+                  value={item.answerOptionId ?? ""}
+                >
+                  <option value="">{t("materials.blockEditor.selectWordBankOption")}</option>
+                  {wordBankOptions.map((option) => (
+                    <option key={option.id} value={option.id}>{option.value || t("materials.blockEditor.emptyWordBankOption")}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => updateItem(index, { answer: event.target.value })}
+                  value={item.answer ?? ""}
+                />
+              )}
             </FormField>
-            {block.type === "multipleChoice" ? (
+            {block.type === "multipleChoice" || gapMode === "singleChoice" ? (
               <FormField label={t("materials.blockEditor.options")}>
                 <input
                   className="playsay-input"
@@ -480,6 +627,7 @@ function ExerciseItemsEditor({
               </Button>
             </div>
           </div>
+          {gapMode === "typed" ? (
           <div className="grid gap-1">
             <div className="flex items-center justify-between gap-2 text-xs font-extrabold text-muted-foreground">
               <span>{t("materials.blockEditor.acceptedAnswers")}</span>
@@ -504,6 +652,7 @@ function ExerciseItemsEditor({
               primaryAnswer={item.answer}
             />
           </div>
+          ) : null}
           {item.aiSuggestedAnswers?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {item.aiSuggestedAnswers.map((suggestion) => (

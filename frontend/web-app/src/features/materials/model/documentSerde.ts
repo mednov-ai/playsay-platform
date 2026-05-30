@@ -1,6 +1,6 @@
 import type { LessonMaterial, LessonMaterialDraft, LessonMaterialInput, LessonMaterialJson } from "../../../shared/api/playsay";
 import { i18n } from "../../../shared/i18n";
-import type { MaterialAssessmentPolicy, MaterialEditorBlock, MaterialEditorDocument, MaterialEditorPage, MaterialFormState, MaterialMatchingPair, MaterialMatchingTargetKind } from "./types";
+import type { MaterialAssessmentPolicy, MaterialEditorBlock, MaterialEditorDocument, MaterialEditorPage, MaterialFillGapMode, MaterialFormState, MaterialMatchingPair, MaterialMatchingTargetKind, MaterialWordBankOption } from "./types";
 import { defaultMaterialDocument } from "./documentFactory";
 import { cleanMaterialAssessment, defaultObjectiveAssessmentPolicy } from "./scoring";
 import { asJsonObject, asNumber, asPositiveNumber, asString, createClientId, isMaterialNormalizationTerm, isObjectiveMaterialBlockType, materialBlockLabel, normalizeMaterialAnswer, normalizeMaterialBlockType, readPromptFromSourceMeta, uniqueMaterialOptions } from "./formatters";
@@ -180,6 +180,12 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
     result.items = block.items.map(materialItemFromJson).filter((item): item is NonNullable<MaterialEditorBlock["items"]>[number] => item !== null);
   }
 
+  if (Array.isArray(block.wordBankOptions)) {
+    result.wordBankOptions = block.wordBankOptions
+      .map(materialWordBankOptionFromJson)
+      .filter((option): option is MaterialWordBankOption => option !== null);
+  }
+
   if (Array.isArray(block.pairs)) {
     result.pairs = block.pairs.map(materialMatchingPairFromJson).filter((pair): pair is MaterialMatchingPair => pair !== null);
   } else if (type === "matchingPairs" && Array.isArray(block.items)) {
@@ -228,6 +234,10 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
         example: card.example?.trim() || undefined,
       }));
   }
+  const cleanWordBankOptions = cleanMaterialWordBankOptions(block.wordBankOptions ?? []);
+  if (cleanWordBankOptions.length) {
+    clean.wordBankOptions = cleanWordBankOptions;
+  }
   if (block.items?.length) {
     const items = block.items
       .filter((item) => item.prompt.trim())
@@ -237,11 +247,17 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
       }));
     const itemIds = new Set(items.map((item) => item.id));
 
+    const wordBankOptionIds = new Set(cleanWordBankOptions.map((option) => option.id));
     clean.items = items
       .map((item) => ({
         prompt: item.prompt.trim(),
         id: item.id,
         answer: item.answer?.trim() || undefined,
+        answerOptionId: normalizeMaterialFillGapMode(item.gapMode) === "wordBank" &&
+          item.answerOptionId &&
+          wordBankOptionIds.has(item.answerOptionId)
+          ? item.answerOptionId
+          : undefined,
         acceptedAnswers: uniqueMaterialOptions(item.acceptedAnswers ?? [])
           .filter((answer) => normalizeMaterialAnswer(answer) !== normalizeMaterialAnswer(item.answer))
           .map((answer) => answer.trim()),
@@ -253,6 +269,7 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
             reason: suggestion.reason.trim(),
             confidence: Math.min(1, Math.max(0, suggestion.confidence)),
           })),
+        gapMode: normalizeMaterialFillGapMode(item.gapMode) === "typed" ? undefined : normalizeMaterialFillGapMode(item.gapMode),
         options: item.options?.map((option) => option.trim()).filter(Boolean),
         threadRootItemId: item.threadRootItemId && item.threadRootItemId !== item.id && itemIds.has(item.threadRootItemId)
           ? item.threadRootItemId
@@ -282,6 +299,22 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   }
 
   return clean;
+}
+
+function cleanMaterialWordBankOptions(options: MaterialWordBankOption[]): MaterialWordBankOption[] {
+  const seenIds = new Set<string>();
+  return options
+    .map((option) => ({
+      id: option.id?.trim() || createClientId("bank"),
+      value: option.value.trim(),
+    }))
+    .filter((option) => {
+      if (!option.value || seenIds.has(option.id)) {
+        return false;
+      }
+      seenIds.add(option.id);
+      return true;
+    });
 }
 
 export function materialCardFromJson(value: unknown): NonNullable<MaterialEditorBlock["cards"]>[number] | null {
@@ -332,12 +365,33 @@ export function materialItemFromJson(value: unknown): NonNullable<MaterialEditor
     id: asString(item.id) || undefined,
     prompt,
     answer,
+    answerOptionId: asString(item.answerOptionId) || undefined,
     acceptedAnswers,
     aiSuggestedAnswers,
+    gapMode: normalizeMaterialFillGapMode(asString(item.gapMode) || asString(item.mode) || asString(item.interactionMode)),
     options: uniqueMaterialOptions([...options, ...choices]),
     threadRootItemId: asString(item.threadRootItemId) || asString(item.continuationOfItemId) || undefined,
     weight: asPositiveNumber(item.weight) ?? asPositiveNumber(asJsonObject(item.assessment).weight) ?? undefined,
   };
+}
+
+export function materialWordBankOptionFromJson(value: unknown): MaterialWordBankOption | null {
+  const option = asJsonObject(value);
+  const rawValue = asString(option.value) || asString(option.label) || asString(option.text);
+  if (!rawValue) {
+    return null;
+  }
+  return {
+    id: asString(option.id) || createClientId("bank"),
+    value: rawValue,
+  };
+}
+
+export function normalizeMaterialFillGapMode(value: string | undefined): MaterialFillGapMode {
+  if (value === "singleChoice" || value === "wordBank") {
+    return value;
+  }
+  return "typed";
 }
 
 export function materialAssessmentFromJson(value: unknown): MaterialAssessmentPolicy | undefined {

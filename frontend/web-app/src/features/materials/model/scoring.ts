@@ -4,6 +4,7 @@ import {
   materialAnswerAttempts,
   materialAnswerHints,
   materialAnswerItems,
+  materialAnswerOptionIds,
   materialAnswerMatches,
 } from "./answers";
 import { editorDocumentFromJson } from "./documentSerde";
@@ -51,7 +52,9 @@ export function materialMaxScore(rubric: LessonMaterialJson): number {
 
 export function materialAnswerContextForBlock(block: MaterialEditorBlock): LessonMaterialJson {
   const items = (block.items ?? []).map((item, index, allItems) => ({
+    answerOptionId: item.answerOptionId ?? null,
     key: materialExerciseItemKey(item, index),
+    gapMode: item.gapMode ?? null,
     prompt: item.prompt,
     previousPrompt: allItems[index - 1]?.prompt ?? null,
     nextPrompt: allItems[index + 1]?.prompt ?? null,
@@ -67,10 +70,15 @@ export function materialAnswerContextForBlock(block: MaterialEditorBlock): Lesso
     body: block.body ?? null,
     prompt: block.prompt ?? null,
     items,
+    wordBankOptions: block.wordBankOptions ?? [],
   };
 }
 
-export function materialItemAnswerMatches(item: MaterialExerciseItem | undefined, value: string): boolean {
+export function materialItemAnswerMatches(item: MaterialExerciseItem | undefined, value: string, answerOptionId?: string): boolean {
+  if (item?.gapMode === "wordBank" && item.answerOptionId) {
+    return value.trim().length > 0 && answerOptionId === item.answerOptionId;
+  }
+
   const expectedAnswers = materialAcceptedAnswersForItem(item);
   if (expectedAnswers.length === 0 || !value.trim()) {
     return false;
@@ -105,6 +113,7 @@ export function materialAnswerStatus(
   hints: MaterialHintEntry[],
   policy?: MaterialAssessmentPolicy,
   requiresExplicitCheck = false,
+  answerOptionId?: string,
 ): MaterialAnswerStatus {
   const cleanPolicy = cleanMaterialAssessment(policy ?? defaultObjectiveAssessmentPolicy());
   const cleanValue = value?.trim() ?? "";
@@ -115,9 +124,9 @@ export function materialAnswerStatus(
   const maxAttempts = cleanPolicy.maxAttempts ?? 3;
   const attemptCount = currentAttempts.length || (!requiresExplicitCheck && cleanValue ? 1 : 0);
   const incorrectAttempts = currentAttempts.filter((attempt) => (
-    attempt.correct === false || (attempt.correct !== true && !materialItemAnswerMatches(item, attempt.value))
+    attempt.correct === false || (attempt.correct !== true && !materialItemAnswerMatches(item, attempt.value, attempt.optionId))
   )).length;
-  const answerIsCorrect = materialItemAnswerMatches(item, cleanValue);
+  const answerIsCorrect = materialItemAnswerMatches(item, cleanValue, answerOptionId);
   const visibleCorrect = answerIsCorrect && checkedByPolicy;
   const locked = !visibleCorrect && cleanPolicy.lockAfterAttempts === true && incorrectAttempts >= maxAttempts;
   const baseStatus = {
@@ -161,6 +170,7 @@ export function materialLiveScore(material: LessonMaterial, answers: MaterialAns
 
       if (block.type === "fillGaps" || block.type === "multipleChoice") {
         const answerItems = materialAnswerItems(answerBlock);
+        const answerOptionIds = materialAnswerOptionIds(answerBlock);
         const attempts = materialAnswerAttempts(answerBlock);
         const hints = materialAnswerHints(answerBlock);
 
@@ -184,7 +194,7 @@ export function materialLiveScore(material: LessonMaterial, answers: MaterialAns
           }
 
           const policy = materialAssessmentForItem(block, item);
-          const correct = materialItemAnswerMatches(item, actual) && (!isManualInput || checkedManualValue);
+          const correct = materialItemAnswerMatches(item, actual, answerOptionIds[itemKey]) && (!isManualInput || checkedManualValue);
           const attemptsUsed = itemAttempts.length || (actual.trim() ? 1 : 0);
           const scoreFactor = materialLiveScoreFactor(correct, attemptsUsed, itemHints, policy);
 

@@ -487,12 +487,25 @@ class LessonMaterialStore(
         val policy = materialAssessmentPolicy(block, item)
         val validation = materialAnswerValidation(block, item)
         val override = answerTeacherOverride(answerBlock, itemKey)
-        val attempts = answerAttemptValues(answerBlock, itemKey, actual)
+        val expectedOptionId = item.get("answerOptionId")
+            ?.asText()
+            ?.trim()
+            ?.takeIf { value -> value.isNotEmpty() && item.get("gapMode")?.asText() == "wordBank" }
+        val actualOptionId = answerBlock?.get("optionIds")?.get(itemKey)?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+        val attempts = answerAttemptValues(answerBlock, itemKey, actual, actualOptionId)
         val hints = answerHints(answerBlock, itemKey, policy)
-        val actualCorrect = expectedAnswers.any { expected -> answersMatch(actual, expected, validation) }
+        val actualCorrect = if (expectedOptionId != null) {
+            !actual.isNullOrBlank() && actualOptionId == expectedOptionId
+        } else {
+            expectedAnswers.any { expected -> answersMatch(actual, expected, validation) }
+        }
         val correct = override?.correct ?: actualCorrect
         val incorrectAttempts = attempts.count { attempt ->
-            expectedAnswers.none { expected -> answersMatch(attempt, expected, validation) }
+            if (expectedOptionId != null) {
+                attempt.optionId != expectedOptionId
+            } else {
+                expectedAnswers.none { expected -> answersMatch(attempt.value, expected, validation) }
+            }
         }
         val attemptsUsed = attempts.size.takeIf { count -> count > 0 } ?: if (actual.isNullOrBlank()) 0 else 1
         val attemptFactor = if (correct) {
@@ -1111,6 +1124,11 @@ private data class UsedHint(
     val penalty: BigDecimal,
 )
 
+private data class AnswerAttempt(
+    val value: String,
+    val optionId: String?,
+)
+
 private data class TeacherOverride(
     val correct: Boolean,
     val scoreFactor: BigDecimal?,
@@ -1416,21 +1434,31 @@ private fun materialAnswerValidation(block: JsonNode, item: JsonNode): AnswerVal
     )
 }
 
-private fun answerAttemptValues(answerBlock: JsonNode?, itemKey: String, actual: String?): List<String> {
+private fun answerAttemptValues(answerBlock: JsonNode?, itemKey: String, actual: String?, actualOptionId: String? = null): List<AnswerAttempt> {
     val attemptsNode = answerBlock?.get("attempts")?.get(itemKey)
     val attempts = when {
         attemptsNode is ArrayNode -> attemptsNode.mapNotNull { node ->
-            when {
+            val value = when {
                 node.isTextual -> node.asText()
                 node.isObject -> node.get("value")?.asText()
                 else -> null
-            }?.trim()?.takeIf { value -> value.isNotEmpty() }
+            }?.trim()?.takeIf { item -> item.isNotEmpty() } ?: return@mapNotNull null
+            AnswerAttempt(
+                value = value,
+                optionId = node.takeIf { item -> item.isObject }
+                    ?.get("optionId")
+                    ?.asText()
+                    ?.trim()
+                    ?.takeIf { item -> item.isNotEmpty() },
+            )
         }
-        attemptsNode?.isTextual == true -> listOfNotNull(attemptsNode.asText().trim().takeIf { value -> value.isNotEmpty() })
+        attemptsNode?.isTextual == true -> listOfNotNull(
+            attemptsNode.asText().trim().takeIf { value -> value.isNotEmpty() }?.let { value -> AnswerAttempt(value, null) },
+        )
         else -> emptyList()
     }
     return attempts.ifEmpty {
-        listOfNotNull(actual?.trim()?.takeIf { value -> value.isNotEmpty() })
+        listOfNotNull(actual?.trim()?.takeIf { value -> value.isNotEmpty() }?.let { value -> AnswerAttempt(value, actualOptionId) })
     }
 }
 

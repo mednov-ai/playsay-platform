@@ -2,7 +2,7 @@ import type { CourseLessonMap } from "../../../entities/schedule/model";
 import type { Course, CourseLesson, LessonMaterialJson, LessonMaterialSubmission } from "../../../shared/api/playsay";
 import { parseOptionalNumber } from "../../../shared/utils/number";
 import { i18n, supportedLanguages } from "../../../shared/i18n";
-import type { MaterialBlockType, MaterialEditorBlock } from "./types";
+import type { MaterialBlockType, MaterialEditorBlock, MaterialExerciseItem, MaterialFillGapMode } from "./types";
 
 export const FILL_GAP_MARKER = "␣";
 
@@ -78,6 +78,16 @@ export function materialPromptWithInsertedGapMarker(
     prompt: nextPrompt,
     cursor: `${prefix}${FILL_GAP_MARKER}`.length,
   };
+}
+
+export function materialFillGapMode(item: MaterialExerciseItem): MaterialFillGapMode {
+  if (item.gapMode === "wordBank") {
+    return "wordBank";
+  }
+  if (item.gapMode === "singleChoice" || (item.options?.length ?? 0) > 0) {
+    return "singleChoice";
+  }
+  return "typed";
 }
 
 export function splitFillGapPrompt(prompt: string): { before: string; after: string } {

@@ -57,6 +57,7 @@ export type MaterialAssessmentPolicy = {
 export type MaterialAttemptEntry = {
   at: string;
   correct?: boolean;
+  optionId?: string;
   value: string;
 };
 
@@ -71,6 +72,13 @@ export type MaterialHintEntry = {
 export type MaterialAnswerSuggestion = {
   confidence: number;
   reason: string;
+  value: string;
+};
+
+export type MaterialFillGapMode = "typed" | "singleChoice" | "wordBank";
+
+export type MaterialWordBankOption = {
+  id: string;
   value: string;
 };
 
@@ -100,13 +108,16 @@ export type MaterialEditorBlock = {
     id?: string;
     prompt: string;
     answer?: string;
+    answerOptionId?: string;
     acceptedAnswers?: string[];
     aiSuggestedAnswers?: MaterialAnswerSuggestion[];
+    gapMode?: MaterialFillGapMode;
     options?: string[];
     threadRootItemId?: string;
     weight?: number;
   }>;
   pairs?: MaterialMatchingPair[];
+  wordBankOptions?: MaterialWordBankOption[];
   height?: number;
 };
 

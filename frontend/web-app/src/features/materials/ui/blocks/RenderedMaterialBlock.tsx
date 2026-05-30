@@ -149,6 +149,7 @@ export function RenderedMaterialBlock({
           <h4>{block.title}</h4>
           <RenderedFillGapExercise answer={answer} block={block} onAnswerChange={onAnswerChange} />
         </>,
+        "playsay-render-block playsay-render-block-fill-gaps",
       );
     case "multipleChoice":
       return blockSection(

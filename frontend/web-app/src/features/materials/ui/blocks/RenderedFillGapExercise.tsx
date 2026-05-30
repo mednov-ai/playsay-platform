@@ -172,11 +172,15 @@ export function RenderedFillGapExercise({
         const options = materialExerciseOptions(item, block);
         const isWordBank = gapMode === "wordBank";
         const isManualInput = gapMode === "typed" && options.length === 0;
+        const currentAnswer = answers[itemKey] ?? "";
         const prompt = splitFillGapPrompt(item.prompt);
         const itemHints = hints[itemKey] ?? [];
-        const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, isManualInput, answerOptionIds[itemKey]);
+        const status = materialAnswerStatus(item, currentAnswer, attempts[itemKey], itemHints, block.assessment, isManualInput, answerOptionIds[itemKey]);
         const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
-        const inlineHint = isManualInput ? materialManualInputInlineHint(item, itemHints, answers[itemKey] ?? "") : "";
+        const inlineHint = isManualInput ? materialManualInputInlineHint(item, itemHints, currentAnswer) : "";
+        const manualInputStyle = isManualInput
+          ? { "--playsay-gap-chars": materialManualInputVisualCharacters(currentAnswer, inlineHint || hintPreview) } as CSSProperties
+          : undefined;
         const canRequestHint = isManualInput && canRequestManualInputHint(item, itemHints, status);
         const selectedWordBankOption = selectedWordBankOptionId
           ? wordBankOptions.find((option) => option.id === selectedWordBankOptionId)
@@ -231,14 +235,13 @@ export function RenderedFillGapExercise({
                 </span>
               ) : (
                 <span className="playsay-inline-answer-wrap">
-                  <span className="playsay-inline-answer" data-status={status.kind}>
+                  <span className="playsay-inline-answer" data-status={status.kind} style={manualInputStyle}>
                     <input
                       aria-label={t("materials.renderer.gapNumber", { number: index + 1 })}
                       disabled={status.locked || status.correct}
                       onChange={(event) => updateItemValue(itemKey, event.target.value)}
                       onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
-                      placeholder={!answers[itemKey]?.trim() ? hintPreview || undefined : undefined}
-                      value={answers[itemKey] ?? ""}
+                      value={currentAnswer}
                     />
                     {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
                     <button
@@ -425,16 +428,16 @@ export function materialManualInputHintPreview(item: MaterialExerciseItem, hints
 export function materialManualInputInlineHint(item: MaterialExerciseItem, hints: MaterialHintEntry[], value: string): string {
   const hint = materialManualInputHintPreview(item, hints);
   const cleanValue = value.trim();
-  if (!hint || !cleanValue) {
+  if (!hint) {
     return "";
+  }
+
+  if (!cleanValue) {
+    return hint;
   }
 
   if (materialItemAnswerMatches(item, cleanValue)) {
     return "";
-  }
-
-  if (hint.toLowerCase().startsWith(cleanValue.toLowerCase()) && cleanValue.length < hint.length) {
-    return hint.slice(cleanValue.length);
   }
 
   const hintPrefix = hint.replace(/\.\.\.$/, "");
@@ -442,11 +445,22 @@ export function materialManualInputInlineHint(item: MaterialExerciseItem, hints:
     return "";
   }
 
+  if (hintPrefix.toLowerCase().startsWith(cleanValue.toLowerCase())) {
+    const suffix = hintPrefix.slice(cleanValue.length);
+    return suffix ? `${suffix}...` : "";
+  }
+
   if (normalizeMaterialAnswer(hint) === normalizeMaterialAnswer(cleanValue)) {
     return "";
   }
 
   return hint;
+}
+
+export function materialManualInputVisualCharacters(value: string, hint: string): number {
+  const valueCharacters = Array.from(value.trim()).length;
+  const hintCharacters = Array.from(hint.replace(/\.\.\.$/, "")).length;
+  return Math.min(18, Math.max(4, valueCharacters + hintCharacters + 1));
 }
 
 export function materialHintForExerciseItem(item: MaterialExerciseItem, block: MaterialEditorBlock, hintNumber: number): MaterialHintEntry {

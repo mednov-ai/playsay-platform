@@ -4,6 +4,7 @@ import {
   materialAttemptBarRedPercent,
   materialAttemptBarVisible,
   materialHintForExerciseItem,
+  materialManualInputInlineHint,
 } from "./RenderedFillGapExercise";
 
 describe("RenderedFillGapExercise hints", () => {
@@ -47,5 +48,24 @@ describe("RenderedFillGapExercise hints", () => {
       locked: false,
       maxAttempts: 3,
     })).toBeCloseTo(66.67, 1);
+  });
+
+  it("keeps the latest manual hint visible next to an empty or partial answer", () => {
+    const item: MaterialExerciseItem = {
+      id: "item-going",
+      prompt: "I don't enjoy ␣ to the cinema.",
+      answer: "going",
+    };
+    const hints = [{
+      at: "2026-05-30T00:00:00.000Z",
+      label: "Hint 2: go...",
+      penalty: 0.15,
+      type: "partialAnswer" as const,
+      value: "go...",
+    }];
+
+    expect(materialManualInputInlineHint(item, hints, "")).toBe("go...");
+    expect(materialManualInputInlineHint(item, hints, "g")).toBe("o...");
+    expect(materialManualInputInlineHint(item, hints, "go")).toBe("");
   });
 });

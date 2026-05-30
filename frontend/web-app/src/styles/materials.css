@@ -219,6 +219,13 @@
   line-height: 1.65;
 }
 
+.playsay-render-block-fill-gaps {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
 .playsay-markdown {
   display: grid;
   min-width: 0;
@@ -733,20 +740,26 @@
 }
 
 .playsay-inline-answer-wrap > .playsay-inline-select,
-.playsay-inline-answer-wrap > .playsay-inline-answer,
 .playsay-inline-answer-wrap > .playsay-word-bank-drop {
   flex: 1 1 auto;
   min-width: 0;
 }
 
+.playsay-inline-answer-wrap > .playsay-inline-answer {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .playsay-inline-answer {
   display: inline-flex;
-  width: min(15rem, 100%);
+  width: clamp(4.5rem, calc((var(--playsay-gap-chars, 8) * 0.68em) + 2.5rem), 15rem);
+  max-width: 100%;
   align-items: center;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.625rem;
-  background: #ffffff;
-  overflow: hidden;
+  border: 0;
+  border-bottom: 2px solid hsl(var(--border));
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
 }
 
 .playsay-inline-answer input,
@@ -770,31 +783,29 @@
   flex: 0 0 auto;
   max-width: 5.5rem;
   overflow: hidden;
-  border-left: 1px solid hsl(var(--border));
   color: hsl(var(--primary) / 0.72);
   font-size: 0.82rem;
   font-weight: 950;
   line-height: 1;
-  padding: 0.3rem 0.45rem 0.3rem 0.35rem;
+  padding: 0.3rem 0.2rem 0.3rem 0.05rem;
   pointer-events: none;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .playsay-inline-answer:focus-within {
-  border-color: hsl(var(--primary));
-  box-shadow: 0 0 0 3px rgb(255 92 0 / 0.14);
+  border-bottom-color: hsl(var(--primary));
 }
 
 .playsay-inline-answer[data-status="wrong"],
 .playsay-inline-answer[data-status="locked"] {
-  border-color: rgb(180 35 24 / 0.32);
+  border-bottom-color: rgb(180 35 24 / 0.66);
 }
 
 .playsay-inline-answer[data-status="correct"],
 .playsay-inline-answer[data-status="hint"],
 .playsay-inline-answer[data-status="retry"] {
-  border-color: rgb(0 168 120 / 0.3);
+  border-bottom-color: rgb(0 168 120 / 0.48);
 }
 
 .playsay-inline-select[data-status="correct"],
@@ -818,14 +829,13 @@
 
 .playsay-inline-check {
   display: inline-flex;
-  width: 2.1rem;
-  min-width: 2.1rem;
+  width: 1.75rem;
+  min-width: 1.75rem;
   min-height: 2.2rem;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-left: 1px solid hsl(var(--border));
-  background: #fff7f1;
+  background: transparent;
   color: hsl(var(--primary));
   cursor: pointer;
 }
@@ -1042,10 +1052,8 @@
 }
 
 .playsay-fill-exercise label {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
+  display: block;
+  line-height: 2.35;
 }
 
 .playsay-fill-exercise label > input {
@@ -1067,7 +1075,14 @@
 }
 
 .playsay-fill-exercise .playsay-inline-answer-wrap {
+  width: auto;
   max-width: min(15.5rem, 78vw);
+  margin-inline: 0.22rem;
+  vertical-align: middle;
+}
+
+.playsay-fill-exercise .playsay-markdown-inline {
+  vertical-align: middle;
 }
 
 .playsay-visually-hidden {
@@ -1085,9 +1100,9 @@
   grid-template-columns: minmax(0, 1fr) max-content;
   gap: 0.35rem;
   align-items: center;
-  border: 1px solid transparent;
-  border-radius: 0.625rem;
-  padding: 0.15rem 0.2rem;
+  border: 0;
+  border-radius: 0;
+  padding: 0.08rem 0;
 }
 
 .playsay-answer-row[data-input-mode="select"] {
@@ -1097,30 +1112,26 @@
 }
 
 .playsay-answer-row[data-input-mode="manual"][data-status="draft"] {
-  border-color: rgb(255 182 72 / 0.22);
-  background: rgb(255 247 241 / 0.42);
+  background: transparent;
 }
 
 .playsay-answer-row[data-input-mode="manual"][data-status="wrong"],
 .playsay-answer-row[data-input-mode="manual"][data-status="locked"] {
-  border-color: rgb(180 35 24 / 0.2);
-  background: rgb(254 243 242 / 0.65);
+  background: transparent;
 }
 
 .playsay-answer-row[data-input-mode="manual"][data-status="retry"] {
-  border-color: rgb(0 168 120 / 0.22);
-  background: rgb(223 248 238 / 0.42);
-  box-shadow: inset 0.1875rem 0 0 #f04438;
+  background: transparent;
+  box-shadow: none;
 }
 
 .playsay-answer-row[data-input-mode="manual"][data-status="hint"],
 .playsay-answer-row[data-input-mode="manual"][data-status="correct"] {
-  border-color: rgb(0 168 120 / 0.22);
-  background: rgb(223 248 238 / 0.42);
+  background: transparent;
 }
 
 .playsay-answer-row[data-input-mode="manual"][data-status="hint"] {
-  box-shadow: inset 0.1875rem 0 0 hsl(var(--primary));
+  box-shadow: none;
 }
 
 .playsay-answer-tools {

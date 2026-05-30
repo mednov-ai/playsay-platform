@@ -16,6 +16,7 @@ import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialEditorForm({
   assetLibrary,
+  canSuggestAcceptedAnswers,
   canGenerateImages,
   disabled,
   form,
@@ -33,6 +34,7 @@ export function MaterialEditorForm({
   pendingImageTargetsCount,
 }: {
   assetLibrary: MaterialAssetLibraryItem[];
+  canSuggestAcceptedAnswers: boolean;
   canGenerateImages: boolean;
   disabled: boolean;
   form: MaterialFormState;
@@ -173,6 +175,7 @@ export function MaterialEditorForm({
             <MaterialBlockEditor
               assetLibrary={assetLibrary}
               block={block}
+              canSuggestAcceptedAnswers={canSuggestAcceptedAnswers}
               currentMaterialId={form.id}
               disabled={disabled}
               index={index}

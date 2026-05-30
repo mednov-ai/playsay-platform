@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Check, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
@@ -6,13 +6,15 @@ import {
   defaultObjectiveAssessmentPolicy,
   formatFlashcards,
   isObjectiveMaterialBlockType,
+  materialAcceptedAnswersWithCandidate,
   materialBlockLabel,
   parseFlashcards,
   createClientId,
+  FILL_GAP_MARKER,
   formatMaterialList,
   materialExerciseItemKey,
+  materialPromptWithInsertedGapMarker,
   splitMaterialList,
-  uniqueMaterialOptions,
   type MaterialAssetLibraryItem,
   type MaterialEditorBlock,
   type MaterialExerciseItem,
@@ -24,6 +26,7 @@ import { useAppTranslation } from "../../../shared/i18n";
 export function MaterialBlockEditor({
   assetLibrary,
   block,
+  canSuggestAcceptedAnswers,
   currentMaterialId,
   disabled,
   index,
@@ -33,6 +36,7 @@ export function MaterialBlockEditor({
 }: {
   assetLibrary: MaterialAssetLibraryItem[];
   block: MaterialEditorBlock;
+  canSuggestAcceptedAnswers: boolean;
   currentMaterialId: string | null;
   disabled: boolean;
   index: number;
@@ -48,8 +52,8 @@ export function MaterialBlockEditor({
   }, [block.id, block.type]);
 
   return (
-    <article className="rounded-2xl border border-border bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className="rounded-xl border border-border bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-muted px-2 py-1 text-xs font-black text-muted-foreground">
@@ -61,22 +65,22 @@ export function MaterialBlockEditor({
             </span>
           </div>
           <input
-            className="mt-3 w-full border-0 bg-transparent p-0 text-lg font-black outline-none"
+            className="mt-2 w-full border-0 bg-transparent p-0 text-base font-black outline-none"
             disabled={disabled}
             maxLength={160}
             onChange={(event) => onUpdate({ title: event.target.value })}
             value={block.title}
           />
         </div>
-        <Button disabled={disabled} onClick={onRemove} type="button" variant="outline">
+        <Button className="h-8 px-2 text-xs" disabled={disabled} onClick={onRemove} type="button" variant="outline">
           <Trash2 className="h-4 w-4" />
           {t("materials.actions.delete")}
         </Button>
       </div>
 
-      <div className="mt-3 grid gap-3">
+      <div className="mt-2 grid gap-2">
         {block.type === "videoEmbed" ? (
-          <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
+          <div className="grid gap-2 sm:grid-cols-[8rem_1fr]">
             <FormField label={t("materials.blockEditor.platform")}>
               <select
                 className="playsay-input"
@@ -102,7 +106,7 @@ export function MaterialBlockEditor({
         ) : null}
 
         {block.type === "image" || block.type === "generatedImage" ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             <FormField label={block.type === "generatedImage" ? t("materials.blockEditor.prompt") : t("materials.blockEditor.imageUrl")}>
               {block.type === "generatedImage" ? (
                 <textarea
@@ -149,6 +153,7 @@ export function MaterialBlockEditor({
         {block.type === "fillGaps" || block.type === "multipleChoice" ? (
           <ExerciseItemsEditor
             block={block}
+            canSuggestAcceptedAnswers={canSuggestAcceptedAnswers}
             disabled={disabled}
             onSuggestAcceptedAnswers={onSuggestAcceptedAnswers}
             onUpdate={onUpdate}
@@ -166,7 +171,7 @@ export function MaterialBlockEditor({
         ) : null}
 
         {isObjectiveMaterialBlockType(block.type) ? (
-          <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-4">
+          <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-2 sm:grid-cols-4">
             <FormField label={t("materials.blockEditor.weight")}>
               <input
                 className="playsay-input"
@@ -245,18 +250,21 @@ export function MaterialBlockEditor({
 
 function ExerciseItemsEditor({
   block,
+  canSuggestAcceptedAnswers,
   disabled,
   onSuggestAcceptedAnswers,
   onUpdate,
 }: {
   block: MaterialEditorBlock;
+  canSuggestAcceptedAnswers: boolean;
   disabled: boolean;
   onSuggestAcceptedAnswers?: (blockId: string, itemIds: string[]) => void;
   onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
 }) {
   const { t } = useAppTranslation();
   const items = block.items ?? [];
-  const canSuggest = Boolean(onSuggestAcceptedAnswers && items.length > 0);
+  const canSuggest = Boolean(onSuggestAcceptedAnswers && canSuggestAcceptedAnswers && items.length > 0);
+  const promptInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   function updateItem(index: number, patch: Partial<MaterialExerciseItem>) {
     onUpdate({
@@ -266,29 +274,74 @@ function ExerciseItemsEditor({
     });
   }
 
+  function createExerciseItem(patch: Partial<MaterialExerciseItem> = {}): MaterialExerciseItem {
+    return {
+      id: createClientId("item"),
+      prompt: "",
+      answer: "",
+      acceptedAnswers: [],
+      options: block.type === "multipleChoice" ? ["", "", ""] : [],
+      ...patch,
+    };
+  }
+
   function addItem() {
     onUpdate({
-      items: [
-        ...items,
-        {
-          id: createClientId("item"),
-          prompt: "",
-          answer: "",
-          acceptedAnswers: [],
-          options: block.type === "multipleChoice" ? ["", "", ""] : [],
-        },
-      ],
+      items: [...items, createExerciseItem()],
+    });
+  }
+
+  function insertItemAfter(index: number) {
+    const item = items[index];
+    if (!item) {
+      return;
+    }
+    const rootItemId = item.threadRootItemId ?? item.id ?? createClientId("item");
+    const currentItem = item.id ? item : { ...item, id: rootItemId };
+
+    onUpdate({
+      items: items.flatMap((candidate, itemIndex) => {
+        if (itemIndex !== index) {
+          return [candidate];
+        }
+
+        return [
+          currentItem,
+          createExerciseItem({ threadRootItemId: rootItemId }),
+        ];
+      }),
+    });
+  }
+
+  function insertGapMarker(index: number) {
+    const item = items[index];
+    if (!item) {
+      return;
+    }
+    const itemKey = item.id ?? `${index}`;
+    const input = promptInputRefs.current[itemKey];
+    const nextPrompt = materialPromptWithInsertedGapMarker(item.prompt, input?.selectionStart, input?.selectionEnd);
+    updateItem(index, { prompt: nextPrompt.prompt });
+
+    globalThis.requestAnimationFrame?.(() => {
+      const nextInput = promptInputRefs.current[itemKey];
+      nextInput?.focus();
+      nextInput?.setSelectionRange(nextPrompt.cursor, nextPrompt.cursor);
     });
   }
 
   function removeItem(index: number) {
-    onUpdate({ items: items.filter((_, itemIndex) => itemIndex !== index) });
+    const removedItemId = items[index]?.id;
+    onUpdate({
+      items: items
+        .filter((_, itemIndex) => itemIndex !== index)
+        .map((item) => (removedItemId && item.threadRootItemId === removedItemId ? { ...item, threadRootItemId: undefined } : item)),
+    });
   }
 
   function acceptSuggestion(index: number, suggestionValue: string) {
     const item = items[index];
-    const acceptedAnswers = uniqueMaterialOptions([...(item.acceptedAnswers ?? []), suggestionValue])
-      .filter((answer) => answer.trim().toLowerCase() !== item.answer?.trim().toLowerCase());
+    const acceptedAnswers = materialAcceptedAnswersWithCandidate(item.acceptedAnswers ?? [], item.answer, suggestionValue);
     updateItem(index, {
       acceptedAnswers,
       aiSuggestedAnswers: (item.aiSuggestedAnswers ?? []).filter((suggestion) => suggestion.value !== suggestionValue),
@@ -302,39 +355,87 @@ function ExerciseItemsEditor({
     });
   }
 
+  function suggestBlockAnswers() {
+    onSuggestAcceptedAnswers?.(block.id, items.map((item, index) => materialExerciseItemKey(item, index)));
+  }
+
+  function suggestSentenceAnswers(index: number) {
+    const threadRootItemId = materialItemThreadRootId(items[index], index);
+    const threadItemIds = items
+      .map((item, itemIndex) => ({
+        itemId: materialExerciseItemKey(item, itemIndex),
+        threadRootItemId: materialItemThreadRootId(item, itemIndex),
+      }))
+      .filter((item) => item.threadRootItemId === threadRootItemId)
+      .map((item) => item.itemId);
+    onSuggestAcceptedAnswers?.(block.id, threadItemIds.length ? threadItemIds : [materialExerciseItemKey(items[index], index)]);
+  }
+
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
         <div className="text-xs font-black uppercase text-muted-foreground">
           {t("materials.blockEditor.exerciseItems")}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           <Button
+            className="h-8 px-2 text-xs"
             disabled={disabled || !canSuggest}
-            onClick={() => onSuggestAcceptedAnswers?.(block.id, items.map((item, index) => materialExerciseItemKey(item, index)))}
+            onClick={suggestBlockAnswers}
+            title={!canSuggestAcceptedAnswers ? t("materials.blockEditor.suggestAnswersSaveRequired") : undefined}
             type="button"
             variant="outline"
           >
             <Sparkles className="h-4 w-4" />
             {t("materials.blockEditor.suggestAnswers")}
           </Button>
-          <Button disabled={disabled} onClick={addItem} type="button" variant="outline">
+          <Button className="h-8 px-2 text-xs" disabled={disabled} onClick={addItem} type="button" variant="outline">
             <Plus className="h-4 w-4" />
-            {t("materials.blockEditor.addItem")}
+            {block.type === "fillGaps" ? t("materials.blockEditor.addGapItem") : t("materials.blockEditor.addItem")}
           </Button>
         </div>
       </div>
 
-      {items.map((item, index) => (
-        <div className="grid gap-2 rounded-xl border border-border bg-muted/30 p-3" key={item.id ?? `${item.prompt}-${index}`}>
-          <div className="grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_5rem_auto]">
+      {items.map((item, index) => {
+        const itemKey = item.id ?? `${index}`;
+        const threadRootItemId = materialItemThreadRootId(item, index);
+        const nextItem = items[index + 1];
+        const nextThreadRootItemId = nextItem ? materialItemThreadRootId(nextItem, index + 1) : null;
+        const isContinuation = Boolean(item.threadRootItemId);
+        const hasNextInThread = Boolean(nextItem && nextThreadRootItemId === threadRootItemId);
+        const isThreadTail = !hasNextInThread;
+        return (
+        <div className="grid gap-1" key={item.id ?? `${block.id}-${index}`}>
+          <div className={isContinuation ? "grid grid-cols-[1.5rem_minmax(0,1fr)] gap-1.5" : ""}>
+            {isContinuation ? <ThreadConnector /> : null}
+            <div className="grid gap-1.5 rounded-lg border border-border bg-muted/20 p-2">
+          <div className={block.type === "fillGaps" ? "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_4.5rem_2.25rem]" : "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]"}>
             <FormField label={t("materials.blockEditor.itemPrompt")}>
-              <input
-                className="playsay-input"
-                disabled={disabled}
-                onChange={(event) => updateItem(index, { prompt: event.target.value })}
-                value={item.prompt}
-              />
+              <div className="flex gap-1.5">
+                <input
+                  className="playsay-input min-w-0 flex-1"
+                  disabled={disabled}
+                  onChange={(event) => updateItem(index, { prompt: event.target.value })}
+                  ref={(node) => {
+                    promptInputRefs.current[itemKey] = node;
+                  }}
+                  value={item.prompt}
+                />
+                {block.type === "fillGaps" ? (
+                  <Button
+                    aria-label={t("materials.blockEditor.insertGapMarkerAria", { marker: FILL_GAP_MARKER })}
+                    className="h-9 w-9 shrink-0 px-0 text-base font-black"
+                    disabled={disabled}
+                    onClick={() => insertGapMarker(index)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    title={t("materials.blockEditor.insertGapMarkerTitle", { marker: FILL_GAP_MARKER })}
+                    type="button"
+                    variant="outline"
+                  >
+                    <span aria-hidden="true">{FILL_GAP_MARKER}</span>
+                  </Button>
+                ) : null}
+              </div>
             </FormField>
             <FormField label={t("materials.blockEditor.primaryAnswer")}>
               <input
@@ -344,14 +445,16 @@ function ExerciseItemsEditor({
                 value={item.answer ?? ""}
               />
             </FormField>
-            <FormField label={t("materials.blockEditor.options")}>
-              <input
-                className="playsay-input"
-                disabled={disabled}
-                onChange={(event) => updateItem(index, { options: splitMaterialList(event.target.value).map((value) => value.trim()).filter(Boolean) })}
-                value={formatMaterialList(item.options) ?? ""}
-              />
-            </FormField>
+            {block.type === "multipleChoice" ? (
+              <FormField label={t("materials.blockEditor.options")}>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => updateItem(index, { options: splitMaterialList(event.target.value).map((value) => value.trim()).filter(Boolean) })}
+                  value={formatMaterialList(item.options) ?? ""}
+                />
+              </FormField>
+            ) : null}
             <FormField label={t("materials.blockEditor.itemWeight")}>
               <input
                 className="playsay-input"
@@ -364,34 +467,57 @@ function ExerciseItemsEditor({
               />
             </FormField>
             <div className="flex items-end">
-              <Button disabled={disabled} onClick={() => removeItem(index)} type="button" variant="outline">
+              <Button
+                aria-label={t("materials.blockEditor.removeItem")}
+                className="h-9 w-9 px-0"
+                disabled={disabled}
+                onClick={() => removeItem(index)}
+                title={t("materials.blockEditor.removeItem")}
+                type="button"
+                variant="outline"
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          <FormField label={t("materials.blockEditor.acceptedAnswers")}>
-            <input
-              className="playsay-input"
+          <div className="grid gap-1">
+            <div className="flex items-center justify-between gap-2 text-xs font-extrabold text-muted-foreground">
+              <span>{t("materials.blockEditor.acceptedAnswers")}</span>
+              {block.type === "fillGaps" ? (
+                <Button
+                  aria-label={t("materials.blockEditor.suggestSentenceAnswers")}
+                  className="h-7 w-7 px-0"
+                  disabled={disabled || !canSuggest}
+                  onClick={() => suggestSentenceAnswers(index)}
+                  title={!canSuggestAcceptedAnswers ? t("materials.blockEditor.suggestAnswersSaveRequired") : t("materials.blockEditor.suggestSentenceAnswers")}
+                  type="button"
+                  variant="outline"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
+            </div>
+            <AcceptedAnswersField
+              acceptedAnswers={item.acceptedAnswers ?? []}
               disabled={disabled}
-              onChange={(event) => updateItem(index, { acceptedAnswers: splitMaterialList(event.target.value).map((value) => value.trim()).filter(Boolean) })}
-              placeholder={t("materials.blockEditor.acceptedAnswersPlaceholder")}
-              value={formatMaterialList(item.acceptedAnswers) ?? ""}
+              onChange={(acceptedAnswers) => updateItem(index, { acceptedAnswers })}
+              primaryAnswer={item.answer}
             />
-          </FormField>
+          </div>
           {item.aiSuggestedAnswers?.length ? (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {item.aiSuggestedAnswers.map((suggestion) => (
-                <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-white px-2 py-1 text-xs font-bold text-foreground" key={suggestion.value}>
-                  {suggestion.value}
+                <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-white px-2 py-0.5 text-xs font-bold text-foreground" key={suggestion.value}>
                   <button
                     aria-label={t("materials.blockEditor.acceptSuggestion", { value: suggestion.value })}
-                    className="text-primary"
+                    className="inline-flex items-center gap-1 text-primary"
                     disabled={disabled}
                     onClick={() => acceptSuggestion(index, suggestion.value)}
-                    title={suggestion.reason}
+                    title={suggestion.reason || t("materials.blockEditor.acceptSuggestion", { value: suggestion.value })}
                     type="button"
                   >
                     <Check className="h-3.5 w-3.5" />
+                    {suggestion.value}
                   </button>
                   <button
                     aria-label={t("materials.blockEditor.rejectSuggestion", { value: suggestion.value })}
@@ -407,8 +533,119 @@ function ExerciseItemsEditor({
               ))}
             </div>
           ) : null}
+            </div>
+          </div>
+          {!isContinuation && hasNextInThread ? (
+            <span aria-hidden="true" className="ml-3 h-1.5 w-px bg-border" />
+          ) : null}
+          {block.type === "fillGaps" && isThreadTail ? (
+            <div className={isContinuation ? "grid grid-cols-[1.5rem_minmax(0,1fr)] gap-1.5" : "flex items-center gap-2 pl-2"}>
+              {isContinuation ? <ThreadConnector compact /> : <span aria-hidden="true" className="h-px w-5 bg-border" />}
+              <Button
+                aria-label={t("materials.blockEditor.continueSentenceAria")}
+                className="h-7 w-fit rounded-full px-2 text-xs"
+                disabled={disabled}
+                onClick={() => insertItemAfter(index)}
+                type="button"
+                variant="outline"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t("materials.blockEditor.continueSentence")}
+              </Button>
+            </div>
+          ) : null}
         </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function materialItemThreadRootId(item: MaterialExerciseItem, index: number): string {
+  return item.threadRootItemId ?? item.id ?? `item-${index}`;
+}
+
+function ThreadConnector({ compact = false }: { compact?: boolean }) {
+  return (
+    <span aria-hidden="true" className="relative min-h-full">
+      <span className="absolute left-3 top-0 h-full w-px bg-border" />
+      {!compact ? <span className="absolute left-3 top-5 h-px w-3 bg-border" /> : null}
+    </span>
+  );
+}
+
+function AcceptedAnswersField({
+  acceptedAnswers,
+  disabled,
+  onChange,
+  primaryAnswer,
+}: {
+  acceptedAnswers: string[];
+  disabled: boolean;
+  onChange: (acceptedAnswers: string[]) => void;
+  primaryAnswer: string | undefined;
+}) {
+  const { t } = useAppTranslation();
+  const [draft, setDraft] = useState("");
+
+  function commitDraft() {
+    const nextAcceptedAnswers = materialAcceptedAnswersWithCandidate(acceptedAnswers, primaryAnswer, draft);
+    if (nextAcceptedAnswers.length !== acceptedAnswers.length) {
+      onChange(nextAcceptedAnswers);
+    }
+    setDraft("");
+  }
+
+  function removeAcceptedAnswer(answer: string) {
+    onChange(acceptedAnswers.filter((candidate) => candidate !== answer));
+  }
+
+  function handleDraftKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    commitDraft();
+  }
+
+  return (
+    <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-border bg-white px-2 py-1">
+      {acceptedAnswers.map((answer) => (
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#fff3eb] px-2 py-0.5 text-xs font-bold text-primary" key={answer}>
+          {answer}
+          <button
+            aria-label={t("materials.blockEditor.removeAcceptedAnswer", { value: answer })}
+            className="text-primary/75"
+            disabled={disabled}
+            onClick={() => removeAcceptedAnswer(answer)}
+            title={t("materials.blockEditor.removeAcceptedAnswer", { value: answer })}
+            type="button"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </span>
       ))}
+      <div className="flex min-w-[10rem] flex-1 items-center gap-1.5">
+        <input
+          className="min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold outline-none"
+          disabled={disabled}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={handleDraftKeyDown}
+          placeholder={t("materials.blockEditor.acceptedAnswerDraftPlaceholder")}
+          value={draft}
+        />
+        <Button
+          aria-label={t("materials.blockEditor.addAcceptedAnswer")}
+          className="h-7 shrink-0 px-2"
+          disabled={disabled || !draft.trim()}
+          onClick={commitDraft}
+          title={t("materials.blockEditor.addAcceptedAnswer")}
+          type="button"
+          variant="outline"
+        >
+          <Check className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }

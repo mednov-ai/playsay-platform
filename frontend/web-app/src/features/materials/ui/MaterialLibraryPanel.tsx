@@ -584,6 +584,7 @@ export function MaterialLibraryPanel({
             ) : (
               <MaterialEditorForm
                 assetLibrary={assetLibrary}
+                canSuggestAcceptedAnswers={Boolean(form.id)}
                 canGenerateImages={canGenerateImages}
                 disabled={disabled}
                 form={form}

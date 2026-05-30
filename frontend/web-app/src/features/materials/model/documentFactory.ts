@@ -79,7 +79,7 @@ export function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
       return {
         ...base,
         assessment: defaultObjectiveAssessmentPolicy(),
-        items: [{ id: createClientId("item"), prompt: "I am ___ the airport.", answer: "at" }],
+        items: [{ id: createClientId("item"), prompt: "I am ␣ the airport.", answer: "at" }],
       };
     case "multipleChoice":
       return {

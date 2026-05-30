@@ -14,6 +14,7 @@ import {
   isMaterialNormalizationTerm,
   materialItemAnswerMatches,
   materialNormalizationTerms,
+  splitFillGapPrompt,
   type MaterialAnswerBlock,
   type MaterialAnswerStatus,
   type MaterialAttemptEntry,
@@ -96,7 +97,7 @@ export function RenderedFillGapExercise({
         const itemKey = materialExerciseItemKey(item, index);
         const options = materialExerciseOptions(item, block);
         const isManualInput = options.length === 0;
-        const prompt = splitGapPrompt(item.prompt);
+        const prompt = splitFillGapPrompt(item.prompt);
         const itemHints = hints[itemKey] ?? [];
         const status = materialAnswerStatus(item, answers[itemKey], attempts[itemKey], itemHints, block.assessment, isManualInput);
         const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
@@ -377,18 +378,6 @@ function materialProgressiveHintValue(answer: string, level: number): string {
       return revealCount >= characters.length ? preview : `${preview}...`;
     })
     .join("");
-}
-
-function splitGapPrompt(prompt: string): { before: string; after: string } {
-  const match = prompt.match(/^(.*?)(___|__|…|\.\.\.)(.*)$/);
-  if (!match) {
-    return { before: prompt, after: "" };
-  }
-
-  return {
-    before: match[1].trimEnd(),
-    after: match[3].trimStart(),
-  };
 }
 
 function uniqueMaterialOptions(options: string[]): string[] {

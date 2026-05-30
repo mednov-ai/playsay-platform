@@ -1,5 +1,5 @@
 import { type CSSProperties, type DragEvent, type KeyboardEvent, useMemo, useState } from "react";
-import { CheckCircle2, FileText } from "lucide-react";
+import { CornerDownLeft, FileText } from "lucide-react";
 import { i18n, useAppTranslation } from "../../../../shared/i18n";
 import {
   MAX_MANUAL_INPUT_HINTS,
@@ -249,7 +249,7 @@ export function RenderedFillGapExercise({
                       title={t("materials.renderer.checkAnswerTitle")}
                       type="button"
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <CornerDownLeft className="h-3.5 w-3.5" />
                     </button>
                   </span>
                   <MaterialAttemptBar status={status} />
@@ -309,19 +309,19 @@ export function MaterialAnswerTools({
 export function MaterialAttemptBar({ status }: { status: MaterialAnswerStatus }) {
   const { t } = useAppTranslation();
 
-  if (status.kind === "empty" || status.kind === "draft") {
+  if (!materialAttemptBarVisible(status)) {
     return null;
   }
 
+  const redPercent = materialAttemptBarRedPercent(status);
   const maxAttempts = Math.max(1, status.maxAttempts);
-  const redPercent = status.locked
-    ? 100
-    : Math.min(100, Math.max(0, (status.incorrectAttempts / maxAttempts) * 100));
   const label = status.locked
     ? t("materials.renderer.attemptsFinished", { used: status.incorrectAttempts, total: maxAttempts })
-    : status.correct
-      ? t("materials.renderer.acceptedAttempts", { used: status.incorrectAttempts, total: maxAttempts })
-      : t("materials.renderer.errorAttempts", { used: status.incorrectAttempts, total: maxAttempts });
+    : status.hintsUsed > 0 && status.incorrectAttempts === 0 && !status.correct
+      ? t("materials.renderer.hintsUsed", { used: status.hintsUsed, total: MAX_MANUAL_INPUT_HINTS })
+      : status.correct
+        ? t("materials.renderer.acceptedAttempts", { used: status.incorrectAttempts, total: maxAttempts })
+        : t("materials.renderer.errorAttempts", { used: status.incorrectAttempts, total: maxAttempts });
   const style = {
     "--playsay-answer-red": `${redPercent}%`,
   } as CSSProperties;
@@ -336,6 +336,24 @@ export function MaterialAttemptBar({ status }: { status: MaterialAnswerStatus })
       title={label}
     />
   );
+}
+
+export function materialAttemptBarVisible(status: MaterialAnswerStatus): boolean {
+  if (status.kind === "empty") {
+    return false;
+  }
+  return status.kind !== "draft" || status.incorrectAttempts > 0 || status.hintsUsed > 0;
+}
+
+export function materialAttemptBarRedPercent(status: MaterialAnswerStatus): number {
+  if (status.locked) {
+    return 100;
+  }
+
+  const maxAttempts = Math.max(1, status.maxAttempts);
+  const errorPercent = Math.min(100, Math.max(0, (status.incorrectAttempts / maxAttempts) * 100));
+  const hintPercent = Math.min(100, Math.max(0, (status.hintsUsed / MAX_MANUAL_INPUT_HINTS) * 100));
+  return Math.max(errorPercent, hintPercent);
 }
 
 export function materialExerciseOptions(item: MaterialExerciseItem, block: MaterialEditorBlock): string[] {
@@ -436,10 +454,11 @@ export function materialHintForExerciseItem(item: MaterialExerciseItem, block: M
   const penalty = cleanMaterialAssessment(block.assessment ?? defaultObjectiveAssessmentPolicy()).hintPenalty ?? 0.15;
   const level = Math.min(Math.max(hintNumber, 1), MAX_MANUAL_INPUT_HINTS);
   const value = materialProgressiveHintValue(answer, level);
-  const type = level === 1 ? "firstLetter" : level === 2 ? "partialAnswer" : "fullAnswer";
+  const fullAnswerVisible = Boolean(answer) && normalizeMaterialAnswer(value) === normalizeMaterialAnswer(answer);
+  const type = fullAnswerVisible ? "fullAnswer" : level === 1 ? "firstLetter" : "partialAnswer";
   return {
     at: new Date().toISOString(),
-    label: level >= MAX_MANUAL_INPUT_HINTS
+    label: fullAnswerVisible
       ? i18n.t("materials.renderer.answerHint", { value })
       : i18n.t("materials.renderer.hintValue", { level, value }),
     penalty,
@@ -453,9 +472,6 @@ function materialProgressiveHintValue(answer: string, level: number): string {
   if (!cleanAnswer) {
     return "";
   }
-  if (level >= MAX_MANUAL_INPUT_HINTS) {
-    return cleanAnswer;
-  }
 
   return cleanAnswer
     .split(/(\s+)/)
@@ -467,7 +483,7 @@ function materialProgressiveHintValue(answer: string, level: number): string {
       if (characters.length === 0) {
         return "";
       }
-      const revealCount = level === 1 ? 1 : Math.min(characters.length, Math.max(2, Math.ceil(characters.length / 2)));
+      const revealCount = Math.min(characters.length, level);
       const preview = characters.slice(0, revealCount).join("");
       return revealCount >= characters.length ? preview : `${preview}...`;
     })

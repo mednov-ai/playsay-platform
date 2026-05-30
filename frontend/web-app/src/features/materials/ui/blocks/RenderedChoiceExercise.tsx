@@ -1,5 +1,5 @@
 import { type KeyboardEvent } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CornerDownLeft } from "lucide-react";
 import {
   materialAnswerAttempts,
   materialAnswerContextForBlock,
@@ -152,7 +152,7 @@ export function RenderedChoiceExercise({
                       title={t("materials.renderer.checkAnswerTitle")}
                       type="button"
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <CornerDownLeft className="h-3.5 w-3.5" />
                     </button>
                   </span>
                   <MaterialAttemptBar status={status} />

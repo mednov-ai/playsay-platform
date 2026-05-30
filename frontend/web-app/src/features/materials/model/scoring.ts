@@ -145,9 +145,15 @@ export function materialAnswerStatus(
     if (incorrectAttempts > 0) {
       return { ...baseStatus, kind: "wrong", label: i18n.t("materials.answerStatus.wrong", { count: incorrectAttempts }) };
     }
+    if (hints.length > 0) {
+      return { ...baseStatus, kind: "hint", label: i18n.t("materials.answerStatus.check") };
+    }
     return { ...baseStatus, kind: "empty", label: i18n.t("materials.answerStatus.empty") };
   }
   if (requiresExplicitCheck && !currentValueChecked) {
+    if (hints.length > 0) {
+      return { ...baseStatus, kind: "hint", label: i18n.t("materials.answerStatus.check") };
+    }
     return { ...baseStatus, kind: "draft", label: i18n.t("materials.answerStatus.check") };
   }
   if (visibleCorrect && hints.length > 0) {

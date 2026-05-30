@@ -198,6 +198,26 @@ describe("material document accepted answers", () => {
     expect(status.incorrectAttempts).toBe(1);
   });
 
+  it("keeps hint-only fill gap state visible for scoring indicators", () => {
+    const item = {
+      id: "item-wait",
+      prompt: "I am waiting ␣ gate 4.",
+      answer: "at",
+    };
+
+    const status = materialAnswerStatus(
+      item,
+      "",
+      [],
+      [{ at: "2026-05-30T00:00:00.000Z", label: "Hint 1: a...", penalty: 0.15, type: "firstLetter", value: "a..." }],
+      undefined,
+      true,
+    );
+
+    expect(status.kind).toBe("hint");
+    expect(status.hintsUsed).toBe(1);
+  });
+
   it("tracks used word bank option ids separately from displayed duplicate words", () => {
     const answerBlock = {
       items: {

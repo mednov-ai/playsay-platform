@@ -392,6 +392,7 @@ export const ru = {
       attemptsFinished: "Попытки закончились: {{used}} из {{total}}",
       acceptedAttempts: "Ответ принят: ошибок до ответа {{used}} из {{total}}",
       errorAttempts: "Ошибок {{used}} из {{total}}",
+      hintsUsed: "Подсказок {{used}} из {{total}}",
       answerHint: "Ответ: {{value}}",
       hintValue: "Подсказка {{level}}: {{value}}",
       videoLinkPlaceholder: "Ссылка на видео будет здесь",

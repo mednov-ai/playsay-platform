@@ -380,6 +380,7 @@ export const de = {
       attemptsFinished: "Keine Versuche übrig: {{used}} von {{total}}",
       acceptedAttempts: "Antwort akzeptiert: {{used}} Fehler vor der Antwort von {{total}}",
       errorAttempts: "Fehler {{used}} von {{total}}",
+      hintsUsed: "Hinweise genutzt: {{used}} von {{total}}",
       answerHint: "Antwort: {{value}}",
       hintValue: "Hinweis {{level}}: {{value}}",
       videoLinkPlaceholder: "Videolink erscheint hier",

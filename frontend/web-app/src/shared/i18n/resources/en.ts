@@ -380,6 +380,7 @@ export const en = {
       attemptsFinished: "No attempts left: {{used}} of {{total}}",
       acceptedAttempts: "Answer accepted: {{used}} errors before the answer out of {{total}}",
       errorAttempts: "Errors {{used}} of {{total}}",
+      hintsUsed: "Hints used: {{used}} of {{total}}",
       answerHint: "Answer: {{value}}",
       hintValue: "Hint {{level}}: {{value}}",
       videoLinkPlaceholder: "Video link will appear here",

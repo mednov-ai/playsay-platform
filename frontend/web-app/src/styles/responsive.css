@@ -347,6 +347,18 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .playsay-material-play-backdrop {
+    padding: 0;
+  }
+
+  .playsay-material-play-dialog {
+    border-radius: 0;
+  }
+
+  .playsay-material-play-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .playsay-image-tools {
     gap: 0.35rem;
   }

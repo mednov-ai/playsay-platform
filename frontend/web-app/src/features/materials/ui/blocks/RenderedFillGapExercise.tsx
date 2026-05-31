@@ -166,108 +166,110 @@ export function RenderedFillGapExercise({
           })}
         </div>
       ) : null}
-      {(block.items ?? []).map((item, index) => {
-        const itemKey = materialExerciseItemKey(item, index);
-        const gapMode = materialFillGapMode(item);
-        const options = materialExerciseOptions(item, block);
-        const isWordBank = gapMode === "wordBank";
-        const isManualInput = gapMode === "typed" && options.length === 0;
-        const currentAnswer = answers[itemKey] ?? "";
-        const prompt = splitFillGapPrompt(item.prompt);
-        const itemHints = hints[itemKey] ?? [];
-        const status = materialAnswerStatus(item, currentAnswer, attempts[itemKey], itemHints, block.assessment, isManualInput, answerOptionIds[itemKey]);
-        const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
-        const inlineHint = isManualInput ? materialManualInputInlineHint(item, itemHints, currentAnswer) : "";
-        const manualInputStyle = isManualInput
-          ? { "--playsay-gap-chars": materialManualInputVisualCharacters(currentAnswer, inlineHint || hintPreview) } as CSSProperties
-          : undefined;
-        const canRequestHint = isManualInput && canRequestManualInputHint(item, itemHints, status);
-        const selectedWordBankOption = selectedWordBankOptionId
-          ? wordBankOptions.find((option) => option.id === selectedWordBankOptionId)
-          : null;
+      <div className="playsay-fill-paragraph">
+        {(block.items ?? []).map((item, index) => {
+          const itemKey = materialExerciseItemKey(item, index);
+          const gapMode = materialFillGapMode(item);
+          const options = materialExerciseOptions(item, block);
+          const isWordBank = gapMode === "wordBank";
+          const isManualInput = gapMode === "typed" && options.length === 0;
+          const currentAnswer = answers[itemKey] ?? "";
+          const prompt = splitFillGapPrompt(item.prompt);
+          const itemHints = hints[itemKey] ?? [];
+          const status = materialAnswerStatus(item, currentAnswer, attempts[itemKey], itemHints, block.assessment, isManualInput, answerOptionIds[itemKey]);
+          const hintPreview = isManualInput ? materialManualInputHintPreview(item, itemHints) : "";
+          const inlineHint = isManualInput ? materialManualInputInlineHint(item, itemHints, currentAnswer) : "";
+          const manualInputStyle = isManualInput
+            ? { "--playsay-gap-chars": materialManualInputVisualCharacters(currentAnswer, inlineHint || hintPreview) } as CSSProperties
+            : undefined;
+          const canRequestHint = isManualInput && canRequestManualInputHint(item, itemHints, status);
+          const selectedWordBankOption = selectedWordBankOptionId
+            ? wordBankOptions.find((option) => option.id === selectedWordBankOptionId)
+            : null;
 
-        return (
-          <div className="playsay-answer-row" data-input-mode={isWordBank ? "wordBank" : isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
-            <label>
-              {prompt.before ? <MarkdownInline value={prompt.before} /> : null}
-              {isWordBank ? (
-                <span className="playsay-inline-answer-wrap">
-                  <button
-                    aria-label={answers[itemKey] ? t("materials.renderer.wordBankFilledGap", { value: answers[itemKey] }) : t("materials.renderer.wordBankEmptyGap", { number: index + 1 })}
-                    className="playsay-word-bank-drop"
-                    data-status={status.kind}
-                    disabled={status.locked || status.correct}
-                    onClick={() => {
-                      if (selectedWordBankOption) {
-                        assignWordBankOption(itemKey, item, selectedWordBankOption.id);
-                      }
-                    }}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => handleWordBankDrop(event, itemKey, item)}
-                    title={selectedWordBankOption ? t("materials.renderer.wordBankPlaceSelected", { value: selectedWordBankOption.value }) : t("materials.renderer.wordBankDropTitle")}
-                    type="button"
-                  >
-                    {answers[itemKey] || t("materials.renderer.wordBankGapPlaceholder")}
-                  </button>
-                  <MaterialAttemptBar status={status} />
-                </span>
-              ) : options.length > 0 ? (
-                <span className="playsay-inline-answer-wrap">
-                  <select
-                    aria-label={t("materials.renderer.gapNumber", { number: index + 1 })}
-                    className="playsay-inline-select"
-                    data-status={status.kind}
-                    disabled={status.locked || status.correct}
-                    onChange={(event) => {
-                      if (!event.target.value) {
-                        return;
-                      }
-                      checkItem(itemKey, event.target.value);
-                    }}
-                    value={answers[itemKey] ?? ""}
-                  >
-                    <option disabled hidden value="">{t("materials.renderer.selectPlaceholder")}</option>
-                    {options.map((option, optionIndex) => (
-                      <option key={`${option}-${optionIndex}`} value={option}>{option}</option>
-                    ))}
-                  </select>
-                  <MaterialAttemptBar status={status} />
-                </span>
-              ) : (
-                <span className="playsay-inline-answer-wrap">
-                  <span className="playsay-inline-answer" data-status={status.kind} style={manualInputStyle}>
-                    <input
-                      aria-label={t("materials.renderer.gapNumber", { number: index + 1 })}
-                      disabled={status.locked || status.correct}
-                      onChange={(event) => updateItemValue(itemKey, event.target.value)}
-                      onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
-                      value={currentAnswer}
-                    />
-                    {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
+          return (
+            <span className="playsay-answer-fragment" data-input-mode={isWordBank ? "wordBank" : isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
+              <label>
+                {prompt.before ? <MarkdownInline value={prompt.before} /> : null}
+                {isWordBank ? (
+                  <span className="playsay-inline-answer-wrap">
                     <button
-                      aria-label={t("materials.renderer.checkAnswer")}
-                      className="playsay-inline-check"
-                      disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
-                      onClick={() => checkItem(itemKey)}
-                      title={t("materials.renderer.checkAnswerTitle")}
+                      aria-label={answers[itemKey] ? t("materials.renderer.wordBankFilledGap", { value: answers[itemKey] }) : t("materials.renderer.wordBankEmptyGap", { number: index + 1 })}
+                      className="playsay-word-bank-drop"
+                      data-status={status.kind}
+                      disabled={status.locked || status.correct}
+                      onClick={() => {
+                        if (selectedWordBankOption) {
+                          assignWordBankOption(itemKey, item, selectedWordBankOption.id);
+                        }
+                      }}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => handleWordBankDrop(event, itemKey, item)}
+                      title={selectedWordBankOption ? t("materials.renderer.wordBankPlaceSelected", { value: selectedWordBankOption.value }) : t("materials.renderer.wordBankDropTitle")}
                       type="button"
                     >
-                      <CornerDownLeft className="h-3.5 w-3.5" />
+                      {answers[itemKey] || t("materials.renderer.wordBankGapPlaceholder")}
                     </button>
+                    <MaterialAttemptBar status={status} />
                   </span>
-                  <MaterialAttemptBar status={status} />
-                  <MaterialAnswerTools
-                    canRequestHint={canRequestHint}
-                    onHint={() => requestHint(itemKey, item)}
-                    status={status}
-                  />
-                </span>
-              )}
-              {prompt.after ? <MarkdownInline value={prompt.after} /> : null}
-            </label>
-          </div>
-        );
-      })}
+                ) : options.length > 0 ? (
+                  <span className="playsay-inline-answer-wrap">
+                    <select
+                      aria-label={t("materials.renderer.gapNumber", { number: index + 1 })}
+                      className="playsay-inline-select"
+                      data-status={status.kind}
+                      disabled={status.locked || status.correct}
+                      onChange={(event) => {
+                        if (!event.target.value) {
+                          return;
+                        }
+                        checkItem(itemKey, event.target.value);
+                      }}
+                      value={answers[itemKey] ?? ""}
+                    >
+                      <option disabled hidden value="">{t("materials.renderer.selectPlaceholder")}</option>
+                      {options.map((option, optionIndex) => (
+                        <option key={`${option}-${optionIndex}`} value={option}>{option}</option>
+                      ))}
+                    </select>
+                    <MaterialAttemptBar status={status} />
+                  </span>
+                ) : (
+                  <span className="playsay-inline-answer-wrap">
+                    <span className="playsay-inline-answer" data-status={status.kind} style={manualInputStyle}>
+                      <input
+                        aria-label={t("materials.renderer.gapNumber", { number: index + 1 })}
+                        disabled={status.locked || status.correct}
+                        onChange={(event) => updateItemValue(itemKey, event.target.value)}
+                        onKeyDown={(event) => handleManualInputKeyDown(event, itemKey)}
+                        value={currentAnswer}
+                      />
+                      {inlineHint ? <span className="playsay-inline-hint-ghost">{inlineHint}</span> : null}
+                      <button
+                        aria-label={t("materials.renderer.checkAnswer")}
+                        className="playsay-inline-check"
+                        disabled={status.locked || status.correct || !answers[itemKey]?.trim()}
+                        onClick={() => checkItem(itemKey)}
+                        title={t("materials.renderer.checkAnswerTitle")}
+                        type="button"
+                      >
+                        <CornerDownLeft className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                    <MaterialAttemptBar status={status} />
+                    <MaterialAnswerTools
+                      canRequestHint={canRequestHint}
+                      onHint={() => requestHint(itemKey, item)}
+                      status={status}
+                    />
+                  </span>
+                )}
+                {prompt.after ? <MarkdownInline value={prompt.after} /> : null}
+              </label>
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -294,7 +296,7 @@ export function MaterialAnswerTools({
   }
 
   return (
-    <div className="playsay-answer-tools">
+    <span className="playsay-answer-tools">
       <button
         aria-label={t("materials.renderer.hintProgress", { current: nextHintNumber, total: MAX_MANUAL_INPUT_HINTS })}
         className="playsay-hint-button"
@@ -305,7 +307,7 @@ export function MaterialAnswerTools({
         <FileText className="h-3.5 w-3.5" />
         {nextHintNumber}/{MAX_MANUAL_INPUT_HINTS}
       </button>
-    </div>
+    </span>
   );
 }
 
@@ -342,10 +344,7 @@ export function MaterialAttemptBar({ status }: { status: MaterialAnswerStatus })
 }
 
 export function materialAttemptBarVisible(status: MaterialAnswerStatus): boolean {
-  if (status.kind === "empty") {
-    return false;
-  }
-  return status.kind !== "draft" || status.incorrectAttempts > 0 || status.hintsUsed > 0;
+  return status.maxAttempts > 0;
 }
 
 export function materialAttemptBarRedPercent(status: MaterialAnswerStatus): number {

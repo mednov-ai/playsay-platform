@@ -253,9 +253,17 @@ export const fr = {
       duplicate: "Dupliquer",
       generate: "Générer",
       generateWithCount: "Générer ({{count}})",
+      play: "Play",
       preview: "Aperçu",
       save: "Enregistrer",
       textMode: "Texte",
+    },
+    playPreview: {
+      aria: "Aperçu du support comme élève",
+      eyebrow: "Mode élève",
+      subtitle: "Testez les exercices sans lancer de cours en ligne.",
+      reset: "Réinitialiser les réponses",
+      close: "Fermer",
     },
     form: {
       title: "Titre",

@@ -7,6 +7,7 @@ import {
   Loader2,
   LockKeyhole,
   PenLine,
+  Play,
   Plus,
   RefreshCw,
 } from "lucide-react";
@@ -57,6 +58,7 @@ import { MaterialDraftPanel } from "./MaterialDraftPanel";
 import { MaterialEditorForm } from "./MaterialEditorForm";
 import { MaterialImageProgress } from "./MaterialImageProgress";
 import { MaterialLessonLinkPanel } from "./MaterialLessonLinkPanel";
+import { MaterialPlayPreviewDialog } from "./MaterialPlayPreviewDialog";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialLibraryPanel({
@@ -104,6 +106,7 @@ export function MaterialLibraryPanel({
   const [draftImage, setDraftImage] = useState<MaterialDraftSourceImage | null>(null);
   const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
   const [authorMode, setAuthorMode] = useState<MaterialAuthorMode>("preview");
+  const [playPreviewOpen, setPlayPreviewOpen] = useState(false);
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
   const [assetLibrary, setAssetLibrary] = useState<MaterialAssetLibraryItem[]>([]);
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
@@ -441,6 +444,11 @@ export function MaterialLibraryPanel({
 
   return (
     <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
+      <MaterialPlayPreviewDialog
+        material={materialPreviewFromForm(form)}
+        onClose={() => setPlayPreviewOpen(false)}
+        open={playPreviewOpen && Boolean(form.title.trim())}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
@@ -547,6 +555,10 @@ export function MaterialLibraryPanel({
                     </div>
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
+                    <Button disabled={disabled || form.title.trim().length === 0} onClick={() => setPlayPreviewOpen(true)} type="button">
+                      <Play className="h-4 w-4" />
+                      {t("materials.actions.play")}
+                    </Button>
                     <Button disabled={disabled} onClick={() => setAuthorMode("edit")} type="button" variant="outline">
                       <PenLine className="h-4 w-4" />
                       {t("materials.actions.textMode")}

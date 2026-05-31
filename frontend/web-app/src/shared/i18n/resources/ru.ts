@@ -263,9 +263,17 @@ export const ru = {
       duplicate: "Дублировать",
       generate: "Сгенерировать",
       generateWithCount: "Сгенерировать ({{count}})",
+      play: "Play",
       preview: "Просмотр",
       save: "Сохранить",
       textMode: "Текст",
+    },
+    playPreview: {
+      aria: "Предпросмотр материала как ученик",
+      eyebrow: "Режим ученика",
+      subtitle: "Проверьте задания без запуска онлайн-урока.",
+      reset: "Сбросить ответы",
+      close: "Закрыть",
     },
     form: {
       title: "Название",

@@ -131,6 +131,46 @@
   margin: 0 auto;
 }
 
+.playsay-material-play-backdrop {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  display: grid;
+  background: rgb(17 17 17 / 0.42);
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  place-items: stretch;
+}
+
+.playsay-material-play-dialog {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.25rem;
+  background: #fffdfb;
+  box-shadow: 0 1.5rem 4rem rgb(17 17 17 / 0.22);
+  overflow: hidden;
+}
+
+.playsay-material-play-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: #ffffff;
+  padding: 0.8rem 1rem;
+}
+
+.playsay-material-play-surface {
+  min-height: 0;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  padding: clamp(0.85rem, 1.6vw, 1.25rem);
+}
+
 .playsay-material-preview .playsay-rendered-material h3 {
   margin: 0.75rem 0 0;
   color: #77b84e;
@@ -848,9 +888,9 @@
 .playsay-answer-attempt-bar {
   --playsay-answer-red: 0%;
   display: inline-block;
-  flex: 0 0 0.32rem;
-  width: 0.32rem;
-  height: 1.95rem;
+  flex: 0 0 0.46rem;
+  width: 0.46rem;
+  height: 2.15rem;
   border-radius: 999px;
   background:
     linear-gradient(
@@ -860,8 +900,10 @@
       #a6d96a var(--playsay-answer-red),
       #a6d96a 100%
   );
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
-  margin-inline: 0.025rem;
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 1px 2px rgb(17 17 17 / 0.08);
+  margin-inline: 0.06rem;
 }
 
 .playsay-answer-attempt-bar[data-kind="wrong"],
@@ -871,8 +913,8 @@
       to bottom,
       #f04438 0%,
       #f04438 var(--playsay-answer-red),
-      #dff8ee var(--playsay-answer-red),
-      #dff8ee 100%
+      #a6d96a var(--playsay-answer-red),
+      #a6d96a 100%
     );
 }
 
@@ -1045,15 +1087,26 @@
 
 .playsay-fill-exercise {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.45rem;
   margin-top: 0.75rem;
   color: hsl(var(--muted-foreground));
   font-weight: 800;
 }
 
-.playsay-fill-exercise label {
+.playsay-fill-paragraph {
   display: block;
-  line-height: 2.35;
+  color: hsl(var(--muted-foreground));
+  line-height: 2.75;
+}
+
+.playsay-answer-fragment {
+  display: inline;
+  margin-right: 0.45rem;
+}
+
+.playsay-fill-exercise label {
+  display: inline;
+  line-height: inherit;
 }
 
 .playsay-fill-exercise label > input {
@@ -1072,13 +1125,25 @@
 
 .playsay-fill-exercise .playsay-inline-select {
   width: auto;
+  min-width: 4.75rem;
+  max-width: 10rem;
+  padding-inline: 0.5rem;
 }
 
 .playsay-fill-exercise .playsay-inline-answer-wrap {
   width: auto;
-  max-width: min(15.5rem, 78vw);
-  margin-inline: 0.22rem;
+  max-width: none;
+  margin-inline: 0.14rem;
   vertical-align: middle;
+}
+
+.playsay-fill-exercise .playsay-inline-answer {
+  width: clamp(3.75rem, calc((var(--playsay-gap-chars, 5) * 0.56em) + 2rem), 10rem);
+}
+
+.playsay-fill-exercise .playsay-word-bank-drop {
+  min-width: 4.25rem;
+  padding-inline: 0.55rem;
 }
 
 .playsay-fill-exercise .playsay-markdown-inline {

@@ -204,6 +204,13 @@ type LoginFlow = {
   redirectUri: string;
 };
 
+type CompletedLoginFlow = {
+  clientId: string;
+  code: string;
+  redirectUri: string;
+  state: string;
+};
+
 export const authConfig: AuthConfig = {
   issuer:
     import.meta.env.VITE_AUTH_ISSUER ??
@@ -214,7 +221,9 @@ export const authConfig: AuthConfig = {
 
 const tokenStorageKey = "playsay.auth.tokens";
 const flowStorageKey = "playsay.auth.loginFlow";
+const completedFlowStorageKey = "playsay.auth.completedLoginFlow";
 const expirySkewMs = 30_000;
+const loginCompletionRequests = new Map<string, Promise<TokenSet>>();
 
 type ProjectErrorBody = {
   status?: number;
@@ -254,6 +263,7 @@ export function readTokens(): TokenSet | null {
 export function clearTokens(): void {
   window.sessionStorage.removeItem(tokenStorageKey);
   window.sessionStorage.removeItem(flowStorageKey);
+  window.sessionStorage.removeItem(completedFlowStorageKey);
 }
 
 export async function startLogin(config = authConfig): Promise<void> {
@@ -285,27 +295,31 @@ export async function completeLogin(url: URL, config = authConfig): Promise<Toke
 
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const flow = readLoginFlow();
-  if (!code || !state || !flow || state !== flow.state) {
+  if (!code || !state) {
     throw new Error("Auth callback state is invalid.");
   }
 
-  const response = await fetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: config.clientId,
-      redirect_uri: flow.redirectUri,
-      code,
-      code_verifier: flow.codeVerifier,
-    }),
-  });
+  if (isCompletedLoginFlow(readCompletedLoginFlow(), config, code, state)) {
+    const existingTokens = readTokens();
+    if (existingTokens) {
+      return existingTokens;
+    }
+  }
 
-  const tokens = await parseTokenResponse(response);
-  window.sessionStorage.removeItem(flowStorageKey);
-  writeTokens(tokens);
-  return tokens;
+  const completionKey = `${config.clientId}:${state}:${code}`;
+  const inFlightCompletion = loginCompletionRequests.get(completionKey);
+  if (inFlightCompletion) {
+    return inFlightCompletion;
+  }
+
+  const completion = exchangeLoginCode(config, code, state);
+  loginCompletionRequests.set(completionKey, completion);
+
+  try {
+    return await completion;
+  } finally {
+    loginCompletionRequests.delete(completionKey);
+  }
 }
 
 export async function getValidAccessToken(config = authConfig): Promise<string | null> {
@@ -987,6 +1001,69 @@ function readLoginFlow(): LoginFlow | null {
     return null;
   }
   return JSON.parse(value) as LoginFlow;
+}
+
+async function exchangeLoginCode(config: AuthConfig, code: string, state: string): Promise<TokenSet> {
+  const flow = readLoginFlow();
+  if (!flow || state !== flow.state) {
+    throw new Error("Auth callback state is invalid.");
+  }
+
+  const response = await fetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: config.clientId,
+      redirect_uri: flow.redirectUri,
+      code,
+      code_verifier: flow.codeVerifier,
+    }),
+  });
+
+  const tokens = await parseTokenResponse(response);
+  window.sessionStorage.removeItem(flowStorageKey);
+  writeTokens(tokens);
+  writeCompletedLoginFlow({
+    clientId: config.clientId,
+    code,
+    redirectUri: flow.redirectUri,
+    state,
+  });
+  return tokens;
+}
+
+function readCompletedLoginFlow(): CompletedLoginFlow | null {
+  const value = window.sessionStorage.getItem(completedFlowStorageKey);
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as CompletedLoginFlow;
+  } catch {
+    window.sessionStorage.removeItem(completedFlowStorageKey);
+    return null;
+  }
+}
+
+function writeCompletedLoginFlow(flow: CompletedLoginFlow): void {
+  window.sessionStorage.setItem(completedFlowStorageKey, JSON.stringify(flow));
+}
+
+function isCompletedLoginFlow(
+  flow: CompletedLoginFlow | null,
+  config: AuthConfig,
+  code: string,
+  state: string,
+): boolean {
+  return Boolean(
+    flow &&
+    flow.clientId === config.clientId &&
+    flow.code === code &&
+    flow.redirectUri === getRedirectUri(config) &&
+    flow.state === state
+  );
 }
 
 function writeTokens(tokens: TokenSet): void {

@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { Check, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -30,32 +30,37 @@ export function MaterialBlockEditor({
   assetLibrary,
   block,
   canSuggestAcceptedAnswers,
+  collapsed,
   currentMaterialId,
   disabled,
   index,
   onRemove,
   onSuggestAcceptedAnswers,
+  onToggleCollapsed,
   onUpdate,
 }: {
   assetLibrary: MaterialAssetLibraryItem[];
   block: MaterialEditorBlock;
   canSuggestAcceptedAnswers: boolean;
+  collapsed: boolean;
   currentMaterialId: string | null;
   disabled: boolean;
   index: number;
   onRemove: () => void;
   onSuggestAcceptedAnswers?: (blockId: string, itemIds: string[]) => void;
+  onToggleCollapsed: () => void;
   onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
 }) {
   const { t } = useAppTranslation();
   const [flashcardsSource, setFlashcardsSource] = useState(() => formatFlashcards(block.cards));
+  const collapseLabel = collapsed ? t("materials.blockEditor.expandBlock") : t("materials.blockEditor.collapseBlock");
 
   useEffect(() => {
     setFlashcardsSource(formatFlashcards(block.cards));
   }, [block.id, block.type]);
 
   return (
-    <article className="rounded-xl border border-border bg-white p-3">
+    <article className="rounded-xl border border-border bg-white p-3" data-collapsed={collapsed ? "true" : "false"}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -75,13 +80,26 @@ export function MaterialBlockEditor({
             value={block.title}
           />
         </div>
-        <Button className="h-8 px-2 text-xs" disabled={disabled} onClick={onRemove} type="button" variant="outline">
-          <Trash2 className="h-4 w-4" />
-          {t("materials.actions.delete")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            aria-expanded={!collapsed}
+            aria-label={collapseLabel}
+            className="h-8 w-8 px-0"
+            onClick={onToggleCollapsed}
+            title={collapseLabel}
+            type="button"
+            variant="outline"
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+          <Button className="h-8 px-2 text-xs" disabled={disabled} onClick={onRemove} type="button" variant="outline">
+            <Trash2 className="h-4 w-4" />
+            {t("materials.actions.delete")}
+          </Button>
+        </div>
       </div>
 
-      <div className="mt-2 grid gap-2">
+      <div aria-hidden={collapsed} className={collapsed ? "hidden" : "mt-2 grid gap-2"}>
         {block.type === "videoEmbed" ? (
           <div className="grid gap-2 sm:grid-cols-[8rem_1fr]">
             <FormField label={t("materials.blockEditor.platform")}>

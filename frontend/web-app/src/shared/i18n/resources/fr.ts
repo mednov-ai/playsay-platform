@@ -347,6 +347,8 @@ export const fr = {
       selectWordBankOption: "Choisir un mot",
       acceptSuggestion: "Accepter {{value}}",
       rejectSuggestion: "Rejeter {{value}}",
+      collapseBlock: "Replier le bloc",
+      expandBlock: "Déplier le bloc",
     },
     matching: {
       left: "Gauche",

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Archive, Copy, Eye, Save, Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
@@ -13,6 +14,7 @@ import { MaterialBlockEditor } from "./MaterialBlockEditor";
 import { MaterialImageProgress } from "./MaterialImageProgress";
 import { materialBlockIcon } from "./materialBlockIcon";
 import { useAppTranslation } from "../../../shared/i18n";
+import { resetMaterialBlockCollapse, toggleMaterialBlockCollapse } from "./materialEditorCollapse";
 
 export function MaterialEditorForm({
   assetLibrary,
@@ -52,6 +54,16 @@ export function MaterialEditorForm({
   pendingImageTargetsCount: number;
 }) {
   const { t } = useAppTranslation();
+  const [collapsedBlockIds, setCollapsedBlockIds] = useState<Set<string>>(() => new Set());
+  const blocks = form.document.pages[0]?.blocks ?? [];
+
+  useEffect(() => {
+    setCollapsedBlockIds(resetMaterialBlockCollapse());
+  }, [form.id]);
+
+  function toggleBlockCollapsed(blockId: string) {
+    setCollapsedBlockIds((current) => toggleMaterialBlockCollapse(current, blockId));
+  }
 
   return (
     <>
@@ -166,22 +178,24 @@ export function MaterialEditorForm({
       </div>
 
       <div className="playsay-material-editor">
-        {form.document.pages[0]?.blocks.length === 0 ? (
+        {blocks.length === 0 ? (
           <div className="rounded-2xl border border-border bg-muted/60 p-4 text-sm font-semibold text-muted-foreground">
             {t("materials.form.emptyBlocks")}
           </div>
         ) : (
-          form.document.pages[0]?.blocks.map((block, index) => (
+          blocks.map((block, index) => (
             <MaterialBlockEditor
               assetLibrary={assetLibrary}
               block={block}
               canSuggestAcceptedAnswers={canSuggestAcceptedAnswers}
+              collapsed={collapsedBlockIds.has(block.id)}
               currentMaterialId={form.id}
               disabled={disabled}
               index={index}
               key={block.id}
               onRemove={() => onRemoveBlock(block.id)}
               onSuggestAcceptedAnswers={onSuggestAcceptedAnswers}
+              onToggleCollapsed={() => toggleBlockCollapsed(block.id)}
               onUpdate={(patch) => onUpdateBlock(block.id, patch)}
             />
           ))

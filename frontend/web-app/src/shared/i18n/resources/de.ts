@@ -347,6 +347,8 @@ export const de = {
       selectWordBankOption: "Wort wählen",
       acceptSuggestion: "{{value}} annehmen",
       rejectSuggestion: "{{value}} ablehnen",
+      collapseBlock: "Block einklappen",
+      expandBlock: "Block ausklappen",
     },
     matching: {
       left: "Links",

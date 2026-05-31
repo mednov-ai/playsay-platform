@@ -357,6 +357,8 @@ export const ru = {
       selectWordBankOption: "Выберите слово",
       acceptSuggestion: "Принять {{value}}",
       rejectSuggestion: "Отклонить {{value}}",
+      collapseBlock: "Свернуть блок",
+      expandBlock: "Развернуть блок",
     },
     matching: {
       left: "Слева",

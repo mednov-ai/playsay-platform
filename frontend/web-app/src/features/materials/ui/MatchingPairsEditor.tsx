@@ -2,9 +2,11 @@ import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
+  DEFAULT_MATCHING_PAIR_MAX_ERRORS,
   defaultMatchingImagePrompt,
   editableMatchingPairs,
   emptyMatchingPair,
+  matchingEffectiveMaxErrors,
   matchingAssetSearchResults,
   materialMatchingPairTargetKind,
   type MaterialAssetLibraryItem,
@@ -33,9 +35,20 @@ export function MatchingPairsEditor({
   ]);
   const [assetQueries, setAssetQueries] = useState<Record<string, string>>({});
   const pairs = editableMatchingPairs(block.pairs ?? [], draftRowsRef.current);
+  const maxErrors = block.assessment?.maxErrors ?? DEFAULT_MATCHING_PAIR_MAX_ERRORS;
+  const effectiveMaxErrors = matchingEffectiveMaxErrors(maxErrors, pairs.length);
 
   function updatePairs(nextPairs: MaterialMatchingPair[]) {
     onUpdate({ pairs: nextPairs });
+  }
+
+  function updateMaxErrors(value: number) {
+    onUpdate({
+      assessment: {
+        ...block.assessment,
+        maxErrors: value,
+      },
+    });
   }
 
   function updatePair(pairId: string, patch: Partial<MaterialMatchingPair>) {
@@ -86,6 +99,21 @@ export function MatchingPairsEditor({
 
   return (
     <div className="playsay-matching-editor">
+      <div className="playsay-matching-editor-controls">
+        <label className="playsay-matching-error-limit" data-scope="block">
+          <span>{t("materials.matching.maxErrors")}</span>
+          <input
+            aria-label={t("materials.matching.maxErrorsAria")}
+            disabled={disabled}
+            max={10}
+            min={1}
+            onChange={(event) => updateMaxErrors(Number(event.target.value))}
+            type="number"
+            value={maxErrors}
+          />
+          <small>{t("materials.matching.effectiveErrors", { count: effectiveMaxErrors })}</small>
+        </label>
+      </div>
       <div className="playsay-matching-editor-head" aria-hidden="true">
         <span>{t("materials.matching.left")}</span>
         <span>{t("materials.matching.right")}</span>
@@ -129,7 +157,7 @@ export function MatchingPairsEditor({
                   onChange={(event) => toggleImage(pair, event.target.checked)}
                   type="checkbox"
                 />
-                <span>image</span>
+                <span>{t("materials.matching.imageTarget")}</span>
               </label>
               <Button
                 aria-label={t("materials.matching.removeRow")}

@@ -90,7 +90,11 @@ export function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
     case "matchingPairs":
       return {
         ...base,
-        assessment: defaultObjectiveAssessmentPolicy(),
+        assessment: {
+          ...defaultObjectiveAssessmentPolicy(),
+          maxAttempts: 5,
+          maxErrors: 5,
+        },
         pairs: [
           emptyMatchingPair(),
           emptyMatchingPair(),

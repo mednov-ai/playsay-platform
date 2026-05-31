@@ -173,7 +173,7 @@ export function MaterialBlockEditor({
           />
         ) : null}
 
-        {isObjectiveMaterialBlockType(block.type) ? (
+        {isObjectiveMaterialBlockType(block.type) && block.type !== "fillGaps" && block.type !== "matchingPairs" ? (
           <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-2 sm:grid-cols-4">
             <FormField label={t("materials.blockEditor.weight")}>
               <input
@@ -267,7 +267,7 @@ function ExerciseItemsEditor({
   const { t } = useAppTranslation();
   const items = block.items ?? [];
   const canSuggest = Boolean(onSuggestAcceptedAnswers && canSuggestAcceptedAnswers && items.length > 0);
-  const promptInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const promptInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const hasWordBankItems = block.type === "fillGaps" && items.some((item) => materialFillGapMode(item) === "wordBank");
   const wordBankOptions = block.wordBankOptions ?? [];
 
@@ -340,6 +340,9 @@ function ExerciseItemsEditor({
               acceptedAnswers: [],
               answerOptionId: createdOption?.id,
               gapMode,
+              hintCount: undefined,
+              maxAttempts: undefined,
+              maxErrors: candidate.maxErrors ?? 3,
               options: [],
             }
             : candidate
@@ -353,7 +356,12 @@ function ExerciseItemsEditor({
 
     updateItem(index, {
       answerOptionId: undefined,
+      baseForm: gapMode === "formTransform" ? item.baseForm ?? item.answer ?? "" : undefined,
       gapMode: gapMode === "typed" ? undefined : gapMode,
+      hintCount: gapMode === "typed" ? item.hintCount ?? 3 : undefined,
+      hintPrefixLength: gapMode === "typed" ? item.hintPrefixLength : undefined,
+      maxAttempts: gapMode === "typed" || gapMode === "formTransform" ? item.maxAttempts ?? 5 : undefined,
+      maxErrors: undefined,
       options: gapMode === "singleChoice" ? (item.options?.length ? item.options : ["", "", ""]) : [],
     });
   }
@@ -528,7 +536,7 @@ function ExerciseItemsEditor({
           <div className={isContinuation ? "grid grid-cols-[1.5rem_minmax(0,1fr)] gap-1.5" : ""}>
             {isContinuation ? <ThreadConnector /> : null}
             <div className="grid gap-1.5 rounded-lg border border-border bg-muted/20 p-2">
-          <div className={block.type === "fillGaps" ? "grid gap-2 lg:grid-cols-[7rem_minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]" : "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]"}>
+          <div className={block.type === "fillGaps" ? "grid gap-2 lg:grid-cols-[7rem_minmax(16rem,2fr)_minmax(8rem,0.8fr)_minmax(8rem,0.9fr)_2.25rem]" : "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]"}>
             {block.type === "fillGaps" ? (
               <FormField label={t("materials.blockEditor.gapMode")}>
                 <select
@@ -540,18 +548,20 @@ function ExerciseItemsEditor({
                   <option value="typed">{t("materials.blockEditor.gapModeTyped")}</option>
                   <option value="singleChoice">{t("materials.blockEditor.gapModeSingleChoice")}</option>
                   <option value="wordBank">{t("materials.blockEditor.gapModeWordBank")}</option>
+                  <option value="formTransform">{t("materials.blockEditor.gapModeFormTransform")}</option>
                 </select>
               </FormField>
             ) : null}
             <FormField label={t("materials.blockEditor.itemPrompt")}>
-              <div className="flex gap-1.5">
-                <input
-                  className="playsay-input min-w-0 flex-1"
+              <div className="flex items-start gap-1.5">
+                <textarea
+                  className="playsay-input min-h-10 min-w-0 flex-1 resize-y py-2"
                   disabled={disabled}
                   onChange={(event) => updateItem(index, { prompt: event.target.value })}
                   ref={(node) => {
                     promptInputRefs.current[itemKey] = node;
                   }}
+                  rows={materialPromptRows(item.prompt)}
                   value={item.prompt}
                 />
                 {block.type === "fillGaps" ? (
@@ -592,6 +602,30 @@ function ExerciseItemsEditor({
                 />
               )}
             </FormField>
+            {gapMode === "formTransform" ? (
+              <FormField label={t("materials.blockEditor.baseForm")}>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => updateItem(index, { baseForm: event.target.value })}
+                  value={item.baseForm ?? ""}
+                />
+              </FormField>
+            ) : null}
+            {gapMode === "typed" ? (
+              <FormField label={t("materials.blockEditor.hintPrefix")}>
+                <select
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => updateItem(index, { hintPrefixLength: Number(event.target.value) || undefined })}
+                  value={item.hintPrefixLength ?? 0}
+                >
+                  <option value={0}>{t("materials.blockEditor.hintPrefixNone")}</option>
+                  <option value={1}>{t("materials.blockEditor.hintPrefixOne")}</option>
+                  <option value={2}>{t("materials.blockEditor.hintPrefixTwo")}</option>
+                </select>
+              </FormField>
+            ) : null}
             {block.type === "multipleChoice" || gapMode === "singleChoice" ? (
               <FormField label={t("materials.blockEditor.options")}>
                 <input
@@ -602,17 +636,47 @@ function ExerciseItemsEditor({
                 />
               </FormField>
             ) : null}
-            <FormField label={t("materials.blockEditor.itemWeight")}>
-              <input
-                className="playsay-input"
-                disabled={disabled}
-                min={0.1}
-                onChange={(event) => updateItem(index, { weight: Number(event.target.value) || undefined })}
-                step={0.1}
-                type="number"
-                value={item.weight ?? ""}
-              />
-            </FormField>
+            {block.type === "fillGaps" && gapMode !== "singleChoice" ? (
+              <FormField label={gapMode === "wordBank" ? t("materials.blockEditor.itemErrors") : t("materials.blockEditor.itemAttempts")}>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  max={10}
+                  min={1}
+                  onChange={(event) => updateItem(index, gapMode === "wordBank"
+                    ? { maxErrors: Number(event.target.value) || undefined }
+                    : { maxAttempts: Number(event.target.value) || undefined })}
+                  type="number"
+                  value={gapMode === "wordBank" ? item.maxErrors ?? 3 : item.maxAttempts ?? 5}
+                />
+              </FormField>
+            ) : null}
+            {block.type === "fillGaps" && gapMode === "typed" ? (
+              <FormField label={t("materials.blockEditor.itemHints")}>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  max={5}
+                  min={3}
+                  onChange={(event) => updateItem(index, { hintCount: Number(event.target.value) || undefined })}
+                  type="number"
+                  value={item.hintCount ?? 3}
+                />
+              </FormField>
+            ) : null}
+            {block.type !== "fillGaps" ? (
+              <FormField label={t("materials.blockEditor.itemWeight")}>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  min={0.1}
+                  onChange={(event) => updateItem(index, { weight: Number(event.target.value) || undefined })}
+                  step={0.1}
+                  type="number"
+                  value={item.weight ?? ""}
+                />
+              </FormField>
+            ) : null}
             <div className="flex items-end">
               <Button
                 aria-label={t("materials.blockEditor.removeItem")}
@@ -627,7 +691,7 @@ function ExerciseItemsEditor({
               </Button>
             </div>
           </div>
-          {gapMode === "typed" ? (
+          {gapMode === "typed" || gapMode === "formTransform" ? (
           <div className="grid gap-1">
             <div className="flex items-center justify-between gap-2 text-xs font-extrabold text-muted-foreground">
               <span>{t("materials.blockEditor.acceptedAnswers")}</span>
@@ -712,6 +776,13 @@ function ExerciseItemsEditor({
 
 function materialItemThreadRootId(item: MaterialExerciseItem, index: number): string {
   return item.threadRootItemId ?? item.id ?? `item-${index}`;
+}
+
+function materialPromptRows(value: string): number {
+  const rows = value
+    .split(/\r?\n/)
+    .reduce((total, line) => total + Math.max(1, Math.ceil(Array.from(line).length / 24)), 0);
+  return Math.min(10, Math.max(2, rows));
 }
 
 function ThreadConnector({ compact = false }: { compact?: boolean }) {

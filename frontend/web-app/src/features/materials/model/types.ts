@@ -49,7 +49,9 @@ export type MaterialVideoEmbedFrame = {
 export type MaterialAssessmentPolicy = {
   weight?: number;
   maxAttempts?: number;
+  maxErrors?: number;
   attemptPenalty?: number;
+  hintCount?: number;
   hintPenalty?: number;
   lockAfterAttempts?: boolean;
 };
@@ -75,7 +77,7 @@ export type MaterialAnswerSuggestion = {
   value: string;
 };
 
-export type MaterialFillGapMode = "typed" | "singleChoice" | "wordBank";
+export type MaterialFillGapMode = "typed" | "singleChoice" | "wordBank" | "formTransform";
 
 export type MaterialWordBankOption = {
   id: string;
@@ -111,7 +113,12 @@ export type MaterialEditorBlock = {
     answerOptionId?: string;
     acceptedAnswers?: string[];
     aiSuggestedAnswers?: MaterialAnswerSuggestion[];
+    baseForm?: string;
     gapMode?: MaterialFillGapMode;
+    hintPrefixLength?: number;
+    hintCount?: number;
+    maxAttempts?: number;
+    maxErrors?: number;
     options?: string[];
     threadRootItemId?: string;
     weight?: number;
@@ -121,7 +128,9 @@ export type MaterialEditorBlock = {
   height?: number;
 };
 
-export const MAX_MANUAL_INPUT_HINTS = 3;
+export const MIN_MANUAL_INPUT_HINTS = 3;
+
+export const MAX_MANUAL_INPUT_HINTS = 5;
 
 export const emptyMaterialMatchingPairs: MaterialMatchingPair[] = [];
 

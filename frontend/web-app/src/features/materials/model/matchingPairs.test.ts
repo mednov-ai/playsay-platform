@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchingRightOptionsForMode } from "./matchingPairs";
+import { matchingEffectiveMaxErrors, matchingRightOptionsForMode } from "./matchingPairs";
 import type { MaterialMatchingPair } from "./types";
 
 const pairs: MaterialMatchingPair[] = [
@@ -39,5 +39,13 @@ describe("matching pairs render order", () => {
     const secondOrder = matchingRightOptionsForMode(pairs, "classroom").map((pair) => pair.id);
 
     expect(secondOrder).toEqual(firstOrder);
+  });
+
+  it("caps pair error budget by the number of available right choices", () => {
+    expect(matchingEffectiveMaxErrors(undefined, 2)).toBe(2);
+    expect(matchingEffectiveMaxErrors(5, 2)).toBe(2);
+    expect(matchingEffectiveMaxErrors(3, 8)).toBe(3);
+    expect(matchingEffectiveMaxErrors(0, 3)).toBe(1);
+    expect(matchingEffectiveMaxErrors(5, 0)).toBe(0);
   });
 });

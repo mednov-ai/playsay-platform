@@ -7,16 +7,17 @@ import {
   materialAttemptBarRedPercent,
   materialAttemptBarVisible,
   materialHintForExerciseItem,
-  materialManualInputInlineHint,
+  materialManualInputHintLimit,
+  materialManualInputHintValue,
 } from "./RenderedFillGapExercise";
 
 describe("RenderedFillGapExercise hints", () => {
-  it("reveals manual fill gap hints one character at a time", () => {
+  it("reveals manual fill gap hints by configured answer proportions", () => {
     const block = {
       id: "block-gaps",
       type: "fillGaps",
       title: "Gerunds",
-      assessment: { hintPenalty: 0.15 },
+      assessment: { hintCount: 3, hintPenalty: 0.15 },
     } as MaterialEditorBlock;
     const item: MaterialExerciseItem = {
       id: "item-going",
@@ -24,9 +25,72 @@ describe("RenderedFillGapExercise hints", () => {
       answer: "going",
     };
 
-    expect(materialHintForExerciseItem(item, block, 1).value).toBe("g...");
-    expect(materialHintForExerciseItem(item, block, 2).value).toBe("go...");
-    expect(materialHintForExerciseItem(item, block, 3).value).toBe("goi...");
+    expect(materialHintForExerciseItem(item, block, 1).value).toBe("go");
+    expect(materialHintForExerciseItem(item, block, 2).value).toBe("goin");
+    expect(materialHintForExerciseItem(item, block, 3).value).toBe("going");
+  });
+
+  it("starts typed fill gap hints from the selected one or two letter prefix", () => {
+    const block = {
+      id: "block-gaps",
+      type: "fillGaps",
+      title: "Gerunds",
+      assessment: { hintCount: 3, hintPenalty: 0.15 },
+    } as MaterialEditorBlock;
+
+    expect(materialHintForExerciseItem({
+      id: "item-g",
+      prompt: "I don't enjoy ␣ to the cinema.",
+      answer: "going",
+      hintPrefixLength: 1,
+    }, block, 1).value).toBe("g");
+    expect(materialHintForExerciseItem({
+      id: "item-go",
+      prompt: "I don't enjoy ␣ to the cinema.",
+      answer: "going",
+      hintPrefixLength: 2,
+    }, block, 1).value).toBe("go");
+    expect(materialHintForExerciseItem({
+      id: "item-go",
+      prompt: "I don't enjoy ␣ to the cinema.",
+      answer: "going",
+      hintPrefixLength: 2,
+    }, block, 2).value).toBe("goin");
+    expect(materialHintForExerciseItem({
+      id: "item-go",
+      prompt: "I don't enjoy ␣ to the cinema.",
+      answer: "going",
+      hintPrefixLength: 2,
+    }, block, 3).value).toBe("going");
+  });
+
+  it("caps manual fill gap hint count by answer length", () => {
+    expect(materialManualInputHintLimit("cat", 5)).toBe(3);
+    expect(materialManualInputHintLimit("planet", 5)).toBe(4);
+    expect(materialManualInputHintLimit("learning", 5)).toBe(5);
+    expect(materialManualInputHintValue("learning", 1, 5)).toBe("le");
+    expect(materialManualInputHintValue("learning", 3, 5)).toBe("learn");
+    expect(materialManualInputHintValue("learning", 5, 5)).toBe("learning");
+  });
+
+  it("uses per-item hint limits over block-level fill gap settings", () => {
+    const block = {
+      id: "block-gaps",
+      type: "fillGaps",
+      title: "Gerunds",
+      assessment: { hintCount: 5, hintPenalty: 1 },
+    } as MaterialEditorBlock;
+    const item: MaterialExerciseItem = {
+      id: "item-learning",
+      prompt: "She keeps ␣ English.",
+      answer: "learning",
+      hintCount: 4,
+    };
+
+    expect(materialHintForExerciseItem(item, block, 1).penalty).toBe(0.15);
+    expect(materialHintForExerciseItem(item, block, 4).value).toBe("learning");
+    expect(materialHintForExerciseItem(item, block, 5).value).toBe("learning");
+    expect(materialHintForExerciseItem(item, block, 5).type).toBe("fullAnswer");
   });
 
   it("keeps the inline attempt bar visible while a penalized answer is being edited", () => {
@@ -61,26 +125,7 @@ describe("RenderedFillGapExercise hints", () => {
       label: "Hint",
       locked: false,
       maxAttempts: 3,
-    })).toBeCloseTo(66.67, 1);
-  });
-
-  it("keeps the latest manual hint visible next to an empty or partial answer", () => {
-    const item: MaterialExerciseItem = {
-      id: "item-going",
-      prompt: "I don't enjoy ␣ to the cinema.",
-      answer: "going",
-    };
-    const hints = [{
-      at: "2026-05-30T00:00:00.000Z",
-      label: "Hint 2: go...",
-      penalty: 0.15,
-      type: "partialAnswer" as const,
-      value: "go...",
-    }];
-
-    expect(materialManualInputInlineHint(item, hints, "")).toBe("go...");
-    expect(materialManualInputInlineHint(item, hints, "g")).toBe("o...");
-    expect(materialManualInputInlineHint(item, hints, "go")).toBe("");
+    }, 5)).toBeCloseTo(40, 1);
   });
 
   it("renders mixed fill gap modes as inline paragraph fragments", () => {
@@ -107,5 +152,128 @@ describe("RenderedFillGapExercise hints", () => {
     expect(markup).toContain("playsay-inline-select");
     expect(markup).toContain("playsay-word-bank-drop");
     expect(markup).not.toContain("playsay-answer-row");
+  });
+
+  it("renders form transform base form as a placeholder and reveals a key after failed attempts", () => {
+    const block = {
+      id: "block-gaps",
+      type: "fillGaps",
+      title: "Verb forms",
+      assessment: { maxAttempts: 2 },
+      items: [
+        {
+          id: "form-study",
+          prompt: "Sam ␣ right now.",
+          baseForm: "not study",
+          answer: "isn't studying",
+          acceptedAnswers: ["is not studying"],
+          gapMode: "formTransform",
+        },
+      ],
+    } as MaterialEditorBlock;
+    const answer = {
+      type: "fillGaps",
+      items: { "form-study": "not studies" },
+      attempts: {
+        "form-study": [
+          { at: "2026-05-31T00:00:00.000Z", value: "not study", correct: false },
+          { at: "2026-05-31T00:01:00.000Z", value: "not studies", correct: false },
+        ],
+      },
+    };
+
+    const initialMarkup = renderToStaticMarkup(createElement(RenderedFillGapExercise, { block }));
+    const failedMarkup = renderToStaticMarkup(createElement(RenderedFillGapExercise, { answer, block }));
+
+    expect(initialMarkup).toContain('placeholder="not study"');
+    expect(initialMarkup).toContain('value=""');
+    expect(initialMarkup).not.toContain('value="not study"');
+    expect(initialMarkup).toContain('data-input-mode="formTransform"');
+    expect(initialMarkup).toContain('data-control-mode="formTransform"');
+    expect(initialMarkup).toContain("--playsay-gap-chars:16");
+    expect(failedMarkup).toContain("playsay-answer-reveal");
+  });
+
+  it("uses per-item max attempts for form transform answer key visibility", () => {
+    const block = {
+      id: "block-gaps",
+      type: "fillGaps",
+      title: "Verb forms",
+      assessment: { maxAttempts: 1 },
+      items: [
+        {
+          id: "form-study",
+          prompt: "Sam ␣ right now.",
+          baseForm: "study",
+          answer: "is studying",
+          gapMode: "formTransform",
+          maxAttempts: 2,
+        },
+      ],
+    } as MaterialEditorBlock;
+    const answer = {
+      type: "fillGaps",
+      items: { "form-study": "studies" },
+      attempts: {
+        "form-study": [
+          { at: "2026-05-31T00:00:00.000Z", value: "studies", correct: false },
+        ],
+      },
+    };
+
+    const markup = renderToStaticMarkup(createElement(RenderedFillGapExercise, { answer, block }));
+
+    expect(markup).not.toContain("playsay-answer-reveal");
+    expect(markup).toContain("Ошибок 1 из 2");
+  });
+
+  it("sizes form transform input from the entered long answer instead of the compact fill gap cap", () => {
+    const block = {
+      id: "block-gaps",
+      type: "fillGaps",
+      title: "Verb forms",
+      items: [
+        {
+          id: "form-study",
+          prompt: "Sam ␣ right now.",
+          baseForm: "study",
+          answer: "is studying",
+          gapMode: "formTransform",
+        },
+      ],
+    } as MaterialEditorBlock;
+    const answer = {
+      type: "fillGaps",
+      items: { "form-study": "has not been studying" },
+    };
+
+    const markup = renderToStaticMarkup(createElement(RenderedFillGapExercise, { answer, block }));
+
+    expect(markup).toContain("--playsay-gap-chars:22");
+  });
+
+  it("keeps short form transform answers wide enough for the answer and inline controls", () => {
+    const block = {
+      id: "block-gaps",
+      type: "fillGaps",
+      title: "Verb forms",
+      items: [
+        {
+          id: "form-go",
+          prompt: "I am ␣ to the airport.",
+          baseForm: "go",
+          answer: "going",
+          gapMode: "formTransform",
+        },
+      ],
+    } as MaterialEditorBlock;
+    const answer = {
+      type: "fillGaps",
+      items: { "form-go": "going" },
+    };
+
+    const markup = renderToStaticMarkup(createElement(RenderedFillGapExercise, { answer, block }));
+
+    expect(markup).toContain("--playsay-gap-chars:10");
   });
 });

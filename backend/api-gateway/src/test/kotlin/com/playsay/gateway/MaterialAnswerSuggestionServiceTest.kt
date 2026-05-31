@@ -92,6 +92,55 @@ class MaterialAnswerSuggestionServiceTest {
         assertTrue(transport.requestBody.contains("2. They were discussing ___ schedule."))
     }
 
+    @Test
+    fun `openai answer suggestions include and enforce typed hint prefix`() {
+        val transport = RecordingOpenAiTransport(
+            """
+            {
+              "id": "resp_test",
+              "output": [
+                {
+                  "type": "message",
+                  "content": [
+                    {
+                      "type": "output_text",
+                      "text": "{\"suggestions\":[{\"value\":\"went\",\"reason\":\"Wrong prefix.\",\"confidence\":0.82},{\"value\":\"going out\",\"reason\":\"Same prefix.\",\"confidence\":0.76}]}"
+                    }
+                  ]
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+        val provider = OpenAiMaterialAnswerSuggestionProvider(
+            transport = transport,
+            apiKey = "test-key",
+            model = "gpt-5.4-mini",
+            baseUrl = "https://api.openai.com/v1",
+        )
+
+        val suggestions = provider.suggest(
+            MaterialAnswerSuggestionInput(
+                materialTitle = "Gerunds",
+                language = "en",
+                cefrLevel = "A2",
+                blockTitle = "Gerunds",
+                blockType = "fillGaps",
+                itemId = "item-going",
+                prompt = "I do not enjoy ___ to the cinema.",
+                itemContextPrompt = "I do not enjoy ___ to the cinema.",
+                blockContextPrompt = "I do not enjoy ___ to the cinema.",
+                answer = "going",
+                acceptedAnswers = emptyList(),
+                options = emptyList(),
+                hintPrefix = "go",
+            ),
+        )
+
+        assertTrue(transport.requestBody.contains("Required answer prefix: go"))
+        assertEquals(listOf("going out"), suggestions.map { suggestion -> suggestion.value })
+    }
+
     private class RecordingOpenAiTransport(
         private val responseBody: String,
     ) : OpenAiResponsesTransport {

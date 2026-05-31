@@ -1,5 +1,7 @@
 import type { MaterialMatchingPair, MaterialRenderMode } from "./types";
 
+export const DEFAULT_MATCHING_PAIR_MAX_ERRORS = 5;
+
 export function matchingRightOptionsForMode(
   pairs: MaterialMatchingPair[],
   mode: MaterialRenderMode,
@@ -9,6 +11,15 @@ export function matchingRightOptionsForMode(
   }
 
   return derangeMatchingRightOptions(pairs);
+}
+
+export function matchingEffectiveMaxErrors(configuredMaxErrors: number | undefined, rightOptionsCount: number): number {
+  if (rightOptionsCount <= 0) {
+    return 0;
+  }
+
+  const configured = Math.round(Number.isFinite(configuredMaxErrors) ? configuredMaxErrors ?? DEFAULT_MATCHING_PAIR_MAX_ERRORS : DEFAULT_MATCHING_PAIR_MAX_ERRORS);
+  return Math.min(Math.max(configured, 1), rightOptionsCount);
 }
 
 function derangeMatchingRightOptions(pairs: MaterialMatchingPair[]): MaterialMatchingPair[] {

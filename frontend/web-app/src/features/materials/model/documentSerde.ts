@@ -144,6 +144,12 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   const assessment = materialAssessmentFromJson(block.assessment);
   if (assessment || isObjectiveMaterialBlockType(type)) {
     result.assessment = assessment ?? defaultObjectiveAssessmentPolicy();
+    if (type === "matchingPairs") {
+      const sourceAssessment = asJsonObject(block.assessment);
+      const maxErrors = asPositiveNumber(sourceAssessment.maxErrors) ?? asPositiveNumber(sourceAssessment.maxAttempts) ?? 5;
+      result.assessment.maxErrors = Math.round(maxErrors);
+      result.assessment.maxAttempts = result.assessment.maxErrors;
+    }
   }
 
   const body = asString(block.body);
@@ -204,6 +210,14 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   };
   if (block.assessment || isObjectiveMaterialBlockType(block.type)) {
     clean.assessment = cleanMaterialAssessment(block.assessment ?? defaultObjectiveAssessmentPolicy());
+    if (block.type === "fillGaps") {
+      delete clean.assessment.weight;
+    }
+    if (block.type === "matchingPairs") {
+      const maxErrors = block.assessment?.maxErrors ?? block.assessment?.maxAttempts ?? 5;
+      clean.assessment.maxErrors = Math.round(Math.min(10, Math.max(1, maxErrors)));
+      clean.assessment.maxAttempts = clean.assessment.maxErrors;
+    }
   }
 
   if (block.body?.trim()) {
@@ -249,11 +263,13 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
 
     const wordBankOptionIds = new Set(cleanWordBankOptions.map((option) => option.id));
     clean.items = items
-      .map((item) => ({
+      .map((item) => {
+        const gapMode = normalizeMaterialFillGapMode(item.gapMode);
+        return {
         prompt: item.prompt.trim(),
         id: item.id,
         answer: item.answer?.trim() || undefined,
-        answerOptionId: normalizeMaterialFillGapMode(item.gapMode) === "wordBank" &&
+        answerOptionId: gapMode === "wordBank" &&
           item.answerOptionId &&
           wordBankOptionIds.has(item.answerOptionId)
           ? item.answerOptionId
@@ -269,13 +285,29 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
             reason: suggestion.reason.trim(),
             confidence: Math.min(1, Math.max(0, suggestion.confidence)),
           })),
-        gapMode: normalizeMaterialFillGapMode(item.gapMode) === "typed" ? undefined : normalizeMaterialFillGapMode(item.gapMode),
+        baseForm: normalizeMaterialFillGapMode(item.gapMode) === "formTransform"
+          ? item.baseForm?.trim() || undefined
+          : undefined,
+        gapMode: gapMode === "typed" ? undefined : gapMode,
+        hintPrefixLength: gapMode === "typed" && normalizeMaterialHintPrefixLength(item.hintPrefixLength)
+          ? normalizeMaterialHintPrefixLength(item.hintPrefixLength)
+          : undefined,
+        hintCount: block.type === "fillGaps" && gapMode === "typed"
+          ? normalizeMaterialItemHintCount(item.hintCount)
+          : undefined,
+        maxAttempts: block.type === "fillGaps" && gapMode !== "singleChoice" && gapMode !== "wordBank"
+          ? normalizeMaterialItemMaxAttempts(item.maxAttempts)
+          : undefined,
+        maxErrors: block.type === "fillGaps" && gapMode === "wordBank"
+          ? normalizeMaterialItemMaxErrors(item.maxErrors ?? item.maxAttempts)
+          : undefined,
         options: item.options?.map((option) => option.trim()).filter(Boolean),
         threadRootItemId: item.threadRootItemId && item.threadRootItemId !== item.id && itemIds.has(item.threadRootItemId)
           ? item.threadRootItemId
           : undefined,
-        weight: item.weight && item.weight > 0 ? item.weight : undefined,
-      }));
+        weight: block.type === "fillGaps" ? undefined : item.weight && item.weight > 0 ? item.weight : undefined,
+        };
+      });
   }
   if (block.pairs?.length) {
     clean.pairs = block.pairs
@@ -342,6 +374,7 @@ export function materialItemFromJson(value: unknown): NonNullable<MaterialEditor
   const options = Array.isArray(item.options) ? item.options.map(asString).filter(Boolean) : [];
   const choices = Array.isArray(item.choices) ? item.choices.map(asString).filter(Boolean) : [];
   const answer = asString(item.answer) || asString(item.correct) || undefined;
+  const baseForm = asString(item.baseForm) || asString(item.givenForm) || asString(item.initialValue) || asString(item.sourceForm) || undefined;
   const acceptedAnswers = uniqueMaterialOptions([
     ...(Array.isArray(item.acceptedAnswers) ? item.acceptedAnswers.map(asString) : []),
     ...(Array.isArray(item.variants) ? item.variants.map(asString) : []),
@@ -368,7 +401,12 @@ export function materialItemFromJson(value: unknown): NonNullable<MaterialEditor
     answerOptionId: asString(item.answerOptionId) || undefined,
     acceptedAnswers,
     aiSuggestedAnswers,
+    baseForm,
     gapMode: normalizeMaterialFillGapMode(asString(item.gapMode) || asString(item.mode) || asString(item.interactionMode)),
+    hintPrefixLength: normalizeMaterialHintPrefixLength(asNumber(item.hintPrefixLength) ?? asNumber(item.hintPrefixLetters)),
+    hintCount: normalizeMaterialItemHintCount(asNumber(item.hintCount) ?? asNumber(asJsonObject(item.assessment).hintCount)),
+    maxAttempts: normalizeMaterialItemMaxAttempts(asNumber(item.maxAttempts) ?? asNumber(asJsonObject(item.assessment).maxAttempts)),
+    maxErrors: normalizeMaterialItemMaxErrors(asNumber(item.maxErrors) ?? asNumber(item.maxAttempts) ?? asNumber(asJsonObject(item.assessment).maxErrors)),
     options: uniqueMaterialOptions([...options, ...choices]),
     threadRootItemId: asString(item.threadRootItemId) || asString(item.continuationOfItemId) || undefined,
     weight: asPositiveNumber(item.weight) ?? asPositiveNumber(asJsonObject(item.assessment).weight) ?? undefined,
@@ -388,10 +426,36 @@ export function materialWordBankOptionFromJson(value: unknown): MaterialWordBank
 }
 
 export function normalizeMaterialFillGapMode(value: string | undefined): MaterialFillGapMode {
-  if (value === "singleChoice" || value === "wordBank") {
+  if (value === "singleChoice" || value === "wordBank" || value === "formTransform") {
     return value;
   }
   return "typed";
+}
+
+function normalizeMaterialHintPrefixLength(value: number | undefined | null): 1 | 2 | undefined {
+  const cleanValue = Math.round(Number(value ?? 0));
+  return cleanValue === 1 || cleanValue === 2 ? cleanValue : undefined;
+}
+
+function normalizeMaterialItemMaxAttempts(value: number | undefined | null): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return Math.round(Math.min(10, Math.max(1, Number(value))));
+}
+
+function normalizeMaterialItemMaxErrors(value: number | undefined | null): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return Math.round(Math.min(10, Math.max(1, Number(value))));
+}
+
+function normalizeMaterialItemHintCount(value: number | undefined | null): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return Math.round(Math.min(5, Math.max(3, Number(value))));
 }
 
 export function materialAssessmentFromJson(value: unknown): MaterialAssessmentPolicy | undefined {
@@ -402,7 +466,9 @@ export function materialAssessmentFromJson(value: unknown): MaterialAssessmentPo
   return cleanMaterialAssessment({
     weight: asPositiveNumber(assessment.weight) ?? undefined,
     maxAttempts: asPositiveNumber(assessment.maxAttempts) ?? undefined,
+    maxErrors: asPositiveNumber(assessment.maxErrors) ?? undefined,
     attemptPenalty: asNumber(assessment.attemptPenalty) ?? undefined,
+    hintCount: asPositiveNumber(assessment.hintCount) ?? undefined,
     hintPenalty: asNumber(assessment.hintPenalty) ?? undefined,
     lockAfterAttempts: typeof assessment.lockAfterAttempts === "boolean" ? assessment.lockAfterAttempts : undefined,
   });

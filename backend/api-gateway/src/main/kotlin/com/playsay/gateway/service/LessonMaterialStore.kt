@@ -57,6 +57,8 @@ private typealias StoredMaterialSubmission = MaterialSubmissionRow
 private typealias StoredMaterialAnnotation = LessonMaterialAnnotationEntity
 private typealias ScheduledMaterialLookup = ScheduledMaterialLookupRow
 
+private const val fillGapDefaultMaxAttempts = 5
+private const val fillGapDefaultMaxErrors = 3
 private data class ValidatedLessonMaterialRequest(
     val title: String,
     val description: String?,
@@ -425,6 +427,9 @@ class LessonMaterialStore(
                     "matchingPairs" -> {
                         val matches = answerBlock?.get("matches")?.takeIf { node -> node.isObject }
                         val pairs = block.get("pairs") as? ArrayNode ?: return@forEach
+                        val globalPolicy = materialAssessmentPolicy(block, pairs.firstOrNull() ?: block, blockType)
+                        val globallyLocked = globalPolicy.lockAfterAttempts &&
+                            matchingIncorrectAttempts(answerBlock, matches, pairs) >= globalPolicy.maxAttempts
                         pairs.forEach { pair ->
                             val expectedPairId = pair.get("id")?.asText()?.takeIf { value -> value.isNotBlank() }
                                 ?: return@forEach
@@ -437,6 +442,7 @@ class LessonMaterialStore(
                                 expectedAnswers = listOf(expectedPairId),
                                 actual = matches?.get(expectedPairId)?.asText(),
                                 answerBlock = answerBlock,
+                                forceLocked = globallyLocked,
                             )
                             totalWeight += result.weight
                             earnedWeight += result.earnedWeight
@@ -483,8 +489,9 @@ class LessonMaterialStore(
         expectedAnswers: List<String>,
         actual: String?,
         answerBlock: JsonNode?,
+        forceLocked: Boolean = false,
     ): ObjectiveItemScore {
-        val policy = materialAssessmentPolicy(block, item)
+        val policy = materialAssessmentPolicy(block, item, blockType)
         val validation = materialAnswerValidation(block, item)
         val override = answerTeacherOverride(answerBlock, itemKey)
         val expectedOptionId = item.get("answerOptionId")
@@ -541,6 +548,7 @@ class LessonMaterialStore(
             weight = policy.weight,
             earnedWeight = earnedWeight,
             scoreFactor = scoreFactor,
+            maxAttempts = policy.maxAttempts,
             attemptsUsed = attemptsUsed,
             incorrectAttempts = incorrectAttempts,
             hintsUsed = hints.size,
@@ -549,6 +557,7 @@ class LessonMaterialStore(
                 correct && hints.isEmpty() && attemptsUsed <= 1 -> "CORRECT"
                 correct && hints.isNotEmpty() -> "CORRECT_WITH_HINT"
                 correct -> "CORRECT_AFTER_RETRY"
+                forceLocked && policy.lockAfterAttempts -> "LOCKED"
                 attemptsUsed >= policy.maxAttempts && policy.lockAfterAttempts -> "LOCKED"
                 else -> "INCORRECT"
             },
@@ -706,6 +715,7 @@ class LessonMaterialStore(
                         answer = item.answer,
                         acceptedAnswers = item.acceptedAnswers,
                         options = item.options,
+                        hintPrefix = item.hintPrefix,
                     ),
                 ),
             )
@@ -1143,6 +1153,7 @@ private data class ObjectiveItemScore(
     val weight: BigDecimal,
     val earnedWeight: BigDecimal,
     val scoreFactor: BigDecimal,
+    val maxAttempts: Int,
     val attemptsUsed: Int,
     val incorrectAttempts: Int,
     val hintsUsed: Int,
@@ -1307,6 +1318,7 @@ internal data class MaterialAnswerItemContext(
     val answer: String?,
     val acceptedAnswers: List<String>,
     val options: List<String>,
+    val hintPrefix: String,
     val itemContextPrompt: String,
     val blockContextPrompt: String,
 )
@@ -1324,6 +1336,7 @@ internal fun materialAnswerItemContexts(block: ObjectNode): List<MaterialAnswerI
             options = ((item.get("options") ?: item.get("choices")) as? ArrayNode)?.mapNotNull { option ->
                 option.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
             } ?: emptyList(),
+            hintPrefix = item.materialHintPrefix(),
         )
     }
     val itemIds = rawItems.map { item -> item.itemId }.toSet()
@@ -1354,6 +1367,7 @@ internal fun materialAnswerItemContexts(block: ObjectNode): List<MaterialAnswerI
             answer = item.answer,
             acceptedAnswers = item.acceptedAnswers,
             options = item.options,
+            hintPrefix = item.hintPrefix,
             itemContextPrompt = threadPrompt.ifBlank { materialAnswerContextText(item.prompt) },
             blockContextPrompt = blockContextPrompt.ifBlank { materialAnswerContextText(item.prompt) },
         )
@@ -1367,7 +1381,23 @@ private data class RawMaterialAnswerItemContext(
     val answer: String?,
     val acceptedAnswers: List<String>,
     val options: List<String>,
+    val hintPrefix: String,
 )
+
+private fun JsonNode.materialHintPrefix(): String {
+    val mode = get("gapMode")?.asText()?.trim().orEmpty()
+    if (mode.isNotEmpty() && mode != "typed") {
+        return ""
+    }
+    val length = get("hintPrefixLength")?.takeIf { node -> node.isNumber }?.asInt() ?: return ""
+    if (length !in 1..2) {
+        return ""
+    }
+    val answer = get("answer")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+        ?: get("correct")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
+        ?: return ""
+    return answer.take(length)
+}
 
 private fun materialAnswerContextText(value: String): String =
     value.trim().replace(Regex("\\s+"), " ")
@@ -1386,7 +1416,7 @@ private fun findMaterialBlock(document: JsonNode, blockId: String): ObjectNode? 
     return null
 }
 
-private fun materialAssessmentPolicy(block: JsonNode, item: JsonNode): AssessmentPolicy {
+private fun materialAssessmentPolicy(block: JsonNode, item: JsonNode, blockType: String): AssessmentPolicy {
     val blockAssessment = block.get("assessment")?.takeIf { node -> node.isObject }
     val itemAssessment = item.get("assessment")?.takeIf { node -> node.isObject }
     fun decimal(name: String, default: BigDecimal): BigDecimal =
@@ -1408,12 +1438,61 @@ private fun materialAssessmentPolicy(block: JsonNode, item: JsonNode): Assessmen
             ?: block.get(name)?.takeIf { node -> node.isBoolean }?.asBoolean()
             ?: default
 
+    val fillGapMode = item.get("gapMode")?.asText()?.takeIf { value -> value.isNotBlank() }
+        ?: if ((item.get("options") as? ArrayNode)?.size()?.let { count -> count > 0 } == true) "singleChoice" else "typed"
+    val configuredMaxAttempts = when (blockType) {
+        "matchingPairs" -> {
+            blockAssessment?.intField("maxErrors")
+                ?: block.intField("maxErrors")
+                ?: blockAssessment?.intField("maxAttempts")
+                ?: block.intField("maxAttempts")
+                ?: 5
+        }
+        "fillGaps" -> {
+            when (fillGapMode) {
+                "singleChoice" -> (item.get("options") as? ArrayNode)?.size()?.takeIf { count -> count > 0 } ?: 1
+                "wordBank" -> item.intField("maxErrors")
+                    ?: itemAssessment?.intField("maxErrors")
+                    ?: item.intField("maxAttempts")
+                    ?: itemAssessment?.intField("maxAttempts")
+                    ?: blockAssessment?.intField("maxErrors")
+                    ?: block.intField("maxErrors")
+                    ?: blockAssessment?.intField("maxAttempts")
+                    ?: block.intField("maxAttempts")
+                    ?: fillGapDefaultMaxErrors
+                else -> item.intField("maxAttempts")
+                    ?: itemAssessment?.intField("maxAttempts")
+                    ?: blockAssessment?.intField("maxAttempts")
+                    ?: block.intField("maxAttempts")
+                    ?: fillGapDefaultMaxAttempts
+            }
+        }
+        else -> int("maxAttempts", 3)
+    }
+    val cappedMaxAttempts = when (blockType) {
+        "matchingPairs" -> {
+            val pairCount = (block.get("pairs") as? ArrayNode)?.size() ?: configuredMaxAttempts
+            configuredMaxAttempts.coerceIn(1, 10).coerceAtMost(pairCount.coerceAtLeast(1))
+        }
+        else -> configuredMaxAttempts.coerceIn(1, 10)
+    }
+    val attemptPenalty = if (blockType == "fillGaps") {
+        BigDecimal("0.30")
+    } else {
+        decimal("attemptPenalty", BigDecimal("0.30")).between(BigDecimal.ZERO, BigDecimal.ONE)
+    }
+    val hintPenalty = if (blockType == "fillGaps") {
+        BigDecimal("0.15")
+    } else {
+        decimal("hintPenalty", BigDecimal("0.15")).between(BigDecimal.ZERO, BigDecimal.ONE)
+    }
+
     return AssessmentPolicy(
-        weight = decimal("weight", BigDecimal.ONE).between(BigDecimal("0.10"), BigDecimal("20")),
-        maxAttempts = int("maxAttempts", 3).coerceIn(1, 10),
-        attemptPenalty = decimal("attemptPenalty", BigDecimal("0.30")).between(BigDecimal.ZERO, BigDecimal.ONE),
+        weight = if (blockType == "fillGaps") BigDecimal.ONE else decimal("weight", BigDecimal.ONE).between(BigDecimal("0.10"), BigDecimal("20")),
+        maxAttempts = cappedMaxAttempts,
+        attemptPenalty = attemptPenalty,
         minimumCorrectFactor = decimal("minimumCorrectFactor", BigDecimal("0.40")).between(BigDecimal.ZERO, BigDecimal.ONE),
-        defaultHintPenalty = decimal("hintPenalty", BigDecimal("0.15")).between(BigDecimal.ZERO, BigDecimal.ONE),
+        defaultHintPenalty = hintPenalty,
         minimumHintFactor = decimal("minimumHintFactor", BigDecimal("0.40")).between(BigDecimal.ZERO, BigDecimal.ONE),
         lockAfterAttempts = boolean("lockAfterAttempts", true),
     )
@@ -1461,6 +1540,13 @@ private fun answerAttemptValues(answerBlock: JsonNode?, itemKey: String, actual:
         listOfNotNull(actual?.trim()?.takeIf { value -> value.isNotEmpty() }?.let { value -> AnswerAttempt(value, actualOptionId) })
     }
 }
+
+private fun matchingIncorrectAttempts(answerBlock: JsonNode?, matches: JsonNode?, pairs: ArrayNode): Int =
+    pairs.sumOf { pair ->
+        val expectedPairId = pair.get("id")?.asText()?.takeIf { value -> value.isNotBlank() } ?: return@sumOf 0
+        answerAttemptValues(answerBlock, expectedPairId, matches?.get(expectedPairId)?.asText())
+            .count { attempt -> attempt.value != expectedPairId }
+    }
 
 private fun answerHints(answerBlock: JsonNode?, itemKey: String, policy: AssessmentPolicy): List<UsedHint> {
     val hintsNode = answerBlock?.get("hints")?.get(itemKey) ?: return emptyList()
@@ -1545,6 +1631,7 @@ private fun ObjectiveItemScore.toJson(objectMapper: ObjectMapper): ObjectNode =
         put("weight", weight)
         put("earnedWeight", earnedWeight)
         put("scoreFactor", scoreFactor)
+        put("maxAttempts", maxAttempts)
         put("attemptsUsed", attemptsUsed)
         put("incorrectAttempts", incorrectAttempts)
         put("hintsUsed", hintsUsed)

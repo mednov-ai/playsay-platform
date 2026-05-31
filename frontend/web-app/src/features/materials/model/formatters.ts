@@ -81,6 +81,9 @@ export function materialPromptWithInsertedGapMarker(
 }
 
 export function materialFillGapMode(item: MaterialExerciseItem): MaterialFillGapMode {
+  if (item.gapMode === "formTransform") {
+    return "formTransform";
+  }
   if (item.gapMode === "wordBank") {
     return "wordBank";
   }
@@ -88,6 +91,11 @@ export function materialFillGapMode(item: MaterialExerciseItem): MaterialFillGap
     return "singleChoice";
   }
   return "typed";
+}
+
+export function materialHintPrefixLength(item: MaterialExerciseItem): 0 | 1 | 2 {
+  const value = Math.round(Number(item.hintPrefixLength ?? 0));
+  return value === 1 || value === 2 ? value : 0;
 }
 
 export function splitFillGapPrompt(prompt: string): { before: string; after: string } {
@@ -228,7 +236,6 @@ export function parseExerciseItems(value: string, type: "fillGaps" | "multipleCh
           prompt: prompt.trim(),
           answer: optionsOrAnswer.trim() || undefined,
           acceptedAnswers: fillGapAcceptedAnswers,
-          weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
         };
       }
 
@@ -236,7 +243,6 @@ export function parseExerciseItems(value: string, type: "fillGaps" | "multipleCh
         prompt: prompt.trim(),
         options: answer ? splitMaterialList(optionsOrAnswer).map((option) => option.trim()).filter(Boolean) : undefined,
         answer: (answer || optionsOrAnswer).trim() || undefined,
-        weight: parsedWeight && parsedWeight > 0 ? parsedWeight : undefined,
       };
     })
     .filter((item) => item.prompt);
@@ -250,10 +256,10 @@ export function formatExerciseItems(items: MaterialEditorBlock["items"], type: "
       }
 
       if (item.acceptedAnswers?.length && !item.options?.length) {
-        return [item.prompt, item.answer, formatMaterialList(item.acceptedAnswers), item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");
+        return [item.prompt, item.answer, formatMaterialList(item.acceptedAnswers)].filter(Boolean).map(escapeMaterialCell).join(" | ");
       }
 
-      return [item.prompt, formatMaterialList(item.options), item.answer, item.weight].filter(Boolean).map(escapeMaterialCell).join(" | ");
+      return [item.prompt, formatMaterialList(item.options), item.answer].filter(Boolean).map(escapeMaterialCell).join(" | ");
     })
     .join("\n");
 }

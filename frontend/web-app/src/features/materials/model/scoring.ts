@@ -8,7 +8,7 @@ import {
   materialAnswerMatches,
 } from "./answers";
 import { editorDocumentFromJson } from "./documentSerde";
-import { asJsonObject, asNumber, clampNumber, isMaterialNormalizationTerm } from "./formatters";
+import { asJsonObject, asNumber, clampNumber, isMaterialNormalizationTerm, materialFillGapMode } from "./formatters";
 import type {
   MaterialAnswerState,
   MaterialAnswerStatus,
@@ -24,16 +24,22 @@ export function defaultObjectiveAssessmentPolicy(): MaterialAssessmentPolicy {
     weight: 1,
     maxAttempts: 3,
     attemptPenalty: 0.3,
+    hintCount: 3,
     hintPenalty: 0.15,
     lockAfterAttempts: true,
   };
 }
 
+export const DEFAULT_FILL_GAP_MAX_ATTEMPTS = 5;
+export const DEFAULT_FILL_GAP_MAX_ERRORS = 3;
+
 export function cleanMaterialAssessment(value: MaterialAssessmentPolicy): MaterialAssessmentPolicy {
   return {
     weight: clampNumber(value.weight ?? 1, 0.1, 20),
     maxAttempts: Math.round(clampNumber(value.maxAttempts ?? 3, 1, 10)),
+    maxErrors: Math.round(clampNumber(value.maxErrors ?? value.maxAttempts ?? 3, 1, 10)),
     attemptPenalty: clampNumber(value.attemptPenalty ?? 0.3, 0, 1),
+    hintCount: Math.round(clampNumber(value.hintCount ?? 3, 3, 5)),
     hintPenalty: clampNumber(value.hintPenalty ?? 0.15, 0, 1),
     lockAfterAttempts: value.lockAfterAttempts ?? true,
   };
@@ -252,10 +258,42 @@ export function materialAssessmentForItem(
   block: MaterialEditorBlock,
   item?: NonNullable<MaterialEditorBlock["items"]>[number],
 ): MaterialAssessmentPolicy {
+  if (block.type === "fillGaps") {
+    return materialFillGapAssessmentForItem(block, item);
+  }
+
   return cleanMaterialAssessment({
     ...defaultObjectiveAssessmentPolicy(),
     ...block.assessment,
     weight: item?.weight ?? block.assessment?.weight ?? defaultObjectiveAssessmentPolicy().weight,
+  });
+}
+
+function materialFillGapAssessmentForItem(
+  block: MaterialEditorBlock,
+  item?: NonNullable<MaterialEditorBlock["items"]>[number],
+): MaterialAssessmentPolicy {
+  const defaults = defaultObjectiveAssessmentPolicy();
+  const blockPolicy = cleanMaterialAssessment({
+    ...defaults,
+    ...block.assessment,
+  });
+  const mode = item ? materialFillGapMode(item) : "typed";
+  const optionCount = Math.max(1, item?.options?.length ?? 0);
+  const maxAttempts = mode === "singleChoice"
+    ? optionCount
+    : mode === "wordBank"
+      ? Math.round(clampNumber(item?.maxErrors ?? block.assessment?.maxErrors ?? block.assessment?.maxAttempts ?? DEFAULT_FILL_GAP_MAX_ERRORS, 1, 10))
+      : Math.round(clampNumber(item?.maxAttempts ?? block.assessment?.maxAttempts ?? DEFAULT_FILL_GAP_MAX_ATTEMPTS, 1, 10));
+
+  return cleanMaterialAssessment({
+    ...blockPolicy,
+    weight: defaults.weight,
+    maxAttempts,
+    maxErrors: maxAttempts,
+    hintCount: Math.round(clampNumber(item?.hintCount ?? block.assessment?.hintCount ?? defaults.hintCount ?? 3, 3, 5)),
+    attemptPenalty: defaults.attemptPenalty,
+    hintPenalty: defaults.hintPenalty,
   });
 }
 

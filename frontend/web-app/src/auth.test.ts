@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { buildAuthorizeUrl, mapTokenResponse, type AuthConfig } from "./shared/auth/oidc";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildAuthorizeUrl, clearTokens, completeLogin, mapTokenResponse, type AuthConfig } from "./shared/auth/oidc";
 
 const config: AuthConfig = {
   issuer: "https://ops.play-and-say.ru:18443/keycloak/realms/playsay/",
@@ -8,6 +8,13 @@ const config: AuthConfig = {
 };
 
 describe("auth helpers", () => {
+  afterEach(() => {
+    if (typeof window !== "undefined") {
+      clearTokens();
+    }
+    vi.unstubAllGlobals();
+  });
+
   it("builds a PKCE authorization URL for the playsay web client", () => {
     const url = buildAuthorizeUrl({
       config,
@@ -45,4 +52,55 @@ describe("auth helpers", () => {
       expiresAt: 61_000,
     });
   });
+
+  it("deduplicates concurrent authorization-code exchange for the same callback", async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "playsay.auth.loginFlow",
+      JSON.stringify({
+        codeVerifier: "verifier-1",
+        redirectUri: "https://online.play-and-say.ru/auth/callback",
+        state: "state-1",
+      }),
+    );
+    vi.stubGlobal("window", { sessionStorage: storage });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access",
+        refresh_token: "refresh",
+        id_token: "id",
+        expires_in: 60,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: "invalid_grant",
+        error_description: "Code not valid",
+      }), { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const callbackUrl = new URL("https://online.play-and-say.ru/auth/callback?code=code-1&state=state-1");
+    const [first, second] = await Promise.all([
+      completeLogin(callbackUrl, config),
+      completeLogin(callbackUrl, config),
+    ]);
+
+    expect(first.accessToken).toBe("access");
+    expect(second).toEqual(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
+
+class MemoryStorage {
+  private readonly values = new Map<string, string>();
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+}

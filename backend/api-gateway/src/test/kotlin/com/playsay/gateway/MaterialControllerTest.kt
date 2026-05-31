@@ -390,7 +390,7 @@ class MaterialControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `submission scoring applies weights attempts and hints`() {
+    fun `submission scoring applies attempts and hints while ignoring fill gap weights`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
@@ -497,16 +497,218 @@ class MaterialControllerTest @Autowired constructor(
             ),
         )
 
-        assertEquals(0, BigDecimal("8.00").compareTo(assertNotNull(submission.score)))
+        assertEquals(0, BigDecimal("8.50").compareTo(assertNotNull(submission.score)))
         assertEquals(1, submission.errorsCount)
         val assessment = submission.content["assessment"]
         assertEquals(1, assessment["errorsCount"].asInt())
+        assertEquals(0, BigDecimal("2").compareTo(assessment["totalWeight"].decimalValue()))
         assertEquals(2, assessment["items"].size())
         val firstItem = assessment["items"][0]
         assertEquals("CORRECT_WITH_HINT", firstItem["status"].asText())
+        assertEquals(0, BigDecimal.ONE.compareTo(firstItem["weight"].decimalValue()))
         assertEquals(2, firstItem["attemptsUsed"].asInt())
         assertEquals(1, firstItem["hintsUsed"].asInt())
         assertEquals(0, BigDecimal("0.70").compareTo(firstItem["scoreFactor"].decimalValue()))
+    }
+
+    @Test
+    fun `submission scoring uses fixed fill gap retry factors instead of configured penalties`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = materialController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "Fixed fill gap scoring",
+                status = "PUBLISHED",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Attempts",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "gaps",
+                              "type": "fillGaps",
+                              "title": "Fill gaps",
+                              "assessment": {
+                                "maxAttempts": 1,
+                                "attemptPenalty": 1,
+                                "hintPenalty": 1
+                              },
+                              "items": [
+                                {
+                                  "id": "retry",
+                                  "prompt": "I enjoy ___ books.",
+                                  "answer": "reading",
+                                  "maxAttempts": 5
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                scoringRubric = objectMapper.readTree("""{"maxScore":10}"""),
+            ),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = material.id,
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val submission = materialController.saveScheduledLessonMaterialSubmission(
+            student,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${material.id}",
+                      "answers": {
+                        "gaps": {
+                          "type": "fillGaps",
+                          "items": {
+                            "retry": "reading"
+                          },
+                          "attempts": {
+                            "retry": [
+                              { "value": "read", "correct": false },
+                              { "value": "reading", "correct": true }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+            ),
+        )
+
+        assertEquals(0, BigDecimal("7.00").compareTo(assertNotNull(submission.score)))
+        val itemAssessment = submission.content["assessment"]["items"][0]
+        assertEquals("CORRECT_AFTER_RETRY", itemAssessment["status"].asText())
+        assertEquals(5, itemAssessment["maxAttempts"].asInt())
+        assertEquals(0, BigDecimal("0.70").compareTo(itemAssessment["scoreFactor"].decimalValue()))
+    }
+
+    @Test
+    fun `submission scoring applies matching pair max error limits`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = materialController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "Matching attempts",
+                status = "PUBLISHED",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Matching",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "matching",
+                              "type": "matchingPairs",
+                              "title": "Match",
+                              "pairs": [
+                                {
+                                  "id": "pair-a",
+                                  "left": "elusive",
+                                  "right": "difficult to find"
+                                },
+                                {
+                                  "id": "pair-b",
+                                  "left": "goal",
+                                  "right": "aim"
+                                }
+                              ],
+                              "assessment": {
+                                "maxErrors": 2
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+                scoringRubric = objectMapper.readTree("""{"maxScore":10}"""),
+            ),
+        ).body!!
+        val course = courseController.create(teacher, CourseRequest(title = "Course", isPublished = true)).body!!
+        val lessonTemplate = courseController.createLesson(
+            teacher,
+            course.id,
+            CourseLessonRequest(title = "Lesson", materialId = material.id),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplate.id,
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val submission = materialController.saveScheduledLessonMaterialSubmission(
+            student,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${material.id}",
+                      "answers": {
+                        "matching": {
+                          "type": "matchingPairs",
+                          "matches": {},
+                          "attempts": {
+                            "pair-a": [
+                              { "value": "pair-b", "correct": false }
+                            ],
+                            "pair-b": [
+                              { "value": "pair-a", "correct": false }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+            ),
+        )
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(assertNotNull(submission.score)))
+        val firstItem = submission.content["assessment"]["items"][0]
+        assertEquals("LOCKED", firstItem["status"].asText())
+        assertEquals(1, firstItem["attemptsUsed"].asInt())
+        assertEquals(1, firstItem["incorrectAttempts"].asInt())
+        val secondItem = submission.content["assessment"]["items"][1]
+        assertEquals("LOCKED", secondItem["status"].asText())
+        assertEquals(1, secondItem["attemptsUsed"].asInt())
+        assertEquals(1, secondItem["incorrectAttempts"].asInt())
     }
 
     @Test

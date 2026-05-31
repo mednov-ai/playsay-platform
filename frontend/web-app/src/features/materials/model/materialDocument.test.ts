@@ -6,9 +6,11 @@ import {
   materialAnswerOptionIds,
   materialAnswerStatus,
   appendMaterialAttempt,
+  materialAssessmentForItem,
   materialBlockFromJson,
   materialExerciseItemKey,
   materialItemAnswerMatches,
+  materialLiveScore,
   materialWordBankUsedOptionIds,
   materialPromptWithInsertedGapMarker,
   materialPromptWithGapMarker,
@@ -136,6 +138,112 @@ describe("material document accepted answers", () => {
     });
   });
 
+  it("keeps form transform base form and typed hint prefix length through serde", () => {
+    const block = materialBlockFromJson({
+      id: "gaps",
+      type: "fillGaps",
+      title: "Verb forms",
+      items: [
+        {
+          id: "item-study",
+          prompt: "Sam ␣ right now.",
+          baseForm: "not study",
+          answer: "isn't studying",
+          acceptedAnswers: ["is not studying"],
+          gapMode: "formTransform",
+        },
+        {
+          id: "item-going",
+          prompt: "I do not enjoy ␣ to the cinema.",
+          answer: "going",
+          hintPrefixLength: 2,
+        },
+      ],
+    });
+
+    expect(block?.items?.[0]).toMatchObject({
+      baseForm: "not study",
+      gapMode: "formTransform",
+    });
+    expect(block?.items?.[1]).toMatchObject({
+      hintPrefixLength: 2,
+    });
+
+    const clean = cleanMaterialBlock(block as MaterialEditorBlock);
+    expect(clean.items?.[0]).toMatchObject({
+      baseForm: "not study",
+      gapMode: "formTransform",
+    });
+    expect(clean.items?.[1]).toMatchObject({
+      hintPrefixLength: 2,
+    });
+  });
+
+  it("keeps per-item fill gap attempt and hint limits through serde", () => {
+    const block = materialBlockFromJson({
+      id: "gaps",
+      type: "fillGaps",
+      title: "Per phrase limits",
+      assessment: { maxAttempts: 2, attemptPenalty: 1, hintPenalty: 1, hintCount: 5 },
+      wordBankOptions: [{ id: "bank-to", value: "to" }],
+      items: [
+        {
+          id: "typed",
+          prompt: "I enjoy ␣ books.",
+          answer: "reading",
+          maxAttempts: 5,
+          hintCount: 4,
+        },
+        {
+          id: "bank",
+          prompt: "I am going ␣ school.",
+          answer: "to",
+          answerOptionId: "bank-to",
+          gapMode: "wordBank",
+          maxErrors: 3,
+        },
+        {
+          id: "choice",
+          prompt: "We met ␣ the station.",
+          answer: "at",
+          gapMode: "singleChoice",
+          maxAttempts: 1,
+          options: ["in", "at", "on", "near"],
+        },
+      ],
+    });
+
+    expect(block?.items?.[0]).toMatchObject({ maxAttempts: 5, hintCount: 4 });
+    expect(block?.items?.[1]).toMatchObject({ maxErrors: 3 });
+    expect(block?.items?.[2]).toMatchObject({ maxAttempts: 1 });
+
+    const clean = cleanMaterialBlock(block as MaterialEditorBlock);
+    expect(clean.items?.[0]).toMatchObject({ maxAttempts: 5, hintCount: 4 });
+    expect(clean.items?.[1]).toMatchObject({ maxErrors: 3 });
+    expect(clean.items?.[2]?.maxAttempts).toBeUndefined();
+  });
+
+  it("derives fill gap limits from each item while ignoring teacher-facing penalty fields", () => {
+    const block = {
+      id: "gaps",
+      type: "fillGaps",
+      title: "Per phrase limits",
+      assessment: { maxAttempts: 2, attemptPenalty: 1, hintPenalty: 1, hintCount: 5 },
+      items: [
+        { id: "typed", prompt: "I enjoy ␣ books.", answer: "reading", maxAttempts: 5, hintCount: 4 },
+        { id: "choice", prompt: "We met ␣ the station.", answer: "at", gapMode: "singleChoice" as const, maxAttempts: 1, options: ["in", "at", "on", "near"] },
+        { id: "bank", prompt: "I am going ␣ school.", answer: "to", gapMode: "wordBank" as const, maxErrors: 3 },
+      ],
+    } as MaterialEditorBlock;
+
+    expect(materialAssessmentForItem(block, block.items?.[0]).maxAttempts).toBe(5);
+    expect(materialAssessmentForItem(block, block.items?.[0]).hintCount).toBe(4);
+    expect(materialAssessmentForItem(block, block.items?.[0]).attemptPenalty).toBe(0.3);
+    expect(materialAssessmentForItem(block, block.items?.[0]).hintPenalty).toBe(0.15);
+    expect(materialAssessmentForItem(block, block.items?.[1]).maxAttempts).toBe(4);
+    expect(materialAssessmentForItem(block, block.items?.[2]).maxAttempts).toBe(3);
+  });
+
   it("matches primary and accepted answers with the same normalization", () => {
     const item = {
       id: "item-about",
@@ -259,9 +367,115 @@ describe("material document accepted answers", () => {
       prompt: "I enjoy ___ books.",
       answer: "reading",
       acceptedAnswers: ["reading stories", "reading novels"],
-      weight: 2,
     });
-    expect(formatExerciseItems(parsed, "fillGaps")).toBe("I enjoy ___ books. | reading | reading stories, reading novels | 2");
+    expect(parsed?.[0]?.weight).toBeUndefined();
+    expect(formatExerciseItems(parsed, "fillGaps")).toBe("I enjoy ___ books. | reading | reading stories, reading novels");
+  });
+
+  it("scores fill gap items evenly without item weights", () => {
+    const material = {
+      id: "material-weights",
+      title: "Weights",
+      document: {
+        schemaVersion: 1,
+        pages: [{
+          id: "page-1",
+          title: "Page",
+          layout: "FLOW",
+          blocks: [{
+            id: "block-1",
+            type: "fillGaps",
+            title: "Gaps",
+            assessment: { weight: 10 },
+            items: [
+              { id: "heavy", prompt: "I enjoy ␣ books.", answer: "reading", weight: 9 },
+              { id: "light", prompt: "I keep ␣ English.", answer: "studying", weight: 1 },
+            ],
+          }],
+        }],
+      },
+      scoringRubric: { maxScore: 10 },
+    };
+
+    const score = materialLiveScore(material as never, {
+      "block-1": {
+        type: "fillGaps",
+        items: {
+          heavy: "reading",
+          light: "wrong",
+        },
+        attempts: {
+          heavy: [{ at: "2026-05-30T00:00:00.000Z", value: "reading", correct: true }],
+          light: [{ at: "2026-05-30T00:00:00.000Z", value: "wrong", correct: false }],
+        },
+      },
+    });
+
+    expect(score).toBe(5);
+  });
+
+  it("scores fill gap retries with fixed factors instead of configurable penalties", () => {
+    const material = {
+      id: "material-fixed-penalty",
+      title: "Fixed penalty",
+      document: {
+        schemaVersion: 1,
+        pages: [{
+          id: "page-1",
+          title: "Page",
+          layout: "FLOW",
+          blocks: [{
+            id: "block-1",
+            type: "fillGaps",
+            title: "Gaps",
+            assessment: { attemptPenalty: 1, hintPenalty: 1 },
+            items: [
+              { id: "retry", prompt: "I enjoy ␣ books.", answer: "reading", maxAttempts: 5 },
+            ],
+          }],
+        }],
+      },
+      scoringRubric: { maxScore: 10 },
+    };
+
+    const score = materialLiveScore(material as never, {
+      "block-1": {
+        type: "fillGaps",
+        items: { retry: "reading" },
+        attempts: {
+          retry: [
+            { at: "2026-05-30T00:00:00.000Z", value: "read", correct: false },
+            { at: "2026-05-30T00:00:01.000Z", value: "reading", correct: true },
+          ],
+        },
+      },
+    });
+
+    expect(score).toBe(7);
+  });
+
+  it("keeps matching pair error budget on the block instead of individual pairs", () => {
+    const block = materialBlockFromJson({
+      id: "matching",
+      type: "matchingPairs",
+      title: "Match words",
+      assessment: { maxErrors: 4 },
+      pairs: [
+        {
+          id: "pair-1",
+          left: "elusive",
+          right: "difficult to find",
+          assessment: { maxErrors: 1 },
+        },
+      ],
+    });
+
+    expect(block?.assessment?.maxErrors).toBe(4);
+    expect(block?.pairs?.[0]).not.toHaveProperty("assessment");
+
+    const clean = cleanMaterialBlock(block as MaterialEditorBlock);
+    expect(clean.assessment?.maxErrors).toBe(4);
+    expect(clean.pairs?.[0]).not.toHaveProperty("assessment");
   });
 
   it("uses a visible blank marker while keeping legacy underscore prompts readable", () => {

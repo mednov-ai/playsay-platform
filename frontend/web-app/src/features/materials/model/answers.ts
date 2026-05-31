@@ -36,6 +36,13 @@ export function materialAnswerMatches(answer: MaterialAnswerBlock | undefined): 
   }, {});
 }
 
+export function materialAnswerMatchOrder(answer: MaterialAnswerBlock | undefined): string[] {
+  const order = Array.isArray(answer?.matchOrder) ? answer.matchOrder : [];
+  return order
+    .map((value) => asString(value))
+    .filter(Boolean);
+}
+
 export function materialAnswerOptionIds(answer: MaterialAnswerBlock | undefined): Record<string, string> {
   const optionIds = asJsonObject(answer?.optionIds);
   return Object.entries(optionIds).reduce<Record<string, string>>((result, [key, value]) => {

@@ -25,6 +25,7 @@ data class MaterialAnswerSuggestionInput(
     val answer: String?,
     val acceptedAnswers: List<String>,
     val options: List<String>,
+    val hintPrefix: String = "",
 )
 
 @Component
@@ -53,7 +54,11 @@ class StubMaterialAnswerSuggestionProvider {
         }
         return candidates
             .map { candidate -> candidate.trim().replace(Regex("\\s+"), " ") }
-            .filter { candidate -> candidate.isNotEmpty() && normalizedAnswerSuggestionValue(candidate) !in knownAnswers }
+            .filter { candidate ->
+                candidate.isNotEmpty() &&
+                    normalizedAnswerSuggestionValue(candidate) !in knownAnswers &&
+                    answerSuggestionMatchesPrefix(candidate, input.hintPrefix)
+            }
             .distinctBy(::normalizedAnswerSuggestionValue)
             .take(5)
             .map { candidate ->
@@ -107,6 +112,9 @@ class OpenAiMaterialAnswerSuggestionProvider(
             val value = suggestion.get("value")?.asText()?.trim()?.takeIf { item -> item.isNotEmpty() }
                 ?: return@mapNotNull null
             if (normalizedAnswerSuggestionValue(value) in knownAnswers) {
+                return@mapNotNull null
+            }
+            if (!answerSuggestionMatchesPrefix(value, input.hintPrefix)) {
                 return@mapNotNull null
             }
             MaterialAnswerSuggestion(
@@ -196,12 +204,14 @@ private fun materialAnswerSuggestionUserPrompt(input: MaterialAnswerSuggestionIn
     Primary answer: ${input.answer ?: ""}
     Already accepted answers: ${input.acceptedAnswers.joinToString(", ")}
     Visible options: ${input.options.joinToString(", ")}
+    Required answer prefix: ${input.hintPrefix}
 
     Requirements:
     - Return only variants that should be accepted as correct for the same grammar meaning.
     - Treat continuation cards in the sentence/thread context as one connected sentence.
     - Use the full block context to disambiguate topic, references, grammar pattern, and tricky English cases.
     - Do not return the primary answer or already accepted answers.
+    - If a required answer prefix is present, every suggestion must start with it.
     - Do not invent answers that change the grammar target.
     - Keep variants short and teacher-review friendly.
     - If no safe variants exist, return an empty suggestions array.
@@ -279,3 +289,11 @@ private fun shortAnswerVariants(answer: String, blockTitle: String, prompt: Stri
 
 private fun normalizedAnswerSuggestionValue(value: String): String =
     value.trim().lowercase().replace(Regex("[\\p{Punct}]+"), "").replace(Regex("\\s+"), " ")
+
+private fun answerSuggestionMatchesPrefix(value: String, hintPrefix: String): Boolean {
+    val cleanPrefix = hintPrefix.trim().lowercase()
+    if (cleanPrefix.isEmpty()) {
+        return true
+    }
+    return value.trim().lowercase().startsWith(cleanPrefix)
+}

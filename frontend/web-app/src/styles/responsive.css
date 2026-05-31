@@ -60,6 +60,10 @@
     justify-content: space-between;
   }
 
+  .playsay-matching-error-limit {
+    min-width: 4.4rem;
+  }
+
   .playsay-classroom-shell {
     grid-template-rows: clamp(9.75rem, 25dvh, 12rem) minmax(0, 1fr);
     border-radius: 0;
@@ -394,24 +398,28 @@
     max-width: 100%;
   }
 
-  .playsay-match-rows {
-    gap: 0.625rem;
+  .playsay-match-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+    gap: 0.5rem;
   }
 
-  .playsay-match-row {
-    grid-template-columns: minmax(4.75rem, 0.8fr) minmax(0, 1.2fr);
-    gap: 0.625rem;
+  .playsay-match-column {
+    gap: 0.42rem;
+  }
+
+  .playsay-match-left-control {
+    gap: 0.26rem;
   }
 
   .playsay-match-word {
-    min-height: 4.4rem;
+    min-height: 2.5rem;
     padding: 0.5rem 0.55rem;
     font-size: 0.8125rem;
   }
 
   .playsay-match-picture {
-    grid-template-columns: 2.75rem minmax(0, 1fr);
-    min-height: 4.4rem;
+    grid-template-columns: 2.55rem minmax(0, 1fr);
+    min-height: 2.5rem;
     gap: 0.45rem;
     padding: 0.45rem;
   }
@@ -427,7 +435,15 @@
 
   .playsay-match-picture img,
   .playsay-match-generated-thumb {
-    width: 2.75rem;
+    width: 2.55rem;
+  }
+
+  .playsay-match-solved-pair {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .playsay-match-solved-card[data-side="right"] {
+    grid-column: 2;
   }
 
   .playsay-match-picture span:not(.playsay-match-generated-thumb) {
@@ -459,6 +475,10 @@
   .playsay-inline-answer-wrap {
     width: min(13.6rem, 68vw);
     max-width: 100%;
+  }
+
+  .playsay-inline-answer-wrap[data-control-mode="formTransform"] {
+    width: min(25rem, 92vw);
   }
 
   .playsay-inline-answer {

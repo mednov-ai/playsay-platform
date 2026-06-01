@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canFinalizeCollaborationMode,
   collaborationRoomKey,
   collaborationScopeForMode,
   collaborationDocumentDisplayName,
@@ -44,6 +45,11 @@ describe("collaboration model", () => {
   it("maps workspace modes to backend document scopes", () => {
     expect(collaborationScopeForMode("individual")).toBe("INDIVIDUAL");
     expect(collaborationScopeForMode("group")).toBe("GROUP");
+  });
+
+  it("allows finalize only for individual workspace mode", () => {
+    expect(canFinalizeCollaborationMode("individual")).toBe(true);
+    expect(canFinalizeCollaborationMode("group")).toBe(false);
   });
 
   it("detects group collaboration documents by scope", () => {

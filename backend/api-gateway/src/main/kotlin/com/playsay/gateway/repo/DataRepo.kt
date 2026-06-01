@@ -13,9 +13,11 @@ import com.playsay.gateway.entity.MaterialAssetEntity
 import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.entity.SubmissionEntity
 import com.playsay.gateway.entity.TeacherProfileEntity
+import jakarta.persistence.LockModeType
 import java.time.Instant
 import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 
 data class CourseSummaryRow(
@@ -222,6 +224,16 @@ interface LessonTemplateRepo : JpaRepository<LessonTemplateEntity, UUID> {
 }
 
 interface LessonRepo : JpaRepository<LessonEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        select l
+          from LessonEntity l
+         where l.id = :lessonId
+        """,
+    )
+    fun lockById(lessonId: UUID): LessonEntity?
+
     @Query(
         """
         select new com.playsay.gateway.repo.ScheduledLessonRow(

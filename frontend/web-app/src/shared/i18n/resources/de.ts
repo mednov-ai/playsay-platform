@@ -588,6 +588,7 @@ export const de = {
       finalizing: "Wird abgeschlossen",
       finalized: "Abgeschlossen",
       finalizeFailed: "Abschluss fehlgeschlagen",
+      groupFinalizeUnavailable: "Gruppenarbeit speichert automatisch. Schließe deine eigene Arbeit ab.",
       loadFailed: "Live-Dokument konnte nicht geöffnet werden",
       teacherLoadFailed: "Live-Dokumente konnten nicht geladen werden",
       groupCreateFailed: "Gruppendokument konnte nicht erstellt werden",

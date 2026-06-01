@@ -602,6 +602,7 @@ export const ru = {
       finalizing: "Завершаем",
       finalized: "Завершено",
       finalizeFailed: "Не удалось завершить",
+      groupFinalizeUnavailable: "Общая работа автосохраняется. Завершайте индивидуальную работу.",
       loadFailed: "Не удалось открыть живой документ",
       teacherLoadFailed: "Не удалось загрузить живые документы",
       groupCreateFailed: "Не удалось создать общий документ",

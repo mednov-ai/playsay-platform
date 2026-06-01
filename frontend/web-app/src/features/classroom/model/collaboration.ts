@@ -34,6 +34,10 @@ export function collaborationScopeForMode(mode: CollaborationWorkspaceMode): Col
   return mode === "group" ? "GROUP" : "INDIVIDUAL";
 }
 
+export function canFinalizeCollaborationMode(mode: CollaborationWorkspaceMode): boolean {
+  return mode === "individual";
+}
+
 export function isGroupCollaborationDocument(document: CollaborationDocumentLike): boolean {
   return document.scope === "GROUP";
 }

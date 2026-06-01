@@ -97,6 +97,7 @@ class CollaborationDocumentService(
     ): CollaborationDocumentResponse {
         val values = request.validated()
         accessibleScheduledMaterial(authentication, lessonId, values.materialId)
+        lockLesson(lessonId)
         val studentUserId = studentUserIdForCurrentDocument(authentication, values.scope)
         val existing = findCurrent(
             lessonId = lessonId,
@@ -359,6 +360,11 @@ class CollaborationDocumentService(
 
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0
+
+    private fun lockLesson(lessonId: UUID) {
+        lessonRepo.lockById(lessonId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+    }
 
     private fun requireValidServiceToken(serviceToken: String?) {
         val expected = collaborationServiceToken.trim()

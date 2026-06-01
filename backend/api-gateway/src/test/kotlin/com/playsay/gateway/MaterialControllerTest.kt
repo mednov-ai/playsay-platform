@@ -9,6 +9,10 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -390,6 +394,72 @@ class MaterialControllerTest @Autowired constructor(
         )
 
         assertFalse(method.getAnnotation(Transactional::class.java).readOnly)
+    }
+
+    @Test
+    fun `scheduled lesson annotation save is idempotent under concurrent create requests`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Concurrent annotation", status = "PUBLISHED"),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = material.id,
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+
+        try {
+            val futures = listOf("stroke-a", "stroke-b").map { strokeId ->
+                executor.submit(
+                    Callable {
+                        start.await(5, TimeUnit.SECONDS)
+                        scheduledMaterialController.saveScheduledLessonMaterialAnnotation(
+                            student,
+                            lesson.id,
+                            MaterialAnnotationRequest(
+                                content = objectMapper.readTree(
+                                    """
+                                    {
+                                      "schemaVersion": 2,
+                                      "coordinateSpace": "material-page",
+                                      "strokes": [{
+                                        "id": "$strokeId",
+                                        "pageId": "material",
+                                        "color": "#ff5c00",
+                                        "points": [{"pageId": "material", "x": 10, "y": 20}]
+                                      }]
+                                    }
+                                    """.trimIndent(),
+                                ),
+                            ),
+                        )
+                    },
+                )
+            }
+            start.countDown()
+            val annotations = futures.map { future -> future.get(10, TimeUnit.SECONDS) }
+            val persisted = requireNotNull(lessonMaterialAnnotationRepo.findByLessonIdAndMaterialId(lesson.id, material.id))
+
+            assertEquals(1, annotations.map { annotation -> annotation.id }.toSet().size)
+            assertEquals(1, lessonMaterialAnnotationRepo.findAll().size)
+            assertEquals(persisted.id, annotations.first().id)
+            assertTrue(
+                setOf("stroke-a", "stroke-b").contains(
+                    objectMapper.readTree(persisted.content)["strokes"][0]["id"].asText(),
+                ),
+            )
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test

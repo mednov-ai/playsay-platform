@@ -74,15 +74,19 @@ export function StudentLiveWorkspace({
       return null;
     }
     return {
+      participants: annotationWorkspace.participants,
       ready: annotationWorkspace.connected,
       setStrokes: annotationWorkspace.setAnnotationStrokes,
       strokes: annotationWorkspace.annotationStrokes,
+      updateCursor: annotationWorkspace.updateCursor,
     };
   }, [
     annotationDocument?.id,
     annotationWorkspace.annotationStrokes,
     annotationWorkspace.connected,
+    annotationWorkspace.participants,
     annotationWorkspace.setAnnotationStrokes,
+    annotationWorkspace.updateCursor,
   ]);
 
   async function finalizeWork() {
@@ -120,6 +124,7 @@ export function StudentLiveWorkspace({
           <button
             aria-selected={mode === "individual"}
             data-active={mode === "individual" ? "true" : "false"}
+            data-testid="collaboration-mode-individual"
             onClick={() => setMode("individual")}
             role="tab"
             type="button"
@@ -130,6 +135,7 @@ export function StudentLiveWorkspace({
           <button
             aria-selected={mode === "group"}
             data-active={mode === "group" ? "true" : "false"}
+            data-testid="collaboration-mode-group"
             onClick={() => setMode("group")}
             role="tab"
             type="button"
@@ -153,6 +159,7 @@ export function StudentLiveWorkspace({
           collaborationControls={(
             <>
               <Button
+                data-testid="collaboration-finalize-button"
                 disabled={documentState.finalizing || !documentState.document || !canFinalize}
                 onClick={() => void finalizeWork()}
                 type="button"
@@ -191,6 +198,7 @@ export function StudentLiveWorkspace({
           </div>
           <textarea
             className="playsay-live-textarea"
+            data-testid="collaboration-live-textarea"
             disabled={!documentState.document}
             onChange={(event) => workspace.updateText(event.target.value)}
             placeholder={t("classroom.collaboration.editorPlaceholder")}

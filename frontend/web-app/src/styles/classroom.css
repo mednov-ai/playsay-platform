@@ -593,6 +593,11 @@
 .playsay-task-document-surface {
   position: relative;
   min-height: 100%;
+  overflow: hidden;
+}
+
+.playsay-task-document-surface .playsay-presence-layer {
+  z-index: 5;
 }
 
 .playsay-task-kicker {

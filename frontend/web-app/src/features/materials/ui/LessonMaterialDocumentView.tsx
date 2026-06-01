@@ -212,18 +212,21 @@ export function AnnotationToolButton({
   disabled = false,
   label,
   onClick,
+  testId,
 }: {
   active: boolean;
   children: ReactNode;
   disabled?: boolean;
   label: string;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <button
       aria-label={label}
       className="playsay-annotation-button"
       data-active={active ? "true" : "false"}
+      data-testid={testId}
       disabled={disabled}
       onClick={onClick}
       title={label}

@@ -30,6 +30,7 @@ export function useCollaborationDocument({
   const [message, setMessage] = useState<string | null>(null);
 
   const scope = collaborationScopeForMode(mode);
+  const activeDocument = document?.scope === scope ? document : null;
 
   const refresh = useCallback(async () => {
     if (!enabled || !materialId) {
@@ -76,17 +77,17 @@ export function useCollaborationDocument({
   }, [refresh]);
 
   async function saveSnapshot(snapshot: LessonMaterialJson): Promise<CollaborationDocument | null> {
-    if (!document) {
+    if (!activeDocument) {
       return null;
     }
 
-    const saved = await saveCollaborationDocumentSnapshot(lessonId, document.id, { snapshot });
+    const saved = await saveCollaborationDocumentSnapshot(lessonId, activeDocument.id, { snapshot });
     setDocument(saved);
     return saved;
   }
 
   async function finalize(snapshot: LessonMaterialJson | null): Promise<LessonMaterialSubmission | null> {
-    if (!document) {
+    if (!activeDocument) {
       return null;
     }
 
@@ -96,7 +97,7 @@ export function useCollaborationDocument({
       if (snapshot) {
         await saveSnapshot(snapshot);
       }
-      const submission = await finalizeCollaborationDocument(lessonId, document.id, { submitted: true });
+      const submission = await finalizeCollaborationDocument(lessonId, activeDocument.id, { submitted: true });
       setMessage(t("classroom.collaboration.finalized"));
       return submission;
     } catch (caught) {
@@ -108,7 +109,7 @@ export function useCollaborationDocument({
   }
 
   return {
-    document,
+    document: activeDocument,
     error,
     finalizing,
     finalize,

@@ -1726,6 +1726,14 @@ components:
           - string
           - "null"
           format: uuid
+        studentSubject:
+          type:
+          - string
+          - "null"
+        studentName:
+          type:
+          - string
+          - "null"
         documentKind:
           type: string
         scope:

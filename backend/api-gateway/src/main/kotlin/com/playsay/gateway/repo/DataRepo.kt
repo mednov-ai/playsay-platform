@@ -109,6 +109,8 @@ interface AppUserRepo : JpaRepository<AppUserEntity, UUID> {
 
     fun findByKeycloakSubjectIn(keycloakSubjects: Collection<String>): List<AppUserEntity>
 
+    fun findByIdIn(ids: Collection<UUID>): List<AppUserEntity>
+
     @Query(
         """
         select u

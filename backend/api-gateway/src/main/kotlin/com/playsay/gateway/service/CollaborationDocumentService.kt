@@ -14,8 +14,10 @@ import com.playsay.gateway.dto.CreateCollaborationDocumentRequest
 import com.playsay.gateway.dto.FinalizeCollaborationDocumentRequest
 import com.playsay.gateway.dto.MaterialSubmissionResponse
 import com.playsay.gateway.dto.SaveCollaborationSnapshotRequest
+import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.CollaborationDocumentEntity
 import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.CollaborationDocumentRepo
 import com.playsay.gateway.repo.LessonParticipantRepo
 import com.playsay.gateway.repo.LessonRepo
@@ -77,6 +79,7 @@ class CollaborationTokenService(
 
 @Component
 class CollaborationDocumentService(
+    private val appUserRepo: AppUserRepo,
     private val collaborationDocumentRepo: CollaborationDocumentRepo,
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
@@ -103,7 +106,7 @@ class CollaborationDocumentService(
             scope = values.scope,
         )
         if (existing != null) {
-            return existing.toResponse()
+            return existing.toResponse(existing.studentUser())
         }
 
         val now = Instant.now()
@@ -123,7 +126,7 @@ class CollaborationDocumentService(
                 updatedAt = now,
             ),
         )
-        return document.toResponse()
+        return document.toResponse(document.studentUser())
     }
 
     @Transactional(readOnly = true)
@@ -142,7 +145,7 @@ class CollaborationDocumentService(
         accessibleScheduledMaterial(authentication, lessonId, materialId)
         val studentUserId = studentUserIdForCurrentDocument(authentication, values.scope)
         return findCurrent(lessonId, materialId, studentUserId, values.documentKind, values.scope)
-            ?.toResponse()
+            ?.let { document -> document.toResponse(document.studentUser()) }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COLLABORATION_DOCUMENT_NOT_FOUND)
     }
 
@@ -154,8 +157,9 @@ class CollaborationDocumentService(
     ): List<CollaborationDocumentResponse> {
         accessibleScheduledMaterial(authentication, lessonId, materialId)
         val documents = collaborationDocumentRepo.findByLessonIdAndMaterialIdOrderByUpdatedAtDesc(lessonId, materialId)
+        val usersById = documents.studentUsersById()
         if (authentication.canManageCollaboration()) {
-            return documents.map { document -> document.toResponse() }
+            return documents.map { document -> document.toResponse(usersById[document.studentUserId]) }
         }
 
         val currentUserId = userProfileStore.currentUserId(authentication)
@@ -164,7 +168,7 @@ class CollaborationDocumentService(
                 document.collaborationScope == MetaData.CollaborationScopes.GROUP ||
                     (document.collaborationScope == MetaData.CollaborationScopes.INDIVIDUAL && document.studentUserId == currentUserId)
             }
-            .map { document -> document.toResponse() }
+            .map { document -> document.toResponse(usersById[document.studentUserId]) }
     }
 
     @Transactional
@@ -201,7 +205,8 @@ class CollaborationDocumentService(
         document.snapshotStorageKey = request.snapshotStorageKey?.trim()?.takeIf { key -> key.isNotEmpty() }
         document.version += 1
         document.updatedAt = Instant.now()
-        return collaborationDocumentRepo.save(document).toResponse()
+        val saved = collaborationDocumentRepo.save(document)
+        return saved.toResponse(saved.studentUser())
     }
 
     @Transactional
@@ -314,12 +319,17 @@ class CollaborationDocumentService(
             )
         }
 
-    private fun CollaborationDocumentEntity.toResponse(): CollaborationDocumentResponse =
+    private fun CollaborationDocumentEntity.toResponse(studentUser: AppUserEntity?): CollaborationDocumentResponse =
         CollaborationDocumentResponse(
             id = id,
             lessonId = lessonId,
             materialId = materialId,
             studentUserId = studentUserId,
+            studentSubject = studentUser?.keycloakSubject,
+            studentName = studentUser?.displayName
+                ?: studentUser?.name
+                ?: studentUser?.username
+                ?: studentUser?.keycloakSubject,
             documentKind = documentKind,
             scope = collaborationScope,
             yjsDocumentId = yjsDocumentId,
@@ -329,6 +339,17 @@ class CollaborationDocumentService(
             createdAt = createdAt,
             updatedAt = updatedAt,
         )
+
+    private fun CollaborationDocumentEntity.studentUser(): AppUserEntity? =
+        studentUserId?.let { userId -> appUserRepo.findById(userId).orElse(null) }
+
+    private fun List<CollaborationDocumentEntity>.studentUsersById(): Map<UUID, AppUserEntity> {
+        val ids = mapNotNull { document -> document.studentUserId }.distinct()
+        if (ids.isEmpty()) {
+            return emptyMap()
+        }
+        return appUserRepo.findByIdIn(ids).associateBy { user -> user.id }
+    }
 
     private fun validateSnapshot(snapshot: JsonNode) {
         if (objectMapper.writeValueAsBytes(snapshot).size > 1_000_000) {

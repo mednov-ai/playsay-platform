@@ -4,6 +4,7 @@ import type { LessonMaterialJson } from "../../../shared/api/playsay";
 export type AnnotationTool = "pointer" | "pen" | "eraser";
 
 export type AnnotationPoint = {
+  pageId: string;
   x: number;
   y: number;
 };
@@ -11,14 +12,16 @@ export type AnnotationPoint = {
 export type AnnotationStroke = {
   color: string;
   id: string;
+  pageId: string;
   points: AnnotationPoint[];
 };
 
-export function svgPointFromEvent(event: PointerEvent<SVGSVGElement>): AnnotationPoint {
+export function svgPointFromEvent(event: PointerEvent<SVGSVGElement>, pageId = defaultAnnotationPageId): AnnotationPoint {
   const rect = event.currentTarget.getBoundingClientRect();
   return {
+    pageId,
     x: ((event.clientX - rect.left) / rect.width) * 1000,
-    y: ((event.clientY - rect.top) / rect.height) * 700,
+    y: ((event.clientY - rect.top) / rect.height) * 1000,
   };
 }
 
@@ -29,17 +32,20 @@ export function eraseAnnotationAt(
   setStrokes((current) => current.filter((stroke) => distanceToStroke(point, stroke) > 34));
 }
 
-export function emptyAnnotationContent(): { schemaVersion: 1; strokes: AnnotationStroke[] } {
-  return { schemaVersion: 1, strokes: [] };
+export function emptyAnnotationContent(): { coordinateSpace: "material-page"; schemaVersion: 2; strokes: AnnotationStroke[] } {
+  return { coordinateSpace: "material-page", schemaVersion: 2, strokes: [] };
 }
 
 export function annotationContentFromStrokes(strokes: AnnotationStroke[]): LessonMaterialJson {
   return {
-    schemaVersion: 1,
+    coordinateSpace: "material-page",
+    schemaVersion: 2,
     strokes: strokes.map((stroke) => ({
       color: stroke.color,
       id: stroke.id,
+      pageId: stroke.pageId,
       points: stroke.points.map((point) => ({
+        pageId: point.pageId,
         x: Number(point.x.toFixed(1)),
         y: Number(point.y.toFixed(1)),
       })),
@@ -47,7 +53,7 @@ export function annotationContentFromStrokes(strokes: AnnotationStroke[]): Lesso
   };
 }
 
-export function annotationContentFromJson(value: unknown): { schemaVersion: 1; strokes: AnnotationStroke[] } {
+export function annotationContentFromJson(value: unknown): { coordinateSpace: "material-page"; schemaVersion: 2; strokes: AnnotationStroke[] } {
   const root = asJsonObject(value);
   const strokes = Array.isArray(root.strokes)
     ? root.strokes
@@ -55,7 +61,7 @@ export function annotationContentFromJson(value: unknown): { schemaVersion: 1; s
         .filter((stroke): stroke is AnnotationStroke => stroke !== null)
     : [];
 
-  return { schemaVersion: 1, strokes };
+  return { coordinateSpace: "material-page", schemaVersion: 2, strokes };
 }
 
 export function pointsToSvgPath(points: AnnotationPoint[]): string {
@@ -74,13 +80,15 @@ function annotationStrokeFromJson(value: unknown): AnnotationStroke | null {
   const stroke = asJsonObject(value);
   const id = asString(stroke.id).trim();
   const color = asString(stroke.color).trim() || "#ff5c00";
+  const pageId = asString(stroke.pageId).trim() || defaultAnnotationPageId;
   const rawPoints = Array.isArray(stroke.points) ? stroke.points : [];
   const points = rawPoints
     .map((point) => {
       const pointObject = asJsonObject(point);
       const x = asNumber(pointObject.x);
       const y = asNumber(pointObject.y);
-      return x === null || y === null ? null : { x, y };
+      const pointPageId = asString(pointObject.pageId).trim() || pageId;
+      return x === null || y === null ? null : { pageId: pointPageId, x, y };
     })
     .filter((point): point is AnnotationPoint => point !== null);
 
@@ -88,7 +96,7 @@ function annotationStrokeFromJson(value: unknown): AnnotationStroke | null {
     return null;
   }
 
-  return { color, id, points };
+  return { color, id, pageId, points };
 }
 
 function distanceToStroke(point: AnnotationPoint, stroke: AnnotationStroke): number {
@@ -118,3 +126,5 @@ function asNumber(value: unknown): number | null {
 
   return null;
 }
+
+const defaultAnnotationPageId = "material";

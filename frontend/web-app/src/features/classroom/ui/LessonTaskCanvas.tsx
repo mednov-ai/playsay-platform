@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Eraser, Loader2, MousePointer2, PenLine, Send, Undo2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
   FallbackLessonDocument,
   LessonMaterialDocumentView,
   materialAnswersFromSubmission,
+  materialDocumentBlocks,
   materialLiveScore,
   type MaterialAnswerBlock,
   type MaterialAnswerState,
@@ -22,6 +23,7 @@ import {
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function LessonTaskCanvas({
+  collaborationControls,
   lessonId,
   material,
   onSaveAnswers,
@@ -31,6 +33,7 @@ export function LessonTaskCanvas({
   submissionSaving,
   teacherName,
 }: {
+  collaborationControls?: ReactNode;
   lessonId: string;
   material?: LessonMaterial | null;
   onSaveAnswers: (content: LessonMaterialJson) => void;
@@ -82,6 +85,7 @@ export function LessonTaskCanvas({
   const displayScore = answersKey !== savedAnswersKey && liveScore !== null
     ? liveScore
     : score ?? liveScore;
+  const taskTotal = Math.max(1, material ? materialDocumentBlocks(material).length : 1);
 
   return (
     <div className="playsay-task-board">
@@ -120,55 +124,62 @@ export function LessonTaskCanvas({
 
       <div className="playsay-task-page">
         <div className="playsay-task-document">
-          {material ? (
-            <LessonMaterialDocumentView
-              answers={answers}
-              material={material}
-              mode="classroom"
-              onAnswerChange={updateAnswer}
-              score={displayScore}
-            />
-          ) : (
-            <FallbackLessonDocument />
-          )}
+          <div className="playsay-task-document-surface">
+            {material ? (
+              <LessonMaterialDocumentView
+                answers={answers}
+                material={material}
+                mode="classroom"
+                onAnswerChange={updateAnswer}
+                score={displayScore}
+              />
+            ) : (
+              <FallbackLessonDocument />
+            )}
+            <svg
+              aria-label={t("classroom.annotation.layer")}
+              className="playsay-annotation-layer"
+              data-tool={annotationTool}
+              onPointerCancel={endAnnotation}
+              onPointerDown={beginAnnotation}
+              onPointerMove={extendAnnotation}
+              onPointerUp={endAnnotation}
+              preserveAspectRatio="none"
+              viewBox="0 0 1000 1000"
+            >
+              {annotationStrokes.map((stroke) => (
+                <path
+                  d={pointsToSvgPath(stroke.points)}
+                  fill="none"
+                  key={stroke.id}
+                  stroke={stroke.color}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="8"
+                />
+              ))}
+            </svg>
+          </div>
         </div>
-
-        <svg
-          className="playsay-annotation-layer"
-          data-tool={annotationTool}
-          onPointerCancel={endAnnotation}
-          onPointerDown={beginAnnotation}
-          onPointerMove={extendAnnotation}
-          onPointerUp={endAnnotation}
-          viewBox="0 0 1000 700"
-        >
-          {annotationStrokes.map((stroke) => (
-            <path
-              d={pointsToSvgPath(stroke.points)}
-              fill="none"
-              key={stroke.id}
-              stroke={stroke.color}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="8"
-            />
-          ))}
-        </svg>
       </div>
 
       <footer className="playsay-task-footer">
         <button aria-label={t("classroom.annotation.previousTask")} className="playsay-page-button" type="button">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span>{t("classroom.annotation.pageIndicator", { current: 1, total: 14 })}</span>
+        <span>{t("classroom.annotation.pageIndicator", { current: 1, total: taskTotal })}</span>
         <button aria-label={t("classroom.annotation.nextTask")} className="playsay-page-button" type="button">
           <ChevronRight className="h-4 w-4" />
         </button>
-        <Button disabled={!material || submissionSaving} onClick={submitAnswers} type="button">
-          {submissionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          {submissionSaving ? t("classroom.actions.submitting") : t("classroom.actions.submit")}
-        </Button>
-        {submissionMessage ? <span className="playsay-task-submit-status">{submissionMessage}</span> : null}
+        {collaborationControls ?? (
+          <>
+            <Button disabled={!material || submissionSaving} onClick={submitAnswers} type="button">
+              {submissionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {submissionSaving ? t("classroom.actions.submitting") : t("classroom.actions.submit")}
+            </Button>
+            {submissionMessage ? <span className="playsay-task-submit-status">{submissionMessage}</span> : null}
+          </>
+        )}
         <span className="playsay-task-teacher">{teacherName}</span>
       </footer>
     </div>

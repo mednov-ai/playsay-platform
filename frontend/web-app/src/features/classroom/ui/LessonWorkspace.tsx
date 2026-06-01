@@ -18,6 +18,8 @@ import {
 } from "../../materials";
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
 import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
+import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
+import { TeacherCollaborationPanel } from "./TeacherCollaborationPanel";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function LessonWorkspace({
@@ -48,6 +50,7 @@ export function LessonWorkspace({
   const canMonitorSubmissions = canAssignLessons(profile);
   const canManageMaterial = canAssignLessons(profile);
   const {
+    registerSubmission,
     saveMaterialAnswers,
     submission,
     submissionMessage,
@@ -133,7 +136,16 @@ export function LessonWorkspace({
         )}
 
         {canMonitorSubmissions && material ? (
-          <MaterialSubmissionsMonitor error={submissionMonitorError} submissions={submissionSnapshots} />
+          <>
+            <TeacherCollaborationPanel
+              displayName={displayName}
+              lessonId={session.lessonId}
+              materialId={material.id}
+              participants={session.participants}
+              profileSubject={profile?.subject}
+            />
+            <MaterialSubmissionsMonitor error={submissionMonitorError} submissions={submissionSnapshots} />
+          </>
         ) : null}
 
         {materialLoading ? (
@@ -142,16 +154,32 @@ export function LessonWorkspace({
             <span>{t("classroom.material.loading")}</span>
           </div>
         ) : material ? (
-          <LessonTaskCanvas
-            lessonId={session.lessonId}
-            material={material}
-            onSaveAnswers={(content) => void saveMaterialAnswers(content)}
-            score={lessonScore}
-            submission={submission}
-            submissionMessage={submissionMessage}
-            submissionSaving={submissionSaving}
-            teacherName={session.teacherName ?? displayName}
-          />
+          canMonitorSubmissions ? (
+            <LessonTaskCanvas
+              lessonId={session.lessonId}
+              material={material}
+              onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              score={lessonScore}
+              submission={submission}
+              submissionMessage={submissionMessage}
+              submissionSaving={submissionSaving}
+              teacherName={session.teacherName ?? displayName}
+            />
+          ) : (
+            <StudentLiveWorkspace
+              displayName={displayName}
+              lessonId={session.lessonId}
+              material={material}
+              onFinalized={registerSubmission}
+              onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              profileSubject={profile?.subject}
+              score={lessonScore}
+              submission={submission}
+              submissionMessage={submissionMessage}
+              submissionSaving={submissionSaving}
+              teacherName={session.teacherName ?? displayName}
+            />
+          )
         ) : canManageMaterial ? (
           <div className="playsay-task-board playsay-material-loading">
             <BookOpen className="h-5 w-5 text-primary" />

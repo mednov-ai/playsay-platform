@@ -113,7 +113,7 @@ export function useLessonAnnotation({
 
     const id = `stroke-${Date.now()}-${Math.round(point.x)}-${Math.round(point.y)}`;
     activeStrokeId.current = id;
-    setAnnotationStrokes((current) => [...current, { color: annotationColor, id, points: [point] }]);
+    setAnnotationStrokes((current) => [...current, { color: annotationColor, id, pageId: point.pageId, points: [point] }]);
   }
 
   function extendAnnotation(event: PointerEvent<SVGSVGElement>) {

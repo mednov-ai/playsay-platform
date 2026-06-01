@@ -107,7 +107,13 @@ export function useLessonSubmission({
     }
   }
 
+  function registerSubmission(savedSubmission: LessonMaterialSubmission) {
+    setSubmission(savedSubmission);
+    setSubmissionMessage(t("classroom.collaboration.finalized"));
+  }
+
   return {
+    registerSubmission,
     saveMaterialAnswers,
     submission,
     submissionMessage,

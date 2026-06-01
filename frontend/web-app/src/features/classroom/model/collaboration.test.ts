@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   collaborationRoomKey,
   collaborationScopeForMode,
+  collaborationDocumentDisplayName,
+  collaborationDocumentStatus,
+  collaborationParticipantColor,
   formatCollaborationUpdatedAt,
   isGroupCollaborationDocument,
 } from "./collaboration";
@@ -55,5 +58,17 @@ describe("collaboration model", () => {
     );
     expect(formatCollaborationUpdatedAt(null, "en-US")).toBe("");
     expect(formatCollaborationUpdatedAt("not-a-date", "en-US")).toBe("");
+  });
+
+  it("derives stable participant colors and document labels", () => {
+    expect(collaborationParticipantColor("student-1")).toBe(collaborationParticipantColor("student-1"));
+    expect(collaborationDocumentDisplayName({ scope: "INDIVIDUAL", studentName: "Alex" }, "Student")).toBe("Alex");
+    expect(collaborationDocumentDisplayName({ scope: "INDIVIDUAL", studentSubject: "subject-1" }, "Student")).toBe("subject-1");
+    expect(collaborationDocumentDisplayName({ scope: "INDIVIDUAL" }, "Student")).toBe("Student");
+  });
+
+  it("marks collaboration documents with saved versions as saved", () => {
+    expect(collaborationDocumentStatus({ scope: "INDIVIDUAL", version: 0 })).toBe("empty");
+    expect(collaborationDocumentStatus({ scope: "INDIVIDUAL", version: 2 })).toBe("saved");
   });
 });

@@ -10,6 +10,8 @@ data class CollaborationDocumentResponse(
     val lessonId: UUID,
     val materialId: UUID,
     val studentUserId: UUID?,
+    val studentSubject: String?,
+    val studentName: String?,
     val documentKind: String,
     val scope: String,
     val yjsDocumentId: String,

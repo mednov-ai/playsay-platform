@@ -596,6 +596,10 @@
   overflow: hidden;
 }
 
+.playsay-task-document-surface > .playsay-rendered-material {
+  min-height: 100%;
+}
+
 .playsay-task-document-surface .playsay-presence-layer {
   z-index: 5;
 }

@@ -1,6 +1,6 @@
 import type { MeProfile } from "../../shared/api/playsay";
 
-export type WorkspaceTab = "schedule" | "materials" | "courses";
+export type WorkspaceTab = "schedule" | "homework" | "materials" | "courses";
 
 export type WorkspaceTabDefinition = {
   id: WorkspaceTab;
@@ -21,11 +21,23 @@ export function workspaceTabsForProfile(profile: MeProfile | null): WorkspaceTab
   };
 
   if (!canAssign) {
-    return [scheduleTab];
+    return [
+      scheduleTab,
+      {
+        id: "homework",
+        labelKey: "workspace.tabs.homework.label",
+        descriptionKey: "workspace.tabs.homework.description",
+      },
+    ];
   }
 
   return [
     scheduleTab,
+    {
+      id: "homework",
+      labelKey: "workspace.tabs.homework.label",
+      descriptionKey: "workspace.tabs.homework.description",
+    },
     {
       id: "materials",
       labelKey: "workspace.tabs.materials.label",

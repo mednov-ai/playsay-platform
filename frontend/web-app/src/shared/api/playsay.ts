@@ -179,6 +179,73 @@ export type LessonMaterialSubmissionInput = {
   content: LessonMaterialJson;
   submitted?: boolean;
 };
+export type HomeworkAssignmentInput = {
+  dueAt?: string | null;
+  instructions?: string | null;
+  materialId: string;
+  studentSubjects: string[];
+  title?: string | null;
+};
+export type LessonHomeworkInput = {
+  dueAt?: string | null;
+  instructions?: string | null;
+  studentSubjects?: string[] | null;
+  title?: string | null;
+};
+export type HomeworkAssignment = {
+  id: string;
+  materialId: string;
+  materialTitle: string;
+  lessonId?: string | null;
+  sourceLessonId?: string | null;
+  title: string;
+  instructions?: string | null;
+  type: string;
+  maxScore?: number | null;
+  dueAt?: string | null;
+  status: string;
+  recipientCount: number;
+  submittedCount: number;
+  scoredCount: number;
+  averageScore?: number | null;
+  averageErrorsCount?: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type HomeworkRecipientProgress = {
+  assignmentId: string;
+  studentUserId: string;
+  studentSubject: string;
+  studentName?: string | null;
+  submissionId?: string | null;
+  hasSubmission: boolean;
+  submitted: boolean;
+  score?: number | null;
+  maxScore?: number | null;
+  scoreRatio?: number | null;
+  errorsCount?: number | null;
+  progressTone?: number | null;
+  showGroupIndicator: boolean;
+  groupAverageScore?: number | null;
+  groupAverageErrorsCount?: number | null;
+  relativeScoreDelta?: number | null;
+  relativeErrorsDelta?: number | null;
+  submittedAt?: string | null;
+  updatedAt?: string | null;
+};
+export type HomeworkAssignmentDetail = {
+  assignment: HomeworkAssignment;
+  recipients: HomeworkRecipientProgress[];
+};
+export type HomeworkSubmission = Omit<LessonMaterialSubmission, "lessonId"> & {
+  lessonId?: string | null;
+  progressTone?: number | null;
+};
+export type StudentHomeworkDetail = {
+  assignment: HomeworkAssignment;
+  material: LessonMaterial;
+  submission: HomeworkSubmission;
+};
 export type LessonMaterialAnnotation = {
   id: string;
   lessonId: string;
@@ -834,6 +901,74 @@ export async function saveScheduledLessonMaterialSubmission(
 ): Promise<LessonMaterialSubmission> {
   return apiJson<LessonMaterialSubmission>(
     `/api/schedule/lessons/${lessonId}/material-submission`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+    config,
+  );
+}
+
+export async function fetchHomeworkAssignments(config = authConfig): Promise<HomeworkAssignment[]> {
+  return apiJson<HomeworkAssignment[]>("/api/assignments", { method: "GET" }, config);
+}
+
+export async function fetchHomeworkAssignment(
+  assignmentId: string,
+  config = authConfig,
+): Promise<HomeworkAssignmentDetail> {
+  return apiJson<HomeworkAssignmentDetail>(`/api/assignments/${assignmentId}`, { method: "GET" }, config);
+}
+
+export async function createHomeworkAssignment(
+  input: HomeworkAssignmentInput,
+  config = authConfig,
+): Promise<HomeworkAssignmentDetail> {
+  return apiJson<HomeworkAssignmentDetail>(
+    "/api/assignments",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    config,
+    201,
+  );
+}
+
+export async function createHomeworkFromScheduledLesson(
+  lessonId: string,
+  input: LessonHomeworkInput = {},
+  config = authConfig,
+): Promise<HomeworkAssignmentDetail> {
+  return apiJson<HomeworkAssignmentDetail>(
+    `/api/schedule/lessons/${lessonId}/homework`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    config,
+    201,
+  );
+}
+
+export async function fetchMyHomeworkAssignments(config = authConfig): Promise<HomeworkAssignment[]> {
+  return apiJson<HomeworkAssignment[]>("/api/me/assignments", { method: "GET" }, config);
+}
+
+export async function fetchMyHomeworkAssignment(
+  assignmentId: string,
+  config = authConfig,
+): Promise<StudentHomeworkDetail> {
+  return apiJson<StudentHomeworkDetail>(`/api/me/assignments/${assignmentId}`, { method: "GET" }, config);
+}
+
+export async function saveMyHomeworkAssignmentSubmission(
+  assignmentId: string,
+  input: LessonMaterialSubmissionInput,
+  config = authConfig,
+): Promise<HomeworkSubmission> {
+  return apiJson<HomeworkSubmission>(
+    `/api/me/assignments/${assignmentId}/submission`,
     {
       method: "PUT",
       body: JSON.stringify(input),

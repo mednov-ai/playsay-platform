@@ -11,7 +11,6 @@ import {
   formatMaterialScore,
   materialAssetTagsMap,
   materialDocumentAssetIds,
-  materialMaxScore,
 } from "../model/materialDocument";
 import { RenderedMaterialBlock } from "./blocks/RenderedMaterialBlock";
 
@@ -24,6 +23,7 @@ export function LessonMaterialDocumentView({
   onBlockPatchCommit,
   onBlockPatch,
   score,
+  showScoreBadge = true,
 }: {
   answers?: MaterialAnswerState;
   material: LessonMaterial;
@@ -33,10 +33,10 @@ export function LessonMaterialDocumentView({
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   score?: number | null;
+  showScoreBadge?: boolean;
 }) {
   const document = editorDocumentFromJson(material.document);
   const page = document.pages[0] ?? defaultMaterialPage(material.title);
-  const maxScore = materialMaxScore(material.scoringRubric);
   const assetIds = materialDocumentAssetIds(document);
   const assetKey = assetIds.join("|");
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
@@ -98,10 +98,12 @@ export function LessonMaterialDocumentView({
 
   return (
     <div className="playsay-rendered-material">
-      <div className="playsay-material-score-badge">
-        <span>{material.cefrLevel}</span>
-        <strong>{formatMaterialScore(score ?? maxScore)}</strong>
-      </div>
+      {showScoreBadge ? (
+        <div className="playsay-material-score-badge">
+          <span>{material.cefrLevel}</span>
+          <strong>{formatMaterialScore(score)}</strong>
+        </div>
+      ) : null}
       <div className="playsay-task-kicker">
         <FileText className="h-4 w-4 text-primary" />
         {material.title}

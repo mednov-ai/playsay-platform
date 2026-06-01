@@ -844,10 +844,11 @@ class LessonMaterialStore(
                     lessonId = lessonId,
                     title = material.title,
                     instructions = "Play&Say material answer snapshot",
-                    type = "MATERIAL_WORK",
+                    type = MetaData.AssignmentTypes.MATERIAL_WORK,
                     payload = objectMapper.writeValueAsString(objectMapper.createObjectNode().put("source", "material")),
                     maxScore = materialScoringService.maxScore(material.scoringRubric),
                     materialId = material.id,
+                    status = MetaData.AssignmentStatuses.ACTIVE,
                     createdAt = now,
                     updatedAt = now,
                 ),
@@ -918,7 +919,7 @@ class LessonMaterialStore(
         assignmentRepo.findFirstByLessonIdAndMaterialIdAndMaterialBlockIdIsNullAndTypeOrderByCreatedAtAsc(
             lessonId = lessonId,
             materialId = materialId,
-            type = "MATERIAL_WORK",
+            type = MetaData.AssignmentTypes.MATERIAL_WORK,
         )?.id
 
     private fun findMaterialSubmission(assignmentId: UUID, lessonId: UUID, userId: UUID): StoredMaterialSubmission? =

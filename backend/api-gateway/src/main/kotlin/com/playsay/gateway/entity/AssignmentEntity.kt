@@ -27,6 +27,16 @@ class AssignmentEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id", insertable = false, updatable = false)
     var lesson: LessonEntity? = null,
+    @Column(name = "teacher_user_id")
+    var teacherUserId: UUID? = null,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "teacher_user_id", insertable = false, updatable = false)
+    var teacherUser: AppUserEntity? = null,
+    @Column(name = "source_lesson_id")
+    var sourceLessonId: UUID? = null,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_lesson_id", insertable = false, updatable = false)
+    var sourceLesson: LessonEntity? = null,
     @Column(name = "material_id")
     var materialId: UUID? = null,
     @ManyToOne(fetch = FetchType.LAZY)
@@ -44,6 +54,10 @@ class AssignmentEntity(
     var payload: String? = null,
     @Column(name = "max_score", precision = 6, scale = 2)
     var maxScore: BigDecimal? = null,
+    @Column(name = "due_at")
+    var dueAt: Instant? = null,
+    @Column(name = "status", nullable = false, length = 24)
+    var status: String = "ACTIVE",
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)

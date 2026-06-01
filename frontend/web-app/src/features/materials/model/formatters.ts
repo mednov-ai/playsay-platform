@@ -456,7 +456,7 @@ export function materialSubmissionAssessmentSummary(submission: LessonMaterialSu
 
 export function formatMaterialScore(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") {
-    return "10";
+    return i18n.t("materials.score.pending");
   }
 
   const numeric = typeof value === "number" ? value : Number(value);

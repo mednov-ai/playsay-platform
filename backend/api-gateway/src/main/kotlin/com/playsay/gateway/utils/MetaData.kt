@@ -47,6 +47,16 @@ object MetaData {
         const val GROUP = "GROUP"
     }
 
+    object AssignmentTypes {
+        const val MATERIAL_WORK = "MATERIAL_WORK"
+        const val HOMEWORK = "HOMEWORK"
+    }
+
+    object AssignmentStatuses {
+        const val ACTIVE = "ACTIVE"
+        const val ARCHIVED = "ARCHIVED"
+    }
+
     object AiProviders {
         const val STUB = "stub"
         const val OPENAI = "openai"
@@ -108,6 +118,9 @@ object MetaData {
         const val COLLABORATION_SCOPE_INVALID = "COLLABORATION_SCOPE_INVALID"
         const val COLLABORATION_SNAPSHOT_INVALID = "COLLABORATION_SNAPSHOT_INVALID"
         const val COLLABORATION_NOT_CONFIGURED = "COLLABORATION_NOT_CONFIGURED"
+        const val ASSIGNMENT_NOT_FOUND = "ASSIGNMENT_NOT_FOUND"
+        const val ASSIGNMENT_ACCESS_DENIED = "ASSIGNMENT_ACCESS_DENIED"
+        const val ASSIGNMENT_RECIPIENTS_REQUIRED = "ASSIGNMENT_RECIPIENTS_REQUIRED"
         const val EXTERNAL_URL_REDIRECT_LOCATION_MISSING = "EXTERNAL_URL_REDIRECT_LOCATION_MISSING"
         const val EXTERNAL_URL_TOO_MANY_REDIRECTS = "EXTERNAL_URL_TOO_MANY_REDIRECTS"
         const val EXTERNAL_URL_HTTP_ERROR = "EXTERNAL_URL_HTTP_ERROR"

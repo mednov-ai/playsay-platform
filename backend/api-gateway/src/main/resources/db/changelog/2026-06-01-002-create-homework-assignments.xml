@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-01-002-create-homework-assignments" author="codex">
+        <addColumn tableName="assignment">
+            <column name="teacher_user_id" type="UUID"/>
+            <column name="source_lesson_id" type="UUID"/>
+            <column name="due_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="status" type="VARCHAR(24)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="assignment"
+            baseColumnNames="teacher_user_id"
+            constraintName="fk_assignment_teacher_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <addForeignKeyConstraint
+            baseTableName="assignment"
+            baseColumnNames="source_lesson_id"
+            constraintName="fk_assignment_source_lesson"
+            referencedTableName="lesson"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <sql>
+            alter table assignment
+                add constraint ck_assignment_status
+                check (status in ('ACTIVE', 'ARCHIVED'));
+        </sql>
+        <createIndex tableName="assignment" indexName="idx_assignment_teacher_status_updated">
+            <column name="teacher_user_id"/>
+            <column name="status"/>
+            <column name="updated_at"/>
+        </createIndex>
+        <createIndex tableName="assignment" indexName="idx_assignment_source_lesson">
+            <column name="source_lesson_id"/>
+            <column name="type"/>
+        </createIndex>
+
+        <createTable tableName="assignment_recipient">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_assignment_recipient"/>
+            </column>
+            <column name="assignment_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="student_user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="assigned_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="due_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="archived_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="assignment_recipient"
+            baseColumnNames="assignment_id"
+            constraintName="fk_assignment_recipient_assignment"
+            referencedTableName="assignment"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="assignment_recipient"
+            baseColumnNames="student_user_id"
+            constraintName="fk_assignment_recipient_student_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint
+            tableName="assignment_recipient"
+            columnNames="assignment_id, student_user_id"
+            constraintName="uq_assignment_recipient_assignment_student"/>
+        <createIndex tableName="assignment_recipient" indexName="idx_assignment_recipient_student_updated">
+            <column name="student_user_id"/>
+            <column name="updated_at"/>
+        </createIndex>
+        <createIndex tableName="assignment_recipient" indexName="idx_assignment_recipient_assignment">
+            <column name="assignment_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="assignment_recipient"/>
+            <dropIndex tableName="assignment" indexName="idx_assignment_source_lesson"/>
+            <dropIndex tableName="assignment" indexName="idx_assignment_teacher_status_updated"/>
+            <dropForeignKeyConstraint baseTableName="assignment" constraintName="fk_assignment_source_lesson"/>
+            <dropForeignKeyConstraint baseTableName="assignment" constraintName="fk_assignment_teacher_user"/>
+            <dropColumn tableName="assignment" columnName="status"/>
+            <dropColumn tableName="assignment" columnName="due_at"/>
+            <dropColumn tableName="assignment" columnName="source_lesson_id"/>
+            <dropColumn tableName="assignment" columnName="teacher_user_id"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

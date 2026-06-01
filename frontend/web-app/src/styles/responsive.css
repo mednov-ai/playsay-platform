@@ -485,6 +485,32 @@
     width: 100%;
   }
 
+  .playsay-homework-panel .playsay-fill-paragraph {
+    display: grid;
+    gap: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .playsay-homework-panel .playsay-answer-fragment {
+    display: block;
+    margin-right: 0;
+  }
+
+  .playsay-homework-panel .playsay-fill-exercise label {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .playsay-homework-panel .playsay-inline-answer-wrap {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+  }
+
+  .playsay-homework-panel .playsay-inline-answer {
+    max-width: 13rem;
+  }
+
   .playsay-inline-hint-ghost {
     max-width: 3.25rem;
     padding-inline: 0.3rem;

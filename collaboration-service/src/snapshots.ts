@@ -43,10 +43,17 @@ export class SnapshotQueue {
     const entries = [...this.dirtyRooms.values()];
     this.dirtyRooms.clear();
 
-    await Promise.all(entries.map((entry) => this.flush(entry)));
+    await Promise.all(entries.map((entry) => this.flushWithRecovery(entry)));
   }
 
-  private async flush(entry: DirtyRoom): Promise<void> {
+  private async flushWithRecovery(entry: DirtyRoom): Promise<void> {
+    const result = await this.flush(entry);
+    if (result === "retry") {
+      this.dirtyRooms.set(entry.claims.documentId, entry);
+    }
+  }
+
+  private async flush(entry: DirtyRoom): Promise<"saved" | "discard" | "retry"> {
     const snapshot = {
       schemaVersion: 1,
       encoding: "yjs-update-v1",
@@ -65,10 +72,28 @@ export class SnapshotQueue {
         "content-type": "application/json",
       },
       body: JSON.stringify({ snapshot }),
+    }).catch((error: unknown) => {
+      console.warn(snapshotFailureMessage(entry, error));
+      return null;
     });
 
-    if (!response.ok) {
-      throw new Error(`snapshot persistence failed with HTTP ${response.status}`);
+    if (!response) {
+      return "retry";
     }
+
+    if (!response.ok) {
+      console.warn(snapshotFailureMessage(entry, `HTTP ${response.status}`));
+      return isRetryableSnapshotStatus(response.status) ? "retry" : "discard";
+    }
+    return "saved";
   }
+}
+
+function isRetryableSnapshotStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function snapshotFailureMessage(entry: DirtyRoom, reason: unknown): string {
+  const detail = reason instanceof Error ? reason.message : String(reason);
+  return `snapshot persistence failed for document ${entry.claims.documentId}: ${detail}`;
 }

@@ -277,6 +277,50 @@ paths:
           description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/collaboration-documents/{documentId}/snapshot:
+    put:
+      tags:
+      - Collaboration
+      summary: Save collaboration document snapshot
+      description: Stores the latest normalized snapshot for a collaboration document
+        and increments its version.
+      operationId: saveCollaborationDocumentSnapshot
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveCollaborationSnapshotRequest"
+        required: true
+      responses:
+        "200":
+          description: Snapshot saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationDocumentResponse"
+        "400":
+          description: Invalid snapshot
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot modify the document
+        "404":
+          description: Collaboration document not found
+      security:
+      - bearerAuth: []
   /materials/{materialId}:
     get:
       tags:
@@ -605,6 +649,169 @@ paths:
           description: Scheduled lesson not found
         "503":
           description: LiveKit is not configured
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/collaboration-documents/{documentId}/token:
+    post:
+      tags:
+      - Collaboration
+      summary: Create collaboration websocket token
+      description: Returns a short-lived token scoped to the collaboration document
+        room.
+      operationId: createCollaborationDocumentToken
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Collaboration token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationTokenResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot join the document
+        "404":
+          description: Collaboration document not found
+        "503":
+          description: Collaboration token signing is not configured
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/collaboration-documents/{documentId}/finalize:
+    post:
+      tags:
+      - Collaboration
+      summary: Finalize collaboration document
+      description: Creates or updates the normal material submission from the latest
+        collaboration snapshot.
+      operationId: finalizeCollaborationDocument
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeCollaborationDocumentRequest"
+        required: true
+      responses:
+        "200":
+          description: Material submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialSubmissionResponse"
+        "400":
+          description: Invalid document scope or missing snapshot
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot finalize the document
+        "404":
+          description: Collaboration document not found
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/collaboration-documents/current:
+    get:
+      tags:
+      - Collaboration
+      summary: Get current collaboration document
+      description: Returns the current user's individual document or the shared group
+        document for a scheduled lesson material.
+      operationId: getCurrentCollaborationDocument
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: materialId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: documentKind
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Collaboration document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationDocumentResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot access the document
+        "404":
+          description: Collaboration document not found
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Collaboration
+      summary: Create or get current collaboration document
+      description: "Creates the current user's individual document or the shared group\
+        \ document if missing, then returns it."
+      operationId: createCurrentCollaborationDocument
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCollaborationDocumentRequest"
+        required: true
+      responses:
+        "200":
+          description: Collaboration document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationDocumentResponse"
+        "400":
+          description: Invalid collaboration scope or payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot access the document
       security:
       - bearerAuth: []
   /materials:
@@ -1031,6 +1238,42 @@ paths:
           description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/collaboration-documents:
+    get:
+      tags:
+      - Collaboration
+      summary: List collaboration documents
+      description: Students see their own individual document and the group document;
+        teachers and admins see all documents for the lesson material.
+      operationId: listCollaborationDocuments
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: materialId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Collaboration documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CollaborationDocumentResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot access the lesson material
+      security:
+      - bearerAuth: []
   /me:
     get:
       tags:
@@ -1455,6 +1698,67 @@ components:
       - lessonId
       - materialId
       - updatedAt
+    SaveCollaborationSnapshotRequest:
+      type: object
+      properties:
+        snapshot:
+          $ref: "#/components/schemas/JsonNode"
+        snapshotStorageKey:
+          type:
+          - string
+          - "null"
+      required:
+      - snapshot
+    CollaborationDocumentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lessonId:
+          type: string
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        studentUserId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        documentKind:
+          type: string
+        scope:
+          type: string
+        yjsDocumentId:
+          type: string
+        snapshot:
+          oneOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
+        snapshotStorageKey:
+          type:
+          - string
+          - "null"
+        version:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - documentKind
+      - id
+      - lessonId
+      - materialId
+      - scope
+      - updatedAt
+      - version
+      - yjsDocumentId
     LessonMaterialRequest:
       type: object
       properties:
@@ -1720,6 +2024,52 @@ components:
       - roomName
       - serverUrl
       - token
+    CollaborationTokenResponse:
+      type: object
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        yjsDocumentId:
+          type: string
+        websocketUrl:
+          type: string
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - documentId
+      - expiresAt
+      - token
+      - websocketUrl
+      - yjsDocumentId
+    FinalizeCollaborationDocumentRequest:
+      type: object
+      properties:
+        submitted:
+          type: boolean
+      required:
+      - submitted
+    CreateCollaborationDocumentRequest:
+      type: object
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        documentKind:
+          type: string
+          maxLength: 40
+        scope:
+          type: string
+          enum:
+          - INDIVIDUAL
+          - GROUP
+      required:
+      - documentKind
+      - materialId
+      - scope
     MaterialGenerateImagesRequest:
       type: object
       properties:

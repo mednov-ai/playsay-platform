@@ -319,6 +319,58 @@ class LessonMaterialStore(
     }
 
     @Transactional
+    fun saveCollaborationSubmission(
+        lessonId: UUID,
+        materialId: UUID,
+        studentUserId: UUID,
+        yjsDocumentId: String,
+        content: JsonNode,
+        submitted: Boolean,
+    ): MaterialSubmissionResponse {
+        val material = find(materialId)?.takeIf { it.status != "ARCHIVED" }
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        validateJsonSize("content", content, objectMapper, 1_000_000)
+
+        val assignmentId = findOrCreateMaterialSubmissionAssignment(lessonId, material)
+        val now = Instant.now()
+        val scoring = materialScoringService.score(material.document, material.scoringRubric, content)
+        val storedContent = objectMapper.writeValueAsString(scoring?.content ?: content)
+        val existing = findMaterialSubmission(assignmentId, lessonId, studentUserId)
+
+        val submissionId = if (existing == null) {
+            submissionRepo.saveAndFlush(
+                SubmissionEntity(
+                    id = UUID.randomUUID(),
+                    assignmentId = assignmentId,
+                    studentUserId = studentUserId,
+                    lessonId = lessonId,
+                    yjsDocumentId = yjsDocumentId,
+                    content = storedContent,
+                    score = scoring?.score,
+                    errorsCount = scoring?.errorsCount,
+                    submittedAt = if (submitted) now else null,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            ).id
+        } else {
+            val entity = submissionRepo.findById(existing.id).orElseThrow()
+            entity.yjsDocumentId = yjsDocumentId
+            entity.content = storedContent
+            entity.score = scoring?.score
+            entity.errorsCount = scoring?.errorsCount
+            if (submitted) {
+                entity.submittedAt = now
+            }
+            entity.updatedAt = now
+            submissionRepo.save(entity)
+            existing.id
+        }
+
+        return requireNotNull(findMaterialSubmission(submissionId)).toResponse(objectMapper)
+    }
+
+    @Transactional
     fun getAnnotationForScheduledLesson(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,

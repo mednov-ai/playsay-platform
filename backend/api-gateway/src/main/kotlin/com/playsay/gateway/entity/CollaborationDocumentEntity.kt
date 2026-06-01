@@ -6,6 +6,8 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import java.time.Instant
 import java.util.UUID
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "collaboration_document")
@@ -25,7 +27,8 @@ class CollaborationDocumentEntity(
     var collaborationScope: String = "",
     @Column(name = "yjs_document_id", nullable = false, unique = true, length = 200)
     var yjsDocumentId: String = "",
-    @Column(name = "snapshot_json", columnDefinition = "TEXT")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "snapshot_json", columnDefinition = "jsonb")
     var snapshotJson: String? = null,
     @Column(name = "snapshot_storage_key", columnDefinition = "TEXT")
     var snapshotStorageKey: String? = null,

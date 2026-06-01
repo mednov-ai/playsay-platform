@@ -47,6 +47,10 @@ playsay:
     api-key: ${PLAYSAY_LIVEKIT_API_KEY:}
     api-secret: ${PLAYSAY_LIVEKIT_API_SECRET:}
     token-ttl-seconds: ${PLAYSAY_LIVEKIT_TOKEN_TTL_SECONDS:3600}
+  collaboration:
+    websocket-url: ${PLAYSAY_COLLABORATION_WEBSOCKET_URL:wss://online.play-and-say.ru/collab/ws}
+    token-secret: ${PLAYSAY_COLLABORATION_TOKEN_SECRET:}
+    token-ttl-seconds: ${PLAYSAY_COLLABORATION_TOKEN_TTL_SECONDS:900}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
     s3:

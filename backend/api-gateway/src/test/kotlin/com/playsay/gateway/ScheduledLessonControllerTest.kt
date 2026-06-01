@@ -51,7 +51,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
     private val liveKitRoomController: LiveKitRoomController,
     private val liveKitWebhookController: LiveKitWebhookController,
     private val courseController: CourseController,
-    private val materialController: MaterialController,
+    private val materialCrudController: MaterialCrudController,
     private val userProfileStore: UserProfileStore,
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val lessonRepo: LessonRepo,
@@ -272,11 +272,11 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val templateMaterial = materialController.create(
+        val templateMaterial = materialCrudController.create(
             teacher,
             LessonMaterialRequest(title = "Template material", status = "PUBLISHED"),
         ).body!!
-        val directMaterial = materialController.create(
+        val directMaterial = materialCrudController.create(
             teacher,
             LessonMaterialRequest(title = "Direct material", status = "PUBLISHED"),
         ).body!!

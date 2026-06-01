@@ -145,7 +145,7 @@ class CourseStore(
         val values = request.validated()
         validateMaterialId(authentication, values.materialId)
         val lesson = lessonTemplateRepo.findByIdAndCourseId(lessonId, courseId)
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course lesson not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_LESSON_NOT_FOUND)
 
         lesson.title = values.title
         lesson.orderIndex = values.orderIndex
@@ -163,7 +163,7 @@ class CourseStore(
         val deleted = lessonTemplateRepo.deleteByIdAndCourseId(lessonId, courseId)
 
         if (deleted == 0L) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Course lesson not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_LESSON_NOT_FOUND)
         }
     }
 
@@ -199,7 +199,7 @@ class CourseStore(
         }
 
         if (!exists) {
-            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_ID_NOT_FOUND)
         }
     }
 }
@@ -230,10 +230,10 @@ private fun CourseRequest.validated(): ValidatedCourseRequest =
 
 private fun CourseLessonRequest.validated(): ValidatedCourseLessonRequest {
     if (orderIndex != null && orderIndex < 0) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "orderIndex must be greater than or equal to 0.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.ORDER_INDEX_NEGATIVE)
     }
     if (plannedDurationMin != null && plannedDurationMin !in 1..480) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "plannedDurationMin must be between 1 and 480.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.PLANNED_DURATION_OUT_OF_RANGE)
     }
 
     return ValidatedCourseLessonRequest(
@@ -246,12 +246,12 @@ private fun CourseLessonRequest.validated(): ValidatedCourseLessonRequest {
 
 private fun String.requiredClean(fieldName: String, maxLength: Int): String =
     optionalClean(fieldName, maxLength)
-        ?: throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName is required.")
+        ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_REQUIRED, fieldName)
 
 private fun String?.optionalClean(fieldName: String, maxLength: Int): String? {
     val cleaned = this?.trim()?.takeIf { it.isNotEmpty() }
     if (cleaned != null && cleaned.length > maxLength) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName must be at most $maxLength characters.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_TOO_LONG, fieldName, maxLength)
     }
     return cleaned
 }

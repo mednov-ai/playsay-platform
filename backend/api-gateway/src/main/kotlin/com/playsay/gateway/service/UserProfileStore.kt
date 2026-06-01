@@ -89,7 +89,7 @@ class UserProfileStore(
     private fun clean(value: String?, maxLength: Int): String? {
         val cleaned = value?.trim()?.takeIf { it.isNotEmpty() }
         if (cleaned != null && cleaned.length > maxLength) {
-            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Field length must be at most $maxLength characters.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_TOO_LONG, "profile field", maxLength)
         }
         return cleaned
     }

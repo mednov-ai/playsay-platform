@@ -34,7 +34,7 @@ import liquibase.integration.spring.SpringLiquibase
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CourseControllerTest @Autowired constructor(
     private val controller: CourseController,
-    private val materialController: MaterialController,
+    private val materialCrudController: MaterialCrudController,
     private val lessonTemplateRepo: LessonTemplateRepo,
     private val courseRepo: CourseRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
@@ -145,7 +145,7 @@ class CourseControllerTest @Autowired constructor(
     @Test
     fun `course lesson list keeps order and material title projection`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(title = "Alphabet cards", status = "PUBLISHED"),
         ).body!!

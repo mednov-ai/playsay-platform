@@ -24,9 +24,9 @@ import javax.imageio.stream.MemoryCacheImageOutputStream
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
-import org.springframework.web.server.ResponseStatusException
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.utils.MetaData
 
 data class MaterialImageGenerationInput(
     val prompt: String,
@@ -51,7 +51,7 @@ class MaterialImageGenerationService(
         when (provider.trim().lowercase()) {
             "", "stub" -> stubProvider.generate(input)
             "openai" -> openAiProvider.generate(input)
-            else -> throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "Unknown AI material provider.")
+            else -> throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.AI_PROVIDER_UNKNOWN)
         }
 }
 
@@ -91,7 +91,7 @@ class OpenAiMaterialImageGenerationProvider(
         val cleanModel = imageModel.trim().ifEmpty { "gpt-image-1-mini" }
         val cleanBaseUrl = baseUrl.trim().ifEmpty { "https://api.openai.com/v1" }
         if (cleanApiKey.isEmpty()) {
-            throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "OpenAI API key is not configured.")
+            throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.AI_API_KEY_NOT_CONFIGURED)
         }
 
         val prompt = materialImageGenerationPrompt(input.prompt, input.alt)
@@ -104,17 +104,17 @@ class OpenAiMaterialImageGenerationProvider(
             } else {
                 HttpStatus.BAD_GATEWAY
             }
-            throw ProjectResponseException(status, "OpenAI image generation failed.")
+            throw ProjectResponseException.localized(status, MetaData.ErrorCodes.AI_IMAGE_GENERATION_FAILED)
         } catch (exception: Exception) {
-            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI image generation failed.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.AI_IMAGE_GENERATION_FAILED)
         }
 
         val responseNode = parseJson(rawResponse)
         val data = responseNode.get("data") as? ArrayNode
         val imageNode = data?.firstOrNull()
-            ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI image response did not contain data.")
+            ?: throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.AI_IMAGE_RESPONSE_MISSING_DATA)
         val base64Image = imageNode.get("b64_json")?.takeIf { node -> node.isTextual }?.asText()?.trim()
-            ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI image response did not contain image bytes.")
+            ?: throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.AI_IMAGE_RESPONSE_MISSING_BYTES)
         val compactBytes = compactJpegBytes(base64Image)
 
         return GeneratedMaterialImage(
@@ -139,7 +139,7 @@ class OpenAiMaterialImageGenerationProvider(
 
     private fun parseJson(raw: String): JsonNode =
         runCatching { objectMapper.readTree(raw) }
-            .getOrElse { throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI image response was not valid JSON.") }
+            .getOrElse { throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.AI_RESPONSE_INVALID_JSON) }
 }
 
 interface OpenAiImagesTransport {

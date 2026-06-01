@@ -85,6 +85,40 @@ spec:
       image: alpine:3.20
       command: ["cat"]
       tty: true
+    - name: smoke
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      command: ["cat"]
+      tty: true
+      env:
+        - name: PLAY_SAY_SMOKE_TEACHER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-dev-users
+              key: teacher-demo-password
+              optional: true
+        - name: PLAY_SAY_SMOKE_STUDENT_A_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-dev-users
+              key: student-demo-password
+              optional: true
+        - name: PLAY_SAY_SMOKE_STUDENT_B_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-dev-users
+              key: student-demo-2-password
+              optional: true
+      volumeMounts:
+        - name: jenkins-agent-cache
+          mountPath: /cache/npm
+          subPath: npm
+      resources:
+        requests:
+          cpu: 300m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1536Mi
     - name: liquibase
       image: liquibase/liquibase:5.0.3
       command: ["cat"]
@@ -463,6 +497,61 @@ EOF
               git push origin "HEAD:${INFRA_BRANCH}" "refs/tags/${BUILD_LABEL}"
             '''
           }
+        }
+      }
+    }
+
+    stage('Sprint 5 UI smoke') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('smoke') {
+          echo "Running Sprint 5 UI smoke against dev for ${env.BUILD_LABEL}"
+          sh '''
+            set -eu
+
+            missing=""
+            for name in PLAY_SAY_SMOKE_TEACHER_PASSWORD PLAY_SAY_SMOKE_STUDENT_A_PASSWORD PLAY_SAY_SMOKE_STUDENT_B_PASSWORD; do
+              eval "value=\${$name:-}"
+              if [ -z "$value" ]; then
+                missing="$missing $name"
+              fi
+            done
+            if [ -n "$missing" ]; then
+              echo "Missing Jenkins smoke secret env:$missing"
+              echo "Sync the keycloak-dev-users Kubernetes secret into the jenkins namespace before running the smoke stage."
+              exit 1
+            fi
+
+            export PLAY_SAY_SMOKE_FETCH_PASSWORDS=false
+            export PLAY_SAY_SMOKE_WEB_BASE_URL="${PLAY_SAY_SMOKE_WEB_BASE_URL:-https://online.play-and-say.ru}"
+            export PLAY_SAY_SMOKE_API_BASE_URL="${PLAY_SAY_SMOKE_API_BASE_URL:-https://online.play-and-say.ru/api}"
+            export PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+            SMOKE_NODE_DIR="/tmp/playsay-sprint5-smoke"
+            rm -rf "$SMOKE_NODE_DIR"
+            mkdir -p "$SMOKE_NODE_DIR"
+            cat > "$SMOKE_NODE_DIR/package.json" <<'JSON'
+{"private":true,"dependencies":{"playwright":"1.56.1"}}
+JSON
+            npm --prefix "$SMOKE_NODE_DIR" install --cache /cache/npm --prefer-offline --ignore-scripts --no-audit --no-fund
+            export PLAYWRIGHT_PACKAGE_DIR="$SMOKE_NODE_DIR"
+
+            attempt=1
+            while [ "$attempt" -le 6 ]; do
+              echo "Sprint 5 UI smoke attempt $attempt/6"
+              if ./scripts/smoke/sprint5-ui-smoke.mjs; then
+                exit 0
+              fi
+              if [ "$attempt" -eq 6 ]; then
+                exit 1
+              fi
+              attempt=$((attempt + 1))
+              sleep 30
+            done
+          '''
         }
       }
     }

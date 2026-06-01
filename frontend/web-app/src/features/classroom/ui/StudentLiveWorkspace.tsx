@@ -10,6 +10,7 @@ import { useAppTranslation } from "../../../shared/i18n";
 import { useCollaborationDocument } from "../hooks/useCollaborationDocument";
 import { useYjsWorkspace } from "../hooks/useYjsWorkspace";
 import {
+  canFinalizeCollaborationMode,
   collaborationParticipantColor,
   type CollaborationWorkspaceMode,
 } from "../model/collaboration";
@@ -55,6 +56,9 @@ export function StudentLiveWorkspace({
   });
 
   async function finalizeWork() {
+    if (!canFinalizeCollaborationMode(mode)) {
+      return;
+    }
     const saved = await documentState.finalize(workspace.snapshot());
     if (saved) {
       onFinalized(saved);
@@ -70,6 +74,7 @@ export function StudentLiveWorkspace({
   }
 
   const liveStatus = liveStatusLabel(workspace.status, t);
+  const canFinalize = canFinalizeCollaborationMode(mode);
   const statusIcon = workspace.connected ? (
     <CheckCircle2 className="h-3.5 w-3.5" />
   ) : documentState.loading ? (
@@ -118,7 +123,7 @@ export function StudentLiveWorkspace({
           collaborationControls={(
             <>
               <Button
-                disabled={documentState.finalizing || !documentState.document}
+                disabled={documentState.finalizing || !documentState.document || !canFinalize}
                 onClick={() => void finalizeWork()}
                 type="button"
               >
@@ -126,7 +131,10 @@ export function StudentLiveWorkspace({
                 {documentState.finalizing ? t("classroom.collaboration.finalizing") : t("classroom.collaboration.finalize")}
               </Button>
               <span className="playsay-task-submit-status">
-                {documentState.message ?? submissionMessage ?? t("classroom.collaboration.autosave")}
+                {documentState.message ??
+                  (canFinalize
+                    ? submissionMessage ?? t("classroom.collaboration.autosave")
+                    : t("classroom.collaboration.groupFinalizeUnavailable"))}
               </span>
             </>
           )}

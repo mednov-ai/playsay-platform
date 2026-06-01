@@ -379,6 +379,7 @@ class LessonMaterialStore(
         val materialId = lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         find(materialId)?.takeIf { it.status != "ARCHIVED" }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        lockScheduledLesson(lessonId)
         val annotation = findMaterialAnnotation(lessonId, materialId)
             ?: createEmptyMaterialAnnotation(lessonId, materialId)
         return annotation.toResponse(objectMapper)
@@ -395,6 +396,7 @@ class LessonMaterialStore(
         find(materialId)?.takeIf { it.status != "ARCHIVED" }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         validateJsonSize("content", request.content, objectMapper, 1_000_000)
+        lockScheduledLesson(lessonId)
 
         val existing = findMaterialAnnotation(lessonId, materialId)
         val now = Instant.now()
@@ -890,6 +892,11 @@ class LessonMaterialStore(
             ),
         )
         return requireNotNull(findMaterialAnnotation(annotation.id))
+    }
+
+    private fun lockScheduledLesson(lessonId: UUID) {
+        lessonRepo.lockById(lessonId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
     }
 
     private fun emptyMaterialSubmissionContent(materialId: UUID): String {

@@ -588,6 +588,7 @@ export const en = {
       finalizing: "Finalizing",
       finalized: "Finalized",
       finalizeFailed: "Could not finalize",
+      groupFinalizeUnavailable: "Group work autosaves. Finalize your individual work.",
       loadFailed: "Could not open live document",
       teacherLoadFailed: "Could not load live documents",
       groupCreateFailed: "Could not create group document",

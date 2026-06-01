@@ -23,6 +23,10 @@ import com.playsay.gateway.repo.SubmissionRepo
 import com.playsay.gateway.service.UserProfileStore
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -129,6 +133,47 @@ class CollaborationDocumentControllerTest @Autowired constructor(
         assertEquals("MATERIAL_WORK", created.documentKind)
         assertEquals("INDIVIDUAL", created.scope)
         assertTrue(created.yjsDocumentId.contains("student:$studentUserId"))
+    }
+
+    @Test
+    fun `group current document creation is idempotent under concurrent student requests`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(studentOne)
+        userProfileStore.currentUserId(studentTwo)
+        val classroom = classroom(teacher, listOf("student-1", "student-2"))
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+
+        try {
+            val futures = listOf(studentOne, studentTwo).map { authentication ->
+                executor.submit(
+                    Callable {
+                        start.await(5, TimeUnit.SECONDS)
+                        collaborationController.createCurrent(
+                            authentication,
+                            classroom.lessonId,
+                            CreateCollaborationDocumentRequest(classroom.materialId, "MATERIAL_WORK", "GROUP"),
+                        )
+                    },
+                )
+            }
+            start.countDown()
+            val documents = futures.map { future -> future.get(10, TimeUnit.SECONDS) }
+
+            assertEquals(1, documents.map { document -> document.id }.toSet().size)
+            assertEquals(
+                1,
+                collaborationDocumentRepo.findByLessonIdAndMaterialIdOrderByUpdatedAtDesc(
+                    classroom.lessonId,
+                    classroom.materialId,
+                ).size,
+            )
+            assertEquals("GROUP", documents.first().scope)
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test

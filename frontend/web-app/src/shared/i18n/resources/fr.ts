@@ -588,6 +588,7 @@ export const fr = {
       finalizing: "Finalisation",
       finalized: "Finalisé",
       finalizeFailed: "Finalisation impossible",
+      groupFinalizeUnavailable: "Le travail de groupe est autosauvé. Finalisez votre travail individuel.",
       loadFailed: "Impossible d'ouvrir le document live",
       teacherLoadFailed: "Impossible de charger les documents live",
       groupCreateFailed: "Impossible de créer le document de groupe",

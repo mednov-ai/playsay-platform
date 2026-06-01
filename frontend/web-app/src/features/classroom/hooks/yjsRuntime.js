@@ -11,6 +11,7 @@ const messageAwareness = 1;
 
 export function createYjsWorkspaceRuntime({
   color,
+  onAnnotationChange,
   onParticipantsChange,
   onTextChange,
   participantName,
@@ -19,6 +20,7 @@ export function createYjsWorkspaceRuntime({
   const ydoc = new Y.Doc();
   applyPersistedSnapshot(ydoc, snapshot);
   const ytext = ydoc.getText("workspace");
+  const yannotations = ydoc.getMap("annotations");
   const awareness = new awarenessProtocol.Awareness(ydoc);
   let socket = null;
   let disposed = false;
@@ -26,6 +28,11 @@ export function createYjsWorkspaceRuntime({
   const updateLocalText = () => {
     if (!disposed) {
       onTextChange(ytext.toString());
+    }
+  };
+  const updateLocalAnnotations = () => {
+    if (!disposed) {
+      onAnnotationChange(annotationStrokesFromMap(yannotations));
     }
   };
   const syncUpdateHandler = (update, origin) => {
@@ -45,6 +52,7 @@ export function createYjsWorkspaceRuntime({
   };
 
   ytext.observe(updateLocalText);
+  yannotations.observe(updateLocalAnnotations);
   ydoc.on("update", syncUpdateHandler);
   awareness.on("update", awarenessUpdateHandler);
   awareness.setLocalState({
@@ -52,6 +60,7 @@ export function createYjsWorkspaceRuntime({
     user: { color, name: participantName },
   });
   updateLocalText();
+  updateLocalAnnotations();
 
   return {
     destroy() {
@@ -59,6 +68,7 @@ export function createYjsWorkspaceRuntime({
       socket = null;
       awareness.destroy();
       ytext.unobserve(updateLocalText);
+      yannotations.unobserve(updateLocalAnnotations);
       ydoc.off("update", syncUpdateHandler);
       ydoc.destroy();
       onParticipantsChange([]);
@@ -71,6 +81,20 @@ export function createYjsWorkspaceRuntime({
     },
     setSocket(nextSocket) {
       socket = nextSocket;
+    },
+    setAnnotationStrokes(strokes) {
+      const nextStrokes = normalizeAnnotationStrokes(strokes);
+      ydoc.transact(() => {
+        const nextIds = new Set(nextStrokes.map((stroke) => stroke.id));
+        yannotations.forEach((_value, id) => {
+          if (!nextIds.has(id)) {
+            yannotations.delete(id);
+          }
+        });
+        nextStrokes.forEach((stroke) => {
+          yannotations.set(stroke.id, stroke);
+        });
+      });
     },
     snapshot() {
       return {
@@ -98,6 +122,50 @@ export function createYjsWorkspaceRuntime({
       });
       onTextChange(nextText);
     },
+  };
+}
+
+function annotationStrokesFromMap(yannotations) {
+  return normalizeAnnotationStrokes([...yannotations.values()])
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function normalizeAnnotationStrokes(strokes) {
+  if (!Array.isArray(strokes)) {
+    return [];
+  }
+  return strokes
+    .map((stroke) => normalizeAnnotationStroke(stroke))
+    .filter((stroke) => stroke !== null);
+}
+
+function normalizeAnnotationStroke(value) {
+  const stroke = asObject(value);
+  const id = asString(stroke?.id);
+  const color = asString(stroke?.color) || "#ff5c00";
+  const pageId = asString(stroke?.pageId) || "material";
+  const points = Array.isArray(stroke?.points)
+    ? stroke.points
+        .map((point) => normalizeAnnotationPoint(point, pageId))
+        .filter((point) => point !== null)
+    : [];
+  if (!id || points.length === 0) {
+    return null;
+  }
+  return { color, id, pageId, points };
+}
+
+function normalizeAnnotationPoint(value, fallbackPageId) {
+  const point = asObject(value);
+  const x = asFiniteNumber(point?.x);
+  const y = asFiniteNumber(point?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return null;
+  }
+  return {
+    pageId: asString(point?.pageId) || fallbackPageId,
+    x,
+    y,
   };
 }
 
@@ -218,6 +286,17 @@ function asString(value) {
 
 function asNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function asFiniteNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+  return Number.NaN;
 }
 
 function clamp01(value) {

@@ -1,4 +1,7 @@
 import type { LessonMaterialJson } from "../../../shared/api/playsay";
+import type { AnnotationStroke } from "../model/annotation";
+
+export type { AnnotationStroke } from "../model/annotation";
 
 export type CollaborationCursor = {
   x: number;
@@ -17,6 +20,7 @@ export type YjsWorkspaceRuntime = {
   getText: () => string;
   handleSocketMessage: (data: unknown) => void;
   setSocket: (socket: WebSocket | null) => void;
+  setAnnotationStrokes: (strokes: AnnotationStroke[]) => void;
   snapshot: () => LessonMaterialJson;
   startSocketSync: (socket: WebSocket) => void;
   updateCursor: (cursor: CollaborationCursor | null) => void;
@@ -25,6 +29,7 @@ export type YjsWorkspaceRuntime = {
 
 export function createYjsWorkspaceRuntime(options: {
   color: string;
+  onAnnotationChange: (strokes: AnnotationStroke[]) => void;
   onParticipantsChange: (participants: CollaborationParticipant[]) => void;
   onTextChange: (text: string) => void;
   participantName: string;

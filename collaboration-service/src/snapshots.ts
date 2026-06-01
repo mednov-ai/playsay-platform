@@ -61,7 +61,7 @@ export class SnapshotQueue {
     const response = await fetch(url, {
       method: "PUT",
       headers: {
-        "authorization": `Bearer ${this.config.collaborationServiceToken}`,
+        "x-playsay-collaboration-service-token": this.config.collaborationServiceToken,
         "content-type": "application/json",
       },
       body: JSON.stringify({ snapshot }),

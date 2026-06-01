@@ -84,6 +84,7 @@ class CollaborationDocumentService(
     private val lessonMaterialStore: LessonMaterialStore,
     private val tokenService: CollaborationTokenService,
     private val objectMapper: ObjectMapper,
+    @param:Value("\${playsay.collaboration.service-token:}") private val collaborationServiceToken: String,
 ) {
     @Transactional
     fun createCurrent(
@@ -174,6 +175,27 @@ class CollaborationDocumentService(
         request: SaveCollaborationSnapshotRequest,
     ): CollaborationDocumentResponse {
         val document = visibleDocument(authentication, lessonId, documentId)
+        return saveSnapshot(document, request)
+    }
+
+    @Transactional
+    fun saveSnapshotFromService(
+        serviceToken: String?,
+        lessonId: UUID,
+        documentId: UUID,
+        request: SaveCollaborationSnapshotRequest,
+    ): CollaborationDocumentResponse {
+        requireValidServiceToken(serviceToken)
+        val document = collaborationDocumentRepo.findById(documentId).orElse(null)
+            ?.takeIf { found -> found.lessonId == lessonId }
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COLLABORATION_DOCUMENT_NOT_FOUND)
+        return saveSnapshot(document, request)
+    }
+
+    private fun saveSnapshot(
+        document: CollaborationDocumentEntity,
+        request: SaveCollaborationSnapshotRequest,
+    ): CollaborationDocumentResponse {
         validateSnapshot(request.snapshot)
         document.snapshotJson = objectMapper.writeValueAsString(request.snapshot)
         document.snapshotStorageKey = request.snapshotStorageKey?.trim()?.takeIf { key -> key.isNotEmpty() }
@@ -316,6 +338,16 @@ class CollaborationDocumentService(
 
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0
+
+    private fun requireValidServiceToken(serviceToken: String?) {
+        val expected = collaborationServiceToken.trim()
+        if (expected.length < 32) {
+            throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.COLLABORATION_NOT_CONFIGURED)
+        }
+        if (serviceToken?.trim() != expected) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
+        }
+    }
 }
 
 private data class ValidatedCollaborationDocumentRequest(

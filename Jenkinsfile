@@ -67,6 +67,20 @@ spec:
         limits:
           cpu: "1"
           memory: 1024Mi
+    - name: kaniko-collaboration
+      image: gcr.io/kaniko-project/executor:debug
+      command: ["/busybox/cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1024Mi
     - name: tools
       image: alpine:3.20
       command: ["cat"]
@@ -126,6 +140,7 @@ spec:
     GITHUB_OWNER = 'mednov-ai'
     API_IMAGE_NAME = 'playsay-api-gateway'
     WEB_IMAGE_NAME = 'playsay-web-app'
+    COLLABORATION_IMAGE_NAME = 'playsay-collaboration-service'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
@@ -284,6 +299,21 @@ spec:
       }
     }
 
+    stage('Collaboration service build') {
+      steps {
+        container('node') {
+          dir('collaboration-service') {
+            echo "Installing collaboration service dependencies for ${env.BUILD_LABEL}"
+            sh 'npm ci --cache /cache/npm --prefer-offline'
+            echo "Testing collaboration service for ${env.BUILD_LABEL}"
+            sh 'npm test'
+            echo "Building collaboration service for ${env.BUILD_LABEL}"
+            sh 'npm run build'
+          }
+        }
+      }
+    }
+
     stage('Build and push backend image') {
       when {
         expression { env.DEPLOY_TO_DEV == 'true' }
@@ -343,6 +373,32 @@ EOF
       }
     }
 
+    stage('Build and push collaboration service image') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('kaniko-collaboration') {
+          withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+            sh '''
+              set -eu
+              mkdir -p /kaniko/.docker
+              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+              cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
+EOF
+              /kaniko/executor \
+                --context "$WORKSPACE/collaboration-service" \
+                --dockerfile "$WORKSPACE/collaboration-service/Dockerfile" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:${GIT_COMMIT}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:${BUILD_LABEL}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:dev"
+            '''
+          }
+        }
+      }
+    }
+
     stage('Tag source commit') {
       when {
         expression { env.DEPLOY_TO_DEV == 'true' }
@@ -392,9 +448,10 @@ EOF
               cd infra
               yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/api-gateway/values-dev.yaml
               yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/web-app/values-dev.yaml
+              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/collaboration-service/values-dev.yaml
               git config user.email "jenkins@play-and-say.ru"
               git config user.name "Play&Say Jenkins"
-              git add helm-charts/api-gateway/values-dev.yaml helm-charts/web-app/values-dev.yaml
+              git add helm-charts/api-gateway/values-dev.yaml helm-charts/web-app/values-dev.yaml helm-charts/collaboration-service/values-dev.yaml
               git commit \
                 -m "chore: deploy ${BUILD_LABEL} to dev" \
                 -m "Source branch: ${CI_BRANCH}" \

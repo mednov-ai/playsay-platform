@@ -8,6 +8,7 @@ import com.playsay.gateway.dto.MaterialSubmissionResponse
 import com.playsay.gateway.dto.SaveCollaborationSnapshotRequest
 import com.playsay.gateway.service.CollaborationDocumentService
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
@@ -127,12 +129,18 @@ class CollaborationDocumentController(
         ],
     )
     fun saveSnapshot(
-        authentication: JwtAuthenticationToken,
+        authentication: JwtAuthenticationToken?,
         @PathVariable lessonId: UUID,
         @PathVariable documentId: UUID,
         @RequestBody request: SaveCollaborationSnapshotRequest,
+        @Parameter(hidden = true)
+        @RequestHeader("X-PlaySay-Collaboration-Service-Token", required = false) serviceToken: String? = null,
     ): CollaborationDocumentResponse =
-        service.saveSnapshot(authentication, lessonId, documentId, request)
+        if (authentication != null) {
+            service.saveSnapshot(authentication, lessonId, documentId, request)
+        } else {
+            service.saveSnapshotFromService(serviceToken, lessonId, documentId, request)
+        }
 
     @PostMapping(
         "/schedule/lessons/{lessonId}/collaboration-documents/{documentId}/finalize",

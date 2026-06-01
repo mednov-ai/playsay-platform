@@ -50,6 +50,7 @@ playsay:
   collaboration:
     websocket-url: ${PLAYSAY_COLLABORATION_WEBSOCKET_URL:wss://online.play-and-say.ru/collab/ws}
     token-secret: ${PLAYSAY_COLLABORATION_TOKEN_SECRET:}
+    service-token: ${PLAYSAY_COLLABORATION_SERVICE_TOKEN:}
     token-ttl-seconds: ${PLAYSAY_COLLABORATION_TOKEN_TTL_SECONDS:900}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}

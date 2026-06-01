@@ -27,6 +27,7 @@ class SecurityConfig {
                         "/v3/api-docs.yaml",
                         "/v3/api-docs/**",
                         "/livekit/webhook",
+                        "/schedule/lessons/*/collaboration-documents/*/snapshot",
                         "/ws/lessons",
                     ).permitAll()
                     .anyRequest().authenticated()

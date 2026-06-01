@@ -51,6 +51,7 @@ import liquibase.integration.spring.SpringLiquibase
         "playsay.collaboration.websocket-url=wss://online.play-and-say.ru/collab/ws",
         "playsay.collaboration.token-secret=01234567890123456789012345678901",
         "playsay.collaboration.token-ttl-seconds=900",
+        "playsay.collaboration.service-token=service-token-01234567890123456789",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -230,6 +231,32 @@ class CollaborationDocumentControllerTest @Autowired constructor(
         assertEquals(classroom.materialId, finalized.materialId)
         assertEquals(snapshot, finalized.content)
         assertNotNull(finalized.submittedAt)
+    }
+
+    @Test
+    fun `collaboration service token can save room snapshot without user jwt`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val classroom = classroom(teacher, listOf("student-1"))
+        val document = collaborationController.createCurrent(
+            student,
+            classroom.lessonId,
+            CreateCollaborationDocumentRequest(classroom.materialId, "MATERIAL_WORK", "GROUP"),
+        )
+        val snapshot = objectMapper.readTree("""{"yjsUpdate":"AQID"}""")
+
+        val saved = collaborationController.saveSnapshot(
+            authentication = null,
+            serviceToken = "service-token-01234567890123456789",
+            lessonId = classroom.lessonId,
+            documentId = document.id,
+            request = SaveCollaborationSnapshotRequest(snapshot),
+        )
+
+        assertEquals(1L, saved.version)
+        assertEquals(snapshot, saved.snapshot)
+        assertEquals(document.id, saved.id)
     }
 
     @Test

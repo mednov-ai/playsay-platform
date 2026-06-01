@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type PointerEvent, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Eraser, Loader2, MousePointer2, PenLine, Send, Undo2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -21,12 +21,16 @@ import {
   pointsToSvgPath,
   type AnnotationStroke,
 } from "../model/annotation";
+import type { CollaborationCursor, CollaborationParticipant } from "../hooks/useYjsWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
+import { PresenceCursorLayer } from "./PresenceCursorLayer";
 
 type LiveAnnotationSync = {
+  participants: CollaborationParticipant[];
   ready: boolean;
   setStrokes: (updater: (current: AnnotationStroke[]) => AnnotationStroke[]) => void;
   strokes: AnnotationStroke[];
+  updateCursor: (cursor: CollaborationCursor | null) => void;
 };
 
 export function LessonTaskCanvas({
@@ -96,16 +100,36 @@ export function LessonTaskCanvas({
     : score ?? liveScore;
   const taskTotal = Math.max(1, material ? materialDocumentBlocks(material).length : 1);
 
+  function updateMaterialCursor(event: PointerEvent<HTMLDivElement>) {
+    if (!annotationSync) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+
+    annotationSync.updateCursor({
+      x: clamp01((event.clientX - rect.left) / rect.width),
+      y: clamp01((event.clientY - rect.top) / rect.height),
+    });
+  }
+
+  function clearMaterialCursor() {
+    annotationSync?.updateCursor(null);
+  }
+
   return (
     <div className="playsay-task-board">
       <aside className="playsay-annotation-toolbar" aria-label={t("classroom.annotation.toolbar")}>
-        <AnnotationToolButton active={annotationTool === "pointer"} label={t("classroom.annotation.pointer")} onClick={() => setAnnotationTool("pointer")}>
+        <AnnotationToolButton active={annotationTool === "pointer"} label={t("classroom.annotation.pointer")} onClick={() => setAnnotationTool("pointer")} testId="annotation-tool-pointer">
           <MousePointer2 className="h-4 w-4" />
         </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "pen"} label={t("classroom.annotation.pen")} onClick={() => setAnnotationTool("pen")}>
+        <AnnotationToolButton active={annotationTool === "pen"} label={t("classroom.annotation.pen")} onClick={() => setAnnotationTool("pen")} testId="annotation-tool-pen">
           <PenLine className="h-4 w-4" />
         </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "eraser"} label={t("classroom.annotation.eraser")} onClick={() => setAnnotationTool("eraser")}>
+        <AnnotationToolButton active={annotationTool === "eraser"} label={t("classroom.annotation.eraser")} onClick={() => setAnnotationTool("eraser")} testId="annotation-tool-eraser">
           <Eraser className="h-4 w-4" />
         </AnnotationToolButton>
         <AnnotationToolButton
@@ -113,6 +137,7 @@ export function LessonTaskCanvas({
           disabled={annotationStrokes.length === 0}
           label={t("classroom.annotation.undo")}
           onClick={() => setAnnotationStrokes((current) => current.slice(0, -1))}
+          testId="annotation-tool-undo"
         >
           <Undo2 className="h-4 w-4" />
         </AnnotationToolButton>
@@ -133,7 +158,12 @@ export function LessonTaskCanvas({
 
       <div className="playsay-task-page">
         <div className="playsay-task-document">
-          <div className="playsay-task-document-surface">
+          <div
+            className="playsay-task-document-surface"
+            data-testid="lesson-material-surface"
+            onPointerLeave={clearMaterialCursor}
+            onPointerMove={updateMaterialCursor}
+          >
             {material ? (
               <LessonMaterialDocumentView
                 answers={answers}
@@ -168,6 +198,7 @@ export function LessonTaskCanvas({
                 />
               ))}
             </svg>
+            <PresenceCursorLayer participants={annotationSync?.participants ?? []} />
           </div>
         </div>
       </div>
@@ -193,4 +224,8 @@ export function LessonTaskCanvas({
       </footer>
     </div>
   );
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }

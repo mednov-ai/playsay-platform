@@ -81,15 +81,19 @@ export function LessonWorkspace({
       return null;
     }
     return {
+      participants: teacherAnnotationWorkspace.participants,
       ready: teacherAnnotationWorkspace.connected,
       setStrokes: teacherAnnotationWorkspace.setAnnotationStrokes,
       strokes: teacherAnnotationWorkspace.annotationStrokes,
+      updateCursor: teacherAnnotationWorkspace.updateCursor,
     };
   }, [
     teacherAnnotationDocumentState.document?.id,
     teacherAnnotationWorkspace.annotationStrokes,
     teacherAnnotationWorkspace.connected,
+    teacherAnnotationWorkspace.participants,
     teacherAnnotationWorkspace.setAnnotationStrokes,
+    teacherAnnotationWorkspace.updateCursor,
   ]);
 
   return (

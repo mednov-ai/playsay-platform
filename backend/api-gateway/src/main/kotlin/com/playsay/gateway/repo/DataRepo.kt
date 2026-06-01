@@ -2,6 +2,7 @@ package com.playsay.gateway.repo
 
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.AssignmentEntity
+import com.playsay.gateway.entity.CollaborationDocumentEntity
 import com.playsay.gateway.entity.CourseEntity
 import com.playsay.gateway.entity.LessonEntity
 import com.playsay.gateway.entity.LessonMaterialAnnotationEntity
@@ -709,4 +710,26 @@ interface MaterialAssetRepo : JpaRepository<MaterialAssetEntity, UUID> {
 
 interface LessonMaterialAnnotationRepo : JpaRepository<LessonMaterialAnnotationEntity, UUID> {
     fun findByLessonIdAndMaterialId(lessonId: UUID, materialId: UUID): LessonMaterialAnnotationEntity?
+}
+
+interface CollaborationDocumentRepo : JpaRepository<CollaborationDocumentEntity, UUID> {
+    fun findByLessonIdAndMaterialIdAndStudentUserIdAndDocumentKindAndCollaborationScope(
+        lessonId: UUID,
+        materialId: UUID,
+        studentUserId: UUID,
+        documentKind: String,
+        collaborationScope: String,
+    ): CollaborationDocumentEntity?
+
+    fun findByLessonIdAndMaterialIdAndStudentUserIdIsNullAndDocumentKindAndCollaborationScope(
+        lessonId: UUID,
+        materialId: UUID,
+        documentKind: String,
+        collaborationScope: String,
+    ): CollaborationDocumentEntity?
+
+    fun findByLessonIdAndMaterialIdOrderByUpdatedAtDesc(
+        lessonId: UUID,
+        materialId: UUID,
+    ): List<CollaborationDocumentEntity>
 }

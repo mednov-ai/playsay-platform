@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-01-001-create-collaboration-documents" author="codex">
+        <createTable tableName="collaboration_document">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_collaboration_document"/>
+            </column>
+            <column name="lesson_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="material_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="student_user_id" type="UUID"/>
+            <column name="document_kind" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="collaboration_scope" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="yjs_document_id" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="snapshot_json" type="JSONB"/>
+            <column name="snapshot_storage_key" type="TEXT"/>
+            <column name="version" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="collaboration_document"
+            baseColumnNames="lesson_id"
+            constraintName="fk_collaboration_document_lesson"
+            referencedTableName="lesson"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="collaboration_document"
+            baseColumnNames="material_id"
+            constraintName="fk_collaboration_document_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="collaboration_document"
+            baseColumnNames="student_user_id"
+            constraintName="fk_collaboration_document_student_user"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint
+            tableName="collaboration_document"
+            columnNames="yjs_document_id"
+            constraintName="uq_collaboration_document_yjs_document_id"/>
+        <addUniqueConstraint
+            tableName="collaboration_document"
+            columnNames="lesson_id, material_id, student_user_id, document_kind, collaboration_scope"
+            constraintName="uq_collaboration_document_scope_student"/>
+        <sql>
+            alter table collaboration_document
+                add constraint ck_collaboration_document_scope
+                check (collaboration_scope in ('INDIVIDUAL', 'GROUP'));
+        </sql>
+        <sql>
+            alter table collaboration_document
+                add constraint ck_collaboration_document_scope_student
+                check (
+                    (collaboration_scope = 'INDIVIDUAL' and student_user_id is not null)
+                    or (collaboration_scope = 'GROUP' and student_user_id is null)
+                );
+        </sql>
+        <sql dbms="postgresql">
+            create unique index uq_collaboration_document_group_scope
+                on collaboration_document (lesson_id, material_id, document_kind, collaboration_scope)
+                where collaboration_scope = 'GROUP';
+        </sql>
+        <createIndex tableName="collaboration_document" indexName="idx_collaboration_document_lesson_material_updated">
+            <column name="lesson_id"/>
+            <column name="material_id"/>
+            <column name="updated_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="collaboration_document"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -237,7 +237,7 @@
 
 .playsay-rendered-material {
   position: relative;
-  min-height: 100%;
+  min-height: 0;
 }
 
 .playsay-material-score-badge {

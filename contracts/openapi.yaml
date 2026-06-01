@@ -321,6 +321,58 @@ paths:
           description: Collaboration document not found
       security:
       - bearerAuth: []
+  /me/assignments/{assignmentId}/submission:
+    get:
+      tags:
+      - Assignments
+      summary: Get my homework answer snapshot
+      description: Returns the current student's saved answers for a homework assignment.
+      operationId: getMyHomeworkAssignmentSubmission
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentSubmissionResponse"
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Assignments
+      summary: Save my homework answer snapshot
+      description: Creates or updates the current student's answers and automatic
+        score/error snapshot for homework.
+      operationId: saveMyHomeworkAssignmentSubmission
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialSubmissionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentSubmissionResponse"
+      security:
+      - bearerAuth: []
   /materials/{materialId}:
     get:
       tags:
@@ -649,6 +701,44 @@ paths:
           description: Scheduled lesson not found
         "503":
           description: LiveKit is not configured
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/homework:
+    post:
+      tags:
+      - Assignments
+      summary: Carry scheduled lesson material into homework
+      description: Creates or updates a homework assignment from a scheduled lesson
+        material and participants. Requires TEACHER or ADMIN role.
+      operationId: createHomeworkFromScheduledLesson
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonHomeworkRequest"
+        required: true
+      responses:
+        "201":
+          description: Homework assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAssignmentDetailResponse"
+        "400":
+          description: Invalid homework payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot create assignments
+        "404":
+          description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
   /schedule/lessons/{lessonId}/collaboration-documents/{documentId}/token:
@@ -1113,6 +1203,54 @@ paths:
           description: Course not found
       security:
       - bearerAuth: []
+  /assignments:
+    get:
+      tags:
+      - Assignments
+      summary: List homework assignments
+      description: Lists homework assignments visible to the current teacher or administrator.
+      operationId: listHomeworkAssignments
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssignmentSummaryResponse"
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Assignments
+      summary: Create homework assignment
+      description: Creates a material-based homework assignment for selected students.
+        Requires TEACHER or ADMIN role.
+      operationId: createHomeworkAssignment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HomeworkAssignmentRequest"
+        required: true
+      responses:
+        "201":
+          description: Homework assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAssignmentDetailResponse"
+        "400":
+          description: Invalid assignment payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot create assignments
+        "404":
+          description: Material not found
+      security:
+      - bearerAuth: []
   /materials/{materialId}/assets/{assetId}:
     patch:
       tags:
@@ -1292,6 +1430,72 @@ paths:
           description: Missing or invalid bearer token
       security:
       - bearerAuth: []
+  /me/assignments:
+    get:
+      tags:
+      - Assignments
+      summary: List my homework assignments
+      description: Lists homework assignments assigned to the current student.
+      operationId: listMyHomeworkAssignments
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AssignmentSummaryResponse"
+      security:
+      - bearerAuth: []
+  /me/assignments/{assignmentId}:
+    get:
+      tags:
+      - Assignments
+      summary: Get my homework assignment
+      description: Returns the assigned material and current answer snapshot for the
+        current student.
+      operationId: getMyHomeworkAssignment
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentAssignmentDetailResponse"
+      security:
+      - bearerAuth: []
+  /me/assignments/{assignmentId}/material:
+    get:
+      tags:
+      - Assignments
+      summary: Get my homework material
+      description: Returns the material attached to a homework assignment assigned
+        to the current student.
+      operationId: getMyHomeworkAssignmentMaterial
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialResponse"
+      security:
+      - bearerAuth: []
   /materials/{materialId}/assets:
     get:
       tags:
@@ -1367,6 +1571,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HelloResponse"
+  /assignments/{assignmentId}:
+    get:
+      tags:
+      - Assignments
+      summary: Get homework assignment progress
+      description: Returns recipients and current score/error progress for a homework
+        assignment.
+      operationId: getHomeworkAssignment
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAssignmentDetailResponse"
+      security:
+      - bearerAuth: []
   /admin/users:
     get:
       tags:
@@ -1767,6 +1995,69 @@ components:
       - updatedAt
       - version
       - yjsDocumentId
+    AssignmentSubmissionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        assignmentId:
+          type: string
+          format: uuid
+        lessonId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userSubject:
+          type:
+          - string
+          - "null"
+        userName:
+          type:
+          - string
+          - "null"
+        content:
+          $ref: "#/components/schemas/JsonNode"
+        score:
+          type:
+          - number
+          - "null"
+        errorsCount:
+          type:
+          - integer
+          - "null"
+          format: int32
+        progressTone:
+          type:
+          - integer
+          - "null"
+          format: int32
+        submittedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - assignmentId
+      - content
+      - createdAt
+      - id
+      - materialId
+      - updatedAt
+      - userId
     LessonMaterialRequest:
       type: object
       properties:
@@ -2032,6 +2323,200 @@ components:
       - roomName
       - serverUrl
       - token
+    LessonHomeworkRequest:
+      type: object
+      properties:
+        studentSubjects:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            maxLength: 255
+          maxItems: 100
+        title:
+          type:
+          - string
+          - "null"
+          maxLength: 160
+        instructions:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+        dueAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+    AssignmentRecipientProgressResponse:
+      type: object
+      properties:
+        assignmentId:
+          type: string
+          format: uuid
+        studentUserId:
+          type: string
+          format: uuid
+        studentSubject:
+          type: string
+        studentName:
+          type:
+          - string
+          - "null"
+        submissionId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        hasSubmission:
+          type: boolean
+        submitted:
+          type: boolean
+        score:
+          type:
+          - number
+          - "null"
+        maxScore:
+          type:
+          - number
+          - "null"
+        scoreRatio:
+          type:
+          - number
+          - "null"
+        errorsCount:
+          type:
+          - integer
+          - "null"
+          format: int32
+        progressTone:
+          type:
+          - integer
+          - "null"
+          format: int32
+        showGroupIndicator:
+          type: boolean
+        groupAverageScore:
+          type:
+          - number
+          - "null"
+        groupAverageErrorsCount:
+          type:
+          - number
+          - "null"
+        relativeScoreDelta:
+          type:
+          - number
+          - "null"
+        relativeErrorsDelta:
+          type:
+          - number
+          - "null"
+        submittedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - assignmentId
+      - hasSubmission
+      - showGroupIndicator
+      - studentSubject
+      - studentUserId
+      - submitted
+    AssignmentSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        materialTitle:
+          type: string
+        lessonId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        sourceLessonId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        title:
+          type: string
+        instructions:
+          type:
+          - string
+          - "null"
+        type:
+          type: string
+        maxScore:
+          type:
+          - number
+          - "null"
+        dueAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        status:
+          type: string
+        recipientCount:
+          type: integer
+          format: int32
+        submittedCount:
+          type: integer
+          format: int32
+        scoredCount:
+          type: integer
+          format: int32
+        averageScore:
+          type:
+          - number
+          - "null"
+        averageErrorsCount:
+          type:
+          - number
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - materialId
+      - materialTitle
+      - recipientCount
+      - scoredCount
+      - status
+      - submittedCount
+      - title
+      - type
+      - updatedAt
+    TeacherAssignmentDetailResponse:
+      type: object
+      properties:
+        assignment:
+          $ref: "#/components/schemas/AssignmentSummaryResponse"
+        recipients:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssignmentRecipientProgressResponse"
+      required:
+      - assignment
+      - recipients
     CollaborationTokenResponse:
       type: object
       properties:
@@ -2265,6 +2750,37 @@ components:
       required:
       - language
       - prompt
+    HomeworkAssignmentRequest:
+      type: object
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        studentSubjects:
+          type: array
+          items:
+            type: string
+            maxLength: 255
+          maxItems: 100
+          minItems: 1
+        title:
+          type:
+          - string
+          - "null"
+          maxLength: 160
+        instructions:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+        dueAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - materialId
+      - studentSubjects
     MaterialAssetUpdateRequest:
       type: object
       properties:
@@ -2337,6 +2853,19 @@ components:
       required:
       - roles
       - subject
+    StudentAssignmentDetailResponse:
+      type: object
+      properties:
+        assignment:
+          $ref: "#/components/schemas/AssignmentSummaryResponse"
+        material:
+          $ref: "#/components/schemas/LessonMaterialResponse"
+        submission:
+          $ref: "#/components/schemas/AssignmentSubmissionResponse"
+      required:
+      - assignment
+      - material
+      - submission
     HelloResponse:
       type: object
       properties:

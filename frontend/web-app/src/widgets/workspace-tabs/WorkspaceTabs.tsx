@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, Layers3 } from "lucide-react";
+import { BookOpen, CalendarDays, ClipboardList, Layers3 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { WorkspaceTab, WorkspaceTabDefinition } from "../../entities/workspace/model";
 import { useAppTranslation } from "../../shared/i18n";
@@ -37,6 +37,8 @@ export function WorkspaceTabs({
 
 function workspaceTabIcon(tab: WorkspaceTab): ReactNode {
   switch (tab) {
+    case "homework":
+      return <ClipboardList className="h-4 w-4" />;
     case "materials":
       return <BookOpen className="h-4 w-4" />;
     case "courses":

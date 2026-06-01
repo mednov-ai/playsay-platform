@@ -31,6 +31,7 @@ import { Button } from "../components/ui/button";
 import { ProfileAccountPanel, type SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
 import { CourseWorkspacePanel } from "../features/courses/ui/CourseWorkspacePanel";
 import { SchedulePanel } from "../features/schedule/ui/SchedulePanel";
+import { HomeworkPanel } from "../features/homework/ui/HomeworkPanel";
 import type { LessonRoomSession } from "../features/classroom";
 import { MaterialLibraryPanel } from "../features/materials/ui/MaterialLibraryPanel";
 import { LiveLessonExperience } from "../features/classroom/ui/LiveLessonExperience";
@@ -273,6 +274,16 @@ export function AppShell(props: AppShellProps) {
                 profile={profile}
                 roomLoadingLessonId={roomLoadingLessonId}
                 roomMessage={roomMessage}
+                scheduledLessons={scheduledLessons}
+                studentUsers={studentUsers}
+              />
+            ) : null}
+
+            {workspaceTab === "homework" ? (
+              <HomeworkPanel
+                disabled={!isAuthenticated}
+                materials={materials}
+                profile={profile}
                 scheduledLessons={scheduledLessons}
                 studentUsers={studentUsers}
               />

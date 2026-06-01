@@ -5,6 +5,7 @@ export const translationDomains = [
   "profile",
   "workspace",
   "schedule",
+  "homework",
   "courses",
   "materials",
   "classroom",

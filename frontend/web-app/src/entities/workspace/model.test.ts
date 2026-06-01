@@ -17,9 +17,9 @@ describe("workspace model", () => {
     expect(canAssignLessons(profileWithRoles(["ADMIN"]))).toBe(true);
   });
 
-  it("keeps students on the schedule workspace only", () => {
-    expect(workspaceTabsForProfile(profileWithRoles(["STUDENT"])).map((tab) => tab.id)).toEqual(["schedule"]);
-    expect(workspaceTabsForProfile(profileWithRoles(["TEACHER"])).map((tab) => tab.id)).toEqual(["schedule", "materials", "courses"]);
+  it("keeps students on schedule and homework workspaces", () => {
+    expect(workspaceTabsForProfile(profileWithRoles(["STUDENT"])).map((tab) => tab.id)).toEqual(["schedule", "homework"]);
+    expect(workspaceTabsForProfile(profileWithRoles(["TEACHER"])).map((tab) => tab.id)).toEqual(["schedule", "homework", "materials", "courses"]);
     expect(workspaceTabsForProfile(profileWithRoles(["STUDENT"]))[0].labelKey).toBe("workspace.tabs.mySchedule.label");
     expect(workspaceTabsForProfile(profileWithRoles(["TEACHER"]))[0].labelKey).toBe("workspace.tabs.schedule.label");
   });

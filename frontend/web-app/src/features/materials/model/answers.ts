@@ -1,8 +1,8 @@
-import type { LessonMaterialSubmission } from "../../../shared/api/playsay";
+import type { LessonMaterialJson, LessonMaterialSubmission } from "../../../shared/api/playsay";
 import type { MaterialAnswerBlock, MaterialAnswerState, MaterialAttemptEntry, MaterialHintEntry } from "./types";
 import { asJsonObject, asNumber, asString } from "./formatters";
 
-export function materialAnswersFromSubmission(submission: LessonMaterialSubmission | null): MaterialAnswerState {
+export function materialAnswersFromSubmission(submission: Pick<LessonMaterialSubmission, "content"> | { content?: LessonMaterialJson | null } | null): MaterialAnswerState {
   const content = asJsonObject(submission?.content);
   const answers = asJsonObject(content.answers);
   return Object.entries(answers).reduce<MaterialAnswerState>((result, [blockId, value]) => {

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.MaterialAnswerSuggestion
 import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.utils.MetaData
 import java.math.BigDecimal
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -38,7 +39,7 @@ class MaterialAnswerSuggestionService(
         when (provider.trim().lowercase()) {
             "", "stub" -> stubProvider.suggest(input)
             "openai" -> openAiProvider.suggest(input)
-            else -> throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "Unknown AI answer suggestion provider.")
+            else -> throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.AI_ANSWER_SUGGESTION_PROVIDER_UNKNOWN)
         }
 }
 
@@ -85,7 +86,7 @@ class OpenAiMaterialAnswerSuggestionProvider(
         val cleanModel = model.trim().ifEmpty { "gpt-5.4-mini" }
         val cleanBaseUrl = baseUrl.trim().ifEmpty { "https://api.openai.com/v1" }
         if (cleanApiKey.isEmpty()) {
-            throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "OpenAI API key is not configured.")
+            throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.AI_API_KEY_NOT_CONFIGURED)
         }
 
         val requestBody = objectMapper.writeValueAsString(openAiRequest(input, cleanModel))
@@ -97,16 +98,16 @@ class OpenAiMaterialAnswerSuggestionProvider(
             } else {
                 HttpStatus.BAD_GATEWAY
             }
-            throw ProjectResponseException(status, "OpenAI answer suggestion failed.")
+            throw ProjectResponseException.localized(status, MetaData.ErrorCodes.AI_ANSWER_SUGGESTION_FAILED)
         } catch (exception: Exception) {
-            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI answer suggestion failed.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.AI_ANSWER_SUGGESTION_FAILED)
         }
 
         val responseNode = parseJson(rawResponse)
         val outputText = responseNode.answerSuggestionOutputText()
-            ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response did not contain answer suggestions.")
+            ?: throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.AI_ANSWER_SUGGESTIONS_MISSING)
         val suggestionsNode = parseJson(outputText).get("suggestions") as? ArrayNode
-            ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response did not match answer suggestion schema.")
+            ?: throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.AI_ANSWER_SUGGESTION_SCHEMA_INVALID)
         val knownAnswers = input.acceptedAnswers.map(::normalizedAnswerSuggestionValue).toSet()
         return suggestionsNode.mapNotNull { suggestion ->
             val value = suggestion.get("value")?.asText()?.trim()?.takeIf { item -> item.isNotEmpty() }
@@ -168,7 +169,7 @@ class OpenAiMaterialAnswerSuggestionProvider(
 
     private fun parseJson(raw: String): JsonNode =
         runCatching { objectMapper.readTree(raw) }
-            .getOrElse { throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response was not valid JSON.") }
+            .getOrElse { throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.AI_RESPONSE_INVALID_JSON) }
 }
 
 private fun JsonNode.answerSuggestionOutputText(): String? {

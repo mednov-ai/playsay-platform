@@ -14,7 +14,6 @@ import java.time.Duration
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
-import org.springframework.web.server.ResponseStatusException
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData
@@ -42,7 +41,10 @@ class MaterialAiDraftService(
         when (provider.trim().lowercase()) {
             "", "stub" -> stubProvider.draft(input)
             "openai" -> openAiProvider.draft(input)
-            else -> throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "Unknown AI material provider.")
+            else -> throw ProjectResponseException.localized(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                MetaData.ErrorCodes.AI_PROVIDER_UNKNOWN,
+            )
         }
 }
 
@@ -92,7 +94,10 @@ class OpenAiMaterialAiDraftProvider(
         val cleanModel = model.trim().ifEmpty { "gpt-5.4-mini" }
         val cleanBaseUrl = baseUrl.trim().ifEmpty { "https://api.openai.com/v1" }
         if (cleanApiKey.isEmpty()) {
-            throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "OpenAI API key is not configured.")
+            throw ProjectResponseException.localized(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                MetaData.ErrorCodes.AI_API_KEY_NOT_CONFIGURED,
+            )
         }
 
         val requestBody = objectMapper.writeValueAsString(openAiRequest(input, cleanModel))
@@ -104,17 +109,31 @@ class OpenAiMaterialAiDraftProvider(
             } else {
                 HttpStatus.BAD_GATEWAY
             }
-            throw ProjectResponseException(status, "OpenAI material generation failed.")
+            throw ProjectResponseException.localized(
+                status,
+                MetaData.ErrorCodes.AI_MATERIAL_GENERATION_FAILED,
+            )
         } catch (exception: Exception) {
-            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI material generation failed.")
+            throw ProjectResponseException.localized(
+                HttpStatus.BAD_GATEWAY,
+                MetaData.ErrorCodes.AI_MATERIAL_GENERATION_FAILED,
+            )
         }
 
         val responseNode = parseJson(rawResponse)
         val outputText = responseNode.outputText()
-            ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response did not contain generated material.")
+            ?: throw ProjectResponseException.localized(
+                HttpStatus.BAD_GATEWAY,
+                MetaData.ErrorCodes.AI_MATERIAL_RESPONSE_MISSING,
+            )
         val draftNode = parseJson(outputText)
         val draft = runCatching { objectMapper.treeToValue(draftNode, LessonMaterialDraftResponse::class.java) }
-            .getOrElse { throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response did not match material schema.") }
+            .getOrElse {
+                throw ProjectResponseException.localized(
+                    HttpStatus.BAD_GATEWAY,
+                    MetaData.ErrorCodes.AI_MATERIAL_SCHEMA_INVALID,
+                )
+            }
             .withNormalizedArticleAnswers()
 
         validateDraft(draft)
@@ -168,7 +187,12 @@ class OpenAiMaterialAiDraftProvider(
 
     private fun parseJson(raw: String): JsonNode =
         runCatching { objectMapper.readTree(raw) }
-            .getOrElse { throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI response was not valid JSON.") }
+            .getOrElse {
+                throw ProjectResponseException.localized(
+                    HttpStatus.BAD_GATEWAY,
+                    MetaData.ErrorCodes.AI_RESPONSE_INVALID_JSON,
+                )
+            }
 
     private fun materialDraftJsonSchema(): JsonNode =
         objectMapper.readTree(materialDraftJsonSchemaJson)
@@ -309,25 +333,43 @@ private fun takesAnArticle(word: String): Boolean =
 
 private fun validateDraft(draft: LessonMaterialDraftResponse) {
     if (draft.title.isBlank() || draft.title.length > 160) {
-        throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid material title.")
+        throw ProjectResponseException.localized(
+            HttpStatus.BAD_GATEWAY,
+            MetaData.ErrorCodes.AI_GENERATED_MATERIAL_TITLE_INVALID,
+        )
     }
     if (draft.language.isBlank() || draft.language.length > 16 || draft.cefrLevel !in materialAiCefrLevels) {
-        throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated invalid material metadata.")
+        throw ProjectResponseException.localized(
+            HttpStatus.BAD_GATEWAY,
+            MetaData.ErrorCodes.AI_GENERATED_MATERIAL_METADATA_INVALID,
+        )
     }
     if (draft.document.get("schemaVersion")?.asInt() != 1 || draft.document.get("pages") !is ArrayNode) {
-        throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid material document.")
+        throw ProjectResponseException.localized(
+            HttpStatus.BAD_GATEWAY,
+            MetaData.ErrorCodes.AI_GENERATED_MATERIAL_DOCUMENT_INVALID,
+        )
     }
     if (draft.scoringRubric.get("maxScore")?.asInt() != 10) {
-        throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated an invalid scoring rubric.")
+        throw ProjectResponseException.localized(
+            HttpStatus.BAD_GATEWAY,
+            MetaData.ErrorCodes.AI_GENERATED_MATERIAL_RUBRIC_INVALID,
+        )
     }
 
     (draft.document.get("pages") as ArrayNode).forEach { page ->
         val blocks = page.get("blocks") as? ArrayNode
-            ?: throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated a material page without blocks.")
+            ?: throw ProjectResponseException.localized(
+                HttpStatus.BAD_GATEWAY,
+                MetaData.ErrorCodes.AI_GENERATED_MATERIAL_PAGE_EMPTY,
+            )
         blocks.forEach { block ->
             val type = block.get("type")?.asText()
             if (type !in materialAiBlockTypes) {
-                throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "OpenAI generated an unsupported material block.")
+                throw ProjectResponseException.localized(
+                    HttpStatus.BAD_GATEWAY,
+                    MetaData.ErrorCodes.AI_GENERATED_MATERIAL_BLOCK_UNSUPPORTED,
+                )
             }
         }
     }

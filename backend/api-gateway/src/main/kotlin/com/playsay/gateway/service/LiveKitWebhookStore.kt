@@ -29,7 +29,7 @@ class LiveKitWebhookVerifier(
         val cleanApiKey = apiKey.trim()
         val secretBytes = apiSecret.trim().toByteArray(StandardCharsets.UTF_8)
         if (cleanApiKey.isEmpty() || secretBytes.size < 32) {
-            throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "LiveKit is not configured.")
+            throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.LIVEKIT_NOT_CONFIGURED)
         }
 
         val token = authorizationHeader
@@ -37,32 +37,32 @@ class LiveKitWebhookVerifier(
             ?.removePrefix("Bearer ")
             ?.trim()
             ?.takeIf { value -> value.isNotEmpty() }
-            ?: throw ProjectResponseException(HttpStatus.UNAUTHORIZED, "Missing LiveKit webhook signature.")
+            ?: throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_SIGNATURE_MISSING)
 
         val jwt = runCatching { SignedJWT.parse(token) }
-            .getOrElse { throw ProjectResponseException(HttpStatus.UNAUTHORIZED, "Invalid LiveKit webhook signature.") }
+            .getOrElse { throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_SIGNATURE_INVALID) }
 
         if (jwt.header.algorithm != JWSAlgorithm.HS256 || !jwt.verify(MACVerifier(secretBytes))) {
-            throw ProjectResponseException(HttpStatus.UNAUTHORIZED, "Invalid LiveKit webhook signature.")
+            throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_SIGNATURE_INVALID)
         }
 
         val claims = jwt.jwtClaimsSet
         if (claims.issuer != cleanApiKey) {
-            throw ProjectResponseException(HttpStatus.UNAUTHORIZED, "Invalid LiveKit webhook issuer.")
+            throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_ISSUER_INVALID)
         }
         val now = Date()
         if (claims.expirationTime?.after(now) != true || claims.notBeforeTime?.after(now) == true) {
-            throw ProjectResponseException(HttpStatus.UNAUTHORIZED, "Expired LiveKit webhook signature.")
+            throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_SIGNATURE_EXPIRED)
         }
 
         val expectedHash = claims.getStringClaim("sha256")
-            ?: throw ProjectResponseException(HttpStatus.UNAUTHORIZED, "Missing LiveKit webhook payload hash.")
+            ?: throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_PAYLOAD_HASH_MISSING)
         val actualHash = MessageDigest.getInstance("SHA-256").digest(rawBody.toByteArray(StandardCharsets.UTF_8))
         val expectedHashBytes = runCatching { Base64.getDecoder().decode(expectedHash) }
-            .getOrElse { throw ProjectResponseException(HttpStatus.UNAUTHORIZED, "Invalid LiveKit webhook payload hash.") }
+            .getOrElse { throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_PAYLOAD_HASH_INVALID) }
 
         if (!MessageDigest.isEqual(actualHash, expectedHashBytes)) {
-            throw ProjectResponseException(HttpStatus.UNAUTHORIZED, "Invalid LiveKit webhook payload hash.")
+            throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_PAYLOAD_HASH_INVALID)
         }
     }
 }

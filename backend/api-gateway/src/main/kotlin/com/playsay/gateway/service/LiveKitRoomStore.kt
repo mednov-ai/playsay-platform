@@ -34,7 +34,7 @@ class LiveKitTokenService(
         val cleanApiSecret = apiSecret.trim()
         val secretBytes = cleanApiSecret.toByteArray(StandardCharsets.UTF_8)
         if (cleanServerUrl.isEmpty() || cleanApiKey.isEmpty() || secretBytes.size < 32) {
-            throw ProjectResponseException(HttpStatus.SERVICE_UNAVAILABLE, "LiveKit is not configured.")
+            throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.LIVEKIT_NOT_CONFIGURED)
         }
 
         val now = Instant.now()

@@ -179,7 +179,7 @@ class ScheduledLessonStore(
 
         val missingSubjects = cleanedSubjects.filter { subject -> subject !in users }
         if (missingSubjects.isNotEmpty()) {
-            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unknown participant subject: ${missingSubjects.first()}.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNKNOWN_PARTICIPANT_SUBJECT, missingSubjects.first())
         }
 
         return cleanedSubjects.map { subject -> requireNotNull(users[subject]) }
@@ -206,7 +206,7 @@ class ScheduledLessonStore(
         }
 
         if (!lessonTemplateRepo.existsById(lessonTemplateId)) {
-            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "lessonTemplateId does not exist.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.LESSON_TEMPLATE_ID_NOT_FOUND)
         }
     }
 
@@ -228,7 +228,7 @@ class ScheduledLessonStore(
         }
 
         if (!exists) {
-            throw ProjectResponseException(HttpStatus.BAD_REQUEST, "materialId does not exist.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_ID_NOT_FOUND)
         }
     }
 }
@@ -245,17 +245,17 @@ private data class ValidatedScheduledLessonRequest(
 
 private fun ScheduledLessonRequest.validated(): ValidatedScheduledLessonRequest {
     if (scheduledStart != null && scheduledEnd != null && !scheduledEnd.isAfter(scheduledStart)) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "scheduledEnd must be after scheduledStart.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.SCHEDULED_END_BEFORE_START)
     }
 
     val cleanedStatus = status.trim().uppercase()
     if (cleanedStatus !in scheduleStatuses) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unsupported lesson status.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_LESSON_STATUS)
     }
 
     val cleanedType = type.trim().uppercase()
     if (cleanedType !in scheduleTypes) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unsupported lesson type.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_LESSON_TYPE)
     }
 
     return ValidatedScheduledLessonRequest(

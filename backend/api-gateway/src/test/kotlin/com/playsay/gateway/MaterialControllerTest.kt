@@ -41,7 +41,10 @@ import liquibase.integration.spring.SpringLiquibase
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MaterialControllerTest @Autowired constructor(
-    private val materialController: MaterialController,
+    private val materialCrudController: MaterialCrudController,
+    private val scheduledMaterialController: ScheduledMaterialController,
+    private val materialAiController: MaterialAiController,
+    private val materialAssetController: MaterialAssetController,
     private val courseController: CourseController,
     private val scheduleController: ScheduledLessonController,
     private val userProfileStore: UserProfileStore,
@@ -86,7 +89,7 @@ class MaterialControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
 
-        val created = materialController.create(
+        val created = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "  Food and travel  ",
@@ -98,14 +101,14 @@ class MaterialControllerTest @Autowired constructor(
         ).body
 
         assertNotNull(created)
-        assertEquals(HttpStatus.CREATED, materialController.create(teacher, LessonMaterialRequest(title = "Second")).statusCode)
+        assertEquals(HttpStatus.CREATED, materialCrudController.create(teacher, LessonMaterialRequest(title = "Second")).statusCode)
         assertEquals("Food and travel", created.title)
         assertEquals("B1", created.cefrLevel)
         assertEquals("PRIVATE", created.visibility)
         assertEquals(1, created.blockCount)
-        assertEquals(emptyList(), materialController.list(student))
+        assertEquals(emptyList(), materialCrudController.list(student))
 
-        val published = materialController.update(
+        val published = materialCrudController.update(
             teacher,
             created.id,
             LessonMaterialRequest(
@@ -122,8 +125,8 @@ class MaterialControllerTest @Autowired constructor(
         )
 
         assertEquals("PUBLIC", published.visibility)
-        assertEquals(listOf(created.id), materialController.list(student).map { material -> material.id })
-        assertEquals(created.id, materialController.get(student, created.id).id)
+        assertEquals(listOf(created.id), materialCrudController.list(student).map { material -> material.id })
+        assertEquals(created.id, materialCrudController.get(student, created.id).id)
     }
 
     @Test
@@ -132,40 +135,40 @@ class MaterialControllerTest @Autowired constructor(
         val otherTeacher = authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER")
         val admin = authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
-        val ownerPrivate = materialController.create(
+        val ownerPrivate = materialCrudController.create(
             owner,
             LessonMaterialRequest(title = "Owner private", status = "PUBLISHED"),
         ).body!!
-        val ownerDraft = materialController.create(
+        val ownerDraft = materialCrudController.create(
             owner,
             LessonMaterialRequest(title = "Owner draft", status = "DRAFT"),
         ).body!!
-        val publicMaterial = materialController.create(
+        val publicMaterial = materialCrudController.create(
             owner,
             LessonMaterialRequest(title = "Public material", visibility = "PUBLIC", status = "PUBLISHED"),
         ).body!!
-        val archived = materialController.create(
+        val archived = materialCrudController.create(
             owner,
             LessonMaterialRequest(title = "Archived material", visibility = "PUBLIC", status = "PUBLISHED"),
         ).body!!
-        val otherPrivate = materialController.create(
+        val otherPrivate = materialCrudController.create(
             otherTeacher,
             LessonMaterialRequest(title = "Other private", status = "PUBLISHED"),
         ).body!!
 
-        materialController.archive(owner, archived.id)
+        materialCrudController.archive(owner, archived.id)
 
         assertEquals(
             setOf(ownerPrivate.id, ownerDraft.id, publicMaterial.id, otherPrivate.id),
-            materialController.list(admin).map { material -> material.id }.toSet(),
+            materialCrudController.list(admin).map { material -> material.id }.toSet(),
         )
         assertEquals(
             setOf(ownerPrivate.id, ownerDraft.id, publicMaterial.id),
-            materialController.list(owner).map { material -> material.id }.toSet(),
+            materialCrudController.list(owner).map { material -> material.id }.toSet(),
         )
-        assertEquals(listOf(publicMaterial.id), materialController.list(student).map { material -> material.id })
+        assertEquals(listOf(publicMaterial.id), materialCrudController.list(student).map { material -> material.id })
         val studentPrivateError = assertFailsWith<ResponseStatusException> {
-            materialController.get(student, ownerPrivate.id)
+            materialCrudController.get(student, ownerPrivate.id)
         }
         assertEquals(HttpStatus.NOT_FOUND, studentPrivateError.statusCode)
     }
@@ -175,7 +178,7 @@ class MaterialControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "Private classroom material",
@@ -224,12 +227,12 @@ class MaterialControllerTest @Autowired constructor(
                 ),
             ),
         ).body!!
-        val generatedMaterial = materialController.generateImages(
+        val generatedMaterial = materialAiController.generateImages(
             teacher,
             material.id,
             MaterialGenerateImagesRequest(maxImages = 1),
         )
-        val asset = materialController.listAssets(teacher, material.id).single()
+        val asset = materialAssetController.listAssets(teacher, material.id).single()
         assertEquals(material.id, generatedMaterial.id)
 
         val course = courseController.create(teacher, CourseRequest(title = "Course", isPublished = true)).body!!
@@ -248,16 +251,16 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val scheduledMaterial = materialController.scheduledLessonMaterial(student, lesson.id)
+        val scheduledMaterial = scheduledMaterialController.scheduledLessonMaterial(student, lesson.id)
 
         assertEquals(material.id, scheduledMaterial.id)
         assertEquals("Private classroom material", scheduledMaterial.title)
-        assertEquals(listOf(asset.id), materialController.listAssets(student, material.id).map { item -> item.id })
-        val assetContent = materialController.assetContent(student, material.id, asset.id)
+        assertEquals(listOf(asset.id), materialAssetController.listAssets(student, material.id).map { item -> item.id })
+        val assetContent = materialAssetController.assetContent(student, material.id, asset.id)
         assertEquals(HttpStatus.OK, assetContent.statusCode)
         assertEquals("image/svg+xml", assetContent.headers.contentType?.toString())
         assertTrue(assertNotNull(assetContent.body).decodeToString().contains("<svg"))
-        val submission = materialController.saveScheduledLessonMaterialSubmission(
+        val submission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
             student,
             lesson.id,
             MaterialSubmissionRequest(
@@ -294,18 +297,18 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals(0, BigDecimal.TEN.compareTo(assertNotNull(submission.score)))
         assertEquals(0, submission.errorsCount)
         assertEquals("an", submission.content["answers"]["warmup"]["items"]["It is ... apple.-0"].asText())
-        assertEquals(submission.id, materialController.scheduledLessonMaterialSubmission(student, lesson.id).id)
-        val teacherSubmissions = materialController.scheduledLessonMaterialSubmissions(teacher, lesson.id)
+        assertEquals(submission.id, scheduledMaterialController.scheduledLessonMaterialSubmission(student, lesson.id).id)
+        val teacherSubmissions = scheduledMaterialController.scheduledLessonMaterialSubmissions(teacher, lesson.id)
         assertEquals(1, teacherSubmissions.size)
         assertEquals(submission.id, teacherSubmissions.single().id)
         assertEquals("student-1", teacherSubmissions.single().userSubject)
         assertEquals(0, BigDecimal.TEN.compareTo(assertNotNull(teacherSubmissions.single().score)))
         assertEquals("an", teacherSubmissions.single().content["answers"]["warmup"]["items"]["It is ... apple.-0"].asText())
         val studentMonitorError = assertFailsWith<ResponseStatusException> {
-            materialController.scheduledLessonMaterialSubmissions(student, lesson.id)
+            scheduledMaterialController.scheduledLessonMaterialSubmissions(student, lesson.id)
         }
         assertEquals(HttpStatus.FORBIDDEN, studentMonitorError.statusCode)
-        val annotation = materialController.saveScheduledLessonMaterialAnnotation(
+        val annotation = scheduledMaterialController.saveScheduledLessonMaterialAnnotation(
             student,
             lesson.id,
             MaterialAnnotationRequest(
@@ -331,11 +334,11 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals(material.id, annotation.materialId)
         assertEquals(lesson.id, annotation.lessonId)
         assertEquals("stroke-1", annotation.content["strokes"][0]["id"].asText())
-        val teacherAnnotation = materialController.scheduledLessonMaterialAnnotation(teacher, lesson.id)
+        val teacherAnnotation = scheduledMaterialController.scheduledLessonMaterialAnnotation(teacher, lesson.id)
         assertEquals(annotation.id, teacherAnnotation.id)
         assertEquals(20, teacherAnnotation.content["strokes"][0]["points"][1]["x"].asInt())
         val directReadError = assertFailsWith<ResponseStatusException> {
-            materialController.get(student, material.id)
+            materialCrudController.get(student, material.id)
         }
         assertEquals(HttpStatus.NOT_FOUND, directReadError.statusCode)
     }
@@ -345,7 +348,7 @@ class MaterialControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(title = "First classroom state", status = "PUBLISHED"),
         ).body!!
@@ -359,8 +362,8 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val submission = materialController.scheduledLessonMaterialSubmission(student, lesson.id)
-        val annotation = materialController.scheduledLessonMaterialAnnotation(student, lesson.id)
+        val submission = scheduledMaterialController.scheduledLessonMaterialSubmission(student, lesson.id)
+        val annotation = scheduledMaterialController.scheduledLessonMaterialAnnotation(student, lesson.id)
 
         assertEquals(material.id, submission.materialId)
         assertEquals(lesson.id, submission.lessonId)
@@ -394,7 +397,7 @@ class MaterialControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "Attempt scoring",
@@ -458,7 +461,7 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val submission = materialController.saveScheduledLessonMaterialSubmission(
+        val submission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
             student,
             lesson.id,
             MaterialSubmissionRequest(
@@ -516,7 +519,7 @@ class MaterialControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "Fixed fill gap scoring",
@@ -568,7 +571,7 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val submission = materialController.saveScheduledLessonMaterialSubmission(
+        val submission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
             student,
             lesson.id,
             MaterialSubmissionRequest(
@@ -610,7 +613,7 @@ class MaterialControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "Matching attempts",
@@ -670,7 +673,7 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val submission = materialController.saveScheduledLessonMaterialSubmission(
+        val submission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
             student,
             lesson.id,
             MaterialSubmissionRequest(
@@ -716,7 +719,7 @@ class MaterialControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "Accepted variants",
@@ -763,7 +766,7 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val submission = materialController.saveScheduledLessonMaterialSubmission(
+        val submission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
             student,
             lesson.id,
             MaterialSubmissionRequest(
@@ -804,7 +807,7 @@ class MaterialControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "Word bank duplicates",
@@ -856,7 +859,7 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val submission = materialController.saveScheduledLessonMaterialSubmission(
+        val submission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
             student,
             lesson.id,
             MaterialSubmissionRequest(
@@ -899,7 +902,7 @@ class MaterialControllerTest @Autowired constructor(
     fun `teacher requests AI accepted answer suggestions for selected material items`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "AI accepted variants",
@@ -936,7 +939,7 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val response = materialController.suggestAcceptedAnswers(
+        val response = materialAiController.suggestAcceptedAnswers(
             teacher,
             material.id,
             MaterialAnswerSuggestionsRequest(blockId = "gaps", itemIds = listOf("item-about")),
@@ -951,7 +954,7 @@ class MaterialControllerTest @Autowired constructor(
         assertTrue(response.items.single().suggestions.none { suggestion -> suggestion.value == "about that" })
 
         val error = assertFailsWith<ResponseStatusException> {
-            materialController.suggestAcceptedAnswers(
+            materialAiController.suggestAcceptedAnswers(
                 student,
                 material.id,
                 MaterialAnswerSuggestionsRequest(blockId = "gaps", itemIds = listOf("item-about")),
@@ -967,7 +970,7 @@ class MaterialControllerTest @Autowired constructor(
         val otherStudent = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
         userProfileStore.currentUserId(otherStudent)
-        val material = materialController.create(teacher, LessonMaterialRequest(title = "Private")).body!!
+        val material = materialCrudController.create(teacher, LessonMaterialRequest(title = "Private")).body!!
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
@@ -979,7 +982,7 @@ class MaterialControllerTest @Autowired constructor(
         ).body!!
 
         val error = assertFailsWith<ResponseStatusException> {
-            materialController.scheduledLessonMaterial(otherStudent, lesson.id)
+            scheduledMaterialController.scheduledLessonMaterial(otherStudent, lesson.id)
         }
 
         assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
@@ -989,11 +992,11 @@ class MaterialControllerTest @Autowired constructor(
     fun `teacher cannot attach another teacher private material`() {
         val owner = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val otherTeacher = authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER")
-        val privateMaterial = materialController.create(
+        val privateMaterial = materialCrudController.create(
             owner,
             LessonMaterialRequest(title = "Owner only", status = "PUBLISHED"),
         ).body!!
-        val privateScheduleMaterial = materialController.create(
+        val privateScheduleMaterial = materialCrudController.create(
             owner,
             LessonMaterialRequest(title = "Owner only schedule", status = "PUBLISHED"),
         ).body!!
@@ -1020,7 +1023,7 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals(HttpStatus.BAD_REQUEST, courseError.statusCode)
         assertEquals(HttpStatus.BAD_REQUEST, scheduleError.statusCode)
 
-        val publicMaterial = materialController.update(
+        val publicMaterial = materialCrudController.update(
             owner,
             privateMaterial.id,
             LessonMaterialRequest(
@@ -1048,7 +1051,7 @@ class MaterialControllerTest @Autowired constructor(
     fun `AI draft stub returns editable PlaySay material document`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
 
-        val draft = materialController.draft(
+        val draft = materialAiController.draft(
             teacher,
             MaterialAiDraftRequest(
                 prompt = "B1 travel speaking lesson with useful vocabulary",
@@ -1068,7 +1071,7 @@ class MaterialControllerTest @Autowired constructor(
     fun `AI draft accepts worksheet image metadata and rejects invalid image data URLs`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
 
-        val draft = materialController.draft(
+        val draft = materialAiController.draft(
             teacher,
             MaterialAiDraftRequest(
                 prompt = "A1 articles worksheet from scan",
@@ -1082,7 +1085,7 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals("articles.png", draft.sourceMeta["sourceFileName"].asText())
 
         val error = assertFailsWith<ResponseStatusException> {
-            materialController.draft(
+            materialAiController.draft(
                 teacher,
                 MaterialAiDraftRequest(
                     prompt = "A1 articles worksheet from scan",
@@ -1097,7 +1100,7 @@ class MaterialControllerTest @Autowired constructor(
     @Test
     fun `teacher generates missing matching pair images and preserves row order`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
-        val material = materialController.create(
+        val material = materialCrudController.create(
             teacher,
             LessonMaterialRequest(
                 title = "Birds",
@@ -1156,7 +1159,7 @@ class MaterialControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val generated = materialController.generateImages(
+        val generated = materialAiController.generateImages(
             teacher,
             material.id,
             MaterialGenerateImagesRequest(maxImages = 12),
@@ -1171,7 +1174,7 @@ class MaterialControllerTest @Autowired constructor(
         assertTrue(pairs[1]["imageUrl"].asText().startsWith("material-asset:"))
         assertEquals("TEXT", pairs[2]["targetKind"].asText())
         assertFalse(pairs[2].has("imageUrl"))
-        val assets = materialController.listAssets(teacher, material.id)
+        val assets = materialAssetController.listAssets(teacher, material.id)
         assertEquals(3, assets.size)
         assertEquals("GENERATED_IMAGE", assets[0].kind)
         assertTrue(assets.all { asset -> asset.externalUrl == null })
@@ -1185,18 +1188,18 @@ class MaterialControllerTest @Autowired constructor(
         assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(pairs[0]["imageUrl"].asText()))
         assertTrue(assets.map { asset -> "material-asset:${asset.id}" }.contains(generatedImageBlock["url"].asText()))
 
-        val regenerated = materialController.generateImages(
+        val regenerated = materialAiController.generateImages(
             teacher,
             material.id,
             MaterialGenerateImagesRequest(maxImages = 12, regenerate = true),
         )
         val regeneratedPairs = regenerated.document["pages"][0]["blocks"][1]["pairs"]
-        val regeneratedAssets = materialController.listAssets(teacher, material.id)
+        val regeneratedAssets = materialAssetController.listAssets(teacher, material.id)
         assertEquals(assets.map { asset -> asset.id }.toSet(), regeneratedAssets.map { asset -> asset.id }.toSet())
         assertEquals(pairs[0]["imageUrl"].asText(), regeneratedPairs[0]["imageUrl"].asText())
         assertEquals(generatedImageBlock["url"].asText(), regenerated.document["pages"][0]["blocks"][0]["url"].asText())
 
-        val updatedAsset = materialController.updateAsset(
+        val updatedAsset = materialAssetController.updateAsset(
             teacher,
             material.id,
             owlAsset.id,
@@ -1207,7 +1210,7 @@ class MaterialControllerTest @Autowired constructor(
         val altEditedDocument = regenerated.document.deepCopy<ObjectNode>()
         (altEditedDocument["pages"][0]["blocks"][1]["pairs"][0] as ObjectNode)
             .put("imageAlt", "teacher-facing label only")
-        materialController.update(
+        materialCrudController.update(
             teacher,
             material.id,
             LessonMaterialRequest(
@@ -1216,13 +1219,13 @@ class MaterialControllerTest @Autowired constructor(
             ),
         )
 
-        val altOnlyGenerated = materialController.generateImages(
+        val altOnlyGenerated = materialAiController.generateImages(
             teacher,
             material.id,
             MaterialGenerateImagesRequest(maxImages = 12),
         )
         val altOnlyPairs = altOnlyGenerated.document["pages"][0]["blocks"][1]["pairs"]
-        val altOnlyAssets = materialController.listAssets(teacher, material.id)
+        val altOnlyAssets = materialAssetController.listAssets(teacher, material.id)
         val altOnlyOwlAsset = altOnlyAssets.single { asset -> asset.metadata["targetId"].asText() == "pair-owl" }
         assertEquals(regeneratedAssets.map { asset -> asset.id }.toSet(), altOnlyAssets.map { asset -> asset.id }.toSet())
         assertEquals(regeneratedPairs[0]["imageUrl"].asText(), altOnlyPairs[0]["imageUrl"].asText())
@@ -1232,7 +1235,7 @@ class MaterialControllerTest @Autowired constructor(
         val editedDocument = altOnlyGenerated.document.deepCopy<ObjectNode>()
         (editedDocument["pages"][0]["blocks"][1]["pairs"][0] as ObjectNode)
             .put("imagePrompt", "child-friendly workbook snowy owl illustration")
-        materialController.update(
+        materialCrudController.update(
             teacher,
             material.id,
             LessonMaterialRequest(
@@ -1241,13 +1244,13 @@ class MaterialControllerTest @Autowired constructor(
             ),
         )
 
-        val promptChanged = materialController.generateImages(
+        val promptChanged = materialAiController.generateImages(
             teacher,
             material.id,
             MaterialGenerateImagesRequest(maxImages = 12),
         )
         val promptChangedPairs = promptChanged.document["pages"][0]["blocks"][1]["pairs"]
-        val promptChangedAssets = materialController.listAssets(teacher, material.id)
+        val promptChangedAssets = materialAssetController.listAssets(teacher, material.id)
         val promptChangedOwlAsset = promptChangedAssets.single { asset -> asset.metadata["targetId"].asText() == "pair-owl" }
         assertEquals(regeneratedAssets.map { asset -> asset.id }.toSet(), promptChangedAssets.map { asset -> asset.id }.toSet())
         assertEquals(pairs[0]["imageUrl"].asText(), promptChangedPairs[0]["imageUrl"].asText())

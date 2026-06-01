@@ -37,8 +37,6 @@ import com.playsay.gateway.repo.MaterialSubmissionRow
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.repo.SubmissionRepo
 import com.playsay.gateway.utils.MetaData
-import java.math.BigDecimal
-import java.math.RoundingMode
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
@@ -106,6 +104,7 @@ class LessonMaterialStore(
     private val materialAnswerSuggestionService: MaterialAnswerSuggestionService,
     private val materialImageGenerationService: MaterialImageGenerationService,
     private val materialUrlImportService: MaterialUrlImportService,
+    private val materialScoringService: MaterialScoringService,
     private val materialObjectStorage: MaterialObjectStorage,
     private val messageProvider: MessageProvider,
 ) {
@@ -184,7 +183,7 @@ class LessonMaterialStore(
         val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
-            throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit this material.")
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.MATERIAL_EDIT_FORBIDDEN)
         }
 
         val values = request.validated(objectMapper, messageProvider)
@@ -210,7 +209,7 @@ class LessonMaterialStore(
         val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
-            throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can archive this material.")
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.MATERIAL_ARCHIVE_FORBIDDEN)
         }
 
         val entity = lessonMaterialRepo.findById(materialId).orElse(null)
@@ -284,7 +283,7 @@ class LessonMaterialStore(
         val userId = userProfileStore.currentUserId(authentication)
         val assignmentId = findOrCreateMaterialSubmissionAssignment(lessonId, material)
         val now = Instant.now()
-        val scoring = scoreMaterialSubmission(material, request.content)
+        val scoring = materialScoringService.score(material.document, material.scoringRubric, request.content)
         val content = objectMapper.writeValueAsString(scoring?.content ?: request.content)
         val existing = findMaterialSubmission(assignmentId, lessonId, userId)
 
@@ -370,200 +369,6 @@ class LessonMaterialStore(
         return requireNotNull(findMaterialAnnotation(annotationId)).toResponse(objectMapper)
     }
 
-    private fun scoreMaterialSubmission(material: StoredLessonMaterial, content: JsonNode): MaterialSubmissionScore? {
-        val document = runCatching { objectMapper.readTree(material.document) }.getOrNull() ?: return null
-        val answerRoot = content.get("answers")?.takeIf { node -> node.isObject } ?: return null
-        val pages = document.get("pages") as? ArrayNode ?: return null
-        val assessedContent = (content as? ObjectNode)?.deepCopy() ?: objectMapper.createObjectNode().apply {
-            set<JsonNode>("answers", answerRoot)
-        }
-        val itemResults = objectMapper.createArrayNode()
-        var totalWeight = BigDecimal.ZERO
-        var earnedWeight = BigDecimal.ZERO
-        var errorsCount = 0
-
-        pages.forEach { page ->
-            val blocks = page.get("blocks") as? ArrayNode ?: return@forEach
-            blocks.forEach { block ->
-                val blockId = block.get("id")?.asText()?.takeIf { value -> value.isNotBlank() } ?: return@forEach
-                val blockType = block.get("type")?.asText().orEmpty()
-                val answerBlock = answerRoot.get(blockId)
-                when (blockType) {
-                    "fillGaps",
-                    "multipleChoice"
-                    -> {
-                        val answerItems = answerBlock?.get("items")?.takeIf { node -> node.isObject }
-                        val items = block.get("items") as? ArrayNode ?: return@forEach
-                        items.forEachIndexed { index, item ->
-                            val expected = item.acceptedAnswers()
-                            if (expected.isEmpty()) {
-                                return@forEachIndexed
-                            }
-                            val prompt = item.get("prompt")?.asText().orEmpty()
-                            val key = item.materialItemKey(index)
-                            val legacyKey = "$prompt-$index"
-                            val answerKey = when {
-                                answerItems?.has(key) == true -> key
-                                answerItems?.has(legacyKey) == true -> legacyKey
-                                else -> key
-                            }
-                            val actual = answerItems?.get(answerKey)?.asText()
-                            val result = scoreObjectiveItem(
-                                block = block,
-                                item = item,
-                                blockId = blockId,
-                                blockType = blockType,
-                                itemKey = answerKey,
-                                expectedAnswers = expected,
-                                actual = actual,
-                                answerBlock = answerBlock,
-                            )
-                            totalWeight += result.weight
-                            earnedWeight += result.earnedWeight
-                            errorsCount += result.errorsCount
-                            itemResults.add(result.toJson(objectMapper))
-                        }
-                    }
-                    "matchingPairs" -> {
-                        val matches = answerBlock?.get("matches")?.takeIf { node -> node.isObject }
-                        val pairs = block.get("pairs") as? ArrayNode ?: return@forEach
-                        val globalPolicy = materialAssessmentPolicy(block, pairs.firstOrNull() ?: block, blockType)
-                        val globallyLocked = globalPolicy.lockAfterAttempts &&
-                            matchingIncorrectAttempts(answerBlock, matches, pairs) >= globalPolicy.maxAttempts
-                        pairs.forEach { pair ->
-                            val expectedPairId = pair.get("id")?.asText()?.takeIf { value -> value.isNotBlank() }
-                                ?: return@forEach
-                            val result = scoreObjectiveItem(
-                                block = block,
-                                item = pair,
-                                blockId = blockId,
-                                blockType = blockType,
-                                itemKey = expectedPairId,
-                                expectedAnswers = listOf(expectedPairId),
-                                actual = matches?.get(expectedPairId)?.asText(),
-                                answerBlock = answerBlock,
-                                forceLocked = globallyLocked,
-                            )
-                            totalWeight += result.weight
-                            earnedWeight += result.earnedWeight
-                            errorsCount += result.errorsCount
-                            itemResults.add(result.toJson(objectMapper))
-                        }
-                    }
-                }
-            }
-        }
-
-        if (totalWeight.compareTo(BigDecimal.ZERO) == 0) {
-            return null
-        }
-
-        val maxScore = materialMaxScore(material.scoringRubric) ?: BigDecimal.TEN
-        val score = maxScore
-            .multiply(earnedWeight)
-            .divide(totalWeight, 2, RoundingMode.HALF_UP)
-        val assessment = objectMapper.createObjectNode().apply {
-            put("schemaVersion", 1)
-            put("maxScore", maxScore)
-            put("score", score)
-            put("errorsCount", errorsCount)
-            put("totalWeight", totalWeight)
-            put("earnedWeight", earnedWeight)
-            set<ArrayNode>("items", itemResults)
-        }
-        assessedContent.set<ObjectNode>("assessment", assessment)
-
-        return MaterialSubmissionScore(
-            score = score,
-            errorsCount = errorsCount,
-            content = assessedContent,
-        )
-    }
-
-    private fun scoreObjectiveItem(
-        block: JsonNode,
-        item: JsonNode,
-        blockId: String,
-        blockType: String,
-        itemKey: String,
-        expectedAnswers: List<String>,
-        actual: String?,
-        answerBlock: JsonNode?,
-        forceLocked: Boolean = false,
-    ): ObjectiveItemScore {
-        val policy = materialAssessmentPolicy(block, item, blockType)
-        val validation = materialAnswerValidation(block, item)
-        val override = answerTeacherOverride(answerBlock, itemKey)
-        val expectedOptionId = item.get("answerOptionId")
-            ?.asText()
-            ?.trim()
-            ?.takeIf { value -> value.isNotEmpty() && item.get("gapMode")?.asText() == "wordBank" }
-        val actualOptionId = answerBlock?.get("optionIds")?.get(itemKey)?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-        val attempts = answerAttemptValues(answerBlock, itemKey, actual, actualOptionId)
-        val hints = answerHints(answerBlock, itemKey, policy)
-        val actualCorrect = if (expectedOptionId != null) {
-            !actual.isNullOrBlank() && actualOptionId == expectedOptionId
-        } else {
-            expectedAnswers.any { expected -> answersMatch(actual, expected, validation) }
-        }
-        val correct = override?.correct ?: actualCorrect
-        val incorrectAttempts = attempts.count { attempt ->
-            if (expectedOptionId != null) {
-                attempt.optionId != expectedOptionId
-            } else {
-                expectedAnswers.none { expected -> answersMatch(attempt.value, expected, validation) }
-            }
-        }
-        val attemptsUsed = attempts.size.takeIf { count -> count > 0 } ?: if (actual.isNullOrBlank()) 0 else 1
-        val attemptFactor = if (correct) {
-            BigDecimal.ONE
-                .subtract(policy.attemptPenalty.multiply(BigDecimal.valueOf((attemptsUsed - 1).coerceAtLeast(0).toLong())))
-                .max(policy.minimumCorrectFactor)
-        } else {
-            BigDecimal.ZERO
-        }
-        val hintPenalty = hints.fold(BigDecimal.ZERO) { total, hint -> total + hint.penalty }
-        val hintFactor = BigDecimal.ONE.subtract(hintPenalty).max(policy.minimumHintFactor)
-        val overrideFactor = override?.scoreFactor
-        val scoreFactor = if (!correct) {
-            BigDecimal.ZERO
-        } else {
-            listOfNotNull(attemptFactor, hintFactor, overrideFactor).minOrNull() ?: BigDecimal.ONE
-        }.between(BigDecimal.ZERO, BigDecimal.ONE)
-        val earnedWeight = policy.weight.multiply(scoreFactor)
-        val errorsCount = if (attempts.isNotEmpty()) {
-            incorrectAttempts
-        } else if (!correct) {
-            1
-        } else {
-            0
-        }
-
-        return ObjectiveItemScore(
-            blockId = blockId,
-            blockType = blockType,
-            itemKey = itemKey,
-            correct = correct,
-            actual = actual?.trim(),
-            weight = policy.weight,
-            earnedWeight = earnedWeight,
-            scoreFactor = scoreFactor,
-            maxAttempts = policy.maxAttempts,
-            attemptsUsed = attemptsUsed,
-            incorrectAttempts = incorrectAttempts,
-            hintsUsed = hints.size,
-            errorsCount = errorsCount,
-            status = when {
-                correct && hints.isEmpty() && attemptsUsed <= 1 -> "CORRECT"
-                correct && hints.isNotEmpty() -> "CORRECT_WITH_HINT"
-                correct -> "CORRECT_AFTER_RETRY"
-                forceLocked && policy.lockAfterAttempts -> "LOCKED"
-                attemptsUsed >= policy.maxAttempts && policy.lockAfterAttempts -> "LOCKED"
-                else -> "INCORRECT"
-            },
-        )
-    }
-
     fun draft(authentication: JwtAuthenticationToken, request: MaterialAiDraftRequest): LessonMaterialDraftResponse {
         authentication.requireMaterialManager()
         val prompt = request.prompt.requiredClean("prompt", 4_000)
@@ -632,7 +437,7 @@ class LessonMaterialStore(
         val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
-            throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit generated images.")
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.MATERIAL_IMAGES_FORBIDDEN)
         }
 
         val blockId = request.blockId.optionalClean("blockId", 80)
@@ -680,7 +485,7 @@ class LessonMaterialStore(
         val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
-            throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can request answer suggestions.")
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.MATERIAL_ANSWER_SUGGESTIONS_FORBIDDEN)
         }
 
         val blockId = request.blockId.requiredClean("blockId", 80)
@@ -692,7 +497,7 @@ class LessonMaterialStore(
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val itemContexts = materialAnswerItemContexts(block)
             .takeIf { items -> items.isNotEmpty() }
-            ?: throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Selected block does not contain answer items.")
+            ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_ANSWER_ITEMS_NOT_FOUND)
         val suggestions = itemContexts.mapNotNull { item ->
             if (requestedItemIds.isNotEmpty() && item.itemId !in requestedItemIds) {
                 return@mapNotNull null
@@ -752,15 +557,15 @@ class LessonMaterialStore(
         }
         val asset = findAsset(assetId)
             ?.takeIf { found -> found.materialId == materialId }
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material asset not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
         val storageKey = asset.storageKey?.trim()?.takeIf { key -> key.isNotEmpty() }
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material asset content not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_CONTENT_NOT_FOUND)
         val content = try {
             materialObjectStorage.getObject(storageKey)
         } catch (exception: MaterialObjectNotFoundException) {
-            throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material asset not found.")
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
         } catch (exception: MaterialObjectStorageException) {
-            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "Material asset storage failed.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
         }
         val contentType = runCatching { MediaType.parseMediaType(content.contentType) }
             .getOrDefault(MediaType.APPLICATION_OCTET_STREAM)
@@ -776,11 +581,11 @@ class LessonMaterialStore(
         val material = find(materialId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val currentUserId = authentication.currentUserIdIfNeeded()
         if (!material.canEdit(authentication, currentUserId)) {
-            throw ProjectResponseException(HttpStatus.FORBIDDEN, "Only the material owner or admin can edit assets.")
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN)
         }
         val asset = findAsset(assetId)
             ?.takeIf { found -> found.materialId == materialId }
-            ?: throw ProjectResponseException(HttpStatus.NOT_FOUND, "Material asset not found.")
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
         val metadata = runCatching { objectMapper.readTree(asset.metadata).deepCopy<ObjectNode>() }
             .getOrElse { objectMapper.createObjectNode() }
 
@@ -832,7 +637,7 @@ class LessonMaterialStore(
                 ),
             )
         } catch (exception: MaterialObjectStorageException) {
-            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "Material asset storage failed.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
         } catch (exception: RuntimeException) {
             runCatching { materialObjectStorage.deleteObject(storageKey) }
             throw exception
@@ -855,7 +660,7 @@ class LessonMaterialStore(
             asset.metadata = objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey, existingTags))
             materialAssetRepo.save(asset)
         } catch (exception: MaterialObjectStorageException) {
-            throw ProjectResponseException(HttpStatus.BAD_GATEWAY, "Material asset storage failed.")
+            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
         }
     }
 
@@ -987,7 +792,7 @@ class LessonMaterialStore(
                     instructions = "Play&Say material answer snapshot",
                     type = "MATERIAL_WORK",
                     payload = objectMapper.writeValueAsString(objectMapper.createObjectNode().put("source", "material")),
-                    maxScore = materialMaxScore(material.scoringRubric),
+                    maxScore = materialScoringService.maxScore(material.scoringRubric),
                     materialId = material.id,
                     createdAt = now,
                     updatedAt = now,
@@ -1089,78 +894,6 @@ class LessonMaterialStore(
 
 }
 
-private data class MaterialImageTarget(
-    val targetType: String,
-    val blockId: String,
-    val targetId: String,
-    val title: String,
-    val left: String?,
-    val right: String?,
-    val imagePrompt: String,
-    val imageAlt: String,
-    val imageUrlField: String,
-    val node: ObjectNode,
-    val previousAssetId: UUID?,
-)
-
-private data class MaterialImageTargetDecision(
-    val previousAssetId: UUID?,
-)
-
-private data class MaterialSubmissionScore(
-    val score: BigDecimal,
-    val errorsCount: Int,
-    val content: JsonNode,
-)
-
-private data class AssessmentPolicy(
-    val weight: BigDecimal = BigDecimal.ONE,
-    val maxAttempts: Int = 3,
-    val attemptPenalty: BigDecimal = BigDecimal("0.30"),
-    val minimumCorrectFactor: BigDecimal = BigDecimal("0.40"),
-    val defaultHintPenalty: BigDecimal = BigDecimal("0.15"),
-    val minimumHintFactor: BigDecimal = BigDecimal("0.40"),
-    val lockAfterAttempts: Boolean = true,
-)
-
-private data class AnswerValidationPolicy(
-    val ignoreCase: Boolean = true,
-    val ignorePunctuation: Boolean = true,
-    val ignoreWhitespace: Boolean = true,
-)
-
-private data class UsedHint(
-    val type: String,
-    val penalty: BigDecimal,
-)
-
-private data class AnswerAttempt(
-    val value: String,
-    val optionId: String?,
-)
-
-private data class TeacherOverride(
-    val correct: Boolean,
-    val scoreFactor: BigDecimal?,
-)
-
-private data class ObjectiveItemScore(
-    val blockId: String,
-    val blockType: String,
-    val itemKey: String,
-    val correct: Boolean,
-    val actual: String?,
-    val weight: BigDecimal,
-    val earnedWeight: BigDecimal,
-    val scoreFactor: BigDecimal,
-    val maxAttempts: Int,
-    val attemptsUsed: Int,
-    val incorrectAttempts: Int,
-    val hintsUsed: Int,
-    val errorsCount: Int,
-    val status: String,
-)
-
 private fun LessonMaterialRequest.validated(
     objectMapper: ObjectMapper,
     messageProvider: MessageProvider,
@@ -1169,15 +902,15 @@ private fun LessonMaterialRequest.validated(
     val language = language.requiredClean("language", 16)
     val cefrLevel = cefrLevel.trim().uppercase()
     if (cefrLevel !in cefrLevels) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unsupported CEFR level.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_CEFR_LEVEL)
     }
     val visibility = visibility.trim().uppercase()
     if (visibility !in materialVisibilities) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unsupported material visibility.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_MATERIAL_VISIBILITY)
     }
     val status = status.trim().uppercase()
     if (status !in materialStatuses) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "Unsupported material status.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_MATERIAL_STATUS)
     }
 
     val document = document ?: defaultMaterialDocument(title, objectMapper, messageProvider)
@@ -1278,531 +1011,6 @@ private fun StoredMaterialAnnotation.toResponse(objectMapper: ObjectMapper): Mat
         updatedAt = updatedAt,
     )
 
-private fun materialMaxScore(scoringRubric: String): BigDecimal? =
-    runCatching {
-        val node = jacksonObjectMapper().readTree(scoringRubric)
-        node.get("maxScore")?.takeIf { value -> value.isNumber }?.decimalValue()
-    }.getOrNull()
-
-private fun normalizedScoringAnswer(value: String?): String =
-    value
-        ?.trim()
-        ?.lowercase()
-        ?.replace(Regex("\\s+"), " ")
-        ?: ""
-
-private fun JsonNode.acceptedAnswers(): List<String> =
-    buildList {
-        get("answer")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }?.let(::add)
-        get("correct")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }?.let(::add)
-        listOf("acceptedAnswers", "answers", "variants").forEach { field ->
-            val values = get(field) as? ArrayNode ?: return@forEach
-            values.forEach { value ->
-                value.asText()?.trim()?.takeIf { item -> item.isNotEmpty() }?.let(::add)
-            }
-        }
-    }.distinct()
-
-private fun JsonNode.materialItemKey(index: Int): String {
-    val id = get("id")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-    if (id != null) {
-        return id
-    }
-    val prompt = get("prompt")?.asText()?.trim().orEmpty()
-    return "$prompt-$index"
-}
-
-internal data class MaterialAnswerItemContext(
-    val itemId: String,
-    val prompt: String,
-    val answer: String?,
-    val acceptedAnswers: List<String>,
-    val options: List<String>,
-    val hintPrefix: String,
-    val itemContextPrompt: String,
-    val blockContextPrompt: String,
-)
-
-internal fun materialAnswerItemContexts(block: ObjectNode): List<MaterialAnswerItemContext> {
-    val items = block.get("items") as? ArrayNode ?: return emptyList()
-    val rawItems = items.mapIndexed { index, item ->
-        RawMaterialAnswerItemContext(
-            itemId = item.materialItemKey(index),
-            threadRootItemId = item.get("threadRootItemId")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() },
-            prompt = item.get("prompt")?.asText()?.trim().orEmpty(),
-            answer = item.get("answer")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                ?: item.get("correct")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() },
-            acceptedAnswers = item.acceptedAnswers(),
-            options = ((item.get("options") ?: item.get("choices")) as? ArrayNode)?.mapNotNull { option ->
-                option.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-            } ?: emptyList(),
-            hintPrefix = item.materialHintPrefix(),
-        )
-    }
-    val itemIds = rawItems.map { item -> item.itemId }.toSet()
-    val rows = rawItems.map { item ->
-        item.copy(
-            threadRootItemId = item.threadRootItemId
-                ?.takeIf { rootItemId -> rootItemId != item.itemId && rootItemId in itemIds },
-        )
-    }
-    val blockContextPrompt = rows
-        .filter { item -> item.prompt.isNotBlank() || item.answer != null }
-        .joinToString("\n") { item ->
-            val prefix = if (item.threadRootItemId == null) "- " else "  continuation: "
-            val answer = item.answer?.let { value -> " [answer: ${materialAnswerContextText(value)}]" }.orEmpty()
-            "$prefix${materialAnswerContextText(item.prompt)}$answer".trim()
-        }
-
-    return rows.map { item ->
-        val threadRootItemId = item.threadRootItemId ?: item.itemId
-        val threadPrompt = rows
-            .filter { candidate -> candidate.itemId == threadRootItemId || candidate.threadRootItemId == threadRootItemId }
-            .map { candidate -> materialAnswerContextText(candidate.prompt) }
-            .filter { prompt -> prompt.isNotBlank() }
-            .joinToString(" ")
-        MaterialAnswerItemContext(
-            itemId = item.itemId,
-            prompt = item.prompt,
-            answer = item.answer,
-            acceptedAnswers = item.acceptedAnswers,
-            options = item.options,
-            hintPrefix = item.hintPrefix,
-            itemContextPrompt = threadPrompt.ifBlank { materialAnswerContextText(item.prompt) },
-            blockContextPrompt = blockContextPrompt.ifBlank { materialAnswerContextText(item.prompt) },
-        )
-    }
-}
-
-private data class RawMaterialAnswerItemContext(
-    val itemId: String,
-    val threadRootItemId: String?,
-    val prompt: String,
-    val answer: String?,
-    val acceptedAnswers: List<String>,
-    val options: List<String>,
-    val hintPrefix: String,
-)
-
-private fun JsonNode.materialHintPrefix(): String {
-    val mode = get("gapMode")?.asText()?.trim().orEmpty()
-    if (mode.isNotEmpty() && mode != "typed") {
-        return ""
-    }
-    val length = get("hintPrefixLength")?.takeIf { node -> node.isNumber }?.asInt() ?: return ""
-    if (length !in 1..2) {
-        return ""
-    }
-    val answer = get("answer")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-        ?: get("correct")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-        ?: return ""
-    return answer.take(length)
-}
-
-private fun materialAnswerContextText(value: String): String =
-    value.trim().replace(Regex("\\s+"), " ")
-
-private fun findMaterialBlock(document: JsonNode, blockId: String): ObjectNode? {
-    val pages = document.get("pages") as? ArrayNode ?: return null
-    pages.forEach { page ->
-        val blocks = page.get("blocks") as? ArrayNode ?: return@forEach
-        blocks.forEach { block ->
-            val blockObject = block as? ObjectNode ?: return@forEach
-            if (blockObject.get("id")?.asText()?.trim() == blockId) {
-                return blockObject
-            }
-        }
-    }
-    return null
-}
-
-private fun materialAssessmentPolicy(block: JsonNode, item: JsonNode, blockType: String): AssessmentPolicy {
-    val blockAssessment = block.get("assessment")?.takeIf { node -> node.isObject }
-    val itemAssessment = item.get("assessment")?.takeIf { node -> node.isObject }
-    fun decimal(name: String, default: BigDecimal): BigDecimal =
-        itemAssessment?.decimalField(name)
-            ?: item.decimalField(name)
-            ?: blockAssessment?.decimalField(name)
-            ?: block.decimalField(name)
-            ?: default
-    fun int(name: String, default: Int): Int =
-        itemAssessment?.intField(name)
-            ?: item.intField(name)
-            ?: blockAssessment?.intField(name)
-            ?: block.intField(name)
-            ?: default
-    fun boolean(name: String, default: Boolean): Boolean =
-        itemAssessment?.get(name)?.takeIf { node -> node.isBoolean }?.asBoolean()
-            ?: item.get(name)?.takeIf { node -> node.isBoolean }?.asBoolean()
-            ?: blockAssessment?.get(name)?.takeIf { node -> node.isBoolean }?.asBoolean()
-            ?: block.get(name)?.takeIf { node -> node.isBoolean }?.asBoolean()
-            ?: default
-
-    val fillGapMode = item.get("gapMode")?.asText()?.takeIf { value -> value.isNotBlank() }
-        ?: if ((item.get("options") as? ArrayNode)?.size()?.let { count -> count > 0 } == true) "singleChoice" else "typed"
-    val configuredMaxAttempts = when (blockType) {
-        "matchingPairs" -> {
-            blockAssessment?.intField("maxErrors")
-                ?: block.intField("maxErrors")
-                ?: blockAssessment?.intField("maxAttempts")
-                ?: block.intField("maxAttempts")
-                ?: 5
-        }
-        "fillGaps" -> {
-            when (fillGapMode) {
-                "singleChoice" -> (item.get("options") as? ArrayNode)?.size()?.takeIf { count -> count > 0 } ?: 1
-                "wordBank" -> item.intField("maxErrors")
-                    ?: itemAssessment?.intField("maxErrors")
-                    ?: item.intField("maxAttempts")
-                    ?: itemAssessment?.intField("maxAttempts")
-                    ?: blockAssessment?.intField("maxErrors")
-                    ?: block.intField("maxErrors")
-                    ?: blockAssessment?.intField("maxAttempts")
-                    ?: block.intField("maxAttempts")
-                    ?: fillGapDefaultMaxErrors
-                else -> item.intField("maxAttempts")
-                    ?: itemAssessment?.intField("maxAttempts")
-                    ?: blockAssessment?.intField("maxAttempts")
-                    ?: block.intField("maxAttempts")
-                    ?: fillGapDefaultMaxAttempts
-            }
-        }
-        else -> int("maxAttempts", 3)
-    }
-    val cappedMaxAttempts = when (blockType) {
-        "matchingPairs" -> {
-            val pairCount = (block.get("pairs") as? ArrayNode)?.size() ?: configuredMaxAttempts
-            configuredMaxAttempts.coerceIn(1, 10).coerceAtMost(pairCount.coerceAtLeast(1))
-        }
-        else -> configuredMaxAttempts.coerceIn(1, 10)
-    }
-    val attemptPenalty = if (blockType == "fillGaps") {
-        BigDecimal("0.30")
-    } else {
-        decimal("attemptPenalty", BigDecimal("0.30")).between(BigDecimal.ZERO, BigDecimal.ONE)
-    }
-    val hintPenalty = if (blockType == "fillGaps") {
-        BigDecimal("0.15")
-    } else {
-        decimal("hintPenalty", BigDecimal("0.15")).between(BigDecimal.ZERO, BigDecimal.ONE)
-    }
-
-    return AssessmentPolicy(
-        weight = if (blockType == "fillGaps") BigDecimal.ONE else decimal("weight", BigDecimal.ONE).between(BigDecimal("0.10"), BigDecimal("20")),
-        maxAttempts = cappedMaxAttempts,
-        attemptPenalty = attemptPenalty,
-        minimumCorrectFactor = decimal("minimumCorrectFactor", BigDecimal("0.40")).between(BigDecimal.ZERO, BigDecimal.ONE),
-        defaultHintPenalty = hintPenalty,
-        minimumHintFactor = decimal("minimumHintFactor", BigDecimal("0.40")).between(BigDecimal.ZERO, BigDecimal.ONE),
-        lockAfterAttempts = boolean("lockAfterAttempts", true),
-    )
-}
-
-private fun materialAnswerValidation(block: JsonNode, item: JsonNode): AnswerValidationPolicy {
-    val blockValidation = block.get("answerValidation")?.takeIf { node -> node.isObject }
-    val itemValidation = item.get("answerValidation")?.takeIf { node -> node.isObject }
-    fun boolean(name: String, default: Boolean): Boolean =
-        itemValidation?.get(name)?.takeIf { node -> node.isBoolean }?.asBoolean()
-            ?: blockValidation?.get(name)?.takeIf { node -> node.isBoolean }?.asBoolean()
-            ?: default
-
-    return AnswerValidationPolicy(
-        ignoreCase = boolean("ignoreCase", true),
-        ignorePunctuation = boolean("ignorePunctuation", true),
-        ignoreWhitespace = boolean("ignoreWhitespace", true),
-    )
-}
-
-private fun answerAttemptValues(answerBlock: JsonNode?, itemKey: String, actual: String?, actualOptionId: String? = null): List<AnswerAttempt> {
-    val attemptsNode = answerBlock?.get("attempts")?.get(itemKey)
-    val attempts = when {
-        attemptsNode is ArrayNode -> attemptsNode.mapNotNull { node ->
-            val value = when {
-                node.isTextual -> node.asText()
-                node.isObject -> node.get("value")?.asText()
-                else -> null
-            }?.trim()?.takeIf { item -> item.isNotEmpty() } ?: return@mapNotNull null
-            AnswerAttempt(
-                value = value,
-                optionId = node.takeIf { item -> item.isObject }
-                    ?.get("optionId")
-                    ?.asText()
-                    ?.trim()
-                    ?.takeIf { item -> item.isNotEmpty() },
-            )
-        }
-        attemptsNode?.isTextual == true -> listOfNotNull(
-            attemptsNode.asText().trim().takeIf { value -> value.isNotEmpty() }?.let { value -> AnswerAttempt(value, null) },
-        )
-        else -> emptyList()
-    }
-    return attempts.ifEmpty {
-        listOfNotNull(actual?.trim()?.takeIf { value -> value.isNotEmpty() }?.let { value -> AnswerAttempt(value, actualOptionId) })
-    }
-}
-
-private fun matchingIncorrectAttempts(answerBlock: JsonNode?, matches: JsonNode?, pairs: ArrayNode): Int =
-    pairs.sumOf { pair ->
-        val expectedPairId = pair.get("id")?.asText()?.takeIf { value -> value.isNotBlank() } ?: return@sumOf 0
-        answerAttemptValues(answerBlock, expectedPairId, matches?.get(expectedPairId)?.asText())
-            .count { attempt -> attempt.value != expectedPairId }
-    }
-
-private fun answerHints(answerBlock: JsonNode?, itemKey: String, policy: AssessmentPolicy): List<UsedHint> {
-    val hintsNode = answerBlock?.get("hints")?.get(itemKey) ?: return emptyList()
-    if (hintsNode !is ArrayNode) {
-        return emptyList()
-    }
-    return hintsNode.mapNotNull { node ->
-        when {
-            node.isTextual -> UsedHint(type = node.asText().ifBlank { "hint" }, penalty = policy.defaultHintPenalty)
-            node.isObject -> {
-                val type = node.get("type")?.asText()?.ifBlank { "hint" } ?: "hint"
-                val penalty = node.decimalField("penalty")
-                    ?: node.decimalField("scorePenalty")
-                    ?: policy.defaultHintPenalty
-                UsedHint(type = type, penalty = penalty.between(BigDecimal.ZERO, BigDecimal.ONE))
-            }
-            else -> null
-        }
-    }
-}
-
-private fun answerTeacherOverride(answerBlock: JsonNode?, itemKey: String): TeacherOverride? {
-    val overrideNode = answerBlock?.get("teacherOverride")?.get(itemKey)
-        ?: answerBlock?.get("overrides")?.get(itemKey)
-        ?: return null
-    if (!overrideNode.isObject) {
-        return null
-    }
-    val correct = overrideNode.get("correct")?.takeIf { node -> node.isBoolean }?.asBoolean() ?: return null
-    val scoreFactor = overrideNode.decimalField("scoreFactor")?.between(BigDecimal.ZERO, BigDecimal.ONE)
-    return TeacherOverride(correct = correct, scoreFactor = scoreFactor)
-}
-
-private fun answersMatch(actual: String?, expected: String, validation: AnswerValidationPolicy): Boolean =
-    normalizedAssessmentAnswer(actual, validation) == normalizedAssessmentAnswer(expected, validation)
-
-private fun normalizedAssessmentAnswer(value: String?, validation: AnswerValidationPolicy): String {
-    var normalized = value?.trim() ?: ""
-    if (validation.ignoreCase) {
-        normalized = normalized.lowercase()
-    }
-    if (validation.ignorePunctuation) {
-        normalized = normalized.replace(Regex("[\\p{Punct}]+"), "")
-    }
-    if (validation.ignoreWhitespace) {
-        normalized = normalized.replace(Regex("\\s+"), " ")
-    }
-    return normalized.trim()
-}
-
-private fun JsonNode.decimalField(name: String): BigDecimal? {
-    val node = get(name) ?: return null
-    return when {
-        node.isNumber -> node.decimalValue()
-        node.isTextual -> node.asText().trim().takeIf { value -> value.isNotEmpty() }?.let { value ->
-            runCatching { BigDecimal(value) }.getOrNull()
-        }
-        else -> null
-    }
-}
-
-private fun JsonNode.intField(name: String): Int? {
-    val node = get(name) ?: return null
-    return when {
-        node.isInt || node.isLong -> node.asInt()
-        node.isTextual -> node.asText().trim().toIntOrNull()
-        else -> null
-    }
-}
-
-private fun BigDecimal.between(min: BigDecimal, max: BigDecimal): BigDecimal =
-    this.max(min).min(max)
-
-private fun ObjectiveItemScore.toJson(objectMapper: ObjectMapper): ObjectNode =
-    objectMapper.createObjectNode().apply {
-        put("blockId", blockId)
-        put("blockType", blockType)
-        put("itemKey", itemKey)
-        actual?.let { value -> put("actual", value) }
-        put("correct", correct)
-        put("status", status)
-        put("weight", weight)
-        put("earnedWeight", earnedWeight)
-        put("scoreFactor", scoreFactor)
-        put("maxAttempts", maxAttempts)
-        put("attemptsUsed", attemptsUsed)
-        put("incorrectAttempts", incorrectAttempts)
-        put("hintsUsed", hintsUsed)
-        put("errorsCount", errorsCount)
-    }
-
-private fun materialImageTargets(
-    document: ObjectNode,
-    blockId: String?,
-    maxImages: Int,
-    regenerate: Boolean,
-    existingAssets: Map<UUID, StoredMaterialAsset>,
-    objectMapper: ObjectMapper,
-    messageProvider: MessageProvider,
-): List<MaterialImageTarget> {
-    val pages = document.get("pages") as? ArrayNode ?: return emptyList()
-    val targets = mutableListOf<MaterialImageTarget>()
-    pages.forEach { page ->
-        val blocks = page.get("blocks") as? ArrayNode ?: return@forEach
-        blocks.forEach { block ->
-            val blockObject = block as? ObjectNode ?: return@forEach
-            val blockType = blockObject.get("type")?.asText()?.trim().orEmpty()
-            val currentBlockId = blockObject.get("id")?.asText()?.takeIf { value -> value.isNotBlank() } ?: blockType.ifBlank { "block" }
-            if (blockId != null && currentBlockId != blockId) {
-                return@forEach
-            }
-
-            when (blockType) {
-                "generatedImage" -> {
-                    if (targets.size >= maxImages) {
-                        return@forEach
-                    }
-                    val imageUrl = blockObject.get("url")?.asText()?.trim().orEmpty()
-                    val imagePrompt = blockObject.get("prompt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                        ?: return@forEach
-                    val title = blockObject.get("title")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                        ?: messageProvider[MetaData.Messages.MATERIAL_AI_IMAGE_ALT]
-                    val imageAlt = blockObject.get("caption")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                        ?: title
-                    val decision = materialImageTargetDecision(
-                        imageUrl = imageUrl,
-                        imagePrompt = imagePrompt,
-                        regenerate = regenerate,
-                        existingAssets = existingAssets,
-                        objectMapper = objectMapper,
-                    ) ?: return@forEach
-                    targets.add(
-                        MaterialImageTarget(
-                            targetType = "generatedImage",
-                            blockId = currentBlockId,
-                            targetId = currentBlockId,
-                            title = title,
-                            left = null,
-                            right = null,
-                            imagePrompt = imagePrompt,
-                            imageAlt = imageAlt,
-                            imageUrlField = "url",
-                            node = blockObject,
-                            previousAssetId = decision.previousAssetId,
-                        ),
-                    )
-                }
-                "matchingPairs" -> {
-                    val pairs = blockObject.get("pairs") as? ArrayNode ?: return@forEach
-                    pairs.forEach { pair ->
-                        if (targets.size >= maxImages) {
-                            return@forEach
-                        }
-                        val pairObject = pair as? ObjectNode ?: return@forEach
-                        val imageUrl = pairObject.get("imageUrl")?.asText()?.trim().orEmpty()
-                        val left = pairObject.get("left")?.asText()?.trim().orEmpty()
-                        val right = pairObject.get("right")?.asText()?.trim().orEmpty()
-                        if (left.isEmpty() || right.isEmpty()) {
-                            return@forEach
-                        }
-                        val imagePromptValue = pairObject.get("imagePrompt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                        val imageAltValue = pairObject.get("imageAlt")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                        val targetKind = pairObject.get("targetKind")?.asText()?.trim()?.uppercase().orEmpty()
-                        val isImageTarget = targetKind == "IMAGE" ||
-                            (targetKind.isEmpty() && (imagePromptValue != null || imageAltValue != null || imageUrl.isNotEmpty()))
-                        if (!isImageTarget) {
-                            return@forEach
-                        }
-                        val pairId = pairObject.get("id")?.asText()?.trim()?.takeIf { value -> value.isNotEmpty() }
-                            ?: "pair-${targets.size + 1}"
-                        val imageAlt = imageAltValue ?: right
-                        val imagePrompt = imagePromptValue ?: return@forEach
-                        val decision = materialImageTargetDecision(
-                            imageUrl = imageUrl,
-                            imagePrompt = imagePrompt,
-                            regenerate = regenerate,
-                            existingAssets = existingAssets,
-                            objectMapper = objectMapper,
-                        ) ?: return@forEach
-                        targets.add(
-                            MaterialImageTarget(
-                                targetType = "matchingPair",
-                                blockId = currentBlockId,
-                                targetId = pairId,
-                                title = right,
-                                left = left,
-                                right = right,
-                                imagePrompt = imagePrompt,
-                                imageAlt = imageAlt,
-                                imageUrlField = "imageUrl",
-                                node = pairObject,
-                                previousAssetId = decision.previousAssetId,
-                            ),
-                        )
-                    }
-                }
-                else -> Unit
-            }
-        }
-    }
-    return targets
-}
-
-private fun materialImageTargetDecision(
-    imageUrl: String,
-    imagePrompt: String,
-    regenerate: Boolean,
-    existingAssets: Map<UUID, StoredMaterialAsset>,
-    objectMapper: ObjectMapper,
-): MaterialImageTargetDecision? {
-    if (imageUrl.isBlank()) {
-        return MaterialImageTargetDecision(previousAssetId = null)
-    }
-
-    val assetId = materialAssetIdFromReference(imageUrl)
-    if (regenerate) {
-        return MaterialImageTargetDecision(previousAssetId = assetId)
-    }
-
-    if (assetId == null) {
-        return null
-    }
-
-    val asset = existingAssets[assetId] ?: return MaterialImageTargetDecision(previousAssetId = assetId)
-    if (asset.kind != "GENERATED_IMAGE") {
-        return null
-    }
-    if (materialGeneratedImageAssetMatches(asset, imagePrompt, objectMapper)) {
-        return null
-    }
-    return MaterialImageTargetDecision(previousAssetId = assetId)
-}
-
-private fun materialGeneratedImageAssetMatches(
-    asset: StoredMaterialAsset,
-    imagePrompt: String,
-    objectMapper: ObjectMapper,
-): Boolean {
-    val metadata = runCatching { objectMapper.readTree(asset.metadata) }.getOrNull() ?: return false
-    val storedPrompt = metadata.get("sourcePrompt")?.takeIf { node -> node.isTextual }?.asText()
-        ?: metadata.get("prompt")?.takeIf { node -> node.isTextual }?.asText()?.substringBefore("\n\nCreate a new original illustration")
-    return normalizeMaterialImageSource(storedPrompt) == normalizeMaterialImageSource(imagePrompt)
-}
-
-private fun normalizeMaterialImageSource(value: String?): String =
-    value.orEmpty().trim().replace(Regex("""\s+"""), " ").lowercase()
-
-private fun materialAssetIdFromReference(value: String?): UUID? {
-    val marker = "material-asset:"
-    val clean = value?.trim().orEmpty()
-    if (!clean.startsWith(marker)) {
-        return null
-    }
-    return runCatching { UUID.fromString(clean.removePrefix(marker).trim()) }.getOrNull()
-}
-
 private fun JwtAuthenticationToken.requireMaterialManager() {
     if (!canManageMaterials()) {
         throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED)
@@ -1815,166 +1023,14 @@ private fun JwtAuthenticationToken.canManageMaterials(): Boolean =
 private fun JwtAuthenticationToken.isMaterialAdmin(): Boolean =
     authorities.any { authority -> authority.authority == MetaData.Authorities.ADMIN }
 
-private fun defaultMaterialDocument(
-    title: String,
-    objectMapper: ObjectMapper,
-    messageProvider: MessageProvider,
-): ObjectNode =
-    objectMapper.createObjectNode().apply {
-        put("schemaVersion", 1)
-        putArray("pages").add(
-            objectMapper.createObjectNode().apply {
-                put("id", "page-1")
-                put("title", title)
-                put("layout", "FLOW")
-                putArray("blocks").add(
-                    objectMapper.createObjectNode().apply {
-                        put("id", "block-text-1")
-                        put("type", "text")
-                        put("title", messageProvider[MetaData.Messages.MATERIAL_NEW_BLOCK_TITLE])
-                        put("body", messageProvider[MetaData.Messages.MATERIAL_NEW_BLOCK_BODY])
-                    },
-                )
-            },
-        )
-    }
-
-private fun aiDraftDocument(
-    title: String,
-    prompt: String,
-    language: String,
-    cefrLevel: String,
-    objectMapper: ObjectMapper,
-    messageProvider: MessageProvider,
-): ObjectNode =
-    objectMapper.createObjectNode().apply {
-        put("schemaVersion", 1)
-        putArray("pages").add(
-            objectMapper.createObjectNode().apply {
-                put("id", "page-warmup")
-                put("title", title)
-                put("layout", "FLOW")
-                val blocks = putArray("blocks")
-                blocks.add(textBlock(objectMapper, "block-goal", messageProvider[MetaData.Messages.MATERIAL_GOAL_TITLE], prompt))
-                blocks.add(
-                    objectMapper.createObjectNode().apply {
-                        put("id", "block-vocab")
-                        put("type", "flashcards")
-                        put("title", "Useful words")
-                        putArray("cards")
-                            .add(flashcard(objectMapper, "topic", "topic", messageProvider[MetaData.Messages.FLASHCARD_TOPIC_TRANSLATION], "Let's discuss this topic."))
-                            .add(flashcard(objectMapper, "opinion", "opinion", messageProvider[MetaData.Messages.FLASHCARD_OPINION_TRANSLATION], "I think it is useful."))
-                            .add(flashcard(objectMapper, "because", "because", messageProvider[MetaData.Messages.FLASHCARD_BECAUSE_TRANSLATION], "I agree because..."))
-                    },
-                )
-                blocks.add(
-                    objectMapper.createObjectNode().apply {
-                        put("id", "block-gap")
-                        put("type", "fillGaps")
-                        put("title", "Complete the ideas")
-                        put("instruction", "Choose words that fit the meaning.")
-                        putArray("items")
-                            .add(gapItem(objectMapper, "I can talk about ___ in English.", "this topic"))
-                            .add(gapItem(objectMapper, "My opinion is ___ because it is useful.", "positive"))
-                    },
-                )
-                blocks.add(
-                    objectMapper.createObjectNode().apply {
-                        put("id", "block-speaking")
-                        put("type", "speakingPrompt")
-                        put("title", "Let's speak")
-                        put("prompt", "Ask your partner three questions about the topic, then share one answer.")
-                        put("level", cefrLevel)
-                        put("language", language)
-                    },
-                )
-                blocks.add(
-                    objectMapper.createObjectNode().apply {
-                        put("id", "block-writing")
-                        put("type", "freeWriting")
-                        put("title", "Short answer")
-                        put("prompt", "Write 3-5 sentences using the new words.")
-                        put("minWords", 20)
-                    },
-                )
-                blocks.add(
-                    objectMapper.createObjectNode().apply {
-                        put("id", "block-drawing")
-                        put("type", "drawingArea")
-                        put("title", "Teacher notes")
-                        put("height", 220)
-                    },
-                )
-            },
-        )
-    }
-
-private fun textBlock(objectMapper: ObjectMapper, id: String, title: String, body: String): ObjectNode =
-    objectMapper.createObjectNode().apply {
-        put("id", id)
-        put("type", "text")
-        put("title", title)
-        put("body", body)
-    }
-
-private fun flashcard(objectMapper: ObjectMapper, id: String, front: String, back: String, example: String): ObjectNode =
-    objectMapper.createObjectNode().apply {
-        put("id", id)
-        put("front", front)
-        put("back", back)
-        put("example", example)
-    }
-
-private fun gapItem(objectMapper: ObjectMapper, prompt: String, answer: String): ObjectNode =
-    objectMapper.createObjectNode().apply {
-        put("prompt", prompt)
-        put("answer", answer)
-    }
-
-private fun defaultScoringRubric(
-    objectMapper: ObjectMapper,
-    messageProvider: MessageProvider,
-): ObjectNode =
-    objectMapper.createObjectNode().apply {
-        put("maxScore", 10)
-        putArray("criteria")
-            .add(criteria(objectMapper, "taskCompletion", messageProvider[MetaData.Messages.RUBRIC_TASK_COMPLETION], 4))
-            .add(criteria(objectMapper, "grammar", messageProvider[MetaData.Messages.RUBRIC_GRAMMAR], 2))
-            .add(criteria(objectMapper, "vocabulary", messageProvider[MetaData.Messages.RUBRIC_VOCABULARY], 2))
-            .add(criteria(objectMapper, "fluency", messageProvider[MetaData.Messages.RUBRIC_FLUENCY], 2))
-        putArray("analysisFlags")
-            .add("taskCompletion")
-            .add("grammar")
-            .add("vocabulary")
-            .add("spelling")
-    }
-
-private fun criteria(objectMapper: ObjectMapper, key: String, label: String, weight: Int): ObjectNode =
-    objectMapper.createObjectNode().apply {
-        put("key", key)
-        put("label", label)
-        put("weight", weight)
-    }
-
-private fun JsonNode.blockCount(): Int {
-    val pages = get("pages")
-    if (pages !is ArrayNode) {
-        return 0
-    }
-    return pages.sumOf { page ->
-        val blocks = page.get("blocks")
-        if (blocks is ArrayNode) blocks.size() else 0
-    }
-}
-
 private fun String.requiredClean(fieldName: String, maxLength: Int): String =
     optionalClean(fieldName, maxLength)
-        ?: throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName is required.")
+        ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_REQUIRED, fieldName)
 
 private fun String?.optionalClean(fieldName: String, maxLength: Int): String? {
     val cleaned = this?.trim()?.takeIf { it.isNotEmpty() }
     if (cleaned != null && cleaned.length > maxLength) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName must be at most $maxLength characters.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_TOO_LONG, fieldName, maxLength)
     }
     return cleaned
 }
@@ -1982,20 +1038,20 @@ private fun String?.optionalClean(fieldName: String, maxLength: Int): String? {
 private fun String?.validatedImageDataUrl(fieldName: String): String? {
     val cleaned = optionalClean(fieldName, materialAiSourceImageDataUrlMaxLength) ?: return null
     val prefix = materialAiImageDataUrlPrefixes.firstOrNull { prefix -> cleaned.startsWith(prefix) }
-        ?: throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName must be a JPEG, PNG, or WebP data URL.")
+        ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.IMAGE_DATA_URL_INVALID_TYPE, fieldName)
     val encoded = cleaned.removePrefix(prefix)
     if (encoded.isBlank()) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName is empty.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_EMPTY, fieldName)
     }
     runCatching { Base64.getDecoder().decode(encoded) }
-        .getOrElse { throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName must contain valid base64 image data.") }
+        .getOrElse { throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.IMAGE_DATA_URL_INVALID_BASE64, fieldName) }
     return cleaned
 }
 
 private fun validateJsonSize(fieldName: String, value: JsonNode, objectMapper: ObjectMapper, maxBytes: Int) {
     val byteSize = objectMapper.writeValueAsBytes(value).size
     if (byteSize > maxBytes) {
-        throw ProjectResponseException(HttpStatus.BAD_REQUEST, "$fieldName must be at most $maxBytes bytes.")
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.JSON_FIELD_TOO_LARGE, fieldName, maxBytes)
     }
 }
 

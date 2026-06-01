@@ -28,6 +28,22 @@ class BackendArchitectureTest {
     }
 
     @Test
+    fun `rest controllers stay focused by endpoint group`() {
+        val mappingAnnotation = Regex("""@(Get|Post|Put|Patch|Delete)Mapping\b""")
+        val oversizedControllers = kotlinSources()
+            .filter { source -> Regex("""(?m)^@RestController$""").containsMatchIn(source.text) }
+            .mapNotNull { source ->
+                val endpointCount = mappingAnnotation.findAll(source.text).count()
+                if (endpointCount > 10) "${source.relativePath} has $endpointCount endpoints" else null
+            }
+
+        assertTrue(
+            oversizedControllers.isEmpty(),
+            "Split REST controllers by cohesive endpoint groups: $oversizedControllers",
+        )
+    }
+
+    @Test
     fun `openapi request and response dto classes are isolated in dto package`() {
         val dtoRegex = Regex("""(?m)^data\s+class\s+\w+(Request|Response)\b""")
         val misplacedDtos = kotlinSources()
@@ -53,6 +69,20 @@ class BackendArchitectureTest {
         assertTrue(
             misplacedServices.isEmpty(),
             "Service/store/provider components must live in com.playsay.gateway.service: $misplacedServices",
+        )
+    }
+
+    @Test
+    fun `backend kotlin files stay below tactical extraction threshold`() {
+        val oversizedFiles = kotlinSources()
+            .mapNotNull { source ->
+                val lineCount = source.text.lineSequence().count()
+                if (lineCount > 1_500) "${source.relativePath} has $lineCount lines" else null
+            }
+
+        assertTrue(
+            oversizedFiles.isEmpty(),
+            "Split large backend files into cohesive collaborators before they become unreviewable: $oversizedFiles",
         )
     }
 
@@ -191,6 +221,61 @@ class BackendArchitectureTest {
         assertTrue(
             directResponseStatusExceptions.isEmpty(),
             "Controller/service business errors must use ProjectResponseException: $directResponseStatusExceptions",
+        )
+    }
+
+    @Test
+    fun `material store business errors use localized project error codes`() {
+        val materialStore = sourceRoot.resolve("service/LessonMaterialStore.kt").readText()
+        val rawMaterialErrors = Regex("""ProjectResponseException\(HttpStatus\.[A-Z_]+,\s*"""")
+            .findAll(materialStore)
+            .map { match -> match.value }
+            .toList()
+
+        assertTrue(
+            rawMaterialErrors.isEmpty(),
+            "LessonMaterialStore business errors must use ProjectResponseException.localized and MetaData error codes.",
+        )
+    }
+
+    @Test
+    fun `controller and service business errors use localized project error codes`() {
+        val rawBusinessErrors = kotlinSources()
+            .filter { source -> ".controller" in source.packageName || ".service" in source.packageName }
+            .flatMap { source ->
+                Regex("""ProjectResponseException\(HttpStatus\.[A-Z_]+,\s*"""")
+                    .findAll(source.text)
+                    .map { "${source.relativePath}: ${it.value}" }
+            }
+            .toList()
+
+        assertTrue(
+            rawBusinessErrors.isEmpty(),
+            "Controller/service ProjectResponseException calls must use localized MetaData error codes: $rawBusinessErrors",
+        )
+    }
+
+    @Test
+    fun `material store does not own answer suggestion context parsing`() {
+        val materialStore = sourceRoot.resolve("service/LessonMaterialStore.kt").readText()
+        val ownsAnswerContextParsing = Regex("""\b(fun\s+materialAnswerItemContexts|data\s+class\s+MaterialAnswerItemContext)\b""")
+            .containsMatchIn(materialStore)
+
+        assertTrue(
+            !ownsAnswerContextParsing,
+            "Move material answer suggestion context parsing into a dedicated service helper.",
+        )
+    }
+
+    @Test
+    fun `material store does not own generated image target discovery`() {
+        val materialStore = sourceRoot.resolve("service/LessonMaterialStore.kt").readText()
+        val ownsImageTargetDiscovery = Regex("""\b(fun\s+materialImageTargets|fun\s+materialImageTargetDecision|data\s+class\s+MaterialImageTarget)\b""")
+            .containsMatchIn(materialStore)
+
+        assertTrue(
+            !ownsImageTargetDiscovery,
+            "Move material generated-image target discovery into a dedicated service helper.",
         )
     }
 

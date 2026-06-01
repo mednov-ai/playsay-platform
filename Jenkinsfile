@@ -513,7 +513,7 @@ EOF
 
             missing=""
             for name in PLAY_SAY_SMOKE_TEACHER_PASSWORD PLAY_SAY_SMOKE_STUDENT_A_PASSWORD PLAY_SAY_SMOKE_STUDENT_B_PASSWORD; do
-              eval "value=\${$name:-}"
+              value="$(printenv "$name" || true)"
               if [ -z "$value" ]; then
                 missing="$missing $name"
               fi

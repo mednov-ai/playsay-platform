@@ -1,0 +1,123 @@
+import { Buffer } from "node:buffer";
+import { describe, expect, it } from "vitest";
+import { createYjsWorkspaceRuntime, type AnnotationStroke } from "./yjsRuntime";
+
+describe("yjs workspace runtime annotations", () => {
+  it("stores annotation strokes in the collaboration document", () => {
+    const annotationChanges: AnnotationStroke[][] = [];
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: (strokes) => annotationChanges.push(strokes),
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      participantName: "Student",
+      snapshot: null,
+    });
+
+    runtime.setAnnotationStrokes([
+      {
+        color: "#00a878",
+        id: "stroke-2",
+        pageId: "material",
+        points: [{ pageId: "material", x: 25, y: 30 }],
+      },
+      {
+        color: "#2574ff",
+        id: "stroke-1",
+        pageId: "material",
+        points: [{ pageId: "material", x: 10, y: 20 }],
+      },
+      {
+        color: "#ff5c00",
+        id: "empty",
+        pageId: "material",
+        points: [],
+      },
+    ]);
+
+    expect(annotationChanges.at(-1)).toEqual([
+      {
+        color: "#2574ff",
+        id: "stroke-1",
+        pageId: "material",
+        points: [{ pageId: "material", x: 10, y: 20 }],
+      },
+      {
+        color: "#00a878",
+        id: "stroke-2",
+        pageId: "material",
+        points: [{ pageId: "material", x: 25, y: 30 }],
+      },
+    ]);
+
+    runtime.destroy();
+  });
+
+  it("persists text and annotations in one Yjs snapshot", () => {
+    withWindowBase64(() => {
+      const stroke: AnnotationStroke = {
+        color: "#ff5c00",
+        id: "stroke-1",
+        pageId: "material",
+        points: [{ pageId: "material", x: 12, y: 34 }],
+      };
+      const runtime = createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Student",
+        snapshot: null,
+      });
+
+      runtime.updateText("Shared draft");
+      runtime.setAnnotationStrokes([stroke]);
+      const snapshot = runtime.snapshot();
+      runtime.destroy();
+
+      const restoredAnnotationChanges: AnnotationStroke[][] = [];
+      const restoredTextChanges: string[] = [];
+      const restored = createYjsWorkspaceRuntime({
+        color: "#00a878",
+        onAnnotationChange: (strokes) => restoredAnnotationChanges.push(strokes),
+        onParticipantsChange: () => undefined,
+        onTextChange: (text) => restoredTextChanges.push(text),
+        participantName: "Teacher",
+        snapshot,
+      });
+
+      expect(restored.getText()).toBe("Shared draft");
+      expect(restoredTextChanges.at(-1)).toBe("Shared draft");
+      expect(restoredAnnotationChanges.at(-1)).toEqual([stroke]);
+
+      restored.destroy();
+    });
+  });
+});
+
+function withWindowBase64(run: () => void) {
+  const globalWithWindow = globalThis as typeof globalThis & { window?: { atob: (value: string) => string; btoa: (value: string) => string } };
+  const hadWindow = "window" in globalWithWindow;
+  const originalWindow = globalWithWindow.window;
+
+  Object.defineProperty(globalWithWindow, "window", {
+    configurable: true,
+    value: {
+      atob: (value: string) => Buffer.from(value, "base64").toString("binary"),
+      btoa: (value: string) => Buffer.from(value, "binary").toString("base64"),
+    },
+  });
+
+  try {
+    run();
+  } finally {
+    if (hadWindow) {
+      Object.defineProperty(globalWithWindow, "window", {
+        configurable: true,
+        value: originalWindow,
+      });
+    } else {
+      Reflect.deleteProperty(globalWithWindow, "window");
+    }
+  }
+}

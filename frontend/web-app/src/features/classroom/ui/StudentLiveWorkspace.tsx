@@ -1,5 +1,5 @@
 import { CheckCircle2, FileCheck2, Loader2, Save, User, Users } from "lucide-react";
-import { useState, type PointerEvent } from "react";
+import { useMemo, useState, type PointerEvent } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   type LessonMaterial,
@@ -44,16 +44,46 @@ export function StudentLiveWorkspace({
 }) {
   const { t } = useAppTranslation();
   const [mode, setMode] = useState<CollaborationWorkspaceMode>("individual");
+  const participantColor = collaborationParticipantColor(profileSubject ?? displayName);
   const documentState = useCollaborationDocument({
     lessonId,
     materialId: material.id,
     mode,
   });
   const workspace = useYjsWorkspace({
-    color: collaborationParticipantColor(profileSubject ?? displayName),
+    color: participantColor,
     document: documentState.document,
     participantName: displayName,
   });
+  const groupAnnotationDocumentState = useCollaborationDocument({
+    enabled: mode !== "group",
+    lessonId,
+    materialId: material.id,
+    mode: "group",
+  });
+  const groupAnnotationWorkspace = useYjsWorkspace({
+    color: participantColor,
+    document: groupAnnotationDocumentState.document,
+    enabled: mode !== "group" && Boolean(groupAnnotationDocumentState.document),
+    participantName: displayName,
+  });
+  const annotationDocument = mode === "group" ? documentState.document : groupAnnotationDocumentState.document;
+  const annotationWorkspace = mode === "group" ? workspace : groupAnnotationWorkspace;
+  const annotationSync = useMemo(() => {
+    if (!annotationDocument) {
+      return null;
+    }
+    return {
+      ready: annotationWorkspace.connected,
+      setStrokes: annotationWorkspace.setAnnotationStrokes,
+      strokes: annotationWorkspace.annotationStrokes,
+    };
+  }, [
+    annotationDocument?.id,
+    annotationWorkspace.annotationStrokes,
+    annotationWorkspace.connected,
+    annotationWorkspace.setAnnotationStrokes,
+  ]);
 
   async function finalizeWork() {
     if (!canFinalizeCollaborationMode(mode)) {
@@ -140,6 +170,7 @@ export function StudentLiveWorkspace({
           )}
           lessonId={lessonId}
           material={material}
+          annotationSync={annotationSync}
           onSaveAnswers={onSaveAnswers}
           score={score}
           submission={submission}

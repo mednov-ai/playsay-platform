@@ -19,10 +19,18 @@ import {
 } from "../../materials";
 import {
   pointsToSvgPath,
+  type AnnotationStroke,
 } from "../model/annotation";
 import { useAppTranslation } from "../../../shared/i18n";
 
+type LiveAnnotationSync = {
+  ready: boolean;
+  setStrokes: (updater: (current: AnnotationStroke[]) => AnnotationStroke[]) => void;
+  strokes: AnnotationStroke[];
+};
+
 export function LessonTaskCanvas({
+  annotationSync,
   collaborationControls,
   lessonId,
   material,
@@ -33,6 +41,7 @@ export function LessonTaskCanvas({
   submissionSaving,
   teacherName,
 }: {
+  annotationSync?: LiveAnnotationSync | null;
   collaborationControls?: ReactNode;
   lessonId: string;
   material?: LessonMaterial | null;
@@ -54,7 +63,7 @@ export function LessonTaskCanvas({
     setAnnotationColor,
     setAnnotationStrokes,
     setAnnotationTool,
-  } = useLessonAnnotation({ lessonId, materialId: material?.id });
+  } = useLessonAnnotation({ lessonId, liveAnnotation: annotationSync, materialId: material?.id });
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
 
   useEffect(() => {

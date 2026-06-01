@@ -13,24 +13,45 @@ import {
   type AnnotationTool,
 } from "../model/annotation";
 
+type LiveAnnotationSync = {
+  ready: boolean;
+  setStrokes: (updater: (current: AnnotationStroke[]) => AnnotationStroke[]) => void;
+  strokes: AnnotationStroke[];
+};
+
 export function useLessonAnnotation({
+  liveAnnotation,
   lessonId,
   materialId,
 }: {
+  liveAnnotation?: LiveAnnotationSync | null;
   lessonId: string;
   materialId?: string | null;
 }) {
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pointer");
   const [annotationColor, setAnnotationColor] = useState("#ff5c00");
-  const [annotationStrokes, setAnnotationStrokes] = useState<AnnotationStroke[]>([]);
+  const [localAnnotationStrokes, setLocalAnnotationStrokes] = useState<AnnotationStroke[]>([]);
   const [annotationReady, setAnnotationReady] = useState(false);
   const activeStrokeId = useRef<string | null>(null);
   const lastSyncedAnnotationRef = useRef("");
+  const liveAnnotationRef = useRef<LiveAnnotationSync | null>(liveAnnotation ?? null);
+  const liveStrokeCountRef = useRef(0);
+  const annotationStrokes = liveAnnotation?.strokes ?? localAnnotationStrokes;
+  const setAnnotationStrokes = liveAnnotation?.setStrokes ?? setLocalAnnotationStrokes;
+  const liveAnnotationEnabled = Boolean(liveAnnotation);
+
+  useEffect(() => {
+    liveAnnotationRef.current = liveAnnotation ?? null;
+  }, [liveAnnotation]);
+
+  useEffect(() => {
+    liveStrokeCountRef.current = liveAnnotation?.strokes.length ?? 0;
+  }, [liveAnnotation?.strokes.length]);
 
   useEffect(() => {
     if (!materialId) {
       setAnnotationReady(false);
-      setAnnotationStrokes([]);
+      setLocalAnnotationStrokes([]);
       lastSyncedAnnotationRef.current = "";
       return undefined;
     }
@@ -44,14 +65,21 @@ export function useLessonAnnotation({
         const serialized = JSON.stringify(content);
         if (!cancelled && serialized !== lastSyncedAnnotationRef.current) {
           lastSyncedAnnotationRef.current = serialized;
-          setAnnotationStrokes(content.strokes);
+          const currentLiveAnnotation = liveAnnotationRef.current;
+          if (currentLiveAnnotation) {
+            if (liveStrokeCountRef.current === 0 && content.strokes.length > 0) {
+              currentLiveAnnotation.setStrokes(() => content.strokes);
+            }
+          } else {
+            setLocalAnnotationStrokes(content.strokes);
+          }
         }
       } catch {
         const content = emptyAnnotationContent();
         const serialized = JSON.stringify(content);
-        if (!cancelled && serialized !== lastSyncedAnnotationRef.current) {
+        if (!liveAnnotationRef.current && !cancelled && serialized !== lastSyncedAnnotationRef.current) {
           lastSyncedAnnotationRef.current = serialized;
-          setAnnotationStrokes(content.strokes);
+          setLocalAnnotationStrokes(content.strokes);
         }
       } finally {
         if (!cancelled) {
@@ -62,8 +90,14 @@ export function useLessonAnnotation({
 
     setAnnotationReady(false);
     lastSyncedAnnotationRef.current = "";
-    setAnnotationStrokes([]);
+    setLocalAnnotationStrokes([]);
     void loadAnnotation();
+    if (liveAnnotationEnabled) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const intervalId = window.setInterval(() => {
       void loadAnnotation();
     }, 2_000);
@@ -72,7 +106,7 @@ export function useLessonAnnotation({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [lessonId, materialId]);
+  }, [lessonId, liveAnnotationEnabled, materialId]);
 
   useEffect(() => {
     if (!materialId || !annotationReady) {
@@ -92,7 +126,7 @@ export function useLessonAnnotation({
         })
         .catch(() => {
           // The next local edit or polling cycle will retry without blocking the lesson UI.
-        });
+      });
     }, 500);
 
     return () => window.clearTimeout(timeoutId);

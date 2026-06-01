@@ -1,4 +1,5 @@
 import { BookOpen, Clock3, Loader2, Plus, Users } from "lucide-react";
+import { useMemo } from "react";
 import { Button } from "../../../components/ui/button";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import { formatLessonRange, formatParticipantCount } from "../../../entities/schedule/model";
@@ -7,8 +8,11 @@ import {
   type MeProfile,
   type ScheduledLesson,
 } from "../../../shared/api/playsay";
+import { useCollaborationDocument } from "../hooks/useCollaborationDocument";
 import { useLessonMaterial } from "../hooks/useLessonMaterial";
 import { useLessonSubmission } from "../hooks/useLessonSubmission";
+import { useYjsWorkspace } from "../hooks/useYjsWorkspace";
+import { collaborationParticipantColor } from "../model/collaboration";
 import type { LessonRoomSession } from "../model/session";
 import {
   AssignmentStub,
@@ -60,6 +64,33 @@ export function LessonWorkspace({
   } = useLessonSubmission({ canMonitorSubmissions, material, session });
   const selectableMaterials = materials.filter((item) => item.status !== "ARCHIVED");
   const lessonScore = canMonitorSubmissions ? averageSubmissionScore(submissionSnapshots) : submission?.score ?? null;
+  const teacherAnnotationDocumentState = useCollaborationDocument({
+    enabled: canMonitorSubmissions && Boolean(material),
+    lessonId: session.lessonId,
+    materialId: material?.id,
+    mode: "group",
+  });
+  const teacherAnnotationWorkspace = useYjsWorkspace({
+    color: collaborationParticipantColor(profile?.subject ?? displayName),
+    document: teacherAnnotationDocumentState.document,
+    enabled: canMonitorSubmissions && Boolean(teacherAnnotationDocumentState.document),
+    participantName: displayName,
+  });
+  const teacherAnnotationSync = useMemo(() => {
+    if (!teacherAnnotationDocumentState.document) {
+      return null;
+    }
+    return {
+      ready: teacherAnnotationWorkspace.connected,
+      setStrokes: teacherAnnotationWorkspace.setAnnotationStrokes,
+      strokes: teacherAnnotationWorkspace.annotationStrokes,
+    };
+  }, [
+    teacherAnnotationDocumentState.document?.id,
+    teacherAnnotationWorkspace.annotationStrokes,
+    teacherAnnotationWorkspace.connected,
+    teacherAnnotationWorkspace.setAnnotationStrokes,
+  ]);
 
   return (
     <section className="playsay-workbench">
@@ -158,6 +189,7 @@ export function LessonWorkspace({
             <LessonTaskCanvas
               lessonId={session.lessonId}
               material={material}
+              annotationSync={teacherAnnotationSync}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
               score={lessonScore}
               submission={submission}

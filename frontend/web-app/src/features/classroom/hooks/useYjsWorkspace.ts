@@ -7,6 +7,7 @@ import {
 } from "../../../shared/api/playsay";
 import {
   createYjsWorkspaceRuntime,
+  type AnnotationStroke,
   type CollaborationCursor,
   type CollaborationParticipant,
   type YjsWorkspaceRuntime,
@@ -29,12 +30,14 @@ export function useYjsWorkspace({
 }) {
   const [participants, setParticipants] = useState<CollaborationParticipant[]>([]);
   const [status, setStatus] = useState<YjsWorkspaceStatus>("idle");
+  const [annotationStrokes, setAnnotationStrokesState] = useState<AnnotationStroke[]>([]);
   const [text, setText] = useState("");
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (!enabled || !document) {
+      setAnnotationStrokesState([]);
       setParticipants([]);
       setStatus("idle");
       setText("");
@@ -44,6 +47,7 @@ export function useYjsWorkspace({
     let disposed = false;
     const runtime = createYjsWorkspaceRuntime({
       color,
+      onAnnotationChange: setAnnotationStrokesState,
       onParticipantsChange: setParticipants,
       onTextChange: setText,
       participantName,
@@ -90,6 +94,7 @@ export function useYjsWorkspace({
       socketRef.current = null;
       runtime.destroy();
       runtimeRef.current = null;
+      setAnnotationStrokesState([]);
       setParticipants([]);
     };
   }, [color, document?.id, enabled, participantName]);
@@ -107,6 +112,14 @@ export function useYjsWorkspace({
     runtimeRef.current?.updateCursor(cursor);
   }, []);
 
+  const setAnnotationStrokes = useCallback((updater: (current: AnnotationStroke[]) => AnnotationStroke[]) => {
+    setAnnotationStrokesState((current) => {
+      const nextStrokes = updater(current);
+      runtimeRef.current?.setAnnotationStrokes(nextStrokes);
+      return nextStrokes;
+    });
+  }, []);
+
   const snapshot = useCallback((): LessonMaterialJson | null => {
     const runtime = runtimeRef.current;
     if (!runtime) {
@@ -116,8 +129,10 @@ export function useYjsWorkspace({
   }, []);
 
   return {
+    annotationStrokes,
     connected: status === "connected",
     participants,
+    setAnnotationStrokes,
     snapshot,
     status,
     text,

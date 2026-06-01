@@ -6,6 +6,7 @@ import { SnapshotQueue } from "./snapshots.js";
 describe("SnapshotQueue", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("persists room snapshots with the collaboration service token header", async () => {
@@ -38,6 +39,44 @@ describe("SnapshotQueue", () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(body.snapshot.encoding).toBe("yjs-update-v1");
     expect(body.snapshot.yjsUpdateBase64).toEqual(expect.any(String));
+  });
+
+  it("does not crash when a deleted collaboration document returns 404", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 404 }));
+    const warnMock = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", fetchMock);
+    const queue = new SnapshotQueue({
+      playsayApiBaseUrl: "https://api.example.test",
+      collaborationServiceToken: "service-token-01234567890123456789",
+      snapshotIntervalMs: 10_000,
+    });
+
+    queue.markDirty(claims, new Y.Doc());
+    await expect(queue.flushAll()).resolves.toBeUndefined();
+    await queue.flushAll();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(warnMock).toHaveBeenCalledWith(expect.stringContaining("HTTP 404"));
+  });
+
+  it("retries transient snapshot persistence failures", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", fetchMock);
+    const queue = new SnapshotQueue({
+      playsayApiBaseUrl: "https://api.example.test",
+      collaborationServiceToken: "service-token-01234567890123456789",
+      snapshotIntervalMs: 10_000,
+    });
+
+    queue.markDirty(claims, new Y.Doc());
+    await queue.flushAll();
+    await queue.flushAll();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 

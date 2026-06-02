@@ -68,9 +68,10 @@ try {
   const studentB = await createSession(browser, "studentB", passwords.studentB, { width: 1180, height: 860 });
   sessions.push(teacher, studentA, studentB);
 
-  const [studentAProfile, studentBProfile] = await Promise.all([
-    apiRequest(studentA.tokens.accessToken, "GET", "/users/me/profile", 200),
-    apiRequest(studentB.tokens.accessToken, "GET", "/users/me/profile", 200),
+  const [, studentAProfile, studentBProfile] = await Promise.all([
+    ensureSmokeProfileLocale(teacher.tokens.accessToken),
+    ensureSmokeProfileLocale(studentA.tokens.accessToken),
+    ensureSmokeProfileLocale(studentB.tokens.accessToken),
   ]);
   addCheck("keycloak-login-and-student-profiles");
 
@@ -401,7 +402,7 @@ async function submitKeycloakLoginForm(page, credentials) {
 
 async function openHomeworkTab(page) {
   await page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-  const homeworkTab = page.locator(".playsay-workspace-tab").filter({ hasText: "Homework" }).first();
+  const homeworkTab = page.locator('.playsay-workspace-tab[data-tab-id="homework"]').first();
   await homeworkTab.waitFor({ timeout: timeoutMs });
   await homeworkTab.click();
   await page.locator(".playsay-homework-panel").waitFor({ timeout: timeoutMs });
@@ -585,6 +586,19 @@ function homeworkContent(materialId, items) {
 
 async function studentCanReadOwnAssignment(token, assignmentId) {
   await apiRequest(token, "GET", `/me/assignments/${assignmentId}`, 200);
+}
+
+async function ensureSmokeProfileLocale(token) {
+  const profile = await apiRequest(token, "GET", "/users/me/profile", 200);
+  if (profile.locale === "en") {
+    return profile;
+  }
+  return apiRequest(token, "PUT", "/users/me/profile", 200, {
+    displayName: profile.displayName,
+    learningGoal: profile.learningGoal,
+    locale: "en",
+    timezone: profile.timezone,
+  });
 }
 
 async function apiRequest(token, method, pathName, expectedStatus, body) {

@@ -20,6 +20,7 @@ export function WorkspaceTabs({
         <button
           className="playsay-workspace-tab"
           data-active={activeTab === tab.id ? "true" : "false"}
+          data-tab-id={tab.id}
           key={tab.id}
           onClick={() => onSelect(tab.id)}
           type="button"

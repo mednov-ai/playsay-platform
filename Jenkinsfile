@@ -24,7 +24,7 @@ spec:
         limits:
           cpu: "2"
           memory: 3Gi
-    - name: node
+    - name: node-frontend
       image: node:22
       command: ["cat"]
       tty: true
@@ -39,6 +39,21 @@ spec:
         limits:
           cpu: 1500m
           memory: 1Gi
+    - name: node-collaboration
+      image: node:22
+      command: ["cat"]
+      tty: true
+      volumeMounts:
+        - name: jenkins-agent-cache
+          mountPath: /cache/npm
+          subPath: npm
+      resources:
+        requests:
+          cpu: 200m
+          memory: 384Mi
+        limits:
+          cpu: "1"
+          memory: 768Mi
     - name: kaniko-backend
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]
@@ -239,44 +254,86 @@ spec:
       }
     }
 
-    stage('Backend tests') {
-      steps {
-        container('gradle') {
-          dir('backend') {
-            echo "Running backend tests for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:test --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
-          }
-        }
-      }
-    }
+    stage('Build, test, and validate') {
+      parallel {
+        stage('Backend validation') {
+          stages {
+            stage('Backend tests') {
+              steps {
+                container('gradle') {
+                  dir('backend') {
+                    echo "Running backend tests for ${env.BUILD_LABEL}"
+                    sh 'gradle :api-gateway:test --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+                  }
+                }
+              }
+            }
 
-    stage('Backend package') {
-      steps {
-        container('gradle') {
-          dir('backend') {
-            echo "Packaging api-gateway for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:bootJar --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
-          }
-        }
-      }
-    }
+            stage('Backend package') {
+              steps {
+                container('gradle') {
+                  dir('backend') {
+                    echo "Packaging api-gateway for ${env.BUILD_LABEL}"
+                    sh 'gradle :api-gateway:bootJar --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+                  }
+                }
+              }
+            }
 
-    stage('OpenAPI contract') {
-      steps {
-        container('gradle') {
-          dir('backend') {
-            echo "Exporting api-gateway OpenAPI contract for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+            stage('OpenAPI contract') {
+              steps {
+                container('gradle') {
+                  dir('backend') {
+                    echo "Exporting api-gateway OpenAPI contract for ${env.BUILD_LABEL}"
+                    sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+                  }
+                }
+                sh '''
+                  set -eu
+                  git diff --exit-code -- contracts/openapi.yaml || {
+                    echo "contracts/openapi.yaml is out of sync with api-gateway. Run gradle :api-gateway:exportOpenApi and commit the result."
+                    exit 1
+                  }
+                '''
+                archiveArtifacts artifacts: 'contracts/openapi.yaml', fingerprint: true
+              }
+            }
           }
         }
-        sh '''
-          set -eu
-          git diff --exit-code -- contracts/openapi.yaml || {
-            echo "contracts/openapi.yaml is out of sync with api-gateway. Run gradle :api-gateway:exportOpenApi and commit the result."
-            exit 1
+
+        stage('Frontend build') {
+          steps {
+            container('node-frontend') {
+              dir('frontend') {
+                echo "Installing frontend dependencies for ${env.BUILD_LABEL}"
+                sh 'npm install --cache /cache/npm --prefer-offline'
+                echo "Generating typed frontend API client for ${env.BUILD_LABEL}"
+                sh 'npm --workspace web-app run generate'
+                echo "Linting frontend for ${env.BUILD_LABEL}"
+                sh 'npm --workspace web-app run lint'
+                echo "Building frontend for ${env.BUILD_LABEL}"
+                sh 'npm --workspace web-app run build'
+                echo "Running frontend tests for ${env.BUILD_LABEL}"
+                sh 'npm --workspace web-app run test'
+              }
+            }
           }
-        '''
-        archiveArtifacts artifacts: 'contracts/openapi.yaml', fingerprint: true
+        }
+
+        stage('Collaboration service build') {
+          steps {
+            container('node-collaboration') {
+              dir('collaboration-service') {
+                echo "Installing collaboration service dependencies for ${env.BUILD_LABEL}"
+                sh 'npm ci --cache /cache/npm --prefer-offline'
+                echo "Testing collaboration service for ${env.BUILD_LABEL}"
+                sh 'npm test'
+                echo "Building collaboration service for ${env.BUILD_LABEL}"
+                sh 'npm run build'
+              }
+            }
+          }
+        }
       }
     }
 
@@ -314,120 +371,84 @@ spec:
       }
     }
 
-    stage('Frontend build') {
-      steps {
-        container('node') {
-          dir('frontend') {
-            echo "Installing frontend dependencies for ${env.BUILD_LABEL}"
-            sh 'npm install --cache /cache/npm --prefer-offline'
-            echo "Generating typed frontend API client for ${env.BUILD_LABEL}"
-            sh 'npm --workspace web-app run generate'
-            echo "Linting frontend for ${env.BUILD_LABEL}"
-            sh 'npm --workspace web-app run lint'
-            echo "Building frontend for ${env.BUILD_LABEL}"
-            sh 'npm --workspace web-app run build'
-            echo "Running frontend tests for ${env.BUILD_LABEL}"
-            sh 'npm --workspace web-app run test'
-          }
-        }
-      }
-    }
-
-    stage('Collaboration service build') {
-      steps {
-        container('node') {
-          dir('collaboration-service') {
-            echo "Installing collaboration service dependencies for ${env.BUILD_LABEL}"
-            sh 'npm ci --cache /cache/npm --prefer-offline'
-            echo "Testing collaboration service for ${env.BUILD_LABEL}"
-            sh 'npm test'
-            echo "Building collaboration service for ${env.BUILD_LABEL}"
-            sh 'npm run build'
-          }
-        }
-      }
-    }
-
-    stage('Build and push backend image') {
+    stage('Build and push images') {
       when {
         expression { env.DEPLOY_TO_DEV == 'true' }
       }
-      steps {
-        container('kaniko-backend') {
-          withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
-            sh '''
-              set -eu
-              JAR_COUNT="$(find "$WORKSPACE/backend/api-gateway/build/libs" -maxdepth 1 -name "*.jar" | wc -l | tr -d " ")"
-              if [ "$JAR_COUNT" != "1" ]; then
-                echo "Expected exactly one api-gateway bootJar, found $JAR_COUNT"
-                find "$WORKSPACE/backend/api-gateway/build/libs" -maxdepth 1 -type f -print || true
-                exit 1
-              fi
-              ls -lh "$WORKSPACE/backend/api-gateway/build/libs"/*.jar
-              mkdir -p /kaniko/.docker
-              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
-              cat > /kaniko/.docker/config.json <<EOF
+      parallel {
+        stage('Build and push backend image') {
+          steps {
+            container('kaniko-backend') {
+              withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+                sh '''
+                  set -eu
+                  JAR_COUNT="$(find "$WORKSPACE/backend/api-gateway/build/libs" -maxdepth 1 -name "*.jar" | wc -l | tr -d " ")"
+                  if [ "$JAR_COUNT" != "1" ]; then
+                    echo "Expected exactly one api-gateway bootJar, found $JAR_COUNT"
+                    find "$WORKSPACE/backend/api-gateway/build/libs" -maxdepth 1 -type f -print || true
+                    exit 1
+                  fi
+                  ls -lh "$WORKSPACE/backend/api-gateway/build/libs"/*.jar
+                  mkdir -p /kaniko/.docker
+                  AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+                  cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-              /kaniko/executor \
-                --context "$WORKSPACE/backend" \
-                --dockerfile "$WORKSPACE/backend/api-gateway/Dockerfile" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${GIT_COMMIT}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${BUILD_LABEL}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:dev"
-            '''
+                  /kaniko/executor \
+                    --context "$WORKSPACE/backend" \
+                    --dockerfile "$WORKSPACE/backend/api-gateway/Dockerfile" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${GIT_COMMIT}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${BUILD_LABEL}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:dev"
+                '''
+              }
+            }
           }
         }
-      }
-    }
 
-    stage('Build and push frontend image') {
-      when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
-      }
-      steps {
-        container('kaniko-frontend') {
-          withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
-            sh '''
-              set -eu
-              mkdir -p /kaniko/.docker
-              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
-              cat > /kaniko/.docker/config.json <<EOF
+        stage('Build and push frontend image') {
+          steps {
+            container('kaniko-frontend') {
+              withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+                sh '''
+                  set -eu
+                  mkdir -p /kaniko/.docker
+                  AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+                  cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-              /kaniko/executor \
-                --context "$WORKSPACE/frontend" \
-                --dockerfile "$WORKSPACE/frontend/web-app/Dockerfile" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:${GIT_COMMIT}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:${BUILD_LABEL}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:dev"
-            '''
+                  /kaniko/executor \
+                    --context "$WORKSPACE/frontend" \
+                    --dockerfile "$WORKSPACE/frontend/web-app/Dockerfile" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:${GIT_COMMIT}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:${BUILD_LABEL}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:dev"
+                '''
+              }
+            }
           }
         }
-      }
-    }
 
-    stage('Build and push collaboration service image') {
-      when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
-      }
-      steps {
-        container('kaniko-collaboration') {
-          withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
-            sh '''
-              set -eu
-              mkdir -p /kaniko/.docker
-              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
-              cat > /kaniko/.docker/config.json <<EOF
+        stage('Build and push collaboration service image') {
+          steps {
+            container('kaniko-collaboration') {
+              withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+                sh '''
+                  set -eu
+                  mkdir -p /kaniko/.docker
+                  AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+                  cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-              /kaniko/executor \
-                --context "$WORKSPACE/collaboration-service" \
-                --dockerfile "$WORKSPACE/collaboration-service/Dockerfile" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:${GIT_COMMIT}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:${BUILD_LABEL}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:dev"
-            '''
+                  /kaniko/executor \
+                    --context "$WORKSPACE/collaboration-service" \
+                    --dockerfile "$WORKSPACE/collaboration-service/Dockerfile" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:${GIT_COMMIT}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:${BUILD_LABEL}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:dev"
+                '''
+              }
+            }
           }
         }
       }

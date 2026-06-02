@@ -305,6 +305,7 @@ type LoginFlow = {
   codeVerifier: string;
   state: string;
   redirectUri: string;
+  silent?: boolean;
 };
 
 type CompletedLoginFlow = {
@@ -325,6 +326,7 @@ export const authConfig: AuthConfig = {
 const tokenStorageKey = "playsay.auth.tokens";
 const flowStorageKey = "playsay.auth.loginFlow";
 const completedFlowStorageKey = "playsay.auth.completedLoginFlow";
+const skipSilentLoginStorageKey = "playsay.auth.skipSilentLoginOnce";
 const expirySkewMs = 30_000;
 const loginCompletionRequests = new Map<string, Promise<TokenSet>>();
 
@@ -343,6 +345,17 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+export class SilentLoginUnavailableError extends Error {
+  constructor(message = "Silent login is unavailable.") {
+    super(message);
+    this.name = "SilentLoginUnavailableError";
+  }
+}
+
+export function isSilentLoginUnavailable(error: unknown): error is SilentLoginUnavailableError {
+  return error instanceof SilentLoginUnavailableError;
 }
 
 export function isAuthCallback(url: URL): boolean {
@@ -390,9 +403,35 @@ export async function startLogin(config = authConfig): Promise<void> {
   );
 }
 
+export async function startSilentLogin(config = authConfig): Promise<void> {
+  const redirectUri = getRedirectUri(config);
+  const codeVerifier = createCodeVerifier();
+  const codeChallenge = await createCodeChallenge(codeVerifier);
+  const state = createCodeVerifier();
+  const flow: LoginFlow = { codeVerifier, state, redirectUri, silent: true };
+
+  window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
+  window.location.assign(
+    buildAuthorizeUrl({
+      config,
+      redirectUri,
+      state,
+      codeChallenge,
+      prompt: "none",
+      uiLocales: currentApiLanguage(),
+    }).toString(),
+  );
+}
+
 export async function completeLogin(url: URL, config = authConfig): Promise<TokenSet> {
   const error = url.searchParams.get("error");
   if (error) {
+    const state = url.searchParams.get("state");
+    const flow = readLoginFlow();
+    if (flow?.silent && state === flow.state && isKeycloakSilentLoginError(error)) {
+      window.sessionStorage.removeItem(flowStorageKey);
+      throw new SilentLoginUnavailableError(url.searchParams.get("error_description") ?? error);
+    }
     throw new Error(url.searchParams.get("error_description") ?? error);
   }
 
@@ -423,6 +462,16 @@ export async function completeLogin(url: URL, config = authConfig): Promise<Toke
   } finally {
     loginCompletionRequests.delete(completionKey);
   }
+}
+
+export function skipSilentLoginOnce(): void {
+  window.sessionStorage.setItem(skipSilentLoginStorageKey, "true");
+}
+
+export function consumeSkipSilentLogin(): boolean {
+  const value = window.sessionStorage.getItem(skipSilentLoginStorageKey);
+  window.sessionStorage.removeItem(skipSilentLoginStorageKey);
+  return value === "true";
 }
 
 export async function getValidAccessToken(config = authConfig): Promise<string | null> {
@@ -1237,6 +1286,7 @@ export function buildAuthorizeUrl(input: {
   redirectUri: string;
   state: string;
   codeChallenge: string;
+  prompt?: "none";
   uiLocales?: string;
 }): URL {
   const url = new URL(`${trimTrailingSlash(input.config.issuer)}/protocol/openid-connect/auth`);
@@ -1247,10 +1297,17 @@ export function buildAuthorizeUrl(input: {
   url.searchParams.set("state", input.state);
   url.searchParams.set("code_challenge", input.codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
+  if (input.prompt) {
+    url.searchParams.set("prompt", input.prompt);
+  }
   if (input.uiLocales) {
     url.searchParams.set("ui_locales", normalizeLanguage(input.uiLocales));
   }
   return url;
+}
+
+function isKeycloakSilentLoginError(error: string): boolean {
+  return error === "login_required" || error === "interaction_required";
 }
 
 export function mapTokenResponse(response: TokenResponse, now = Date.now()): TokenSet {

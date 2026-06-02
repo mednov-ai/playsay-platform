@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildAuthorizeUrl, clearTokens, completeLogin, mapTokenResponse, type AuthConfig } from "./shared/auth/oidc";
+import {
+  buildAuthorizeUrl,
+  clearTokens,
+  completeLogin,
+  isSilentLoginUnavailable,
+  mapTokenResponse,
+  type AuthConfig,
+} from "./shared/auth/oidc";
 
 const config: AuthConfig = {
   issuer: "https://ops.play-and-say.ru:18443/keycloak/realms/playsay/",
@@ -32,6 +39,18 @@ describe("auth helpers", () => {
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
     expect(url.searchParams.get("scope")).toBe("openid profile email");
     expect(url.searchParams.get("ui_locales")).toBe("en");
+  });
+
+  it("can request a silent SSO check without showing the Keycloak login form", () => {
+    const url = buildAuthorizeUrl({
+      config,
+      redirectUri: "https://online.play-and-say.ru/auth/callback",
+      state: "state-1",
+      codeChallenge: "challenge-1",
+      prompt: "none",
+    });
+
+    expect(url.searchParams.get("prompt")).toBe("none");
   });
 
   it("maps token expiration to an absolute timestamp", () => {
@@ -86,6 +105,26 @@ describe("auth helpers", () => {
     expect(first.accessToken).toBe("access");
     expect(second).toEqual(first);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats Keycloak login_required callback as anonymous after a silent SSO check", async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "playsay.auth.loginFlow",
+      JSON.stringify({
+        codeVerifier: "verifier-1",
+        redirectUri: "https://online.play-and-say.ru/auth/callback",
+        silent: true,
+        state: "state-1",
+      }),
+    );
+    vi.stubGlobal("window", { sessionStorage: storage });
+
+    await expect(
+      completeLogin(new URL("https://online.play-and-say.ru/auth/callback?error=login_required&state=state-1"), config),
+    ).rejects.toSatisfy(isSilentLoginUnavailable);
+
+    expect(storage.getItem("playsay.auth.loginFlow")).toBeNull();
   });
 });
 

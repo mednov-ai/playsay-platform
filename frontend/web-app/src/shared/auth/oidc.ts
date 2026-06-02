@@ -4,11 +4,15 @@ export {
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  consumeSkipSilentLogin,
   getValidAccessToken,
+  isSilentLoginUnavailable,
   isAuthCallback,
   mapTokenResponse,
   readTokens,
+  skipSilentLoginOnce,
   startLogin,
+  startSilentLogin,
 } from "../api/playsay";
 
 export type {

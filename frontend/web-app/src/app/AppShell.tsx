@@ -37,6 +37,7 @@ import { MaterialLibraryPanel } from "../features/materials/ui/MaterialLibraryPa
 import { LiveLessonExperience } from "../features/classroom/ui/LiveLessonExperience";
 import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
+import officialLogoUrl from "../shared/assets/playsay-official-logo.jpg";
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -175,52 +176,36 @@ export function AppShell(props: AppShellProps) {
             : "min-h-screen max-w-6xl gap-7 px-5 py-6 sm:px-8"
         }`}
       >
-        {isClassroomOpen ? null : (
+        {isClassroomOpen || !isAuthenticated ? null : (
           <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <BrandMark />
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {isAuthenticated ? (
-                <>
-                  <Button
-                    className="min-w-40"
-                    disabled={!nextJoinableLesson || anyLessonLoading}
-                    onClick={() => {
-                      if (nextJoinableLesson) {
-                        void joinScheduledLesson(nextJoinableLesson);
-                      }
-                    }}
-                    type="button"
-                  >
-                    {nextLessonLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-                    {t("shell.actions.joinLesson")}
-                  </Button>
-                  <Button
-                    aria-expanded={profileOpen}
-                    onClick={() => setProfileOpen((current) => !current)}
-                    type="button"
-                    variant="outline"
-                  >
-                    <User className="h-4 w-4" />
-                    {t("shell.actions.profile")}
-                  </Button>
-                  <Button aria-label={t("shell.aria.logout")} variant="outline" onClick={logout}>
-                    <LogOut className="h-4 w-4" />
-                    {t("auth.logout")}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <LanguageSwitcher disabled={profileSaving} />
-                  <Button onClick={() => void startLogin()} disabled={status === "checking" || status === "loggingOut"}>
-                    {status === "checking" || status === "loggingOut" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <LogIn className="h-4 w-4" />
-                    )}
-                    {t("auth.login")}
-                  </Button>
-                </>
-              )}
+              <Button
+                className="min-w-40"
+                disabled={!nextJoinableLesson || anyLessonLoading}
+                onClick={() => {
+                  if (nextJoinableLesson) {
+                    void joinScheduledLesson(nextJoinableLesson);
+                  }
+                }}
+                type="button"
+              >
+                {nextLessonLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                {t("shell.actions.joinLesson")}
+              </Button>
+              <Button
+                aria-expanded={profileOpen}
+                onClick={() => setProfileOpen((current) => !current)}
+                type="button"
+                variant="outline"
+              >
+                <User className="h-4 w-4" />
+                {t("shell.actions.profile")}
+              </Button>
+              <Button aria-label={t("shell.aria.logout")} variant="outline" onClick={logout}>
+                <LogOut className="h-4 w-4" />
+                {t("auth.logout")}
+              </Button>
             </div>
           </header>
         )}
@@ -233,6 +218,8 @@ export function AppShell(props: AppShellProps) {
             profile={profile}
             session={roomSession}
           />
+        ) : !isAuthenticated ? (
+          <WelcomeLanding profileSaving={profileSaving} status={status} />
         ) : (
           <div className="grid flex-1 gap-5">
             {profileOpen ? (
@@ -329,5 +316,113 @@ export function AppShell(props: AppShellProps) {
         )}
       </section>
     </main>
+  );
+}
+
+function WelcomeLanding({
+  profileSaving,
+  status,
+}: {
+  profileSaving: boolean;
+  status: SessionStatus;
+}) {
+  const { t } = useAppTranslation();
+  const isBusy = status === "checking" || status === "loggingOut";
+
+  return (
+    <div className="playsay-welcome-scene" aria-busy={isBusy}>
+      <div className="playsay-welcome-motion" aria-hidden="true">
+        <span className="playsay-floating-ball playsay-floating-ball-one" />
+        <span className="playsay-floating-ball playsay-floating-ball-two" />
+        <span className="playsay-floating-ball playsay-floating-ball-three" />
+        <span className="playsay-floating-ball playsay-floating-ball-four" />
+        <span className="playsay-handprint playsay-handprint-one">
+          <span />
+          <span />
+          <span />
+          <span />
+        </span>
+        <span className="playsay-handprint playsay-handprint-two">
+          <span />
+          <span />
+          <span />
+          <span />
+        </span>
+        <span className="playsay-handprint playsay-handprint-three">
+          <span />
+          <span />
+          <span />
+          <span />
+        </span>
+      </div>
+
+      <div className="playsay-welcome-content">
+        <PlaySayAnimatedLogo label={t("common.appName")} />
+        <div className="playsay-welcome-actions">
+          <LanguageSwitcher
+            className="playsay-welcome-language"
+            disabled={profileSaving || isBusy}
+          />
+          <button
+            className="playsay-welcome-login"
+            disabled={isBusy}
+            onClick={() => void startLogin()}
+            type="button"
+          >
+            {isBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
+            <span>{t("auth.login")}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlaySayAnimatedLogo({ label }: { label: string }) {
+  return (
+    <svg
+      aria-label={label}
+      className="playsay-welcome-logo"
+      role="img"
+      viewBox="0 0 420 420"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <clipPath id="playsay-welcome-logo-clip">
+          <path d="M74 38C117 21 187 25 239 30C310 37 365 61 386 111C410 168 397 252 371 310C344 370 281 404 203 401C123 398 57 367 33 307C10 250 23 169 35 113C45 69 53 47 74 38Z" />
+        </clipPath>
+        <linearGradient id="playsay-welcome-logo-shine" x1="-30%" x2="130%" y1="0%" y2="100%">
+          <stop offset="0%" stopColor="#ff5c00" stopOpacity="0" />
+          <stop offset="35%" stopColor="#ffd84d" stopOpacity="0.1" />
+          <stop offset="50%" stopColor="#ffffff" stopOpacity="0.7" />
+          <stop offset="65%" stopColor="#74dbbe" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#ff5c00" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <g clipPath="url(#playsay-welcome-logo-clip)">
+        <rect className="playsay-welcome-logo-paper" height="420" width="420" />
+        <image
+          className="playsay-welcome-logo-art"
+          height="456"
+          href={officialLogoUrl}
+          preserveAspectRatio="xMidYMid meet"
+          width="456"
+          x="-28"
+          y="-18"
+        />
+        <rect
+          className="playsay-welcome-logo-shine"
+          fill="url(#playsay-welcome-logo-shine)"
+          height="560"
+          width="190"
+          x="-240"
+          y="-80"
+        />
+      </g>
+      <path
+        className="playsay-welcome-logo-outline"
+        d="M74 38C117 21 187 25 239 30C310 37 365 61 386 111C410 168 397 252 371 310C344 370 281 404 203 401C123 398 57 367 33 307C10 250 23 169 35 113C45 69 53 47 74 38Z"
+      />
+    </svg>
   );
 }

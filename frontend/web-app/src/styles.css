@@ -117,3 +117,474 @@ textarea {
   border-radius: 0.75rem;
   object-fit: cover;
 }
+
+.playsay-welcome-scene {
+  position: relative;
+  display: grid;
+  min-height: calc(100dvh - 3rem);
+  place-items: center;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  isolation: isolate;
+}
+
+.playsay-welcome-scene::before {
+  position: absolute;
+  inset: 5%;
+  z-index: -3;
+  border: 1px solid rgb(255 92 0 / 0.08);
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at 18% 18%, rgb(255 231 127 / 0.35), transparent 14rem),
+    radial-gradient(circle at 82% 24%, rgb(116 219 190 / 0.25), transparent 16rem),
+    radial-gradient(circle at 58% 88%, rgb(255 92 0 / 0.13), transparent 18rem),
+    #fffdf8;
+  box-shadow: 0 24px 80px rgb(111 74 37 / 0.09);
+  content: "";
+}
+
+.playsay-welcome-motion {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.playsay-welcome-content {
+  display: grid;
+  justify-items: center;
+  width: min(100%, 38rem);
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+.playsay-welcome-logo {
+  width: min(78vw, 26rem);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 24px 28px rgb(255 92 0 / 0.18));
+  transform: rotate(-1.4deg);
+  animation: playsay-logo-breathe 5.8s ease-in-out infinite;
+}
+
+.playsay-welcome-logo-paper {
+  fill: rgb(255 253 248 / 0.82);
+}
+
+.playsay-welcome-logo-art {
+  mix-blend-mode: multiply;
+}
+
+.playsay-welcome-logo-shine {
+  mix-blend-mode: screen;
+  opacity: 0.72;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: playsay-logo-shine 4.8s ease-in-out infinite;
+}
+
+.playsay-welcome-logo-outline {
+  fill: none;
+  stroke: rgb(255 92 0 / 0.14);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.playsay-welcome-actions {
+  display: grid;
+  justify-items: center;
+  gap: 0.875rem;
+  margin-top: clamp(0.875rem, 3vw, 1.5rem);
+}
+
+.playsay-welcome-language {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border: 1px solid rgb(255 92 0 / 0.22);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.82);
+  padding: 0 1rem;
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  font-weight: 900;
+  box-shadow: 0 14px 34px rgb(255 92 0 / 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.playsay-welcome-language select {
+  cursor: pointer;
+}
+
+.playsay-welcome-login {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: min(18rem, calc(100vw - 3rem));
+  min-height: 4rem;
+  gap: 0.625rem;
+  border: 0;
+  border-radius: 1.4rem;
+  background: #ff5c00;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: clamp(1.05rem, 2.3vw, 1.35rem);
+  font-weight: 1000;
+  box-shadow:
+    0 18px 38px rgb(255 92 0 / 0.28),
+    0 0 0 8px rgb(255 92 0 / 0.09);
+  transform: translateY(0) scale(1);
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+  animation: playsay-login-invite 3.6s ease-in-out infinite;
+}
+
+.playsay-welcome-login::before,
+.playsay-welcome-login::after {
+  position: absolute;
+  inset: -0.65rem;
+  border: 2px solid rgb(255 92 0 / 0.18);
+  border-radius: 1.8rem;
+  content: "";
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+.playsay-welcome-login::after {
+  inset: -1.1rem;
+  border-color: rgb(116 219 190 / 0.28);
+}
+
+.playsay-welcome-login:hover,
+.playsay-welcome-login:focus-visible {
+  background: #df4100;
+  box-shadow:
+    0 24px 44px rgb(223 65 0 / 0.32),
+    0 0 0 10px rgb(255 92 0 / 0.13);
+  transform: translateY(-0.22rem) scale(1.035);
+  animation: playsay-login-hover 0.72s ease-in-out infinite alternate;
+}
+
+.playsay-welcome-login:hover::before,
+.playsay-welcome-login:hover::after,
+.playsay-welcome-login:focus-visible::before,
+.playsay-welcome-login:focus-visible::after {
+  animation: playsay-login-ripple 1.2s ease-out infinite;
+}
+
+.playsay-welcome-login:hover::after,
+.playsay-welcome-login:focus-visible::after {
+  animation-delay: 0.18s;
+}
+
+.playsay-welcome-login:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.playsay-floating-ball {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+  box-shadow:
+    inset -0.5rem -0.7rem 0 rgb(17 17 17 / 0.08),
+    0 18px 28px rgb(80 52 27 / 0.12);
+  opacity: 0.92;
+  animation: playsay-ball-float 8s ease-in-out infinite;
+}
+
+.playsay-floating-ball-one {
+  top: 12%;
+  left: 11%;
+  width: clamp(3.6rem, 8vw, 6.8rem);
+  height: clamp(3.6rem, 8vw, 6.8rem);
+  background: #ff5c00;
+}
+
+.playsay-floating-ball-two {
+  top: 17%;
+  right: 13%;
+  width: clamp(2.7rem, 6vw, 5rem);
+  height: clamp(2.7rem, 6vw, 5rem);
+  background: #ffd84d;
+  animation-delay: -1.6s;
+}
+
+.playsay-floating-ball-three {
+  bottom: 12%;
+  left: 17%;
+  width: clamp(2.6rem, 5vw, 4.5rem);
+  height: clamp(2.6rem, 5vw, 4.5rem);
+  background: #74dbbe;
+  animation-delay: -3s;
+}
+
+.playsay-floating-ball-four {
+  right: 18%;
+  bottom: 16%;
+  width: clamp(3.1rem, 6.8vw, 5.9rem);
+  height: clamp(3.1rem, 6.8vw, 5.9rem);
+  background: #ff9c35;
+  animation-delay: -4.2s;
+}
+
+.playsay-handprint {
+  position: absolute;
+  display: block;
+  width: 4.5rem;
+  height: 4.8rem;
+  --playsay-hand-rotate: 0deg;
+  --playsay-hand-scale: 1;
+  color: #ff5c00;
+  opacity: 0.82;
+  transform-origin: 50% 100%;
+  animation: playsay-hand-wave 6.5s ease-in-out infinite;
+}
+
+.playsay-handprint::before {
+  position: absolute;
+  left: 1.15rem;
+  bottom: 0.58rem;
+  width: 2.1rem;
+  height: 2.2rem;
+  border-radius: 44% 46% 48% 52%;
+  background: currentColor;
+  content: "";
+  transform: rotate(-12deg);
+}
+
+.playsay-handprint::after {
+  position: absolute;
+  left: 0.65rem;
+  bottom: 0.2rem;
+  width: 1.35rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: currentColor;
+  content: "";
+  transform: rotate(24deg);
+}
+
+.playsay-handprint span {
+  position: absolute;
+  bottom: 2.85rem;
+  width: 0.48rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: 50% 100%;
+}
+
+.playsay-handprint span:nth-child(1) {
+  left: 1.08rem;
+  height: 1.45rem;
+  transform: rotate(-34deg);
+}
+
+.playsay-handprint span:nth-child(2) {
+  left: 1.72rem;
+  height: 1.95rem;
+  transform: rotate(-14deg);
+}
+
+.playsay-handprint span:nth-child(3) {
+  left: 2.38rem;
+  height: 1.9rem;
+  transform: rotate(10deg);
+}
+
+.playsay-handprint span:nth-child(4) {
+  left: 3rem;
+  height: 1.5rem;
+  transform: rotate(28deg);
+}
+
+.playsay-handprint-one {
+  top: 22%;
+  left: 25%;
+  --playsay-hand-rotate: -16deg;
+  --playsay-hand-scale: 1;
+  color: #ff5c00;
+  transform: rotate(var(--playsay-hand-rotate)) scale(var(--playsay-hand-scale));
+}
+
+.playsay-handprint-two {
+  right: 24%;
+  bottom: 25%;
+  --playsay-hand-rotate: 18deg;
+  --playsay-hand-scale: 0.88;
+  color: #22a684;
+  transform: rotate(var(--playsay-hand-rotate)) scale(var(--playsay-hand-scale));
+  animation-delay: -2.1s;
+}
+
+.playsay-handprint-three {
+  top: 35%;
+  right: 10%;
+  --playsay-hand-rotate: 28deg;
+  --playsay-hand-scale: 0.72;
+  color: #f4b700;
+  transform: rotate(var(--playsay-hand-rotate)) scale(var(--playsay-hand-scale));
+  animation-delay: -3.6s;
+}
+
+@keyframes playsay-logo-breathe {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.4deg) scale(1);
+  }
+
+  50% {
+    transform: translateY(-0.4rem) rotate(1deg) scale(1.015);
+  }
+}
+
+@keyframes playsay-logo-shine {
+  0%,
+  15% {
+    transform: translateX(0) rotate(12deg);
+  }
+
+  70% {
+    transform: translateX(38rem) rotate(12deg);
+  }
+
+  100% {
+    transform: translateX(38rem) rotate(12deg);
+  }
+}
+
+@keyframes playsay-login-invite {
+  0%,
+  68%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  78% {
+    transform: translateY(-0.16rem) scale(1.025);
+  }
+
+  88% {
+    transform: translateY(0.04rem) scale(0.995);
+  }
+}
+
+@keyframes playsay-login-hover {
+  from {
+    transform: translateY(-0.16rem) scale(1.02) rotate(-0.3deg);
+  }
+
+  to {
+    transform: translateY(-0.34rem) scale(1.05) rotate(0.3deg);
+  }
+}
+
+@keyframes playsay-login-ripple {
+  from {
+    opacity: 0.9;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+
+@keyframes playsay-ball-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+
+  45% {
+    transform: translate3d(0.8rem, -1.1rem, 0) rotate(7deg);
+  }
+
+  72% {
+    transform: translate3d(-0.6rem, 0.5rem, 0) rotate(-4deg);
+  }
+}
+
+@keyframes playsay-hand-wave {
+  0%,
+  100% {
+    transform: rotate(var(--playsay-hand-rotate)) translateY(0) scale(var(--playsay-hand-scale));
+  }
+
+  50% {
+    transform: rotate(calc(var(--playsay-hand-rotate) + 8deg)) translateY(-0.55rem) scale(var(--playsay-hand-scale));
+  }
+}
+
+@media (max-width: 720px) {
+  .playsay-welcome-scene {
+    min-height: calc(100dvh - 2rem);
+    border-radius: 1rem;
+  }
+
+  .playsay-welcome-scene::before {
+    inset: 0;
+    border-radius: 1.25rem;
+  }
+
+  .playsay-welcome-logo {
+    width: min(80vw, 18.5rem);
+  }
+
+  .playsay-floating-ball-one {
+    left: 3%;
+    top: 12%;
+  }
+
+  .playsay-floating-ball-two {
+    right: 5%;
+    top: 20%;
+  }
+
+  .playsay-floating-ball-three {
+    bottom: 8%;
+    left: 8%;
+  }
+
+  .playsay-floating-ball-four {
+    right: 8%;
+    bottom: 10%;
+  }
+
+  .playsay-handprint-one {
+    left: -1%;
+    top: 42%;
+    --playsay-hand-scale: 0.58;
+  }
+
+  .playsay-handprint-two {
+    right: -1%;
+    bottom: 39%;
+    --playsay-hand-scale: 0.56;
+  }
+
+  .playsay-handprint-three {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playsay-floating-ball,
+  .playsay-handprint,
+  .playsay-welcome-logo,
+  .playsay-welcome-logo-shine,
+  .playsay-welcome-login,
+  .playsay-welcome-login:hover,
+  .playsay-welcome-login:focus-visible,
+  .playsay-welcome-login:hover::before,
+  .playsay-welcome-login:hover::after,
+  .playsay-welcome-login:focus-visible::before,
+  .playsay-welcome-login:focus-visible::after {
+    animation: none;
+  }
+}

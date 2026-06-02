@@ -7,6 +7,7 @@ import {
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  consumeSkipSilentLogin,
   draftMaterial,
   draftMaterialFromUrl,
   enterScheduledLessonRoom,
@@ -22,6 +23,7 @@ import {
   fetchUserProfile,
   getValidAccessToken,
   generateMaterialImages,
+  isSilentLoginUnavailable,
   isAuthCallback,
   removeCourse,
   removeCourseLesson,
@@ -33,6 +35,8 @@ import {
   saveMaterial,
   saveScheduledLesson,
   saveUserProfile,
+  skipSilentLoginOnce,
+  startSilentLogin,
   suggestMaterialAcceptedAnswers,
   updateMaterialAsset,
   type AdminUserProfile,
@@ -130,7 +134,15 @@ export function useAppController(): AppShellProps {
         }
 
         if (!readTokens()) {
+          if (!isAuthCallback(currentUrl) && !consumeSkipSilentLogin()) {
+            await startSilentLogin();
+            return;
+          }
           if (!cancelled) {
+            if (isAuthCallback(currentUrl)) {
+              window.history.replaceState({}, document.title, "/");
+              setCurrentPath("/");
+            }
             setStatus("anonymous");
           }
           return;
@@ -187,6 +199,14 @@ export function useAppController(): AppShellProps {
           setStatus("authenticated");
         }
       } catch (caught) {
+        if (isSilentLoginUnavailable(caught)) {
+          window.history.replaceState({}, document.title, "/");
+          setCurrentPath("/");
+          if (!cancelled) {
+            setStatus("anonymous");
+          }
+          return;
+        }
         clearTokens();
         if (!cancelled) {
           setError(caught instanceof Error ? caught.message : t("errors.authFailed"));
@@ -438,6 +458,7 @@ export function useAppController(): AppShellProps {
   function logout() {
     const logoutUrl = buildLogoutUrl();
     clearTokens();
+    skipSilentLoginOnce();
     setProfile(null);
     setAppProfile(null);
     setAdminUsers([]);

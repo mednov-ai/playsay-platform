@@ -154,7 +154,7 @@ class AssignmentStore(
             )
         }
 
-        return assignments.map { assignment -> summary(assignment) }
+        return assignments.mapNotNull { assignment -> summaryIfMaterialAvailable(assignment) }
     }
 
     @Transactional(readOnly = true)
@@ -178,7 +178,7 @@ class AssignmentStore(
                     status = MetaData.AssignmentStatuses.ARCHIVED,
                 )
             }
-            .map { assignment -> summary(assignment) }
+            .mapNotNull { assignment -> summaryIfMaterialAvailable(assignment) }
     }
 
     @Transactional
@@ -298,6 +298,16 @@ class AssignmentStore(
         val materialId = assignment.materialId
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val material = materialById(materialId)
+        return summary(assignment, material)
+    }
+
+    private fun summaryIfMaterialAvailable(assignment: StoredAssignment): AssignmentSummaryResponse? {
+        val materialId = assignment.materialId ?: return null
+        val material = availableMaterialById(materialId) ?: return null
+        return summary(assignment, material)
+    }
+
+    private fun summary(assignment: StoredAssignment, material: StoredHomeworkMaterial): AssignmentSummaryResponse {
         val submissions = latestSubmissionsByStudent(assignment.id).values.toList()
         val scores = submissions.mapNotNull { submission -> submission.score }
         val errors = submissions.mapNotNull { submission -> submission.errorsCount?.let(::BigDecimal) }
@@ -500,9 +510,12 @@ class AssignmentStore(
     }
 
     private fun materialById(materialId: UUID): StoredHomeworkMaterial =
+        availableMaterialById(materialId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+
+    private fun availableMaterialById(materialId: UUID): StoredHomeworkMaterial? =
         lessonMaterialRepo.findRowById(materialId)
             ?.takeIf { material -> material.status != MetaData.MaterialStatuses.ARCHIVED }
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
 
     private fun recipientCount(assignmentId: UUID): Int =
         assignmentRecipientRepo.countByAssignmentId(assignmentId).toInt()

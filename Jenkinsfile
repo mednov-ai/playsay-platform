@@ -629,13 +629,15 @@ EOF
             export PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
             export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-            SMOKE_NODE_DIR="/tmp/playsay-sprint5-smoke"
-            rm -rf "$SMOKE_NODE_DIR"
-            mkdir -p "$SMOKE_NODE_DIR"
-            cat > "$SMOKE_NODE_DIR/package.json" <<'JSON'
+            SMOKE_NODE_DIR="/tmp/playsay-ui-smoke"
+            if [ ! -d "$SMOKE_NODE_DIR/node_modules/playwright" ]; then
+              rm -rf "$SMOKE_NODE_DIR"
+              mkdir -p "$SMOKE_NODE_DIR"
+              cat > "$SMOKE_NODE_DIR/package.json" <<'JSON'
 {"private":true,"dependencies":{"playwright":"1.56.1"}}
 JSON
-            npm --prefix "$SMOKE_NODE_DIR" install --cache /cache/npm --prefer-offline --ignore-scripts --no-audit --no-fund
+              npm --prefix "$SMOKE_NODE_DIR" install --cache /cache/npm --prefer-offline --ignore-scripts --no-audit --no-fund
+            fi
             export PLAYWRIGHT_PACKAGE_DIR="$SMOKE_NODE_DIR"
 
             attempt=1
@@ -645,6 +647,63 @@ JSON
                 exit 0
               fi
               if [ "$attempt" -eq 6 ]; then
+                exit 1
+              fi
+              attempt=$((attempt + 1))
+              sleep 30
+            done
+          '''
+        }
+      }
+    }
+
+    stage('Sprint 6 Homework smoke') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('smoke') {
+          echo "Running Sprint 6 homework smoke against dev for ${env.BUILD_LABEL}"
+          sh '''
+            set -eu
+
+            missing=""
+            for name in PLAY_SAY_SMOKE_TEACHER_PASSWORD PLAY_SAY_SMOKE_STUDENT_A_PASSWORD PLAY_SAY_SMOKE_STUDENT_B_PASSWORD; do
+              value="$(printenv "$name" || true)"
+              if [ -z "$value" ]; then
+                missing="$missing $name"
+              fi
+            done
+            if [ -n "$missing" ]; then
+              echo "Missing Jenkins smoke secret env:$missing"
+              echo "Sync the keycloak-dev-users Kubernetes secret into the jenkins namespace before running the smoke stage."
+              exit 1
+            fi
+
+            export PLAY_SAY_SMOKE_FETCH_PASSWORDS=false
+            export PLAY_SAY_SMOKE_WEB_BASE_URL="${PLAY_SAY_SMOKE_WEB_BASE_URL:-https://online.play-and-say.ru}"
+            export PLAY_SAY_SMOKE_API_BASE_URL="${PLAY_SAY_SMOKE_API_BASE_URL:-https://online.play-and-say.ru/api}"
+            export PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+            SMOKE_NODE_DIR="/tmp/playsay-ui-smoke"
+            if [ ! -d "$SMOKE_NODE_DIR/node_modules/playwright" ]; then
+              rm -rf "$SMOKE_NODE_DIR"
+              mkdir -p "$SMOKE_NODE_DIR"
+              cat > "$SMOKE_NODE_DIR/package.json" <<'JSON'
+{"private":true,"dependencies":{"playwright":"1.56.1"}}
+JSON
+              npm --prefix "$SMOKE_NODE_DIR" install --cache /cache/npm --prefer-offline --ignore-scripts --no-audit --no-fund
+            fi
+            export PLAYWRIGHT_PACKAGE_DIR="$SMOKE_NODE_DIR"
+
+            attempt=1
+            while [ "$attempt" -le 3 ]; do
+              echo "Sprint 6 homework smoke attempt $attempt/3"
+              if ./scripts/smoke/sprint6-homework-smoke.mjs; then
+                exit 0
+              fi
+              if [ "$attempt" -eq 3 ]; then
                 exit 1
               fi
               attempt=$((attempt + 1))

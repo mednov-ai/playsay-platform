@@ -1,29 +1,26 @@
 import { type KeyboardEvent } from "react";
 import { CornerDownLeft } from "lucide-react";
 import {
+  appendMaterialAttempt,
+  appendMaterialHint,
+  canRequestManualInputHint,
   materialAnswerAttempts,
   materialAnswerContextForBlock,
   materialAnswerHints,
   materialAnswerItems,
   materialAnswerStatus,
-  materialItemAnswerMatches,
+  materialExerciseOptions,
   materialExerciseItemKey,
+  materialHintForExerciseItem,
+  materialItemAnswerMatches,
+  materialManualInputInlineHint,
+  materialManualInputHintPreview,
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
   type MaterialExerciseItem,
 } from "../../model/materialDocument";
+import { MaterialAnswerTools, MaterialAttemptBar } from "./MaterialAnswerControls";
 import { MarkdownInline } from "../markdown/RenderedMarkdown";
-import {
-  MaterialAnswerTools,
-  MaterialAttemptBar,
-  appendMaterialAttempt,
-  appendMaterialHint,
-  canRequestManualInputHint,
-  materialExerciseOptions,
-  materialHintForExerciseItem,
-  materialManualInputHintPreview,
-  materialManualInputInlineHint,
-} from "./RenderedFillGapExercise";
 import { useAppTranslation } from "../../../../shared/i18n";
 
 export function RenderedChoiceExercise({

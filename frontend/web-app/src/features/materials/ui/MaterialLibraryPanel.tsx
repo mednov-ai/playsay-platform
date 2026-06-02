@@ -1,16 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import {
-  Archive,
-  BookOpen,
-  Copy,
-  Globe2,
-  Loader2,
-  LockKeyhole,
-  PenLine,
-  Play,
-  Plus,
-  RefreshCw,
-} from "lucide-react";
 import { type CourseLessonMap } from "../../../entities/schedule/model";
 import {
   fetchMaterialAssets,
@@ -28,10 +16,8 @@ import {
   type LessonMaterialUrlDraftInput,
   type MeProfile,
 } from "../../../shared/api/playsay";
-import { Button } from "../../../components/ui/button";
 
 import {
-  MaterialAssetLibraryItem,
   MaterialAuthorMode,
   MaterialBlockType,
   MaterialDraftSourceImage,
@@ -41,7 +27,6 @@ import {
   countPendingMaterialImageTargets,
   defaultMaterialForm,
   duplicateMaterialForm,
-  materialAssetLibraryItemFromAsset,
   materialDraftToForm,
   materialFormToInput,
   materialFormWithBlockPatch,
@@ -52,13 +37,14 @@ import {
   readPromptFromSourceMeta,
   readUrlFromSourceMeta,
 } from "../model/materialDocument";
+import { useMaterialAssets } from "../hooks/useMaterialAssets";
 import { useMaterialLibraryState } from "../hooks/useMaterialLibraryState";
-import { LessonMaterialDocumentView } from "./LessonMaterialDocumentView";
-import { MaterialDraftPanel } from "./MaterialDraftPanel";
+import { MaterialAccessMessage } from "./MaterialAccessMessage";
+import { MaterialAuthorSidebar } from "./MaterialAuthorSidebar";
 import { MaterialEditorForm } from "./MaterialEditorForm";
-import { MaterialImageProgress } from "./MaterialImageProgress";
-import { MaterialLessonLinkPanel } from "./MaterialLessonLinkPanel";
+import { MaterialLibraryHeader } from "./MaterialLibraryHeader";
 import { MaterialPlayPreviewDialog } from "./MaterialPlayPreviewDialog";
+import { MaterialReaderPreview } from "./MaterialReaderPreview";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialLibraryPanel({
@@ -108,12 +94,13 @@ export function MaterialLibraryPanel({
   const [authorMode, setAuthorMode] = useState<MaterialAuthorMode>("preview");
   const [playPreviewOpen, setPlayPreviewOpen] = useState(false);
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
-  const [assetLibrary, setAssetLibrary] = useState<MaterialAssetLibraryItem[]>([]);
+  const { assetLibrary, currentMaterialAssets, syncMaterialAssets } = useMaterialAssets({
+    canManage,
+    formMaterialId: form.id,
+    materials,
+  });
   const canGenerateDraft = draftPrompt.trim().length > 0 || draftImage !== null;
   const canGenerateUrlDraft = draftUrl.trim().length > 0;
-  const currentMaterialAssets = form.id
-    ? assetLibrary.filter((item) => item.materialId === form.id).map((item) => item.asset)
-    : [];
   const pendingImageTargetsCount = countPendingMaterialImageTargets(form.document, currentMaterialAssets);
   const canGenerateImages = pendingImageTargetsCount > 0;
 
@@ -129,36 +116,6 @@ export function MaterialLibraryPanel({
     setAuthorMode("preview");
     setAutoSelectedMaterialId(firstMaterial.id);
   }, [autoSelectedMaterialId, form.id, form.title, materials]);
-
-  useEffect(() => {
-    if (!canManage || materials.length === 0) {
-      setAssetLibrary([]);
-      return;
-    }
-
-    let active = true;
-
-    Promise.allSettled(
-      materials.slice(0, 40).map(async (material) => {
-        const assets = await fetchMaterialAssets(material.id);
-        return assets
-          .map((asset) => materialAssetLibraryItemFromAsset(material, asset))
-          .filter((item): item is MaterialAssetLibraryItem => item !== null);
-      }),
-    ).then((results) => {
-      if (!active) {
-        return;
-      }
-
-      setAssetLibrary(results.flatMap((result) => (
-        result.status === "fulfilled" ? result.value : []
-      )));
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [canManage, materials]);
 
   function updateForm<Key extends keyof MaterialFormState>(field: Key, value: MaterialFormState[Key]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -341,16 +298,6 @@ export function MaterialLibraryPanel({
     setAuthorMode("edit");
   }
 
-  function syncMaterialAssets(material: LessonMaterial, assets: LessonMaterialAsset[]) {
-    const nextItems = assets
-      .map((asset) => materialAssetLibraryItemFromAsset(material, asset))
-      .filter((item): item is MaterialAssetLibraryItem => item !== null);
-    setAssetLibrary((current) => [
-      ...current.filter((item) => item.materialId !== material.id),
-      ...nextItems,
-    ]);
-  }
-
   async function saveMaterialAndMaybeGenerate({
     generateMissing = false,
   }: {
@@ -431,13 +378,8 @@ export function MaterialLibraryPanel({
   if (!profile) {
     return (
       <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">{t("materials.title")}</h2>
-        </div>
-        <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-          {t("materials.loginRequired")}
-        </div>
+        <MaterialLibraryHeader />
+        <MaterialAccessMessage message={t("materials.loginRequired")} />
       </section>
     );
   }
@@ -449,150 +391,62 @@ export function MaterialLibraryPanel({
         onClose={() => setPlayPreviewOpen(false)}
         open={playPreviewOpen && Boolean(form.title.trim())}
       />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">{t("materials.title")}</h2>
-        </div>
-        <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {t("common.actions.refresh")}
-        </Button>
-      </div>
+      <MaterialLibraryHeader
+        disabled={disabled}
+        loading={loading}
+        onRefresh={onRefresh}
+        withBorder
+      />
 
       {!canManage ? (
-        <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
-          {t("materials.studentAvailability")}
-        </div>
+        <MaterialAccessMessage message={t("materials.studentAvailability")} />
       ) : (
         <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(18rem,0.72fr)_minmax(0,1.28fr)]">
-          <aside className="grid content-start gap-3">
-            <div className="rounded-2xl border border-border bg-muted/45 p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-sm font-extrabold">{t("materials.library.title")}</div>
-                <Button disabled={disabled} onClick={resetForm} type="button" variant="outline">
-                  <Plus className="h-4 w-4" />
-                  {t("materials.library.new")}
-                </Button>
-              </div>
-              {materials.length === 0 ? (
-                <div className="rounded-xl border border-border bg-white p-3 text-sm font-semibold text-muted-foreground">
-                  {t("materials.library.empty")}
-                </div>
-              ) : (
-                <div className="grid max-h-[30rem] gap-2 overflow-auto pr-1">
-                  {materials.map((material) => (
-                    <button
-                      className="playsay-material-list-item"
-                      data-active={form.id === material.id ? "true" : "false"}
-                      key={material.id}
-                      onClick={() => selectMaterial(material)}
-                      type="button"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-extrabold">{material.title}</span>
-                        <span className="mt-1 flex flex-wrap gap-1.5 text-[0.68rem] font-black uppercase text-muted-foreground">
-                          <span>{material.cefrLevel}</span>
-                          <span>{material.status}</span>
-                          <span>{material.visibility}</span>
-                          <span>{t("materials.library.blocks", { count: material.blockCount })}</span>
-                        </span>
-                      </span>
-                      {material.visibility === "PUBLIC" ? (
-                        <Globe2 className="h-4 w-4 shrink-0 text-primary" />
-                      ) : (
-                        <LockKeyhole className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <MaterialDraftPanel
-              canGenerateDraft={canGenerateDraft}
-              canGenerateUrlDraft={canGenerateUrlDraft}
-              disabled={disabled}
-              draftImage={draftImage}
-              draftImageMessage={draftImageMessage}
-              draftPrompt={draftPrompt}
-              draftUrl={draftUrl}
-              onDraftFromUrl={() => void generateDraftFromUrl()}
-              onDraftImageChange={(file) => void handleDraftImageChange(file)}
-              onGenerateDraft={() => void generateDraft()}
-              onRemoveDraftImage={() => setDraftImage(null)}
-              onUpdateDraftPrompt={setDraftPrompt}
-              onUpdateDraftUrl={setDraftUrl}
-            />
-
-            <MaterialLessonLinkPanel
-              disabled={disabled}
-              formMaterialId={form.id}
-              lessonOptions={lessonOptions}
-              onLinkSelectedLesson={linkSelectedLesson}
-              onSelectLessonKey={setSelectedLessonKey}
-              onUnlinkSelectedLesson={() => {
-                const option = lessonOptions.find((item) => item.key === selectedLessonKey);
-                if (option) {
-                  onLinkLesson(option.courseId, option.lesson, null);
-                }
-              }}
-              selectedLessonKey={selectedLessonKey}
-            />
-          </aside>
+          <MaterialAuthorSidebar
+            canGenerateDraft={canGenerateDraft}
+            canGenerateUrlDraft={canGenerateUrlDraft}
+            disabled={disabled}
+            draftImage={draftImage}
+            draftImageMessage={draftImageMessage}
+            draftPrompt={draftPrompt}
+            draftUrl={draftUrl}
+            formMaterialId={form.id}
+            lessonOptions={lessonOptions}
+            materials={materials}
+            onCreateNew={resetForm}
+            onDraftFromUrl={() => void generateDraftFromUrl()}
+            onDraftImageChange={(file) => void handleDraftImageChange(file)}
+            onGenerateDraft={() => void generateDraft()}
+            onLinkSelectedLesson={linkSelectedLesson}
+            onRemoveDraftImage={() => setDraftImage(null)}
+            onSelectLessonKey={setSelectedLessonKey}
+            onSelectMaterial={selectMaterial}
+            onUnlinkSelectedLesson={() => {
+              const option = lessonOptions.find((item) => item.key === selectedLessonKey);
+              if (option) {
+                onLinkLesson(option.courseId, option.lesson, null);
+              }
+            }}
+            onUpdateDraftPrompt={setDraftPrompt}
+            onUpdateDraftUrl={setDraftUrl}
+            selectedLessonKey={selectedLessonKey}
+          />
 
           <form className="grid gap-4" onSubmit={submit}>
             {authorMode === "preview" && form.title.trim() ? (
-              <>
-                <div className="playsay-material-reader-toolbar">
-                  <div className="min-w-0">
-                    <div className="truncate text-lg font-extrabold">{form.title}</div>
-                    <div className="mt-1 flex flex-wrap gap-1.5 text-[0.7rem] font-black uppercase text-muted-foreground">
-                      <span>{form.cefrLevel}</span>
-                      <span>{form.status}</span>
-                      <span>{form.visibility}</span>
-                      <span>{t("materials.library.blocks", { count: form.document.pages[0]?.blocks.length ?? 0 })}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Button disabled={disabled || form.title.trim().length === 0} onClick={() => setPlayPreviewOpen(true)} type="button">
-                      <Play className="h-4 w-4" />
-                      {t("materials.actions.play")}
-                    </Button>
-                    <Button disabled={disabled} onClick={() => setAuthorMode("edit")} type="button" variant="outline">
-                      <PenLine className="h-4 w-4" />
-                      {t("materials.actions.textMode")}
-                    </Button>
-                    <Button disabled={disabled || form.title.trim().length === 0} onClick={duplicateCurrentMaterial} type="button" variant="outline">
-                      <Copy className="h-4 w-4" />
-                      {t("materials.actions.duplicate")}
-                    </Button>
-                    {form.id ? (
-                      <Button disabled={disabled} onClick={() => onArchive(form.id!)} type="button" variant="outline">
-                        <Archive className="h-4 w-4" />
-                        {t("materials.actions.archive")}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-                {imageGenerationProgress ? (
-                  <MaterialImageProgress value={imageGenerationProgress} />
-                ) : null}
-                <div className="playsay-material-preview playsay-material-reader">
-                  <LessonMaterialDocumentView
-                    material={materialPreviewFromForm(form)}
-                    mode="teacherPreview"
-                    onAssetTagsChange={updatePreviewAssetTags}
-                    onBlockPatchCommit={(blockId, patch) => void persistMaterialBlockPatch(blockId, patch)}
-                    onBlockPatch={updateMaterialBlock}
-                  />
-                </div>
-                {message ? (
-                  <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
-                    {message}
-                  </div>
-                ) : null}
-              </>
+              <MaterialReaderPreview
+                disabled={disabled}
+                form={form}
+                imageGenerationProgress={imageGenerationProgress}
+                message={message}
+                onArchive={onArchive}
+                onBlockPatch={updateMaterialBlock}
+                onBlockPatchCommit={(blockId, patch) => void persistMaterialBlockPatch(blockId, patch)}
+                onDuplicate={duplicateCurrentMaterial}
+                onEdit={() => setAuthorMode("edit")}
+                onPlay={() => setPlayPreviewOpen(true)}
+                onUpdateAssetTags={updatePreviewAssetTags}
+              />
             ) : (
               <MaterialEditorForm
                 assetLibrary={assetLibrary}
@@ -605,9 +459,9 @@ export function MaterialLibraryPanel({
                 onAddBlock={addBlock}
                 onArchive={onArchive}
                 onDuplicate={duplicateCurrentMaterial}
-              onGenerateCurrentImages={() => void generateCurrentImages()}
-              onSuggestAcceptedAnswers={(blockId, itemIds) => void suggestAcceptedAnswers(blockId, itemIds)}
-              onPreview={() => setAuthorMode("preview")}
+                onGenerateCurrentImages={() => void generateCurrentImages()}
+                onSuggestAcceptedAnswers={(blockId, itemIds) => void suggestAcceptedAnswers(blockId, itemIds)}
+                onPreview={() => setAuthorMode("preview")}
                 onRemoveBlock={removeBlock}
                 onUpdateBlock={updateBlock}
                 onUpdateForm={updateForm}

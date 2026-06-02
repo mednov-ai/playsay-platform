@@ -1,0 +1,262 @@
+import type {
+  CourseLessonRequest,
+  CourseLessonResponse,
+  CourseRequest,
+  CourseResponse,
+  LiveKitRoomTokenResponse,
+  MeResponse,
+  ScheduledLessonRequest,
+  ScheduledLessonResponse,
+  UpdateUserProfileRequest,
+  UserProfileResponse,
+} from "../../generated/playsay-api";
+
+export type MeProfile = MeResponse;
+export type AppUserProfile = UserProfileResponse;
+export type UpdateUserProfileInput = UpdateUserProfileRequest;
+export type AdminUserProfile = UserProfileResponse;
+export type Course = CourseResponse;
+export type CourseLesson = CourseLessonResponse & {
+  materialId?: string | null;
+  materialTitle?: string | null;
+};
+export type CourseInput = CourseRequest;
+export type CourseLessonInput = CourseLessonRequest & {
+  materialId?: string | null;
+};
+export type ScheduledLesson = ScheduledLessonResponse & {
+  materialId?: string | null;
+  materialTitle?: string | null;
+};
+export type ScheduledLessonInput = ScheduledLessonRequest & {
+  materialId?: string | null;
+};
+export type LiveKitRoomToken = LiveKitRoomTokenResponse;
+export type LessonMaterialJson = Record<string, unknown>;
+export type LessonMaterial = {
+  id: string;
+  ownerTeacherUserId?: string | null;
+  ownerTeacherSubject?: string | null;
+  ownerTeacherName?: string | null;
+  title: string;
+  description?: string | null;
+  language: string;
+  cefrLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | string;
+  visibility: "PRIVATE" | "PUBLIC" | string;
+  status: "DRAFT" | "PUBLISHED" | "ARCHIVED" | string;
+  document: LessonMaterialJson;
+  sourceMeta: LessonMaterialJson;
+  scoringRubric: LessonMaterialJson;
+  blockCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+export type LessonMaterialAsset = {
+  id: string;
+  materialId: string;
+  kind: string;
+  storageKey?: string | null;
+  externalUrl?: string | null;
+  contentUrl?: string | null;
+  provider: string;
+  metadata: LessonMaterialJson;
+  createdAt: string;
+};
+export type LessonMaterialInput = {
+  title: string;
+  description?: string | null;
+  language?: string;
+  cefrLevel?: string;
+  visibility?: "PRIVATE" | "PUBLIC" | string;
+  status?: "DRAFT" | "PUBLISHED" | "ARCHIVED" | string;
+  document?: LessonMaterialJson;
+  sourceMeta?: LessonMaterialJson;
+  scoringRubric?: LessonMaterialJson;
+};
+export type LessonMaterialDraftInput = {
+  title?: string | null;
+  prompt: string;
+  language?: string;
+  cefrLevel?: string | null;
+  sourceImageDataUrl?: string | null;
+  sourceFileName?: string | null;
+};
+export type LessonMaterialUrlDraftInput = {
+  url: string;
+  title?: string | null;
+  prompt?: string | null;
+  language?: string;
+  cefrLevel?: string | null;
+};
+export type LessonMaterialGenerateImagesInput = {
+  blockId?: string | null;
+  maxImages?: number | null;
+  regenerate?: boolean | null;
+};
+export type LessonMaterialAnswerSuggestionsInput = {
+  blockId: string;
+  itemIds?: string[];
+};
+export type LessonMaterialAnswerSuggestion = {
+  value: string;
+  reason: string;
+  confidence: number;
+};
+export type LessonMaterialAnswerSuggestionItem = {
+  itemId: string;
+  prompt: string;
+  answer?: string | null;
+  suggestions: LessonMaterialAnswerSuggestion[];
+};
+export type LessonMaterialAnswerSuggestions = {
+  materialId: string;
+  blockId: string;
+  items: LessonMaterialAnswerSuggestionItem[];
+};
+export type LessonMaterialAssetUpdateInput = {
+  tags?: string[] | null;
+};
+export type LessonMaterialDraft = Omit<LessonMaterialInput, "title"> & {
+  title: string;
+  description?: string | null;
+  language: string;
+  cefrLevel: string;
+  visibility: string;
+  status: string;
+  document: LessonMaterialJson;
+  sourceMeta: LessonMaterialJson;
+  scoringRubric: LessonMaterialJson;
+};
+export type LessonMaterialSubmission = {
+  id: string;
+  assignmentId: string;
+  lessonId: string;
+  materialId: string;
+  userId: string;
+  userSubject?: string | null;
+  userName?: string | null;
+  content: LessonMaterialJson;
+  score?: number | null;
+  errorsCount?: number | null;
+  submittedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type LessonMaterialSubmissionInput = {
+  content: LessonMaterialJson;
+  submitted?: boolean;
+};
+export type HomeworkAssignmentInput = {
+  dueAt?: string | null;
+  instructions?: string | null;
+  materialId: string;
+  studentSubjects: string[];
+  title?: string | null;
+};
+export type LessonHomeworkInput = {
+  dueAt?: string | null;
+  instructions?: string | null;
+  studentSubjects?: string[] | null;
+  title?: string | null;
+};
+export type HomeworkAssignment = {
+  id: string;
+  materialId: string;
+  materialTitle: string;
+  lessonId?: string | null;
+  sourceLessonId?: string | null;
+  title: string;
+  instructions?: string | null;
+  type: string;
+  maxScore?: number | null;
+  dueAt?: string | null;
+  status: string;
+  recipientCount: number;
+  submittedCount: number;
+  scoredCount: number;
+  averageScore?: number | null;
+  averageErrorsCount?: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type HomeworkRecipientProgress = {
+  assignmentId: string;
+  studentUserId: string;
+  studentSubject: string;
+  studentName?: string | null;
+  submissionId?: string | null;
+  hasSubmission: boolean;
+  submitted: boolean;
+  score?: number | null;
+  maxScore?: number | null;
+  scoreRatio?: number | null;
+  errorsCount?: number | null;
+  progressTone?: number | null;
+  showGroupIndicator: boolean;
+  groupAverageScore?: number | null;
+  groupAverageErrorsCount?: number | null;
+  relativeScoreDelta?: number | null;
+  relativeErrorsDelta?: number | null;
+  submittedAt?: string | null;
+  updatedAt?: string | null;
+};
+export type HomeworkAssignmentDetail = {
+  assignment: HomeworkAssignment;
+  recipients: HomeworkRecipientProgress[];
+};
+export type HomeworkSubmission = Omit<LessonMaterialSubmission, "lessonId"> & {
+  lessonId?: string | null;
+  progressTone?: number | null;
+};
+export type StudentHomeworkDetail = {
+  assignment: HomeworkAssignment;
+  material: LessonMaterial;
+  submission: HomeworkSubmission;
+};
+export type LessonMaterialAnnotation = {
+  id: string;
+  lessonId: string;
+  materialId: string;
+  content: LessonMaterialJson;
+  createdAt: string;
+  updatedAt: string;
+};
+export type LessonMaterialAnnotationInput = {
+  content: LessonMaterialJson;
+};
+export type CollaborationDocumentScope = "INDIVIDUAL" | "GROUP";
+export type CollaborationDocument = {
+  id: string;
+  lessonId: string;
+  materialId: string;
+  studentUserId?: string | null;
+  studentSubject?: string | null;
+  studentName?: string | null;
+  documentKind: string;
+  scope: CollaborationDocumentScope | string;
+  yjsDocumentId: string;
+  snapshot?: LessonMaterialJson | null;
+  snapshotStorageKey?: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+export type CreateCollaborationDocumentInput = {
+  materialId: string;
+  documentKind?: string;
+  scope?: CollaborationDocumentScope;
+};
+export type SaveCollaborationSnapshotInput = {
+  snapshot: LessonMaterialJson;
+  snapshotStorageKey?: string | null;
+};
+export type FinalizeCollaborationDocumentInput = {
+  submitted?: boolean;
+};
+export type CollaborationDocumentToken = {
+  documentId: string;
+  yjsDocumentId: string;
+  websocketUrl: string;
+  token: string;
+  expiresAt: string;
+};

@@ -13,9 +13,9 @@ export {
   skipSilentLoginOnce,
   startLogin,
   startSilentLogin,
-} from "../api/playsay";
+} from "../api/auth";
 
 export type {
   AuthConfig,
   TokenSet,
-} from "../api/playsay";
+} from "../api/auth";

@@ -3,13 +3,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MaterialEditorBlock, MaterialExerciseItem } from "../../model/materialDocument";
 import {
-  RenderedFillGapExercise,
   materialAttemptBarRedPercent,
   materialAttemptBarVisible,
   materialHintForExerciseItem,
   materialManualInputHintLimit,
   materialManualInputHintValue,
-} from "./RenderedFillGapExercise";
+} from "../../model/materialDocument";
+import { RenderedFillGapExercise } from "./RenderedFillGapExercise";
 
 describe("RenderedFillGapExercise hints", () => {
   it("reveals manual fill gap hints by configured answer proportions", () => {

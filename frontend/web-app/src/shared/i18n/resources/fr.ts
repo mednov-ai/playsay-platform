@@ -23,6 +23,10 @@ export const fr = {
     logout: "Se déconnecter",
     sessionExpired: "La session a expiré. Veuillez vous reconnecter.",
   },
+  welcome: {
+    logoLinkAria: "Ouvrir le site principal Play&Say",
+    returnToSite: "Retour au site",
+  },
   shell: {
     actions: {
       joinLesson: "Entrer en cours",

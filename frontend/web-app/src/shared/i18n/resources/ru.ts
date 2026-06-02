@@ -23,6 +23,10 @@ export const ru = {
     logout: "Выйти",
     sessionExpired: "Сессия истекла. Войдите снова.",
   },
+  welcome: {
+    logoLinkAria: "Открыть основной сайт Play&Say",
+    returnToSite: "Вернуться на сайт",
+  },
   shell: {
     actions: {
       joinLesson: "Войти в урок",

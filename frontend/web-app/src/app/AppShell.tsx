@@ -39,6 +39,8 @@ import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 import officialLogoUrl from "../shared/assets/playsay-official-logo.jpg";
 
+const mainSiteUrl = "https://play-and-say.ru";
+
 export type AppShellProps = {
   adminLoading: boolean;
   adminMessage: string | null;
@@ -357,7 +359,9 @@ function WelcomeLanding({
       </div>
 
       <div className="playsay-welcome-content">
-        <PlaySayAnimatedLogo label={t("common.appName")} />
+        <a className="playsay-welcome-logo-link" href={mainSiteUrl} aria-label={t("welcome.logoLinkAria")}>
+          <PlaySayAnimatedLogo label={t("common.appName")} />
+        </a>
         <div className="playsay-welcome-actions">
           <LanguageSwitcher
             className="playsay-welcome-language"
@@ -372,6 +376,9 @@ function WelcomeLanding({
             {isBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
             <span>{t("auth.login")}</span>
           </button>
+          <a className="playsay-welcome-return" href={mainSiteUrl}>
+            {t("welcome.returnToSite")}
+          </a>
         </div>
       </div>
     </div>

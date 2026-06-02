@@ -157,6 +157,23 @@ textarea {
   padding: clamp(1rem, 4vw, 3rem);
 }
 
+.playsay-welcome-logo-link {
+  display: block;
+  border-radius: 2rem;
+  line-height: 0;
+  outline: none;
+  transition: transform 0.2s ease;
+}
+
+.playsay-welcome-logo-link:hover,
+.playsay-welcome-logo-link:focus-visible {
+  transform: translateY(-0.12rem) scale(1.018);
+}
+
+.playsay-welcome-logo-link:focus-visible {
+  box-shadow: 0 0 0 4px rgb(255 92 0 / 0.16);
+}
+
 .playsay-welcome-logo {
   width: min(78vw, 26rem);
   height: auto;
@@ -283,6 +300,20 @@ textarea {
 .playsay-welcome-login:disabled {
   cursor: wait;
   opacity: 0.78;
+}
+
+.playsay-welcome-return {
+  margin-top: -0.1rem;
+  color: rgb(95 102 114 / 0.92);
+  font-size: 0.875rem;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.playsay-welcome-return:hover,
+.playsay-welcome-return:focus-visible {
+  color: #df4100;
+  text-decoration: none;
 }
 
 .playsay-floating-ball {

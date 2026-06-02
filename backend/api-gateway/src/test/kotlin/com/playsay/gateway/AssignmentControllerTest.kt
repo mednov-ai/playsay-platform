@@ -201,6 +201,34 @@ class AssignmentControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `homework lists skip assignments whose material was archived`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = fillGapMaterial(teacher)
+        val assignmentId = assignmentController.createHomeworkAssignment(
+            teacher,
+            HomeworkAssignmentRequest(materialId = material.id, studentSubjects = listOf("student-1")),
+        ).body!!.assignment.id
+
+        assertEquals(listOf(assignmentId), assignmentController.listHomeworkAssignments(teacher).map { assignment -> assignment.id })
+        assertEquals(listOf(assignmentId), assignmentController.listMyHomeworkAssignments(student).map { assignment -> assignment.id })
+
+        assertEquals(HttpStatus.NO_CONTENT, materialCrudController.archive(teacher, material.id).statusCode)
+
+        assertEquals(emptyList(), assignmentController.listHomeworkAssignments(teacher).map { assignment -> assignment.id })
+        assertEquals(emptyList(), assignmentController.listMyHomeworkAssignments(student).map { assignment -> assignment.id })
+        val teacherError = assertFailsWith<ResponseStatusException> {
+            assignmentController.getHomeworkAssignment(teacher, assignmentId)
+        }
+        val studentError = assertFailsWith<ResponseStatusException> {
+            assignmentController.getMyHomeworkAssignment(student, assignmentId)
+        }
+        assertEquals(HttpStatus.NOT_FOUND, teacherError.statusCode)
+        assertEquals(HttpStatus.NOT_FOUND, studentError.statusCode)
+    }
+
+    @Test
     fun `homework can be created from expired scheduled lesson participants`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")

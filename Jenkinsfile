@@ -540,6 +540,8 @@ EOF
             APPS="api-gateway web-app collaboration-service"
             DEADLINE="$(( $(date +%s) + TIMEOUT_SECONDS ))"
 
+            kubectl -n argocd annotate application api-gateway web-app collaboration-service argocd.argoproj.io/refresh=hard --overwrite
+
             while true; do
               all_ready="true"
               echo "Checking dev rollout for ${EXPECTED_BUILD}"

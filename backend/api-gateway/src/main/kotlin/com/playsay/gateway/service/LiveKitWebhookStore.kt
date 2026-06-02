@@ -68,6 +68,15 @@ class LiveKitWebhookVerifier(
 }
 
 @Component
+class LiveKitWebhookEventParser {
+    private val objectMapper = jacksonObjectMapper()
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+
+    fun parse(rawBody: String): LiveKitWebhookEvent =
+        objectMapper.readValue(rawBody, LiveKitWebhookEvent::class.java)
+}
+
+@Component
 class LiveKitWebhookAttendanceStore(
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,

@@ -87,6 +87,45 @@ class BackendArchitectureTest {
     }
 
     @Test
+    fun `new service files stay below cleanup threshold`() {
+        val legacyOversizedServices = setOf(
+            "service/AssignmentStore.kt",
+            "service/LessonMaterialStore.kt",
+            "service/MaterialAiDraftService.kt",
+            "service/MaterialScoringService.kt",
+        )
+        val oversizedServices = kotlinSources()
+            .filter { source -> ".service" in source.packageName }
+            .filterNot { source -> source.relativePath in legacyOversizedServices }
+            .mapNotNull { source ->
+                val lineCount = source.text.lineSequence().count()
+                if (lineCount > 450) "${source.relativePath} has $lineCount lines" else null
+            }
+
+        assertTrue(
+            oversizedServices.isEmpty(),
+            "New services should be split before crossing 450 lines: $oversizedServices",
+        )
+    }
+
+    @Test
+    fun `controllers do not parse or serialize json directly`() {
+        val controllerJsonUsage = kotlinSources()
+            .filter { source -> ".controller" in source.packageName }
+            .filter { source ->
+                source.text.contains("ObjectMapper") ||
+                    source.text.contains(".readTree(") ||
+                    source.text.contains(".writeValueAsString(")
+            }
+            .map { source -> source.relativePath }
+
+        assertTrue(
+            controllerJsonUsage.isEmpty(),
+            "Controllers must delegate JSON parsing and serialization to services or codecs: $controllerJsonUsage",
+        )
+    }
+
+    @Test
     fun `liquibase tables have jpa entities`() {
         val entitySources = kotlinSources()
             .filter { source -> ".entity" in source.packageName }
@@ -161,15 +200,52 @@ class BackendArchitectureTest {
     }
 
     @Test
-    fun `jpql queries are declared in data repo`() {
-        val queryAnnotationsOutsideDataRepo = kotlinSources()
+    fun `repository contracts are split by aggregate`() {
+        val expectedRepoFiles = setOf(
+            "repo/UserRepos.kt",
+            "repo/CourseRepos.kt",
+            "repo/ScheduleRepos.kt",
+            "repo/MaterialRepos.kt",
+            "repo/AssignmentRepos.kt",
+            "repo/CollaborationRepos.kt",
+        )
+        val existingRepoFiles = kotlinSources()
+            .filter { source -> ".repo" in source.packageName }
+            .filter { source -> source.text.contains("JpaRepository<") }
+            .map { source -> source.relativePath }
+            .toSet()
+
+        val missingRepoFiles = expectedRepoFiles - existingRepoFiles
+
+        assertTrue(
+            missingRepoFiles.isEmpty(),
+            "Split repository contracts by aggregate instead of growing repo/DataRepo.kt: $missingRepoFiles",
+        )
+    }
+
+    @Test
+    fun `repository jpql queries stay in repo package`() {
+        val queryAnnotationsOutsideRepo = kotlinSources()
             .filter { source -> source.text.contains("@Query") }
-            .filterNot { source -> source.relativePath == "repo/DataRepo.kt" }
+            .filterNot { source -> ".repo" in source.packageName }
             .map { source -> source.relativePath }
 
         assertTrue(
-            queryAnnotationsOutsideDataRepo.isEmpty(),
-            "Repository JPQL/native queries must be declared in repo/DataRepo.kt: $queryAnnotationsOutsideDataRepo",
+            queryAnnotationsOutsideRepo.isEmpty(),
+            "Repository JPQL queries must stay in com.playsay.gateway.repo: $queryAnnotationsOutsideRepo",
+        )
+    }
+
+    @Test
+    fun `repository queries are jpql not native sql`() {
+        val nativeQueries = kotlinSources()
+            .filter { source -> ".repo" in source.packageName }
+            .filter { source -> Regex("""@Query\s*\([^)]*nativeQuery\s*=\s*true""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(source.text) }
+            .map { source -> source.relativePath }
+
+        assertTrue(
+            nativeQueries.isEmpty(),
+            "Repository queries must use JPQL unless a migration-specific allowlist is added: $nativeQueries",
         )
     }
 
@@ -276,6 +352,71 @@ class BackendArchitectureTest {
         assertTrue(
             !ownsImageTargetDiscovery,
             "Move material generated-image target discovery into a dedicated service helper.",
+        )
+    }
+
+    @Test
+    fun `material store does not own material asset persistence details`() {
+        val materialStore = sourceRoot.resolve("service/LessonMaterialStore.kt").readText()
+        val ownsMaterialAssetPersistence = Regex(
+            """\b(fun\s+upsertGeneratedImageAsset|fun\s+insertGeneratedImageAsset|fun\s+replaceGeneratedImageAsset|fun\s+generatedImageMetadata|fun\s+generatedImageTags|fun\s+materialAssetTags|fun\s+normalizeMaterialImageTags|fun\s+cleanupReplacedGeneratedAssets|fun\s+findAsset|fun\s+findAssets)\b""",
+        ).containsMatchIn(materialStore)
+
+        assertTrue(
+            !ownsMaterialAssetPersistence,
+            "Move material asset persistence, metadata, and generated-image storage details into a dedicated service.",
+        )
+    }
+
+    @Test
+    fun `material store does not own material submission persistence details`() {
+        val materialStore = sourceRoot.resolve("service/LessonMaterialStore.kt").readText()
+        val ownsMaterialSubmissionPersistence = Regex(
+            """\b(fun\s+findOrCreateMaterialSubmissionAssignment|fun\s+createEmptyMaterialSubmission|fun\s+emptyMaterialSubmissionContent|fun\s+findMaterialSubmissionAssignment|fun\s+findMaterialSubmission)\b""",
+        ).containsMatchIn(materialStore)
+
+        assertTrue(
+            !ownsMaterialSubmissionPersistence,
+            "Move material submission assignment, scoring, and persistence details into a dedicated service.",
+        )
+    }
+
+    @Test
+    fun `material store does not own material annotation persistence details`() {
+        val materialStore = sourceRoot.resolve("service/LessonMaterialStore.kt").readText()
+        val ownsMaterialAnnotationPersistence = Regex(
+            """\b(fun\s+createEmptyMaterialAnnotation|fun\s+emptyMaterialAnnotationContent|fun\s+findMaterialAnnotation)\b""",
+        ).containsMatchIn(materialStore)
+
+        assertTrue(
+            !ownsMaterialAnnotationPersistence,
+            "Move material annotation JSON and persistence details into a dedicated service.",
+        )
+    }
+
+    @Test
+    fun `material store does not own material catalog persistence details`() {
+        val materialStore = sourceRoot.resolve("service/LessonMaterialStore.kt").readText()
+        val ownsMaterialCatalogPersistence = Regex(
+            """\b(LessonMaterialEntity|LessonMaterialRepo|writeValueAsString|findRowsForAdmin|findRowsForTeacher|findPublicPublishedRows|findRowById)\b""",
+        ).containsMatchIn(materialStore)
+
+        assertTrue(
+            !ownsMaterialCatalogPersistence,
+            "Move material CRUD, visibility listing, and row mapping details into a dedicated catalog service.",
+        )
+    }
+
+    @Test
+    fun `material store does not own material authoring orchestration details`() {
+        val materialStore = sourceRoot.resolve("service/LessonMaterialStore.kt").readText()
+        val ownsMaterialAuthoringOrchestration = Regex(
+            """\b(MaterialAiDraftInput|MaterialImageGenerationInput|MaterialAnswerSuggestionInput|materialImageTargets|materialAnswerItemContexts|findMaterialBlock)\b""",
+        ).containsMatchIn(materialStore)
+
+        assertTrue(
+            !ownsMaterialAuthoringOrchestration,
+            "Move AI draft, URL import, image generation, and answer suggestion orchestration into a dedicated authoring service.",
         )
     }
 

@@ -39,7 +39,7 @@ import liquibase.integration.spring.SpringLiquibase
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional
-class DataRepoQueryCoverageTest @Autowired constructor(
+class RepositoryQueryCoverageTest @Autowired constructor(
     private val appUserRepo: AppUserRepo,
     private val courseRepo: CourseRepo,
     private val lessonTemplateRepo: LessonTemplateRepo,
@@ -58,7 +58,7 @@ class DataRepoQueryCoverageTest @Autowired constructor(
     @BeforeAll
     fun migrateDatabase() {
         SpringLiquibase().apply {
-            this.dataSource = this@DataRepoQueryCoverageTest.dataSource
+            this.dataSource = this@RepositoryQueryCoverageTest.dataSource
             changeLog = "classpath:db/changelog/db.changelog-master.xml"
         }.afterPropertiesSet()
     }

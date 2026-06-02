@@ -32,7 +32,6 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
 import java.util.UUID
-import kotlin.math.roundToInt
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
@@ -54,6 +53,8 @@ class AssignmentStore(
     private val appUserRepo: AppUserRepo,
     private val userProfileStore: UserProfileStore,
     private val materialScoringService: MaterialScoringService,
+    private val progressCalculator: AssignmentProgressCalculator,
+    private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -189,8 +190,8 @@ class AssignmentStore(
             ?: createEmptyHomeworkSubmission(assignment, material.id, userId)
         return StudentAssignmentDetailResponse(
             assignment = summary(assignment),
-            material = material.toResponse(objectMapper),
-            submission = submission.toResponse(objectMapper, recipientCount(assignment.id), assignment.maxScore),
+            material = lessonMaterialResponseMapper.toResponse(material),
+            submission = submission.toResponse(objectMapper, recipientCount(assignment.id), assignment.maxScore, progressCalculator),
         )
     }
 
@@ -198,7 +199,7 @@ class AssignmentStore(
     fun studentMaterial(authentication: JwtAuthenticationToken, assignmentId: UUID): LessonMaterialResponse {
         val userId = userProfileStore.currentUserId(authentication)
         val assignment = studentAssignment(assignmentId, userId)
-        return materialById(requireNotNull(assignment.materialId)).toResponse(objectMapper)
+        return lessonMaterialResponseMapper.toResponse(materialById(requireNotNull(assignment.materialId)))
     }
 
     @Transactional
@@ -208,7 +209,7 @@ class AssignmentStore(
         val material = materialById(requireNotNull(assignment.materialId))
         val submission = findHomeworkSubmission(assignment.id, userId)
             ?: createEmptyHomeworkSubmission(assignment, material.id, userId)
-        return submission.toResponse(objectMapper, recipientCount(assignment.id), assignment.maxScore)
+        return submission.toResponse(objectMapper, recipientCount(assignment.id), assignment.maxScore, progressCalculator)
     }
 
     @Transactional
@@ -263,7 +264,8 @@ class AssignmentStore(
         assignment.updatedAt = now
         assignmentRepo.save(assignment)
 
-        return requireNotNull(findSubmissionById(submissionId)).toResponse(objectMapper, recipientCount(assignment.id), assignment.maxScore)
+        return requireNotNull(findSubmissionById(submissionId))
+            .toResponse(objectMapper, recipientCount(assignment.id), assignment.maxScore, progressCalculator)
     }
 
     private fun teacherAssignment(authentication: JwtAuthenticationToken, assignmentId: UUID): StoredAssignment {
@@ -315,8 +317,8 @@ class AssignmentStore(
             recipientCount = recipientCount(assignment.id),
             submittedCount = submissions.count { submission -> submission.submittedAt != null },
             scoredCount = scores.size,
-            averageScore = scores.averageOrNull(),
-            averageErrorsCount = errors.averageOrNull(),
+            averageScore = progressCalculator.average(scores),
+            averageErrorsCount = progressCalculator.average(errors),
             createdAt = assignment.createdAt,
             updatedAt = assignment.updatedAt,
         )
@@ -329,8 +331,8 @@ class AssignmentStore(
         val latestByStudent = latestSubmissionsByStudent(assignment.id)
         val scoredSubmissions = latestByStudent.values.filter { submission -> submission.score != null }
         val scoredErrors = latestByStudent.values.mapNotNull { submission -> submission.errorsCount?.let(::BigDecimal) }
-        val groupAverageScore = scoredSubmissions.mapNotNull { submission -> submission.score }.averageOrNull()
-        val groupAverageErrors = scoredErrors.averageOrNull()
+        val groupAverageScore = progressCalculator.average(scoredSubmissions.mapNotNull { submission -> submission.score })
+        val groupAverageErrors = progressCalculator.average(scoredErrors)
         val groupMode = recipients.size > 1
 
         return recipients.map { recipient ->
@@ -338,7 +340,7 @@ class AssignmentStore(
             val submission = latestByStudent[recipient.studentUserId]
             val score = submission?.score
             val errorsCount = submission?.errorsCount
-            val progressTone = if (groupMode) progressTone(score, assignment.maxScore, errorsCount) else null
+            val progressTone = if (groupMode) progressCalculator.progressTone(score, assignment.maxScore, errorsCount) else null
             AssignmentRecipientProgressResponse(
                 assignmentId = assignment.id,
                 studentUserId = recipient.studentUserId,
@@ -349,7 +351,7 @@ class AssignmentStore(
                 submitted = submission?.submittedAt != null,
                 score = score,
                 maxScore = assignment.maxScore,
-                scoreRatio = scoreRatio(score, assignment.maxScore),
+                scoreRatio = progressCalculator.scoreRatio(score, assignment.maxScore),
                 errorsCount = errorsCount,
                 progressTone = progressTone,
                 showGroupIndicator = progressTone != null,
@@ -515,32 +517,11 @@ class AssignmentStore(
         )
 }
 
-private fun StoredHomeworkMaterial.toResponse(objectMapper: ObjectMapper): LessonMaterialResponse {
-    val documentNode = objectMapper.readTree(document)
-    return LessonMaterialResponse(
-        id = id,
-        ownerTeacherUserId = ownerTeacherUserId,
-        ownerTeacherSubject = ownerTeacherSubject,
-        ownerTeacherName = ownerTeacherName,
-        title = title,
-        description = description,
-        language = language,
-        cefrLevel = cefrLevel,
-        visibility = visibility,
-        status = status,
-        document = documentNode,
-        sourceMeta = objectMapper.readTree(sourceMeta),
-        scoringRubric = objectMapper.readTree(scoringRubric),
-        blockCount = documentNode.blockCount(),
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-    )
-}
-
 private fun StoredHomeworkSubmission.toResponse(
     objectMapper: ObjectMapper,
     recipientCount: Int,
     maxScore: BigDecimal?,
+    progressCalculator: AssignmentProgressCalculator,
 ): AssignmentSubmissionResponse =
     AssignmentSubmissionResponse(
         id = id,
@@ -553,7 +534,7 @@ private fun StoredHomeworkSubmission.toResponse(
         content = objectMapper.readTree(requireNotNull(content)),
         score = score,
         errorsCount = errorsCount,
-        progressTone = if (recipientCount > 1) progressTone(score, maxScore = maxScore, errorsCount = errorsCount) else null,
+        progressTone = if (recipientCount > 1) progressCalculator.progressTone(score, maxScore, errorsCount) else null,
         submittedAt = submittedAt,
         createdAt = createdAt,
         updatedAt = updatedAt,
@@ -590,39 +571,3 @@ private fun validateJsonSize(fieldName: String, value: JsonNode, objectMapper: O
         throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.JSON_FIELD_TOO_LARGE, fieldName, maxBytes)
     }
 }
-
-private fun scoreRatio(score: BigDecimal?, maxScore: BigDecimal?): BigDecimal? {
-    if (score == null || maxScore == null || maxScore.compareTo(BigDecimal.ZERO) <= 0) {
-        return null
-    }
-    return score.divide(maxScore, 4, RoundingMode.HALF_UP)
-        .coerceIn(BigDecimal.ZERO, BigDecimal.ONE)
-        .setScale(2, RoundingMode.HALF_UP)
-}
-
-private fun progressTone(score: BigDecimal?, maxScore: BigDecimal?, errorsCount: Int?): Int? {
-    if (score == null && errorsCount == null) {
-        return null
-    }
-    val scorePercent = scoreRatio(score, maxScore)
-        ?.multiply(BigDecimal("100"))
-        ?.toDouble()
-        ?: errorsCount?.let { errors -> 100.0 - (errors * 15.0) }
-        ?: return null
-    val errorPenalty = (errorsCount ?: 0).coerceAtLeast(0).coerceAtMost(8) * 4.0
-    return (scorePercent - errorPenalty).roundToInt().coerceIn(0, 100)
-}
-
-private fun List<BigDecimal>.averageOrNull(): BigDecimal? {
-    if (isEmpty()) {
-        return null
-    }
-    return reduce(BigDecimal::add).divide(BigDecimal(size), 2, RoundingMode.HALF_UP)
-}
-
-private fun BigDecimal.coerceIn(min: BigDecimal, max: BigDecimal): BigDecimal =
-    when {
-        this < min -> min
-        this > max -> max
-        else -> this
-    }

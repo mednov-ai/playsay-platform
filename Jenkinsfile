@@ -19,11 +19,11 @@ spec:
           subPath: gradle
       resources:
         requests:
-          cpu: 250m
-          memory: 768Mi
+          cpu: 500m
+          memory: 1Gi
         limits:
-          cpu: "1"
-          memory: 2Gi
+          cpu: "2"
+          memory: 3Gi
     - name: node
       image: node:22
       command: ["cat"]
@@ -34,11 +34,11 @@ spec:
           subPath: npm
       resources:
         requests:
-          cpu: 150m
-          memory: 256Mi
+          cpu: 300m
+          memory: 512Mi
         limits:
-          cpu: 750m
-          memory: 768Mi
+          cpu: 1500m
+          memory: 1Gi
     - name: kaniko-backend
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]
@@ -244,7 +244,7 @@ spec:
         container('gradle') {
           dir('backend') {
             echo "Running backend tests for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:test --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :api-gateway:test --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
       }
@@ -255,7 +255,7 @@ spec:
         container('gradle') {
           dir('backend') {
             echo "Packaging api-gateway for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:bootJar --no-daemon --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :api-gateway:bootJar --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
       }
@@ -266,7 +266,7 @@ spec:
         container('gradle') {
           dir('backend') {
             echo "Exporting api-gateway OpenAPI contract for ${env.BUILD_LABEL}"
-            sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
         sh '''

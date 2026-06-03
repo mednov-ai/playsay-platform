@@ -115,7 +115,11 @@ try {
   await switchStudentMode(studentA.page, "individual");
   await switchStudentMode(studentB.page, "individual");
   await verifyMaterialCursor(studentA.page, studentB.page);
-  addCheck("material-presence-cursor-is-clipped-to-material-surface");
+  await verifyMaterialCursorAlignment(studentA.page, studentB.page, 0.34, 0.38, "student A cursor on student B");
+  await verifyMaterialCursorAlignment(studentB.page, studentA.page, 0.62, 0.32, "student B cursor on student A");
+  await verifyMaterialCursorAlignment(teacher.page, studentA.page, 0.49, 0.46, "teacher cursor on student A");
+  await verifyMaterialCursorAlignment(teacher.page, studentB.page, 0.49, 0.46, "teacher cursor on student B");
+  addCheck("material-presence-cursors-are-aligned-and-clipped");
 
   await drawAnnotation(studentA.page);
   await waitForLocatorCount(studentB.page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path", 1, "student B annotation path");
@@ -475,6 +479,47 @@ async function verifyMaterialCursor(sourcePage, targetPage) {
       cursorRect.right <= surfaceRect.right + 1 &&
       cursorRect.bottom <= surfaceRect.bottom + 1;
   }, null, { timeout: timeoutMs });
+}
+
+async function verifyMaterialCursorAlignment(sourcePage, targetPage, xRatio, yRatio, label) {
+  const sourceSurface = sourcePage.locator("[data-testid='lesson-material-surface']").first();
+  const box = await sourceSurface.boundingBox();
+  if (!box) {
+    throw new Error(`Source material surface is not visible for ${label}.`);
+  }
+  await sourcePage.mouse.move(box.x + box.width * xRatio, box.y + box.height * yRatio);
+  await targetPage.waitForFunction(({ expectedXRatio, expectedYRatio, nextLabel }) => {
+    const surface = document.querySelector("[data-testid='lesson-material-surface']");
+    const cursor = surface?.querySelector(".playsay-presence-cursor");
+    const cursorIcon = cursor?.querySelector("svg");
+    if (!surface || !cursor || !cursorIcon) {
+      return false;
+    }
+
+    const surfaceRect = surface.getBoundingClientRect();
+    const iconRect = cursorIcon.getBoundingClientRect();
+    const expectedX = surfaceRect.left + surfaceRect.width * expectedXRatio;
+    const expectedY = surfaceRect.top + surfaceRect.height * expectedYRatio;
+    const tipX = iconRect.left + iconRect.width * (4.037 / 24);
+    const tipY = iconRect.top + iconRect.height * (4.688 / 24);
+    const distance = Math.hypot(tipX - expectedX, tipY - expectedY);
+    if (distance <= 3) {
+      return true;
+    }
+
+    window.__playsayCursorAlignmentDebug = {
+      distance,
+      expectedX,
+      expectedY,
+      label: nextLabel,
+      tipX,
+      tipY,
+    };
+    return false;
+  }, { expectedXRatio: xRatio, expectedYRatio: yRatio, nextLabel: label }, { timeout: timeoutMs }).catch(async (error) => {
+    const debug = await targetPage.evaluate(() => window.__playsayCursorAlignmentDebug ?? null).catch(() => null);
+    throw new Error(`Timed out waiting for aligned ${label}; debug=${JSON.stringify(debug)}: ${error instanceof Error ? error.message : String(error)}`);
+  });
 }
 
 async function drawAnnotation(page) {

@@ -28,6 +28,8 @@ class MaterialVideoPlaybackService(
     private val rfRelayEnabled: Boolean,
     @param:Value("\${playsay.video.youtube.rf-relay.geo-country-header:}")
     private val geoCountryHeader: String,
+    @param:Value("\${playsay.video.youtube.rf-relay.require-geo-country:true}")
+    private val requireGeoCountry: Boolean,
     @param:Value("\${playsay.video.youtube.rf-relay.session-ttl-seconds:900}")
     private val sessionTtlSeconds: Long,
     private val clock: Clock = Clock.systemUTC(),
@@ -72,7 +74,7 @@ class MaterialVideoPlaybackService(
         if (profileCountry != "RU") {
             return response(materialId, request.blockId, meta.videoId, "EMBED", "PROFILE_COUNTRY_NOT_RU", embedUrl)
         }
-        if (ipCountry != "RU") {
+        if (requireGeoCountry && ipCountry != "RU") {
             val reason = if (ipCountry == null) "IP_COUNTRY_UNKNOWN" else "PROFILE_IP_COUNTRY_MISMATCH"
             return response(materialId, request.blockId, meta.videoId, "EMBED", reason, embedUrl)
         }

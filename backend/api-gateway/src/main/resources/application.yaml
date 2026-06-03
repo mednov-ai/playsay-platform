@@ -67,5 +67,6 @@ playsay:
       rf-relay:
         enabled: ${PLAYSAY_YOUTUBE_RF_RELAY_ENABLED:false}
         geo-country-header: ${PLAYSAY_YOUTUBE_RF_RELAY_GEO_COUNTRY_HEADER:}
+        require-geo-country: ${PLAYSAY_YOUTUBE_RF_RELAY_REQUIRE_GEO_COUNTRY:true}
         session-ttl-seconds: ${PLAYSAY_YOUTUBE_RF_RELAY_SESSION_TTL_SECONDS:900}
         ytdlp-path: ${PLAYSAY_YOUTUBE_RF_RELAY_YTDLP_PATH:yt-dlp}

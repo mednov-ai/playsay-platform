@@ -7,7 +7,7 @@ import { useAppTranslation } from "../../../shared/i18n";
 
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
 type ClassroomStripLayout = "single" | "row";
-type ClassroomVideoMode = "lesson" | "videoOnly";
+export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly";
 
 export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
   const { t } = useAppTranslation();
@@ -183,7 +183,12 @@ export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
   }
 
   return (
-    <div className="playsay-classroom-conference" data-layout={stripLayout} data-screen-share={remoteScreenShareTrack ? "true" : "false"}>
+    <div
+      className="playsay-classroom-conference"
+      data-layout={stripLayout}
+      data-mode={mode === "focusOnly" ? "focus-only" : "lesson"}
+      data-screen-share={remoteScreenShareTrack ? "true" : "false"}
+    >
       <div className="playsay-video-focus" ref={focusRef}>
         {featuredTrack ? <ParticipantTile trackRef={featuredTrack} /> : null}
         {remoteScreenShareTrack ? (

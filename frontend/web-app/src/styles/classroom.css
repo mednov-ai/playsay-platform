@@ -123,6 +123,19 @@
   background: #202020;
 }
 
+.playsay-video-focus > .lk-participant-tile {
+  width: 100%;
+}
+
+.playsay-video-focus > .lk-participant-tile .lk-participant-media-video[data-lk-source="camera"] {
+  object-fit: cover;
+  background: #111111;
+}
+
+.playsay-video-focus > .lk-participant-tile .lk-participant-media-video[data-lk-source="screen_share"] {
+  object-fit: contain;
+}
+
 .playsay-video-strip {
   position: absolute;
   z-index: 4;

@@ -1,5 +1,6 @@
 import { LiveKitRoom } from "@livekit/components-react";
 import { PhoneOff, Radio } from "lucide-react";
+import { useEffect, useState } from "react";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import {
   formatLessonRange,
@@ -12,9 +13,11 @@ import {
 } from "../../../shared/api/playsay";
 import { Button } from "../../../components/ui/button";
 import type { LessonRoomSession } from "../model/session";
-import { ClassroomVideoStage } from "./ClassroomVideoStage";
+import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoStage";
 import { LessonWorkspace } from "./LessonWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
+
+type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
 
 export function LiveLessonExperience({
   materials,
@@ -35,9 +38,22 @@ export function LiveLessonExperience({
   const lessonTypeLabel = formatLessonType(session.lessonType, translate);
   const canManageLesson = canAssignLessons(profile);
   const videoOnly = !session.materialId && !canManageLesson;
+  const viewportMode = useClassroomViewportMode();
+  const videoExpanded = viewportMode === "mobileLandscape";
+  const classroomVideoMode: ClassroomVideoMode = videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
+    ? "focusOnly"
+    : videoOnly
+      ? "videoOnly"
+      : "lesson";
+  const showWorkspace = !videoOnly && !videoExpanded;
 
   return (
-    <div className="playsay-classroom-shell" data-video-only={videoOnly ? "true" : "false"}>
+    <div
+      className="playsay-classroom-shell"
+      data-video-expanded={videoExpanded ? "true" : "false"}
+      data-video-only={videoOnly ? "true" : "false"}
+      data-viewport-mode={viewportMode}
+    >
       <section className="playsay-video-rail">
         <div className="playsay-video-header">
           <div className="min-w-0">
@@ -70,12 +86,12 @@ export function LiveLessonExperience({
             token={session.token}
             video
           >
-            <ClassroomVideoStage mode={videoOnly ? "videoOnly" : "lesson"} />
+            <ClassroomVideoStage mode={classroomVideoMode} />
           </LiveKitRoom>
         </div>
       </section>
 
-      {videoOnly ? null : (
+      {showWorkspace ? (
         <LessonWorkspace
           displayName={displayName}
           materials={materials}
@@ -83,7 +99,45 @@ export function LiveLessonExperience({
           profile={profile}
           session={session}
         />
-      )}
+      ) : null}
     </div>
   );
+}
+
+function useClassroomViewportMode(): ClassroomViewportMode {
+  const [mode, setMode] = useState<ClassroomViewportMode>(() => classroomViewportMode());
+
+  useEffect(() => {
+    const portraitQuery = window.matchMedia("(max-width: 640px) and (orientation: portrait)");
+    const landscapeQuery = window.matchMedia("(max-width: 980px) and (orientation: landscape)");
+
+    function updateMode() {
+      setMode(classroomViewportMode());
+    }
+
+    updateMode();
+    portraitQuery.addEventListener("change", updateMode);
+    landscapeQuery.addEventListener("change", updateMode);
+    window.addEventListener("resize", updateMode);
+
+    return () => {
+      portraitQuery.removeEventListener("change", updateMode);
+      landscapeQuery.removeEventListener("change", updateMode);
+      window.removeEventListener("resize", updateMode);
+    };
+  }, []);
+
+  return mode;
+}
+
+function classroomViewportMode(): ClassroomViewportMode {
+  if (window.matchMedia("(max-width: 980px) and (orientation: landscape)").matches) {
+    return "mobileLandscape";
+  }
+
+  if (window.matchMedia("(max-width: 640px) and (orientation: portrait)").matches) {
+    return "mobilePortrait";
+  }
+
+  return "desktop";
 }

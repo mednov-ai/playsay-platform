@@ -18,6 +18,8 @@ import { LessonWorkspace } from "./LessonWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
 
 type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
+const mobilePortraitQuery = "(max-width: 640px) and (orientation: portrait)";
+const mobileLandscapeQuery = "(max-width: 980px) and (orientation: landscape) and (max-height: 640px)";
 
 export function LiveLessonExperience({
   materials,
@@ -108,8 +110,8 @@ function useClassroomViewportMode(): ClassroomViewportMode {
   const [mode, setMode] = useState<ClassroomViewportMode>(() => classroomViewportMode());
 
   useEffect(() => {
-    const portraitQuery = window.matchMedia("(max-width: 640px) and (orientation: portrait)");
-    const landscapeQuery = window.matchMedia("(max-width: 980px) and (orientation: landscape)");
+    const portraitQuery = window.matchMedia(mobilePortraitQuery);
+    const landscapeQuery = window.matchMedia(mobileLandscapeQuery);
 
     function updateMode() {
       setMode(classroomViewportMode());
@@ -130,12 +132,12 @@ function useClassroomViewportMode(): ClassroomViewportMode {
   return mode;
 }
 
-function classroomViewportMode(): ClassroomViewportMode {
-  if (window.matchMedia("(max-width: 980px) and (orientation: landscape)").matches) {
+export function classroomViewportMode(): ClassroomViewportMode {
+  if (window.matchMedia(mobileLandscapeQuery).matches) {
     return "mobileLandscape";
   }
 
-  if (window.matchMedia("(max-width: 640px) and (orientation: portrait)").matches) {
+  if (window.matchMedia(mobilePortraitQuery).matches) {
     return "mobilePortrait";
   }
 

@@ -9,10 +9,6 @@
     grid-template-columns: 1fr;
   }
 
-  .playsay-classroom-controls .lk-button[data-lk-source="screen_share"] {
-    display: none;
-  }
-
   .playsay-classroom-shell {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(14rem, 36dvh) minmax(0, 1fr);
@@ -567,6 +563,13 @@
   }
 }
 
+@media (max-width: 640px) and (orientation: portrait),
+  (max-width: 980px) and (orientation: landscape) and (max-height: 640px) {
+  .playsay-classroom-controls .lk-button[data-lk-source="screen_share"] {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) and (orientation: portrait) {
   .playsay-classroom-shell[data-video-expanded="false"] {
     grid-template-rows: clamp(24rem, 64dvh, calc(100vw * 16 / 9)) minmax(0, 1fr);
@@ -589,7 +592,7 @@
   }
 }
 
-@media (max-width: 980px) and (orientation: landscape) {
+@media (max-width: 980px) and (orientation: landscape) and (max-height: 640px) {
   body.playsay-classroom-active main > section {
     max-width: none;
     gap: 0;

@@ -39,7 +39,7 @@ class UserProfileStore(
         profile.roles = identity.roles.toStoredRoles()
         profile.displayName = clean(request.displayName, 120)
         profile.locale = clean(request.locale, 16)
-        profile.countryCode = cleanCountryCode(request.countryCode)
+        profile.countryCode = cleanCountryCode(request.countryCode) ?: defaultCountryCode
         profile.timezone = clean(request.timezone, 64)
         profile.learningGoal = clean(request.learningGoal, 500)
         profile.updatedAt = updatedAt

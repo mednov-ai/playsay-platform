@@ -82,7 +82,8 @@ class UserProfileControllerTest @Autowired constructor(
     fun `delete removes editable profile fields until recreated from jwt`() {
         val authentication = authentication(role = "ROLE_STUDENT")
 
-        controller.update(authentication, UpdateUserProfileRequest(displayName = "Custom Name"))
+        val updatedWithoutCountry = controller.update(authentication, UpdateUserProfileRequest(displayName = "Custom Name"))
+        assertEquals("RU", updatedWithoutCountry.countryCode)
         controller.delete(authentication)
 
         val recreated = controller.current(authentication)
@@ -90,6 +91,15 @@ class UserProfileControllerTest @Autowired constructor(
         assertEquals("Student One", recreated.displayName)
         assertEquals("RU", recreated.countryCode)
         assertNull(recreated.learningGoal)
+    }
+
+    @Test
+    fun `defaults blank country code to Russia`() {
+        val authentication = authentication(role = "ROLE_STUDENT")
+
+        val updated = controller.update(authentication, UpdateUserProfileRequest(countryCode = " "))
+
+        assertEquals("RU", updated.countryCode)
     }
 
     @Test

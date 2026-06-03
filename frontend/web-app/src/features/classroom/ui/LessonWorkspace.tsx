@@ -23,7 +23,6 @@ import {
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
 import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
-import { TeacherCollaborationPanel } from "./TeacherCollaborationPanel";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function LessonWorkspace({
@@ -171,16 +170,7 @@ export function LessonWorkspace({
         )}
 
         {canMonitorSubmissions && material ? (
-          <>
-            <TeacherCollaborationPanel
-              displayName={displayName}
-              lessonId={session.lessonId}
-              materialId={material.id}
-              participants={session.participants}
-              profileSubject={profile?.subject}
-            />
-            <MaterialSubmissionsMonitor error={submissionMonitorError} submissions={submissionSnapshots} />
-          </>
+          <MaterialSubmissionsMonitor error={submissionMonitorError} submissions={submissionSnapshots} />
         ) : null}
 
         {materialLoading ? (
@@ -191,6 +181,7 @@ export function LessonWorkspace({
         ) : material ? (
           canMonitorSubmissions ? (
             <LessonTaskCanvas
+              collaborationControls={null}
               lessonId={session.lessonId}
               material={material}
               annotationSync={teacherAnnotationSync}

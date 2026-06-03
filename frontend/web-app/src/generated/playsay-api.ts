@@ -162,6 +162,57 @@ export interface MaterialAnnotationResponse {
   updatedAt: string;
 }
 
+export interface SaveCollaborationSnapshotRequest {
+  snapshot: JsonNode;
+  /** @nullable */
+  snapshotStorageKey?: string | null;
+}
+
+export interface CollaborationDocumentResponse {
+  id: string;
+  lessonId: string;
+  materialId: string;
+  /** @nullable */
+  studentUserId?: string | null;
+  /** @nullable */
+  studentSubject?: string | null;
+  /** @nullable */
+  studentName?: string | null;
+  documentKind: string;
+  scope: string;
+  yjsDocumentId: string;
+  snapshot?: JsonNode | null;
+  /** @nullable */
+  snapshotStorageKey?: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssignmentSubmissionResponse {
+  id: string;
+  assignmentId: string;
+  /** @nullable */
+  lessonId?: string | null;
+  materialId: string;
+  userId: string;
+  /** @nullable */
+  userSubject?: string | null;
+  /** @nullable */
+  userName?: string | null;
+  content: JsonNode;
+  /** @nullable */
+  score?: number | null;
+  /** @nullable */
+  errorsCount?: number | null;
+  /** @nullable */
+  progressTone?: number | null;
+  /** @nullable */
+  submittedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type LessonMaterialRequestCefrLevel = typeof LessonMaterialRequestCefrLevel[keyof typeof LessonMaterialRequestCefrLevel];
 
 
@@ -301,6 +352,122 @@ export interface LiveKitRoomTokenResponse {
   expiresAt: string;
 }
 
+export interface LessonHomeworkRequest {
+  /**
+     * @maxItems 100
+     * @nullable
+     * @items.maxLength 255
+     */
+  studentSubjects?: string[] | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  title?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  instructions?: string | null;
+  /** @nullable */
+  dueAt?: string | null;
+}
+
+export interface AssignmentRecipientProgressResponse {
+  assignmentId: string;
+  studentUserId: string;
+  studentSubject: string;
+  /** @nullable */
+  studentName?: string | null;
+  /** @nullable */
+  submissionId?: string | null;
+  hasSubmission: boolean;
+  submitted: boolean;
+  /** @nullable */
+  score?: number | null;
+  /** @nullable */
+  maxScore?: number | null;
+  /** @nullable */
+  scoreRatio?: number | null;
+  /** @nullable */
+  errorsCount?: number | null;
+  /** @nullable */
+  progressTone?: number | null;
+  showGroupIndicator: boolean;
+  /** @nullable */
+  groupAverageScore?: number | null;
+  /** @nullable */
+  groupAverageErrorsCount?: number | null;
+  /** @nullable */
+  relativeScoreDelta?: number | null;
+  /** @nullable */
+  relativeErrorsDelta?: number | null;
+  /** @nullable */
+  submittedAt?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
+}
+
+export interface AssignmentSummaryResponse {
+  id: string;
+  materialId: string;
+  materialTitle: string;
+  /** @nullable */
+  lessonId?: string | null;
+  /** @nullable */
+  sourceLessonId?: string | null;
+  title: string;
+  /** @nullable */
+  instructions?: string | null;
+  type: string;
+  /** @nullable */
+  maxScore?: number | null;
+  /** @nullable */
+  dueAt?: string | null;
+  status: string;
+  recipientCount: number;
+  submittedCount: number;
+  scoredCount: number;
+  /** @nullable */
+  averageScore?: number | null;
+  /** @nullable */
+  averageErrorsCount?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeacherAssignmentDetailResponse {
+  assignment: AssignmentSummaryResponse;
+  recipients: AssignmentRecipientProgressResponse[];
+}
+
+export interface CollaborationTokenResponse {
+  documentId: string;
+  yjsDocumentId: string;
+  websocketUrl: string;
+  token: string;
+  expiresAt: string;
+}
+
+export interface FinalizeCollaborationDocumentRequest {
+  submitted: boolean;
+}
+
+export type CreateCollaborationDocumentRequestScope = typeof CreateCollaborationDocumentRequestScope[keyof typeof CreateCollaborationDocumentRequestScope];
+
+
+export const CreateCollaborationDocumentRequestScope = {
+  INDIVIDUAL: 'INDIVIDUAL',
+  GROUP: 'GROUP',
+} as const;
+
+export interface CreateCollaborationDocumentRequest {
+  materialId: string;
+  /** @maxLength 40 */
+  documentKind: string;
+  scope: CreateCollaborationDocumentRequestScope;
+}
+
 export interface MaterialGenerateImagesRequest {
   /**
      * @maxLength 80
@@ -434,6 +601,28 @@ export interface MaterialAiDraftRequest {
   sourceFileName?: string | null;
 }
 
+export interface HomeworkAssignmentRequest {
+  materialId: string;
+  /**
+     * @minItems 1
+     * @maxItems 100
+     * @items.maxLength 255
+     */
+  studentSubjects: string[];
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  title?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  instructions?: string | null;
+  /** @nullable */
+  dueAt?: string | null;
+}
+
 export interface MaterialAssetUpdateRequest {
   /**
      * @maxItems 16
@@ -469,11 +658,27 @@ export interface MeResponse {
   roles: string[];
 }
 
+export interface StudentAssignmentDetailResponse {
+  assignment: AssignmentSummaryResponse;
+  material: LessonMaterialResponse;
+  submission: AssignmentSubmissionResponse;
+}
+
 export interface HelloResponse {
   service: string;
   message: string;
   timestamp: string;
 }
+
+export type GetCurrentCollaborationDocumentParams = {
+materialId: string;
+documentKind?: string;
+scope?: string;
+};
+
+export type ListCollaborationDocumentsParams = {
+materialId: string;
+};
 
 export type getMyUserProfileResponse200 = {
   data: UserProfileResponse
@@ -1049,6 +1254,164 @@ export const saveScheduledLessonMaterialAnnotation = async (lessonId: string,
 
   const data: saveScheduledLessonMaterialAnnotationResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as saveScheduledLessonMaterialAnnotationResponse
+}
+
+
+
+export type saveCollaborationDocumentSnapshotResponse200 = {
+  data: CollaborationDocumentResponse
+  status: 200
+}
+
+export type saveCollaborationDocumentSnapshotResponse400 = {
+  data: void
+  status: 400
+}
+
+export type saveCollaborationDocumentSnapshotResponse401 = {
+  data: void
+  status: 401
+}
+
+export type saveCollaborationDocumentSnapshotResponse403 = {
+  data: void
+  status: 403
+}
+
+export type saveCollaborationDocumentSnapshotResponse404 = {
+  data: void
+  status: 404
+}
+
+export type saveCollaborationDocumentSnapshotResponseSuccess = (saveCollaborationDocumentSnapshotResponse200) & {
+  headers: Headers;
+};
+export type saveCollaborationDocumentSnapshotResponseError = (saveCollaborationDocumentSnapshotResponse400 | saveCollaborationDocumentSnapshotResponse401 | saveCollaborationDocumentSnapshotResponse403 | saveCollaborationDocumentSnapshotResponse404) & {
+  headers: Headers;
+};
+
+export type saveCollaborationDocumentSnapshotResponse = (saveCollaborationDocumentSnapshotResponseSuccess | saveCollaborationDocumentSnapshotResponseError)
+
+export const getSaveCollaborationDocumentSnapshotUrl = (lessonId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/collaboration-documents/${documentId}/snapshot`
+}
+
+/**
+ * Stores the latest normalized snapshot for a collaboration document and increments its version.
+ * @summary Save collaboration document snapshot
+ */
+export const saveCollaborationDocumentSnapshot = async (lessonId: string,
+    documentId: string,
+    saveCollaborationSnapshotRequest: SaveCollaborationSnapshotRequest, options?: RequestInit): Promise<saveCollaborationDocumentSnapshotResponse> => {
+
+  const res = await fetch(getSaveCollaborationDocumentSnapshotUrl(lessonId,documentId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(saveCollaborationSnapshotRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: saveCollaborationDocumentSnapshotResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as saveCollaborationDocumentSnapshotResponse
+}
+
+
+
+export type getMyHomeworkAssignmentSubmissionResponse200 = {
+  data: AssignmentSubmissionResponse
+  status: 200
+}
+
+export type getMyHomeworkAssignmentSubmissionResponseSuccess = (getMyHomeworkAssignmentSubmissionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMyHomeworkAssignmentSubmissionResponse = (getMyHomeworkAssignmentSubmissionResponseSuccess)
+
+export const getGetMyHomeworkAssignmentSubmissionUrl = (assignmentId: string,) => {
+
+
+
+
+  return `/api/me/assignments/${assignmentId}/submission`
+}
+
+/**
+ * Returns the current student's saved answers for a homework assignment.
+ * @summary Get my homework answer snapshot
+ */
+export const getMyHomeworkAssignmentSubmission = async (assignmentId: string, options?: RequestInit): Promise<getMyHomeworkAssignmentSubmissionResponse> => {
+
+  const res = await fetch(getGetMyHomeworkAssignmentSubmissionUrl(assignmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMyHomeworkAssignmentSubmissionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMyHomeworkAssignmentSubmissionResponse
+}
+
+
+
+export type saveMyHomeworkAssignmentSubmissionResponse200 = {
+  data: AssignmentSubmissionResponse
+  status: 200
+}
+
+export type saveMyHomeworkAssignmentSubmissionResponseSuccess = (saveMyHomeworkAssignmentSubmissionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type saveMyHomeworkAssignmentSubmissionResponse = (saveMyHomeworkAssignmentSubmissionResponseSuccess)
+
+export const getSaveMyHomeworkAssignmentSubmissionUrl = (assignmentId: string,) => {
+
+
+
+
+  return `/api/me/assignments/${assignmentId}/submission`
+}
+
+/**
+ * Creates or updates the current student's answers and automatic score/error snapshot for homework.
+ * @summary Save my homework answer snapshot
+ */
+export const saveMyHomeworkAssignmentSubmission = async (assignmentId: string,
+    materialSubmissionRequest: MaterialSubmissionRequest, options?: RequestInit): Promise<saveMyHomeworkAssignmentSubmissionResponse> => {
+
+  const res = await fetch(getSaveMyHomeworkAssignmentSubmissionUrl(assignmentId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialSubmissionRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: saveMyHomeworkAssignmentSubmissionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as saveMyHomeworkAssignmentSubmissionResponse
 }
 
 
@@ -1726,6 +2089,342 @@ export const createScheduledLessonRoomToken = async (lessonId: string, options?:
 
 
 
+export type createHomeworkFromScheduledLessonResponse201 = {
+  data: TeacherAssignmentDetailResponse
+  status: 201
+}
+
+export type createHomeworkFromScheduledLessonResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createHomeworkFromScheduledLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createHomeworkFromScheduledLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createHomeworkFromScheduledLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createHomeworkFromScheduledLessonResponseSuccess = (createHomeworkFromScheduledLessonResponse201) & {
+  headers: Headers;
+};
+export type createHomeworkFromScheduledLessonResponseError = (createHomeworkFromScheduledLessonResponse400 | createHomeworkFromScheduledLessonResponse401 | createHomeworkFromScheduledLessonResponse403 | createHomeworkFromScheduledLessonResponse404) & {
+  headers: Headers;
+};
+
+export type createHomeworkFromScheduledLessonResponse = (createHomeworkFromScheduledLessonResponseSuccess | createHomeworkFromScheduledLessonResponseError)
+
+export const getCreateHomeworkFromScheduledLessonUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/homework`
+}
+
+/**
+ * Creates or updates a homework assignment from a scheduled lesson material and participants. Requires TEACHER or ADMIN role.
+ * @summary Carry scheduled lesson material into homework
+ */
+export const createHomeworkFromScheduledLesson = async (lessonId: string,
+    lessonHomeworkRequest: LessonHomeworkRequest, options?: RequestInit): Promise<createHomeworkFromScheduledLessonResponse> => {
+
+  const res = await fetch(getCreateHomeworkFromScheduledLessonUrl(lessonId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(lessonHomeworkRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createHomeworkFromScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createHomeworkFromScheduledLessonResponse
+}
+
+
+
+export type createCollaborationDocumentTokenResponse200 = {
+  data: CollaborationTokenResponse
+  status: 200
+}
+
+export type createCollaborationDocumentTokenResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createCollaborationDocumentTokenResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createCollaborationDocumentTokenResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createCollaborationDocumentTokenResponse503 = {
+  data: void
+  status: 503
+}
+
+export type createCollaborationDocumentTokenResponseSuccess = (createCollaborationDocumentTokenResponse200) & {
+  headers: Headers;
+};
+export type createCollaborationDocumentTokenResponseError = (createCollaborationDocumentTokenResponse401 | createCollaborationDocumentTokenResponse403 | createCollaborationDocumentTokenResponse404 | createCollaborationDocumentTokenResponse503) & {
+  headers: Headers;
+};
+
+export type createCollaborationDocumentTokenResponse = (createCollaborationDocumentTokenResponseSuccess | createCollaborationDocumentTokenResponseError)
+
+export const getCreateCollaborationDocumentTokenUrl = (lessonId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/collaboration-documents/${documentId}/token`
+}
+
+/**
+ * Returns a short-lived token scoped to the collaboration document room.
+ * @summary Create collaboration websocket token
+ */
+export const createCollaborationDocumentToken = async (lessonId: string,
+    documentId: string, options?: RequestInit): Promise<createCollaborationDocumentTokenResponse> => {
+
+  const res = await fetch(getCreateCollaborationDocumentTokenUrl(lessonId,documentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createCollaborationDocumentTokenResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createCollaborationDocumentTokenResponse
+}
+
+
+
+export type finalizeCollaborationDocumentResponse200 = {
+  data: MaterialSubmissionResponse
+  status: 200
+}
+
+export type finalizeCollaborationDocumentResponse400 = {
+  data: void
+  status: 400
+}
+
+export type finalizeCollaborationDocumentResponse401 = {
+  data: void
+  status: 401
+}
+
+export type finalizeCollaborationDocumentResponse403 = {
+  data: void
+  status: 403
+}
+
+export type finalizeCollaborationDocumentResponse404 = {
+  data: void
+  status: 404
+}
+
+export type finalizeCollaborationDocumentResponseSuccess = (finalizeCollaborationDocumentResponse200) & {
+  headers: Headers;
+};
+export type finalizeCollaborationDocumentResponseError = (finalizeCollaborationDocumentResponse400 | finalizeCollaborationDocumentResponse401 | finalizeCollaborationDocumentResponse403 | finalizeCollaborationDocumentResponse404) & {
+  headers: Headers;
+};
+
+export type finalizeCollaborationDocumentResponse = (finalizeCollaborationDocumentResponseSuccess | finalizeCollaborationDocumentResponseError)
+
+export const getFinalizeCollaborationDocumentUrl = (lessonId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/collaboration-documents/${documentId}/finalize`
+}
+
+/**
+ * Creates or updates the normal material submission from the latest collaboration snapshot.
+ * @summary Finalize collaboration document
+ */
+export const finalizeCollaborationDocument = async (lessonId: string,
+    documentId: string,
+    finalizeCollaborationDocumentRequest: FinalizeCollaborationDocumentRequest, options?: RequestInit): Promise<finalizeCollaborationDocumentResponse> => {
+
+  const res = await fetch(getFinalizeCollaborationDocumentUrl(lessonId,documentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(finalizeCollaborationDocumentRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: finalizeCollaborationDocumentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as finalizeCollaborationDocumentResponse
+}
+
+
+
+export type getCurrentCollaborationDocumentResponse200 = {
+  data: CollaborationDocumentResponse
+  status: 200
+}
+
+export type getCurrentCollaborationDocumentResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getCurrentCollaborationDocumentResponse403 = {
+  data: void
+  status: 403
+}
+
+export type getCurrentCollaborationDocumentResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getCurrentCollaborationDocumentResponseSuccess = (getCurrentCollaborationDocumentResponse200) & {
+  headers: Headers;
+};
+export type getCurrentCollaborationDocumentResponseError = (getCurrentCollaborationDocumentResponse401 | getCurrentCollaborationDocumentResponse403 | getCurrentCollaborationDocumentResponse404) & {
+  headers: Headers;
+};
+
+export type getCurrentCollaborationDocumentResponse = (getCurrentCollaborationDocumentResponseSuccess | getCurrentCollaborationDocumentResponseError)
+
+export const getGetCurrentCollaborationDocumentUrl = (lessonId: string,
+    params: GetCurrentCollaborationDocumentParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/collaboration-documents/current?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/collaboration-documents/current`
+}
+
+/**
+ * Returns the current user's individual document or the shared group document for a scheduled lesson material.
+ * @summary Get current collaboration document
+ */
+export const getCurrentCollaborationDocument = async (lessonId: string,
+    params: GetCurrentCollaborationDocumentParams, options?: RequestInit): Promise<getCurrentCollaborationDocumentResponse> => {
+
+  const res = await fetch(getGetCurrentCollaborationDocumentUrl(lessonId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getCurrentCollaborationDocumentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getCurrentCollaborationDocumentResponse
+}
+
+
+
+export type createCurrentCollaborationDocumentResponse200 = {
+  data: CollaborationDocumentResponse
+  status: 200
+}
+
+export type createCurrentCollaborationDocumentResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createCurrentCollaborationDocumentResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createCurrentCollaborationDocumentResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createCurrentCollaborationDocumentResponseSuccess = (createCurrentCollaborationDocumentResponse200) & {
+  headers: Headers;
+};
+export type createCurrentCollaborationDocumentResponseError = (createCurrentCollaborationDocumentResponse400 | createCurrentCollaborationDocumentResponse401 | createCurrentCollaborationDocumentResponse403) & {
+  headers: Headers;
+};
+
+export type createCurrentCollaborationDocumentResponse = (createCurrentCollaborationDocumentResponseSuccess | createCurrentCollaborationDocumentResponseError)
+
+export const getCreateCurrentCollaborationDocumentUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/collaboration-documents/current`
+}
+
+/**
+ * Creates the current user's individual document or the shared group document if missing, then returns it.
+ * @summary Create or get current collaboration document
+ */
+export const createCurrentCollaborationDocument = async (lessonId: string,
+    createCollaborationDocumentRequest: CreateCollaborationDocumentRequest, options?: RequestInit): Promise<createCurrentCollaborationDocumentResponse> => {
+
+  const res = await fetch(getCreateCurrentCollaborationDocumentUrl(lessonId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createCollaborationDocumentRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createCurrentCollaborationDocumentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createCurrentCollaborationDocumentResponse
+}
+
+
+
 export type listMaterialsResponse200 = {
   data: LessonMaterialResponse[]
   status: 200
@@ -2324,6 +3023,116 @@ export const createCourseLesson = async (courseId: string,
 
 
 
+export type listHomeworkAssignmentsResponse200 = {
+  data: AssignmentSummaryResponse[]
+  status: 200
+}
+
+export type listHomeworkAssignmentsResponseSuccess = (listHomeworkAssignmentsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listHomeworkAssignmentsResponse = (listHomeworkAssignmentsResponseSuccess)
+
+export const getListHomeworkAssignmentsUrl = () => {
+
+
+
+
+  return `/api/assignments`
+}
+
+/**
+ * Lists homework assignments visible to the current teacher or administrator.
+ * @summary List homework assignments
+ */
+export const listHomeworkAssignments = async ( options?: RequestInit): Promise<listHomeworkAssignmentsResponse> => {
+
+  const res = await fetch(getListHomeworkAssignmentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listHomeworkAssignmentsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listHomeworkAssignmentsResponse
+}
+
+
+
+export type createHomeworkAssignmentResponse201 = {
+  data: TeacherAssignmentDetailResponse
+  status: 201
+}
+
+export type createHomeworkAssignmentResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createHomeworkAssignmentResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createHomeworkAssignmentResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createHomeworkAssignmentResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createHomeworkAssignmentResponseSuccess = (createHomeworkAssignmentResponse201) & {
+  headers: Headers;
+};
+export type createHomeworkAssignmentResponseError = (createHomeworkAssignmentResponse400 | createHomeworkAssignmentResponse401 | createHomeworkAssignmentResponse403 | createHomeworkAssignmentResponse404) & {
+  headers: Headers;
+};
+
+export type createHomeworkAssignmentResponse = (createHomeworkAssignmentResponseSuccess | createHomeworkAssignmentResponseError)
+
+export const getCreateHomeworkAssignmentUrl = () => {
+
+
+
+
+  return `/api/assignments`
+}
+
+/**
+ * Creates a material-based homework assignment for selected students. Requires TEACHER or ADMIN role.
+ * @summary Create homework assignment
+ */
+export const createHomeworkAssignment = async (homeworkAssignmentRequest: HomeworkAssignmentRequest, options?: RequestInit): Promise<createHomeworkAssignmentResponse> => {
+
+  const res = await fetch(getCreateHomeworkAssignmentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(homeworkAssignmentRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createHomeworkAssignmentResponse
+}
+
+
+
 export type updateMaterialAssetResponse200 = {
   data: MaterialAssetResponse
   status: 200
@@ -2561,6 +3370,71 @@ export const listScheduledLessonMaterialSubmissions = async (lessonId: string, o
 
 
 
+export type listCollaborationDocumentsResponse200 = {
+  data: CollaborationDocumentResponse[]
+  status: 200
+}
+
+export type listCollaborationDocumentsResponse401 = {
+  data: void
+  status: 401
+}
+
+export type listCollaborationDocumentsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type listCollaborationDocumentsResponseSuccess = (listCollaborationDocumentsResponse200) & {
+  headers: Headers;
+};
+export type listCollaborationDocumentsResponseError = (listCollaborationDocumentsResponse401 | listCollaborationDocumentsResponse403) & {
+  headers: Headers;
+};
+
+export type listCollaborationDocumentsResponse = (listCollaborationDocumentsResponseSuccess | listCollaborationDocumentsResponseError)
+
+export const getListCollaborationDocumentsUrl = (lessonId: string,
+    params: ListCollaborationDocumentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/collaboration-documents?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/collaboration-documents`
+}
+
+/**
+ * Students see their own individual document and the group document; teachers and admins see all documents for the lesson material.
+ * @summary List collaboration documents
+ */
+export const listCollaborationDocuments = async (lessonId: string,
+    params: ListCollaborationDocumentsParams, options?: RequestInit): Promise<listCollaborationDocumentsResponse> => {
+
+  const res = await fetch(getListCollaborationDocumentsUrl(lessonId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listCollaborationDocumentsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listCollaborationDocumentsResponse
+}
+
+
+
 export type getMeResponse200 = {
   data: MeResponse
   status: 200
@@ -2608,6 +3482,138 @@ export const getMe = async ( options?: RequestInit): Promise<getMeResponse> => {
 
   const data: getMeResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getMeResponse
+}
+
+
+
+export type listMyHomeworkAssignmentsResponse200 = {
+  data: AssignmentSummaryResponse[]
+  status: 200
+}
+
+export type listMyHomeworkAssignmentsResponseSuccess = (listMyHomeworkAssignmentsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listMyHomeworkAssignmentsResponse = (listMyHomeworkAssignmentsResponseSuccess)
+
+export const getListMyHomeworkAssignmentsUrl = () => {
+
+
+
+
+  return `/api/me/assignments`
+}
+
+/**
+ * Lists homework assignments assigned to the current student.
+ * @summary List my homework assignments
+ */
+export const listMyHomeworkAssignments = async ( options?: RequestInit): Promise<listMyHomeworkAssignmentsResponse> => {
+
+  const res = await fetch(getListMyHomeworkAssignmentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listMyHomeworkAssignmentsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listMyHomeworkAssignmentsResponse
+}
+
+
+
+export type getMyHomeworkAssignmentResponse200 = {
+  data: StudentAssignmentDetailResponse
+  status: 200
+}
+
+export type getMyHomeworkAssignmentResponseSuccess = (getMyHomeworkAssignmentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMyHomeworkAssignmentResponse = (getMyHomeworkAssignmentResponseSuccess)
+
+export const getGetMyHomeworkAssignmentUrl = (assignmentId: string,) => {
+
+
+
+
+  return `/api/me/assignments/${assignmentId}`
+}
+
+/**
+ * Returns the assigned material and current answer snapshot for the current student.
+ * @summary Get my homework assignment
+ */
+export const getMyHomeworkAssignment = async (assignmentId: string, options?: RequestInit): Promise<getMyHomeworkAssignmentResponse> => {
+
+  const res = await fetch(getGetMyHomeworkAssignmentUrl(assignmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMyHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMyHomeworkAssignmentResponse
+}
+
+
+
+export type getMyHomeworkAssignmentMaterialResponse200 = {
+  data: LessonMaterialResponse
+  status: 200
+}
+
+export type getMyHomeworkAssignmentMaterialResponseSuccess = (getMyHomeworkAssignmentMaterialResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMyHomeworkAssignmentMaterialResponse = (getMyHomeworkAssignmentMaterialResponseSuccess)
+
+export const getGetMyHomeworkAssignmentMaterialUrl = (assignmentId: string,) => {
+
+
+
+
+  return `/api/me/assignments/${assignmentId}/material`
+}
+
+/**
+ * Returns the material attached to a homework assignment assigned to the current student.
+ * @summary Get my homework material
+ */
+export const getMyHomeworkAssignmentMaterial = async (assignmentId: string, options?: RequestInit): Promise<getMyHomeworkAssignmentMaterialResponse> => {
+
+  const res = await fetch(getGetMyHomeworkAssignmentMaterialUrl(assignmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMyHomeworkAssignmentMaterialResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMyHomeworkAssignmentMaterialResponse
 }
 
 
@@ -2758,6 +3764,50 @@ export const getHello = async ( options?: RequestInit): Promise<getHelloResponse
 
   const data: getHelloResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getHelloResponse
+}
+
+
+
+export type getHomeworkAssignmentResponse200 = {
+  data: TeacherAssignmentDetailResponse
+  status: 200
+}
+
+export type getHomeworkAssignmentResponseSuccess = (getHomeworkAssignmentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getHomeworkAssignmentResponse = (getHomeworkAssignmentResponseSuccess)
+
+export const getGetHomeworkAssignmentUrl = (assignmentId: string,) => {
+
+
+
+
+  return `/api/assignments/${assignmentId}`
+}
+
+/**
+ * Returns recipients and current score/error progress for a homework assignment.
+ * @summary Get homework assignment progress
+ */
+export const getHomeworkAssignment = async (assignmentId: string, options?: RequestInit): Promise<getHomeworkAssignmentResponse> => {
+
+  const res = await fetch(getGetHomeworkAssignmentUrl(assignmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getHomeworkAssignmentResponse
 }
 
 

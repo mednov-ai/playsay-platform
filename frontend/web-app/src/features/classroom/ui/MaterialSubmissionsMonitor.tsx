@@ -18,6 +18,10 @@ export function MaterialSubmissionsMonitor({
   const { t } = useAppTranslation();
   const latestSubmissions = submissions.slice(0, 4);
 
+  if (!error && latestSubmissions.length === 0) {
+    return null;
+  }
+
   return (
     <section className="playsay-submission-monitor" aria-label={t("classroom.submissions.aria")}>
       <div className="playsay-submission-monitor-summary">

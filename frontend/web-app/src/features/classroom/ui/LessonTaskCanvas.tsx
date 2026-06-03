@@ -1,5 +1,5 @@
 import { useEffect, useState, type PointerEvent, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Eraser, Loader2, MousePointer2, PenLine, Send, Undo2 } from "lucide-react";
+import { Eraser, Loader2, MousePointer2, PenLine, Send, Undo2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   type LessonMaterial,
@@ -12,7 +12,6 @@ import {
   FallbackLessonDocument,
   LessonMaterialDocumentView,
   materialAnswersFromSubmission,
-  materialDocumentBlocks,
   materialLiveScore,
   type MaterialAnswerBlock,
   type MaterialAnswerState,
@@ -98,7 +97,15 @@ export function LessonTaskCanvas({
   const displayScore = answersKey !== savedAnswersKey && liveScore !== null
     ? liveScore
     : score ?? liveScore;
-  const taskTotal = Math.max(1, material ? materialDocumentBlocks(material).length : 1);
+  const footerControls = collaborationControls === undefined ? (
+    <>
+      <Button disabled={!material || submissionSaving} onClick={submitAnswers} type="button">
+        {submissionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        {submissionSaving ? t("classroom.actions.submitting") : t("classroom.actions.submit")}
+      </Button>
+      {submissionMessage ? <span className="playsay-task-submit-status">{submissionMessage}</span> : null}
+    </>
+  ) : collaborationControls;
 
   function updateMaterialCursor(event: PointerEvent<HTMLDivElement>) {
     if (!annotationSync) {
@@ -204,22 +211,7 @@ export function LessonTaskCanvas({
       </div>
 
       <footer className="playsay-task-footer">
-        <button aria-label={t("classroom.annotation.previousTask")} className="playsay-page-button" type="button">
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <span>{t("classroom.annotation.pageIndicator", { current: 1, total: taskTotal })}</span>
-        <button aria-label={t("classroom.annotation.nextTask")} className="playsay-page-button" type="button">
-          <ChevronRight className="h-4 w-4" />
-        </button>
-        {collaborationControls ?? (
-          <>
-            <Button disabled={!material || submissionSaving} onClick={submitAnswers} type="button">
-              {submissionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {submissionSaving ? t("classroom.actions.submitting") : t("classroom.actions.submit")}
-            </Button>
-            {submissionMessage ? <span className="playsay-task-submit-status">{submissionMessage}</span> : null}
-          </>
-        )}
+        {footerControls}
         <span className="playsay-task-teacher">{teacherName}</span>
       </footer>
     </div>

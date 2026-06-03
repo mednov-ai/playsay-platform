@@ -41,6 +41,7 @@ export function LessonMaterialDocumentView({
   const assetKey = assetIds.join("|");
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
+  const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
 
   useEffect(() => {
     let active = true;
@@ -98,10 +99,10 @@ export function LessonMaterialDocumentView({
 
   return (
     <div className="playsay-rendered-material">
-      {showScoreBadge ? (
+      {showScoreBadge && numericScore !== null ? (
         <div className="playsay-material-score-badge">
           <span>{material.cefrLevel}</span>
-          <strong>{formatMaterialScore(score)}</strong>
+          <strong>{formatMaterialScore(numericScore)}</strong>
         </div>
       ) : null}
       <div className="playsay-task-kicker">

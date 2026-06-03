@@ -61,6 +61,11 @@ export function LessonWorkspace({
   const isParallelWork = session.workMode === "PARALLEL" &&
     session.participants.length > 1 &&
     assignedParticipants.length === session.participants.length;
+  const studentSharedPresenceEnabled = !canMonitorSubmissions &&
+    !isParallelWork &&
+    session.lessonType === "GROUP" &&
+    session.workMode === "SHARED" &&
+    session.participants.length > 1;
   const canManageMaterial = canAssignLessons(profile) && !isParallelWork;
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
   const activeParticipant = isParallelWork
@@ -71,7 +76,6 @@ export function LessonWorkspace({
     : null;
   const visibleMaterial = activeAssignedMaterial ?? material;
   const {
-    registerSubmission,
     saveMaterialAnswers,
     submission,
     submissionMessage,
@@ -268,10 +272,10 @@ export function LessonWorkspace({
               displayName={displayName}
               lessonId={session.lessonId}
               material={visibleMaterial}
-              onFinalized={registerSubmission}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
               profileSubject={profile?.subject}
               score={lessonScore}
+              sharedPresenceEnabled={studentSharedPresenceEnabled}
               submission={submission}
               submissionMessage={submissionMessage}
               submissionSaving={submissionSaving}

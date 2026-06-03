@@ -540,27 +540,8 @@
     padding: 0.425rem 0.5rem;
   }
 
-  .playsay-live-workspace-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .playsay-live-mode-switch {
-    width: 100%;
-  }
-
-  .playsay-live-mode-switch button {
-    flex: 1 1 0;
-    justify-content: center;
-  }
-
-  .playsay-live-workspace-grid,
   .playsay-collaboration-panel-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .playsay-live-editor {
-    min-height: 15rem;
   }
 
   .playsay-collaboration-panel-summary {

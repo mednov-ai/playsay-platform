@@ -43,6 +43,8 @@ class LessonEntity(
     var status: String = "",
     @Column(name = "type", nullable = false, length = 32)
     var type: String = "",
+    @Column(name = "work_mode", nullable = false, length = 32)
+    var workMode: String = "SHARED",
     @Column(name = "livekit_room_name", length = 255)
     var livekitRoomName: String? = null,
     @Column(name = "created_at", nullable = false)

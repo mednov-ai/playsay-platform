@@ -10,4 +10,5 @@
     <include file="2026-05-26-003-drop-legacy-data-url-materials.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-01-001-create-collaboration-documents.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-01-002-create-homework-assignments.xml" relativeToChangelogFile="true"/>
+    <include file="2026-06-03-001-add-parallel-lesson-assignments.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

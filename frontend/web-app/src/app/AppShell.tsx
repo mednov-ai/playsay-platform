@@ -253,6 +253,7 @@ export function AppShell(props: AppShellProps) {
                 disabled={!isAuthenticated || scheduleLoading}
                 lessons={courseLessons}
                 loading={scheduleLoading}
+                materials={materials}
                 message={scheduleMessage}
                 nowMs={nowMs}
                 onCancel={(lesson) => void cancelScheduledLesson(lesson)}

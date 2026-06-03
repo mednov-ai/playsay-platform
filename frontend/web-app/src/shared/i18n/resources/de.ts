@@ -143,6 +143,10 @@ export const de = {
       individual: "Einzelstunde",
       group: "Gruppe",
     },
+    workMode: {
+      shared: "Gemeinsames Feld",
+      parallel: "Eigene Aufgaben",
+    },
     time: {
       pending: "Zeit später",
       until: "bis {{time}}",
@@ -166,6 +170,12 @@ export const de = {
     form: {
       lessonTemplate: "Kurslektion",
       noTemplate: "Keine Vorlage",
+      workMode: "Arbeit",
+      directMaterial: "Material",
+      parallelDefaultMaterial: "Standardmaterial",
+      noMaterial: "Kein Material",
+      studentMaterials: "Schülermaterialien",
+      useDefaultMaterial: "Standard verwenden",
       start: "Start",
       end: "Ende",
       format: "Format",
@@ -675,6 +685,15 @@ export const de = {
       loadFailed: "Live-Dokument konnte nicht geöffnet werden",
       teacherLoadFailed: "Live-Dokumente konnten nicht geladen werden",
       groupCreateFailed: "Gruppendokument konnte nicht erstellt werden",
+    },
+    health: {
+      aria: "Statusindikatoren der Schüler",
+      title: "Status",
+      clear: "Keine neuen Fehler",
+      watch: "Neuer Fehler",
+      warm: "Fehler häufen sich",
+      hot: "Fehler in Folge",
+      openStudent: "Arbeit von {{name}} öffnen",
     },
     submissions: {
       aria: "Schülerantworten",

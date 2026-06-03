@@ -143,6 +143,10 @@ export const en = {
       individual: "Individual",
       group: "Group",
     },
+    workMode: {
+      shared: "Shared workspace",
+      parallel: "Own tasks",
+    },
     time: {
       pending: "time later",
       until: "until {{time}}",
@@ -166,6 +170,12 @@ export const en = {
     form: {
       lessonTemplate: "Course lesson",
       noTemplate: "No template",
+      workMode: "Work",
+      directMaterial: "Material",
+      parallelDefaultMaterial: "Default material",
+      noMaterial: "No material",
+      studentMaterials: "Student materials",
+      useDefaultMaterial: "Use default",
       start: "Start",
       end: "End",
       format: "Format",
@@ -675,6 +685,15 @@ export const en = {
       loadFailed: "Could not open live document",
       teacherLoadFailed: "Could not load live documents",
       groupCreateFailed: "Could not create group document",
+    },
+    health: {
+      aria: "Student health indicators",
+      title: "Health",
+      clear: "No new errors",
+      watch: "New error",
+      warm: "Errors are building up",
+      hot: "Consecutive errors",
+      openStudent: "Open {{name}} work",
     },
     submissions: {
       aria: "Student answers",

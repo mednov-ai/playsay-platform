@@ -23,6 +23,7 @@ data class ScheduledLessonRow(
     val scheduledEnd: Instant?,
     val status: String,
     val type: String,
+    val workMode: String,
     val livekitRoomName: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
@@ -35,12 +36,15 @@ data class LessonParticipantRow(
     val username: String?,
     val displayName: String?,
     val attendanceStatus: String?,
+    val materialId: UUID?,
+    val materialTitle: String?,
 )
 
 data class ScheduledMaterialLookupRow(
     val id: UUID,
     val status: String,
     val scheduledEnd: Instant?,
+    val workMode: String,
     val materialId: UUID?,
 )
 
@@ -71,6 +75,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.scheduledEnd,
             l.status,
             l.type,
+            l.workMode,
             l.livekitRoomName,
             l.createdAt,
             l.updatedAt
@@ -78,7 +83,10 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           from LessonEntity l
           left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
           left join CourseEntity c on c.id = lt.courseId
-          left join LessonMaterialEntity lm on lm.id = coalesce(l.materialId, lt.materialId)
+          left join LessonMaterialEntity lm on lm.id = case
+              when l.workMode = 'PARALLEL' then null
+              else coalesce(l.materialId, lt.materialId)
+          end
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
          order by case when l.scheduledStart is null then 1 else 0 end,
                   l.scheduledStart,
@@ -103,22 +111,19 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.scheduledEnd,
             l.status,
             l.type,
+            l.workMode,
             l.livekitRoomName,
             l.createdAt,
             l.updatedAt
         )
           from LessonEntity l
+          join LessonParticipantEntity lpCurrent on lpCurrent.lessonId = l.id
+          join AppUserEntity currentStudent on currentStudent.id = lpCurrent.studentUserId
           left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
           left join CourseEntity c on c.id = lt.courseId
-          left join LessonMaterialEntity lm on lm.id = coalesce(l.materialId, lt.materialId)
+          left join LessonMaterialEntity lm on lm.id = coalesce(lpCurrent.materialId, l.materialId, lt.materialId)
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
-         where exists (
-             select 1
-               from LessonParticipantEntity lpFilter
-               join AppUserEntity studentFilter on studentFilter.id = lpFilter.studentUserId
-              where lpFilter.lessonId = l.id
-                and studentFilter.keycloakSubject = :subject
-         )
+         where currentStudent.keycloakSubject = :subject
            and l.status not in :excludedStatuses
            and (l.scheduledEnd is null or l.scheduledEnd > :now)
          order by case when l.scheduledStart is null then 1 else 0 end,
@@ -148,6 +153,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.scheduledEnd,
             l.status,
             l.type,
+            l.workMode,
             l.livekitRoomName,
             l.createdAt,
             l.updatedAt
@@ -155,12 +161,49 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           from LessonEntity l
           left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
           left join CourseEntity c on c.id = lt.courseId
-          left join LessonMaterialEntity lm on lm.id = coalesce(l.materialId, lt.materialId)
+          left join LessonMaterialEntity lm on lm.id = case
+              when l.workMode = 'PARALLEL' then null
+              else coalesce(l.materialId, lt.materialId)
+          end
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
          where l.id = :lessonId
         """,
     )
     fun findScheduleRowById(lessonId: UUID): ScheduledLessonRow?
+
+    @Query(
+        """
+        select new com.playsay.gateway.repo.ScheduledLessonRow(
+            l.id,
+            l.lessonTemplateId,
+            coalesce(lpCurrent.materialId, l.materialId, lt.materialId),
+            lm.title,
+            lt.courseId,
+            c.title,
+            lt.title,
+            teacher.keycloakSubject,
+            coalesce(teacher.displayName, teacher.name, teacher.username),
+            l.scheduledStart,
+            l.scheduledEnd,
+            l.status,
+            l.type,
+            l.workMode,
+            l.livekitRoomName,
+            l.createdAt,
+            l.updatedAt
+        )
+          from LessonEntity l
+          join LessonParticipantEntity lpCurrent on lpCurrent.lessonId = l.id
+          join AppUserEntity currentStudent on currentStudent.id = lpCurrent.studentUserId
+          left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
+          left join CourseEntity c on c.id = lt.courseId
+          left join LessonMaterialEntity lm on lm.id = coalesce(lpCurrent.materialId, l.materialId, lt.materialId)
+          left join AppUserEntity teacher on teacher.id = l.teacherUserId
+         where l.id = :lessonId
+           and currentStudent.keycloakSubject = :subject
+        """,
+    )
+    fun findScheduleRowByIdForStudent(lessonId: UUID, subject: String): ScheduledLessonRow?
 
     @Query(
         """
@@ -215,7 +258,11 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.id,
             l.status,
             l.scheduledEnd,
-            coalesce(l.materialId, lt.materialId)
+            l.workMode,
+            case
+                when l.workMode = 'PARALLEL' then null
+                else coalesce(l.materialId, lt.materialId)
+            end
         )
           from LessonEntity l
           left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
@@ -226,12 +273,31 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
 
     @Query(
         """
+        select new com.playsay.gateway.repo.ScheduledMaterialLookupRow(
+            l.id,
+            l.status,
+            l.scheduledEnd,
+            l.workMode,
+            coalesce(lpCurrent.materialId, l.materialId, lt.materialId)
+        )
+          from LessonEntity l
+          join LessonParticipantEntity lpCurrent on lpCurrent.lessonId = l.id
+          join AppUserEntity currentStudent on currentStudent.id = lpCurrent.studentUserId
+          left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
+         where l.id = :lessonId
+           and currentStudent.keycloakSubject = :subject
+        """,
+    )
+    fun findScheduledMaterialLookupForStudent(lessonId: UUID, subject: String): ScheduledMaterialLookupRow?
+
+    @Query(
+        """
         select count(l)
           from LessonEntity l
           left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
           join LessonParticipantEntity lp on lp.lessonId = l.id
           join AppUserEntity student on student.id = lp.studentUserId
-         where coalesce(l.materialId, lt.materialId) = :materialId
+         where coalesce(lp.materialId, l.materialId, lt.materialId) = :materialId
            and student.keycloakSubject = :subject
            and l.status not in :excludedStatuses
            and (l.scheduledEnd is null or l.scheduledEnd > :now)
@@ -258,15 +324,38 @@ interface LessonParticipantRepo : JpaRepository<LessonParticipantEntity, UUID> {
             student.keycloakSubject,
             student.username,
             student.displayName,
-            lp.attendanceStatus
+            lp.attendanceStatus,
+            lp.materialId,
+            lm.title
         )
           from LessonParticipantEntity lp
           join AppUserEntity student on student.id = lp.studentUserId
+          left join LessonMaterialEntity lm on lm.id = lp.materialId
          where lp.lessonId in :lessonIds
          order by coalesce(student.displayName, student.username, student.keycloakSubject)
         """,
     )
     fun findParticipantRowsByLessonIds(lessonIds: Collection<UUID>): List<LessonParticipantRow>
+
+    @Query(
+        """
+        select distinct lp.materialId
+          from LessonParticipantEntity lp
+         where lp.lessonId = :lessonId
+           and lp.materialId is not null
+        """,
+    )
+    fun findAssignedMaterialIdsByLessonId(lessonId: UUID): List<UUID>
+
+    @Query(
+        """
+        select count(lp)
+          from LessonParticipantEntity lp
+         where lp.lessonId = :lessonId
+           and lp.materialId = :materialId
+        """,
+    )
+    fun countByLessonIdAndMaterialId(lessonId: UUID, materialId: UUID): Long
 
     @Query(
         """

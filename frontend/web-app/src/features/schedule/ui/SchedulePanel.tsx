@@ -11,6 +11,7 @@ import { Button } from "../../../components/ui/button";
 import type {
   AdminUserProfile,
   Course,
+  LessonMaterial,
   MeProfile,
   ScheduledLesson,
   ScheduledLessonInput,
@@ -26,6 +27,7 @@ export function SchedulePanel({
   disabled,
   lessons,
   loading,
+  materials,
   message,
   nowMs,
   onCancel,
@@ -43,6 +45,7 @@ export function SchedulePanel({
   disabled: boolean;
   lessons: CourseLessonMap;
   loading: boolean;
+  materials: LessonMaterial[];
   message: string | null;
   nowMs: number;
   onCancel: (lesson: ScheduledLesson) => void;
@@ -119,6 +122,7 @@ export function SchedulePanel({
             <ScheduleCreateForm
               disabled={disabled}
               lessonOptions={lessonOptions}
+              materials={materials}
               onCreate={onCreate}
               studentUsers={studentUsers}
             />

@@ -145,6 +145,10 @@ export const ru = {
       individual: "Индивидуально",
       group: "Группа",
     },
+    workMode: {
+      shared: "Общее поле",
+      parallel: "Свои задания",
+    },
     time: {
       pending: "время позже",
       until: "до {{time}}",
@@ -172,6 +176,12 @@ export const ru = {
     form: {
       lessonTemplate: "Урок курса",
       noTemplate: "Без шаблона",
+      workMode: "Работа",
+      directMaterial: "Материал",
+      parallelDefaultMaterial: "Материал по умолчанию",
+      noMaterial: "Без материала",
+      studentMaterials: "Материалы учеников",
+      useDefaultMaterial: "Как по умолчанию",
       start: "Начало",
       end: "Конец",
       format: "Формат",
@@ -689,6 +699,15 @@ export const ru = {
       loadFailed: "Не удалось открыть живой документ",
       teacherLoadFailed: "Не удалось загрузить живые документы",
       groupCreateFailed: "Не удалось создать общий документ",
+    },
+    health: {
+      aria: "Индикаторы состояния учеников",
+      title: "Состояние",
+      clear: "Новых ошибок нет",
+      watch: "Есть новая ошибка",
+      warm: "Ошибки накапливаются",
+      hot: "Ошибки идут подряд",
+      openStudent: "Открыть работу ученика {{name}}",
     },
     submissions: {
       aria: "Ответы учеников",

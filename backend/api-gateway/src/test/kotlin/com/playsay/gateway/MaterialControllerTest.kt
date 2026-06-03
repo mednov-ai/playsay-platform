@@ -348,6 +348,88 @@ class MaterialControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `parallel scheduled lesson uses each participant assignment for materials and teacher submissions`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(studentOne)
+        userProfileStore.currentUserId(studentTwo)
+        val materialOne = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Student one material", status = "PUBLISHED"),
+        ).body!!
+        val materialTwo = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Student two material", status = "PUBLISHED"),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                type = "GROUP",
+                workMode = "PARALLEL",
+                participantSubjects = listOf("student-1", "student-2"),
+                participantAssignments = listOf(
+                    ScheduledLessonMaterialAssignmentRequest(
+                        materialId = materialOne.id,
+                        participantSubjects = listOf("student-1"),
+                    ),
+                    ScheduledLessonMaterialAssignmentRequest(
+                        materialId = materialTwo.id,
+                        participantSubjects = listOf("student-2"),
+                    ),
+                ),
+            ),
+        ).body!!
+
+        assertEquals(materialOne.id, scheduledMaterialController.scheduledLessonMaterial(studentOne, lesson.id).id)
+        assertEquals(materialTwo.id, scheduledMaterialController.scheduledLessonMaterial(studentTwo, lesson.id).id)
+
+        val firstSubmission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
+            studentOne,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${materialOne.id}",
+                      "answers": {}
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+            ),
+        )
+        val secondSubmission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
+            studentTwo,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${materialTwo.id}",
+                      "answers": {}
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+            ),
+        )
+
+        assertEquals(materialOne.id, firstSubmission.materialId)
+        assertEquals(materialTwo.id, secondSubmission.materialId)
+        assertEquals(
+            setOf("student-1" to materialOne.id, "student-2" to materialTwo.id),
+            scheduledMaterialController.scheduledLessonMaterialSubmissions(teacher, lesson.id)
+                .map { submission -> submission.userSubject to submission.materialId }
+                .toSet(),
+        )
+    }
+
+    @Test
     fun `first classroom material state returns empty submission and annotation`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")

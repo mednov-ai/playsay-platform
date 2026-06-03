@@ -19,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
@@ -312,6 +313,57 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(directMaterial.id, direct.materialId)
         assertEquals("Direct material", direct.materialTitle)
         assertEquals(directMaterial.id, scheduleController.get(student, direct.id).materialId)
+    }
+
+    @Test
+    fun `teacher schedules parallel lesson with per participant material assignments`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(studentOne)
+        userProfileStore.currentUserId(studentTwo)
+        val materialOne = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Student one material", status = "PUBLISHED"),
+        ).body!!
+        val materialTwo = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Student two material", status = "PUBLISHED"),
+        ).body!!
+
+        val created = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                type = "GROUP",
+                workMode = "PARALLEL",
+                participantSubjects = listOf("student-1", "student-2"),
+                participantAssignments = listOf(
+                    ScheduledLessonMaterialAssignmentRequest(
+                        materialId = materialOne.id,
+                        participantSubjects = listOf("student-1"),
+                    ),
+                    ScheduledLessonMaterialAssignmentRequest(
+                        materialId = materialTwo.id,
+                        participantSubjects = listOf("student-2"),
+                    ),
+                ),
+            ),
+        ).body!!
+
+        assertEquals("PARALLEL", created.workMode)
+        assertNull(created.materialId)
+        assertEquals(
+            mapOf("student-1" to materialOne.id, "student-2" to materialTwo.id),
+            created.participants.associate { participant -> participant.subject to participant.materialId },
+        )
+        assertEquals(
+            mapOf("student-1" to "Student one material", "student-2" to "Student two material"),
+            created.participants.associate { participant -> participant.subject to participant.materialTitle },
+        )
+        assertEquals(materialOne.id, scheduleController.get(studentOne, created.id).materialId)
+        assertEquals(materialTwo.id, scheduleController.get(studentTwo, created.id).materialId)
     }
 
     @Test

@@ -1,14 +1,18 @@
-import type { Course, CourseLesson, ScheduledLesson } from "../../shared/api/playsay";
+import type { Course, CourseLesson, ScheduledLesson, ScheduledLessonMaterialAssignmentInput } from "../../shared/api/playsay";
 
 export type CourseLessonMap = Record<string, CourseLesson[]>;
 
 export type ScheduleTranslate = (key: string, options?: Record<string, unknown>) => string;
 
 export type ScheduleFormState = {
+  defaultParallelMaterialId: string;
   lessonTemplateId: string;
+  materialId: string;
+  participantMaterialIds: Record<string, string>;
   scheduledStart: string;
   scheduledEnd: string;
   type: "INDIVIDUAL" | "GROUP";
+  workMode: "SHARED" | "PARALLEL";
   participantSubjects: string;
 };
 
@@ -36,10 +40,14 @@ export function defaultScheduleForm(lessonTemplateId: string): ScheduleFormState
   end.setMinutes(end.getMinutes() + 45);
 
   return {
+    defaultParallelMaterialId: "",
     lessonTemplateId,
+    materialId: "",
+    participantMaterialIds: {},
     scheduledStart: toDateTimeLocalValue(start),
     scheduledEnd: toDateTimeLocalValue(end),
     type: "GROUP",
+    workMode: "SHARED",
     participantSubjects: "",
   };
 }
@@ -180,4 +188,19 @@ export function selectedParticipantSubjects(value: string): string[] {
     .split(",")
     .map((subject) => subject.trim())
     .filter(Boolean);
+}
+
+export function participantAssignmentsFromLesson(lesson: ScheduledLesson): ScheduledLessonMaterialAssignmentInput[] {
+  const grouped = new Map<string, string[]>();
+  lesson.participants.forEach((participant) => {
+    if (!participant.materialId) {
+      return;
+    }
+    grouped.set(participant.materialId, [...(grouped.get(participant.materialId) ?? []), participant.subject]);
+  });
+
+  return Array.from(grouped.entries()).map(([materialId, participantSubjects]) => ({
+    materialId,
+    participantSubjects,
+  }));
 }

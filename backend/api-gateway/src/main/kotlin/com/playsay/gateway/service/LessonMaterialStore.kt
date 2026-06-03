@@ -86,8 +86,17 @@ class LessonMaterialStore(
         lessonId: UUID,
     ): List<MaterialSubmissionResponse> {
         lessonMaterialCatalogService.requireMaterialManager(authentication)
-        val lookup = accessibleScheduledMaterial(authentication, lessonId)
-        return materialSubmissionService.listForScheduledLesson(lessonId, requireNotNull(lookup.materialId))
+        val lookup = scheduledMaterialLookup(lessonId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        val materialIds = if (lookup.workMode == MetaData.LessonWorkModes.PARALLEL) {
+            lessonParticipantRepo.findAssignedMaterialIdsByLessonId(lessonId)
+        } else {
+            listOfNotNull(lookup.materialId)
+        }
+        if (materialIds.isEmpty()) {
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        }
+        return materialSubmissionService.listForScheduledLesson(lessonId, materialIds)
     }
 
     @Transactional
@@ -217,7 +226,7 @@ class LessonMaterialStore(
     }
 
     private fun accessibleScheduledMaterial(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledMaterialLookup {
-        val lookup = scheduledMaterialLookup(lessonId)
+        val lookup = scheduledMaterialLookup(authentication, lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
         if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !lookup.isVisibleToParticipant(Instant.now())) {
@@ -236,6 +245,13 @@ class LessonMaterialStore(
 
     private fun scheduledMaterialLookup(lessonId: UUID): ScheduledMaterialLookup? =
         lessonRepo.findScheduledMaterialLookup(lessonId)
+
+    private fun scheduledMaterialLookup(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledMaterialLookup? =
+        if (lessonMaterialCatalogService.canManageMaterials(authentication)) {
+            lessonRepo.findScheduledMaterialLookup(lessonId)
+        } else {
+            lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.subject)
+        }
 
     private fun lockScheduledLesson(lessonId: UUID) {
         lessonRepo.lockById(lessonId)

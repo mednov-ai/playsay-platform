@@ -3,6 +3,7 @@ import { classroomLessonIdFromPath, classroomPath } from "../routes";
 import {
   type LessonRoomSession,
 } from "../../features/classroom";
+import { participantAssignmentsFromLesson } from "../../entities/schedule/model";
 import {
   editScheduledLesson,
   enterScheduledLessonRoom,
@@ -99,7 +100,9 @@ export function useScheduleActions({
         scheduledEnd: lesson.scheduledEnd ?? null,
         status: lesson.status as ScheduledLessonInput["status"],
         type: lesson.type === "INDIVIDUAL" ? "INDIVIDUAL" : "GROUP",
+        workMode: lesson.workMode === "PARALLEL" ? "PARALLEL" : "SHARED",
         participantSubjects: lesson.participants.map((participant) => participant.subject),
+        participantAssignments: participantAssignmentsFromLesson(lesson),
       });
       setScheduledLessons((current) => current.map((item) => (item.id === lessonId ? updated : item)));
       setRoomSession((current) => (
@@ -111,6 +114,7 @@ export function useScheduleActions({
               lessonStatus: updated.status,
               lessonTitle: updated.lessonTitle ?? current.lessonTitle,
               lessonType: updated.type,
+              workMode: updated.workMode,
               materialId: updated.materialId ?? null,
               participants: updated.participants,
             }
@@ -137,7 +141,9 @@ export function useScheduleActions({
         scheduledEnd: lesson.scheduledEnd ?? null,
         status: "CANCELLED",
         type: lesson.type === "INDIVIDUAL" ? "INDIVIDUAL" : "GROUP",
+        workMode: lesson.workMode === "PARALLEL" ? "PARALLEL" : "SHARED",
         participantSubjects: lesson.participants.map((participant) => participant.subject),
+        participantAssignments: participantAssignmentsFromLesson(lesson),
       });
       setScheduledLessons(await fetchScheduledLessons());
       setScheduleMessage(t("schedule.messages.cancelled"));
@@ -184,6 +190,7 @@ export function useScheduleActions({
         lessonStatus: lesson.status,
         lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? t("schedule.lessonFallbackTitle"),
         lessonType: lesson.type,
+        workMode: lesson.workMode,
         materialId: lesson.materialId ?? null,
         participants: lesson.participants,
         teacherName: lesson.teacherName ?? null,

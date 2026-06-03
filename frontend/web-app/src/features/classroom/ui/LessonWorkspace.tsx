@@ -1,5 +1,5 @@
 import { BookOpen, Clock3, Loader2, Plus, Users } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import { formatLessonRange, formatParticipantCount } from "../../../entities/schedule/model";
@@ -14,6 +14,12 @@ import { useLessonSubmission } from "../hooks/useLessonSubmission";
 import { useYjsWorkspace } from "../hooks/useYjsWorkspace";
 import { collaborationParticipantColor } from "../model/collaboration";
 import type { LessonRoomSession } from "../model/session";
+import {
+  acknowledgeStudentHealth,
+  studentHealthViews,
+  updateStudentHealthState,
+  type StudentHealthState,
+} from "../model/studentHealth";
 import {
   AssignmentStub,
   averageSubmissionScore,
@@ -51,7 +57,19 @@ export function LessonWorkspace({
     setSelectedMaterialId,
   } = useLessonMaterial({ onAssignMaterial, session });
   const canMonitorSubmissions = canAssignLessons(profile);
-  const canManageMaterial = canAssignLessons(profile);
+  const assignedParticipants = session.participants.filter((participant) => Boolean(participant.materialId));
+  const isParallelWork = session.workMode === "PARALLEL" &&
+    session.participants.length > 1 &&
+    assignedParticipants.length === session.participants.length;
+  const canManageMaterial = canAssignLessons(profile) && !isParallelWork;
+  const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
+  const activeParticipant = isParallelWork
+    ? assignedParticipants.find((participant) => participant.subject === activeStudentSubject) ?? assignedParticipants[0] ?? null
+    : null;
+  const activeAssignedMaterial = canMonitorSubmissions && activeParticipant?.materialId
+    ? materials.find((item) => item.id === activeParticipant.materialId) ?? null
+    : null;
+  const visibleMaterial = activeAssignedMaterial ?? material;
   const {
     registerSubmission,
     saveMaterialAnswers,
@@ -60,13 +78,23 @@ export function LessonWorkspace({
     submissionMonitorError,
     submissionSaving,
     submissionSnapshots,
-  } = useLessonSubmission({ canMonitorSubmissions, material, session });
+  } = useLessonSubmission({ canMonitorSubmissions, material: visibleMaterial, session });
+  const activeStudentSubmission = isParallelWork
+    ? submissionSnapshots.find((item) => item.userSubject === activeParticipant?.subject) ?? null
+    : null;
   const selectableMaterials = materials.filter((item) => item.status !== "ARCHIVED");
-  const lessonScore = canMonitorSubmissions ? averageSubmissionScore(submissionSnapshots) : submission?.score ?? null;
+  const lessonScore = isParallelWork
+    ? activeStudentSubmission?.score ?? null
+    : canMonitorSubmissions
+      ? averageSubmissionScore(submissionSnapshots)
+      : submission?.score ?? null;
+  const [studentHealthState, setStudentHealthState] = useState<StudentHealthState>({});
+  const healthSubjects = assignedParticipants.map((participant) => participant.subject);
+  const healthSubjectKey = healthSubjects.join("|");
   const teacherAnnotationDocumentState = useCollaborationDocument({
-    enabled: canMonitorSubmissions && Boolean(material),
+    enabled: canMonitorSubmissions && Boolean(visibleMaterial) && !isParallelWork,
     lessonId: session.lessonId,
-    materialId: material?.id,
+    materialId: visibleMaterial?.id,
     mode: "group",
   });
   const teacherAnnotationWorkspace = useYjsWorkspace({
@@ -94,6 +122,31 @@ export function LessonWorkspace({
     teacherAnnotationWorkspace.setAnnotationStrokes,
     teacherAnnotationWorkspace.updateCursor,
   ]);
+
+  useEffect(() => {
+    if (!isParallelWork) {
+      setActiveStudentSubject(null);
+      return;
+    }
+
+    if (!activeStudentSubject || !assignedParticipants.some((participant) => participant.subject === activeStudentSubject)) {
+      setActiveStudentSubject(assignedParticipants[0]?.subject ?? null);
+    }
+  }, [activeStudentSubject, assignedParticipants, isParallelWork]);
+
+  useEffect(() => {
+    if (!isParallelWork || !canMonitorSubmissions) {
+      setStudentHealthState({});
+      return;
+    }
+
+    setStudentHealthState((current) => updateStudentHealthState(current, submissionSnapshots, healthSubjects));
+  }, [canMonitorSubmissions, healthSubjectKey, isParallelWork, submissionSnapshots]);
+
+  function selectStudentWork(subject: string) {
+    setActiveStudentSubject(subject);
+    setStudentHealthState((current) => acknowledgeStudentHealth(current, subject));
+  }
 
   return (
     <section className="playsay-workbench">
@@ -152,9 +205,9 @@ export function LessonWorkspace({
           </div>
         ) : null}
 
-        {material ? (
+        {visibleMaterial ? (
           <div className="playsay-assignment-strip" aria-label={t("classroom.material.assignedAria")}>
-            {materialDocumentBlocks(material).slice(0, 6).map((block, index) => (
+            {materialDocumentBlocks(visibleMaterial).slice(0, 6).map((block, index) => (
               <AssignmentStub
                 active={index === 0}
                 key={block.id}
@@ -169,8 +222,15 @@ export function LessonWorkspace({
           </div>
         )}
 
-        {canMonitorSubmissions && material ? (
-          <MaterialSubmissionsMonitor error={submissionMonitorError} submissions={submissionSnapshots} />
+        {canMonitorSubmissions && visibleMaterial ? (
+          <MaterialSubmissionsMonitor
+            activeStudentSubject={activeParticipant?.subject ?? null}
+            error={submissionMonitorError}
+            health={isParallelWork ? studentHealthViews(studentHealthState) : undefined}
+            onSelectStudent={isParallelWork ? selectStudentWork : undefined}
+            participants={isParallelWork ? assignedParticipants : undefined}
+            submissions={submissionSnapshots}
+          />
         ) : null}
 
         {materialLoading ? (
@@ -178,13 +238,24 @@ export function LessonWorkspace({
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
             <span>{t("classroom.material.loading")}</span>
           </div>
-        ) : material ? (
+        ) : visibleMaterial ? (
           canMonitorSubmissions ? (
             <LessonTaskCanvas
               collaborationControls={null}
               lessonId={session.lessonId}
-              material={material}
-              annotationSync={teacherAnnotationSync}
+              material={visibleMaterial}
+              annotationSync={isParallelWork ? null : teacherAnnotationSync}
+              onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              score={lessonScore}
+              submission={isParallelWork ? activeStudentSubmission : submission}
+              submissionMessage={submissionMessage}
+              submissionSaving={submissionSaving}
+              teacherName={session.teacherName ?? displayName}
+            />
+          ) : isParallelWork ? (
+            <LessonTaskCanvas
+              lessonId={session.lessonId}
+              material={visibleMaterial}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
               score={lessonScore}
               submission={submission}
@@ -196,7 +267,7 @@ export function LessonWorkspace({
             <StudentLiveWorkspace
               displayName={displayName}
               lessonId={session.lessonId}
-              material={material}
+              material={visibleMaterial}
               onFinalized={registerSubmission}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
               profileSubject={profile?.subject}

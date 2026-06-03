@@ -26,6 +26,11 @@ class LessonParticipantEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_user_id", nullable = false, insertable = false, updatable = false)
     var studentUser: AppUserEntity? = null,
+    @Column(name = "material_id")
+    var materialId: UUID? = null,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "material_id", insertable = false, updatable = false)
+    var material: LessonMaterialEntity? = null,
     @Column(name = "joined_at")
     var joinedAt: Instant? = null,
     @Column(name = "left_at")

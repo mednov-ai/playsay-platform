@@ -250,13 +250,24 @@ class CollaborationDocumentService(
         lessonId: UUID,
         materialId: UUID,
     ): ScheduledMaterialLookupRow {
-        val lookup = lessonRepo.findScheduledMaterialLookup(lessonId)
+        if (authentication.canManageCollaboration()) {
+            val lookup = lessonRepo.findScheduledMaterialLookup(lessonId)
+                ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+            val materialIds = if (lookup.workMode == MetaData.LessonWorkModes.PARALLEL) {
+                lessonParticipantRepo.findAssignedMaterialIdsByLessonId(lessonId)
+            } else {
+                listOfNotNull(lookup.materialId)
+            }
+            if (materialId !in materialIds) {
+                throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+            }
+            return lookup
+        }
+
+        val lookup = lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.subject)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         if (lookup.materialId != materialId) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        }
-        if (authentication.canManageCollaboration()) {
-            return lookup
         }
         if (!lookup.isVisibleToParticipant(Instant.now()) || !isLessonParticipant(lessonId, authentication.token.subject)) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)

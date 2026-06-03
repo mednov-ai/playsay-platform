@@ -44,6 +44,12 @@ class MaterialSubmissionService(
             .map { submission -> submission.toResponse(objectMapper) }
     }
 
+    fun listForScheduledLesson(lessonId: UUID, materialIds: Collection<UUID>): List<MaterialSubmissionResponse> =
+        materialIds
+            .distinct()
+            .flatMap { materialId -> listForScheduledLesson(lessonId, materialId) }
+            .sortedByDescending { submission -> submission.updatedAt }
+
     fun saveForScheduledLesson(
         lessonId: UUID,
         material: LessonMaterialRow,

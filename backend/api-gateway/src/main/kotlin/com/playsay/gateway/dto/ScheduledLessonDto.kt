@@ -13,6 +13,14 @@ data class ScheduledLessonRequest(
     val status: String = "SCHEDULED",
     @field:Schema(allowableValues = ["INDIVIDUAL", "GROUP"])
     val type: String = "GROUP",
+    @field:Schema(allowableValues = ["SHARED", "PARALLEL"])
+    val workMode: String = "SHARED",
+    val participantSubjects: List<String> = emptyList(),
+    val participantAssignments: List<ScheduledLessonMaterialAssignmentRequest> = emptyList(),
+)
+
+data class ScheduledLessonMaterialAssignmentRequest(
+    val materialId: UUID,
     val participantSubjects: List<String> = emptyList(),
 )
 
@@ -21,6 +29,8 @@ data class ScheduledLessonParticipantResponse(
     val username: String?,
     val displayName: String?,
     val attendanceStatus: String?,
+    val materialId: UUID? = null,
+    val materialTitle: String? = null,
 )
 
 data class ScheduledLessonResponse(
@@ -37,6 +47,7 @@ data class ScheduledLessonResponse(
     val scheduledEnd: Instant?,
     val status: String,
     val type: String,
+    val workMode: String = "SHARED",
     val livekitRoomName: String?,
     val participants: List<ScheduledLessonParticipantResponse>,
     val createdAt: Instant,

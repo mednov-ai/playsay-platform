@@ -26,6 +26,11 @@ object MetaData {
         const val GROUP = "GROUP"
     }
 
+    object LessonWorkModes {
+        const val SHARED = "SHARED"
+        const val PARALLEL = "PARALLEL"
+    }
+
     object AttendanceStatuses {
         const val PLANNED = "PLANNED"
         const val PRESENT = "PRESENT"
@@ -85,6 +90,7 @@ object MetaData {
         const val SCHEDULED_END_BEFORE_START = "SCHEDULED_END_BEFORE_START"
         const val UNSUPPORTED_LESSON_STATUS = "UNSUPPORTED_LESSON_STATUS"
         const val UNSUPPORTED_LESSON_TYPE = "UNSUPPORTED_LESSON_TYPE"
+        const val UNSUPPORTED_LESSON_WORK_MODE = "UNSUPPORTED_LESSON_WORK_MODE"
         const val ORDER_INDEX_NEGATIVE = "ORDER_INDEX_NEGATIVE"
         const val PLANNED_DURATION_OUT_OF_RANGE = "PLANNED_DURATION_OUT_OF_RANGE"
         const val MATERIAL_NOT_FOUND = "MATERIAL_NOT_FOUND"

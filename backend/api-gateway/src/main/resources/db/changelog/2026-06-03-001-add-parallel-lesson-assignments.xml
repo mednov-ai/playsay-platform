@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-03-001-add-parallel-lesson-assignments" author="codex">
+        <addColumn tableName="lesson">
+            <column name="work_mode" type="VARCHAR(32)" defaultValue="SHARED">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <addColumn tableName="lesson_participant">
+            <column name="material_id" type="UUID"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="lesson_participant"
+            baseColumnNames="material_id"
+            constraintName="fk_lesson_participant_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <createIndex tableName="lesson_participant" indexName="idx_lesson_participant_material">
+            <column name="lesson_id"/>
+            <column name="material_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="lesson_participant" indexName="idx_lesson_participant_material"/>
+            <dropForeignKeyConstraint baseTableName="lesson_participant" constraintName="fk_lesson_participant_material"/>
+            <dropColumn tableName="lesson_participant" columnName="material_id"/>
+            <dropColumn tableName="lesson" columnName="work_mode"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

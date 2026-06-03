@@ -1686,6 +1686,19 @@ components:
       - roles
       - subject
       - updatedAt
+    ScheduledLessonMaterialAssignmentRequest:
+      type: object
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        participantSubjects:
+          type: array
+          items:
+            type: string
+      required:
+      - materialId
+      - participantSubjects
     ScheduledLessonRequest:
       type: object
       properties:
@@ -1721,14 +1734,25 @@ components:
           enum:
           - INDIVIDUAL
           - GROUP
+        workMode:
+          type: string
+          enum:
+          - SHARED
+          - PARALLEL
         participantSubjects:
           type: array
           items:
             type: string
+        participantAssignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduledLessonMaterialAssignmentRequest"
       required:
+      - participantAssignments
       - participantSubjects
       - status
       - type
+      - workMode
     ScheduledLessonParticipantResponse:
       type: object
       properties:
@@ -1743,6 +1767,15 @@ components:
           - string
           - "null"
         attendanceStatus:
+          type:
+          - string
+          - "null"
+        materialId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        materialTitle:
           type:
           - string
           - "null"
@@ -1803,6 +1836,8 @@ components:
           type: string
         type:
           type: string
+        workMode:
+          type: string
         livekitRoomName:
           type:
           - string
@@ -1824,6 +1859,7 @@ components:
       - status
       - type
       - updatedAt
+      - workMode
     JsonNode: {}
     MaterialSubmissionRequest:
       type: object

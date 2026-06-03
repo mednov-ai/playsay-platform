@@ -48,6 +48,11 @@ export interface UserProfileResponse {
   updatedAt: string;
 }
 
+export interface ScheduledLessonMaterialAssignmentRequest {
+  materialId: string;
+  participantSubjects: string[];
+}
+
 export type ScheduledLessonRequestStatus = typeof ScheduledLessonRequestStatus[keyof typeof ScheduledLessonRequestStatus];
 
 
@@ -66,6 +71,14 @@ export const ScheduledLessonRequestType = {
   GROUP: 'GROUP',
 } as const;
 
+export type ScheduledLessonRequestWorkMode = typeof ScheduledLessonRequestWorkMode[keyof typeof ScheduledLessonRequestWorkMode];
+
+
+export const ScheduledLessonRequestWorkMode = {
+  SHARED: 'SHARED',
+  PARALLEL: 'PARALLEL',
+} as const;
+
 export interface ScheduledLessonRequest {
   /** @nullable */
   lessonTemplateId?: string | null;
@@ -77,7 +90,9 @@ export interface ScheduledLessonRequest {
   scheduledEnd?: string | null;
   status: ScheduledLessonRequestStatus;
   type: ScheduledLessonRequestType;
+  workMode: ScheduledLessonRequestWorkMode;
   participantSubjects: string[];
+  participantAssignments: ScheduledLessonMaterialAssignmentRequest[];
 }
 
 export interface ScheduledLessonParticipantResponse {
@@ -88,6 +103,10 @@ export interface ScheduledLessonParticipantResponse {
   displayName?: string | null;
   /** @nullable */
   attendanceStatus?: string | null;
+  /** @nullable */
+  materialId?: string | null;
+  /** @nullable */
+  materialTitle?: string | null;
 }
 
 export interface ScheduledLessonResponse {
@@ -114,6 +133,7 @@ export interface ScheduledLessonResponse {
   scheduledEnd?: string | null;
   status: string;
   type: string;
+  workMode: string;
   /** @nullable */
   livekitRoomName?: string | null;
   participants: ScheduledLessonParticipantResponse[];

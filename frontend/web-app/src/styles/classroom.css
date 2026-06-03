@@ -456,6 +456,63 @@
   display: none;
 }
 
+.playsay-student-health-card {
+  display: inline-grid;
+  flex: 0 0 auto;
+  min-width: 9.5rem;
+  max-width: 13rem;
+  gap: 0.125rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: #ffffff;
+  padding: 0.5rem 0.625rem;
+  color: hsl(var(--foreground));
+  text-align: left;
+}
+
+.playsay-student-health-card[data-active="true"] {
+  box-shadow: 0 0 0 2px rgb(255 92 0 / 0.24);
+}
+
+.playsay-student-health-card[data-health="clear"] {
+  background: linear-gradient(135deg, #f5fff9 0%, #ffffff 100%);
+  border-color: rgb(0 168 120 / 0.22);
+}
+
+.playsay-student-health-card[data-health="watch"] {
+  background: linear-gradient(135deg, #fffdf3 0%, #ffffff 100%);
+  border-color: rgb(255 190 68 / 0.4);
+}
+
+.playsay-student-health-card[data-health="warm"] {
+  background: linear-gradient(135deg, #fff3ed 0%, #ffe8df 100%);
+  border-color: rgb(255 92 0 / 0.28);
+}
+
+.playsay-student-health-card[data-health="hot"] {
+  background: linear-gradient(135deg, #ffe9e3 0%, #ffb9aa 100%);
+  border-color: rgb(198 40 40 / 0.36);
+}
+
+.playsay-student-health-card span,
+.playsay-student-health-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-student-health-card span {
+  font-size: 0.8125rem;
+  font-weight: 950;
+}
+
+.playsay-student-health-card small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.6875rem;
+  font-weight: 850;
+}
+
 .playsay-submission-pill,
 .playsay-submission-monitor-empty,
 .playsay-submission-monitor-error {

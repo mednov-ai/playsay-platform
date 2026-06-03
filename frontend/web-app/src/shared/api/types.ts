@@ -5,6 +5,7 @@ import type {
   CourseResponse,
   LiveKitRoomTokenResponse,
   MeResponse,
+  ScheduledLessonMaterialAssignmentRequest,
   ScheduledLessonRequest,
   ScheduledLessonResponse,
   UpdateUserProfileRequest,
@@ -28,6 +29,7 @@ export type ScheduledLesson = ScheduledLessonResponse & {
   materialId?: string | null;
   materialTitle?: string | null;
 };
+export type ScheduledLessonMaterialAssignmentInput = ScheduledLessonMaterialAssignmentRequest;
 export type ScheduledLessonInput = ScheduledLessonRequest & {
   materialId?: string | null;
 };

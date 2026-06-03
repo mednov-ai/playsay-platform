@@ -143,6 +143,10 @@ export const fr = {
       individual: "Individuel",
       group: "Groupe",
     },
+    workMode: {
+      shared: "Espace partagé",
+      parallel: "Tâches propres",
+    },
     time: {
       pending: "horaire à venir",
       until: "jusqu'à {{time}}",
@@ -166,6 +170,12 @@ export const fr = {
     form: {
       lessonTemplate: "Leçon du parcours",
       noTemplate: "Sans modèle",
+      workMode: "Travail",
+      directMaterial: "Support",
+      parallelDefaultMaterial: "Support par défaut",
+      noMaterial: "Sans support",
+      studentMaterials: "Supports élèves",
+      useDefaultMaterial: "Par défaut",
       start: "Début",
       end: "Fin",
       format: "Format",
@@ -675,6 +685,15 @@ export const fr = {
       loadFailed: "Impossible d'ouvrir le document live",
       teacherLoadFailed: "Impossible de charger les documents live",
       groupCreateFailed: "Impossible de créer le document de groupe",
+    },
+    health: {
+      aria: "Indicateurs d’état des élèves",
+      title: "État",
+      clear: "Aucune nouvelle erreur",
+      watch: "Nouvelle erreur",
+      warm: "Les erreurs augmentent",
+      hot: "Erreurs consécutives",
+      openStudent: "Ouvrir le travail de {{name}}",
     },
     submissions: {
       aria: "Réponses des élèves",

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { classroomViewportMode } from "./LiveLessonExperience";
+import { classroomViewportModeFromSnapshot } from "./LiveLessonExperience";
 
 describe("classroomViewportMode", () => {
   afterEach(() => {
@@ -7,46 +7,40 @@ describe("classroomViewportMode", () => {
   });
 
   it("treats phone portrait as mobile portrait", () => {
-    stubMatchMedia(390, 844);
-
-    expect(classroomViewportMode()).toBe("mobilePortrait");
+    expect(classroomViewportModeFromSnapshot(viewportSnapshot(390, 844))).toBe("mobilePortrait");
   });
 
   it("treats phone landscape as mobile landscape", () => {
-    stubMatchMedia(844, 390);
+    expect(classroomViewportModeFromSnapshot(viewportSnapshot(844, 390))).toBe("mobileLandscape");
+  });
 
-    expect(classroomViewportMode()).toBe("mobileLandscape");
+  it("treats iPhone Safari landscape as mobile landscape when orientation media query lags", () => {
+    expect(classroomViewportModeFromSnapshot({
+      ...viewportSnapshot(980, 414),
+      landscapeQueryMatches: false,
+    })).toBe("mobileLandscape");
   });
 
   it("keeps tall narrow desktop and tablet resizes in desktop mode", () => {
-    stubMatchMedia(920, 820);
+    expect(classroomViewportModeFromSnapshot(viewportSnapshot(920, 820))).toBe("desktop");
+  });
 
-    expect(classroomViewportMode()).toBe("desktop");
+  it("keeps short desktop browser resizes in desktop mode without a coarse pointer", () => {
+    expect(classroomViewportModeFromSnapshot({
+      ...viewportSnapshot(920, 600),
+      coarsePointer: false,
+    })).toBe("desktop");
   });
 });
 
-function stubMatchMedia(width: number, height: number) {
-  vi.stubGlobal("window", {
-    matchMedia: (query: string): MediaQueryList => ({
-      addEventListener: vi.fn(),
-      addListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-      matches: matchesMediaQuery(query, width, height),
-      media: query,
-      onchange: null,
-      removeEventListener: vi.fn(),
-      removeListener: vi.fn(),
-    }),
-  });
-}
+function viewportSnapshot(width: number, height: number) {
+  const portrait = height >= width;
 
-function matchesMediaQuery(query: string, width: number, height: number): boolean {
-  const maxWidth = Number(query.match(/max-width:\s*(\d+)px/)?.[1] ?? Infinity);
-  const maxHeight = Number(query.match(/max-height:\s*(\d+)px/)?.[1] ?? Infinity);
-  const orientation = query.match(/orientation:\s*(portrait|landscape)/)?.[1];
-
-  return width <= maxWidth &&
-    height <= maxHeight &&
-    (orientation === undefined ||
-      (orientation === "portrait" ? height >= width : width >= height));
+  return {
+    coarsePointer: true,
+    height,
+    landscapeQueryMatches: !portrait && width <= 1024 && height <= 640,
+    portraitQueryMatches: portrait && width <= 640,
+    width,
+  };
 }

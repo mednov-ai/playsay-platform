@@ -17,9 +17,21 @@ import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoSt
 import { LessonWorkspace } from "./LessonWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
 
-type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
-const mobilePortraitQuery = "(max-width: 640px) and (orientation: portrait)";
-const mobileLandscapeQuery = "(max-width: 980px) and (orientation: landscape) and (max-height: 640px)";
+export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
+
+type ClassroomViewportSnapshot = {
+  coarsePointer: boolean;
+  height: number;
+  landscapeQueryMatches: boolean;
+  portraitQueryMatches: boolean;
+  width: number;
+};
+
+const mobilePortraitMaxWidth = 640;
+const mobileLandscapeMaxWidth = 1024;
+const mobileLandscapeMaxHeight = 640;
+const mobilePortraitQuery = `(max-width: ${mobilePortraitMaxWidth}px) and (orientation: portrait)`;
+const mobileLandscapeQuery = `(max-width: ${mobileLandscapeMaxWidth}px) and (orientation: landscape) and (max-height: ${mobileLandscapeMaxHeight}px)`;
 
 export function LiveLessonExperience({
   materials,
@@ -48,6 +60,12 @@ export function LiveLessonExperience({
       ? "videoOnly"
       : "lesson";
   const showWorkspace = !videoOnly && !videoExpanded;
+
+  useEffect(() => {
+    document.body.classList.toggle("playsay-classroom-video-expanded", videoExpanded);
+
+    return () => document.body.classList.remove("playsay-classroom-video-expanded");
+  }, [videoExpanded]);
 
   return (
     <div
@@ -112,6 +130,7 @@ function useClassroomViewportMode(): ClassroomViewportMode {
   useEffect(() => {
     const portraitQuery = window.matchMedia(mobilePortraitQuery);
     const landscapeQuery = window.matchMedia(mobileLandscapeQuery);
+    const visualViewport = window.visualViewport;
 
     function updateMode() {
       setMode(classroomViewportMode());
@@ -120,12 +139,16 @@ function useClassroomViewportMode(): ClassroomViewportMode {
     updateMode();
     portraitQuery.addEventListener("change", updateMode);
     landscapeQuery.addEventListener("change", updateMode);
+    window.addEventListener("orientationchange", updateMode);
     window.addEventListener("resize", updateMode);
+    visualViewport?.addEventListener("resize", updateMode);
 
     return () => {
       portraitQuery.removeEventListener("change", updateMode);
       landscapeQuery.removeEventListener("change", updateMode);
+      window.removeEventListener("orientationchange", updateMode);
       window.removeEventListener("resize", updateMode);
+      visualViewport?.removeEventListener("resize", updateMode);
     };
   }, []);
 
@@ -133,13 +156,38 @@ function useClassroomViewportMode(): ClassroomViewportMode {
 }
 
 export function classroomViewportMode(): ClassroomViewportMode {
-  if (window.matchMedia(mobileLandscapeQuery).matches) {
+  return classroomViewportModeFromSnapshot(readClassroomViewportSnapshot());
+}
+
+export function classroomViewportModeFromSnapshot(snapshot: ClassroomViewportSnapshot): ClassroomViewportMode {
+  const isLandscape = snapshot.width > snapshot.height;
+  const isPhoneLikeLandscape = isLandscape &&
+    snapshot.coarsePointer &&
+    snapshot.width <= mobileLandscapeMaxWidth &&
+    snapshot.height <= mobileLandscapeMaxHeight;
+  const isPhoneLikePortrait = snapshot.height >= snapshot.width &&
+    snapshot.width <= mobilePortraitMaxWidth;
+
+  if ((snapshot.landscapeQueryMatches && snapshot.coarsePointer) || isPhoneLikeLandscape) {
     return "mobileLandscape";
   }
 
-  if (window.matchMedia(mobilePortraitQuery).matches) {
+  if (snapshot.portraitQueryMatches || isPhoneLikePortrait) {
     return "mobilePortrait";
   }
 
   return "desktop";
+}
+
+function readClassroomViewportSnapshot(): ClassroomViewportSnapshot {
+  const width = Math.round(window.innerWidth || document.documentElement.clientWidth);
+  const height = Math.round(window.innerHeight || document.documentElement.clientHeight);
+
+  return {
+    coarsePointer: window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0,
+    height,
+    landscapeQueryMatches: window.matchMedia(mobileLandscapeQuery).matches,
+    portraitQueryMatches: window.matchMedia(mobilePortraitQuery).matches,
+    width,
+  };
 }

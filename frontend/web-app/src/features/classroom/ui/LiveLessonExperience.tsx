@@ -37,11 +37,6 @@ type FullscreenCapableDocument = Document & {
   webkitFullscreenElement?: Element | null;
 };
 
-type NativeFullscreenVideoElement = HTMLVideoElement & {
-  webkitEnterFullScreen?: () => void;
-  webkitEnterFullscreen?: () => void;
-};
-
 const mobilePortraitMaxWidth = 640;
 const mobileLandscapeMaxWidth = 1024;
 const mobileLandscapeMaxHeight = 640;
@@ -251,13 +246,6 @@ export async function requestClassroomFullscreen(shell: HTMLElement | null): Pro
   const requestWebkitFullscreen = fullscreenShell.webkitRequestFullscreen ?? fullscreenShell.webkitRequestFullScreen;
   if (requestWebkitFullscreen) {
     await Promise.resolve(requestWebkitFullscreen.call(fullscreenShell));
-    return true;
-  }
-
-  const focusVideo = shell.querySelector(".playsay-video-focus video") as NativeFullscreenVideoElement | null;
-  const enterNativeVideoFullscreen = focusVideo?.webkitEnterFullscreen ?? focusVideo?.webkitEnterFullScreen;
-  if (focusVideo && enterNativeVideoFullscreen) {
-    enterNativeVideoFullscreen.call(focusVideo);
     return true;
   }
 

@@ -44,15 +44,27 @@ describe("classroomViewportMode", () => {
     expect(requestFullscreen).toHaveBeenCalledWith({ navigationUI: "hide" });
   });
 
-  it("falls back to native video fullscreen for iPhone Safari", async () => {
+  it("requests webkit fullscreen for the classroom shell when standard fullscreen is unavailable", async () => {
+    const webkitRequestFullscreen = vi.fn();
+    const shell = {
+      webkitRequestFullscreen,
+      querySelector: vi.fn(),
+    } as unknown as HTMLElement;
+
+    await expect(requestClassroomFullscreen(shell)).resolves.toBe(true);
+
+    expect(webkitRequestFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fall back to native video fullscreen because it hides classroom controls and participants", async () => {
     const webkitEnterFullscreen = vi.fn();
     const shell = {
       querySelector: vi.fn(() => ({ webkitEnterFullscreen })),
     } as unknown as HTMLElement;
 
-    await expect(requestClassroomFullscreen(shell)).resolves.toBe(true);
+    await expect(requestClassroomFullscreen(shell)).resolves.toBe(false);
 
-    expect(webkitEnterFullscreen).toHaveBeenCalledTimes(1);
+    expect(webkitEnterFullscreen).not.toHaveBeenCalled();
   });
 });
 

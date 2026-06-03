@@ -621,6 +621,8 @@ export const ru = {
     participantFallback: "Участник",
     actions: {
       assign: "Назначить",
+      enterFullscreen: "На весь экран",
+      exitFullscreen: "Выйти из полноэкранного режима",
       leave: "Выйти",
       submit: "Отправить",
       submitting: "Отправляем",

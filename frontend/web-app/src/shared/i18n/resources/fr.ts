@@ -607,6 +607,8 @@ export const fr = {
     participantFallback: "Participant",
     actions: {
       assign: "Attribuer",
+      enterFullscreen: "Plein écran",
+      exitFullscreen: "Quitter le plein écran",
       leave: "Quitter",
       submit: "Envoyer",
       submitting: "Envoi",

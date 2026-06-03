@@ -1,6 +1,6 @@
 import { LiveKitRoom } from "@livekit/components-react";
-import { PhoneOff, Radio } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Maximize2, Minimize2, PhoneOff, Radio } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import {
   formatLessonRange,
@@ -27,6 +27,21 @@ type ClassroomViewportSnapshot = {
   width: number;
 };
 
+type FullscreenCapableElement = HTMLElement & {
+  webkitRequestFullScreen?: () => Promise<void> | void;
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenCapableDocument = Document & {
+  webkitExitFullscreen?: () => Promise<void> | void;
+  webkitFullscreenElement?: Element | null;
+};
+
+type NativeFullscreenVideoElement = HTMLVideoElement & {
+  webkitEnterFullScreen?: () => void;
+  webkitEnterFullscreen?: () => void;
+};
+
 const mobilePortraitMaxWidth = 640;
 const mobileLandscapeMaxWidth = 1024;
 const mobileLandscapeMaxHeight = 640;
@@ -47,6 +62,9 @@ export function LiveLessonExperience({
   session: LessonRoomSession;
 }) {
   const { t } = useAppTranslation();
+  const shellRef = useRef<HTMLDivElement>(null);
+  const [fullscreenActive, setFullscreenActive] = useState(() => classroomFullscreenActive());
+  const [fullscreenPending, setFullscreenPending] = useState(false);
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
   const displayName = profile?.name ?? profile?.username ?? t("classroom.participantFallback");
   const lessonTypeLabel = formatLessonType(session.lessonType, translate);
@@ -67,12 +85,50 @@ export function LiveLessonExperience({
     return () => document.body.classList.remove("playsay-classroom-video-expanded");
   }, [videoExpanded]);
 
+  useEffect(() => {
+    function updateFullscreenState() {
+      setFullscreenActive(classroomFullscreenActive(shellRef.current));
+    }
+
+    updateFullscreenState();
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    document.addEventListener("webkitfullscreenchange", updateFullscreenState);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", updateFullscreenState);
+      document.removeEventListener("webkitfullscreenchange", updateFullscreenState);
+    };
+  }, []);
+
+  async function toggleFullscreen() {
+    if (fullscreenPending) {
+      return;
+    }
+
+    setFullscreenPending(true);
+    try {
+      if (classroomFullscreenActive(shellRef.current)) {
+        await exitClassroomFullscreen();
+      } else {
+        await requestClassroomFullscreen(shellRef.current);
+      }
+    } finally {
+      setFullscreenPending(false);
+      setFullscreenActive(classroomFullscreenActive(shellRef.current));
+    }
+  }
+
+  const fullscreenLabel = fullscreenActive
+    ? t("classroom.actions.exitFullscreen")
+    : t("classroom.actions.enterFullscreen");
+
   return (
     <div
       className="playsay-classroom-shell"
       data-video-expanded={videoExpanded ? "true" : "false"}
       data-video-only={videoOnly ? "true" : "false"}
       data-viewport-mode={viewportMode}
+      ref={shellRef}
     >
       <section className="playsay-video-rail">
         <div className="playsay-video-header">
@@ -91,10 +147,26 @@ export function LiveLessonExperience({
               {session.courseTitle ?? "Play&Say"} · {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt, translate)}
             </p>
           </div>
-          <Button className="playsay-lesson-exit" onClick={onLeave} type="button" variant="outline">
-            <PhoneOff className="h-4 w-4" />
-            {t("classroom.actions.leave")}
-          </Button>
+          <div className="playsay-video-actions">
+            {videoExpanded ? (
+              <Button
+                aria-label={fullscreenLabel}
+                className="playsay-classroom-fullscreen"
+                disabled={fullscreenPending}
+                onClick={() => void toggleFullscreen()}
+                title={fullscreenLabel}
+                type="button"
+                variant="outline"
+              >
+                {fullscreenActive ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                <span className="sr-only">{fullscreenLabel}</span>
+              </Button>
+            ) : null}
+            <Button className="playsay-lesson-exit" onClick={onLeave} type="button" variant="outline">
+              <PhoneOff className="h-4 w-4" />
+              {t("classroom.actions.leave")}
+            </Button>
+          </div>
         </div>
 
         <div className="playsay-classroom-room min-h-0 flex-1">
@@ -157,6 +229,54 @@ function useClassroomViewportMode(): ClassroomViewportMode {
 
 export function classroomViewportMode(): ClassroomViewportMode {
   return classroomViewportModeFromSnapshot(readClassroomViewportSnapshot());
+}
+
+export function classroomFullscreenActive(shell?: HTMLElement | null): boolean {
+  const fullscreenElement = document.fullscreenElement ?? (document as FullscreenCapableDocument).webkitFullscreenElement ?? null;
+
+  return fullscreenElement !== null && (shell === undefined || shell === null || fullscreenElement === shell || shell.contains(fullscreenElement));
+}
+
+export async function requestClassroomFullscreen(shell: HTMLElement | null): Promise<boolean> {
+  if (!shell) {
+    return false;
+  }
+
+  const fullscreenShell = shell as FullscreenCapableElement;
+  if (fullscreenShell.requestFullscreen) {
+    await fullscreenShell.requestFullscreen({ navigationUI: "hide" });
+    return true;
+  }
+
+  const requestWebkitFullscreen = fullscreenShell.webkitRequestFullscreen ?? fullscreenShell.webkitRequestFullScreen;
+  if (requestWebkitFullscreen) {
+    await Promise.resolve(requestWebkitFullscreen.call(fullscreenShell));
+    return true;
+  }
+
+  const focusVideo = shell.querySelector(".playsay-video-focus video") as NativeFullscreenVideoElement | null;
+  const enterNativeVideoFullscreen = focusVideo?.webkitEnterFullscreen ?? focusVideo?.webkitEnterFullScreen;
+  if (focusVideo && enterNativeVideoFullscreen) {
+    enterNativeVideoFullscreen.call(focusVideo);
+    return true;
+  }
+
+  return false;
+}
+
+async function exitClassroomFullscreen(): Promise<boolean> {
+  if (document.fullscreenElement) {
+    await document.exitFullscreen();
+    return true;
+  }
+
+  const fullscreenDocument = document as FullscreenCapableDocument;
+  if (fullscreenDocument.webkitFullscreenElement && fullscreenDocument.webkitExitFullscreen) {
+    await Promise.resolve(fullscreenDocument.webkitExitFullscreen());
+    return true;
+  }
+
+  return false;
 }
 
 export function classroomViewportModeFromSnapshot(snapshot: ClassroomViewportSnapshot): ClassroomViewportMode {

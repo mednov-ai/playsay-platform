@@ -59,6 +59,22 @@
   line-height: 1.15;
 }
 
+.playsay-video-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.playsay-classroom-fullscreen {
+  width: 2.6rem;
+  min-width: 2.6rem;
+  min-height: 2.4rem;
+  border-radius: 0.75rem;
+  padding-inline: 0;
+}
+
 .playsay-classroom-conference {
   display: grid;
   height: 100%;

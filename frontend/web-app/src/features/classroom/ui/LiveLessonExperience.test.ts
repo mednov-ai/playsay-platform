@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { classroomViewportModeFromSnapshot } from "./LiveLessonExperience";
+import { classroomViewportModeFromSnapshot, requestClassroomFullscreen } from "./LiveLessonExperience";
 
 describe("classroomViewportMode", () => {
   afterEach(() => {
@@ -30,6 +30,29 @@ describe("classroomViewportMode", () => {
       ...viewportSnapshot(920, 600),
       coarsePointer: false,
     })).toBe("desktop");
+  });
+
+  it("requests browser fullscreen for the classroom shell when supported", async () => {
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    const shell = {
+      requestFullscreen,
+      querySelector: vi.fn(),
+    } as unknown as HTMLElement;
+
+    await expect(requestClassroomFullscreen(shell)).resolves.toBe(true);
+
+    expect(requestFullscreen).toHaveBeenCalledWith({ navigationUI: "hide" });
+  });
+
+  it("falls back to native video fullscreen for iPhone Safari", async () => {
+    const webkitEnterFullscreen = vi.fn();
+    const shell = {
+      querySelector: vi.fn(() => ({ webkitEnterFullscreen })),
+    } as unknown as HTMLElement;
+
+    await expect(requestClassroomFullscreen(shell)).resolves.toBe(true);
+
+    expect(webkitEnterFullscreen).toHaveBeenCalledTimes(1);
   });
 });
 

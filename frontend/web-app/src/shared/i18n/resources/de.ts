@@ -607,6 +607,8 @@ export const de = {
     participantFallback: "Teilnehmer",
     actions: {
       assign: "Zuweisen",
+      enterFullscreen: "Vollbild öffnen",
+      exitFullscreen: "Vollbild beenden",
       leave: "Verlassen",
       submit: "Senden",
       submitting: "Wird gesendet",

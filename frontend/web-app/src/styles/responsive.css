@@ -648,6 +648,17 @@ body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expand
   font-size: 0.75rem;
 }
 
+body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-video-actions {
+  gap: 0.45rem;
+}
+
+body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-fullscreen {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.1rem;
+  border-radius: 0.65rem;
+}
+
 body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-room,
 body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-room [data-lk-theme="default"] {
   height: 100%;

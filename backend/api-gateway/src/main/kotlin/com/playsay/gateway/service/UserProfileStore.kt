@@ -39,6 +39,7 @@ class UserProfileStore(
         profile.roles = identity.roles.toStoredRoles()
         profile.displayName = clean(request.displayName, 120)
         profile.locale = clean(request.locale, 16)
+        profile.countryCode = cleanCountryCode(request.countryCode)
         profile.timezone = clean(request.timezone, 64)
         profile.learningGoal = clean(request.learningGoal, 500)
         profile.updatedAt = updatedAt
@@ -57,6 +58,7 @@ class UserProfileStore(
         profile.roles = identity.roles.toStoredRoles()
         profile.displayName = identity.defaultDisplayName()
         profile.locale = null
+        profile.countryCode = defaultCountryCode
         profile.timezone = null
         profile.learningGoal = null
         profile.updatedAt = Instant.now()
@@ -94,6 +96,14 @@ class UserProfileStore(
         return cleaned
     }
 
+    private fun cleanCountryCode(value: String?): String? {
+        val cleaned = value?.trim()?.uppercase()?.takeIf { it.isNotEmpty() } ?: return null
+        if (!countryCodePattern.matches(cleaned)) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.INVALID_COUNTRY_CODE)
+        }
+        return cleaned
+    }
+
     private fun insertProfile(identity: CurrentIdentity): AppUserEntity {
         val now = Instant.now()
         val profile = AppUserEntity(
@@ -105,6 +115,7 @@ class UserProfileStore(
             roles = identity.roles.toStoredRoles(),
             displayName = identity.defaultDisplayName(),
             locale = null,
+            countryCode = defaultCountryCode,
             timezone = null,
             learningGoal = null,
             createdAt = now,
@@ -161,6 +172,7 @@ private fun AppUserEntity.toResponse(): UserProfileResponse =
         roles = roles.toApplicationRoles(),
         displayName = displayName,
         locale = locale,
+        countryCode = countryCode,
         timezone = timezone,
         learningGoal = learningGoal,
         updatedAt = updatedAt,
@@ -178,3 +190,6 @@ private fun String?.toApplicationRoles(): List<String> =
         ?.mapNotNull { role -> role.trim().takeIf { it.isNotEmpty() } }
         ?.sorted()
         ?: emptyList()
+
+private const val defaultCountryCode = "RU"
+private val countryCodePattern = Regex("^[A-Z]{2}$")

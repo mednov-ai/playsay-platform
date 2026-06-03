@@ -17,6 +17,12 @@ export interface UpdateUserProfileRequest {
      */
   locale?: string | null;
   /**
+     * ISO-3166 alpha-2 country code.
+     * @maxLength 2
+     * @nullable
+     */
+  countryCode?: string | null;
+  /**
      * @maxLength 64
      * @nullable
      */
@@ -41,6 +47,8 @@ export interface UserProfileResponse {
   displayName?: string | null;
   /** @nullable */
   locale?: string | null;
+  /** @nullable */
+  countryCode?: string | null;
   /** @nullable */
   timezone?: string | null;
   /** @nullable */
@@ -488,6 +496,29 @@ export interface CreateCollaborationDocumentRequest {
   scope: CreateCollaborationDocumentRequestScope;
 }
 
+export interface MaterialVideoPlaybackRequest {
+  /** @maxLength 80 */
+  blockId: string;
+}
+
+export interface MaterialVideoPlaybackResponse {
+  materialId: string;
+  blockId: string;
+  /** @nullable */
+  videoId?: string | null;
+  mode: string;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  embedUrl?: string | null;
+  /** @nullable */
+  relayUrl?: string | null;
+  /** @nullable */
+  sessionId?: string | null;
+  /** @nullable */
+  expiresAt?: string | null;
+}
+
 export interface MaterialGenerateImagesRequest {
   /**
      * @maxLength 80
@@ -683,6 +714,8 @@ export interface StudentAssignmentDetailResponse {
   material: LessonMaterialResponse;
   submission: AssignmentSubmissionResponse;
 }
+
+export interface StreamingResponseBody {}
 
 export interface HelloResponse {
   service: string;
@@ -2557,6 +2590,63 @@ export const createMaterial = async (lessonMaterialRequest: LessonMaterialReques
 
 
 
+export type createMaterialVideoPlaybackResponse200 = {
+  data: MaterialVideoPlaybackResponse
+  status: 200
+}
+
+export type createMaterialVideoPlaybackResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createMaterialVideoPlaybackResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createMaterialVideoPlaybackResponseSuccess = (createMaterialVideoPlaybackResponse200) & {
+  headers: Headers;
+};
+export type createMaterialVideoPlaybackResponseError = (createMaterialVideoPlaybackResponse401 | createMaterialVideoPlaybackResponse404) & {
+  headers: Headers;
+};
+
+export type createMaterialVideoPlaybackResponse = (createMaterialVideoPlaybackResponseSuccess | createMaterialVideoPlaybackResponseError)
+
+export const getCreateMaterialVideoPlaybackUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/video-playback`
+}
+
+/**
+ * Returns the playback mode for a material video block and creates a short-lived RF relay session when allowed.
+ * @summary Create material video playback decision
+ */
+export const createMaterialVideoPlayback = async (materialId: string,
+    materialVideoPlaybackRequest: MaterialVideoPlaybackRequest, options?: RequestInit): Promise<createMaterialVideoPlaybackResponse> => {
+
+  const res = await fetch(getCreateMaterialVideoPlaybackUrl(materialId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialVideoPlaybackRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createMaterialVideoPlaybackResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createMaterialVideoPlaybackResponse
+}
+
+
+
 export type generateMaterialImagesResponse200 = {
   data: LessonMaterialResponse
   status: 200
@@ -3740,6 +3830,67 @@ export const getMaterialAssetContent = async (materialId: string,
 
   const data: getMaterialAssetContentResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
   return { data, status: res.status, headers: res.headers } as getMaterialAssetContentResponse
+}
+
+
+
+export type streamMaterialVideoPlaybackSessionResponse200 = {
+  data: StreamingResponseBody
+  status: 200
+}
+
+export type streamMaterialVideoPlaybackSessionResponse206 = {
+  data: StreamingResponseBody
+  status: 206
+}
+
+export type streamMaterialVideoPlaybackSessionResponse404 = {
+  data: void
+  status: 404
+}
+
+export type streamMaterialVideoPlaybackSessionResponse503 = {
+  data: void
+  status: 503
+}
+
+export type streamMaterialVideoPlaybackSessionResponseSuccess = (streamMaterialVideoPlaybackSessionResponse200 | streamMaterialVideoPlaybackSessionResponse206) & {
+  headers: Headers;
+};
+export type streamMaterialVideoPlaybackSessionResponseError = (streamMaterialVideoPlaybackSessionResponse404 | streamMaterialVideoPlaybackSessionResponse503) & {
+  headers: Headers;
+};
+
+export type streamMaterialVideoPlaybackSessionResponse = (streamMaterialVideoPlaybackSessionResponseSuccess | streamMaterialVideoPlaybackSessionResponseError)
+
+export const getStreamMaterialVideoPlaybackSessionUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/materials/video-playback-sessions/${sessionId}/stream`
+}
+
+/**
+ * Streams a short-lived RF relay session created by the material video playback endpoint.
+ * @summary Stream a material video playback session
+ */
+export const streamMaterialVideoPlaybackSession = async (sessionId: string, options?: RequestInit): Promise<streamMaterialVideoPlaybackSessionResponse> => {
+
+  const res = await fetch(getStreamMaterialVideoPlaybackSessionUrl(sessionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: streamMaterialVideoPlaybackSessionResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
+  return { data, status: res.status, headers: res.headers } as streamMaterialVideoPlaybackSessionResponse
 }
 
 

@@ -45,8 +45,13 @@ export const ru = {
     fields: {
       name: "Имя",
       language: "Язык",
+      country: "Страна",
       timezone: "Часовой пояс",
       learningGoal: "Цель обучения",
+    },
+    country: {
+      unspecified: "Не указана",
+      russia: "Россия",
     },
     status: {
       checkingSession: "Проверяем сессию",
@@ -519,6 +524,7 @@ export const ru = {
       answerKeyTitle: "Показать верную форму",
       answerKeyValue: "Ответ по ключу: {{value}}",
       videoLinkPlaceholder: "Ссылка на видео будет здесь",
+      videoPlaybackUnsupported: "Ваш браузер не поддерживает встроенное воспроизведение видео.",
       imageFallback: "Изображение",
       studentAnswerPlaceholder: "Ответ ученика",
       resizeImage: "Изменить размер картинки",

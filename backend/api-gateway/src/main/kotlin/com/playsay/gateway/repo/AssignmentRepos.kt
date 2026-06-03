@@ -66,6 +66,25 @@ interface AssignmentRecipientRepo : JpaRepository<AssignmentRecipientEntity, UUI
     fun countByAssignmentIdAndStudentUserId(assignmentId: UUID, studentUserId: UUID): Long
 
     fun countByAssignmentId(assignmentId: UUID): Long
+
+    @Query(
+        """
+        select count(ar)
+          from AssignmentRecipientEntity ar
+          join AssignmentEntity a on a.id = ar.assignmentId
+         where ar.studentUserId = :studentUserId
+           and ar.archivedAt is null
+           and a.materialId = :materialId
+           and a.type = :type
+           and a.status <> :archivedStatus
+        """,
+    )
+    fun countActiveMaterialRecipients(
+        materialId: UUID,
+        studentUserId: UUID,
+        type: String,
+        archivedStatus: String,
+    ): Long
 }
 
 interface SubmissionRepo : JpaRepository<SubmissionEntity, UUID> {

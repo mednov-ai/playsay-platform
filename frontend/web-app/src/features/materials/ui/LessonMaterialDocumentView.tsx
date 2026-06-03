@@ -119,6 +119,7 @@ export function LessonMaterialDocumentView({
             assetUrls={assetUrls}
             block={block}
             key={block.id}
+            materialId={material.id}
             mode={mode}
             onAnswerChange={onAnswerChange}
             onAssetTagsChange={async (assetId, tags) => {

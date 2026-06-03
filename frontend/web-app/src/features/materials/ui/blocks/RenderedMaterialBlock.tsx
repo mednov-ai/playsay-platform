@@ -1,5 +1,6 @@
-import { type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { ImageIcon, Video } from "lucide-react";
+import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
 import {
   materialAnswerContextForBlock,
   materialAnswerText,
@@ -28,11 +29,13 @@ export function RenderedMaterialBlock({
   onAssetTagsChange,
   onBlockPatchCommit,
   onBlockPatch,
+  materialId,
 }: {
   answer?: MaterialAnswerBlock;
   assetTags: Record<string, string[]>;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
+  materialId?: string;
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
   onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
@@ -40,7 +43,36 @@ export function RenderedMaterialBlock({
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
 }) {
   const { t } = useAppTranslation();
+  const [videoPlayback, setVideoPlayback] = useState<MaterialVideoPlayback | null>(null);
   const contextLabel = materialBlockContextLabel(block);
+
+  useEffect(() => {
+    let active = true;
+    const provider = (block.provider ?? "").toUpperCase();
+    if (block.type !== "videoEmbed" || provider !== "YOUTUBE" || !materialId || materialId === "preview") {
+      setVideoPlayback(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    createMaterialVideoPlayback(materialId, { blockId: block.id })
+      .then((decision) => {
+        if (active) {
+          setVideoPlayback(decision);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setVideoPlayback(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [block.id, block.provider, block.type, materialId]);
+
   const blockSection = (children: ReactNode, className = "playsay-render-block") => (
     <section
       className={className}
@@ -63,11 +95,17 @@ export function RenderedMaterialBlock({
       );
     case "videoEmbed":
       {
-        const frame = materialVideoEmbedFrame(block);
+        const frame = materialVideoEmbedFrame(block, videoPlayback);
         return blockSection(
           <>
             <h4>{block.title}</h4>
-            {frame ? (
+            {frame?.kind === "RF_RELAY" ? (
+              <div className="playsay-video-embed">
+                <video controls preload="metadata" src={frame.src} title={frame.title}>
+                  {t("materials.renderer.videoPlaybackUnsupported")}
+                </video>
+              </div>
+            ) : frame ? (
               <div className="playsay-video-embed">
                 <iframe
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

@@ -62,3 +62,10 @@ playsay:
       secret-key: ${PLAYSAY_S3_SECRET_KEY:}
       path-style-access: ${PLAYSAY_S3_PATH_STYLE_ACCESS:true}
       create-bucket: ${PLAYSAY_S3_CREATE_BUCKET:false}
+  video:
+    youtube:
+      rf-relay:
+        enabled: ${PLAYSAY_YOUTUBE_RF_RELAY_ENABLED:false}
+        geo-country-header: ${PLAYSAY_YOUTUBE_RF_RELAY_GEO_COUNTRY_HEADER:}
+        session-ttl-seconds: ${PLAYSAY_YOUTUBE_RF_RELAY_SESSION_TTL_SECONDS:900}
+        ytdlp-path: ${PLAYSAY_YOUTUBE_RF_RELAY_YTDLP_PATH:yt-dlp}

@@ -433,6 +433,7 @@ export function useAppController(): AppShellProps {
 function userProfileInputWithLanguage(profile: AppUserProfile, language: SupportedLanguage): UpdateUserProfileInput {
   return {
     displayName: profile.displayName ?? null,
+    countryCode: profile.countryCode ?? null,
     learningGoal: profile.learningGoal ?? null,
     locale: language,
     timezone: profile.timezone ?? null,

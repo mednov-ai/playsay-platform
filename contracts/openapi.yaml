@@ -953,6 +953,40 @@ paths:
           description: Current user cannot manage materials
       security:
       - bearerAuth: []
+  /materials/{materialId}/video-playback:
+    post:
+      tags:
+      - Materials
+      summary: Create material video playback decision
+      description: Returns the playback mode for a material video block and creates
+        a short-lived RF relay session when allowed.
+      operationId: createMaterialVideoPlayback
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialVideoPlaybackRequest"
+        required: true
+      responses:
+        "200":
+          description: Video playback decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialVideoPlaybackResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Material or block not found
+      security:
+      - bearerAuth: []
   /materials/{materialId}/generate-images:
     post:
       tags:
@@ -1557,6 +1591,43 @@ paths:
           description: Object storage failed
       security:
       - bearerAuth: []
+  /materials/video-playback-sessions/{sessionId}/stream:
+    get:
+      tags:
+      - Materials
+      summary: Stream a material video playback session
+      description: Streams a short-lived RF relay session created by the material
+        video playback endpoint.
+      operationId: streamMaterialVideoPlaybackSession
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Range
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Video stream
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StreamingResponseBody"
+        "206":
+          description: Partial video stream
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StreamingResponseBody"
+        "404":
+          description: Playback session not found
+        "503":
+          description: Relay unavailable
   /hello:
     get:
       tags:
@@ -1632,6 +1703,12 @@ components:
           - string
           - "null"
           maxLength: 16
+        countryCode:
+          type:
+          - string
+          - "null"
+          description: ISO-3166 alpha-2 country code.
+          maxLength: 2
         timezone:
           type:
           - string
@@ -1668,6 +1745,10 @@ components:
           - string
           - "null"
         locale:
+          type:
+          - string
+          - "null"
+        countryCode:
           type:
           - string
           - "null"
@@ -2599,6 +2680,54 @@ components:
       - documentKind
       - materialId
       - scope
+    MaterialVideoPlaybackRequest:
+      type: object
+      properties:
+        blockId:
+          type: string
+          maxLength: 80
+      required:
+      - blockId
+    MaterialVideoPlaybackResponse:
+      type: object
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        blockId:
+          type: string
+        videoId:
+          type:
+          - string
+          - "null"
+        mode:
+          type: string
+        reason:
+          type:
+          - string
+          - "null"
+        embedUrl:
+          type:
+          - string
+          - "null"
+        relayUrl:
+          type:
+          - string
+          - "null"
+        sessionId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        expiresAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - blockId
+      - materialId
+      - mode
     MaterialGenerateImagesRequest:
       type: object
       properties:
@@ -2902,6 +3031,7 @@ components:
       - assignment
       - material
       - submission
+    StreamingResponseBody: {}
     HelloResponse:
       type: object
       properties:

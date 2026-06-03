@@ -42,6 +42,7 @@ export type MaterialAssetLibraryItem = {
 };
 
 export type MaterialVideoEmbedFrame = {
+  kind: "EMBED" | "RF_RELAY";
   src: string;
   title: string;
 };

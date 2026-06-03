@@ -45,8 +45,13 @@ export const en = {
     fields: {
       name: "Name",
       language: "Language",
+      country: "Country",
       timezone: "Time zone",
       learningGoal: "Learning goal",
+    },
+    country: {
+      unspecified: "Not specified",
+      russia: "Russia",
     },
     status: {
       checkingSession: "Checking session",
@@ -507,6 +512,7 @@ export const en = {
       answerKeyTitle: "Show the correct form",
       answerKeyValue: "Answer key: {{value}}",
       videoLinkPlaceholder: "Video link will appear here",
+      videoPlaybackUnsupported: "Your browser does not support embedded video playback.",
       imageFallback: "Image",
       studentAnswerPlaceholder: "Student answer",
       resizeImage: "Resize image",

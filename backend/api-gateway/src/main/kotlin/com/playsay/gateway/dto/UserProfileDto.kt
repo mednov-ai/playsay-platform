@@ -11,6 +11,7 @@ data class UserProfileResponse(
     val roles: List<String>,
     val displayName: String?,
     val locale: String?,
+    val countryCode: String?,
     val timezone: String?,
     val learningGoal: String?,
     val updatedAt: Instant,
@@ -21,6 +22,8 @@ data class UpdateUserProfileRequest(
     val displayName: String? = null,
     @field:Schema(maxLength = 16)
     val locale: String? = null,
+    @field:Schema(maxLength = 2, nullable = true, description = "ISO-3166 alpha-2 country code.")
+    val countryCode: String? = null,
     @field:Schema(maxLength = 64)
     val timezone: String? = null,
     @field:Schema(maxLength = 500)

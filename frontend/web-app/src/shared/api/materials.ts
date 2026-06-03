@@ -16,6 +16,8 @@ import type {
   LessonMaterialSubmission,
   LessonMaterialSubmissionInput,
   LessonMaterialUrlDraftInput,
+  MaterialVideoPlayback,
+  MaterialVideoPlaybackInput,
 } from "./types";
 
 export async function fetchMaterials(config = authConfig): Promise<LessonMaterial[]> {
@@ -92,6 +94,21 @@ export async function suggestMaterialAcceptedAnswers(
 ): Promise<LessonMaterialAnswerSuggestions> {
   return apiJson<LessonMaterialAnswerSuggestions>(
     `/api/materials/${materialId}/answer-suggestions`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+    config,
+  );
+}
+
+export async function createMaterialVideoPlayback(
+  materialId: string,
+  input: MaterialVideoPlaybackInput,
+  config = authConfig,
+): Promise<MaterialVideoPlayback> {
+  return apiJson<MaterialVideoPlayback>(
+    `/api/materials/${materialId}/video-playback`,
     {
       method: "POST",
       body: JSON.stringify(input),

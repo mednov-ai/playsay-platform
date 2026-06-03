@@ -115,6 +115,23 @@ data class MaterialAnswerSuggestionsResponse(
     val items: List<MaterialAnswerSuggestionItem>,
 )
 
+data class MaterialVideoPlaybackRequest(
+    @field:Schema(maxLength = 80)
+    val blockId: String,
+)
+
+data class MaterialVideoPlaybackResponse(
+    val materialId: UUID,
+    val blockId: String,
+    val videoId: String?,
+    val mode: String,
+    val reason: String?,
+    val embedUrl: String?,
+    val relayUrl: String?,
+    val sessionId: UUID?,
+    val expiresAt: Instant?,
+)
+
 data class MaterialAnswerSuggestionItem(
     val itemId: String,
     val prompt: String,

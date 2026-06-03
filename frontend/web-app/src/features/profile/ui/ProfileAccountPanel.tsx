@@ -14,6 +14,7 @@ import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
 export type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggingOut" | "error";
 
 type ProfileFormState = {
+  countryCode: string;
   displayName: string;
   timezone: string;
   learningGoal: string;
@@ -110,6 +111,7 @@ function ProfileEditor({
 }) {
   const { i18n, t } = useAppTranslation();
   const [form, setForm] = useState<ProfileFormState>({
+    countryCode: "",
     displayName: "",
     timezone: "",
     learningGoal: "",
@@ -117,6 +119,7 @@ function ProfileEditor({
 
   useEffect(() => {
     setForm({
+      countryCode: profile?.countryCode ?? "",
       displayName: profile?.displayName ?? "",
       timezone: profile?.timezone ?? "",
       learningGoal: profile?.learningGoal ?? "",
@@ -130,6 +133,7 @@ function ProfileEditor({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSave({
+      countryCode: form.countryCode,
       displayName: form.displayName,
       locale: normalizeLanguage(i18n.resolvedLanguage ?? i18n.language),
       timezone: form.timezone,
@@ -158,6 +162,18 @@ function ProfileEditor({
           />
         </FormField>
       </div>
+
+      <FormField label={t("profile.fields.country")}>
+        <select
+          className="playsay-input"
+          disabled={disabled}
+          onChange={(event) => updateField("countryCode", event.target.value)}
+          value={form.countryCode}
+        >
+          <option value="">{t("profile.country.unspecified")}</option>
+          <option value="RU">{t("profile.country.russia")}</option>
+        </select>
+      </FormField>
 
       <FormField label={t("profile.fields.timezone")}>
         <input

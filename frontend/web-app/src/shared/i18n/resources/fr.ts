@@ -45,8 +45,13 @@ export const fr = {
     fields: {
       name: "Nom",
       language: "Langue",
+      country: "Pays",
       timezone: "Fuseau horaire",
-      learningGoal: "Objectif d'apprentissage",
+      learningGoal: "Objectif d’apprentissage",
+    },
+    country: {
+      unspecified: "Non indiqué",
+      russia: "Russie",
     },
     status: {
       checkingSession: "Vérification de la session",
@@ -507,6 +512,7 @@ export const fr = {
       answerKeyTitle: "Afficher la forme correcte",
       answerKeyValue: "Correction : {{value}}",
       videoLinkPlaceholder: "Le lien vidéo apparaîtra ici",
+      videoPlaybackUnsupported: "Votre navigateur ne prend pas en charge la lecture vidéo intégrée.",
       imageFallback: "Image",
       studentAnswerPlaceholder: "Réponse de l'élève",
       resizeImage: "Redimensionner l'image",

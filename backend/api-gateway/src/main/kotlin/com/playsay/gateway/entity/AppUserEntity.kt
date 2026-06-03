@@ -29,6 +29,8 @@ class AppUserEntity(
     var avatarUrl: String? = null,
     @Column(name = "locale", length = 16)
     var locale: String? = null,
+    @Column(name = "country_code", length = 2)
+    var countryCode: String? = null,
     @Column(name = "timezone", length = 64)
     var timezone: String? = null,
     @Column(name = "learning_goal", length = 500)

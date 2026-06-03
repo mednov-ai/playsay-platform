@@ -45,8 +45,13 @@ export const de = {
     fields: {
       name: "Name",
       language: "Sprache",
+      country: "Land",
       timezone: "Zeitzone",
       learningGoal: "Lernziel",
+    },
+    country: {
+      unspecified: "Nicht angegeben",
+      russia: "Russland",
     },
     status: {
       checkingSession: "Sitzung wird geprüft",
@@ -507,6 +512,7 @@ export const de = {
       answerKeyTitle: "Richtige Form anzeigen",
       answerKeyValue: "Lösung: {{value}}",
       videoLinkPlaceholder: "Videolink erscheint hier",
+      videoPlaybackUnsupported: "Ihr Browser unterstützt die eingebettete Videowiedergabe nicht.",
       imageFallback: "Bild",
       studentAnswerPlaceholder: "Schülerantwort",
       resizeImage: "Bildgröße ändern",

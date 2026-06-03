@@ -13,8 +13,12 @@ import type {
 } from "../../generated/playsay-api";
 
 export type MeProfile = MeResponse;
-export type AppUserProfile = UserProfileResponse;
-export type UpdateUserProfileInput = UpdateUserProfileRequest;
+export type AppUserProfile = UserProfileResponse & {
+  countryCode?: string | null;
+};
+export type UpdateUserProfileInput = UpdateUserProfileRequest & {
+  countryCode?: string | null;
+};
 export type AdminUserProfile = UserProfileResponse;
 export type Course = CourseResponse;
 export type CourseLesson = CourseLessonResponse & {
@@ -114,6 +118,20 @@ export type LessonMaterialAnswerSuggestions = {
   materialId: string;
   blockId: string;
   items: LessonMaterialAnswerSuggestionItem[];
+};
+export type MaterialVideoPlaybackInput = {
+  blockId: string;
+};
+export type MaterialVideoPlayback = {
+  materialId: string;
+  blockId: string;
+  videoId?: string | null;
+  mode: "EMBED" | "RF_RELAY" | "BLOCKED" | "NEEDS_REVIEW" | string;
+  reason?: string | null;
+  embedUrl?: string | null;
+  relayUrl?: string | null;
+  sessionId?: string | null;
+  expiresAt?: string | null;
 };
 export type LessonMaterialAssetUpdateInput = {
   tags?: string[] | null;

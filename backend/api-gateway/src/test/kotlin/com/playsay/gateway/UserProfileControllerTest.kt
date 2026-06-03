@@ -57,12 +57,14 @@ class UserProfileControllerTest @Autowired constructor(
         assertEquals("user-1", initial.subject)
         assertEquals("Student One", initial.displayName)
         assertNull(initial.locale)
+        assertEquals("RU", initial.countryCode)
 
         val updated = controller.update(
             authentication,
             UpdateUserProfileRequest(
                 displayName = "  Student Alpha  ",
                 locale = "en",
+                countryCode = " ru ",
                 timezone = "Europe/Moscow",
                 learningGoal = "Practice classroom speaking.",
             ),
@@ -70,6 +72,7 @@ class UserProfileControllerTest @Autowired constructor(
 
         assertEquals("Student Alpha", updated.displayName)
         assertEquals("en", updated.locale)
+        assertEquals("RU", updated.countryCode)
         assertEquals("Europe/Moscow", updated.timezone)
         assertEquals("Practice classroom speaking.", updated.learningGoal)
         assertEquals(listOf("STUDENT"), updated.roles)
@@ -85,6 +88,7 @@ class UserProfileControllerTest @Autowired constructor(
         val recreated = controller.current(authentication)
 
         assertEquals("Student One", recreated.displayName)
+        assertEquals("RU", recreated.countryCode)
         assertNull(recreated.learningGoal)
     }
 
@@ -125,7 +129,19 @@ class UserProfileControllerTest @Autowired constructor(
         val error = assertFailsWith<ResponseStatusException> {
             controller.update(
                 authentication(role = "ROLE_STUDENT"),
-                UpdateUserProfileRequest(displayName = "x".repeat(121)),
+                UpdateUserProfileRequest(displayName = "x".repeat(121), countryCode = "RUS"),
+            )
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.statusCode)
+    }
+
+    @Test
+    fun `rejects malformed country code`() {
+        val error = assertFailsWith<ResponseStatusException> {
+            controller.update(
+                authentication(role = "ROLE_STUDENT"),
+                UpdateUserProfileRequest(countryCode = "R1"),
             )
         }
 

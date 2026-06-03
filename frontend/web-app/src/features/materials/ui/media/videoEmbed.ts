@@ -1,6 +1,25 @@
 import type { MaterialEditorBlock, MaterialVideoEmbedFrame } from "../../model/materialDocument";
+import type { MaterialVideoPlayback } from "../../../../shared/api/playsay";
 
-export function materialVideoEmbedFrame(block: MaterialEditorBlock): MaterialVideoEmbedFrame | null {
+export function materialVideoEmbedFrame(
+  block: MaterialEditorBlock,
+  playback?: Pick<MaterialVideoPlayback, "embedUrl" | "mode" | "relayUrl"> | null,
+): MaterialVideoEmbedFrame | null {
+  if (playback?.mode === "RF_RELAY" && playback.relayUrl?.trim()) {
+    return {
+      kind: "RF_RELAY",
+      src: playback.relayUrl,
+      title: block.title || "YouTube video",
+    };
+  }
+  if (playback?.embedUrl?.trim()) {
+    return {
+      kind: "EMBED",
+      src: playback.embedUrl,
+      title: block.title || "YouTube video",
+    };
+  }
+
   const provider = (block.provider ?? "").toUpperCase();
   if (provider === "YOUTUBE") {
     return youtubeEmbedFrame(block.url, block.title);
@@ -41,6 +60,7 @@ function youtubeEmbedFrame(value?: string, title = "YouTube video"): MaterialVid
   }
 
   return {
+    kind: "EMBED",
     src: `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`,
     title: title || "YouTube video",
   };
@@ -68,6 +88,7 @@ function rutubeEmbedFrame(value?: string, title = "Rutube video"): MaterialVideo
   }
 
   return {
+    kind: "EMBED",
     src: `https://rutube.ru/play/embed/${videoId}`,
     title: title || "Rutube video",
   };

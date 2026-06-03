@@ -167,6 +167,8 @@ export function LessonTaskCanvas({
         <div className="playsay-task-document">
           <div
             className="playsay-task-document-surface"
+            data-live-presence={annotationSync ? "true" : "false"}
+            data-live-presence-ready={annotationSync?.ready ? "true" : "false"}
             data-testid="lesson-material-surface"
             onPointerLeave={clearMaterialCursor}
             onPointerMove={updateMaterialCursor}

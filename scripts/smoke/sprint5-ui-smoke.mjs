@@ -84,36 +84,24 @@ try {
   addCheck("temporary-group-lesson-created");
 
   await Promise.all([
-    ensureCollaborationDocument(studentA.tokens.accessToken, lesson.id, material.id, "INDIVIDUAL"),
-    ensureCollaborationDocument(studentB.tokens.accessToken, lesson.id, material.id, "INDIVIDUAL"),
     ensureCollaborationDocument(studentA.tokens.accessToken, lesson.id, material.id, "GROUP"),
   ]);
-  addCheck("collaboration-documents-precreated");
+  addCheck("shared-collaboration-document-precreated");
 
   await openClassroom(teacher.page, lesson.id, "[data-testid='lesson-material-surface']");
   await Promise.all([
-    openClassroom(studentA.page, lesson.id, ".playsay-live-workspace"),
-    openClassroom(studentB.page, lesson.id, ".playsay-live-workspace"),
+    openClassroom(studentA.page, lesson.id, "[data-testid='lesson-material-surface']"),
+    openClassroom(studentB.page, lesson.id, "[data-testid='lesson-material-surface']"),
   ]);
   addCheck("classroom-opened-for-teacher-and-two-students");
 
-  const studentAText = `Student A individual ${runId}`;
-  const studentBText = `Student B individual ${runId}`;
-  await fillStudentWorkspace(studentA.page, studentAText);
-  console.log("ok student-a-individual-text-entered");
-  await fillStudentWorkspace(studentB.page, studentBText);
-  console.log("ok student-b-individual-text-entered");
-  addCheck("students-created-individual-documents");
+  await Promise.all([
+    assertStudentDocumentChromeHidden(studentA.page),
+    assertStudentDocumentChromeHidden(studentB.page),
+  ]);
+  addCheck("student-workspace-hides-document-tabs-and-side-editor");
 
-  const groupText = `Group workspace ${runId}`;
-  await switchStudentMode(studentA.page, "group");
-  await switchStudentMode(studentB.page, "group");
-  await fillStudentWorkspace(studentA.page, groupText);
-  await waitForValueContains(studentB.page, "[data-testid='collaboration-live-textarea']", groupText, "student B receives group text");
-  addCheck("group-document-syncs-between-students");
-
-  await switchStudentMode(studentA.page, "individual");
-  await switchStudentMode(studentB.page, "individual");
+  await waitForSharedPresenceReady(teacher.page, studentA.page, studentB.page);
   await verifyMaterialCursor(studentA.page, studentB.page);
   await verifyMaterialCursorAlignment(studentA.page, studentB.page, 0.34, 0.38, "student A cursor on student B");
   await verifyMaterialCursorAlignment(studentB.page, studentA.page, 0.62, 0.32, "student B cursor on student A");
@@ -131,13 +119,13 @@ try {
   addCheck("annotation-sync-stays-inside-material-after-scroll-and-resize");
 
   await studentB.page.reload({ waitUntil: "domcontentloaded" });
-  await studentB.page.locator(".playsay-live-workspace").waitFor({ timeout: timeoutMs });
+  await studentB.page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
+  await waitForSharedPresenceReady(studentB.page);
   await waitForLocatorCount(studentB.page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path", 1, "student B annotation path after reload");
   addCheck("reconnect-restores-annotations");
 
-  await switchStudentMode(studentA.page, "individual");
-  await finalizeStudentWork(studentA.page, studentA.tokens.accessToken, lesson.id);
-  addCheck("finalize-creates-material-submission");
+  await submitStudentMaterialWork(studentA.page, studentA.tokens.accessToken, lesson.id);
+  addCheck("student-material-submit-creates-submission");
 
   await cleanup(teacher.tokens.accessToken);
   addCheck("cleanup-completed");
@@ -325,7 +313,7 @@ async function createSmokeMaterial(token) {
         {
           blocks: [
             {
-              body: "Use this page to verify live text, material cursors, and shared annotations.",
+              body: "Use this page to verify material cursors, shared annotations, and material submission.",
               id: "smoke-text",
               title: "Live collaboration",
               type: "text",
@@ -339,7 +327,7 @@ async function createSmokeMaterial(token) {
                   gapMode: "singleChoice",
                   id: "smoke-gap-item",
                   options: ["write", "writes", "writing"],
-                  prompt: "I ___ in the live workspace.",
+                  prompt: "I ___ in the shared material.",
                 },
               ],
               title: "Warm up",
@@ -347,7 +335,7 @@ async function createSmokeMaterial(token) {
             },
             {
               id: "smoke-writing",
-              prompt: "Write a short answer in the live document.",
+              prompt: "Write a short answer in the material.",
               title: "Individual answer",
               type: "freeWriting",
             },
@@ -404,59 +392,21 @@ async function openClassroom(page, lessonId, readySelector) {
   await page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
 }
 
-async function fillStudentWorkspace(page, text) {
-  try {
-    await fillStudentWorkspaceOnce(page, text);
-  } catch (error) {
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await page.locator(".playsay-live-workspace").waitFor({ timeout: timeoutMs });
-    await fillStudentWorkspaceOnce(page, text).catch(() => {
-      throw error;
-    });
-  }
-}
-
-async function fillStudentWorkspaceOnce(page, text) {
-  const textarea = page.locator("[data-testid='collaboration-live-textarea']");
-  await textarea.waitFor({ timeout: timeoutMs });
+async function assertStudentDocumentChromeHidden(page) {
   await page.waitForFunction(() => {
-    const element = document.querySelector("[data-testid='collaboration-live-textarea']");
-    return element instanceof HTMLTextAreaElement && !element.disabled;
-  }, null, { timeout: timeoutMs }).catch((error) => {
-    return page.evaluate(() => ({
-      inlineMessage: document.querySelector(".playsay-lesson-inline-message")?.textContent?.trim() ?? "",
-      status: document.querySelector(".playsay-live-sync-status")?.getAttribute("data-state") ?? "missing",
-      statusText: document.querySelector(".playsay-live-sync-status")?.textContent?.trim() ?? "",
-      textareaDisabled: document.querySelector("[data-testid='collaboration-live-textarea']") instanceof HTMLTextAreaElement
-        ? document.querySelector("[data-testid='collaboration-live-textarea']").disabled
-        : null,
-    })).catch(() => ({ status: "debug-unavailable" })).then((debug) => {
-      throw new Error(`Timed out waiting for enabled student live textarea; debug=${JSON.stringify(debug)}: ${error instanceof Error ? error.message : String(error)}`);
-    });
-  });
-  await page.locator(".playsay-live-sync-status[data-state='connected']").waitFor({ timeout: timeoutMs }).catch(async (error) => {
-    const debug = await page.evaluate(() => ({
-      inlineMessage: document.querySelector(".playsay-lesson-inline-message")?.textContent?.trim() ?? "",
-      status: document.querySelector(".playsay-live-sync-status")?.getAttribute("data-state") ?? "missing",
-      statusText: document.querySelector(".playsay-live-sync-status")?.textContent?.trim() ?? "",
-      textareaDisabled: document.querySelector("[data-testid='collaboration-live-textarea']") instanceof HTMLTextAreaElement
-        ? document.querySelector("[data-testid='collaboration-live-textarea']").disabled
-        : null,
-    })).catch(() => ({ status: "debug-unavailable" }));
-    throw new Error(`Timed out waiting for connected student Yjs workspace; debug=${JSON.stringify(debug)}: ${error instanceof Error ? error.message : String(error)}`);
-  });
-  await textarea.fill(text);
+    return !document.querySelector("[data-testid='collaboration-mode-individual']") &&
+      !document.querySelector("[data-testid='collaboration-mode-group']") &&
+      !document.querySelector("[data-testid='collaboration-live-textarea']") &&
+      !document.querySelector("[data-testid='collaboration-finalize-button']") &&
+      Boolean(document.querySelector("[data-testid='lesson-material-surface']"));
+  }, null, { timeout: timeoutMs });
 }
 
-async function switchStudentMode(page, mode) {
-  await page.locator(`[data-testid='collaboration-mode-${mode}']`).click();
-  await page.waitForFunction((expectedMode) => {
-    const button = document.querySelector(`[data-testid='collaboration-mode-${expectedMode}']`);
-    const textarea = document.querySelector("[data-testid='collaboration-live-textarea']");
-    return button?.getAttribute("data-active") === "true" &&
-      textarea instanceof HTMLTextAreaElement &&
-      !textarea.disabled;
-  }, mode, { timeout: timeoutMs });
+async function waitForSharedPresenceReady(...pages) {
+  await Promise.all(pages.map((page) => page.waitForFunction(() => {
+    const surface = document.querySelector("[data-testid='lesson-material-surface']");
+    return surface?.getAttribute("data-live-presence-ready") === "true";
+  }, null, { timeout: timeoutMs })));
 }
 
 async function verifyMaterialCursor(sourcePage, targetPage) {
@@ -570,26 +520,13 @@ async function scrollMaterialDocument(page, top) {
   }, top);
 }
 
-async function finalizeStudentWork(page, token, lessonId) {
-  const button = page.locator("[data-testid='collaboration-finalize-button']");
-  await button.waitFor({ timeout: timeoutMs });
-  await page.waitForFunction(() => {
-    const element = document.querySelector("[data-testid='collaboration-finalize-button']");
-    return element instanceof HTMLButtonElement && !element.disabled;
-  }, null, { timeout: timeoutMs });
-  await button.click();
+async function submitStudentMaterialWork(page, token, lessonId) {
+  await page.locator(".playsay-render-block-fill-gaps .playsay-inline-select").selectOption("write");
+  await page.locator(".playsay-student-answer").fill(`Material answer ${runId}`);
+  await page.locator(".playsay-task-footer button").first().click();
   await waitForApi(async () => {
     const submission = await apiRequest(token, "GET", `/schedule/lessons/${lessonId}/material-submission`, 200);
     return Boolean(submission.submittedAt);
-  });
-}
-
-async function waitForValueContains(page, selector, text, label = selector) {
-  await page.waitForFunction(({ nextSelector, expected }) => {
-    const element = document.querySelector(nextSelector);
-    return element instanceof HTMLTextAreaElement && element.value.includes(expected);
-  }, { nextSelector: selector, expected: text }, { timeout: timeoutMs }).catch((error) => {
-    throw new Error(`Timed out waiting for ${label}: ${error instanceof Error ? error.message : String(error)}`);
   });
 }
 

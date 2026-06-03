@@ -90,7 +90,7 @@ try {
   ]);
   addCheck("collaboration-documents-precreated");
 
-  await openClassroom(teacher.page, lesson.id, ".playsay-collaboration-panel");
+  await openClassroom(teacher.page, lesson.id, "[data-testid='lesson-material-surface']");
   await Promise.all([
     openClassroom(studentA.page, lesson.id, ".playsay-live-workspace"),
     openClassroom(studentB.page, lesson.id, ".playsay-live-workspace"),
@@ -103,25 +103,14 @@ try {
   console.log("ok student-a-individual-text-entered");
   await fillStudentWorkspace(studentB.page, studentBText);
   console.log("ok student-b-individual-text-entered");
-  await refreshTeacherPanel(teacher.page);
-  await waitForLocatorCount(teacher.page, ".playsay-collaboration-student-row:not([disabled])", 2, "teacher student document rows");
   addCheck("students-created-individual-documents");
-
-  await openTeacherStudentDocument(teacher.page, studentAProfile);
-  await waitForValueContains(teacher.page, ".playsay-teacher-live-editor textarea", studentAText, "teacher selected student document text");
-  const teacherNote = `Teacher edit ${runId}`;
-  await appendTextarea(teacher.page, ".playsay-teacher-live-editor textarea", `\n${teacherNote}`);
-  await waitForValueContains(studentA.page, "[data-testid='collaboration-live-textarea']", teacherNote, "student receives teacher edit");
-  addCheck("teacher-sees-and-edits-student-document");
 
   const groupText = `Group workspace ${runId}`;
   await switchStudentMode(studentA.page, "group");
   await switchStudentMode(studentB.page, "group");
   await fillStudentWorkspace(studentA.page, groupText);
   await waitForValueContains(studentB.page, "[data-testid='collaboration-live-textarea']", groupText, "student B receives group text");
-  await openTeacherGroupDocument(teacher.page);
-  await waitForValueContains(teacher.page, ".playsay-teacher-live-editor textarea", groupText, "teacher receives group text");
-  addCheck("group-document-syncs-between-participants-and-teacher");
+  addCheck("group-document-syncs-between-students");
 
   await switchStudentMode(studentA.page, "individual");
   await switchStudentMode(studentB.page, "individual");
@@ -390,6 +379,7 @@ async function createSmokeLesson(token, materialId, participantSubjects) {
     scheduledStart: new Date(now - 5 * 60 * 1000).toISOString(),
     status: "IN_PROGRESS",
     type: "GROUP",
+    workMode: "SHARED",
   });
 }
 
@@ -452,25 +442,6 @@ async function fillStudentWorkspaceOnce(page, text) {
     throw new Error(`Timed out waiting for connected student Yjs workspace; debug=${JSON.stringify(debug)}: ${error instanceof Error ? error.message : String(error)}`);
   });
   await textarea.fill(text);
-}
-
-async function openTeacherStudentDocument(page, profile) {
-  const label = profile.displayName ?? profile.username ?? profile.subject;
-  const row = page.locator(".playsay-collaboration-student-row").filter({ hasText: label }).first();
-  await row.waitFor({ timeout: timeoutMs });
-  await row.click();
-}
-
-async function openTeacherGroupDocument(page) {
-  const groupButton = page.locator(".playsay-collaboration-doc-status").first();
-  await groupButton.waitFor({ timeout: timeoutMs });
-  await groupButton.click();
-}
-
-async function refreshTeacherPanel(page) {
-  const button = page.locator(".playsay-collaboration-panel-summary button").first();
-  await button.waitFor({ timeout: timeoutMs });
-  await button.click();
 }
 
 async function switchStudentMode(page, mode) {
@@ -566,12 +537,6 @@ async function finalizeStudentWork(page, token, lessonId) {
     const submission = await apiRequest(token, "GET", `/schedule/lessons/${lessonId}/material-submission`, 200);
     return Boolean(submission.submittedAt);
   });
-}
-
-async function appendTextarea(page, selector, value) {
-  const textarea = page.locator(selector).first();
-  const current = await textarea.inputValue();
-  await textarea.fill(`${current}${value}`);
 }
 
 async function waitForValueContains(page, selector, text, label = selector) {

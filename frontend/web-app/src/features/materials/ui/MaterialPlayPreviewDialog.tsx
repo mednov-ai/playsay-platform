@@ -84,6 +84,7 @@ export function MaterialPlayPreviewDialog({
         </div>
         <div className="playsay-material-preview playsay-material-reader playsay-material-play-surface">
           <LessonMaterialDocumentView
+            allowVideoFullscreen
             answers={answers}
             material={material}
             mode="classroom"

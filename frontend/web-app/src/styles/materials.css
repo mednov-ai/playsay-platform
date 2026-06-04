@@ -481,6 +481,10 @@
   padding: 0.45rem;
 }
 
+.playsay-relay-player-controls[data-fullscreen="false"] {
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+}
+
 .playsay-relay-player-controls button {
   display: inline-grid;
   width: 2rem;
@@ -572,6 +576,25 @@
   font-weight: 800;
   padding: 0.25rem 0.4rem;
   overflow-wrap: anywhere;
+}
+
+.playsay-video-attribution {
+  display: flex;
+  width: min(100%, 44rem);
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  align-items: center;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin: 0.35rem 0 0;
+}
+
+.playsay-video-attribution a {
+  color: hsl(var(--primary));
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 0.18rem;
 }
 
 .playsay-video-embed-placeholder small,

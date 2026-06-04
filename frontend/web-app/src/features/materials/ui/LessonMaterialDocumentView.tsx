@@ -15,6 +15,7 @@ import {
 import { RenderedMaterialBlock } from "./blocks/RenderedMaterialBlock";
 
 export function LessonMaterialDocumentView({
+  allowVideoFullscreen,
   answers = {},
   material,
   mode = "classroom",
@@ -25,6 +26,7 @@ export function LessonMaterialDocumentView({
   score,
   showScoreBadge = true,
 }: {
+  allowVideoFullscreen?: boolean;
   answers?: MaterialAnswerState;
   material: LessonMaterial;
   mode?: MaterialRenderMode;
@@ -42,6 +44,7 @@ export function LessonMaterialDocumentView({
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
+  const videoFullscreenAllowed = allowVideoFullscreen ?? mode === "teacherPreview";
 
   useEffect(() => {
     let active = true;
@@ -114,6 +117,7 @@ export function LessonMaterialDocumentView({
       <div className="playsay-material-blocks">
         {page.blocks.map((block) => (
           <RenderedMaterialBlock
+            allowVideoFullscreen={videoFullscreenAllowed}
             answer={answers[block.id]}
             assetTags={assetTags}
             assetUrls={assetUrls}

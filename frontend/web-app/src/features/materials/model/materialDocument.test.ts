@@ -21,6 +21,41 @@ import {
 import type { MaterialEditorBlock } from "./types";
 
 describe("material document accepted answers", () => {
+  it("keeps a selected video clip through serde and removes invalid bounds", () => {
+    const block = materialBlockFromJson({
+      id: "video-1",
+      type: "videoEmbed",
+      title: "Warm-up video",
+      provider: "YOUTUBE",
+      url: "https://youtu.be/5l-fo-d0gt8",
+      videoClip: {
+        startSeconds: 12.8,
+        endSeconds: 45.2,
+      },
+    });
+
+    expect(block?.videoClip).toEqual({
+      startSeconds: 12,
+      endSeconds: 45,
+    });
+
+    const clean = cleanMaterialBlock(block as MaterialEditorBlock);
+    expect(clean.videoClip).toEqual({
+      startSeconds: 12,
+      endSeconds: 45,
+    });
+
+    expect(cleanMaterialBlock({
+      id: "video-2",
+      type: "videoEmbed",
+      title: "Invalid clip",
+      videoClip: {
+        startSeconds: 50,
+        endSeconds: 40,
+      },
+    } as MaterialEditorBlock).videoClip).toBeUndefined();
+  });
+
   it("keeps stable item ids and accepted answer variants through serde", () => {
     const block = materialBlockFromJson({
       id: "gaps",

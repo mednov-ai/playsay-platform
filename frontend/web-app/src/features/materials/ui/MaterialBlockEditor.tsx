@@ -5,8 +5,11 @@ import { FormField } from "../../../shared/ui/FormField";
 import {
   defaultObjectiveAssessmentPolicy,
   formatFlashcards,
+  formatMaterialVideoClipTime,
   isObjectiveMaterialBlockType,
   materialBlockLabel,
+  normalizeMaterialVideoClip,
+  parseMaterialVideoClipTime,
   parseFlashcards,
   type MaterialAssetLibraryItem,
   type MaterialEditorBlock,
@@ -43,11 +46,32 @@ export function MaterialBlockEditor({
 }) {
   const { t } = useAppTranslation();
   const [flashcardsSource, setFlashcardsSource] = useState(() => formatFlashcards(block.cards));
+  const [videoClipStartSource, setVideoClipStartSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.startSeconds));
+  const [videoClipEndSource, setVideoClipEndSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.endSeconds));
   const collapseLabel = collapsed ? t("materials.blockEditor.expandBlock") : t("materials.blockEditor.collapseBlock");
 
   useEffect(() => {
     setFlashcardsSource(formatFlashcards(block.cards));
   }, [block.id, block.type]);
+
+  useEffect(() => {
+    setVideoClipStartSource(formatMaterialVideoClipTime(block.videoClip?.startSeconds));
+    setVideoClipEndSource(formatMaterialVideoClipTime(block.videoClip?.endSeconds));
+  }, [block.id, block.videoClip?.endSeconds, block.videoClip?.startSeconds]);
+
+  function commitVideoClip(boundary: "startSeconds" | "endSeconds", value: string) {
+    const seconds = parseMaterialVideoClipTime(value);
+    const nextClip = { ...(block.videoClip ?? {}) };
+    if (seconds === undefined) {
+      delete nextClip[boundary];
+    } else {
+      nextClip[boundary] = seconds;
+    }
+    const normalizedClip = normalizeMaterialVideoClip(nextClip);
+    setVideoClipStartSource(formatMaterialVideoClipTime(normalizedClip?.startSeconds));
+    setVideoClipEndSource(formatMaterialVideoClipTime(normalizedClip?.endSeconds));
+    onUpdate({ videoClip: normalizedClip });
+  }
 
   return (
     <article className="rounded-xl border border-border bg-white p-3" data-collapsed={collapsed ? "true" : "false"}>
@@ -91,29 +115,70 @@ export function MaterialBlockEditor({
 
       <div aria-hidden={collapsed} className={collapsed ? "hidden" : "mt-2 grid gap-2"}>
         {block.type === "videoEmbed" ? (
-          <div className="grid gap-2 sm:grid-cols-[8rem_1fr]">
-            <FormField label={t("materials.blockEditor.platform")}>
-              <select
-                className="playsay-input"
-                disabled={disabled}
-                onChange={(event) => onUpdate({ provider: event.target.value })}
-                value={block.provider ?? "YOUTUBE"}
-              >
-                <option value="YOUTUBE">YouTube</option>
-                <option value="VK">VK</option>
-                <option value="RUTUBE">Rutube</option>
-              </select>
-            </FormField>
-            <FormField label={t("materials.blockEditor.link")}>
-              <input
-                className="playsay-input"
-                disabled={disabled}
-                onChange={(event) => onUpdate({ url: event.target.value })}
-                placeholder="https://..."
-                value={block.url ?? ""}
-              />
-            </FormField>
-          </div>
+          <>
+            <div className="grid gap-2 sm:grid-cols-[8rem_1fr]">
+              <FormField label={t("materials.blockEditor.platform")}>
+                <select
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => onUpdate({ provider: event.target.value })}
+                  value={block.provider ?? "YOUTUBE"}
+                >
+                  <option value="YOUTUBE">YouTube</option>
+                  <option value="VK">VK</option>
+                  <option value="RUTUBE">Rutube</option>
+                </select>
+              </FormField>
+              <FormField label={t("materials.blockEditor.link")}>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  onChange={(event) => onUpdate({ url: event.target.value })}
+                  placeholder={t("materials.blockEditor.linkPlaceholder")}
+                  value={block.url ?? ""}
+                />
+              </FormField>
+            </div>
+            <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-2 sm:grid-cols-2">
+              <FormField label={t("materials.blockEditor.videoClipStart")}>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  inputMode="numeric"
+                  onBlur={(event) => commitVideoClip("startSeconds", event.currentTarget.value)}
+                  onChange={(event) => setVideoClipStartSource(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  placeholder={t("materials.blockEditor.videoClipStartPlaceholder")}
+                  value={videoClipStartSource}
+                />
+              </FormField>
+              <FormField label={t("materials.blockEditor.videoClipEnd")}>
+                <input
+                  className="playsay-input"
+                  disabled={disabled}
+                  inputMode="numeric"
+                  onBlur={(event) => commitVideoClip("endSeconds", event.currentTarget.value)}
+                  onChange={(event) => setVideoClipEndSource(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  placeholder={t("materials.blockEditor.videoClipEndPlaceholder")}
+                  value={videoClipEndSource}
+                />
+              </FormField>
+              <small className="text-xs font-bold text-muted-foreground sm:col-span-2">
+                {t("materials.blockEditor.videoClipHint")}
+              </small>
+            </div>
+          </>
         ) : null}
 
         {block.type === "image" || block.type === "generatedImage" ? (
@@ -124,7 +189,7 @@ export function MaterialBlockEditor({
                   className="playsay-input min-h-20 resize-y py-3"
                   disabled={disabled}
                   onChange={(event) => onUpdate({ prompt: event.target.value })}
-                  placeholder="friendly classroom picture"
+                  placeholder={t("materials.blockEditor.generatedImagePromptPlaceholder")}
                   value={block.prompt ?? ""}
                 />
               ) : (
@@ -132,7 +197,7 @@ export function MaterialBlockEditor({
                   className="playsay-input"
                   disabled={disabled}
                   onChange={(event) => onUpdate({ url: event.target.value })}
-                  placeholder="https://..."
+                  placeholder={t("materials.blockEditor.linkPlaceholder")}
                   value={block.url ?? ""}
                 />
               )}

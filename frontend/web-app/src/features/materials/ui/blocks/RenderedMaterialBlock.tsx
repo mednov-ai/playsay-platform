@@ -21,6 +21,7 @@ import { RenderedMatchingPairsExercise } from "./RenderedMatchingPairsExercise";
 import { useAppTranslation } from "../../../../shared/i18n";
 
 export function RenderedMaterialBlock({
+  allowVideoFullscreen = false,
   answer,
   assetTags,
   assetUrls,
@@ -32,6 +33,7 @@ export function RenderedMaterialBlock({
   onBlockPatch,
   materialId,
 }: {
+  allowVideoFullscreen?: boolean;
   answer?: MaterialAnswerBlock;
   assetTags: Record<string, string[]>;
   assetUrls: Record<string, string>;
@@ -109,6 +111,15 @@ export function RenderedMaterialBlock({
     case "videoEmbed":
       {
         const frame = materialVideoEmbedFrame(block, videoPlayback);
+        const originalVideoUrl = safeExternalVideoUrl(block.url);
+        const videoAttribution = originalVideoUrl ? (
+          <p className="playsay-video-attribution">
+            <span>{t("materials.renderer.videoCopyright", { provider: videoProviderLabel(block.provider) ?? t("materials.renderer.videoProviderFallback") })}</span>
+            <a href={originalVideoUrl} rel="noreferrer" target="_blank">
+              {t("materials.renderer.videoOriginalLink")}
+            </a>
+          </p>
+        ) : null;
         const reasonKey = frame?.reason ? `materials.renderer.videoRelayReasons.${frame.reason}` : "materials.renderer.videoRelayReasons.UNKNOWN";
         const reasonLabel = frame?.reason
           ? t(reasonKey, { defaultValue: t("materials.renderer.videoRelayReasons.UNKNOWN") })
@@ -117,54 +128,74 @@ export function RenderedMaterialBlock({
           <>
             <h4>{block.title}</h4>
             {frame?.kind === "RF_RELAY" ? (
-              <div
-                className="playsay-video-embed"
-                data-playsay-video-playback-mode="RF_RELAY"
-              >
-                <PlaySayRelayVideoPlayer src={frame.src} title={frame.title} />
-              </div>
+              <>
+                <div
+                  className="playsay-video-embed"
+                  data-playsay-video-playback-mode="RF_RELAY"
+                >
+                  <PlaySayRelayVideoPlayer
+                    allowFullscreen={allowVideoFullscreen}
+                    clip={block.videoClip}
+                    src={frame.src}
+                    title={frame.title}
+                  />
+                </div>
+                {videoAttribution}
+              </>
             ) : frame?.kind === "PENDING" ? (
-              <div
-                className="playsay-video-relay-pending"
-                data-playsay-video-playback-mode={frame.mode ?? "UNKNOWN"}
-                data-playsay-video-playback-reason={frame.reason ?? "UNKNOWN"}
-                role="status"
-              >
-                <span aria-hidden="true" />
-                <small>{reasonLabel}</small>
-              </div>
+              <>
+                <div
+                  className="playsay-video-relay-pending"
+                  data-playsay-video-playback-mode={frame.mode ?? "UNKNOWN"}
+                  data-playsay-video-playback-reason={frame.reason ?? "UNKNOWN"}
+                  role="status"
+                >
+                  <span aria-hidden="true" />
+                  <small>{reasonLabel}</small>
+                </div>
+                {videoAttribution}
+              </>
             ) : frame?.kind === "UNAVAILABLE" ? (
-              <div
-                className="playsay-video-relay-unavailable"
-                data-playsay-video-playback-mode={frame.mode ?? "UNKNOWN"}
-                data-playsay-video-playback-reason={frame.reason ?? "UNKNOWN"}
-                role="status"
-              >
-                <CircleAlert className="h-5 w-5 text-primary" />
-                <span>{t("materials.renderer.videoRelayUnavailable")}</span>
-                <small>{reasonLabel}</small>
-                {frame.reason ? <code>{t("materials.renderer.videoRelayReasonCode", { reason: frame.reason })}</code> : null}
-              </div>
+              <>
+                <div
+                  className="playsay-video-relay-unavailable"
+                  data-playsay-video-playback-mode={frame.mode ?? "UNKNOWN"}
+                  data-playsay-video-playback-reason={frame.reason ?? "UNKNOWN"}
+                  role="status"
+                >
+                  <CircleAlert className="h-5 w-5 text-primary" />
+                  <span>{t("materials.renderer.videoRelayUnavailable")}</span>
+                  <small>{reasonLabel}</small>
+                  {frame.reason ? <code>{t("materials.renderer.videoRelayReasonCode", { reason: frame.reason })}</code> : null}
+                </div>
+                {videoAttribution}
+              </>
             ) : frame ? (
-              <div
-                className="playsay-video-embed"
-                data-playsay-video-playback-mode="EMBED"
-              >
-                <iframe
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  src={frame.src}
-                  title={frame.title}
-                />
-              </div>
+              <>
+                <div
+                  className="playsay-video-embed"
+                  data-playsay-video-playback-mode="EMBED"
+                >
+                  <iframe
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen={allowVideoFullscreen}
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    src={frame.src}
+                    title={frame.title}
+                  />
+                </div>
+                {videoAttribution}
+              </>
             ) : (
-              <div className="playsay-video-embed-placeholder">
-                <Video className="h-5 w-5 text-primary" />
-                <span>{block.provider ?? "VIDEO"}</span>
-                <small>{block.url || t("materials.renderer.videoLinkPlaceholder")}</small>
-              </div>
+              <>
+                <div className="playsay-video-embed-placeholder">
+                  <Video className="h-5 w-5 text-primary" />
+                  <span>{block.provider?.trim() || t("materials.renderer.videoProviderFallback")}</span>
+                  <small>{block.url || t("materials.renderer.videoLinkPlaceholder")}</small>
+                </div>
+                {videoAttribution}
+              </>
             )}
           </>,
         );
@@ -287,4 +318,36 @@ export function RenderedMaterialBlock({
     default:
       return null;
   }
+}
+
+function safeExternalVideoUrl(value?: string): string | null {
+  const cleanValue = value?.trim();
+  if (!cleanValue) {
+    return null;
+  }
+  try {
+    const url = new URL(cleanValue);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    try {
+      const url = new URL(`https://${cleanValue}`);
+      return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function videoProviderLabel(value?: string): string | undefined {
+  const provider = value?.trim().toUpperCase();
+  if (provider === "YOUTUBE") {
+    return "YouTube";
+  }
+  if (provider === "RUTUBE") {
+    return "Rutube";
+  }
+  if (provider === "VK") {
+    return "VK";
+  }
+  return provider || undefined;
 }

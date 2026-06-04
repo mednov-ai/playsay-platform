@@ -1,8 +1,18 @@
 import { Maximize2, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppTranslation } from "../../../../shared/i18n";
+import type { MaterialVideoClip } from "../../model/materialDocument";
+import {
+  absoluteTimeForRelayClip,
+  displayTimeForRelayClip,
+  normalizeRelayVideoClip,
+  relayClipDuration,
+  relayClipEndReached,
+} from "./relayVideoTiming";
 
 type PlaySayRelayVideoPlayerProps = {
+  allowFullscreen?: boolean;
+  clip?: MaterialVideoClip;
   src: string;
   title: string;
 };
@@ -11,11 +21,13 @@ type FullscreenElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
-export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerProps) {
+export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, title }: PlaySayRelayVideoPlayerProps) {
   const { t } = useAppTranslation();
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const previousSrcRef = useRef(src);
+  const normalizedClip = useMemo(() => normalizeRelayVideoClip(clip), [clip?.endSeconds, clip?.startSeconds]);
+  const playbackKey = `${src}|${normalizedClip?.startSeconds ?? 0}|${normalizedClip?.endSeconds ?? ""}`;
+  const previousPlaybackKeyRef = useRef(playbackKey);
   const [activated, setActivated] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -25,10 +37,10 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
   const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    if (previousSrcRef.current === src) {
+    if (previousPlaybackKeyRef.current === playbackKey) {
       return;
     }
-    previousSrcRef.current = src;
+    previousPlaybackKeyRef.current = playbackKey;
     setActivated(false);
     setCurrentTime(0);
     setDuration(0);
@@ -41,12 +53,14 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
       video.removeAttribute("src");
       video.load();
     }
-  }, [src]);
+  }, [playbackKey]);
 
-  const progressValue = duration > 0 ? Math.min(currentTime, duration) : 0;
+  const displayDuration = relayClipDuration(normalizedClip, duration);
+  const displayCurrentTime = displayTimeForRelayClip(normalizedClip, currentTime);
+  const progressValue = displayDuration > 0 ? Math.min(displayCurrentTime, displayDuration) : 0;
   const progressLabel = useMemo(
-    () => t("materials.renderer.videoProgress", { current: formatMediaTime(progressValue), duration: formatMediaTime(duration) }),
-    [duration, progressValue, t],
+    () => t("materials.renderer.videoProgress", { current: formatMediaTime(progressValue), duration: formatMediaTime(displayDuration) }),
+    [displayDuration, progressValue, t],
   );
 
   function activateAndPlay() {
@@ -58,6 +72,8 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
         video.src = src;
         video.preload = "metadata";
         video.load();
+        seekVideo(video, normalizedClip?.startSeconds ?? 0);
+        setCurrentTime(normalizedClip?.startSeconds ?? 0);
         playVideo(video);
       }
       return;
@@ -73,11 +89,11 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
   }
 
   function seek(value: string) {
-    const nextTime = Number(value);
+    const nextTime = absoluteTimeForRelayClip(normalizedClip, Number(value));
     const video = videoRef.current;
     setCurrentTime(nextTime);
     if (video && Number.isFinite(nextTime)) {
-      video.currentTime = nextTime;
+      seekVideo(video, nextTime);
     }
   }
 
@@ -90,8 +106,9 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
     if (!video) {
       return;
     }
-    video.currentTime = 0;
-    setCurrentTime(0);
+    const startSeconds = normalizedClip?.startSeconds ?? 0;
+    seekVideo(video, startSeconds);
+    setCurrentTime(startSeconds);
     setHasError(false);
     video.load();
     playVideo(video);
@@ -135,14 +152,31 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
           setIsLoading(false);
           setIsPlaying(false);
         }}
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
+        onLoadedMetadata={(event) => {
+          const video = event.currentTarget;
+          setDuration(video.duration || 0);
+          if ((normalizedClip?.startSeconds ?? 0) > 0 && video.currentTime < (normalizedClip?.startSeconds ?? 0)) {
+            seekVideo(video, normalizedClip?.startSeconds ?? 0);
+            setCurrentTime(normalizedClip?.startSeconds ?? 0);
+          }
+        }}
         onPause={() => setIsPlaying(false)}
         onPlay={() => {
           setHasError(false);
           setIsLoading(false);
           setIsPlaying(true);
         }}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onTimeUpdate={(event) => {
+          const absoluteTime = event.currentTarget.currentTime;
+          if (relayClipEndReached(normalizedClip, absoluteTime)) {
+            seekVideo(event.currentTarget, normalizedClip?.endSeconds ?? absoluteTime);
+            setCurrentTime(normalizedClip?.endSeconds ?? absoluteTime);
+            event.currentTarget.pause();
+            setIsPlaying(false);
+            return;
+          }
+          setCurrentTime(absoluteTime);
+        }}
         onWaiting={() => setIsLoading(true)}
         playsInline
         preload={activated ? "metadata" : "none"}
@@ -172,31 +206,44 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
       ) : null}
 
       {activated && !hasError ? (
-        <div className="playsay-relay-player-controls">
+        <div className="playsay-relay-player-controls" data-fullscreen={allowFullscreen ? "true" : "false"}>
           <button aria-label={playLabel} onClick={activateAndPlay} title={playLabel} type="button">
             {isPlaying ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
           </button>
-          <span className="playsay-relay-player-time">{formatMediaTime(currentTime)}</span>
+          <span className="playsay-relay-player-time">{formatMediaTime(displayCurrentTime)}</span>
           <input
             aria-label={progressLabel}
-            max={Math.max(duration, 0)}
+            max={Math.max(displayDuration, 0)}
             min="0"
             onChange={(event) => seek(event.currentTarget.value)}
             step="0.1"
             type="range"
             value={progressValue}
           />
-          <span className="playsay-relay-player-time">{formatMediaTime(duration)}</span>
+          <span className="playsay-relay-player-time">{formatMediaTime(displayDuration)}</span>
           <button aria-label={muteLabel} onClick={toggleMute} title={muteLabel} type="button">
             {isMuted ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
           </button>
-          <button aria-label={t("materials.renderer.videoFullscreen")} onClick={requestFullscreen} title={t("materials.renderer.videoFullscreen")} type="button">
-            <Maximize2 aria-hidden="true" />
-          </button>
+          {allowFullscreen ? (
+            <button aria-label={t("materials.renderer.videoFullscreen")} onClick={requestFullscreen} title={t("materials.renderer.videoFullscreen")} type="button">
+              <Maximize2 aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
+}
+
+function seekVideo(video: HTMLVideoElement, value: number) {
+  if (!Number.isFinite(value) || value < 0) {
+    return;
+  }
+  try {
+    video.currentTime = value;
+  } catch {
+    // Some browsers reject seeking before metadata is ready; onLoadedMetadata applies it again.
+  }
 }
 
 function formatMediaTime(value: number): string {

@@ -67,4 +67,17 @@ describe("materialVideoEmbedFrame", () => {
       title: "Warm-up",
     });
   });
+
+  it("applies teacher-selected clip bounds to youtube embed fallback urls", () => {
+    const frame = materialVideoEmbedFrame({
+      ...youtubeBlock,
+      url: "https://youtu.be/5l-fo-d0gt8?t=8",
+      videoClip: {
+        startSeconds: 12,
+        endSeconds: 45,
+      },
+    }, null);
+
+    expect(frame?.src).toBe("https://www.youtube-nocookie.com/embed/5l-fo-d0gt8?rel=0&start=12&end=45");
+  });
 });

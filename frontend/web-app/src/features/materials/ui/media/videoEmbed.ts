@@ -1,4 +1,4 @@
-import type { MaterialEditorBlock, MaterialVideoEmbedFrame } from "../../model/materialDocument";
+import { normalizeMaterialVideoClip, type MaterialEditorBlock, type MaterialVideoClip, type MaterialVideoEmbedFrame } from "../../model/materialDocument";
 import type { MaterialVideoPlayback } from "../../../../shared/api/playsay";
 
 export function materialVideoEmbedFrame(
@@ -16,7 +16,7 @@ export function materialVideoEmbedFrame(
   if (playback?.mode === "EMBED" && playback.embedUrl?.trim()) {
     return {
       kind: "EMBED",
-      src: playback.embedUrl,
+      src: provider === "YOUTUBE" ? youtubeEmbedUrlWithClip(playback.embedUrl, block.videoClip) : playback.embedUrl,
       title: block.title || "YouTube video",
     };
   }
@@ -40,7 +40,7 @@ export function materialVideoEmbedFrame(
   }
 
   if (provider === "YOUTUBE") {
-    return youtubeEmbedFrame(block.url, block.title);
+    return youtubeEmbedFrame(block.url, block.title, block.videoClip);
   }
   if (provider === "RUTUBE") {
     return rutubeEmbedFrame(block.url, block.title);
@@ -48,7 +48,7 @@ export function materialVideoEmbedFrame(
   return null;
 }
 
-function youtubeEmbedFrame(value?: string, title = "YouTube video"): MaterialVideoEmbedFrame | null {
+function youtubeEmbedFrame(value?: string, title = "YouTube video", clip?: MaterialVideoClip): MaterialVideoEmbedFrame | null {
   const url = parseExternalUrl(value);
   if (!url) {
     return null;
@@ -72,9 +72,13 @@ function youtubeEmbedFrame(value?: string, title = "YouTube video"): MaterialVid
   }
 
   const params = new URLSearchParams({ rel: "0" });
-  const start = youtubeStartSeconds(url.searchParams.get("start") ?? url.searchParams.get("t"));
+  const normalizedClip = normalizeMaterialVideoClip(clip);
+  const start = normalizedClip?.startSeconds ?? youtubeStartSeconds(url.searchParams.get("start") ?? url.searchParams.get("t"));
   if (start > 0) {
     params.set("start", String(start));
+  }
+  if (normalizedClip?.endSeconds !== undefined) {
+    params.set("end", String(normalizedClip.endSeconds));
   }
 
   return {
@@ -82,6 +86,29 @@ function youtubeEmbedFrame(value?: string, title = "YouTube video"): MaterialVid
     src: `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`,
     title: title || "YouTube video",
   };
+}
+
+function youtubeEmbedUrlWithClip(value: string, clip?: MaterialVideoClip): string {
+  const normalizedClip = normalizeMaterialVideoClip(clip);
+  if (!normalizedClip) {
+    return value;
+  }
+
+  const url = parseExternalUrl(value);
+  if (!url) {
+    return value;
+  }
+  if (normalizedClip.startSeconds !== undefined) {
+    url.searchParams.set("start", String(normalizedClip.startSeconds));
+  } else {
+    url.searchParams.delete("start");
+  }
+  if (normalizedClip.endSeconds !== undefined) {
+    url.searchParams.set("end", String(normalizedClip.endSeconds));
+  } else {
+    url.searchParams.delete("end");
+  }
+  return url.toString();
 }
 
 function rutubeEmbedFrame(value?: string, title = "Rutube video"): MaterialVideoEmbedFrame | null {

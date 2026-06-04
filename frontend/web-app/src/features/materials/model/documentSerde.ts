@@ -5,6 +5,7 @@ import { defaultMaterialDocument } from "./documentFactory";
 import { cleanMaterialWordBankOptions, materialCardFromJson, materialItemFromJson, materialWordBankOptionFromJson, normalizeMaterialFillGapMode, normalizeMaterialHintPrefixLength, normalizeMaterialItemHintCount, normalizeMaterialItemMaxAttempts, normalizeMaterialItemMaxErrors } from "./documentItemSerde";
 import { cleanMaterialAssessment, defaultObjectiveAssessmentPolicy } from "./scoring";
 import { asJsonObject, asNumber, asPositiveNumber, asString, createClientId, isMaterialNormalizationTerm, isObjectiveMaterialBlockType, materialBlockLabel, normalizeMaterialAnswer, normalizeMaterialBlockType, readPromptFromSourceMeta, uniqueMaterialOptions } from "./formatters";
+import { normalizeMaterialVideoClip } from "./videoClip";
 
 export function materialToForm(material: LessonMaterial): MaterialFormState {
   const sourceMeta = asJsonObject(material.sourceMeta);
@@ -159,6 +160,7 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   const provider = asString(block.provider);
   const caption = asString(block.caption);
   const height = asNumber(block.height);
+  const videoClip = normalizeMaterialVideoClip(block.videoClip);
 
   if (body) {
     result.body = body;
@@ -171,6 +173,9 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   }
   if (provider) {
     result.provider = provider;
+  }
+  if (videoClip) {
+    result.videoClip = videoClip;
   }
   if (caption) {
     result.caption = caption;
@@ -232,6 +237,10 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   }
   if (block.provider?.trim()) {
     clean.provider = block.provider.trim();
+  }
+  const videoClip = normalizeMaterialVideoClip(block.videoClip);
+  if (videoClip) {
+    clean.videoClip = videoClip;
   }
   if (block.caption?.trim()) {
     clean.caption = block.caption.trim();

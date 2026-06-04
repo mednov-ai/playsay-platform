@@ -49,6 +49,11 @@ export type MaterialVideoEmbedFrame = {
   title: string;
 };
 
+export type MaterialVideoClip = {
+  startSeconds?: number;
+  endSeconds?: number;
+};
+
 export type MaterialAssessmentPolicy = {
   weight?: number;
   maxAttempts?: number;
@@ -107,6 +112,7 @@ export type MaterialEditorBlock = {
   prompt?: string;
   url?: string;
   provider?: string;
+  videoClip?: MaterialVideoClip;
   caption?: string;
   cards?: Array<{ id: string; front: string; back: string; example?: string }>;
   items?: Array<{

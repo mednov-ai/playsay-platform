@@ -34,6 +34,10 @@ management:
       probes:
         enabled: true
 
+logging:
+  level:
+    org.hibernate.orm.connections.pooling: warn
+
 playsay:
   ai:
     provider: ${PLAYSAY_AI_PROVIDER:stub}

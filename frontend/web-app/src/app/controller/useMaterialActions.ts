@@ -1,5 +1,4 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { CourseLessonMap } from "../../entities/schedule/model";
 import {
   archiveMaterial,
   draftMaterial,
@@ -28,13 +27,13 @@ import type { SessionErrorHandler } from "./types";
 
 export function useMaterialActions({
   applySessionError,
-  setCourseLessons,
+  setCourseLessonsForCourse,
   setMaterialLoading,
   setMaterialMessage,
   setMaterials,
 }: {
   applySessionError: SessionErrorHandler;
-  setCourseLessons: Dispatch<SetStateAction<CourseLessonMap>>;
+  setCourseLessonsForCourse: (courseId: string, lessons: CourseLesson[]) => void;
   setMaterialLoading: Dispatch<SetStateAction<boolean>>;
   setMaterialMessage: Dispatch<SetStateAction<string | null>>;
   setMaterials: Dispatch<SetStateAction<LessonMaterial[]>>;
@@ -186,7 +185,7 @@ export function useMaterialActions({
         materialId,
       });
       const lessons = await fetchCourseLessons(courseId);
-      setCourseLessons((current) => ({ ...current, [courseId]: lessons }));
+      setCourseLessonsForCourse(courseId, lessons);
       setMaterialMessage(materialId ? t("materials.messages.linkedToLesson") : t("materials.messages.unlinkedFromLesson"));
     } catch (caught) {
       setMaterialMessage(applySessionError(caught, t("materials.messages.linkFailed")));

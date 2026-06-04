@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import { Loader2, LogIn, LogOut, User, Video } from "lucide-react";
 import { type WorkspaceTab, type WorkspaceTabDefinition } from "../entities/workspace/model";
 import type { CourseLessonMap } from "../entities/schedule/model";
@@ -31,19 +31,28 @@ import {
 import { BrandMark } from "../shared/ui/BrandMark";
 import { WorkspaceTabs } from "../widgets/workspace-tabs/WorkspaceTabs";
 import { Button } from "../components/ui/button";
-import { ProfileAccountPanel, type SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
-import { CourseWorkspacePanel } from "../features/courses/ui/CourseWorkspacePanel";
-import { SchedulePanel } from "../features/schedule/ui/SchedulePanel";
-import { HomeworkPanel } from "../features/homework/ui/HomeworkPanel";
-import { BillingPanel } from "../features/payments";
+import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
 import type { LessonRoomSession } from "../features/classroom";
-import { MaterialLibraryPanel } from "../features/materials/ui/MaterialLibraryPanel";
-import { LiveLessonExperience } from "../features/classroom/ui/LiveLessonExperience";
 import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 import officialLogoUrl from "../shared/assets/playsay-official-logo.jpg";
 
 const mainSiteUrl = "https://play-and-say.ru";
+const BillingPanel = lazy(() => import("../features/payments/ui/BillingPanel").then((module) => ({ default: module.BillingPanel })));
+const CourseWorkspacePanel = lazy(() => (
+  import("../features/courses/ui/CourseWorkspacePanel").then((module) => ({ default: module.CourseWorkspacePanel }))
+));
+const HomeworkPanel = lazy(() => import("../features/homework/ui/HomeworkPanel").then((module) => ({ default: module.HomeworkPanel })));
+const LiveLessonExperience = lazy(() => (
+  import("../features/classroom/ui/LiveLessonExperience").then((module) => ({ default: module.LiveLessonExperience }))
+));
+const MaterialLibraryPanel = lazy(() => (
+  import("../features/materials/ui/MaterialLibraryPanel").then((module) => ({ default: module.MaterialLibraryPanel }))
+));
+const ProfileAccountPanel = lazy(() => (
+  import("../features/profile/ui/ProfileAccountPanel").then((module) => ({ default: module.ProfileAccountPanel }))
+));
+const SchedulePanel = lazy(() => import("../features/schedule/ui/SchedulePanel").then((module) => ({ default: module.SchedulePanel })));
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -227,124 +236,132 @@ export function AppShell(props: AppShellProps) {
         )}
 
         {roomSession ? (
-          <LiveLessonExperience
-            materials={materials}
-            onAssignMaterial={(lessonId, materialId) => assignMaterialToScheduledLesson(lessonId, materialId)}
-            onLeave={leaveScheduledLessonRoom}
-            profile={profile}
-            session={roomSession}
-          />
+          <Suspense fallback={<PanelFallback />}>
+            <LiveLessonExperience
+              materials={materials}
+              onAssignMaterial={(lessonId, materialId) => assignMaterialToScheduledLesson(lessonId, materialId)}
+              onLeave={leaveScheduledLessonRoom}
+              profile={profile}
+              session={roomSession}
+            />
+          </Suspense>
         ) : !isAuthenticated ? (
           <WelcomeLanding profileSaving={profileSaving} status={status} />
         ) : (
           <div className="grid flex-1 gap-5">
-            {profileOpen ? (
-              <ProfileAccountPanel
-                adminLoading={adminLoading}
-                adminMessage={adminMessage}
-                adminUsers={adminUsers}
-                appProfile={appProfile}
-                error={error}
-                isAdmin={isAdmin}
-                isAuthenticated={isAuthenticated}
-                onRefreshAdminUsers={() => void refreshAdminUsers()}
-                onResetProfile={() => void resetProfile()}
-                onSaveProfile={saveProfile}
-                profile={profile}
-                profileMessage={profileMessage}
-                profileSaving={profileSaving}
-                status={status}
-              />
-            ) : null}
+            <Suspense fallback={<PanelFallback />}>
+              {profileOpen ? (
+                <ProfileAccountPanel
+                  adminLoading={adminLoading}
+                  adminMessage={adminMessage}
+                  adminUsers={adminUsers}
+                  appProfile={appProfile}
+                  error={error}
+                  isAdmin={isAdmin}
+                  isAuthenticated={isAuthenticated}
+                  onRefreshAdminUsers={() => void refreshAdminUsers()}
+                  onResetProfile={() => void resetProfile()}
+                  onSaveProfile={saveProfile}
+                  profile={profile}
+                  profileMessage={profileMessage}
+                  profileSaving={profileSaving}
+                  status={status}
+                />
+              ) : null}
 
-            {workspaceTabs.length > 1 ? (
-              <WorkspaceTabs activeTab={workspaceTab} onSelect={setWorkspaceTab} tabs={workspaceTabs} />
-            ) : null}
+              {workspaceTabs.length > 1 ? (
+                <WorkspaceTabs activeTab={workspaceTab} onSelect={setWorkspaceTab} tabs={workspaceTabs} />
+              ) : null}
 
-            {workspaceTab === "schedule" ? (
-              <SchedulePanel
-                courses={courses}
-                disabled={!isAuthenticated || scheduleLoading}
-                lessons={courseLessons}
-                loading={scheduleLoading}
-                materials={materials}
-                message={scheduleMessage}
-                nowMs={nowMs}
-                onCancel={(lesson) => void cancelScheduledLesson(lesson)}
-                onCreate={(input) => void createScheduledLesson(input)}
-                onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
-                onJoin={(lesson) => void joinScheduledLesson(lesson)}
-                onRefresh={() => void refreshSchedule()}
-                profile={profile}
-                roomLoadingLessonId={roomLoadingLessonId}
-                roomMessage={roomMessage}
-                scheduledLessons={scheduledLessons}
-                studentUsers={studentUsers}
-              />
-            ) : null}
+              {workspaceTab === "schedule" ? (
+                <SchedulePanel
+                  courses={courses}
+                  disabled={!isAuthenticated || scheduleLoading}
+                  lessons={courseLessons}
+                  loading={scheduleLoading}
+                  materials={materials}
+                  message={scheduleMessage}
+                  nowMs={nowMs}
+                  onCancel={(lesson) => void cancelScheduledLesson(lesson)}
+                  onCreate={(input) => void createScheduledLesson(input)}
+                  onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
+                  onJoin={(lesson) => void joinScheduledLesson(lesson)}
+                  onRefresh={() => void refreshSchedule()}
+                  profile={profile}
+                  roomLoadingLessonId={roomLoadingLessonId}
+                  roomMessage={roomMessage}
+                  scheduledLessons={scheduledLessons}
+                  studentUsers={studentUsers}
+                />
+              ) : null}
 
-            {workspaceTab === "homework" ? (
-              <HomeworkPanel
-                disabled={!isAuthenticated}
-                materials={materials}
-                profile={profile}
-                scheduledLessons={scheduledLessons}
-                studentUsers={studentUsers}
-              />
-            ) : null}
+              {workspaceTab === "homework" ? (
+                <HomeworkPanel
+                  disabled={!isAuthenticated}
+                  materials={materials}
+                  profile={profile}
+                  scheduledLessons={scheduledLessons}
+                  studentUsers={studentUsers}
+                />
+              ) : null}
 
-            {workspaceTab === "materials" ? (
-              <MaterialLibraryPanel
-                courses={courses}
-                disabled={!isAuthenticated || materialLoading}
-                lessons={courseLessons}
-                loading={materialLoading}
-                materials={materials}
-                message={materialMessage}
-                onArchive={(materialId) => void deleteMaterial(materialId)}
-                onDraft={(input) => generateMaterialDraft(input)}
-                onDraftFromUrl={(input) => generateMaterialDraftFromUrl(input)}
-                onGenerateImages={(materialId, input) => generateImagesForMaterial(materialId, input)}
-                onSuggestAcceptedAnswers={(materialId, input) => suggestAcceptedAnswersForMaterial(materialId, input)}
-                onUpdateAsset={(materialId, assetId, input) => updateMaterialAssetMetadata(materialId, assetId, input)}
-                onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
-                onRefresh={() => void refreshMaterials()}
-                onSave={(input, materialId) => upsertMaterial(input, materialId)}
-                profile={profile}
-              />
-            ) : null}
+              {workspaceTab === "materials" ? (
+                <MaterialLibraryPanel
+                  courses={courses}
+                  disabled={!isAuthenticated || materialLoading}
+                  lessons={courseLessons}
+                  loading={materialLoading}
+                  materials={materials}
+                  message={materialMessage}
+                  onArchive={(materialId) => void deleteMaterial(materialId)}
+                  onDraft={(input) => generateMaterialDraft(input)}
+                  onDraftFromUrl={(input) => generateMaterialDraftFromUrl(input)}
+                  onGenerateImages={(materialId, input) => generateImagesForMaterial(materialId, input)}
+                  onSuggestAcceptedAnswers={(materialId, input) => suggestAcceptedAnswersForMaterial(materialId, input)}
+                  onUpdateAsset={(materialId, assetId, input) => updateMaterialAssetMetadata(materialId, assetId, input)}
+                  onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
+                  onRefresh={() => void refreshMaterials()}
+                  onSave={(input, materialId) => upsertMaterial(input, materialId)}
+                  profile={profile}
+                />
+              ) : null}
 
-            {workspaceTab === "courses" ? (
-              <CourseWorkspacePanel
-                courses={courses}
-                disabled={!isAuthenticated || courseLoading}
-                lessons={courseLessons}
-                loading={courseLoading}
-                message={courseMessage}
-                onCreateCourse={(input) => void createCourse(input)}
-                onCreateLesson={(courseId, input) => void createLesson(courseId, input)}
-                onDeleteCourse={(courseId) => void deleteCourse(courseId)}
-                onDeleteLesson={(courseId, lessonId) => void deleteLesson(courseId, lessonId)}
-                onRefresh={() => void refreshCourses()}
-                profile={profile}
-              />
-            ) : null}
+              {workspaceTab === "courses" ? (
+                <CourseWorkspacePanel
+                  courses={courses}
+                  disabled={!isAuthenticated || courseLoading}
+                  lessons={courseLessons}
+                  loading={courseLoading}
+                  message={courseMessage}
+                  onCreateCourse={(input) => void createCourse(input)}
+                  onCreateLesson={(courseId, input) => void createLesson(courseId, input)}
+                  onDeleteCourse={(courseId) => void deleteCourse(courseId)}
+                  onDeleteLesson={(courseId, lessonId) => void deleteLesson(courseId, lessonId)}
+                  onRefresh={() => void refreshCourses()}
+                  profile={profile}
+                />
+              ) : null}
 
-            {workspaceTab === "billing" ? (
-              <BillingPanel
-                disabled={!isAuthenticated || paymentLoading}
-                invoices={paymentInvoices}
-                loading={paymentLoading}
-                message={paymentMessage}
-                onCreate={createPaymentInvoice}
-                onRefresh={() => void refreshPaymentInvoices()}
-              />
-            ) : null}
+              {workspaceTab === "billing" ? (
+                <BillingPanel
+                  disabled={!isAuthenticated || paymentLoading}
+                  invoices={paymentInvoices}
+                  loading={paymentLoading}
+                  message={paymentMessage}
+                  onCreate={createPaymentInvoice}
+                  onRefresh={() => void refreshPaymentInvoices()}
+                />
+              ) : null}
+            </Suspense>
           </div>
         )}
       </section>
     </main>
   );
+}
+
+function PanelFallback() {
+  return <div aria-hidden="true" className="min-h-40" />;
 }
 
 function WelcomeLanding({

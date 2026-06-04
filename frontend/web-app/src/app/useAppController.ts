@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { type WorkspaceTab, workspaceTabsForProfile } from "../entities/workspace/model";
-import { compareJoinableLessons, isJoinableScheduledLesson, type CourseLessonMap } from "../entities/schedule/model";
+import { workspaceTabsForProfile } from "../entities/workspace/model";
+import { compareJoinableLessons, isJoinableScheduledLesson } from "../entities/schedule/model";
 import {
   ApiError,
   buildLogoutUrl,
@@ -10,7 +10,6 @@ import {
   fetchAdminUserProfiles,
   fetchMaterials,
   fetchMe,
-  fetchPaymentInvoices,
   fetchScheduledLessons,
   fetchStudentProfiles,
   fetchUserProfile,
@@ -18,23 +17,19 @@ import {
   isAuthCallback,
   readTokens,
   saveUserProfile,
-  createPaymentInvoice as createPaymentInvoiceRequest,
   skipSilentLoginOnce,
   startSilentLogin,
   type AdminUserProfile,
   type AppUserProfile,
-  type Course,
   type LessonMaterial,
   type MeProfile,
-  type PaymentInvoice,
-  type PaymentInvoiceCreateInput,
-  type PaymentInvoiceCreated,
   type ScheduledLesson,
   type UpdateUserProfileInput,
 } from "../shared/api/playsay";
 import { classroomLessonIdFromPath } from "./routes";
 import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
-import { fetchCourseBundle } from "../features/courses";
+import { useCourseWorkspaceData } from "../features/courses";
+import { usePaymentInvoicesData } from "../features/payments";
 import {
   type LessonRoomSession,
 } from "../features/classroom";
@@ -46,35 +41,12 @@ import {
   useAppTranslation,
   type SupportedLanguage,
 } from "../shared/i18n";
-import { useCourseActions } from "./controller/useCourseActions";
+import { appQueryClient } from "./AppProviders";
 import { useLessonRealtime } from "./controller/useLessonRealtime";
 import { useMaterialActions } from "./controller/useMaterialActions";
 import { useProfileActions } from "./controller/useProfileActions";
 import { useScheduleActions } from "./controller/useScheduleActions";
-
-export async function loadInitialPaymentInvoices({
-  canManagePeople,
-  loadInvoices,
-  onUnavailable,
-}: {
-  canManagePeople: boolean;
-  loadInvoices: () => Promise<PaymentInvoice[]>;
-  onUnavailable: (caught: unknown) => void;
-}): Promise<PaymentInvoice[]> {
-  if (!canManagePeople) {
-    return [];
-  }
-
-  try {
-    return await loadInvoices();
-  } catch (caught) {
-    if (caught instanceof ApiError && caught.status === 401) {
-      throw caught;
-    }
-    onUnavailable(caught);
-    return [];
-  }
-}
+import { useAppShellUiStore } from "./model/useAppShellUiStore";
 
 export function useAppController(): AppShellProps {
   const { i18n, t } = useAppTranslation();
@@ -84,29 +56,25 @@ export function useAppController(): AppShellProps {
   const [error, setError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const profileOpen = useAppShellUiStore((state) => state.profileOpen);
+  const resetShellUi = useAppShellUiStore((state) => state.resetShellUi);
+  const setProfileOpen = useAppShellUiStore((state) => state.setProfileOpen);
+  const setWorkspaceTab = useAppShellUiStore((state) => state.setWorkspaceTab);
+  const workspaceTab = useAppShellUiStore((state) => state.workspaceTab);
   const [adminUsers, setAdminUsers] = useState<AdminUserProfile[]>([]);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [courseLessons, setCourseLessons] = useState<CourseLessonMap>({});
-  const [courseMessage, setCourseMessage] = useState<string | null>(null);
-  const [courseLoading, setCourseLoading] = useState(false);
   const [materials, setMaterials] = useState<LessonMaterial[]>([]);
   const [materialMessage, setMaterialMessage] = useState<string | null>(null);
   const [materialLoading, setMaterialLoading] = useState(false);
   const [scheduledLessons, setScheduledLessons] = useState<ScheduledLesson[]>([]);
   const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [paymentInvoices, setPaymentInvoices] = useState<PaymentInvoice[]>([]);
-  const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
-  const [paymentLoading, setPaymentLoading] = useState(false);
   const [studentUsers, setStudentUsers] = useState<AdminUserProfile[]>([]);
   const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(null);
   const [roomLoadingLessonId, setRoomLoadingLessonId] = useState<string | null>(null);
   const [roomMessage, setRoomMessage] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
-  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("schedule");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const routeLessonId = classroomLessonIdFromPath(currentPath);
 
@@ -139,22 +107,12 @@ export function useAppController(): AppShellProps {
 
         const me = await fetchMe();
         const canManagePeople = me.roles.includes("TEACHER") || me.roles.includes("ADMIN");
-        const [currentAppProfile, currentAdminUsers, currentCourseBundle, currentMaterials, currentSchedule, currentStudents, currentPaymentInvoices] = await Promise.all([
+        const [currentAppProfile, currentAdminUsers, currentMaterials, currentSchedule, currentStudents] = await Promise.all([
           fetchUserProfile(),
           me.roles.includes("ADMIN") ? fetchAdminUserProfiles() : Promise.resolve([]),
-          fetchCourseBundle(),
           fetchMaterials(),
           fetchScheduledLessons(),
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
-          loadInitialPaymentInvoices({
-            canManagePeople,
-            loadInvoices: fetchPaymentInvoices,
-            onUnavailable: () => {
-              if (!cancelled) {
-                setPaymentMessage(t("payments.messages.refreshFailed"));
-              }
-            },
-          }),
         ]);
         if (!cancelled) {
           let authenticatedAppProfile = currentAppProfile;
@@ -189,12 +147,9 @@ export function useAppController(): AppShellProps {
               user.subject === authenticatedAppProfile.subject ? authenticatedAppProfile : user,
             ),
           );
-          setCourses(currentCourseBundle.courses);
-          setCourseLessons(currentCourseBundle.lessons);
           setMaterials(currentMaterials);
           setScheduledLessons(currentSchedule);
           setStudentUsers(currentStudents);
-          setPaymentInvoices(currentPaymentInvoices);
           setStatus("authenticated");
         }
       } catch (caught) {
@@ -236,6 +191,7 @@ export function useAppController(): AppShellProps {
 
   const isAuthenticated = status === "authenticated" && profile !== null;
   const isAdmin = profile?.roles.includes("ADMIN") ?? false;
+  const canManagePeople = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const isClassroomOpen = roomSession !== null;
   const workspaceTabs = workspaceTabsForProfile(profile);
   const nextJoinableLesson = [...scheduledLessons]
@@ -243,6 +199,31 @@ export function useAppController(): AppShellProps {
     .sort((left, right) => compareJoinableLessons(left, right, nowMs))[0] ?? null;
   const anyLessonLoading = roomLoadingLessonId !== null;
   const nextLessonLoading = nextJoinableLesson ? roomLoadingLessonId === nextJoinableLesson.id : false;
+  const {
+    courseLessons,
+    courseLoading,
+    courseMessage,
+    courses,
+    createCourse,
+    createLesson,
+    deleteCourse,
+    deleteLesson,
+    refreshCourses,
+    setCourseLessonsForCourse,
+  } = useCourseWorkspaceData({
+    applySessionError,
+    enabled: isAuthenticated,
+  });
+  const {
+    createPaymentInvoice,
+    paymentInvoices,
+    paymentLoading,
+    paymentMessage,
+    refreshPaymentInvoices,
+  } = usePaymentInvoicesData({
+    applySessionError,
+    enabled: isAuthenticated && canManagePeople,
+  });
   const {
     refreshAdminUsers,
     resetProfile,
@@ -258,19 +239,6 @@ export function useAppController(): AppShellProps {
     setProfileSaving,
   });
   const {
-    createCourse,
-    createLesson,
-    deleteCourse,
-    deleteLesson,
-    refreshCourses,
-  } = useCourseActions({
-    applySessionError,
-    setCourseLessons,
-    setCourseLoading,
-    setCourseMessage,
-    setCourses,
-  });
-  const {
     deleteMaterial,
     generateImagesForMaterial,
     generateMaterialDraft,
@@ -282,7 +250,7 @@ export function useAppController(): AppShellProps {
     upsertMaterial,
   } = useMaterialActions({
     applySessionError,
-    setCourseLessons,
+    setCourseLessonsForCourse,
     setMaterialLoading,
     setMaterialMessage,
     setMaterials,
@@ -323,39 +291,6 @@ export function useAppController(): AppShellProps {
     status,
   });
 
-  async function refreshPaymentInvoices() {
-    setPaymentLoading(true);
-    setPaymentMessage(null);
-    try {
-      const invoices = await fetchPaymentInvoices();
-      setPaymentInvoices(invoices);
-      setPaymentMessage(t("payments.messages.refreshed"));
-    } catch (caught) {
-      setPaymentMessage(applySessionError(caught, t("payments.messages.refreshFailed")));
-    } finally {
-      setPaymentLoading(false);
-    }
-  }
-
-  async function createPaymentInvoice(input: PaymentInvoiceCreateInput): Promise<PaymentInvoiceCreated | null> {
-    setPaymentLoading(true);
-    setPaymentMessage(null);
-    try {
-      const created = await createPaymentInvoiceRequest(input);
-      setPaymentInvoices((current) => [
-        created.invoice,
-        ...current.filter((invoice) => invoice.id !== created.invoice.id),
-      ]);
-      setPaymentMessage(t("payments.messages.created"));
-      return created;
-    } catch (caught) {
-      setPaymentMessage(applySessionError(caught, t("payments.messages.createFailed")));
-      return null;
-    } finally {
-      setPaymentLoading(false);
-    }
-  }
-
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(timer);
@@ -393,19 +328,17 @@ export function useAppController(): AppShellProps {
     const logoutUrl = buildLogoutUrl();
     clearTokens();
     skipSilentLoginOnce();
+    appQueryClient.clear();
     setProfile(null);
     setAppProfile(null);
     setAdminUsers([]);
-    setCourses([]);
-    setCourseLessons({});
     setMaterials([]);
     setScheduledLessons([]);
-    setPaymentInvoices([]);
     setStudentUsers([]);
     setRoomSession(null);
     setRoomLoadingLessonId(null);
     setRoomMessage(null);
-    setProfileOpen(false);
+    resetShellUi();
     setStatus("loggingOut");
     window.location.assign(logoutUrl);
   }
@@ -418,19 +351,17 @@ export function useAppController(): AppShellProps {
       message.includes("HTTP 401")
     ) {
       clearTokens();
+      appQueryClient.clear();
       setProfile(null);
       setAppProfile(null);
       setAdminUsers([]);
-      setCourses([]);
-      setCourseLessons({});
       setMaterials([]);
       setScheduledLessons([]);
-      setPaymentInvoices([]);
       setStudentUsers([]);
       setRoomSession(null);
       setRoomLoadingLessonId(null);
       setRoomMessage(null);
-      setProfileOpen(false);
+      resetShellUi();
       setStatus("anonymous");
       return t("errors.sessionExpired");
     }

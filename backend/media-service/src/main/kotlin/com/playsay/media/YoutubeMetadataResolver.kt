@@ -3,7 +3,9 @@ package com.playsay.media
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import java.io.InputStream
 import java.time.Duration
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -39,6 +41,8 @@ class YoutubeMetadataResolver(
             logger.warn("media-service yt-dlp start failed videoId={} ytdlpPath={}", videoId, ytdlpPath, it)
             return null
         }
+        val stdoutFuture = readTextAsync(process.inputStream)
+        val stderrFuture = readTextAsync(process.errorStream)
 
         val finished = process.waitFor(25, TimeUnit.SECONDS)
         val durationMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis()
@@ -48,8 +52,8 @@ class YoutubeMetadataResolver(
             return null
         }
 
-        val stdout = process.inputStream.bufferedReader().use { reader -> reader.readText() }
-        val stderr = process.errorStream.bufferedReader().use { reader -> reader.readText() }
+        val stdout = readCompletedText(stdoutFuture, "stdout", videoId) ?: return null
+        val stderr = readCompletedText(stderrFuture, "stderr", videoId) ?: return null
         if (process.exitValue() != 0) {
             logger.warn(
                 "media-service yt-dlp failed videoId={} exitCode={} durationMs={} stdoutLines={} stderrLines={}",
@@ -114,6 +118,18 @@ class YoutubeMetadataResolver(
             ?.asText()
             ?.trim()
             ?.takeIf { value -> value.isNotBlank() && value != "NA" && value != "None" && value != "null" }
+
+    private fun readTextAsync(stream: InputStream): CompletableFuture<String> =
+        CompletableFuture.supplyAsync {
+            stream.bufferedReader().use { reader -> reader.readText() }
+        }
+
+    private fun readCompletedText(future: CompletableFuture<String>, streamName: String, videoId: String): String? =
+        runCatching { future.get(5, TimeUnit.SECONDS) }
+            .getOrElse {
+                logger.warn("media-service yt-dlp stream read failed videoId={} stream={}", videoId, streamName, it)
+                null
+            }
 
     companion object {
         private val logger = LoggerFactory.getLogger(YoutubeMetadataResolver::class.java)

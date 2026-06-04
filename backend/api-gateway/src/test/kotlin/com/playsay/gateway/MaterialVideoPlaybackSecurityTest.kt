@@ -27,7 +27,7 @@ class MaterialVideoPlaybackSecurityTest @Autowired constructor(
     @param:LocalServerPort private val port: Int,
 ) {
     @Test
-    fun `stream endpoint can be requested by native video element without bearer token`() {
+    fun `old gateway stream endpoint is no longer a public video route`() {
         val response = HttpClient.newHttpClient().send(
             HttpRequest.newBuilder(
                 URI.create("http://127.0.0.1:$port/materials/video-playback-sessions/${UUID.randomUUID()}/stream"),
@@ -35,6 +35,6 @@ class MaterialVideoPlaybackSecurityTest @Autowired constructor(
             HttpResponse.BodyHandlers.discarding(),
         )
 
-        assertEquals(HttpStatus.NOT_FOUND.value(), response.statusCode())
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.statusCode())
     }
 }

@@ -1,5 +1,5 @@
-import { Maximize2, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useAppTranslation } from "../../../../shared/i18n";
 import type { MaterialVideoClip } from "../../model/materialDocument";
 import {
@@ -13,7 +13,11 @@ import {
 type PlaySayRelayVideoPlayerProps = {
   allowFullscreen?: boolean;
   clip?: MaterialVideoClip;
+  onQualityChange?: (quality: MaterialVideoQuality, currentTimeSeconds: number) => void;
+  quality?: MaterialVideoQuality;
+  resumeAtSeconds?: number | null;
   src: string;
+  thumbnailUrl?: string | null;
   title: string;
 };
 
@@ -21,28 +25,56 @@ type FullscreenElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
-export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, title }: PlaySayRelayVideoPlayerProps) {
+type MaterialVideoQuality = "LOW" | "MEDIUM" | "HIGH";
+
+export function PlaySayRelayVideoPlayer({
+  allowFullscreen = true,
+  clip,
+  onQualityChange,
+  quality = "MEDIUM",
+  resumeAtSeconds,
+  src,
+  thumbnailUrl,
+  title,
+}: PlaySayRelayVideoPlayerProps) {
   const { t } = useAppTranslation();
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const normalizedClip = useMemo(() => normalizeRelayVideoClip(clip), [clip?.endSeconds, clip?.startSeconds]);
   const playbackKey = `${src}|${normalizedClip?.startSeconds ?? 0}|${normalizedClip?.endSeconds ?? ""}`;
   const previousPlaybackKeyRef = useRef(playbackKey);
+  const activatedRef = useRef(false);
   const [activated, setActivated] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [hasError, setHasError] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(100);
+
+  useEffect(() => {
+    activatedRef.current = activated;
+  }, [activated]);
+
+  useEffect(() => {
+    function updateFullscreenState() {
+      setIsFullscreen(document.fullscreenElement === shellRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    return () => document.removeEventListener("fullscreenchange", updateFullscreenState);
+  }, []);
 
   useEffect(() => {
     if (previousPlaybackKeyRef.current === playbackKey) {
       return;
     }
     previousPlaybackKeyRef.current = playbackKey;
-    setActivated(false);
-    setCurrentTime(0);
+    const shouldResume = activatedRef.current;
+    const resumeTime = safeResumeTime(resumeAtSeconds, normalizedClip?.startSeconds ?? 0);
+    setActivated(shouldResume);
+    setCurrentTime(shouldResume ? resumeTime : 0);
     setDuration(0);
     setHasError(false);
     setIsLoading(false);
@@ -52,8 +84,24 @@ export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, tit
       video.pause();
       video.removeAttribute("src");
       video.load();
+      if (shouldResume) {
+        video.src = src;
+        video.preload = "metadata";
+        video.load();
+        seekVideo(video, resumeTime);
+        playVideo(video);
+      }
     }
-  }, [playbackKey]);
+  }, [playbackKey, resumeAtSeconds, src]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+    video.volume = Math.min(1, Math.max(0, volume / 100));
+    video.muted = volume === 0;
+  }, [volume]);
 
   const displayDuration = relayClipDuration(normalizedClip, duration);
   const displayCurrentTime = displayTimeForRelayClip(normalizedClip, currentTime);
@@ -72,8 +120,9 @@ export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, tit
         video.src = src;
         video.preload = "metadata";
         video.load();
-        seekVideo(video, normalizedClip?.startSeconds ?? 0);
-        setCurrentTime(normalizedClip?.startSeconds ?? 0);
+        const startSeconds = safeResumeTime(resumeAtSeconds, normalizedClip?.startSeconds ?? 0);
+        seekVideo(video, startSeconds);
+        setCurrentTime(startSeconds);
         playVideo(video);
       }
       return;
@@ -98,7 +147,22 @@ export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, tit
   }
 
   function toggleMute() {
-    setIsMuted((muted) => !muted);
+    setVolume((current) => (current === 0 ? 100 : 0));
+  }
+
+  function changeVolume(value: string) {
+    const nextVolume = Number(value);
+    if (Number.isFinite(nextVolume)) {
+      setVolume(Math.min(100, Math.max(0, nextVolume)));
+    }
+  }
+
+  function changeQuality(value: string) {
+    const nextQuality = normalizedQuality(value);
+    if (nextQuality === quality) {
+      return;
+    }
+    onQualityChange?.(nextQuality, currentTime);
   }
 
   function replay() {
@@ -123,8 +187,21 @@ export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, tit
     void request?.call(element);
   }
 
+  function exitFullscreen() {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    }
+  }
+
   const playLabel = isPlaying ? t("materials.renderer.videoPause") : t("materials.renderer.videoPlay");
-  const muteLabel = isMuted ? t("materials.renderer.videoUnmute") : t("materials.renderer.videoMute");
+  const muteLabel = volume === 0 ? t("materials.renderer.videoUnmute") : t("materials.renderer.videoMute");
+  const volumeLabel = t("materials.renderer.videoVolume", { value: volume });
+  const fullscreenLabel = isFullscreen ? t("materials.renderer.videoExitFullscreen") : t("materials.renderer.videoFullscreen");
+  const posterStyle = thumbnailUrl
+    ? ({
+        backgroundImage: `linear-gradient(180deg, rgb(17 17 17 / 0.08), rgb(17 17 17 / 0.62)), url("${thumbnailUrl}")`,
+      } as CSSProperties)
+    : undefined;
 
   function playVideo(video: HTMLVideoElement) {
     setIsLoading(true);
@@ -141,7 +218,7 @@ export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, tit
     <div className="playsay-relay-player" data-state={activated ? "active" : "idle"} ref={shellRef}>
       <video
         aria-label={title}
-        muted={isMuted}
+        muted={volume === 0}
         onCanPlay={() => setIsLoading(false)}
         onEnded={() => {
           setIsLoading(false);
@@ -191,17 +268,17 @@ export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, tit
           aria-label={hasError ? t("materials.renderer.videoRetry") : t("materials.renderer.videoPlay")}
           className="playsay-relay-player-poster"
           onClick={hasError ? replay : activateAndPlay}
+          style={posterStyle}
           title={hasError ? t("materials.renderer.videoRetry") : t("materials.renderer.videoPlay")}
           type="button"
         >
           {hasError ? <RotateCcw aria-hidden="true" /> : <Play aria-hidden="true" />}
-          <span>{hasError ? t("materials.renderer.videoLoadFailed") : title}</span>
         </button>
       ) : null}
 
       {isLoading ? (
         <div className="playsay-relay-player-loading" role="status">
-          <span className="playsay-visually-hidden">{t("materials.renderer.videoLoading")}</span>
+          <span>{t("materials.renderer.videoLoading")}</span>
         </div>
       ) : null}
 
@@ -222,17 +299,45 @@ export function PlaySayRelayVideoPlayer({ allowFullscreen = true, clip, src, tit
           />
           <span className="playsay-relay-player-time">{formatMediaTime(displayDuration)}</span>
           <button aria-label={muteLabel} onClick={toggleMute} title={muteLabel} type="button">
-            {isMuted ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+            {volume === 0 ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
           </button>
+          <input
+            aria-label={volumeLabel}
+            className="playsay-relay-player-volume"
+            max="100"
+            min="0"
+            onChange={(event) => changeVolume(event.currentTarget.value)}
+            step="1"
+            type="range"
+            value={volume}
+          />
+          <select
+            aria-label={t("materials.renderer.videoQuality")}
+            className="playsay-relay-player-quality"
+            onChange={(event) => changeQuality(event.currentTarget.value)}
+            value={quality}
+          >
+            <option value="LOW">480p</option>
+            <option value="MEDIUM">720p</option>
+            <option value="HIGH">1080p</option>
+          </select>
           {allowFullscreen ? (
-            <button aria-label={t("materials.renderer.videoFullscreen")} onClick={requestFullscreen} title={t("materials.renderer.videoFullscreen")} type="button">
-              <Maximize2 aria-hidden="true" />
+            <button aria-label={fullscreenLabel} onClick={isFullscreen ? exitFullscreen : requestFullscreen} title={fullscreenLabel} type="button">
+              {isFullscreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
             </button>
           ) : null}
         </div>
       ) : null}
     </div>
   );
+}
+
+function normalizedQuality(value: string): MaterialVideoQuality {
+  return value === "LOW" || value === "HIGH" ? value : "MEDIUM";
+}
+
+function safeResumeTime(value: number | null | undefined, fallback: number): number {
+  return Number.isFinite(value) && (value ?? 0) >= 0 ? value ?? fallback : fallback;
 }
 
 function seekVideo(video: HTMLVideoElement, value: number) {

@@ -1,0 +1,34 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: media-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+playsay:
+  media-service:
+    service-token: ${PLAYSAY_MEDIA_SERVICE_TOKEN:}
+    session-ttl-seconds: ${PLAYSAY_MEDIA_SERVICE_SESSION_TTL_SECONDS:900}
+    max-upstream-range-bytes: ${PLAYSAY_MEDIA_SERVICE_MAX_UPSTREAM_RANGE_BYTES:1048576}
+    max-thumbnail-bytes: ${PLAYSAY_MEDIA_SERVICE_MAX_THUMBNAIL_BYTES:5242880}
+    ytdlp-path: ${PLAYSAY_MEDIA_SERVICE_YTDLP_PATH:yt-dlp}
+  storage:
+    provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
+    s3:
+      endpoint: ${PLAYSAY_S3_ENDPOINT:}
+      region: ${PLAYSAY_S3_REGION:us-east-1}
+      bucket: ${PLAYSAY_S3_BUCKET:playsay-material-assets}
+      access-key: ${PLAYSAY_S3_ACCESS_KEY:}
+      secret-key: ${PLAYSAY_S3_SECRET_KEY:}
+      path-style-access: ${PLAYSAY_S3_PATH_STYLE_ACCESS:true}
+      create-bucket: ${PLAYSAY_S3_CREATE_BUCKET:false}

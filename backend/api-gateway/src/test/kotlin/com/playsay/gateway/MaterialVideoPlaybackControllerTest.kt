@@ -13,23 +13,29 @@ import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.AppUserRepo
+import com.playsay.gateway.repo.MaterialAssetRepo
+import com.playsay.gateway.service.MaterialAssetService
 import com.playsay.gateway.service.UserProfileStore
+import com.playsay.gateway.service.YoutubeMediaClient
+import com.playsay.gateway.service.YoutubeMediaPlaybackSessionCommand
+import com.playsay.gateway.service.YoutubeMediaPlaybackSessionResult
+import com.playsay.gateway.service.YoutubeVideoMeta
 import com.playsay.gateway.utils.MetaData
-import java.nio.file.Files
+import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.io.path.writeText
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -58,29 +64,19 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
     private val assignmentRepo: AssignmentRepo,
     private val assignmentRecipientRepo: AssignmentRecipientRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
+    private val materialAssetRepo: MaterialAssetRepo,
+    private val materialAssetService: MaterialAssetService,
     private val appUserRepo: AppUserRepo,
     private val dataSource: DataSource,
+    private val testYoutubeMediaClient: TestYoutubeMediaClient,
 ) {
     private val objectMapper = jacksonObjectMapper()
 
-    companion object {
-        private val ytdlp = Files.createTempFile("playsay-youtube-metadata", ".sh").apply {
-            writeText(
-                """
-                #!/usr/bin/env sh
-                printf '%s\n' '5l-fo-d0gt8'
-                printf '%s\n' '105'
-                printf '%s\n' 'en'
-                """.trimIndent(),
-            )
-            toFile().setExecutable(true)
-        }
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun youtubeMetadataProperties(registry: DynamicPropertyRegistry) {
-            registry.add("playsay.video.youtube.rf-relay.ytdlp-path") { ytdlp.toString() }
-        }
+    @TestConfiguration
+    class MediaClientTestConfig {
+        @Bean
+        @Primary
+        fun youtubeMediaClient(): TestYoutubeMediaClient = TestYoutubeMediaClient()
     }
 
     @BeforeAll
@@ -93,6 +89,8 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
+        testYoutubeMediaClient.reset()
+        materialAssetRepo.deleteAllInBatch()
         assignmentRecipientRepo.deleteAllInBatch()
         assignmentRepo.deleteAllInBatch()
         lessonMaterialRepo.deleteAllInBatch()
@@ -114,9 +112,51 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
 
         assertEquals("RF_RELAY", response.mode)
         assertEquals("5l-fo-d0gt8", response.videoId)
+        assertEquals("MEDIUM", response.requestedQuality)
+        assertEquals("MEDIUM", response.selectedQuality)
+        assertEquals(720, response.selectedHeight)
         assertNotNull(response.sessionId)
         assertNotNull(response.relayUrl)
+        assertEquals("/api/media/video-playback-sessions/${response.sessionId}/stream", response.relayUrl)
         assertNull(response.reason)
+    }
+
+    @Test
+    fun `passes requested playback quality to media service`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        userProfileStore.update(teacher, UpdateUserProfileRequest(countryCode = "RU"))
+        val material = createYoutubeMaterial(teacher)
+
+        val response = materialVideoPlaybackController.playback(
+            teacher,
+            material.id,
+            MaterialVideoPlaybackRequest(blockId = "video-1", quality = "HIGH"),
+            requestWithCountry("RU"),
+        )
+
+        assertEquals("RF_RELAY", response.mode)
+        assertEquals("HIGH", response.requestedQuality)
+        assertEquals("HIGH", response.selectedQuality)
+        assertEquals(1080, response.selectedHeight)
+    }
+
+    @Test
+    fun `normalizes unknown playback quality to medium`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        userProfileStore.update(teacher, UpdateUserProfileRequest(countryCode = "RU"))
+        val material = createYoutubeMaterial(teacher)
+
+        val response = materialVideoPlaybackController.playback(
+            teacher,
+            material.id,
+            MaterialVideoPlaybackRequest(blockId = "video-1", quality = "GIANT"),
+            requestWithCountry("RU"),
+        )
+
+        assertEquals("RF_RELAY", response.mode)
+        assertEquals("MEDIUM", response.requestedQuality)
+        assertEquals("MEDIUM", response.selectedQuality)
+        assertEquals(720, response.selectedHeight)
     }
 
     @Test
@@ -239,6 +279,58 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
         assertNotNull(response.sessionId)
     }
 
+    @Test
+    fun `creates youtube thumbnail asset when media service stores thumbnail`() {
+        testYoutubeMediaClient.thumbnailStored = true
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        userProfileStore.update(teacher, UpdateUserProfileRequest(countryCode = "RU"))
+        val material = createYoutubeMaterial(teacher)
+
+        val response = materialVideoPlaybackController.playback(
+            teacher,
+            material.id,
+            MaterialVideoPlaybackRequest(blockId = "video-1"),
+            requestWithCountry("RU"),
+        )
+
+        val thumbnailAssetId = assertNotNull(response.thumbnailAssetId)
+        assertEquals("/api/materials/${material.id}/assets/$thumbnailAssetId/content", response.thumbnailUrl)
+        val assets = materialAssetService.list(material.id)
+        assertEquals(1, assets.size)
+        assertEquals("VIDEO_THUMBNAIL", assets.single().kind)
+        assertEquals("YOUTUBE", assets.single().provider)
+        assertEquals("video-1", assets.single().metadata.path("blockId").asText())
+        assertEquals("5l-fo-d0gt8", assets.single().metadata.path("videoId").asText())
+        assertEquals("material-assets/${material.id}/$thumbnailAssetId.youtube-thumbnail", assets.single().storageKey)
+    }
+
+    @Test
+    fun `reuses existing youtube thumbnail asset for repeated playback decisions`() {
+        testYoutubeMediaClient.thumbnailStored = true
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        userProfileStore.update(teacher, UpdateUserProfileRequest(countryCode = "RU"))
+        val material = createYoutubeMaterial(teacher)
+
+        val first = materialVideoPlaybackController.playback(
+            teacher,
+            material.id,
+            MaterialVideoPlaybackRequest(blockId = "video-1"),
+            requestWithCountry("RU"),
+        )
+        val second = materialVideoPlaybackController.playback(
+            teacher,
+            material.id,
+            MaterialVideoPlaybackRequest(blockId = "video-1"),
+            requestWithCountry("RU"),
+        )
+
+        assertEquals(first.thumbnailAssetId, second.thumbnailAssetId)
+        assertEquals(first.thumbnailUrl, second.thumbnailUrl)
+        assertNotNull(testYoutubeMediaClient.sessionRequests.first().thumbnailStorageKey)
+        assertNull(testYoutubeMediaClient.sessionRequests.last().thumbnailStorageKey)
+        assertEquals(1, materialAssetService.list(material.id).size)
+    }
+
     private fun createYoutubeMaterial(
         authentication: JwtAuthenticationToken,
         durationSeconds: Int = 300,
@@ -308,5 +400,48 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
             .build()
 
         return JwtAuthenticationToken(jwt, listOf(SimpleGrantedAuthority(role)))
+    }
+}
+
+class TestYoutubeMediaClient : YoutubeMediaClient {
+    val sessionRequests = mutableListOf<YoutubeMediaPlaybackSessionCommand>()
+    var thumbnailStored: Boolean = false
+
+    fun reset() {
+        sessionRequests.clear()
+        thumbnailStored = false
+    }
+
+    override fun resolveMetadata(videoId: String): YoutubeVideoMeta? =
+        YoutubeVideoMeta(
+            videoId = videoId,
+            durationSeconds = 105,
+            language = "en",
+            thumbnailUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg",
+        )
+
+    override fun createPlaybackSession(command: YoutubeMediaPlaybackSessionCommand): YoutubeMediaPlaybackSessionResult {
+        sessionRequests.add(command)
+        val height = when (command.requestedQuality) {
+            "LOW" -> 480
+            "HIGH" -> 1080
+            else -> 720
+        }
+        val selectedQuality = when (height) {
+            in 0..480 -> "LOW"
+            in 481..720 -> "MEDIUM"
+            else -> "HIGH"
+        }
+        return YoutubeMediaPlaybackSessionResult(
+            sessionId = UUID.randomUUID(),
+            expiresAt = Instant.now().plusSeconds(900),
+            requestedQuality = command.requestedQuality,
+            selectedQuality = selectedQuality,
+            selectedHeight = height,
+            thumbnailSourceUrl = "https://img.youtube.com/vi/${command.videoId}/maxresdefault.jpg",
+            thumbnailStored = thumbnailStored && command.thumbnailStorageKey != null,
+            thumbnailContentType = if (thumbnailStored && command.thumbnailStorageKey != null) "image/jpeg" else null,
+            thumbnailByteSize = if (thumbnailStored && command.thumbnailStorageKey != null) 12345 else null,
+        )
     }
 }

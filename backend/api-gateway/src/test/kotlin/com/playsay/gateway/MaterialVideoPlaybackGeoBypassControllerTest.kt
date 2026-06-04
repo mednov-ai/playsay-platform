@@ -10,6 +10,7 @@ import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
+import com.playsay.gateway.service.YoutubeMediaClient
 import com.playsay.gateway.service.UserProfileStore
 import java.util.UUID
 import javax.sql.DataSource
@@ -21,7 +22,10 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
@@ -51,6 +55,13 @@ class MaterialVideoPlaybackGeoBypassControllerTest @Autowired constructor(
     private val dataSource: DataSource,
 ) {
     private val objectMapper = jacksonObjectMapper()
+
+    @TestConfiguration
+    class MediaClientConfig {
+        @Bean
+        @Primary
+        fun youtubeMediaClient(): YoutubeMediaClient = TestYoutubeMediaClient()
+    }
 
     @BeforeAll
     fun migrateDatabase() {

@@ -52,6 +52,9 @@ playsay:
     token-secret: ${PLAYSAY_COLLABORATION_TOKEN_SECRET:}
     service-token: ${PLAYSAY_COLLABORATION_SERVICE_TOKEN:}
     token-ttl-seconds: ${PLAYSAY_COLLABORATION_TOKEN_TTL_SECONDS:900}
+  media-service:
+    base-url: ${PLAYSAY_MEDIA_SERVICE_BASE_URL:http://media-service.playsay-dev.svc.cluster.local}
+    service-token: ${PLAYSAY_MEDIA_SERVICE_TOKEN:}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
     s3:
@@ -68,6 +71,3 @@ playsay:
         enabled: ${PLAYSAY_YOUTUBE_RF_RELAY_ENABLED:false}
         geo-country-header: ${PLAYSAY_YOUTUBE_RF_RELAY_GEO_COUNTRY_HEADER:}
         require-geo-country: ${PLAYSAY_YOUTUBE_RF_RELAY_REQUIRE_GEO_COUNTRY:true}
-        session-ttl-seconds: ${PLAYSAY_YOUTUBE_RF_RELAY_SESSION_TTL_SECONDS:900}
-        max-upstream-range-bytes: ${PLAYSAY_YOUTUBE_RF_RELAY_MAX_UPSTREAM_RANGE_BYTES:1048576}
-        ytdlp-path: ${PLAYSAY_YOUTUBE_RF_RELAY_YTDLP_PATH:yt-dlp}

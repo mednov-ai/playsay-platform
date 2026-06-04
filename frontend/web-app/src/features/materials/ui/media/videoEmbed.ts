@@ -3,13 +3,14 @@ import type { MaterialVideoPlayback } from "../../../../shared/api/playsay";
 
 export function materialVideoEmbedFrame(
   block: MaterialEditorBlock,
-  playback?: Pick<MaterialVideoPlayback, "embedUrl" | "mode" | "reason" | "relayUrl"> | null,
+  playback?: Pick<MaterialVideoPlayback, "embedUrl" | "mode" | "reason" | "relayUrl" | "thumbnailUrl"> | null,
 ): MaterialVideoEmbedFrame | null {
   const provider = (block.provider ?? "").toUpperCase();
   if (playback?.mode === "RF_RELAY" && playback.relayUrl?.trim()) {
     return {
       kind: "RF_RELAY",
       src: playback.relayUrl,
+      thumbnailUrl: playback.thumbnailUrl,
       title: block.title || "YouTube video",
     };
   }

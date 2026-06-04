@@ -14,12 +14,12 @@ describe("materialVideoEmbedFrame", () => {
   it("uses rf relay decision when backend returns a relay url", () => {
     const frame = materialVideoEmbedFrame(youtubeBlock, {
       mode: "RF_RELAY",
-      relayUrl: "/api/materials/video-playback-sessions/session-1/stream",
+      relayUrl: "/api/media/video-playback-sessions/session-1/stream",
     });
 
     expect(frame).toEqual({
       kind: "RF_RELAY",
-      src: "/api/materials/video-playback-sessions/session-1/stream",
+      src: "/api/media/video-playback-sessions/session-1/stream",
       title: "Warm-up",
     });
   });

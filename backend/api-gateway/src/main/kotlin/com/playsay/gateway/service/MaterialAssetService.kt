@@ -92,6 +92,54 @@ class MaterialAssetService(
     fun findAssets(materialId: UUID): List<MaterialAssetEntity> =
         materialAssetRepo.findByMaterialId(materialId)
 
+    fun findYoutubeThumbnailAsset(
+        materialId: UUID,
+        blockId: String,
+        videoId: String,
+    ): MaterialAssetResponse? =
+        materialAssetRepo.findByMaterialId(materialId)
+            .firstOrNull { asset ->
+                asset.kind == "VIDEO_THUMBNAIL" &&
+                    asset.provider == "YOUTUBE" &&
+                    runCatching { objectMapper.readTree(asset.metadata) }.getOrNull()?.let { metadata ->
+                        metadata.path("blockId").asText() == blockId &&
+                            metadata.path("videoId").asText() == videoId &&
+                            asset.storageKey?.isNotBlank() == true
+                    } == true
+            }
+            ?.toResponse(objectMapper)
+
+    fun insertYoutubeThumbnailAsset(
+        materialId: UUID,
+        assetId: UUID,
+        blockId: String,
+        videoId: String,
+        sourceThumbnailUrl: String,
+        storageKey: String,
+        contentType: String?,
+        byteSize: Long?,
+    ): MaterialAssetResponse =
+        materialAssetRepo.saveAndFlush(
+            MaterialAssetEntity(
+                id = assetId,
+                materialId = materialId,
+                kind = "VIDEO_THUMBNAIL",
+                storageKey = storageKey,
+                externalUrl = null,
+                provider = "YOUTUBE",
+                metadata = objectMapper.writeValueAsString(
+                    objectMapper.createObjectNode().apply {
+                        put("blockId", blockId)
+                        put("videoId", videoId)
+                        put("sourceThumbnailUrl", sourceThumbnailUrl)
+                        contentType?.let { value -> put("contentType", value) }
+                        byteSize?.let { value -> put("byteSize", value) }
+                    },
+                ),
+                createdAt = Instant.now(),
+            ),
+        ).toResponse(objectMapper)
+
     internal fun upsertGeneratedImageAsset(
         materialId: UUID,
         target: MaterialImageTarget,

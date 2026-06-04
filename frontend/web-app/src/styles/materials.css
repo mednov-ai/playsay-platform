@@ -389,6 +389,13 @@
   background: #111111;
 }
 
+.playsay-video-embed[data-editable="true"] {
+  aspect-ratio: auto;
+  height: var(--playsay-video-height, 18rem);
+  min-height: 11.25rem;
+  max-height: min(45rem, 78vh);
+}
+
 .playsay-video-embed iframe,
 .playsay-video-embed video {
   display: block;
@@ -427,10 +434,13 @@
   background:
     linear-gradient(180deg, rgb(17 17 17 / 0.18), rgb(17 17 17 / 0.68)),
     radial-gradient(circle at 50% 42%, rgb(255 92 0 / 0.22), transparent 28%);
+  background-position: center;
+  background-size: cover;
   color: #ffffff;
   cursor: pointer;
   padding: 1rem;
   text-align: center;
+  transition: filter 160ms ease, transform 160ms ease;
 }
 
 .playsay-relay-player-poster svg {
@@ -441,27 +451,48 @@
   box-shadow: 0 18px 42px rgb(0 0 0 / 0.28);
   color: #ffffff;
   padding: 1.1rem;
+  transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
-.playsay-relay-player-poster span {
-  max-width: min(26rem, 88%);
-  overflow-wrap: anywhere;
-  color: rgb(255 255 255 / 0.9);
-  font-size: 0.95rem;
-  font-weight: 900;
+.playsay-relay-player-poster:hover svg,
+.playsay-relay-player-poster:focus-visible svg {
+  box-shadow: 0 22px 54px rgb(255 92 0 / 0.32), 0 0 0 0.45rem rgb(255 255 255 / 0.18);
+  transform: scale(1.08);
+}
+
+.playsay-relay-player-poster:active svg {
+  transform: scale(0.96);
 }
 
 .playsay-relay-player-loading {
   position: absolute;
-  top: calc(50% - 1.25rem);
-  left: calc(50% - 1.25rem);
+  top: 50%;
+  left: 50%;
   z-index: 3;
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 0.2rem solid rgb(255 255 255 / 0.28);
+  display: inline-flex;
+  max-width: min(28rem, calc(100% - 2rem));
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 999px;
+  background: rgb(17 17 17 / 0.78);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.24);
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 900;
+  padding: 0.6rem 0.85rem;
+  transform: translate(-50%, -50%);
+}
+
+.playsay-relay-player-loading::before {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  border: 0.16rem solid rgb(255 255 255 / 0.28);
   border-top-color: hsl(var(--primary));
   border-radius: 999px;
   animation: playsay-spin 0.85s linear infinite;
+  content: "";
 }
 
 .playsay-relay-player-controls {
@@ -471,7 +502,7 @@
   left: 0.75rem;
   z-index: 4;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto minmax(3.5rem, 5rem) auto auto;
   align-items: center;
   gap: 0.5rem;
   border: 1px solid rgb(255 255 255 / 0.16);
@@ -482,7 +513,7 @@
 }
 
 .playsay-relay-player-controls[data-fullscreen="false"] {
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto minmax(3.5rem, 5rem) auto;
 }
 
 .playsay-relay-player-controls button {
@@ -512,6 +543,28 @@
   width: 100%;
   min-width: 0;
   accent-color: hsl(var(--primary));
+}
+
+.playsay-relay-player-controls input.playsay-relay-player-volume {
+  min-width: 3.5rem;
+}
+
+.playsay-relay-player-quality {
+  min-width: 4.4rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.1);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 900;
+  outline: none;
+  padding: 0 0.35rem;
+}
+
+.playsay-relay-player-quality option {
+  color: #111111;
 }
 
 .playsay-relay-player-time {
@@ -655,7 +708,8 @@
 
 .playsay-image-prompt-button,
 .playsay-image-tag,
-.playsay-image-resize-handle {
+.playsay-image-resize-handle,
+.playsay-video-resize-handle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -749,7 +803,16 @@
   cursor: ns-resize;
 }
 
-.playsay-image-resize-handle::before {
+.playsay-video-resize-handle {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  cursor: ns-resize;
+  margin-top: 0.4rem;
+}
+
+.playsay-image-resize-handle::before,
+.playsay-video-resize-handle::before {
   width: 0.8rem;
   height: 0.8rem;
   border-right: 2px solid hsl(var(--primary));

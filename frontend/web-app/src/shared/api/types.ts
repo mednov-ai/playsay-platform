@@ -121,6 +121,7 @@ export type LessonMaterialAnswerSuggestions = {
 };
 export type MaterialVideoPlaybackInput = {
   blockId: string;
+  quality?: "LOW" | "MEDIUM" | "HIGH" | string | null;
 };
 export type MaterialVideoPlayback = {
   materialId: string;
@@ -132,6 +133,11 @@ export type MaterialVideoPlayback = {
   relayUrl?: string | null;
   sessionId?: string | null;
   expiresAt?: string | null;
+  requestedQuality?: "LOW" | "MEDIUM" | "HIGH" | string | null;
+  selectedQuality?: "LOW" | "MEDIUM" | "HIGH" | string | null;
+  selectedHeight?: number | null;
+  thumbnailUrl?: string | null;
+  thumbnailAssetId?: string | null;
 };
 export type LessonMaterialAssetUpdateInput = {
   tags?: string[] | null;

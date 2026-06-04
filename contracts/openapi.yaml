@@ -1591,43 +1591,6 @@ paths:
           description: Object storage failed
       security:
       - bearerAuth: []
-  /materials/video-playback-sessions/{sessionId}/stream:
-    get:
-      tags:
-      - Materials
-      summary: Stream a material video playback session
-      description: Streams a short-lived RF relay session created by the material
-        video playback endpoint.
-      operationId: streamMaterialVideoPlaybackSession
-      parameters:
-      - name: sessionId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: Range
-        in: header
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          description: Video stream
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/StreamingResponseBody"
-        "206":
-          description: Partial video stream
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/StreamingResponseBody"
-        "404":
-          description: Playback session not found
-        "503":
-          description: Relay unavailable
   /hello:
     get:
       tags:
@@ -2686,6 +2649,14 @@ components:
         blockId:
           type: string
           maxLength: 80
+        quality:
+          type:
+          - string
+          - "null"
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
       required:
       - blockId
     MaterialVideoPlaybackResponse:
@@ -2724,6 +2695,28 @@ components:
           - string
           - "null"
           format: date-time
+        requestedQuality:
+          type:
+          - string
+          - "null"
+        selectedQuality:
+          type:
+          - string
+          - "null"
+        selectedHeight:
+          type:
+          - integer
+          - "null"
+          format: int32
+        thumbnailUrl:
+          type:
+          - string
+          - "null"
+        thumbnailAssetId:
+          type:
+          - string
+          - "null"
+          format: uuid
       required:
       - blockId
       - materialId
@@ -3031,7 +3024,6 @@ components:
       - assignment
       - material
       - submission
-    StreamingResponseBody: {}
     HelloResponse:
       type: object
       properties:

@@ -46,6 +46,7 @@ export type MaterialVideoEmbedFrame = {
   mode?: string;
   reason?: string | null;
   src: string;
+  thumbnailUrl?: string | null;
   title: string;
 };
 

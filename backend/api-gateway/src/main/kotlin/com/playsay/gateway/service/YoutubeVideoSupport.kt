@@ -7,6 +7,7 @@ data class YoutubeVideoMeta(
     val videoId: String,
     val durationSeconds: Int?,
     val language: String?,
+    val thumbnailUrl: String? = null,
 )
 
 data class YoutubeVideoPolicyDecision(

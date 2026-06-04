@@ -496,9 +496,23 @@ export interface CreateCollaborationDocumentRequest {
   scope: CreateCollaborationDocumentRequestScope;
 }
 
+/**
+ * @nullable
+ */
+export type MaterialVideoPlaybackRequestQuality = typeof MaterialVideoPlaybackRequestQuality[keyof typeof MaterialVideoPlaybackRequestQuality] | null;
+
+
+export const MaterialVideoPlaybackRequestQuality = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+} as const;
+
 export interface MaterialVideoPlaybackRequest {
   /** @maxLength 80 */
   blockId: string;
+  /** @nullable */
+  quality?: MaterialVideoPlaybackRequestQuality;
 }
 
 export interface MaterialVideoPlaybackResponse {
@@ -517,6 +531,16 @@ export interface MaterialVideoPlaybackResponse {
   sessionId?: string | null;
   /** @nullable */
   expiresAt?: string | null;
+  /** @nullable */
+  requestedQuality?: string | null;
+  /** @nullable */
+  selectedQuality?: string | null;
+  /** @nullable */
+  selectedHeight?: number | null;
+  /** @nullable */
+  thumbnailUrl?: string | null;
+  /** @nullable */
+  thumbnailAssetId?: string | null;
 }
 
 export interface MaterialGenerateImagesRequest {
@@ -714,8 +738,6 @@ export interface StudentAssignmentDetailResponse {
   material: LessonMaterialResponse;
   submission: AssignmentSubmissionResponse;
 }
-
-export interface StreamingResponseBody {}
 
 export interface HelloResponse {
   service: string;
@@ -3830,67 +3852,6 @@ export const getMaterialAssetContent = async (materialId: string,
 
   const data: getMaterialAssetContentResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
   return { data, status: res.status, headers: res.headers } as getMaterialAssetContentResponse
-}
-
-
-
-export type streamMaterialVideoPlaybackSessionResponse200 = {
-  data: StreamingResponseBody
-  status: 200
-}
-
-export type streamMaterialVideoPlaybackSessionResponse206 = {
-  data: StreamingResponseBody
-  status: 206
-}
-
-export type streamMaterialVideoPlaybackSessionResponse404 = {
-  data: void
-  status: 404
-}
-
-export type streamMaterialVideoPlaybackSessionResponse503 = {
-  data: void
-  status: 503
-}
-
-export type streamMaterialVideoPlaybackSessionResponseSuccess = (streamMaterialVideoPlaybackSessionResponse200 | streamMaterialVideoPlaybackSessionResponse206) & {
-  headers: Headers;
-};
-export type streamMaterialVideoPlaybackSessionResponseError = (streamMaterialVideoPlaybackSessionResponse404 | streamMaterialVideoPlaybackSessionResponse503) & {
-  headers: Headers;
-};
-
-export type streamMaterialVideoPlaybackSessionResponse = (streamMaterialVideoPlaybackSessionResponseSuccess | streamMaterialVideoPlaybackSessionResponseError)
-
-export const getStreamMaterialVideoPlaybackSessionUrl = (sessionId: string,) => {
-
-
-
-
-  return `/api/materials/video-playback-sessions/${sessionId}/stream`
-}
-
-/**
- * Streams a short-lived RF relay session created by the material video playback endpoint.
- * @summary Stream a material video playback session
- */
-export const streamMaterialVideoPlaybackSession = async (sessionId: string, options?: RequestInit): Promise<streamMaterialVideoPlaybackSessionResponse> => {
-
-  const res = await fetch(getStreamMaterialVideoPlaybackSessionUrl(sessionId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-)
-
-  const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: streamMaterialVideoPlaybackSessionResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
-  return { data, status: res.status, headers: res.headers } as streamMaterialVideoPlaybackSessionResponse
 }
 
 

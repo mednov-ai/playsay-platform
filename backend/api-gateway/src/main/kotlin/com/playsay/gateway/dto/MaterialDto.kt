@@ -118,6 +118,8 @@ data class MaterialAnswerSuggestionsResponse(
 data class MaterialVideoPlaybackRequest(
     @field:Schema(maxLength = 80)
     val blockId: String,
+    @field:Schema(allowableValues = ["LOW", "MEDIUM", "HIGH"], nullable = true)
+    val quality: String? = null,
 )
 
 data class MaterialVideoPlaybackResponse(
@@ -130,6 +132,11 @@ data class MaterialVideoPlaybackResponse(
     val relayUrl: String?,
     val sessionId: UUID?,
     val expiresAt: Instant?,
+    val requestedQuality: String? = null,
+    val selectedQuality: String? = null,
+    val selectedHeight: Int? = null,
+    val thumbnailUrl: String? = null,
+    val thumbnailAssetId: UUID? = null,
 )
 
 data class MaterialAnswerSuggestionItem(

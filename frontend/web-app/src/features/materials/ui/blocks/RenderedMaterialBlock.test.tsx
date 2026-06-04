@@ -40,4 +40,30 @@ describe("RenderedMaterialBlock video playback", () => {
 
     expect(markup).toContain('href="https://rutube.ru/video/abcdef123456/"');
   });
+
+  it("shows video resize handle only in teacher preview", () => {
+    const teacherMarkup = renderToStaticMarkup(
+      <RenderedMaterialBlock
+        allowVideoFullscreen={false}
+        assetTags={{}}
+        assetUrls={{}}
+        block={rutubeBlock}
+        mode="teacherPreview"
+        onBlockPatch={() => undefined}
+        onBlockPatchCommit={() => undefined}
+      />,
+    );
+    const learnerMarkup = renderToStaticMarkup(
+      <RenderedMaterialBlock
+        allowVideoFullscreen={false}
+        assetTags={{}}
+        assetUrls={{}}
+        block={rutubeBlock}
+        mode="classroom"
+      />,
+    );
+
+    expect(teacherMarkup).toContain("playsay-video-resize-handle");
+    expect(learnerMarkup).not.toContain("playsay-video-resize-handle");
+  });
 });

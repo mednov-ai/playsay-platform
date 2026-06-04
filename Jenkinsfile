@@ -97,6 +97,20 @@ spec:
         limits:
           cpu: "1"
           memory: 1024Mi
+    - name: kaniko-media
+      image: gcr.io/kaniko-project/executor:debug
+      command: ["/busybox/cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1024Mi
     - name: tools
       image: alpine:3.20
       command: ["cat"]
@@ -191,6 +205,7 @@ spec:
     API_IMAGE_NAME = 'playsay-api-gateway'
     WEB_IMAGE_NAME = 'playsay-web-app'
     COLLABORATION_IMAGE_NAME = 'playsay-collaboration-service'
+    MEDIA_IMAGE_NAME = 'playsay-media-service'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
@@ -264,7 +279,7 @@ spec:
                 container('gradle') {
                   dir('backend') {
                     echo "Running backend tests for ${env.BUILD_LABEL}"
-                    sh 'gradle :api-gateway:test --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+                    sh 'gradle :api-gateway:test :media-service:test --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
                   }
                 }
               }
@@ -275,7 +290,7 @@ spec:
                 container('gradle') {
                   dir('backend') {
                     echo "Packaging api-gateway for ${env.BUILD_LABEL}"
-                    sh 'gradle :api-gateway:bootJar --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+                    sh 'gradle :api-gateway:bootJar :media-service:bootJar --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
                   }
                 }
               }
@@ -452,6 +467,36 @@ EOF
             }
           }
         }
+
+        stage('Build and push media service image') {
+          steps {
+            container('kaniko-media') {
+              withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+                sh '''
+                  set -eu
+                  JAR_COUNT="$(find "$WORKSPACE/backend/media-service/build/libs" -maxdepth 1 -name "*.jar" | wc -l | tr -d " ")"
+                  if [ "$JAR_COUNT" != "1" ]; then
+                    echo "Expected exactly one media-service bootJar, found $JAR_COUNT"
+                    find "$WORKSPACE/backend/media-service/build/libs" -maxdepth 1 -type f -print || true
+                    exit 1
+                  fi
+                  ls -lh "$WORKSPACE/backend/media-service/build/libs"/*.jar
+                  mkdir -p /kaniko/.docker
+                  AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+                  cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
+EOF
+                  /kaniko/executor \
+                    --context "$WORKSPACE/backend" \
+                    --dockerfile "$WORKSPACE/backend/media-service/Dockerfile" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:${GIT_COMMIT}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:${BUILD_LABEL}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:dev"
+                '''
+              }
+            }
+          }
+        }
       }
     }
 
@@ -505,9 +550,10 @@ EOF
               yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/api-gateway/values-dev.yaml
               yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/web-app/values-dev.yaml
               yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/collaboration-service/values-dev.yaml
+              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/media-service/values-dev.yaml
               git config user.email "jenkins@play-and-say.ru"
               git config user.name "Play&Say Jenkins"
-              git add helm-charts/api-gateway/values-dev.yaml helm-charts/web-app/values-dev.yaml helm-charts/collaboration-service/values-dev.yaml
+              git add helm-charts/api-gateway/values-dev.yaml helm-charts/web-app/values-dev.yaml helm-charts/collaboration-service/values-dev.yaml helm-charts/media-service/values-dev.yaml
               git commit \
                 -m "chore: deploy ${BUILD_LABEL} to dev" \
                 -m "Source branch: ${CI_BRANCH}" \
@@ -537,10 +583,10 @@ EOF
             EXPECTED_BUILD="$BUILD_LABEL"
             TIMEOUT_SECONDS="${PLAYSAY_DEV_ROLLOUT_TIMEOUT_SECONDS:-420}"
             POLL_SECONDS="${PLAYSAY_DEV_ROLLOUT_POLL_SECONDS:-10}"
-            APPS="api-gateway web-app collaboration-service"
+            APPS="api-gateway web-app collaboration-service media-service"
             DEADLINE="$(( $(date +%s) + TIMEOUT_SECONDS ))"
 
-            kubectl -n argocd annotate application api-gateway web-app collaboration-service argocd.argoproj.io/refresh=hard --overwrite
+            kubectl -n argocd annotate application api-gateway web-app collaboration-service media-service argocd.argoproj.io/refresh=hard --overwrite
 
             while true; do
               all_ready="true"
@@ -585,9 +631,9 @@ EOF
 
               if [ "$(date +%s)" -ge "$DEADLINE" ]; then
                 echo "Timed out waiting for dev rollout ${EXPECTED_BUILD}"
-                kubectl -n argocd get applications api-gateway web-app collaboration-service \
+                kubectl -n argocd get applications api-gateway web-app collaboration-service media-service \
                   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision || true
-                kubectl -n playsay-dev get deployments api-gateway web-app collaboration-service \
+                kubectl -n playsay-dev get deployments api-gateway web-app collaboration-service media-service \
                   -o custom-columns=NAME:.metadata.name,BUILD:.spec.template.metadata.labels.playsay\\.io/build-name,UPDATED:.status.updatedReplicas,READY:.status.readyReplicas,AVAILABLE:.status.availableReplicas || true
                 kubectl -n playsay-dev get pods --show-labels || true
                 exit 1

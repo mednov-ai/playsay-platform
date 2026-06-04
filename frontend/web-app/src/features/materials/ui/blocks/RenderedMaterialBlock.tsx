@@ -1,7 +1,8 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { CircleAlert, ImageIcon, Video } from "lucide-react";
 import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
 import {
+  clampNumber,
   materialAnswerContextForBlock,
   materialAnswerText,
   materialAssetIdFromUrl,
@@ -19,6 +20,8 @@ import { RenderedChoiceExercise } from "./RenderedChoiceExercise";
 import { RenderedFillGapExercise } from "./RenderedFillGapExercise";
 import { RenderedMatchingPairsExercise } from "./RenderedMatchingPairsExercise";
 import { useAppTranslation } from "../../../../shared/i18n";
+
+type MaterialVideoQuality = "LOW" | "MEDIUM" | "HIGH";
 
 export function RenderedMaterialBlock({
   allowVideoFullscreen = false,
@@ -47,6 +50,8 @@ export function RenderedMaterialBlock({
 }) {
   const { t } = useAppTranslation();
   const [videoPlayback, setVideoPlayback] = useState<MaterialVideoPlayback | null>(null);
+  const [videoQuality, setVideoQuality] = useState<MaterialVideoQuality>("MEDIUM");
+  const [videoResumeAtSeconds, setVideoResumeAtSeconds] = useState<number | null>(null);
   const contextLabel = materialBlockContextLabel(block);
 
   useEffect(() => {
@@ -66,7 +71,7 @@ export function RenderedMaterialBlock({
       reason: "VIDEO_PLAYBACK_LOADING",
     });
 
-    createMaterialVideoPlayback(materialId, { blockId: block.id })
+    createMaterialVideoPlayback(materialId, { blockId: block.id, quality: videoQuality })
       .then((decision) => {
         if (active) {
           setVideoPlayback(decision);
@@ -86,7 +91,7 @@ export function RenderedMaterialBlock({
     return () => {
       active = false;
     };
-  }, [block.id, block.provider, block.type, materialId]);
+  }, [block.id, block.provider, block.type, materialId, videoQuality]);
 
   const blockSection = (children: ReactNode, className = "playsay-render-block") => (
     <section
@@ -112,6 +117,9 @@ export function RenderedMaterialBlock({
       {
         const frame = materialVideoEmbedFrame(block, videoPlayback);
         const originalVideoUrl = safeExternalVideoUrl(block.url);
+        const videoHeight = block.height ? `${block.height}px` : undefined;
+        const videoFrameStyle = { "--playsay-video-height": videoHeight } as CSSProperties;
+        const isVideoResizable = mode === "teacherPreview" && Boolean(onBlockPatch);
         const videoAttribution = originalVideoUrl ? (
           <p className="playsay-video-attribution">
             <span>{t("materials.renderer.videoCopyright", { provider: videoProviderLabel(block.provider) ?? t("materials.renderer.videoProviderFallback") })}</span>
@@ -132,14 +140,30 @@ export function RenderedMaterialBlock({
                 <div
                   className="playsay-video-embed"
                   data-playsay-video-playback-mode="RF_RELAY"
+                  data-editable={isVideoResizable ? "true" : "false"}
+                  style={videoFrameStyle}
                 >
                   <PlaySayRelayVideoPlayer
                     allowFullscreen={allowVideoFullscreen}
                     clip={block.videoClip}
+                    onQualityChange={(quality, currentTimeSeconds) => {
+                      setVideoResumeAtSeconds(currentTimeSeconds);
+                      setVideoQuality(quality);
+                    }}
+                    quality={videoQuality}
+                    resumeAtSeconds={videoResumeAtSeconds}
                     src={frame.src}
+                    thumbnailUrl={frame.thumbnailUrl}
                     title={frame.title}
                   />
                 </div>
+                {isVideoResizable ? (
+                  <MaterialVideoResizeHandle
+                    block={block}
+                    onResize={(height) => onBlockPatch?.(block.id, { height })}
+                    onResizeCommit={(height) => onBlockPatchCommit?.(block.id, { height })}
+                  />
+                ) : null}
                 {videoAttribution}
               </>
             ) : frame?.kind === "PENDING" ? (
@@ -175,6 +199,8 @@ export function RenderedMaterialBlock({
                 <div
                   className="playsay-video-embed"
                   data-playsay-video-playback-mode="EMBED"
+                  data-editable={isVideoResizable ? "true" : "false"}
+                  style={videoFrameStyle}
                 >
                   <iframe
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -185,6 +211,13 @@ export function RenderedMaterialBlock({
                     title={frame.title}
                   />
                 </div>
+                {isVideoResizable ? (
+                  <MaterialVideoResizeHandle
+                    block={block}
+                    onResize={(height) => onBlockPatch?.(block.id, { height })}
+                    onResizeCommit={(height) => onBlockPatchCommit?.(block.id, { height })}
+                  />
+                ) : null}
                 {videoAttribution}
               </>
             ) : (
@@ -318,6 +351,56 @@ export function RenderedMaterialBlock({
     default:
       return null;
   }
+}
+
+function MaterialVideoResizeHandle({
+  block,
+  onResize,
+  onResizeCommit,
+}: {
+  block: MaterialEditorBlock;
+  onResize?: (height: number) => void;
+  onResizeCommit?: (height: number) => void;
+}) {
+  const { t } = useAppTranslation();
+
+  function startResize(event: PointerEvent<HTMLButtonElement>) {
+    if (!onResize) {
+      return;
+    }
+
+    const applyResize = onResize;
+    event.preventDefault();
+    const startY = event.clientY;
+    const frame = event.currentTarget.previousElementSibling;
+    const startHeight = block.height ?? frame?.getBoundingClientRect().height ?? 320;
+    let latestHeight = Math.round(startHeight);
+
+    function handlePointerMove(moveEvent: globalThis.PointerEvent) {
+      latestHeight = Math.round(clampNumber(startHeight + moveEvent.clientY - startY, 180, 720));
+      applyResize(latestHeight);
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      applyResize(latestHeight);
+      onResizeCommit?.(latestHeight);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }
+
+  return (
+    <button
+      aria-label={t("materials.renderer.resizeVideo")}
+      className="playsay-video-resize-handle"
+      onPointerDown={startResize}
+      title={t("materials.renderer.resizeVideo")}
+      type="button"
+    />
+  );
 }
 
 function safeExternalVideoUrl(value?: string): string | null {

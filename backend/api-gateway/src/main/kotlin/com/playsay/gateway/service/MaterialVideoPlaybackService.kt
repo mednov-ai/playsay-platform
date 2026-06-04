@@ -10,9 +10,7 @@ import com.playsay.gateway.repo.LessonRepo
 import com.playsay.gateway.utils.MetaData
 import jakarta.servlet.http.HttpServletRequest
 import java.time.Clock
-import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -25,25 +23,23 @@ class MaterialVideoPlaybackService(
     private val userProfileStore: UserProfileStore,
     private val assignmentRecipientRepo: AssignmentRecipientRepo,
     private val lessonRepo: LessonRepo,
-    private val youtubeVideoMetadataResolver: YoutubeVideoMetadataResolver,
+    private val youtubeMediaClient: YoutubeMediaClient,
+    private val materialAssetService: MaterialAssetService,
     @param:Value("\${playsay.video.youtube.rf-relay.enabled:false}")
     private val rfRelayEnabled: Boolean,
     @param:Value("\${playsay.video.youtube.rf-relay.geo-country-header:}")
     private val geoCountryHeader: String,
     @param:Value("\${playsay.video.youtube.rf-relay.require-geo-country:true}")
     private val requireGeoCountry: Boolean,
-    @param:Value("\${playsay.video.youtube.rf-relay.session-ttl-seconds:900}")
-    private val sessionTtlSeconds: Long,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-    private val sessions = ConcurrentHashMap<UUID, YoutubePlaybackSession>()
-
     fun playback(
         authentication: JwtAuthenticationToken,
         materialId: UUID,
         request: MaterialVideoPlaybackRequest,
         servletRequest: HttpServletRequest,
     ): MaterialVideoPlaybackResponse {
+        val requestedQuality = YoutubePlaybackQuality.normalized(request.quality)
         val profile = userProfileStore.current(authentication)
         val currentUserId = userProfileStore.currentUserId(authentication)
         val materialRow = materialCatalogService.find(materialId)
@@ -60,12 +56,12 @@ class MaterialVideoPlaybackService(
         val diagnostics = YoutubeVideoSupport.diagnosticsFromBlock(block)
         val provider = block.path("provider").asText("").uppercase()
         if (block.path("type").asText("") != "videoEmbed" || provider != "YOUTUBE") {
-            return response(materialId, request.blockId, null, "BLOCKED", "YOUTUBE_BLOCK_REQUIRED", null, diagnostics, profileCountry, ipCountry)
+            return response(materialId, request.blockId, null, "BLOCKED", "YOUTUBE_BLOCK_REQUIRED", null, diagnostics, profileCountry, ipCountry, requestedQuality)
         }
 
         val storedMeta = YoutubeVideoSupport.metaFromBlock(block)
         val storedMetaComplete = storedMeta?.durationSeconds != null && storedMeta.language != null
-        val resolvedMeta = if (storedMetaComplete) null else diagnostics.videoId?.let { videoId -> youtubeVideoMetadataResolver.resolve(videoId) }
+        val resolvedMeta = if (storedMetaComplete) null else diagnostics.videoId?.let { videoId -> youtubeMediaClient.resolveMetadata(videoId) }
         val meta = storedMeta?.takeIf { storedMetaComplete } ?: resolvedMeta
             ?: return response(
                 materialId,
@@ -77,29 +73,50 @@ class MaterialVideoPlaybackService(
                 diagnostics,
                 profileCountry,
                 ipCountry,
+                requestedQuality,
                 metadataSource = "MISSING",
                 effectiveMeta = null,
             )
-        val metadataSource = if (storedMetaComplete) "STORED" else "YTDLP_ON_DEMAND"
+        val metadataSource = if (storedMetaComplete) "STORED" else "MEDIA_SERVICE_ON_DEMAND"
         val embedUrl = YoutubeVideoSupport.embedUrl(meta.videoId)
         val policy = YoutubeVideoSupport.videoMeetsPolicy(meta)
         if (!policy.approved) {
-            return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", policy.reason, embedUrl, diagnostics, profileCountry, ipCountry, metadataSource, meta)
+            return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", policy.reason, embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
         }
 
         if (!rfRelayEnabled) {
-            return response(materialId, request.blockId, meta.videoId, "EMBED", "RF_RELAY_DISABLED", embedUrl, diagnostics, profileCountry, ipCountry, metadataSource, meta)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", "RF_RELAY_DISABLED", embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
         }
         if (profileCountry != "RU") {
-            return response(materialId, request.blockId, meta.videoId, "EMBED", "PROFILE_COUNTRY_NOT_RU", embedUrl, diagnostics, profileCountry, ipCountry, metadataSource, meta)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", "PROFILE_COUNTRY_NOT_RU", embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
         }
         if (requireGeoCountry && ipCountry != "RU") {
             val reason = if (ipCountry == null) "IP_COUNTRY_UNKNOWN" else "PROFILE_IP_COUNTRY_MISMATCH"
-            return response(materialId, request.blockId, meta.videoId, "EMBED", reason, embedUrl, diagnostics, profileCountry, ipCountry, metadataSource, meta)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", reason, embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
         }
 
-        val session = createSession(profile.subject, materialId, request.blockId, meta.videoId)
-        logPlaybackDecision(materialId, request.blockId, meta.videoId, "RF_RELAY", null, diagnostics, profileCountry, ipCountry, session.id, metadataSource, meta)
+        val existingThumbnail = materialAssetService.findYoutubeThumbnailAsset(materialId, request.blockId, meta.videoId)
+        val thumbnailAssetId = existingThumbnail?.id ?: UUID.randomUUID()
+        val thumbnailStorageKey = existingThumbnail?.storageKey ?: "material-assets/$materialId/$thumbnailAssetId.youtube-thumbnail"
+        val mediaSession = youtubeMediaClient.createPlaybackSession(
+            YoutubeMediaPlaybackSessionCommand(
+                subject = profile.subject,
+                materialId = materialId,
+                blockId = request.blockId,
+                videoId = meta.videoId,
+                requestedQuality = requestedQuality.name,
+                thumbnailStorageKey = if (existingThumbnail == null) thumbnailStorageKey else null,
+            ),
+        )
+        val thumbnailAsset = existingThumbnail ?: maybeCreateYoutubeThumbnailAsset(
+            materialId = materialId,
+            blockId = request.blockId,
+            videoId = meta.videoId,
+            assetId = thumbnailAssetId,
+            storageKey = thumbnailStorageKey,
+            mediaSession = mediaSession,
+        )
+        logPlaybackDecision(materialId, request.blockId, meta.videoId, "RF_RELAY", null, diagnostics, profileCountry, ipCountry, mediaSession.sessionId, metadataSource, meta)
         return MaterialVideoPlaybackResponse(
             materialId = materialId,
             blockId = request.blockId,
@@ -107,31 +124,15 @@ class MaterialVideoPlaybackService(
             mode = "RF_RELAY",
             reason = null,
             embedUrl = embedUrl,
-            relayUrl = "/api/materials/video-playback-sessions/${session.id}/stream",
-            sessionId = session.id,
-            expiresAt = session.expiresAt,
+            relayUrl = "/api/media/video-playback-sessions/${mediaSession.sessionId}/stream",
+            sessionId = mediaSession.sessionId,
+            expiresAt = mediaSession.expiresAt,
+            requestedQuality = requestedQuality.name,
+            selectedQuality = mediaSession.selectedQuality,
+            selectedHeight = mediaSession.selectedHeight,
+            thumbnailUrl = thumbnailAsset?.contentUrl,
+            thumbnailAssetId = thumbnailAsset?.id,
         )
-    }
-
-    fun findSession(sessionId: UUID): YoutubePlaybackSession? =
-        sessions[sessionId]?.takeIf { session -> session.expiresAt.isAfter(clock.instant()) }
-
-    private fun createSession(
-        subject: String,
-        materialId: UUID,
-        blockId: String,
-        videoId: String,
-    ): YoutubePlaybackSession {
-        val session = YoutubePlaybackSession(
-            id = UUID.randomUUID(),
-            subject = subject,
-            materialId = materialId,
-            blockId = blockId,
-            videoId = videoId,
-            expiresAt = clock.instant().plusSeconds(sessionTtlSeconds.coerceAtLeast(60)),
-        )
-        sessions[session.id] = session
-        return session
     }
 
     private fun canAccessMaterial(
@@ -179,6 +180,7 @@ class MaterialVideoPlaybackService(
         diagnostics: YoutubeVideoBlockDiagnostics?,
         profileCountry: String?,
         ipCountry: String?,
+        requestedQuality: YoutubePlaybackQuality,
         metadataSource: String? = null,
         effectiveMeta: YoutubeVideoMeta? = null,
     ): MaterialVideoPlaybackResponse {
@@ -193,7 +195,52 @@ class MaterialVideoPlaybackService(
             relayUrl = null,
             sessionId = null,
             expiresAt = null,
+            requestedQuality = requestedQuality.name,
+            selectedQuality = null,
+            selectedHeight = null,
+            thumbnailUrl = null,
+            thumbnailAssetId = null,
         )
+    }
+
+    private fun maybeCreateYoutubeThumbnailAsset(
+        materialId: UUID,
+        blockId: String,
+        videoId: String,
+        assetId: UUID,
+        storageKey: String,
+        mediaSession: YoutubeMediaPlaybackSessionResult,
+    ): com.playsay.gateway.dto.MaterialAssetResponse? {
+        if (!mediaSession.thumbnailStored) {
+            logger.warn(
+                "YouTube RF relay thumbnail was not stored materialId={} blockId={} videoId={} sourceThumbnailPresent={}",
+                materialId,
+                blockId,
+                videoId,
+                mediaSession.thumbnailSourceUrl != null,
+            )
+            return null
+        }
+        val sourceUrl = mediaSession.thumbnailSourceUrl?.trim()?.takeIf { value -> value.isNotBlank() }
+        if (sourceUrl == null) {
+            logger.warn("YouTube RF relay thumbnail upload returned without source URL materialId={} blockId={} videoId={}", materialId, blockId, videoId)
+            return null
+        }
+        return runCatching {
+            materialAssetService.insertYoutubeThumbnailAsset(
+                materialId = materialId,
+                assetId = assetId,
+                blockId = blockId,
+                videoId = videoId,
+                sourceThumbnailUrl = sourceUrl,
+                storageKey = storageKey,
+                contentType = mediaSession.thumbnailContentType,
+                byteSize = mediaSession.thumbnailByteSize,
+            )
+        }.getOrElse {
+            logger.warn("YouTube RF relay thumbnail asset row could not be created materialId={} blockId={} videoId={}", materialId, blockId, videoId, it)
+            null
+        }
     }
 
     private fun logPlaybackDecision(
@@ -245,11 +292,13 @@ class MaterialVideoPlaybackService(
     }
 }
 
-data class YoutubePlaybackSession(
-    val id: UUID,
-    val subject: String,
-    val materialId: UUID,
-    val blockId: String,
-    val videoId: String,
-    val expiresAt: Instant,
-)
+enum class YoutubePlaybackQuality(val targetHeight: Int) {
+    LOW(480),
+    MEDIUM(720),
+    HIGH(1080);
+
+    companion object {
+        fun normalized(value: String?): YoutubePlaybackQuality =
+            entries.firstOrNull { quality -> quality.name == value?.trim()?.uppercase() } ?: MEDIUM
+    }
+}

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.controller.MaterialCrudController
 import com.playsay.gateway.controller.MaterialVideoPlaybackController
 import com.playsay.gateway.dto.LessonMaterialRequest
+import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.dto.MaterialVideoPlaybackRequest
 import com.playsay.gateway.dto.UpdateUserProfileRequest
 import com.playsay.gateway.entity.AssignmentEntity
@@ -14,17 +15,21 @@ import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.service.UserProfileStore
 import com.playsay.gateway.utils.MetaData
+import java.nio.file.Files
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.io.path.writeText
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
 import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -57,6 +62,26 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
     private val dataSource: DataSource,
 ) {
     private val objectMapper = jacksonObjectMapper()
+
+    companion object {
+        private val ytdlp = Files.createTempFile("playsay-youtube-metadata", ".sh").apply {
+            writeText(
+                """
+                #!/usr/bin/env sh
+                printf '%s\n' '5l-fo-d0gt8'
+                printf '%s\n' '105'
+                printf '%s\n' 'en'
+                """.trimIndent(),
+            )
+            toFile().setExecutable(true)
+        }
+
+        @JvmStatic
+        @DynamicPropertySource
+        fun youtubeMetadataProperties(registry: DynamicPropertyRegistry) {
+            registry.add("playsay.video.youtube.rf-relay.ytdlp-path") { ytdlp.toString() }
+        }
+    }
 
     @BeforeAll
     fun migrateDatabase() {
@@ -132,6 +157,29 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `resolves missing youtube metadata on demand before relay decision`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        userProfileStore.update(teacher, UpdateUserProfileRequest(countryCode = "RU"))
+        val material = createYoutubeMaterial(
+            teacher,
+            includeVideoMeta = false,
+            url = "https://youtu.be/5l-fo-d0gt8?si=abc",
+        )
+
+        val response = materialVideoPlaybackController.playback(
+            teacher,
+            material.id,
+            MaterialVideoPlaybackRequest(blockId = "video-1"),
+            requestWithCountry("RU"),
+        )
+
+        assertEquals("RF_RELAY", response.mode)
+        assertEquals("5l-fo-d0gt8", response.videoId)
+        assertNotNull(response.sessionId)
+        assertNull(response.reason)
+    }
+
+    @Test
     fun `does not expose private material to unrelated student`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
@@ -194,40 +242,51 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
     private fun createYoutubeMaterial(
         authentication: JwtAuthenticationToken,
         durationSeconds: Int = 300,
-    ) = materialCrudController.create(
-        authentication,
-        LessonMaterialRequest(
-            title = "YouTube activity",
-            status = "PUBLISHED",
-            document = objectMapper.readTree(
-                """
-                {
-                  "schemaVersion": 1,
-                  "pages": [
-                    {
-                      "id": "page-1",
-                      "title": "Video",
-                      "layout": "FLOW",
-                      "blocks": [
-                        {
-                          "id": "video-1",
-                          "type": "videoEmbed",
-                          "title": "Warm-up video",
-                          "provider": "YOUTUBE",
-                          "url": "https://www.youtube.com/watch?v=5l-fo-d0gt8",
+        includeVideoMeta: Boolean = true,
+        url: String = "https://www.youtube.com/watch?v=5l-fo-d0gt8",
+    ): LessonMaterialResponse {
+        val videoMetaJson = if (includeVideoMeta) {
+            """
+            ,
                           "videoMeta": {
                             "durationSeconds": $durationSeconds,
                             "language": "en"
                           }
+            """.trimIndent()
+        } else {
+            ""
+        }
+        return materialCrudController.create(
+            authentication,
+            LessonMaterialRequest(
+                title = "YouTube activity",
+                status = "PUBLISHED",
+                document = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "pages": [
+                        {
+                          "id": "page-1",
+                          "title": "Video",
+                          "layout": "FLOW",
+                          "blocks": [
+                            {
+                              "id": "video-1",
+                              "type": "videoEmbed",
+                              "title": "Warm-up video",
+                              "provider": "YOUTUBE",
+                              "url": "$url"$videoMetaJson
+                            }
+                          ]
                         }
                       ]
                     }
-                  ]
-                }
-                """.trimIndent(),
+                    """.trimIndent(),
+                ),
             ),
-        ),
-    ).body!!
+        ).body!!
+    }
 
     private fun requestWithCountry(countryCode: String): MockHttpServletRequest =
         MockHttpServletRequest().apply {

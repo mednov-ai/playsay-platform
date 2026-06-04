@@ -25,6 +25,7 @@ class MaterialVideoPlaybackService(
     private val userProfileStore: UserProfileStore,
     private val assignmentRecipientRepo: AssignmentRecipientRepo,
     private val lessonRepo: LessonRepo,
+    private val youtubeVideoMetadataResolver: YoutubeVideoMetadataResolver,
     @param:Value("\${playsay.video.youtube.rf-relay.enabled:false}")
     private val rfRelayEnabled: Boolean,
     @param:Value("\${playsay.video.youtube.rf-relay.geo-country-header:}")
@@ -62,27 +63,43 @@ class MaterialVideoPlaybackService(
             return response(materialId, request.blockId, null, "BLOCKED", "YOUTUBE_BLOCK_REQUIRED", null, diagnostics, profileCountry, ipCountry)
         }
 
-        val meta = YoutubeVideoSupport.metaFromBlock(block)
-            ?: return response(materialId, request.blockId, null, "NEEDS_REVIEW", "YOUTUBE_METADATA_MISSING", null, diagnostics, profileCountry, ipCountry)
+        val storedMeta = YoutubeVideoSupport.metaFromBlock(block)
+        val storedMetaComplete = storedMeta?.durationSeconds != null && storedMeta.language != null
+        val resolvedMeta = if (storedMetaComplete) null else diagnostics.videoId?.let { videoId -> youtubeVideoMetadataResolver.resolve(videoId) }
+        val meta = storedMeta?.takeIf { storedMetaComplete } ?: resolvedMeta
+            ?: return response(
+                materialId,
+                request.blockId,
+                diagnostics.videoId,
+                "NEEDS_REVIEW",
+                "YOUTUBE_METADATA_MISSING",
+                null,
+                diagnostics,
+                profileCountry,
+                ipCountry,
+                metadataSource = "MISSING",
+                effectiveMeta = null,
+            )
+        val metadataSource = if (storedMetaComplete) "STORED" else "YTDLP_ON_DEMAND"
         val embedUrl = YoutubeVideoSupport.embedUrl(meta.videoId)
         val policy = YoutubeVideoSupport.videoMeetsPolicy(meta)
         if (!policy.approved) {
-            return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", policy.reason, embedUrl, diagnostics, profileCountry, ipCountry)
+            return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", policy.reason, embedUrl, diagnostics, profileCountry, ipCountry, metadataSource, meta)
         }
 
         if (!rfRelayEnabled) {
-            return response(materialId, request.blockId, meta.videoId, "EMBED", "RF_RELAY_DISABLED", embedUrl, diagnostics, profileCountry, ipCountry)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", "RF_RELAY_DISABLED", embedUrl, diagnostics, profileCountry, ipCountry, metadataSource, meta)
         }
         if (profileCountry != "RU") {
-            return response(materialId, request.blockId, meta.videoId, "EMBED", "PROFILE_COUNTRY_NOT_RU", embedUrl, diagnostics, profileCountry, ipCountry)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", "PROFILE_COUNTRY_NOT_RU", embedUrl, diagnostics, profileCountry, ipCountry, metadataSource, meta)
         }
         if (requireGeoCountry && ipCountry != "RU") {
             val reason = if (ipCountry == null) "IP_COUNTRY_UNKNOWN" else "PROFILE_IP_COUNTRY_MISMATCH"
-            return response(materialId, request.blockId, meta.videoId, "EMBED", reason, embedUrl, diagnostics, profileCountry, ipCountry)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", reason, embedUrl, diagnostics, profileCountry, ipCountry, metadataSource, meta)
         }
 
         val session = createSession(profile.subject, materialId, request.blockId, meta.videoId)
-        logPlaybackDecision(materialId, request.blockId, meta.videoId, "RF_RELAY", null, diagnostics, profileCountry, ipCountry, session.id)
+        logPlaybackDecision(materialId, request.blockId, meta.videoId, "RF_RELAY", null, diagnostics, profileCountry, ipCountry, session.id, metadataSource, meta)
         return MaterialVideoPlaybackResponse(
             materialId = materialId,
             blockId = request.blockId,
@@ -162,8 +179,10 @@ class MaterialVideoPlaybackService(
         diagnostics: YoutubeVideoBlockDiagnostics?,
         profileCountry: String?,
         ipCountry: String?,
+        metadataSource: String? = null,
+        effectiveMeta: YoutubeVideoMeta? = null,
     ): MaterialVideoPlaybackResponse {
-        logPlaybackDecision(materialId, blockId, videoId, mode, reason, diagnostics, profileCountry, ipCountry, null)
+        logPlaybackDecision(materialId, blockId, videoId, mode, reason, diagnostics, profileCountry, ipCountry, null, metadataSource, effectiveMeta)
         return MaterialVideoPlaybackResponse(
             materialId = materialId,
             blockId = blockId,
@@ -187,9 +206,11 @@ class MaterialVideoPlaybackService(
         profileCountry: String?,
         ipCountry: String?,
         sessionId: UUID?,
+        metadataSource: String?,
+        effectiveMeta: YoutubeVideoMeta?,
     ) {
         logger.info(
-            "YouTube RF relay playback decision materialId={} blockId={} sessionId={} mode={} reason={} videoId={} relayEnabled={} requireGeoCountry={} geoHeaderConfigured={} profileCountry={} ipCountry={} blockType={} provider={} urlHost={} urlKind={} parsedVideoId={} videoMetaPresent={} durationPresent={} durationSeconds={} durationNodeType={} languagePresent={} language={}",
+            "YouTube RF relay playback decision materialId={} blockId={} sessionId={} mode={} reason={} videoId={} relayEnabled={} requireGeoCountry={} geoHeaderConfigured={} profileCountry={} ipCountry={} metadataSource={} effectiveDurationSeconds={} effectiveLanguage={} blockType={} provider={} urlHost={} urlKind={} parsedVideoId={} videoMetaPresent={} durationPresent={} durationSeconds={} durationNodeType={} languagePresent={} language={}",
             materialId,
             blockId,
             sessionId,
@@ -201,6 +222,9 @@ class MaterialVideoPlaybackService(
             geoCountryHeader.isNotBlank(),
             profileCountry,
             ipCountry,
+            metadataSource,
+            effectiveMeta?.durationSeconds,
+            effectiveMeta?.language,
             diagnostics?.blockType,
             diagnostics?.provider,
             diagnostics?.urlHost,

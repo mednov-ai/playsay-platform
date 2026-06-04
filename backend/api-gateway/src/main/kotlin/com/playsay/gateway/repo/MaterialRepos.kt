@@ -22,6 +22,10 @@ data class LessonMaterialRow(
     val document: String,
     val sourceMeta: String,
     val scoringRubric: String,
+    val topicTags: String,
+    val skillTags: String,
+    val ageBand: String?,
+    val estimatedDurationMin: Int?,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
@@ -65,6 +69,10 @@ interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
             m.document,
             m.sourceMeta,
             m.scoringRubric,
+            m.topicTags,
+            m.skillTags,
+            m.ageBand,
+            m.estimatedDurationMin,
             m.createdAt,
             m.updatedAt
         )
@@ -92,6 +100,10 @@ interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
             m.document,
             m.sourceMeta,
             m.scoringRubric,
+            m.topicTags,
+            m.skillTags,
+            m.ageBand,
+            m.estimatedDurationMin,
             m.createdAt,
             m.updatedAt
         )
@@ -130,6 +142,10 @@ interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
             m.document,
             m.sourceMeta,
             m.scoringRubric,
+            m.topicTags,
+            m.skillTags,
+            m.ageBand,
+            m.estimatedDurationMin,
             m.createdAt,
             m.updatedAt
         )
@@ -158,6 +174,10 @@ interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
             m.document,
             m.sourceMeta,
             m.scoringRubric,
+            m.topicTags,
+            m.skillTags,
+            m.ageBand,
+            m.estimatedDurationMin,
             m.createdAt,
             m.updatedAt
         )

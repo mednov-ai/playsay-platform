@@ -13,4 +13,5 @@
     <include file="2026-06-03-001-add-parallel-lesson-assignments.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-03-002-add-app-user-country.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-03-003-backfill-app-user-country.xml" relativeToChangelogFile="true"/>
+    <include file="2026-06-04-004-create-curriculum-board.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

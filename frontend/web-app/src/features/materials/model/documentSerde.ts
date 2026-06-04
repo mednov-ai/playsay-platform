@@ -17,6 +17,10 @@ export function materialToForm(material: LessonMaterial): MaterialFormState {
     description: material.description ?? "",
     language: material.language || "en",
     cefrLevel: material.cefrLevel || "A2",
+    topicTags: (material.topicTags ?? []).join(", "),
+    skillTags: (material.skillTags ?? []).join(", "),
+    ageBand: material.ageBand ?? "",
+    estimatedDurationMin: material.estimatedDurationMin?.toString() ?? "",
     visibility: material.visibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
     status: material.status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
     sourcePrompt: readPromptFromSourceMeta(material.sourceMeta),
@@ -36,6 +40,10 @@ export function materialDraftToForm(draft: LessonMaterialDraft): MaterialFormSta
     description: draft.description ?? "",
     language: draft.language || "en",
     cefrLevel: draft.cefrLevel || "A2",
+    topicTags: draft.topicTags?.join(", ") ?? "",
+    skillTags: draft.skillTags?.join(", ") ?? "",
+    ageBand: draft.ageBand ?? "",
+    estimatedDurationMin: draft.estimatedDurationMin?.toString() ?? "",
     visibility: draft.visibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
     status: draft.status === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
     sourcePrompt: readPromptFromSourceMeta(sourceMeta),
@@ -57,6 +65,10 @@ export function materialFormToInput(form: MaterialFormState): LessonMaterialInpu
     description: form.description.trim() || null,
     language: form.language.trim() || "en",
     cefrLevel: form.cefrLevel,
+    topicTags: commaListFromText(form.topicTags),
+    skillTags: commaListFromText(form.skillTags),
+    ageBand: form.ageBand.trim() || null,
+    estimatedDurationMin: optionalPositiveInteger(form.estimatedDurationMin),
     visibility: form.visibility,
     status: form.status,
     document: {
@@ -93,10 +105,30 @@ export function materialPreviewFromForm(form: MaterialFormState): LessonMaterial
     document: input.document ?? {},
     sourceMeta: input.sourceMeta ?? {},
     scoringRubric: input.scoringRubric ?? {},
+    topicTags: input.topicTags ?? [],
+    skillTags: input.skillTags ?? [],
+    ageBand: input.ageBand ?? null,
+    estimatedDurationMin: input.estimatedDurationMin ?? null,
     blockCount: form.document.pages.reduce((count, page) => count + page.blocks.length, 0),
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function commaListFromText(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function optionalPositiveInteger(value: string): number | null {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 export function editorDocumentFromJson(value: LessonMaterialJson | unknown, fallbackTitle = i18n.t("materials.defaults.fallbackTitle")): MaterialEditorDocument {

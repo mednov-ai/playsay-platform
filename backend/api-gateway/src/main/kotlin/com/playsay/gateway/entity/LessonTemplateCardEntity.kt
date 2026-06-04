@@ -11,30 +11,25 @@ import java.time.Instant
 import java.util.UUID
 
 @Entity
-@Table(name = "lesson_template")
-class LessonTemplateEntity(
+@Table(name = "lesson_template_card")
+class LessonTemplateCardEntity(
     @Id
     @Column(name = "id", nullable = false)
     var id: UUID = UUID.randomUUID(),
-    @Column(name = "course_id")
-    var courseId: UUID? = null,
+    @Column(name = "lesson_template_id", nullable = false)
+    var lessonTemplateId: UUID = UUID.randomUUID(),
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id", insertable = false, updatable = false)
-    var course: CourseEntity? = null,
-    @Column(name = "topic_id")
-    var topicId: UUID? = null,
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "topic_id", insertable = false, updatable = false)
-    var topic: CurriculumTopicEntity? = null,
-    @Column(name = "material_id")
-    var materialId: UUID? = null,
+    @JoinColumn(name = "lesson_template_id", insertable = false, updatable = false)
+    var lessonTemplate: LessonTemplateEntity? = null,
+    @Column(name = "material_id", nullable = false)
+    var materialId: UUID = UUID.randomUUID(),
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "material_id", insertable = false, updatable = false)
     var material: LessonMaterialEntity? = null,
-    @Column(name = "title", nullable = false, length = 160)
-    var title: String = "",
     @Column(name = "order_index")
     var orderIndex: Int? = null,
+    @Column(name = "role", nullable = false, length = 32)
+    var role: String = "MAIN",
     @Column(name = "planned_duration_min")
     var plannedDurationMin: Int? = null,
     @Column(name = "created_at", nullable = false)

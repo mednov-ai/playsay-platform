@@ -1,6 +1,8 @@
 package com.playsay.gateway.repo
 
 import com.playsay.gateway.entity.CourseEntity
+import com.playsay.gateway.entity.CurriculumTopicEntity
+import com.playsay.gateway.entity.LessonTemplateCardEntity
 import com.playsay.gateway.entity.LessonTemplateEntity
 import java.time.Instant
 import java.util.UUID
@@ -18,8 +20,22 @@ data class CourseLessonRow(
     val title: String,
     val orderIndex: Int?,
     val plannedDurationMin: Int?,
+    val topicId: UUID?,
+    val topicTitle: String?,
     val materialId: UUID?,
     val materialTitle: String?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+data class LessonTemplateCardRow(
+    val id: UUID,
+    val lessonTemplateId: UUID,
+    val materialId: UUID,
+    val materialTitle: String,
+    val orderIndex: Int?,
+    val role: String,
+    val plannedDurationMin: Int?,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
@@ -60,6 +76,23 @@ interface CourseRepo : JpaRepository<CourseEntity, UUID> {
     fun findCourseSummaryById(courseId: UUID): CourseSummaryRow?
 }
 
+interface CurriculumTopicRepo : JpaRepository<CurriculumTopicEntity, UUID> {
+    fun deleteByCourseId(courseId: UUID): Long
+
+    fun deleteByIdAndCourseId(id: UUID, courseId: UUID): Long
+
+    fun findByIdAndCourseId(id: UUID, courseId: UUID): CurriculumTopicEntity?
+
+    @Query(
+        """
+          from CurriculumTopicEntity t
+         where t.courseId = :courseId
+         order by coalesce(t.orderIndex, 2147483647), t.createdAt, t.title
+        """,
+    )
+    fun findByCourseIdOrdered(courseId: UUID): List<CurriculumTopicEntity>
+}
+
 interface LessonTemplateRepo : JpaRepository<LessonTemplateEntity, UUID> {
     fun deleteByCourseId(courseId: UUID): Long
 
@@ -75,12 +108,15 @@ interface LessonTemplateRepo : JpaRepository<LessonTemplateEntity, UUID> {
             lt.title,
             lt.orderIndex,
             lt.plannedDurationMin,
+            lt.topicId,
+            topic.title,
             lt.materialId,
             lm.title,
             lt.createdAt,
             lt.updatedAt
         )
           from LessonTemplateEntity lt
+          left join CurriculumTopicEntity topic on topic.id = lt.topicId
           left join LessonMaterialEntity lm on lm.id = lt.materialId
          where lt.courseId = :courseId
          order by coalesce(lt.orderIndex, 2147483647), lt.createdAt, lt.title
@@ -96,16 +132,47 @@ interface LessonTemplateRepo : JpaRepository<LessonTemplateEntity, UUID> {
             lt.title,
             lt.orderIndex,
             lt.plannedDurationMin,
+            lt.topicId,
+            topic.title,
             lt.materialId,
             lm.title,
             lt.createdAt,
             lt.updatedAt
         )
           from LessonTemplateEntity lt
+          left join CurriculumTopicEntity topic on topic.id = lt.topicId
           left join LessonMaterialEntity lm on lm.id = lt.materialId
          where lt.courseId = :courseId
            and lt.id = :lessonId
         """,
     )
     fun findLessonRowByCourseIdAndId(courseId: UUID, lessonId: UUID): CourseLessonRow?
+}
+
+interface LessonTemplateCardRepo : JpaRepository<LessonTemplateCardEntity, UUID> {
+    fun deleteByLessonTemplateId(lessonTemplateId: UUID): Long
+
+    @Query(
+        """
+        select new com.playsay.gateway.repo.LessonTemplateCardRow(
+            card.id,
+            card.lessonTemplateId,
+            card.materialId,
+            material.title,
+            card.orderIndex,
+            card.role,
+            card.plannedDurationMin,
+            card.createdAt,
+            card.updatedAt
+        )
+          from LessonTemplateCardEntity card
+          join LessonMaterialEntity material on material.id = card.materialId
+         where card.lessonTemplateId in :lessonTemplateIds
+         order by card.lessonTemplateId,
+                  coalesce(card.orderIndex, 2147483647),
+                  card.createdAt,
+                  material.title
+        """,
+    )
+    fun findRowsByLessonTemplateIds(lessonTemplateIds: Collection<UUID>): List<LessonTemplateCardRow>
 }

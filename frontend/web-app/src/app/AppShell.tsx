@@ -10,6 +10,8 @@ import {
   type CourseInput,
   type CourseLesson,
   type CourseLessonInput,
+  type CurriculumTopic,
+  type CurriculumTopicInput,
   type LessonMaterial,
   type LessonMaterialAnswerSuggestions,
   type LessonMaterialAnswerSuggestionsInput,
@@ -19,6 +21,7 @@ import {
   type LessonMaterialDraftInput,
   type LessonMaterialGenerateImagesInput,
   type LessonMaterialInput,
+  type LessonTemplateCardsInput,
   type LessonMaterialUrlDraftInput,
   type MeProfile,
   type PaymentInvoice,
@@ -65,13 +68,16 @@ export type AppShellProps = {
   courseLessons: CourseLessonMap;
   courseLoading: boolean;
   courseMessage: string | null;
+  courseTopics: Record<string, CurriculumTopic[]>;
   courses: Course[];
   createCourse: (input: CourseInput) => Promise<void>;
   createLesson: (courseId: string, input: CourseLessonInput) => Promise<void>;
+  createTopic: (courseId: string, input: CurriculumTopicInput) => Promise<void>;
   createScheduledLesson: (input: ScheduledLessonInput) => Promise<void>;
   deleteCourse: (courseId: string) => Promise<void>;
   deleteLesson: (courseId: string, lessonId: string) => Promise<void>;
   deleteMaterial: (materialId: string) => Promise<void>;
+  deleteTopic: (courseId: string, topicId: string) => Promise<void>;
   deleteScheduledLesson: (lessonId: string) => Promise<void>;
   error: string | null;
   generateImagesForMaterial: (materialId: string, input: LessonMaterialGenerateImagesInput) => Promise<LessonMaterial | null>;
@@ -114,9 +120,11 @@ export type AppShellProps = {
   setWorkspaceTab: Dispatch<SetStateAction<WorkspaceTab>>;
   status: SessionStatus;
   studentUsers: AdminUserProfile[];
+  replaceLessonCards: (courseId: string, lessonId: string, input: LessonTemplateCardsInput) => Promise<void>;
   createPaymentInvoice: (input: PaymentInvoiceCreateInput) => Promise<PaymentInvoiceCreated | null>;
   suggestAcceptedAnswersForMaterial: (materialId: string, input: LessonMaterialAnswerSuggestionsInput) => Promise<LessonMaterialAnswerSuggestions | null>;
   updateMaterialAssetMetadata: (materialId: string, assetId: string, input: LessonMaterialAssetUpdateInput) => Promise<LessonMaterialAsset | null>;
+  updateTopic: (courseId: string, topicId: string, input: CurriculumTopicInput) => Promise<void>;
   upsertMaterial: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
   workspaceTab: WorkspaceTab;
   workspaceTabs: WorkspaceTabDefinition[];
@@ -135,13 +143,16 @@ export function AppShell(props: AppShellProps) {
     courseLessons,
     courseLoading,
     courseMessage,
+    courseTopics,
     courses,
     createCourse,
     createLesson,
+    createTopic,
     createScheduledLesson,
     deleteCourse,
     deleteLesson,
     deleteMaterial,
+    deleteTopic,
     deleteScheduledLesson,
     error,
     generateImagesForMaterial,
@@ -184,9 +195,11 @@ export function AppShell(props: AppShellProps) {
     setWorkspaceTab,
     status,
     studentUsers,
+    replaceLessonCards,
     createPaymentInvoice,
     suggestAcceptedAnswersForMaterial,
     updateMaterialAssetMetadata,
+    updateTopic,
     upsertMaterial,
     workspaceTab,
     workspaceTabs,
@@ -332,13 +345,19 @@ export function AppShell(props: AppShellProps) {
                   disabled={!isAuthenticated || courseLoading}
                   lessons={courseLessons}
                   loading={courseLoading}
+                  materials={materials}
                   message={courseMessage}
                   onCreateCourse={(input) => void createCourse(input)}
                   onCreateLesson={(courseId, input) => void createLesson(courseId, input)}
+                  onCreateTopic={(courseId, input) => void createTopic(courseId, input)}
                   onDeleteCourse={(courseId) => void deleteCourse(courseId)}
                   onDeleteLesson={(courseId, lessonId) => void deleteLesson(courseId, lessonId)}
+                  onDeleteTopic={(courseId, topicId) => void deleteTopic(courseId, topicId)}
                   onRefresh={() => void refreshCourses()}
+                  onReplaceLessonCards={(courseId, lessonId, input) => void replaceLessonCards(courseId, lessonId, input)}
+                  onUpdateTopic={(courseId, topicId, input) => void updateTopic(courseId, topicId, input)}
                   profile={profile}
+                  topics={courseTopics}
                 />
               ) : null}
 

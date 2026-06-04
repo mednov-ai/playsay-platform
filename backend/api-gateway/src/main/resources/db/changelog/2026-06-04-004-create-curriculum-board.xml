@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-04-004-create-curriculum-board" author="codex">
+        <createTable tableName="curriculum_topic">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_curriculum_topic"/>
+            </column>
+            <column name="course_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="VARCHAR(160)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="order_index" type="INT"/>
+            <column name="tag_slugs" type="TEXT" defaultValue="[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="curriculum_topic"
+            baseColumnNames="course_id"
+            constraintName="fk_curriculum_topic_course"
+            referencedTableName="course"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <createIndex tableName="curriculum_topic" indexName="idx_curriculum_topic_course">
+            <column name="course_id"/>
+            <column name="order_index"/>
+        </createIndex>
+
+        <addColumn tableName="lesson_template">
+            <column name="topic_id" type="UUID"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="lesson_template"
+            baseColumnNames="topic_id"
+            constraintName="fk_lesson_template_topic"
+            referencedTableName="curriculum_topic"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <createIndex tableName="lesson_template" indexName="idx_lesson_template_topic">
+            <column name="topic_id"/>
+        </createIndex>
+
+        <createTable tableName="lesson_template_card">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_lesson_template_card"/>
+            </column>
+            <column name="lesson_template_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="material_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_index" type="INT"/>
+            <column name="role" type="VARCHAR(32)" defaultValue="MAIN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="planned_duration_min" type="INT"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="lesson_template_card"
+            baseColumnNames="lesson_template_id"
+            constraintName="fk_lesson_template_card_lesson"
+            referencedTableName="lesson_template"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="lesson_template_card"
+            baseColumnNames="material_id"
+            constraintName="fk_lesson_template_card_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <createIndex tableName="lesson_template_card" indexName="idx_lesson_template_card_lesson">
+            <column name="lesson_template_id"/>
+            <column name="order_index"/>
+        </createIndex>
+        <createIndex tableName="lesson_template_card" indexName="idx_lesson_template_card_material">
+            <column name="material_id"/>
+        </createIndex>
+        <sql>
+            INSERT INTO lesson_template_card (
+                id,
+                lesson_template_id,
+                material_id,
+                order_index,
+                role,
+                planned_duration_min,
+                created_at,
+                updated_at
+            )
+            SELECT
+                id,
+                id,
+                material_id,
+                1,
+                'MAIN',
+                planned_duration_min,
+                created_at,
+                updated_at
+            FROM lesson_template
+            WHERE material_id IS NOT NULL
+        </sql>
+
+        <addColumn tableName="lesson_material">
+            <column name="topic_tags" type="TEXT" defaultValue="[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="skill_tags" type="TEXT" defaultValue="[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="age_band" type="VARCHAR(32)"/>
+            <column name="estimated_duration_min" type="INT"/>
+        </addColumn>
+
+        <rollback>
+            <dropColumn tableName="lesson_material" columnName="estimated_duration_min"/>
+            <dropColumn tableName="lesson_material" columnName="age_band"/>
+            <dropColumn tableName="lesson_material" columnName="skill_tags"/>
+            <dropColumn tableName="lesson_material" columnName="topic_tags"/>
+            <dropIndex tableName="lesson_template_card" indexName="idx_lesson_template_card_material"/>
+            <dropIndex tableName="lesson_template_card" indexName="idx_lesson_template_card_lesson"/>
+            <dropForeignKeyConstraint baseTableName="lesson_template_card" constraintName="fk_lesson_template_card_material"/>
+            <dropForeignKeyConstraint baseTableName="lesson_template_card" constraintName="fk_lesson_template_card_lesson"/>
+            <dropTable tableName="lesson_template_card"/>
+            <dropIndex tableName="lesson_template" indexName="idx_lesson_template_topic"/>
+            <dropForeignKeyConstraint baseTableName="lesson_template" constraintName="fk_lesson_template_topic"/>
+            <dropColumn tableName="lesson_template" columnName="topic_id"/>
+            <dropIndex tableName="curriculum_topic" indexName="idx_curriculum_topic_course"/>
+            <dropForeignKeyConstraint baseTableName="curriculum_topic" constraintName="fk_curriculum_topic_course"/>
+            <dropTable tableName="curriculum_topic"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -35,6 +35,10 @@ class LessonMaterialResponseMapperTest {
             """.trimIndent(),
             sourceMeta = """{"kind":"MANUAL"}""",
             scoringRubric = """{"maxScore":10}""",
+            topicTags = """["pets","animals"]""",
+            skillTags = """["vocabulary"]""",
+            ageBand = "7-9",
+            estimatedDurationMin = 8,
             createdAt = now,
             updatedAt = now,
         )
@@ -45,6 +49,10 @@ class LessonMaterialResponseMapperTest {
         assertEquals("Pets", response.title)
         assertEquals("MANUAL", response.sourceMeta["kind"].asText())
         assertEquals(10, response.scoringRubric["maxScore"].asInt())
+        assertEquals(listOf("pets", "animals"), response.topicTags)
+        assertEquals(listOf("vocabulary"), response.skillTags)
+        assertEquals("7-9", response.ageBand)
+        assertEquals(8, response.estimatedDurationMin)
         assertEquals(3, response.blockCount)
     }
 }

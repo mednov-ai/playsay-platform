@@ -20,6 +20,10 @@ data class ValidatedLessonMaterialValues(
     val document: JsonNode,
     val sourceMeta: JsonNode,
     val scoringRubric: JsonNode,
+    val topicTags: List<String>,
+    val skillTags: List<String>,
+    val ageBand: String?,
+    val estimatedDurationMin: Int?,
 )
 
 @Component
@@ -61,7 +65,41 @@ class MaterialRequestValidator(
             document = document,
             sourceMeta = sourceMeta,
             scoringRubric = scoringRubric,
+            topicTags = cleanTags(request.topicTags, "topicTags", 16),
+            skillTags = cleanTags(request.skillTags, "skillTags", 16),
+            ageBand = optionalClean(request.ageBand, "ageBand", 32),
+            estimatedDurationMin = cleanDuration(request.estimatedDurationMin, "estimatedDurationMin"),
         )
+    }
+
+    fun cleanTags(values: List<String>, fieldName: String, maxItems: Int): List<String> {
+        if (values.size > maxItems) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_TOO_LONG, fieldName, maxItems)
+        }
+        val seen = linkedSetOf<String>()
+        values.forEach { raw ->
+            val normalized = raw.trim()
+                .removePrefix("#")
+                .lowercase()
+                .replace(Regex("[^a-z0-9-]+"), "-")
+                .replace(Regex("-+"), "-")
+                .trim('-')
+                .take(40)
+            if (normalized.isNotEmpty()) {
+                seen.add(normalized)
+            }
+        }
+        return seen.toList()
+    }
+
+    fun cleanDuration(value: Int?, fieldName: String): Int? {
+        if (value == null) {
+            return null
+        }
+        if (value !in 1..480) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.PLANNED_DURATION_OUT_OF_RANGE)
+        }
+        return value
     }
 
     fun requiredClean(value: String?, fieldName: String, maxLength: Int): String =

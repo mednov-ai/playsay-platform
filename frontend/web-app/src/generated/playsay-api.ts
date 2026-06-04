@@ -286,6 +286,15 @@ export interface LessonMaterialRequest {
   document?: JsonNode | null;
   sourceMeta?: JsonNode | null;
   scoringRubric?: JsonNode | null;
+  topicTags: string[];
+  skillTags: string[];
+  /**
+     * @maxLength 32
+     * @nullable
+     */
+  ageBand?: string | null;
+  /** @nullable */
+  estimatedDurationMin?: number | null;
 }
 
 export interface LessonMaterialResponse {
@@ -306,6 +315,12 @@ export interface LessonMaterialResponse {
   document: JsonNode;
   sourceMeta: JsonNode;
   scoringRubric: JsonNode;
+  topicTags: string[];
+  skillTags: string[];
+  /** @nullable */
+  ageBand?: string | null;
+  /** @nullable */
+  estimatedDurationMin?: number | null;
   blockCount: number;
   createdAt: string;
   updatedAt: string;
@@ -345,6 +360,42 @@ export interface CourseResponse {
   updatedAt: string;
 }
 
+export interface CurriculumTopicRequest {
+  /** @maxLength 160 */
+  title: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  description?: string | null;
+  /** @nullable */
+  orderIndex?: number | null;
+  tagSlugs: string[];
+}
+
+export interface CurriculumTopicResponse {
+  id: string;
+  courseId: string;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  orderIndex?: number | null;
+  tagSlugs: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LessonTemplateCardRequest {
+  materialId: string;
+  /** @nullable */
+  orderIndex?: number | null;
+  /** @maxLength 32 */
+  role: string;
+  /** @nullable */
+  plannedDurationMin?: number | null;
+}
+
 export interface CourseLessonRequest {
   /** @maxLength 160 */
   title: string;
@@ -353,7 +404,25 @@ export interface CourseLessonRequest {
   /** @nullable */
   plannedDurationMin?: number | null;
   /** @nullable */
+  topicId?: string | null;
+  /** @nullable */
   materialId?: string | null;
+  /** @nullable */
+  cards?: LessonTemplateCardRequest[] | null;
+}
+
+export interface LessonTemplateCardResponse {
+  id: string;
+  lessonTemplateId: string;
+  materialId: string;
+  materialTitle: string;
+  /** @nullable */
+  orderIndex?: number | null;
+  role: string;
+  /** @nullable */
+  plannedDurationMin?: number | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CourseLessonResponse {
@@ -365,11 +434,20 @@ export interface CourseLessonResponse {
   /** @nullable */
   plannedDurationMin?: number | null;
   /** @nullable */
+  topicId?: string | null;
+  /** @nullable */
+  topicTitle?: string | null;
+  /** @nullable */
   materialId?: string | null;
   /** @nullable */
   materialTitle?: string | null;
+  cards: LessonTemplateCardResponse[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface LessonTemplateCardsRequest {
+  cards: LessonTemplateCardRequest[];
 }
 
 export interface LiveKitRoomTokenResponse {
@@ -1960,6 +2038,99 @@ export const deleteCourse = async (courseId: string, options?: RequestInit): Pro
 
 
 
+export type updateCurriculumTopicResponse200 = {
+  data: CurriculumTopicResponse
+  status: 200
+}
+
+export type updateCurriculumTopicResponseSuccess = (updateCurriculumTopicResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateCurriculumTopicResponse = (updateCurriculumTopicResponseSuccess)
+
+export const getUpdateCurriculumTopicUrl = (courseId: string,
+    topicId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/topics/${topicId}`
+}
+
+/**
+ * Updates a controlled curriculum topic. Requires TEACHER or ADMIN role.
+ * @summary Update curriculum topic
+ */
+export const updateCurriculumTopic = async (courseId: string,
+    topicId: string,
+    curriculumTopicRequest: CurriculumTopicRequest, options?: RequestInit): Promise<updateCurriculumTopicResponse> => {
+
+  const res = await fetch(getUpdateCurriculumTopicUrl(courseId,topicId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(curriculumTopicRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateCurriculumTopicResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateCurriculumTopicResponse
+}
+
+
+
+export type deleteCurriculumTopicResponse200 = {
+  data: void
+  status: 200
+}
+
+export type deleteCurriculumTopicResponseSuccess = (deleteCurriculumTopicResponse200) & {
+  headers: Headers;
+};
+;
+
+export type deleteCurriculumTopicResponse = (deleteCurriculumTopicResponseSuccess)
+
+export const getDeleteCurriculumTopicUrl = (courseId: string,
+    topicId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/topics/${topicId}`
+}
+
+/**
+ * Deletes a controlled curriculum topic. Requires TEACHER or ADMIN role.
+ * @summary Delete curriculum topic
+ */
+export const deleteCurriculumTopic = async (courseId: string,
+    topicId: string, options?: RequestInit): Promise<deleteCurriculumTopicResponse> => {
+
+  const res = await fetch(getDeleteCurriculumTopicUrl(courseId,topicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteCurriculumTopicResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteCurriculumTopicResponse
+}
+
+
+
 export type updateCourseLessonResponse200 = {
   data: CourseLessonResponse
   status: 200
@@ -2088,6 +2259,53 @@ export const deleteCourseLesson = async (courseId: string,
 
   const data: deleteCourseLessonResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteCourseLessonResponse
+}
+
+
+
+export type replaceCourseLessonCardsResponse200 = {
+  data: CourseLessonResponse
+  status: 200
+}
+
+export type replaceCourseLessonCardsResponseSuccess = (replaceCourseLessonCardsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type replaceCourseLessonCardsResponse = (replaceCourseLessonCardsResponseSuccess)
+
+export const getReplaceCourseLessonCardsUrl = (courseId: string,
+    lessonId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/lessons/${lessonId}/cards`
+}
+
+/**
+ * Replaces the ordered reusable card list for a lesson template. Requires TEACHER or ADMIN role.
+ * @summary Replace course lesson cards
+ */
+export const replaceCourseLessonCards = async (courseId: string,
+    lessonId: string,
+    lessonTemplateCardsRequest: LessonTemplateCardsRequest, options?: RequestInit): Promise<replaceCourseLessonCardsResponse> => {
+
+  const res = await fetch(getReplaceCourseLessonCardsUrl(courseId,lessonId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(lessonTemplateCardsRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: replaceCourseLessonCardsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as replaceCourseLessonCardsResponse
 }
 
 
@@ -3329,6 +3547,95 @@ export const createCourse = async (courseRequest: CourseRequest, options?: Reque
 
   const data: createCourseResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createCourseResponse
+}
+
+
+
+export type listCurriculumTopicsResponse200 = {
+  data: CurriculumTopicResponse[]
+  status: 200
+}
+
+export type listCurriculumTopicsResponseSuccess = (listCurriculumTopicsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listCurriculumTopicsResponse = (listCurriculumTopicsResponseSuccess)
+
+export const getListCurriculumTopicsUrl = (courseId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/topics`
+}
+
+/**
+ * Returns controlled curriculum topics inside a course/level track.
+ * @summary List curriculum topics
+ */
+export const listCurriculumTopics = async (courseId: string, options?: RequestInit): Promise<listCurriculumTopicsResponse> => {
+
+  const res = await fetch(getListCurriculumTopicsUrl(courseId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listCurriculumTopicsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listCurriculumTopicsResponse
+}
+
+
+
+export type createCurriculumTopicResponse200 = {
+  data: CurriculumTopicResponse
+  status: 200
+}
+
+export type createCurriculumTopicResponseSuccess = (createCurriculumTopicResponse200) & {
+  headers: Headers;
+};
+;
+
+export type createCurriculumTopicResponse = (createCurriculumTopicResponseSuccess)
+
+export const getCreateCurriculumTopicUrl = (courseId: string,) => {
+
+
+
+
+  return `/api/courses/${courseId}/topics`
+}
+
+/**
+ * Creates a controlled curriculum topic. Requires TEACHER or ADMIN role.
+ * @summary Create curriculum topic
+ */
+export const createCurriculumTopic = async (courseId: string,
+    curriculumTopicRequest: CurriculumTopicRequest, options?: RequestInit): Promise<createCurriculumTopicResponse> => {
+
+  const res = await fetch(getCreateCurriculumTopicUrl(courseId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(curriculumTopicRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createCurriculumTopicResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createCurriculumTopicResponse
 }
 
 

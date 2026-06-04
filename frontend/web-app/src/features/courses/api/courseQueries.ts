@@ -2,13 +2,20 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { useEffect, useState } from "react";
 import type { CourseLessonMap } from "../../../entities/schedule/model";
 import {
+  editCourseLesson,
+  editCurriculumTopic,
   removeCourse,
   removeCourseLesson,
+  removeCurriculumTopic,
   saveCourse,
   saveCourseLesson,
+  saveCourseLessonCards,
+  saveCurriculumTopic,
   type CourseInput,
   type CourseLesson,
   type CourseLessonInput,
+  type CurriculumTopicInput,
+  type LessonTemplateCardsInput,
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { SessionErrorHandler } from "../../../app/controller/types";
@@ -22,8 +29,13 @@ export const courseQueryKeys = {
 type CourseMutationRequest =
   | { type: "createCourse"; input: CourseInput }
   | { type: "createLesson"; courseId: string; input: CourseLessonInput }
+  | { type: "updateLesson"; courseId: string; lessonId: string; input: CourseLessonInput }
+  | { type: "replaceLessonCards"; courseId: string; lessonId: string; input: LessonTemplateCardsInput }
+  | { type: "createTopic"; courseId: string; input: CurriculumTopicInput }
+  | { type: "updateTopic"; courseId: string; topicId: string; input: CurriculumTopicInput }
   | { type: "deleteCourse"; courseId: string }
-  | { type: "deleteLesson"; courseId: string; lessonId: string };
+  | { type: "deleteLesson"; courseId: string; lessonId: string }
+  | { type: "deleteTopic"; courseId: string; topicId: string };
 
 export function setCourseBundleQueryData(queryClient: QueryClient, bundle: CourseBundle) {
   queryClient.setQueryData(courseQueryKeys.bundle(), bundle);
@@ -40,6 +52,7 @@ export function setCourseLessonsForCourseQueryData(
       ...(current?.lessons ?? {}),
       [courseId]: lessons,
     },
+    topics: current?.topics ?? {},
   }));
 }
 
@@ -116,9 +129,49 @@ export function useCourseWorkspaceData({
     }
   }
 
+  async function updateLesson(courseId: string, lessonId: string, input: CourseLessonInput) {
+    try {
+      await courseMutation.mutateAsync({ courseId, input, lessonId, type: "updateLesson" });
+    } catch {
+      // Error state is surfaced through courseMessage.
+    }
+  }
+
+  async function replaceLessonCards(courseId: string, lessonId: string, input: LessonTemplateCardsInput) {
+    try {
+      await courseMutation.mutateAsync({ courseId, input, lessonId, type: "replaceLessonCards" });
+    } catch {
+      // Error state is surfaced through courseMessage.
+    }
+  }
+
+  async function createTopic(courseId: string, input: CurriculumTopicInput) {
+    try {
+      await courseMutation.mutateAsync({ courseId, input, type: "createTopic" });
+    } catch {
+      // Error state is surfaced through courseMessage.
+    }
+  }
+
+  async function updateTopic(courseId: string, topicId: string, input: CurriculumTopicInput) {
+    try {
+      await courseMutation.mutateAsync({ courseId, input, topicId, type: "updateTopic" });
+    } catch {
+      // Error state is surfaced through courseMessage.
+    }
+  }
+
   async function deleteLesson(courseId: string, lessonId: string) {
     try {
       await courseMutation.mutateAsync({ courseId, lessonId, type: "deleteLesson" });
+    } catch {
+      // Error state is surfaced through courseMessage.
+    }
+  }
+
+  async function deleteTopic(courseId: string, topicId: string) {
+    try {
+      await courseMutation.mutateAsync({ courseId, topicId, type: "deleteTopic" });
     } catch {
       // Error state is surfaced through courseMessage.
     }
@@ -129,15 +182,21 @@ export function useCourseWorkspaceData({
     courseLessons: bundle?.lessons ?? ({} as CourseLessonMap),
     courseLoading: courseBundleQuery.isFetching || courseMutation.isPending,
     courseMessage,
+    courseTopics: bundle?.topics ?? {},
     courses: bundle?.courses ?? [],
     createCourse,
     createLesson,
+    createTopic,
     deleteCourse,
     deleteLesson,
+    deleteTopic,
     refreshCourses,
+    replaceLessonCards,
     setCourseLessonsForCourse: (courseId: string, lessons: CourseLesson[]) => (
       setCourseLessonsForCourseQueryData(queryClient, courseId, lessons)
     ),
+    updateLesson,
+    updateTopic,
   };
 }
 
@@ -157,7 +216,32 @@ async function applyCourseMutation(request: CourseMutationRequest): Promise<Cour
     return fetchCourseBundle();
   }
 
-  await removeCourseLesson(request.courseId, request.lessonId);
+  if (request.type === "updateLesson") {
+    await editCourseLesson(request.courseId, request.lessonId, request.input);
+    return fetchCourseBundle();
+  }
+
+  if (request.type === "replaceLessonCards") {
+    await saveCourseLessonCards(request.courseId, request.lessonId, request.input);
+    return fetchCourseBundle();
+  }
+
+  if (request.type === "createTopic") {
+    await saveCurriculumTopic(request.courseId, request.input);
+    return fetchCourseBundle();
+  }
+
+  if (request.type === "updateTopic") {
+    await editCurriculumTopic(request.courseId, request.topicId, request.input);
+    return fetchCourseBundle();
+  }
+
+  if (request.type === "deleteLesson") {
+    await removeCourseLesson(request.courseId, request.lessonId);
+    return fetchCourseBundle();
+  }
+
+  await removeCurriculumTopic(request.courseId, request.topicId);
   return fetchCourseBundle();
 }
 
@@ -171,7 +255,22 @@ function successMessageForCourseMutation(t: ReturnType<typeof useAppTranslation>
   if (request.type === "createLesson") {
     return t("courses.messages.lessonCreated");
   }
-  return t("courses.messages.lessonDeleted");
+  if (request.type === "updateLesson") {
+    return t("courses.messages.lessonUpdated");
+  }
+  if (request.type === "replaceLessonCards") {
+    return t("courses.messages.lessonCardsUpdated");
+  }
+  if (request.type === "createTopic") {
+    return t("courses.messages.topicCreated");
+  }
+  if (request.type === "updateTopic") {
+    return t("courses.messages.topicUpdated");
+  }
+  if (request.type === "deleteLesson") {
+    return t("courses.messages.lessonDeleted");
+  }
+  return t("courses.messages.topicDeleted");
 }
 
 function failureMessageForCourseMutation(t: ReturnType<typeof useAppTranslation>["t"], request: CourseMutationRequest) {
@@ -184,5 +283,20 @@ function failureMessageForCourseMutation(t: ReturnType<typeof useAppTranslation>
   if (request.type === "createLesson") {
     return t("courses.messages.lessonCreateFailed");
   }
-  return t("courses.messages.lessonDeleteFailed");
+  if (request.type === "updateLesson") {
+    return t("courses.messages.lessonUpdateFailed");
+  }
+  if (request.type === "replaceLessonCards") {
+    return t("courses.messages.lessonCardsUpdateFailed");
+  }
+  if (request.type === "createTopic") {
+    return t("courses.messages.topicCreateFailed");
+  }
+  if (request.type === "updateTopic") {
+    return t("courses.messages.topicUpdateFailed");
+  }
+  if (request.type === "deleteLesson") {
+    return t("courses.messages.lessonDeleteFailed");
+  }
+  return t("courses.messages.topicDeleteFailed");
 }

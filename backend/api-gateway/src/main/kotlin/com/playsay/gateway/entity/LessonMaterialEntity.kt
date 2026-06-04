@@ -39,6 +39,14 @@ class LessonMaterialEntity(
     var sourceMeta: String = "{}",
     @Column(name = "scoring_rubric", nullable = false, columnDefinition = "TEXT")
     var scoringRubric: String = "{}",
+    @Column(name = "topic_tags", nullable = false, columnDefinition = "TEXT")
+    var topicTags: String = "[]",
+    @Column(name = "skill_tags", nullable = false, columnDefinition = "TEXT")
+    var skillTags: String = "[]",
+    @Column(name = "age_band", length = 32)
+    var ageBand: String? = null,
+    @Column(name = "estimated_duration_min")
+    var estimatedDurationMin: Int? = null,
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)

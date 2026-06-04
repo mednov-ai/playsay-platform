@@ -173,6 +173,10 @@ export type MaterialFormState = {
   description: string;
   language: string;
   cefrLevel: string;
+  topicTags: string;
+  skillTags: string;
+  ageBand: string;
+  estimatedDurationMin: string;
   visibility: "PRIVATE" | "PUBLIC";
   status: "DRAFT" | "PUBLISHED";
   sourcePrompt: string;

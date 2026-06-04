@@ -182,7 +182,11 @@ export function useMaterialActions({
         title: lesson.title,
         orderIndex: lesson.orderIndex ?? null,
         plannedDurationMin: lesson.plannedDurationMin ?? null,
+        topicId: lesson.topicId ?? null,
         materialId,
+        cards: materialId
+          ? [{ materialId, orderIndex: 1, role: "MAIN", plannedDurationMin: lesson.plannedDurationMin ?? null }]
+          : [],
       });
       const lessons = await fetchCourseLessons(courseId);
       setCourseLessonsForCourse(courseId, lessons);

@@ -135,6 +135,50 @@ export function MaterialEditorForm({
             />
           </FormField>
         </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem_8rem]">
+          <FormField label={t("materials.form.topicTags")}>
+            <input
+              className="playsay-input"
+              disabled={disabled}
+              maxLength={240}
+              onChange={(event) => onUpdateForm("topicTags", event.target.value)}
+              placeholder={t("materials.form.topicTagsPlaceholder")}
+              value={form.topicTags}
+            />
+          </FormField>
+          <FormField label={t("materials.form.skillTags")}>
+            <input
+              className="playsay-input"
+              disabled={disabled}
+              maxLength={240}
+              onChange={(event) => onUpdateForm("skillTags", event.target.value)}
+              placeholder={t("materials.form.skillTagsPlaceholder")}
+              value={form.skillTags}
+            />
+          </FormField>
+          <FormField label={t("materials.form.ageBand")}>
+            <input
+              className="playsay-input"
+              disabled={disabled}
+              maxLength={40}
+              onChange={(event) => onUpdateForm("ageBand", event.target.value)}
+              placeholder={t("materials.form.ageBandPlaceholder")}
+              value={form.ageBand}
+            />
+          </FormField>
+          <FormField label={t("materials.form.estimatedDuration")}>
+            <input
+              className="playsay-input"
+              disabled={disabled}
+              max={480}
+              min={1}
+              onChange={(event) => onUpdateForm("estimatedDurationMin", event.target.value)}
+              placeholder={t("materials.form.durationPlaceholder")}
+              type="number"
+              value={form.estimatedDurationMin}
+            />
+          </FormField>
+        </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">

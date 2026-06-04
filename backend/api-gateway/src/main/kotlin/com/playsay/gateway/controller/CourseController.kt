@@ -218,6 +218,25 @@ class CourseController(
     ): CourseLessonResponse =
         store.updateCourseLesson(authentication, courseId, lessonId, request)
 
+    @PutMapping(
+        "/courses/{courseId}/lessons/{lessonId}/cards",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "replaceCourseLessonCards",
+        summary = "Replace course lesson cards",
+        description = "Replaces the ordered reusable card list for a lesson template. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun replaceLessonCards(
+        authentication: JwtAuthenticationToken,
+        @PathVariable courseId: UUID,
+        @PathVariable lessonId: UUID,
+        @RequestBody request: LessonTemplateCardsRequest,
+    ): CourseLessonResponse =
+        store.replaceLessonCards(authentication, courseId, lessonId, request)
+
     @DeleteMapping("/courses/{courseId}/lessons/{lessonId}")
     @Operation(
         operationId = "deleteCourseLesson",

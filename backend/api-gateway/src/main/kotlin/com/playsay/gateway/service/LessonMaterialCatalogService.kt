@@ -82,6 +82,10 @@ class LessonMaterialCatalogService(
                 document = objectMapper.writeValueAsString(values.document),
                 sourceMeta = objectMapper.writeValueAsString(values.sourceMeta),
                 scoringRubric = objectMapper.writeValueAsString(values.scoringRubric),
+                topicTags = objectMapper.writeValueAsString(values.topicTags),
+                skillTags = objectMapper.writeValueAsString(values.skillTags),
+                ageBand = values.ageBand,
+                estimatedDurationMin = values.estimatedDurationMin,
                 createdAt = now,
                 updatedAt = now,
             ),
@@ -109,6 +113,10 @@ class LessonMaterialCatalogService(
         entity.document = objectMapper.writeValueAsString(values.document)
         entity.sourceMeta = objectMapper.writeValueAsString(values.sourceMeta)
         entity.scoringRubric = objectMapper.writeValueAsString(values.scoringRubric)
+        entity.topicTags = objectMapper.writeValueAsString(values.topicTags)
+        entity.skillTags = objectMapper.writeValueAsString(values.skillTags)
+        entity.ageBand = values.ageBand
+        entity.estimatedDurationMin = values.estimatedDurationMin
         entity.updatedAt = Instant.now()
         lessonMaterialRepo.save(entity)
 

@@ -2,6 +2,12 @@ import type { Course, CourseLesson, ScheduledLesson, ScheduledLessonMaterialAssi
 
 export type CourseLessonMap = Record<string, CourseLesson[]>;
 
+export type CourseLessonOption = {
+  id: string;
+  label: string;
+  materialId: string;
+};
+
 export type ScheduleTranslate = (key: string, options?: Record<string, unknown>) => string;
 
 export type ScheduleFormState = {
@@ -23,13 +29,22 @@ export function formatDuration(value: number | null | undefined, t: ScheduleTran
 export function flattenCourseLessonOptions(
   courses: Course[],
   lessons: CourseLessonMap,
-): Array<{ id: string; label: string }> {
+): CourseLessonOption[] {
   return courses.flatMap((course) =>
     (lessons[course.id] ?? []).map((lesson) => ({
       id: lesson.id,
       label: `${course.title} · ${lesson.orderIndex ?? "?"}. ${lesson.title}`,
+      materialId: courseLessonDefaultMaterialId(lesson),
     })),
   );
+}
+
+export function courseLessonDefaultMaterialId(lesson: CourseLesson | undefined): string {
+  if (!lesson) {
+    return "";
+  }
+  const firstLessonCard = lesson.cards?.find((card) => card.role !== "HOMEWORK") ?? lesson.cards?.[0];
+  return firstLessonCard?.materialId ?? lesson.materialId ?? "";
 }
 
 export function defaultScheduleForm(lessonTemplateId: string): ScheduleFormState {

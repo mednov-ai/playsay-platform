@@ -134,6 +134,49 @@ class MaterialControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher stores reusable card curriculum metadata`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+
+        val created = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "Airport warm-up",
+                status = "PUBLISHED",
+                topicTags = listOf(" travelling ", "#airport", "travelling"),
+                skillTags = listOf("vocabulary", " speaking ", "vocabulary"),
+                ageBand = " 10-12 ",
+                estimatedDurationMin = 7,
+            ),
+        ).body!!
+
+        assertEquals(listOf("travelling", "airport"), created.topicTags)
+        assertEquals(listOf("vocabulary", "speaking"), created.skillTags)
+        assertEquals("10-12", created.ageBand)
+        assertEquals(7, created.estimatedDurationMin)
+
+        val updated = materialCrudController.update(
+            teacher,
+            created.id,
+            LessonMaterialRequest(
+                title = created.title,
+                status = "PUBLISHED",
+                topicTags = listOf("travel-basics"),
+                skillTags = listOf("listening"),
+                ageBand = null,
+                estimatedDurationMin = null,
+                document = created.document,
+                sourceMeta = created.sourceMeta,
+                scoringRubric = created.scoringRubric,
+            ),
+        )
+
+        assertEquals(listOf("travel-basics"), updated.topicTags)
+        assertEquals(listOf("listening"), updated.skillTags)
+        assertEquals(null, updated.ageBand)
+        assertEquals(null, updated.estimatedDurationMin)
+    }
+
+    @Test
     fun `material list respects admin teacher student visibility and archive status`() {
         val owner = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val otherTeacher = authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER")

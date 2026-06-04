@@ -550,6 +550,67 @@ paths:
           description: Course not found
       security:
       - bearerAuth: []
+  /courses/{courseId}/topics/{topicId}:
+    put:
+      tags:
+      - Curriculum topics
+      summary: Update curriculum topic
+      description: Updates a controlled curriculum topic. Requires TEACHER or ADMIN
+        role.
+      operationId: updateCurriculumTopic
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: topicId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurriculumTopicRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurriculumTopicResponse"
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Curriculum topics
+      summary: Delete curriculum topic
+      description: Deletes a controlled curriculum topic. Requires TEACHER or ADMIN
+        role.
+      operationId: deleteCurriculumTopic
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: topicId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearerAuth: []
   /courses/{courseId}/lessons/{lessonId}:
     put:
       tags:
@@ -623,6 +684,42 @@ paths:
           description: Current user cannot manage courses
         "404":
           description: Course lesson not found
+      security:
+      - bearerAuth: []
+  /courses/{courseId}/lessons/{lessonId}/cards:
+    put:
+      tags:
+      - Courses
+      summary: Replace course lesson cards
+      description: Replaces the ordered reusable card list for a lesson template.
+        Requires TEACHER or ADMIN role.
+      operationId: replaceCourseLessonCards
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonTemplateCardsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseLessonResponse"
       security:
       - bearerAuth: []
   /schedule/lessons:
@@ -1254,6 +1351,60 @@ paths:
           description: Missing or invalid bearer token
         "403":
           description: Current user cannot manage courses
+      security:
+      - bearerAuth: []
+  /courses/{courseId}/topics:
+    get:
+      tags:
+      - Curriculum topics
+      summary: List curriculum topics
+      description: Returns controlled curriculum topics inside a course/level track.
+      operationId: listCurriculumTopics
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CurriculumTopicResponse"
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Curriculum topics
+      summary: Create curriculum topic
+      description: Creates a controlled curriculum topic. Requires TEACHER or ADMIN
+        role.
+      operationId: createCurriculumTopic
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurriculumTopicRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurriculumTopicResponse"
       security:
       - bearerAuth: []
   /courses/{courseId}/lessons:
@@ -2307,11 +2458,31 @@ components:
           oneOf:
           - $ref: "#/components/schemas/JsonNode"
           - type: "null"
+        topicTags:
+          type: array
+          items:
+            type: string
+        skillTags:
+          type: array
+          items:
+            type: string
+        ageBand:
+          type:
+          - string
+          - "null"
+          maxLength: 32
+        estimatedDurationMin:
+          type:
+          - integer
+          - "null"
+          format: int32
       required:
       - cefrLevel
       - language
+      - skillTags
       - status
       - title
+      - topicTags
       - visibility
     LessonMaterialResponse:
       type: object
@@ -2352,6 +2523,23 @@ components:
           $ref: "#/components/schemas/JsonNode"
         scoringRubric:
           $ref: "#/components/schemas/JsonNode"
+        topicTags:
+          type: array
+          items:
+            type: string
+        skillTags:
+          type: array
+          items:
+            type: string
+        ageBand:
+          type:
+          - string
+          - "null"
+        estimatedDurationMin:
+          type:
+          - integer
+          - "null"
+          format: int32
         blockCount:
           type: integer
           format: int32
@@ -2369,9 +2557,11 @@ components:
       - id
       - language
       - scoringRubric
+      - skillTags
       - sourceMeta
       - status
       - title
+      - topicTags
       - updatedAt
       - visibility
     CourseRequest:
@@ -2441,6 +2631,66 @@ components:
       - lessonCount
       - title
       - updatedAt
+    CurriculumTopicRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+        orderIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+        tagSlugs:
+          type: array
+          items:
+            type: string
+      required:
+      - tagSlugs
+      - title
+    CurriculumTopicResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        courseId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - "null"
+        orderIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+        tagSlugs:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - courseId
+      - createdAt
+      - id
+      - tagSlugs
+      - title
+      - updatedAt
     CourseLessonRequest:
       type: object
       properties:
@@ -2457,13 +2707,46 @@ components:
           - integer
           - "null"
           format: int32
+        topicId:
+          type:
+          - string
+          - "null"
+          format: uuid
         materialId:
           type:
           - string
           - "null"
           format: uuid
+        cards:
+          type:
+          - array
+          - "null"
+          items:
+            $ref: "#/components/schemas/LessonTemplateCardRequest"
       required:
       - title
+    LessonTemplateCardRequest:
+      type: object
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        orderIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+        role:
+          type: string
+          maxLength: 32
+        plannedDurationMin:
+          type:
+          - integer
+          - "null"
+          format: int32
+      required:
+      - materialId
+      - role
     CourseLessonResponse:
       type: object
       properties:
@@ -2485,6 +2768,15 @@ components:
           - integer
           - "null"
           format: int32
+        topicId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        topicTitle:
+          type:
+          - string
+          - "null"
         materialId:
           type:
           - string
@@ -2494,6 +2786,10 @@ components:
           type:
           - string
           - "null"
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/LessonTemplateCardResponse"
         createdAt:
           type: string
           format: date-time
@@ -2501,11 +2797,61 @@ components:
           type: string
           format: date-time
       required:
+      - cards
       - courseId
       - createdAt
       - id
       - title
       - updatedAt
+    LessonTemplateCardResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lessonTemplateId:
+          type: string
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        materialTitle:
+          type: string
+        orderIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+        role:
+          type: string
+        plannedDurationMin:
+          type:
+          - integer
+          - "null"
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - lessonTemplateId
+      - materialId
+      - materialTitle
+      - role
+      - updatedAt
+    LessonTemplateCardsRequest:
+      type: object
+      properties:
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/LessonTemplateCardRequest"
+      required:
+      - cards
     LiveKitRoomTokenResponse:
       type: object
       properties:

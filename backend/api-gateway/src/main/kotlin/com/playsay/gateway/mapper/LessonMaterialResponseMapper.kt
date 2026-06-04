@@ -27,9 +27,21 @@ class LessonMaterialResponseMapper(
             document = documentNode,
             sourceMeta = objectMapper.readTree(material.sourceMeta),
             scoringRubric = objectMapper.readTree(material.scoringRubric),
+            topicTags = readStringList(material.topicTags),
+            skillTags = readStringList(material.skillTags),
+            ageBand = material.ageBand,
+            estimatedDurationMin = material.estimatedDurationMin,
             blockCount = documentNode.blockCount(),
             createdAt = material.createdAt,
             updatedAt = material.updatedAt,
         )
+    }
+
+    private fun readStringList(value: String): List<String> {
+        val node = runCatching { objectMapper.readTree(value) }.getOrNull() ?: return emptyList()
+        if (!node.isArray) {
+            return emptyList()
+        }
+        return node.mapNotNull { item -> item.asText(null)?.takeIf { text -> text.isNotBlank() } }
     }
 }

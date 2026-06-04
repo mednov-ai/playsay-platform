@@ -4,13 +4,20 @@ import com.playsay.gateway.dto.CourseLessonRequest
 import com.playsay.gateway.dto.CourseLessonResponse
 import com.playsay.gateway.dto.CourseRequest
 import com.playsay.gateway.dto.CourseResponse
+import com.playsay.gateway.dto.LessonTemplateCardRequest
+import com.playsay.gateway.dto.LessonTemplateCardResponse
+import com.playsay.gateway.dto.LessonTemplateCardsRequest
 import com.playsay.gateway.entity.CourseEntity
+import com.playsay.gateway.entity.LessonTemplateCardEntity
 import com.playsay.gateway.entity.LessonTemplateEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.CourseLessonRow
 import com.playsay.gateway.repo.CourseRepo
 import com.playsay.gateway.repo.CourseSummaryRow
+import com.playsay.gateway.repo.CurriculumTopicRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
+import com.playsay.gateway.repo.LessonTemplateCardRepo
+import com.playsay.gateway.repo.LessonTemplateCardRow
 import com.playsay.gateway.repo.LessonTemplateRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant
@@ -23,7 +30,9 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class CourseStore(
     private val courseRepo: CourseRepo,
+    private val curriculumTopicRepo: CurriculumTopicRepo,
     private val lessonTemplateRepo: LessonTemplateRepo,
+    private val lessonTemplateCardRepo: LessonTemplateCardRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val userProfileStore: UserProfileStore,
 ) {
@@ -35,8 +44,7 @@ class CourseStore(
             courseRepo.findPublishedCourseSummaries()
         }
 
-        return rows
-            .map { course -> course.toResponse() }
+        return rows.map { course -> course.toResponse() }
     }
 
     @Transactional(readOnly = true)
@@ -94,15 +102,16 @@ class CourseStore(
         }
 
         lessonTemplateRepo.deleteByCourseId(courseId)
+        curriculumTopicRepo.deleteByCourseId(courseId)
         courseRepo.deleteById(courseId)
     }
 
     @Transactional(readOnly = true)
     fun listCourseLessons(authentication: JwtAuthenticationToken, courseId: UUID): List<CourseLessonResponse> {
-        findVisibleCourse(authentication, courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
+        findVisibleCourse(authentication, courseId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
 
-        return lessonTemplateRepo.findLessonRowsByCourseId(courseId)
-            .map { lesson -> lesson.toResponse() }
+        return lessonTemplateRepo.findLessonRowsByCourseId(courseId).withCards()
     }
 
     @Transactional
@@ -114,23 +123,28 @@ class CourseStore(
         authentication.requireCourseManager()
         findCourse(courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         val values = request.validated()
+        validateTopic(courseId, values.topicId)
+        values.cards.forEach { card -> validateMaterialId(authentication, card.materialId) }
         validateMaterialId(authentication, values.materialId)
         val now = Instant.now()
+        val cards = values.effectiveCards()
 
         val lesson = lessonTemplateRepo.save(
             LessonTemplateEntity(
                 id = UUID.randomUUID(),
                 courseId = courseId,
+                topicId = values.topicId,
                 title = values.title,
                 orderIndex = values.orderIndex,
                 plannedDurationMin = values.plannedDurationMin,
-                materialId = values.materialId,
+                materialId = cards.firstOrNull()?.materialId ?: values.materialId,
                 createdAt = now,
                 updatedAt = now,
             ),
         )
+        replaceCards(lesson.id, cards, now)
 
-        return requireNotNull(findCourseLesson(courseId, lesson.id)).toResponse()
+        return requireNotNull(findCourseLesson(courseId, lesson.id)).withCards()
     }
 
     @Transactional
@@ -143,18 +157,45 @@ class CourseStore(
         authentication.requireCourseManager()
         findCourse(courseId) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_NOT_FOUND)
         val values = request.validated()
+        validateTopic(courseId, values.topicId)
+        values.cards.forEach { card -> validateMaterialId(authentication, card.materialId) }
         validateMaterialId(authentication, values.materialId)
         val lesson = lessonTemplateRepo.findByIdAndCourseId(lessonId, courseId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_LESSON_NOT_FOUND)
+        val cards = values.effectiveCards()
 
         lesson.title = values.title
         lesson.orderIndex = values.orderIndex
         lesson.plannedDurationMin = values.plannedDurationMin
-        lesson.materialId = values.materialId
+        lesson.topicId = values.topicId
+        lesson.materialId = cards.firstOrNull()?.materialId ?: values.materialId
         lesson.updatedAt = Instant.now()
         lessonTemplateRepo.save(lesson)
+        replaceCards(lessonId, cards, lesson.updatedAt)
 
-        return requireNotNull(findCourseLesson(courseId, lessonId)).toResponse()
+        return requireNotNull(findCourseLesson(courseId, lessonId)).withCards()
+    }
+
+    @Transactional
+    fun replaceLessonCards(
+        authentication: JwtAuthenticationToken,
+        courseId: UUID,
+        lessonId: UUID,
+        request: LessonTemplateCardsRequest,
+    ): CourseLessonResponse {
+        authentication.requireCourseManager()
+        val lesson = lessonTemplateRepo.findByIdAndCourseId(lessonId, courseId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_LESSON_NOT_FOUND)
+        val cards = request.cards.map { card -> card.validated() }
+        cards.forEach { card -> validateMaterialId(authentication, card.materialId) }
+        val now = Instant.now()
+
+        lesson.materialId = cards.firstOrNull()?.materialId
+        lesson.updatedAt = now
+        lessonTemplateRepo.save(lesson)
+        replaceCards(lessonId, cards, now)
+
+        return requireNotNull(findCourseLesson(courseId, lessonId)).withCards()
     }
 
     @Transactional
@@ -166,6 +207,37 @@ class CourseStore(
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COURSE_LESSON_NOT_FOUND)
         }
     }
+
+    private fun replaceCards(lessonId: UUID, cards: List<ValidatedLessonTemplateCardRequest>, now: Instant) {
+        lessonTemplateCardRepo.deleteByLessonTemplateId(lessonId)
+        lessonTemplateCardRepo.flush()
+        lessonTemplateCardRepo.saveAll(
+            cards.mapIndexed { index, card ->
+                LessonTemplateCardEntity(
+                    id = UUID.randomUUID(),
+                    lessonTemplateId = lessonId,
+                    materialId = card.materialId,
+                    orderIndex = card.orderIndex ?: index + 1,
+                    role = card.role,
+                    plannedDurationMin = card.plannedDurationMin,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            },
+        )
+    }
+
+    private fun List<CourseLessonRow>.withCards(): List<CourseLessonResponse> {
+        if (isEmpty()) {
+            return emptyList()
+        }
+        val cardsByLesson = lessonTemplateCardRepo.findRowsByLessonTemplateIds(map { lesson -> lesson.id })
+            .groupBy { card -> card.lessonTemplateId }
+        return map { lesson -> lesson.toResponse(cardsByLesson[lesson.id].orEmpty()) }
+    }
+
+    private fun CourseLessonRow.withCards(): CourseLessonResponse =
+        toResponse(lessonTemplateCardRepo.findRowsByLessonTemplateIds(listOf(id)))
 
     private fun findVisibleCourse(authentication: JwtAuthenticationToken, courseId: UUID): CourseSummaryRow? {
         val course = findCourse(courseId) ?: return null
@@ -180,6 +252,15 @@ class CourseStore(
 
     private fun findCourseLesson(courseId: UUID, lessonId: UUID): CourseLessonRow? =
         lessonTemplateRepo.findLessonRowByCourseIdAndId(courseId, lessonId)
+
+    private fun validateTopic(courseId: UUID, topicId: UUID?) {
+        if (topicId == null) {
+            return
+        }
+        if (curriculumTopicRepo.findByIdAndCourseId(topicId, courseId) == null) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.COURSE_LESSON_NOT_FOUND)
+        }
+    }
 
     private fun validateMaterialId(authentication: JwtAuthenticationToken, materialId: UUID?) {
         if (materialId == null) {
@@ -216,7 +297,17 @@ private data class ValidatedCourseLessonRequest(
     val title: String,
     val orderIndex: Int?,
     val plannedDurationMin: Int?,
+    val topicId: UUID?,
     val materialId: UUID?,
+    val cards: List<ValidatedLessonTemplateCardRequest>,
+    val cardsWereProvided: Boolean,
+)
+
+private data class ValidatedLessonTemplateCardRequest(
+    val materialId: UUID,
+    val orderIndex: Int?,
+    val role: String,
+    val plannedDurationMin: Int?,
 )
 
 private fun CourseRequest.validated(): ValidatedCourseRequest =
@@ -240,8 +331,42 @@ private fun CourseLessonRequest.validated(): ValidatedCourseLessonRequest {
         title = title.requiredClean("title", 160),
         orderIndex = orderIndex,
         plannedDurationMin = plannedDurationMin,
+        topicId = topicId,
         materialId = materialId,
+        cards = cards?.map { card -> card.validated() } ?: emptyList(),
+        cardsWereProvided = cards != null,
     )
+}
+
+private fun LessonTemplateCardRequest.validated(): ValidatedLessonTemplateCardRequest {
+    if (orderIndex != null && orderIndex < 0) {
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.ORDER_INDEX_NEGATIVE)
+    }
+    if (plannedDurationMin != null && plannedDurationMin !in 1..480) {
+        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.PLANNED_DURATION_OUT_OF_RANGE)
+    }
+    return ValidatedLessonTemplateCardRequest(
+        materialId = materialId,
+        orderIndex = orderIndex,
+        role = role.requiredClean("role", 32).uppercase(),
+        plannedDurationMin = plannedDurationMin,
+    )
+}
+
+private fun ValidatedCourseLessonRequest.effectiveCards(): List<ValidatedLessonTemplateCardRequest> {
+    if (cardsWereProvided) {
+        return cards
+    }
+    return materialId?.let { id ->
+        listOf(
+            ValidatedLessonTemplateCardRequest(
+                materialId = id,
+                orderIndex = 1,
+                role = "MAIN",
+                plannedDurationMin = plannedDurationMin,
+            ),
+        )
+    } ?: emptyList()
 }
 
 private fun String.requiredClean(fieldName: String, maxLength: Int): String =
@@ -282,15 +407,31 @@ private fun CourseSummaryRow.toResponse(): CourseResponse =
         updatedAt = course.updatedAt,
     )
 
-private fun CourseLessonRow.toResponse(): CourseLessonResponse =
+private fun CourseLessonRow.toResponse(cards: List<LessonTemplateCardRow>): CourseLessonResponse =
     CourseLessonResponse(
         id = id,
         courseId = requireNotNull(courseId),
         title = title,
         orderIndex = orderIndex,
         plannedDurationMin = plannedDurationMin,
+        topicId = topicId,
+        topicTitle = topicTitle,
+        materialId = materialId ?: cards.firstOrNull()?.materialId,
+        materialTitle = materialTitle ?: cards.firstOrNull()?.materialTitle,
+        cards = cards.map { card -> card.toResponse() },
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+
+private fun LessonTemplateCardRow.toResponse(): LessonTemplateCardResponse =
+    LessonTemplateCardResponse(
+        id = id,
+        lessonTemplateId = lessonTemplateId,
         materialId = materialId,
         materialTitle = materialTitle,
+        orderIndex = orderIndex,
+        role = role,
+        plannedDurationMin = plannedDurationMin,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

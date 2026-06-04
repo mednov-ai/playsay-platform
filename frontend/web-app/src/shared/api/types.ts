@@ -3,6 +3,10 @@ import type {
   CourseLessonResponse,
   CourseRequest,
   CourseResponse,
+  CurriculumTopicRequest,
+  CurriculumTopicResponse,
+  LessonTemplateCardRequest,
+  LessonTemplateCardsRequest,
   LiveKitRoomTokenResponse,
   MeResponse,
   ScheduledLessonMaterialAssignmentRequest,
@@ -29,6 +33,10 @@ export type CourseInput = CourseRequest;
 export type CourseLessonInput = CourseLessonRequest & {
   materialId?: string | null;
 };
+export type CurriculumTopic = CurriculumTopicResponse;
+export type CurriculumTopicInput = CurriculumTopicRequest;
+export type LessonTemplateCardInput = LessonTemplateCardRequest;
+export type LessonTemplateCardsInput = LessonTemplateCardsRequest;
 export type ScheduledLesson = ScheduledLessonResponse & {
   materialId?: string | null;
   materialTitle?: string | null;
@@ -53,6 +61,10 @@ export type LessonMaterial = {
   document: LessonMaterialJson;
   sourceMeta: LessonMaterialJson;
   scoringRubric: LessonMaterialJson;
+  topicTags?: string[];
+  skillTags?: string[];
+  ageBand?: string | null;
+  estimatedDurationMin?: number | null;
   blockCount: number;
   createdAt: string;
   updatedAt: string;
@@ -78,6 +90,10 @@ export type LessonMaterialInput = {
   document?: LessonMaterialJson;
   sourceMeta?: LessonMaterialJson;
   scoringRubric?: LessonMaterialJson;
+  topicTags?: string[];
+  skillTags?: string[];
+  ageBand?: string | null;
+  estimatedDurationMin?: number | null;
 };
 export type LessonMaterialDraftInput = {
   title?: string | null;

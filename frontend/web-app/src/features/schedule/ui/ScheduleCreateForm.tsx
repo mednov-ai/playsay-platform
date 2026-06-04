@@ -6,6 +6,7 @@ import {
   defaultScheduleForm,
   localDateTimeToIso,
   selectedParticipantSubjects,
+  type CourseLessonOption,
   type ScheduleFormState,
 } from "../../../entities/schedule/model";
 import type { AdminUserProfile, LessonMaterial, ScheduledLessonInput } from "../../../shared/api/playsay";
@@ -19,7 +20,7 @@ export function ScheduleCreateForm({
   studentUsers,
 }: {
   disabled: boolean;
-  lessonOptions: Array<{ id: string; label: string }>;
+  lessonOptions: CourseLessonOption[];
   materials: LessonMaterial[];
   onCreate: (input: ScheduledLessonInput) => void;
   studentUsers: AdminUserProfile[];
@@ -31,15 +32,33 @@ export function ScheduleCreateForm({
   const showParallelAssignments = form.workMode === "PARALLEL" && selectedSubjects.length > 1;
 
   useEffect(() => {
-    setForm((current) => (
-      current.lessonTemplateId || lessonOptions.length === 0
-        ? current
-        : { ...current, lessonTemplateId: lessonOptions[0].id }
-    ));
+    setForm((current) => {
+      const selectedOption = lessonOptions.find((option) => option.id === current.lessonTemplateId) ?? lessonOptions[0];
+      if (!selectedOption) {
+        return current;
+      }
+      return {
+        ...current,
+        lessonTemplateId: current.lessonTemplateId || selectedOption.id,
+        materialId: current.materialId || selectedOption.materialId,
+        defaultParallelMaterialId: current.defaultParallelMaterialId || selectedOption.materialId,
+      };
+    });
   }, [lessonOptions]);
 
   function updateField<Key extends keyof ScheduleFormState>(field: Key, value: ScheduleFormState[Key]) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function selectLessonTemplate(lessonTemplateId: string) {
+    const selectedOption = lessonOptions.find((option) => option.id === lessonTemplateId);
+    setForm((current) => ({
+      ...current,
+      lessonTemplateId,
+      materialId: selectedOption?.materialId ?? "",
+      defaultParallelMaterialId: selectedOption?.materialId ?? "",
+      participantMaterialIds: {},
+    }));
   }
 
   function toggleParticipant(subject: string) {
@@ -101,7 +120,7 @@ export function ScheduleCreateForm({
         <select
           className="playsay-input"
           disabled={disabled}
-          onChange={(event) => updateField("lessonTemplateId", event.target.value)}
+          onChange={(event) => selectLessonTemplate(event.target.value)}
           value={form.lessonTemplateId}
         >
           <option value="">{t("schedule.form.noTemplate")}</option>

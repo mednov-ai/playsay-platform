@@ -34,7 +34,10 @@ import liquibase.integration.spring.SpringLiquibase
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CourseControllerTest @Autowired constructor(
     private val controller: CourseController,
+    private val topicController: CurriculumTopicController,
     private val materialCrudController: MaterialCrudController,
+    private val lessonTemplateCardRepo: LessonTemplateCardRepo,
+    private val curriculumTopicRepo: CurriculumTopicRepo,
     private val lessonTemplateRepo: LessonTemplateRepo,
     private val courseRepo: CourseRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
@@ -51,6 +54,8 @@ class CourseControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
+        lessonTemplateCardRepo.deleteAllInBatch()
+        curriculumTopicRepo.deleteAllInBatch()
         lessonTemplateRepo.deleteAllInBatch()
         courseRepo.deleteAllInBatch()
         lessonMaterialRepo.deleteAllInBatch()
@@ -166,6 +171,169 @@ class CourseControllerTest @Autowired constructor(
         assertEquals(listOf(first.id, second.id), lessons.map { lesson -> lesson.id })
         assertEquals("Alphabet cards", lessons.single { lesson -> lesson.id == second.id }.materialTitle)
         assertEquals(2, controller.get(teacher, course.id).lessonCount)
+    }
+
+    @Test
+    fun `teacher manages curriculum topics inside level track`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val publishedCourse = controller.create(
+            teacher,
+            CourseRequest(title = "A2 track", level = "A2", isPublished = true),
+        ).body!!
+        val draftCourse = controller.create(
+            teacher,
+            CourseRequest(title = "Draft B1", level = "B1", isPublished = false),
+        ).body!!
+
+        val travel = topicController.createTopic(
+            teacher,
+            publishedCourse.id,
+            CurriculumTopicRequest(
+                title = "  Travelling  ",
+                description = "Airport and hotel lessons",
+                orderIndex = 2,
+                tagSlugs = listOf(" travel ", "#airport", "travel"),
+            ),
+        ).body!!
+        val draftOnly = topicController.createTopic(
+            teacher,
+            draftCourse.id,
+            CurriculumTopicRequest(title = "Hidden", orderIndex = 1),
+        ).body!!
+
+        assertEquals("Travelling", travel.title)
+        assertEquals(listOf("travel", "airport"), travel.tagSlugs)
+        assertEquals(2, travel.orderIndex)
+
+        val updated = topicController.updateTopic(
+            teacher,
+            publishedCourse.id,
+            travel.id,
+            CurriculumTopicRequest(title = "Travel basics", orderIndex = 1, tagSlugs = listOf("travel-basics")),
+        )
+        assertEquals("Travel basics", updated.title)
+        assertEquals(listOf("travel-basics"), updated.tagSlugs)
+
+        assertEquals(listOf(updated.id), topicController.listTopics(student, publishedCourse.id).map { topic -> topic.id })
+        val hiddenError = assertFailsWith<ResponseStatusException> {
+            topicController.listTopics(student, draftCourse.id)
+        }
+        assertEquals(HttpStatus.NOT_FOUND, hiddenError.statusCode)
+
+        assertEquals(HttpStatus.NO_CONTENT, topicController.deleteTopic(teacher, draftCourse.id, draftOnly.id).statusCode)
+        assertEquals(emptyList(), topicController.listTopics(teacher, draftCourse.id))
+    }
+
+    @Test
+    fun `lesson templates belong to topics and contain ordered reusable cards`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val course = controller.create(teacher, CourseRequest(title = "A2 track", level = "A2", isPublished = true)).body!!
+        val topic = topicController.createTopic(
+            teacher,
+            course.id,
+            CurriculumTopicRequest(title = "Travelling", orderIndex = 1),
+        ).body!!
+        val warmup = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Airport warm-up", status = "PUBLISHED"),
+        ).body!!
+        val speaking = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Check-in roleplay", status = "PUBLISHED"),
+        ).body!!
+
+        val lesson = controller.createLesson(
+            teacher,
+            course.id,
+            CourseLessonRequest(
+                title = "At the airport",
+                orderIndex = 1,
+                plannedDurationMin = 45,
+                topicId = topic.id,
+                materialId = warmup.id,
+                cards = listOf(
+                    LessonTemplateCardRequest(
+                        materialId = warmup.id,
+                        orderIndex = 1,
+                        role = "WARM_UP",
+                        plannedDurationMin = 7,
+                    ),
+                    LessonTemplateCardRequest(
+                        materialId = speaking.id,
+                        orderIndex = 2,
+                        role = "SPEAKING",
+                        plannedDurationMin = 15,
+                    ),
+                ),
+            ),
+        ).body!!
+
+        assertEquals(topic.id, lesson.topicId)
+        assertEquals("Travelling", lesson.topicTitle)
+        assertEquals(warmup.id, lesson.materialId)
+        assertEquals("Airport warm-up", lesson.materialTitle)
+        assertEquals(listOf(warmup.id, speaking.id), lesson.cards.map { card -> card.materialId })
+        assertEquals(listOf("WARM_UP", "SPEAKING"), lesson.cards.map { card -> card.role })
+
+        val grammar = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Boarding pass gaps", status = "PUBLISHED"),
+        ).body!!
+        val replaced = controller.replaceLessonCards(
+            teacher,
+            course.id,
+            lesson.id,
+            LessonTemplateCardsRequest(
+                cards = listOf(
+                    LessonTemplateCardRequest(
+                        materialId = grammar.id,
+                        orderIndex = 1,
+                        role = "PRACTICE",
+                        plannedDurationMin = 12,
+                    ),
+                    LessonTemplateCardRequest(
+                        materialId = speaking.id,
+                        orderIndex = 2,
+                        role = "SPEAKING",
+                        plannedDurationMin = 16,
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(grammar.id, replaced.materialId)
+        assertEquals("Boarding pass gaps", replaced.materialTitle)
+        assertEquals(listOf(grammar.id, speaking.id), replaced.cards.map { card -> card.materialId })
+        assertEquals(listOf("PRACTICE", "SPEAKING"), replaced.cards.map { card -> card.role })
+
+        val listed = controller.listLessons(teacher, course.id).single()
+        assertEquals(topic.id, listed.topicId)
+        assertEquals(listOf(grammar.id, speaking.id), listed.cards.map { card -> card.materialId })
+        assertEquals(2, lessonTemplateCardRepo.count())
+    }
+
+    @Test
+    fun `legacy lesson material id is backfilled as a single lesson card`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val course = controller.create(teacher, CourseRequest(title = "A1 track")).body!!
+        val material = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Alphabet cards", status = "PUBLISHED"),
+        ).body!!
+
+        val lesson = controller.createLesson(
+            teacher,
+            course.id,
+            CourseLessonRequest(title = "Alphabet", orderIndex = 1, materialId = material.id),
+        ).body!!
+
+        assertEquals(material.id, lesson.materialId)
+        assertEquals("Alphabet cards", lesson.materialTitle)
+        assertEquals(1, lesson.cards.size)
+        assertEquals(material.id, lesson.cards.single().materialId)
+        assertEquals("MAIN", lesson.cards.single().role)
+        assertEquals(1, lesson.cards.single().orderIndex)
     }
 
     @Test

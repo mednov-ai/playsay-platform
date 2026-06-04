@@ -77,7 +77,7 @@ export type PublicPaymentCheckout = {
 };
 
 export async function fetchPaymentInvoices(config: AuthConfig = authConfig): Promise<PaymentInvoice[]> {
-  return apiJson<PaymentInvoice[]>("/payments/admin/invoices", { method: "GET" }, config);
+  return apiJson<PaymentInvoice[]>("/api/payments/admin/invoices", { method: "GET" }, config);
 }
 
 export async function createPaymentInvoice(
@@ -85,7 +85,7 @@ export async function createPaymentInvoice(
   config: AuthConfig = authConfig,
 ): Promise<PaymentInvoiceCreated> {
   return apiJson<PaymentInvoiceCreated>(
-    "/payments/admin/invoices",
+    "/api/payments/admin/invoices",
     {
       body: JSON.stringify(input),
       method: "POST",
@@ -95,12 +95,12 @@ export async function createPaymentInvoice(
 }
 
 export async function fetchPublicPaymentInvoice(publicToken: string): Promise<PublicPaymentInvoice> {
-  return publicApiJson<PublicPaymentInvoice>(`/public/payment-invoices/${encodeURIComponent(publicToken)}`, { method: "GET" });
+  return publicApiJson<PublicPaymentInvoice>(`/api/public/payment-invoices/${encodeURIComponent(publicToken)}`, { method: "GET" });
 }
 
 export async function createPublicPaymentCheckout(publicToken: string): Promise<PublicPaymentCheckout> {
   return publicApiJson<PublicPaymentCheckout>(
-    `/public/payment-invoices/${encodeURIComponent(publicToken)}/checkout`,
+    `/api/public/payment-invoices/${encodeURIComponent(publicToken)}/checkout`,
     { method: "POST" },
   );
 }

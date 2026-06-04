@@ -20,7 +20,7 @@ spec:
           subPath: gradle
       resources:
         requests:
-          cpu: 500m
+          cpu: 450m
           memory: 1Gi
         limits:
           cpu: "2"
@@ -35,7 +35,7 @@ spec:
           subPath: npm
       resources:
         requests:
-          cpu: 300m
+          cpu: 250m
           memory: 512Mi
         limits:
           cpu: 1500m
@@ -50,7 +50,7 @@ spec:
           subPath: npm
       resources:
         requests:
-          cpu: 200m
+          cpu: 150m
           memory: 384Mi
         limits:
           cpu: "1"
@@ -64,7 +64,7 @@ spec:
           mountPath: /kaniko/.docker
       resources:
         requests:
-          cpu: 250m
+          cpu: 150m
           memory: 256Mi
         limits:
           cpu: "1"
@@ -78,7 +78,7 @@ spec:
           mountPath: /kaniko/.docker
       resources:
         requests:
-          cpu: 250m
+          cpu: 150m
           memory: 256Mi
         limits:
           cpu: "1"
@@ -92,7 +92,7 @@ spec:
           mountPath: /kaniko/.docker
       resources:
         requests:
-          cpu: 250m
+          cpu: 150m
           memory: 256Mi
         limits:
           cpu: "1"
@@ -106,7 +106,7 @@ spec:
           mountPath: /kaniko/.docker
       resources:
         requests:
-          cpu: 250m
+          cpu: 150m
           memory: 256Mi
         limits:
           cpu: "1"
@@ -120,7 +120,7 @@ spec:
           mountPath: /kaniko/.docker
       resources:
         requests:
-          cpu: 250m
+          cpu: 150m
           memory: 256Mi
         limits:
           cpu: "1"
@@ -158,7 +158,7 @@ spec:
           subPath: npm
       resources:
         requests:
-          cpu: 300m
+          cpu: 250m
           memory: 512Mi
         limits:
           cpu: "1"

@@ -54,43 +54,35 @@ class MaterialVideoPlaybackService(
         val document = material.document
         val block = findBlock(document, request.blockId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        val ipCountry = resolveIpCountry(servletRequest)
+        val profileCountry = profile.countryCode?.uppercase()
+        val diagnostics = YoutubeVideoSupport.diagnosticsFromBlock(block)
         val provider = block.path("provider").asText("").uppercase()
         if (block.path("type").asText("") != "videoEmbed" || provider != "YOUTUBE") {
-            return response(materialId, request.blockId, null, "BLOCKED", "YOUTUBE_BLOCK_REQUIRED", null)
+            return response(materialId, request.blockId, null, "BLOCKED", "YOUTUBE_BLOCK_REQUIRED", null, diagnostics, profileCountry, ipCountry)
         }
 
         val meta = YoutubeVideoSupport.metaFromBlock(block)
-            ?: return response(materialId, request.blockId, null, "NEEDS_REVIEW", "YOUTUBE_METADATA_MISSING", null)
+            ?: return response(materialId, request.blockId, null, "NEEDS_REVIEW", "YOUTUBE_METADATA_MISSING", null, diagnostics, profileCountry, ipCountry)
         val embedUrl = YoutubeVideoSupport.embedUrl(meta.videoId)
         val policy = YoutubeVideoSupport.videoMeetsPolicy(meta)
         if (!policy.approved) {
-            return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", policy.reason, embedUrl)
+            return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", policy.reason, embedUrl, diagnostics, profileCountry, ipCountry)
         }
 
-        val ipCountry = resolveIpCountry(servletRequest)
-        val profileCountry = profile.countryCode?.uppercase()
         if (!rfRelayEnabled) {
-            return response(materialId, request.blockId, meta.videoId, "EMBED", "RF_RELAY_DISABLED", embedUrl)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", "RF_RELAY_DISABLED", embedUrl, diagnostics, profileCountry, ipCountry)
         }
         if (profileCountry != "RU") {
-            return response(materialId, request.blockId, meta.videoId, "EMBED", "PROFILE_COUNTRY_NOT_RU", embedUrl)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", "PROFILE_COUNTRY_NOT_RU", embedUrl, diagnostics, profileCountry, ipCountry)
         }
         if (requireGeoCountry && ipCountry != "RU") {
             val reason = if (ipCountry == null) "IP_COUNTRY_UNKNOWN" else "PROFILE_IP_COUNTRY_MISMATCH"
-            return response(materialId, request.blockId, meta.videoId, "EMBED", reason, embedUrl)
+            return response(materialId, request.blockId, meta.videoId, "EMBED", reason, embedUrl, diagnostics, profileCountry, ipCountry)
         }
 
         val session = createSession(profile.subject, materialId, request.blockId, meta.videoId)
-        logger.info(
-            "YouTube RF relay playback decision materialId={} blockId={} videoId={} mode={} reason={} requireGeoCountry={} ipCountryPresent={}",
-            materialId,
-            request.blockId,
-            meta.videoId,
-            "RF_RELAY",
-            null,
-            requireGeoCountry,
-            ipCountry != null,
-        )
+        logPlaybackDecision(materialId, request.blockId, meta.videoId, "RF_RELAY", null, diagnostics, profileCountry, ipCountry, session.id)
         return MaterialVideoPlaybackResponse(
             materialId = materialId,
             blockId = request.blockId,
@@ -167,16 +159,11 @@ class MaterialVideoPlaybackService(
         mode: String,
         reason: String?,
         embedUrl: String?,
+        diagnostics: YoutubeVideoBlockDiagnostics?,
+        profileCountry: String?,
+        ipCountry: String?,
     ): MaterialVideoPlaybackResponse {
-        logger.info(
-            "YouTube RF relay playback decision materialId={} blockId={} videoId={} mode={} reason={} requireGeoCountry={}",
-            materialId,
-            blockId,
-            videoId,
-            mode,
-            reason,
-            requireGeoCountry,
-        )
+        logPlaybackDecision(materialId, blockId, videoId, mode, reason, diagnostics, profileCountry, ipCountry, null)
         return MaterialVideoPlaybackResponse(
             materialId = materialId,
             blockId = blockId,
@@ -187,6 +174,44 @@ class MaterialVideoPlaybackService(
             relayUrl = null,
             sessionId = null,
             expiresAt = null,
+        )
+    }
+
+    private fun logPlaybackDecision(
+        materialId: UUID,
+        blockId: String,
+        videoId: String?,
+        mode: String,
+        reason: String?,
+        diagnostics: YoutubeVideoBlockDiagnostics?,
+        profileCountry: String?,
+        ipCountry: String?,
+        sessionId: UUID?,
+    ) {
+        logger.info(
+            "YouTube RF relay playback decision materialId={} blockId={} sessionId={} mode={} reason={} videoId={} relayEnabled={} requireGeoCountry={} geoHeaderConfigured={} profileCountry={} ipCountry={} blockType={} provider={} urlHost={} urlKind={} parsedVideoId={} videoMetaPresent={} durationPresent={} durationSeconds={} durationNodeType={} languagePresent={} language={}",
+            materialId,
+            blockId,
+            sessionId,
+            mode,
+            reason,
+            videoId,
+            rfRelayEnabled,
+            requireGeoCountry,
+            geoCountryHeader.isNotBlank(),
+            profileCountry,
+            ipCountry,
+            diagnostics?.blockType,
+            diagnostics?.provider,
+            diagnostics?.urlHost,
+            diagnostics?.urlKind,
+            diagnostics?.videoId,
+            diagnostics?.videoMetaPresent,
+            diagnostics?.durationPresent,
+            diagnostics?.durationSeconds,
+            diagnostics?.durationNodeType,
+            diagnostics?.languagePresent,
+            diagnostics?.language,
         )
     }
 

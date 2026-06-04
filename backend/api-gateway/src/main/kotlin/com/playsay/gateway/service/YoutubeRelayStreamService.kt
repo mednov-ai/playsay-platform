@@ -45,25 +45,32 @@ class YoutubeRelayStreamService(
             httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofInputStream())
         }.getOrElse {
             logger.warn(
-                "YouTube RF relay upstream request failed sessionId={} materialId={} blockId={} videoId={} rangePresent={}",
+                "YouTube RF relay upstream request failed sessionId={} materialId={} blockId={} videoId={} rangeHeader={} rangePresent={}",
                 session.id,
                 session.materialId,
                 session.blockId,
                 session.videoId,
+                sanitizedRange(rangeHeader),
                 !rangeHeader.isNullOrBlank(),
                 it,
             )
             throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
         }
 
+        val upstreamHeaders = upstreamResponse.headers()
         logger.info(
-            "YouTube RF relay stream response sessionId={} materialId={} blockId={} videoId={} status={} rangePresent={}",
+            "YouTube RF relay stream response sessionId={} materialId={} blockId={} videoId={} status={} rangeHeader={} rangePresent={} contentType={} contentLength={} contentRange={} acceptRanges={}",
             session.id,
             session.materialId,
             session.blockId,
             session.videoId,
             upstreamResponse.statusCode(),
+            sanitizedRange(rangeHeader),
             !rangeHeader.isNullOrBlank(),
+            upstreamHeaders.firstValue(HttpHeaders.CONTENT_TYPE).orElse(null),
+            upstreamHeaders.firstValue(HttpHeaders.CONTENT_LENGTH).orElse(null),
+            upstreamHeaders.firstValue(HttpHeaders.CONTENT_RANGE).orElse(null),
+            upstreamHeaders.firstValue(HttpHeaders.ACCEPT_RANGES).orElse(null),
         )
 
         val headers = HttpHeaders()
@@ -87,6 +94,14 @@ class YoutubeRelayStreamService(
         val now = clock.instant()
         upstreamUrlCache.entries.removeIf { (_, cached) -> !cached.expiresAt.isAfter(now) }
         upstreamUrlCache[session.id]?.takeIf { cached -> cached.expiresAt.isAfter(now) }?.let { cached ->
+            logger.info(
+                "YouTube RF relay upstream cache hit sessionId={} materialId={} blockId={} videoId={} remainingSeconds={}",
+                session.id,
+                session.materialId,
+                session.blockId,
+                session.videoId,
+                Duration.between(now, cached.expiresAt).seconds.coerceAtLeast(0),
+            )
             return cached.url
         }
 
@@ -104,6 +119,7 @@ class YoutubeRelayStreamService(
     }
 
     private fun resolveUpstreamUrl(videoId: String): String {
+        val startedAt = System.nanoTime()
         val process = runCatching {
             ProcessBuilder(
                 ytdlpPath,
@@ -116,23 +132,57 @@ class YoutubeRelayStreamService(
                 .redirectErrorStream(true)
                 .start()
         }.getOrElse {
+            logger.warn("YouTube RF relay yt-dlp start failed videoId={} ytdlpPath={}", videoId, ytdlpPath, it)
             throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
         }
 
         val output = process.inputStream.bufferedReader().use { reader -> reader.readText() }
         val finished = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
+        val durationMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis()
         if (!finished) {
             process.destroyForcibly()
+            logger.warn(
+                "YouTube RF relay yt-dlp timed out videoId={} durationMs={} outputChars={} outputLines={}",
+                videoId,
+                durationMs,
+                output.length,
+                output.lineSequence().count(),
+            )
             throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
         }
         if (process.exitValue() != 0) {
+            logger.warn(
+                "YouTube RF relay yt-dlp failed videoId={} exitCode={} durationMs={} outputChars={} outputLines={}",
+                videoId,
+                process.exitValue(),
+                durationMs,
+                output.length,
+                output.lineSequence().count(),
+            )
             throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
         }
 
-        return output.lineSequence()
+        val resolvedUrl = output.lineSequence()
             .map { line -> line.trim() }
             .firstOrNull { line -> line.startsWith("https://") || line.startsWith("http://") }
-            ?: throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
+        if (resolvedUrl == null) {
+            logger.warn(
+                "YouTube RF relay yt-dlp returned no media url videoId={} durationMs={} outputChars={} outputLines={}",
+                videoId,
+                durationMs,
+                output.length,
+                output.lineSequence().count(),
+            )
+            throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
+        }
+        logger.info(
+            "YouTube RF relay yt-dlp resolved media url videoId={} durationMs={} outputChars={} outputLines={}",
+            videoId,
+            durationMs,
+            output.length,
+            output.lineSequence().count(),
+        )
+        return resolvedUrl
     }
 
     private fun copyHeader(
@@ -142,6 +192,9 @@ class YoutubeRelayStreamService(
     ) {
         response.headers().firstValue(headerName).ifPresent { value -> headers[headerName] = value }
     }
+
+    private fun sanitizedRange(rangeHeader: String?): String? =
+        rangeHeader?.trim()?.takeIf { range -> range.startsWith("bytes=") }?.take(64)
 
     companion object {
         private val logger = LoggerFactory.getLogger(YoutubeRelayStreamService::class.java)

@@ -14,6 +14,20 @@ data class YoutubeVideoPolicyDecision(
     val reason: String?,
 )
 
+data class YoutubeVideoBlockDiagnostics(
+    val blockType: String,
+    val provider: String,
+    val urlHost: String?,
+    val urlKind: String,
+    val videoId: String?,
+    val videoMetaPresent: Boolean,
+    val durationPresent: Boolean,
+    val durationSeconds: Int?,
+    val durationNodeType: String,
+    val languagePresent: Boolean,
+    val language: String?,
+)
+
 object YoutubeVideoSupport {
     private val youtubeIdPattern = Regex("^[A-Za-z0-9_-]{6,32}$")
 
@@ -70,14 +84,59 @@ object YoutubeVideoSupport {
         )
     }
 
+    fun diagnosticsFromBlock(block: JsonNode): YoutubeVideoBlockDiagnostics {
+        val videoMeta = block.path("videoMeta")
+        val durationNode = videoMeta.path("durationSeconds")
+        val languageNode = videoMeta.path("language")
+        val language = languageNode.takeIf { node -> node.isTextual }?.asText()?.trim()?.takeIf { value -> value.isNotBlank() }
+        val url = parseUri(block.path("url").asText(null))
+        val host = url?.host?.lowercase()?.removePrefix("www.")
+
+        return YoutubeVideoBlockDiagnostics(
+            blockType = block.path("type").asText(""),
+            provider = block.path("provider").asText(""),
+            urlHost = host,
+            urlKind = urlKind(url, host),
+            videoId = parseVideoId(block.path("url").asText(null)),
+            videoMetaPresent = !videoMeta.isMissingNode && !videoMeta.isNull,
+            durationPresent = durationNode.isInt || durationNode.isLong,
+            durationSeconds = durationNode.takeIf { node -> node.isInt || node.isLong }?.asInt(),
+            durationNodeType = durationNode.nodeType.name,
+            languagePresent = language != null,
+            language = language,
+        )
+    }
+
     private fun isEnglish(value: String?): Boolean =
         value?.trim()?.lowercase()?.let { language -> language == "en" || language.startsWith("en-") || language.startsWith("en_") } == true
 
     private fun parseUri(value: String?): URI? {
         val cleanValue = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        return runCatching { URI(cleanValue) }
-            .recoverCatching { URI("https://$cleanValue") }
-            .getOrNull()
+        val parsed = runCatching { URI(cleanValue) }.getOrNull()
+        if (parsed?.host != null) {
+            return parsed
+        }
+        return runCatching { URI("https://$cleanValue") }.getOrNull()
+    }
+
+    private fun urlKind(url: URI?, host: String?): String {
+        if (url == null) {
+            return "INVALID_URL"
+        }
+        val pathParts = url.path.orEmpty().split("/").filter { part -> part.isNotBlank() }
+        return when (host) {
+            "youtu.be" -> "SHORT"
+            "youtube.com", "youtube-nocookie.com", "m.youtube.com", "music.youtube.com" -> when (pathParts.firstOrNull()) {
+                "watch" -> "WATCH"
+                "embed" -> "EMBED"
+                "shorts" -> "SHORTS"
+                "live" -> "LIVE"
+                "v" -> "V"
+                else -> "UNSUPPORTED_PATH"
+            }
+            null -> "INVALID_URL"
+            else -> "UNSUPPORTED_HOST"
+        }
     }
 
     private fun queryParams(rawQuery: String?): Map<String, String> =

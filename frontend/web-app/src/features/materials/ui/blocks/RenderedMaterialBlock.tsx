@@ -12,6 +12,7 @@ import {
   type MaterialRenderMode,
 } from "../../model/materialDocument";
 import { RenderedMarkdown, MarkdownInline } from "../markdown/RenderedMarkdown";
+import { PlaySayRelayVideoPlayer } from "../media/PlaySayRelayVideoPlayer";
 import { materialVideoEmbedFrame } from "../media/videoEmbed";
 import { MaterialImageInlineTools, MaterialImagePromptPopover } from "./MaterialImageInlineTools";
 import { RenderedChoiceExercise } from "./RenderedChoiceExercise";
@@ -120,9 +121,17 @@ export function RenderedMaterialBlock({
                 className="playsay-video-embed"
                 data-playsay-video-playback-mode="RF_RELAY"
               >
-                <video controls preload="metadata" src={frame.src} title={frame.title}>
-                  {t("materials.renderer.videoPlaybackUnsupported")}
-                </video>
+                <PlaySayRelayVideoPlayer src={frame.src} title={frame.title} />
+              </div>
+            ) : frame?.kind === "PENDING" ? (
+              <div
+                className="playsay-video-relay-pending"
+                data-playsay-video-playback-mode={frame.mode ?? "UNKNOWN"}
+                data-playsay-video-playback-reason={frame.reason ?? "UNKNOWN"}
+                role="status"
+              >
+                <span aria-hidden="true" />
+                <small>{reasonLabel}</small>
               </div>
             ) : frame?.kind === "UNAVAILABLE" ? (
               <div

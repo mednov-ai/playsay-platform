@@ -21,6 +21,15 @@ export function materialVideoEmbedFrame(
     };
   }
   if (playback && provider === "YOUTUBE") {
+    if (playback.reason === "VIDEO_PLAYBACK_LOADING") {
+      return {
+        kind: "PENDING",
+        mode: playback.mode,
+        reason: playback.reason,
+        src: "",
+        title: block.title || "YouTube video",
+      };
+    }
     return {
       kind: "UNAVAILABLE",
       mode: playback.mode,

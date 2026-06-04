@@ -52,4 +52,19 @@ describe("materialVideoEmbedFrame", () => {
       title: "Warm-up",
     });
   });
+
+  it("keeps protected playback loading separate from unavailable errors", () => {
+    const frame = materialVideoEmbedFrame(youtubeBlock, {
+      mode: "NEEDS_REVIEW",
+      reason: "VIDEO_PLAYBACK_LOADING",
+    });
+
+    expect(frame).toEqual({
+      kind: "PENDING",
+      mode: "NEEDS_REVIEW",
+      reason: "VIDEO_PLAYBACK_LOADING",
+      src: "",
+      title: "Warm-up",
+    });
+  });
 });

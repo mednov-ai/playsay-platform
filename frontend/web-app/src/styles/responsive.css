@@ -530,6 +530,7 @@
   }
 
   .playsay-video-embed-placeholder,
+  .playsay-video-relay-pending,
   .playsay-video-relay-unavailable,
   .playsay-image-placeholder {
     min-height: 8rem;

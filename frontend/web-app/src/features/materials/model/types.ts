@@ -42,7 +42,7 @@ export type MaterialAssetLibraryItem = {
 };
 
 export type MaterialVideoEmbedFrame = {
-  kind: "EMBED" | "RF_RELAY" | "UNAVAILABLE";
+  kind: "EMBED" | "RF_RELAY" | "PENDING" | "UNAVAILABLE";
   mode?: string;
   reason?: string | null;
   src: string;

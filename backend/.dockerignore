@@ -1,8 +1,12 @@
 .gradle
 **/build/*
+# Kaniko uses backend/ as the build context; keep bootJar artifacts for backend images.
 !api-gateway/build/
 !api-gateway/build/libs/
 !api-gateway/build/libs/*.jar
 !media-service/build/
 !media-service/build/libs/
 !media-service/build/libs/*.jar
+!payment-service/build/
+!payment-service/build/libs/
+!payment-service/build/libs/*.jar

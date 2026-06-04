@@ -531,6 +531,12 @@ EOF
                     exit 1
                   fi
                   ls -lh "$WORKSPACE/backend/payment-service/build/libs"/*.jar
+                  for INCLUDE in '!payment-service/build/' '!payment-service/build/libs/' '!payment-service/build/libs/*.jar'; do
+                    if ! grep -Fxq "$INCLUDE" "$WORKSPACE/backend/.dockerignore"; then
+                      echo "payment-service bootJar is not included in the backend Docker context: missing $INCLUDE"
+                      exit 1
+                    fi
+                  done
                   mkdir -p /kaniko/.docker
                   AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
                   cat > /kaniko/.docker/config.json <<EOF

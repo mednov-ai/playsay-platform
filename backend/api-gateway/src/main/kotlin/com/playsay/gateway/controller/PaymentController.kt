@@ -8,6 +8,12 @@ import com.playsay.gateway.dto.PaymentProviderEventResponse
 import com.playsay.gateway.dto.PublicPaymentCheckoutResponse
 import com.playsay.gateway.dto.PublicPaymentInvoiceResponse
 import com.playsay.gateway.service.PaymentInvoiceFacade
+import com.playsay.gateway.utils.rawBodyUtf8
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.parameters.RequestBody as OpenApiRequestBody
+import jakarta.servlet.http.HttpServletRequest
 import java.util.UUID
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -63,6 +69,12 @@ class PaymentController(
         consumes = [MediaType.APPLICATION_JSON_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
-    fun yookassaWebhook(@RequestBody rawBody: String): PaymentProviderEventResponse =
-        paymentInvoiceFacade.processYooKassaWebhook(rawBody)
+    @Operation(
+        requestBody = OpenApiRequestBody(
+            required = true,
+            content = [Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = Schema(type = "object"))],
+        ),
+    )
+    fun yookassaWebhook(request: HttpServletRequest): PaymentProviderEventResponse =
+        paymentInvoiceFacade.processYooKassaWebhook(request.rawBodyUtf8())
 }

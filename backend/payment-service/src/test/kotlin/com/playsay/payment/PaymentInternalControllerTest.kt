@@ -111,6 +111,18 @@ class PaymentInternalControllerTest @Autowired constructor(
 
         assertEquals(HttpStatus.OK.value(), checkout.statusCode())
         assertTrue(checkout.body().contains("https://checkout.test/pay-1"))
+
+        val webhook = httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/internal/payment-webhooks/yookassa"))
+                .header("content-type", "application/json")
+                .header("X-PlaySay-Payment-Service-Token", "test-payment-token-0123456789")
+                .POST(HttpRequest.BodyPublishers.ofString("""{"event":"payment.succeeded","object":{"id":"pay-1"}}"""))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(HttpStatus.OK.value(), webhook.statusCode(), webhook.body())
+        assertTrue(webhook.body().contains("PROCESSED"))
     }
 
     private fun createInvoiceBody(): String =

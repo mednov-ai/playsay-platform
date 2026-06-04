@@ -850,6 +850,8 @@ documentKind?: string;
 scope?: string;
 };
 
+export type YookassaWebhookBody = { [key: string]: unknown };
+
 export type ListCollaborationDocumentsParams = {
 materialId: string;
 };
@@ -2779,7 +2781,7 @@ export const getYookassaWebhookUrl = () => {
   return `/api/payment-webhooks/yookassa`
 }
 
-export const yookassaWebhook = async (yookassaWebhookBody: string, options?: RequestInit): Promise<yookassaWebhookResponse> => {
+export const yookassaWebhook = async (yookassaWebhookBody: YookassaWebhookBody, options?: RequestInit): Promise<yookassaWebhookResponse> => {
 
   const res = await fetch(getYookassaWebhookUrl(),
   {

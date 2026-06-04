@@ -9,6 +9,8 @@ import com.playsay.payment.dto.PaymentProviderEventResponse
 import com.playsay.payment.mapper.toCommand
 import com.playsay.payment.mapper.toResponse
 import com.playsay.payment.service.PaymentInvoiceOperations
+import com.playsay.payment.utils.rawBodyUtf8
+import jakarta.servlet.http.HttpServletRequest
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -87,10 +89,10 @@ class PaymentInternalController(
     @PostMapping("/internal/payment-webhooks/yookassa")
     fun processYooKassaWebhook(
         @RequestHeader(PAYMENT_SERVICE_TOKEN_HEADER, required = false) token: String?,
-        @RequestBody rawBody: String,
+        request: HttpServletRequest,
     ): PaymentProviderEventResponse {
         requireServiceToken(token)
-        return store.processYooKassaWebhook(rawBody).toResponse()
+        return store.processYooKassaWebhook(request.rawBodyUtf8()).toResponse()
     }
 
     private fun requireServiceToken(token: String?) {

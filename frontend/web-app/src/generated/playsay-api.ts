@@ -496,6 +496,69 @@ export interface CreateCollaborationDocumentRequest {
   scope: CreateCollaborationDocumentRequestScope;
 }
 
+export interface PublicPaymentCheckoutResponse {
+  confirmationUrl: string;
+}
+
+export interface PaymentInvoiceCreateRequest {
+  amountMinor: number;
+  currency: string;
+  description: string;
+  /** @nullable */
+  studentUserId?: string | null;
+  /** @nullable */
+  payerName?: string | null;
+  /** @nullable */
+  payerEmail?: string | null;
+  /** @nullable */
+  payerPhone?: string | null;
+  /** @nullable */
+  dueAt?: string | null;
+}
+
+export interface PaymentInvoiceResponse {
+  id: string;
+  number: string;
+  status: string;
+  amountMinor: number;
+  currency: string;
+  description: string;
+  /** @nullable */
+  studentUserId?: string | null;
+  /** @nullable */
+  payerName?: string | null;
+  /** @nullable */
+  payerEmail?: string | null;
+  /** @nullable */
+  payerPhone?: string | null;
+  createdBySubject: string;
+  /** @nullable */
+  dueAt?: string | null;
+  /** @nullable */
+  paidAt?: string | null;
+  /** @nullable */
+  canceledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentInvoiceCreatedResponse {
+  invoice: PaymentInvoiceResponse;
+  publicUrlToken: string;
+}
+
+export interface PaymentProviderEventResponse {
+  id: string;
+  provider: string;
+  eventType: string;
+  /** @nullable */
+  providerPaymentId?: string | null;
+  status: string;
+  receivedAt: string;
+  /** @nullable */
+  processedAt?: string | null;
+}
+
 /**
  * @nullable
  */
@@ -720,6 +783,42 @@ export interface MaterialAssetResponse {
   provider: string;
   metadata: JsonNode;
   createdAt: string;
+}
+
+export interface PublicPaymentInvoiceResponse {
+  number: string;
+  status: string;
+  amountMinor: number;
+  currency: string;
+  description: string;
+  /** @nullable */
+  payerName?: string | null;
+  /** @nullable */
+  dueAt?: string | null;
+  /** @nullable */
+  paidAt?: string | null;
+  /** @nullable */
+  canceledAt?: string | null;
+}
+
+export interface PaymentAttemptResponse {
+  id: string;
+  invoiceId: string;
+  provider: string;
+  /** @nullable */
+  providerPaymentId?: string | null;
+  status: string;
+  /** @nullable */
+  confirmationUrl?: string | null;
+  amountMinor: number;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentInvoiceDetailResponse {
+  invoice: PaymentInvoiceResponse;
+  paymentAttempts: PaymentAttemptResponse[];
 }
 
 export interface MeResponse {
@@ -2500,6 +2599,206 @@ export const createCurrentCollaborationDocument = async (lessonId: string,
 
 
 
+export type createPublicCheckoutResponse200 = {
+  data: PublicPaymentCheckoutResponse
+  status: 200
+}
+
+export type createPublicCheckoutResponseSuccess = (createPublicCheckoutResponse200) & {
+  headers: Headers;
+};
+;
+
+export type createPublicCheckoutResponse = (createPublicCheckoutResponseSuccess)
+
+export const getCreatePublicCheckoutUrl = (publicToken: string,) => {
+
+
+
+
+  return `/api/public/payment-invoices/${publicToken}/checkout`
+}
+
+export const createPublicCheckout = async (publicToken: string, options?: RequestInit): Promise<createPublicCheckoutResponse> => {
+
+  const res = await fetch(getCreatePublicCheckoutUrl(publicToken),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createPublicCheckoutResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createPublicCheckoutResponse
+}
+
+
+
+export type listInvoicesResponse200 = {
+  data: PaymentInvoiceResponse[]
+  status: 200
+}
+
+export type listInvoicesResponseSuccess = (listInvoicesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listInvoicesResponse = (listInvoicesResponseSuccess)
+
+export const getListInvoicesUrl = () => {
+
+
+
+
+  return `/api/payments/admin/invoices`
+}
+
+export const listInvoices = async ( options?: RequestInit): Promise<listInvoicesResponse> => {
+
+  const res = await fetch(getListInvoicesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listInvoicesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listInvoicesResponse
+}
+
+
+
+export type createInvoiceResponse200 = {
+  data: PaymentInvoiceCreatedResponse
+  status: 200
+}
+
+export type createInvoiceResponseSuccess = (createInvoiceResponse200) & {
+  headers: Headers;
+};
+;
+
+export type createInvoiceResponse = (createInvoiceResponseSuccess)
+
+export const getCreateInvoiceUrl = () => {
+
+
+
+
+  return `/api/payments/admin/invoices`
+}
+
+export const createInvoice = async (paymentInvoiceCreateRequest: PaymentInvoiceCreateRequest, options?: RequestInit): Promise<createInvoiceResponse> => {
+
+  const res = await fetch(getCreateInvoiceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(paymentInvoiceCreateRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createInvoiceResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createInvoiceResponse
+}
+
+
+
+export type cancelInvoiceResponse200 = {
+  data: PaymentInvoiceResponse
+  status: 200
+}
+
+export type cancelInvoiceResponseSuccess = (cancelInvoiceResponse200) & {
+  headers: Headers;
+};
+;
+
+export type cancelInvoiceResponse = (cancelInvoiceResponseSuccess)
+
+export const getCancelInvoiceUrl = (invoiceId: string,) => {
+
+
+
+
+  return `/api/payments/admin/invoices/${invoiceId}/cancel`
+}
+
+export const cancelInvoice = async (invoiceId: string, options?: RequestInit): Promise<cancelInvoiceResponse> => {
+
+  const res = await fetch(getCancelInvoiceUrl(invoiceId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: cancelInvoiceResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as cancelInvoiceResponse
+}
+
+
+
+export type yookassaWebhookResponse200 = {
+  data: PaymentProviderEventResponse
+  status: 200
+}
+
+export type yookassaWebhookResponseSuccess = (yookassaWebhookResponse200) & {
+  headers: Headers;
+};
+;
+
+export type yookassaWebhookResponse = (yookassaWebhookResponseSuccess)
+
+export const getYookassaWebhookUrl = () => {
+
+
+
+
+  return `/api/payment-webhooks/yookassa`
+}
+
+export const yookassaWebhook = async (yookassaWebhookBody: string, options?: RequestInit): Promise<yookassaWebhookResponse> => {
+
+  const res = await fetch(getYookassaWebhookUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(yookassaWebhookBody)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: yookassaWebhookResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as yookassaWebhookResponse
+}
+
+
+
 export type listMaterialsResponse200 = {
   data: LessonMaterialResponse[]
   status: 200
@@ -3563,6 +3862,86 @@ export const listCollaborationDocuments = async (lessonId: string,
 
   const data: listCollaborationDocumentsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listCollaborationDocumentsResponse
+}
+
+
+
+export type publicInvoiceResponse200 = {
+  data: PublicPaymentInvoiceResponse
+  status: 200
+}
+
+export type publicInvoiceResponseSuccess = (publicInvoiceResponse200) & {
+  headers: Headers;
+};
+;
+
+export type publicInvoiceResponse = (publicInvoiceResponseSuccess)
+
+export const getPublicInvoiceUrl = (publicToken: string,) => {
+
+
+
+
+  return `/api/public/payment-invoices/${publicToken}`
+}
+
+export const publicInvoice = async (publicToken: string, options?: RequestInit): Promise<publicInvoiceResponse> => {
+
+  const res = await fetch(getPublicInvoiceUrl(publicToken),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: publicInvoiceResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as publicInvoiceResponse
+}
+
+
+
+export type adminInvoiceResponse200 = {
+  data: PaymentInvoiceDetailResponse
+  status: 200
+}
+
+export type adminInvoiceResponseSuccess = (adminInvoiceResponse200) & {
+  headers: Headers;
+};
+;
+
+export type adminInvoiceResponse = (adminInvoiceResponseSuccess)
+
+export const getAdminInvoiceUrl = (invoiceId: string,) => {
+
+
+
+
+  return `/api/payments/admin/invoices/${invoiceId}`
+}
+
+export const adminInvoice = async (invoiceId: string, options?: RequestInit): Promise<adminInvoiceResponse> => {
+
+  const res = await fetch(getAdminInvoiceUrl(invoiceId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: adminInvoiceResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as adminInvoiceResponse
 }
 
 

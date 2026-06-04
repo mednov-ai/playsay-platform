@@ -904,6 +904,92 @@ paths:
           description: Current user cannot access the document
       security:
       - bearerAuth: []
+  /public/payment-invoices/{publicToken}/checkout:
+    post:
+      tags:
+      - payment-controller
+      operationId: createPublicCheckout
+      parameters:
+      - name: publicToken
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicPaymentCheckoutResponse"
+  /payments/admin/invoices:
+    get:
+      tags:
+      - payment-controller
+      operationId: listInvoices
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentInvoiceResponse"
+    post:
+      tags:
+      - payment-controller
+      operationId: createInvoice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInvoiceCreateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInvoiceCreatedResponse"
+  /payments/admin/invoices/{invoiceId}/cancel:
+    post:
+      tags:
+      - payment-controller
+      operationId: cancelInvoice
+      parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInvoiceResponse"
+  /payment-webhooks/yookassa:
+    post:
+      tags:
+      - payment-controller
+      operationId: yookassaWebhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentProviderEventResponse"
   /materials:
     get:
       tags:
@@ -1446,6 +1532,43 @@ paths:
           description: Current user cannot access the lesson material
       security:
       - bearerAuth: []
+  /public/payment-invoices/{publicToken}:
+    get:
+      tags:
+      - payment-controller
+      operationId: publicInvoice
+      parameters:
+      - name: publicToken
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicPaymentInvoiceResponse"
+  /payments/admin/invoices/{invoiceId}:
+    get:
+      tags:
+      - payment-controller
+      operationId: adminInvoice
+      parameters:
+      - name: invoiceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInvoiceDetailResponse"
   /me:
     get:
       tags:
@@ -2643,6 +2766,156 @@ components:
       - documentKind
       - materialId
       - scope
+    PublicPaymentCheckoutResponse:
+      type: object
+      properties:
+        confirmationUrl:
+          type: string
+      required:
+      - confirmationUrl
+    PaymentInvoiceCreateRequest:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        description:
+          type: string
+        studentUserId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        payerName:
+          type:
+          - string
+          - "null"
+        payerEmail:
+          type:
+          - string
+          - "null"
+        payerPhone:
+          type:
+          - string
+          - "null"
+        dueAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - amountMinor
+      - currency
+      - description
+    PaymentInvoiceCreatedResponse:
+      type: object
+      properties:
+        invoice:
+          $ref: "#/components/schemas/PaymentInvoiceResponse"
+        publicUrlToken:
+          type: string
+      required:
+      - invoice
+      - publicUrlToken
+    PaymentInvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+        status:
+          type: string
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        description:
+          type: string
+        studentUserId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        payerName:
+          type:
+          - string
+          - "null"
+        payerEmail:
+          type:
+          - string
+          - "null"
+        payerPhone:
+          type:
+          - string
+          - "null"
+        createdBySubject:
+          type: string
+        dueAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        paidAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        canceledAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - amountMinor
+      - createdAt
+      - createdBySubject
+      - currency
+      - description
+      - id
+      - number
+      - status
+      - updatedAt
+    PaymentProviderEventResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        eventType:
+          type: string
+        providerPaymentId:
+          type:
+          - string
+          - "null"
+        status:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
+        processedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - eventType
+      - id
+      - provider
+      - receivedAt
+      - status
     MaterialVideoPlaybackRequest:
       type: object
       properties:
@@ -2987,6 +3260,98 @@ components:
       - materialId
       - metadata
       - provider
+    PublicPaymentInvoiceResponse:
+      type: object
+      properties:
+        number:
+          type: string
+        status:
+          type: string
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        description:
+          type: string
+        payerName:
+          type:
+          - string
+          - "null"
+        dueAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        paidAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        canceledAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - amountMinor
+      - currency
+      - description
+      - number
+      - status
+    PaymentAttemptResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        providerPaymentId:
+          type:
+          - string
+          - "null"
+        status:
+          type: string
+        confirmationUrl:
+          type:
+          - string
+          - "null"
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - amountMinor
+      - createdAt
+      - currency
+      - id
+      - invoiceId
+      - provider
+      - status
+      - updatedAt
+    PaymentInvoiceDetailResponse:
+      type: object
+      properties:
+        invoice:
+          $ref: "#/components/schemas/PaymentInvoiceResponse"
+        paymentAttempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentAttemptResponse"
+      required:
+      - invoice
+      - paymentAttempts
     MeResponse:
       type: object
       properties:

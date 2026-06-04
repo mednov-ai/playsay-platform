@@ -55,6 +55,9 @@ playsay:
   media-service:
     base-url: ${PLAYSAY_MEDIA_SERVICE_BASE_URL:http://media-service.playsay-dev.svc.cluster.local}
     service-token: ${PLAYSAY_MEDIA_SERVICE_TOKEN:}
+  payment-service:
+    base-url: ${PLAYSAY_PAYMENT_SERVICE_BASE_URL:http://payment-service.playsay-dev.svc.cluster.local}
+    service-token: ${PLAYSAY_PAYMENT_SERVICE_TOKEN:}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
     s3:

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-04-001-create-payment-invoices" author="codex">
+        <createTable tableName="payment_invoices">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="number" type="varchar(64)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="public_token_hash" type="varchar(64)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="status" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount_minor" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="varchar(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="varchar(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="student_user_id" type="uuid"/>
+            <column name="payer_name" type="varchar(255)"/>
+            <column name="payer_email" type="varchar(255)"/>
+            <column name="payer_phone" type="varchar(64)"/>
+            <column name="created_by_subject" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="due_at" type="timestamp with time zone"/>
+            <column name="paid_at" type="timestamp with time zone"/>
+            <column name="canceled_at" type="timestamp with time zone"/>
+            <column name="created_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="payment_invoices" indexName="idx_payment_invoices_status">
+            <column name="status"/>
+        </createIndex>
+        <createIndex tableName="payment_invoices" indexName="idx_payment_invoices_created_at">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2026-06-04-002-create-payment-attempts" author="codex">
+        <createTable tableName="payment_attempts">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="invoice_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_payment_id" type="varchar(255)"/>
+            <column name="status" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="idempotence_key" type="varchar(128)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="confirmation_url" type="varchar(1024)"/>
+            <column name="amount_minor" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="varchar(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="payment_attempts"
+            baseColumnNames="invoice_id"
+            constraintName="fk_payment_attempts_invoice"
+            referencedTableName="payment_invoices"
+            referencedColumnNames="id"/>
+        <createIndex tableName="payment_attempts" indexName="idx_payment_attempts_invoice">
+            <column name="invoice_id"/>
+        </createIndex>
+        <createIndex tableName="payment_attempts" indexName="idx_payment_attempts_provider_payment">
+            <column name="provider_payment_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2026-06-04-003-create-payment-provider-events" author="codex">
+        <createTable tableName="payment_provider_events">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="provider" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_type" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_payment_id" type="varchar(255)"/>
+            <column name="body_sha256" type="varchar(64)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="payload_summary_json" type="varchar(2000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="processed_at" type="timestamp with time zone"/>
+        </createTable>
+        <createIndex tableName="payment_provider_events" indexName="idx_payment_provider_events_provider_payment">
+            <column name="provider_payment_id"/>
+        </createIndex>
+        <createIndex tableName="payment_provider_events" indexName="idx_payment_provider_events_received_at">
+            <column name="received_at"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

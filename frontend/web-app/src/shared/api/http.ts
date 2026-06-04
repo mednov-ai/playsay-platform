@@ -46,3 +46,28 @@ export async function apiJson<T>(
 
   return (await response.json()) as T;
 }
+
+export async function publicApiJson<T>(
+  path: string,
+  init: RequestInit,
+  expectedStatus = 200,
+): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      "Accept-Language": currentApiLanguage(),
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
+  });
+
+  if (response.status !== expectedStatus) {
+    throw await apiErrorFromResponse(response, `API request ${path} failed with HTTP ${response.status}.`);
+  }
+
+  if (expectedStatus === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}

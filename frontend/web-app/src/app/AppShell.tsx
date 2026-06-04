@@ -21,6 +21,9 @@ import {
   type LessonMaterialInput,
   type LessonMaterialUrlDraftInput,
   type MeProfile,
+  type PaymentInvoice,
+  type PaymentInvoiceCreateInput,
+  type PaymentInvoiceCreated,
   type ScheduledLesson,
   type ScheduledLessonInput,
   type UpdateUserProfileInput,
@@ -32,6 +35,7 @@ import { ProfileAccountPanel, type SessionStatus } from "../features/profile/ui/
 import { CourseWorkspacePanel } from "../features/courses/ui/CourseWorkspacePanel";
 import { SchedulePanel } from "../features/schedule/ui/SchedulePanel";
 import { HomeworkPanel } from "../features/homework/ui/HomeworkPanel";
+import { BillingPanel } from "../features/payments";
 import type { LessonRoomSession } from "../features/classroom";
 import { MaterialLibraryPanel } from "../features/materials/ui/MaterialLibraryPanel";
 import { LiveLessonExperience } from "../features/classroom/ui/LiveLessonExperience";
@@ -77,6 +81,9 @@ export type AppShellProps = {
   nextJoinableLesson: ScheduledLesson | null;
   nextLessonLoading: boolean;
   nowMs: number;
+  paymentInvoices: PaymentInvoice[];
+  paymentLoading: boolean;
+  paymentMessage: string | null;
   profile: MeProfile | null;
   profileMessage: string | null;
   profileOpen: boolean;
@@ -84,6 +91,7 @@ export type AppShellProps = {
   refreshAdminUsers: () => Promise<void>;
   refreshCourses: () => Promise<void>;
   refreshMaterials: () => Promise<void>;
+  refreshPaymentInvoices: () => Promise<void>;
   refreshSchedule: () => Promise<void>;
   resetProfile: () => Promise<void>;
   roomLoadingLessonId: string | null;
@@ -97,6 +105,7 @@ export type AppShellProps = {
   setWorkspaceTab: Dispatch<SetStateAction<WorkspaceTab>>;
   status: SessionStatus;
   studentUsers: AdminUserProfile[];
+  createPaymentInvoice: (input: PaymentInvoiceCreateInput) => Promise<PaymentInvoiceCreated | null>;
   suggestAcceptedAnswersForMaterial: (materialId: string, input: LessonMaterialAnswerSuggestionsInput) => Promise<LessonMaterialAnswerSuggestions | null>;
   updateMaterialAssetMetadata: (materialId: string, assetId: string, input: LessonMaterialAssetUpdateInput) => Promise<LessonMaterialAsset | null>;
   upsertMaterial: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
@@ -142,6 +151,9 @@ export function AppShell(props: AppShellProps) {
     nextJoinableLesson,
     nextLessonLoading,
     nowMs,
+    paymentInvoices,
+    paymentLoading,
+    paymentMessage,
     profile,
     profileMessage,
     profileOpen,
@@ -149,6 +161,7 @@ export function AppShell(props: AppShellProps) {
     refreshAdminUsers,
     refreshCourses,
     refreshMaterials,
+    refreshPaymentInvoices,
     refreshSchedule,
     resetProfile,
     roomLoadingLessonId,
@@ -162,6 +175,7 @@ export function AppShell(props: AppShellProps) {
     setWorkspaceTab,
     status,
     studentUsers,
+    createPaymentInvoice,
     suggestAcceptedAnswersForMaterial,
     updateMaterialAssetMetadata,
     upsertMaterial,
@@ -313,6 +327,17 @@ export function AppShell(props: AppShellProps) {
                 onDeleteLesson={(courseId, lessonId) => void deleteLesson(courseId, lessonId)}
                 onRefresh={() => void refreshCourses()}
                 profile={profile}
+              />
+            ) : null}
+
+            {workspaceTab === "billing" ? (
+              <BillingPanel
+                disabled={!isAuthenticated || paymentLoading}
+                invoices={paymentInvoices}
+                loading={paymentLoading}
+                message={paymentMessage}
+                onCreate={createPaymentInvoice}
+                onRefresh={() => void refreshPaymentInvoices()}
               />
             ) : null}
           </div>

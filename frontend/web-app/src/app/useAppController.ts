@@ -10,6 +10,7 @@ import {
   fetchAdminUserProfiles,
   fetchMaterials,
   fetchMe,
+  fetchPaymentInvoices,
   fetchScheduledLessons,
   fetchStudentProfiles,
   fetchUserProfile,
@@ -17,6 +18,7 @@ import {
   isAuthCallback,
   readTokens,
   saveUserProfile,
+  createPaymentInvoice as createPaymentInvoiceRequest,
   skipSilentLoginOnce,
   startSilentLogin,
   type AdminUserProfile,
@@ -24,6 +26,9 @@ import {
   type Course,
   type LessonMaterial,
   type MeProfile,
+  type PaymentInvoice,
+  type PaymentInvoiceCreateInput,
+  type PaymentInvoiceCreated,
   type ScheduledLesson,
   type UpdateUserProfileInput,
 } from "../shared/api/playsay";
@@ -69,6 +74,9 @@ export function useAppController(): AppShellProps {
   const [scheduledLessons, setScheduledLessons] = useState<ScheduledLesson[]>([]);
   const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [paymentInvoices, setPaymentInvoices] = useState<PaymentInvoice[]>([]);
+  const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [studentUsers, setStudentUsers] = useState<AdminUserProfile[]>([]);
   const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(null);
   const [roomLoadingLessonId, setRoomLoadingLessonId] = useState<string | null>(null);
@@ -107,13 +115,14 @@ export function useAppController(): AppShellProps {
 
         const me = await fetchMe();
         const canManagePeople = me.roles.includes("TEACHER") || me.roles.includes("ADMIN");
-        const [currentAppProfile, currentAdminUsers, currentCourseBundle, currentMaterials, currentSchedule, currentStudents] = await Promise.all([
+        const [currentAppProfile, currentAdminUsers, currentCourseBundle, currentMaterials, currentSchedule, currentStudents, currentPaymentInvoices] = await Promise.all([
           fetchUserProfile(),
           me.roles.includes("ADMIN") ? fetchAdminUserProfiles() : Promise.resolve([]),
           fetchCourseBundle(),
           fetchMaterials(),
           fetchScheduledLessons(),
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
+          canManagePeople ? fetchPaymentInvoices() : Promise.resolve([]),
         ]);
         if (!cancelled) {
           let authenticatedAppProfile = currentAppProfile;
@@ -153,6 +162,7 @@ export function useAppController(): AppShellProps {
           setMaterials(currentMaterials);
           setScheduledLessons(currentSchedule);
           setStudentUsers(currentStudents);
+          setPaymentInvoices(currentPaymentInvoices);
           setStatus("authenticated");
         }
       } catch (caught) {
@@ -281,6 +291,39 @@ export function useAppController(): AppShellProps {
     status,
   });
 
+  async function refreshPaymentInvoices() {
+    setPaymentLoading(true);
+    setPaymentMessage(null);
+    try {
+      const invoices = await fetchPaymentInvoices();
+      setPaymentInvoices(invoices);
+      setPaymentMessage(t("payments.messages.refreshed"));
+    } catch (caught) {
+      setPaymentMessage(applySessionError(caught, t("payments.messages.refreshFailed")));
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
+
+  async function createPaymentInvoice(input: PaymentInvoiceCreateInput): Promise<PaymentInvoiceCreated | null> {
+    setPaymentLoading(true);
+    setPaymentMessage(null);
+    try {
+      const created = await createPaymentInvoiceRequest(input);
+      setPaymentInvoices((current) => [
+        created.invoice,
+        ...current.filter((invoice) => invoice.id !== created.invoice.id),
+      ]);
+      setPaymentMessage(t("payments.messages.created"));
+      return created;
+    } catch (caught) {
+      setPaymentMessage(applySessionError(caught, t("payments.messages.createFailed")));
+      return null;
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
+
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(timer);
@@ -325,6 +368,7 @@ export function useAppController(): AppShellProps {
     setCourseLessons({});
     setMaterials([]);
     setScheduledLessons([]);
+    setPaymentInvoices([]);
     setStudentUsers([]);
     setRoomSession(null);
     setRoomLoadingLessonId(null);
@@ -349,6 +393,7 @@ export function useAppController(): AppShellProps {
       setCourseLessons({});
       setMaterials([]);
       setScheduledLessons([]);
+      setPaymentInvoices([]);
       setStudentUsers([]);
       setRoomSession(null);
       setRoomLoadingLessonId(null);
@@ -402,6 +447,9 @@ export function useAppController(): AppShellProps {
     nextJoinableLesson,
     nextLessonLoading,
     nowMs,
+    paymentInvoices,
+    paymentLoading,
+    paymentMessage,
     profile,
     profileMessage,
     profileOpen,
@@ -409,6 +457,7 @@ export function useAppController(): AppShellProps {
     refreshAdminUsers,
     refreshCourses,
     refreshMaterials,
+    refreshPaymentInvoices,
     refreshSchedule,
     resetProfile,
     roomLoadingLessonId,
@@ -422,6 +471,7 @@ export function useAppController(): AppShellProps {
     setWorkspaceTab,
     status,
     studentUsers,
+    createPaymentInvoice,
     suggestAcceptedAnswersForMaterial,
     updateMaterialAssetMetadata,
     upsertMaterial,

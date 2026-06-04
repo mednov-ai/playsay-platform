@@ -56,13 +56,9 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
       setActivated(true);
       if (video) {
         video.src = src;
+        video.preload = "metadata";
         video.load();
-        setIsLoading(true);
-        void video.play().catch(() => {
-          setHasError(true);
-          setIsLoading(false);
-          setIsPlaying(false);
-        });
+        playVideo(video);
       }
       return;
     }
@@ -70,12 +66,7 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
       return;
     }
     if (video.paused) {
-      setIsLoading(true);
-      void video.play().catch(() => {
-        setHasError(true);
-        setIsLoading(false);
-        setIsPlaying(false);
-      });
+      playVideo(video);
     } else {
       video.pause();
     }
@@ -102,12 +93,8 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
     video.currentTime = 0;
     setCurrentTime(0);
     setHasError(false);
-    setIsLoading(true);
     video.load();
-    void video.play().catch(() => {
-      setHasError(true);
-      setIsLoading(false);
-    });
+    playVideo(video);
   }
 
   function requestFullscreen() {
@@ -121,6 +108,17 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
 
   const playLabel = isPlaying ? t("materials.renderer.videoPause") : t("materials.renderer.videoPlay");
   const muteLabel = isMuted ? t("materials.renderer.videoUnmute") : t("materials.renderer.videoMute");
+
+  function playVideo(video: HTMLVideoElement) {
+    setIsLoading(true);
+    void video.play().catch(() => {
+      setIsLoading(false);
+      setIsPlaying(false);
+      if (video.error) {
+        setHasError(true);
+      }
+    });
+  }
 
   return (
     <div className="playsay-relay-player" data-state={activated ? "active" : "idle"} ref={shellRef}>
@@ -147,7 +145,7 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
         onWaiting={() => setIsLoading(true)}
         playsInline
-        preload="none"
+        preload={activated ? "metadata" : "none"}
         ref={videoRef}
         src={activated ? src : undefined}
       >

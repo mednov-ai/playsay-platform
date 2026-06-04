@@ -13,6 +13,7 @@ import com.playsay.gateway.dto.MaterialAnswerSuggestionsResponse
 import com.playsay.gateway.dto.MaterialGenerateImagesRequest
 import com.playsay.gateway.dto.MaterialUrlImportRequest
 import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.mapper.LessonMaterialResponseMapper
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.LessonMaterialRow
 import com.playsay.gateway.utils.MetaData

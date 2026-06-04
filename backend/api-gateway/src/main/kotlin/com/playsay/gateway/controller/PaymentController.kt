@@ -7,12 +7,8 @@ import com.playsay.gateway.dto.PaymentInvoiceResponse
 import com.playsay.gateway.dto.PaymentProviderEventResponse
 import com.playsay.gateway.dto.PublicPaymentCheckoutResponse
 import com.playsay.gateway.dto.PublicPaymentInvoiceResponse
-import com.playsay.gateway.error.ProjectResponseException
-import com.playsay.gateway.service.InternalPaymentInvoiceCreatePayload
-import com.playsay.gateway.service.PaymentServiceClient
-import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.service.PaymentInvoiceFacade
 import java.util.UUID
-import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.GetMapping
@@ -23,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 class PaymentController(
-    private val paymentServiceClient: PaymentServiceClient,
+    private val paymentInvoiceFacade: PaymentInvoiceFacade,
 ) {
     @PostMapping(
         "/payments/admin/invoices",
@@ -33,42 +29,34 @@ class PaymentController(
     fun createInvoice(
         authentication: JwtAuthenticationToken,
         @RequestBody request: PaymentInvoiceCreateRequest,
-    ): PaymentInvoiceCreatedResponse {
-        requirePaymentManager(authentication)
-        return paymentServiceClient.createInvoice(request.toInternal(authentication.name))
-    }
+    ): PaymentInvoiceCreatedResponse =
+        paymentInvoiceFacade.createInvoice(authentication, request)
 
     @GetMapping("/payments/admin/invoices", produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun listInvoices(authentication: JwtAuthenticationToken): List<PaymentInvoiceResponse> {
-        requirePaymentManager(authentication)
-        return paymentServiceClient.listInvoices()
-    }
+    fun listInvoices(authentication: JwtAuthenticationToken): List<PaymentInvoiceResponse> =
+        paymentInvoiceFacade.listInvoices(authentication)
 
     @GetMapping("/payments/admin/invoices/{invoiceId}", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun adminInvoice(
         authentication: JwtAuthenticationToken,
         @PathVariable invoiceId: UUID,
-    ): PaymentInvoiceDetailResponse {
-        requirePaymentManager(authentication)
-        return paymentServiceClient.adminInvoice(invoiceId)
-    }
+    ): PaymentInvoiceDetailResponse =
+        paymentInvoiceFacade.adminInvoice(authentication, invoiceId)
 
     @PostMapping("/payments/admin/invoices/{invoiceId}/cancel", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun cancelInvoice(
         authentication: JwtAuthenticationToken,
         @PathVariable invoiceId: UUID,
-    ): PaymentInvoiceResponse {
-        requirePaymentManager(authentication)
-        return paymentServiceClient.cancelInvoice(invoiceId)
-    }
+    ): PaymentInvoiceResponse =
+        paymentInvoiceFacade.cancelInvoice(authentication, invoiceId)
 
     @GetMapping("/public/payment-invoices/{publicToken}", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun publicInvoice(@PathVariable publicToken: String): PublicPaymentInvoiceResponse =
-        paymentServiceClient.publicInvoice(publicToken).toPublicResponse()
+        paymentInvoiceFacade.publicInvoice(publicToken)
 
     @PostMapping("/public/payment-invoices/{publicToken}/checkout", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun createPublicCheckout(@PathVariable publicToken: String): PublicPaymentCheckoutResponse =
-        PublicPaymentCheckoutResponse(confirmationUrl = paymentServiceClient.createCheckout(publicToken).confirmationUrl)
+        paymentInvoiceFacade.createPublicCheckout(publicToken)
 
     @PostMapping(
         "/payment-webhooks/yookassa",
@@ -76,38 +64,5 @@ class PaymentController(
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
     fun yookassaWebhook(@RequestBody rawBody: String): PaymentProviderEventResponse =
-        paymentServiceClient.processYooKassaWebhook(rawBody)
-
-    private fun PaymentInvoiceCreateRequest.toInternal(createdBySubject: String): InternalPaymentInvoiceCreatePayload =
-        InternalPaymentInvoiceCreatePayload(
-            amountMinor = amountMinor,
-            currency = currency,
-            description = description,
-            createdBySubject = createdBySubject,
-            studentUserId = studentUserId,
-            payerName = payerName,
-            payerEmail = payerEmail,
-            payerPhone = payerPhone,
-            dueAt = dueAt,
-        )
-
-    private fun requirePaymentManager(authentication: JwtAuthenticationToken) {
-        val authorities = authentication.authorities.map { authority -> authority.authority }.toSet()
-        if (MetaData.Authorities.ADMIN !in authorities && MetaData.Authorities.TEACHER !in authorities) {
-            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.PAYMENT_ADMIN_ROLE_REQUIRED)
-        }
-    }
-
-    private fun PaymentInvoiceResponse.toPublicResponse(): PublicPaymentInvoiceResponse =
-        PublicPaymentInvoiceResponse(
-            number = number,
-            status = status,
-            amountMinor = amountMinor,
-            currency = currency,
-            description = description,
-            payerName = payerName,
-            dueAt = dueAt,
-            paidAt = paidAt,
-            canceledAt = canceledAt,
-        )
+        paymentInvoiceFacade.processYooKassaWebhook(rawBody)
 }

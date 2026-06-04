@@ -6,6 +6,7 @@ import com.playsay.gateway.dto.LessonMaterialRequest
 import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.entity.LessonMaterialEntity
 import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.mapper.LessonMaterialResponseMapper
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.LessonMaterialRow
 import com.playsay.gateway.utils.MetaData

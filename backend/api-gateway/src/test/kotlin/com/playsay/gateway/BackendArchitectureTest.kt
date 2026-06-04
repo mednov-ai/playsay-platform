@@ -15,6 +15,44 @@ class BackendArchitectureTest {
         Path.of("").toAbsolutePath().resolve("src/main/kotlin/com/playsay/gateway")
 
     @Test
+    fun `root package contains only application launcher`() {
+        val misplacedRootFiles = sourceRoot.listEntries()
+            .filter { path -> Files.isRegularFile(path) && path.name.endsWith(".kt") }
+            .filterNot { path -> path.name == "ApiGatewayApplication.kt" }
+            .map { path -> path.name }
+
+        assertTrue(
+            misplacedRootFiles.isEmpty(),
+            "Root package must contain only ApiGatewayApplication.kt: $misplacedRootFiles",
+        )
+    }
+
+    @Test
+    fun `top level package folders are intentional`() {
+        val intentionalFolders = setOf(
+            "config",
+            "controller",
+            "dto",
+            "entity",
+            "error",
+            "mapper",
+            "realtime",
+            "repo",
+            "service",
+            "utils",
+        )
+        val unexpectedFolders = sourceRoot.listEntries()
+            .filter { path -> Files.isDirectory(path) }
+            .map { path -> path.name }
+            .filterNot { name -> name in intentionalFolders }
+
+        assertTrue(
+            unexpectedFolders.isEmpty(),
+            "Top-level package folders must be intentional and reviewed: $unexpectedFolders",
+        )
+    }
+
+    @Test
     fun `rest controllers are isolated in controller package`() {
         val misplacedControllers = kotlinSources()
             .filter { source -> Regex("""(?m)^@RestController$""").containsMatchIn(source.text) }
@@ -122,6 +160,51 @@ class BackendArchitectureTest {
         assertTrue(
             controllerJsonUsage.isEmpty(),
             "Controllers must delegate JSON parsing and serialization to services or codecs: $controllerJsonUsage",
+        )
+    }
+
+    @Test
+    fun `controllers do not inject persistence or internal provider clients`() {
+        val entityReference = Regex("""com\.playsay\.gateway\.entity\.|\b[A-Z]\w*Entity\b""")
+        val controllerLowLevelDependencies = kotlinSources()
+            .filter { source -> ".controller" in source.packageName }
+            .filter { source ->
+                source.text.contains("Repo") ||
+                    source.text.contains("Repository") ||
+                    entityReference.containsMatchIn(source.text.replace("ResponseEntity", "")) ||
+                    source.text.contains("ServiceClient")
+            }
+            .map { source -> source.relativePath }
+
+        assertTrue(
+            controllerLowLevelDependencies.isEmpty(),
+            "Controllers must depend on application services/stores, not persistence or internal provider clients: $controllerLowLevelDependencies",
+        )
+    }
+
+    @Test
+    fun `controllers delegate business authorization failures to services`() {
+        val controllerBusinessErrors = kotlinSources()
+            .filter { source -> ".controller" in source.packageName }
+            .filter { source -> source.text.contains("ProjectResponseException") }
+            .map { source -> source.relativePath }
+
+        assertTrue(
+            controllerBusinessErrors.isEmpty(),
+            "Controllers must delegate business authorization and error decisions to services: $controllerBusinessErrors",
+        )
+    }
+
+    @Test
+    fun `mapper classes live in mapper package`() {
+        val misplacedMappers = kotlinSources()
+            .filter { source -> Regex("""\bclass\s+\w+Mapper\b""").containsMatchIn(source.text) }
+            .filterNot { source -> ".mapper" in source.packageName }
+            .map { source -> source.relativePath }
+
+        assertTrue(
+            misplacedMappers.isEmpty(),
+            "Mapper classes must live in com.playsay.gateway.mapper: $misplacedMappers",
         )
     }
 
@@ -456,4 +539,13 @@ class BackendArchitectureTest {
         val packageName: String,
         val text: String,
     )
+
+    private fun Path.listEntries(): List<Path> {
+        val stream = Files.list(this)
+        return try {
+            stream.toList()
+        } finally {
+            stream.close()
+        }
+    }
 }

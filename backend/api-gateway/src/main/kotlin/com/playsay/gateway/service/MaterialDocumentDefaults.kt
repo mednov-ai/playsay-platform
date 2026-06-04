@@ -1,8 +1,6 @@
 package com.playsay.gateway.service
 
-import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.playsay.gateway.utils.MetaData
 
@@ -47,17 +45,6 @@ internal fun defaultScoringRubric(
             .add("vocabulary")
             .add("spelling")
     }
-
-internal fun JsonNode.blockCount(): Int {
-    val pages = get("pages")
-    if (pages !is ArrayNode) {
-        return 0
-    }
-    return pages.sumOf { page ->
-        val blocks = page.get("blocks")
-        if (blocks is ArrayNode) blocks.size() else 0
-    }
-}
 
 private fun criteria(objectMapper: ObjectMapper, key: String, label: String, weight: Int): ObjectNode =
     objectMapper.createObjectNode().apply {

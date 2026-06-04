@@ -9,6 +9,7 @@ import com.playsay.gateway.dto.PaymentInvoiceResponse
 import com.playsay.gateway.dto.PaymentProviderEventResponse
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.service.InternalPaymentInvoiceCreatePayload
+import com.playsay.gateway.service.PaymentInvoiceFacade
 import com.playsay.gateway.service.PaymentServiceClient
 import java.time.Instant
 import java.util.UUID
@@ -28,7 +29,7 @@ class PaymentControllerTest {
     @Test
     fun `teacher creates payment invoice with authenticated subject`() {
         val client = RecordingPaymentServiceClient()
-        val controller = PaymentController(client)
+        val controller = PaymentController(PaymentInvoiceFacade(client))
 
         val created = controller.createInvoice(
             authentication(subject = "teacher-1", role = "ROLE_TEACHER"),
@@ -51,7 +52,7 @@ class PaymentControllerTest {
 
     @Test
     fun `student cannot create payment invoice`() {
-        val controller = PaymentController(RecordingPaymentServiceClient())
+        val controller = PaymentController(PaymentInvoiceFacade(RecordingPaymentServiceClient()))
 
         val error = assertFailsWith<ProjectResponseException> {
             controller.createInvoice(
@@ -75,7 +76,7 @@ class PaymentControllerTest {
     @Test
     fun `public checkout does not require authentication`() {
         val client = RecordingPaymentServiceClient()
-        val controller = PaymentController(client)
+        val controller = PaymentController(PaymentInvoiceFacade(client))
 
         val checkout = controller.createPublicCheckout("public-token")
 
@@ -85,7 +86,7 @@ class PaymentControllerTest {
 
     @Test
     fun `public invoice hides internal identifiers and private contact fields`() {
-        val controller = PaymentController(RecordingPaymentServiceClient())
+        val controller = PaymentController(PaymentInvoiceFacade(RecordingPaymentServiceClient()))
 
         val responseJson = objectMapper.writeValueAsString(controller.publicInvoice("public-token"))
 

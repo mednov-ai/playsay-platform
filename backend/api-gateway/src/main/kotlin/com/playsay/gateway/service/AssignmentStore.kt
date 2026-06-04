@@ -17,6 +17,7 @@ import com.playsay.gateway.entity.AssignmentEntity
 import com.playsay.gateway.entity.AssignmentRecipientEntity
 import com.playsay.gateway.entity.SubmissionEntity
 import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.mapper.LessonMaterialResponseMapper
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo

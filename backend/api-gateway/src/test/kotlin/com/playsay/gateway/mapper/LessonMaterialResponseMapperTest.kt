@@ -1,4 +1,4 @@
-package com.playsay.gateway.service
+package com.playsay.gateway.mapper
 
 import com.playsay.gateway.repo.LessonMaterialRow
 import java.time.Instant

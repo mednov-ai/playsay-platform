@@ -67,12 +67,22 @@ class UserProfileStore(
     }
 
     @Transactional(readOnly = true)
-    fun list(): List<UserProfileResponse> =
+    fun list(authentication: JwtAuthenticationToken): List<UserProfileResponse> {
+        requireAdmin(authentication)
+        return listProfiles()
+    }
+
+    @Transactional(readOnly = true)
+    fun listStudents(authentication: JwtAuthenticationToken): List<UserProfileResponse> {
+        requireTeacherOrAdmin(authentication)
+        return listStudentProfiles()
+    }
+
+    private fun listProfiles(): List<UserProfileResponse> =
         userRepo.findAllOrdered()
             .map { profile -> profile.toResponse() }
 
-    @Transactional(readOnly = true)
-    fun listStudents(): List<UserProfileResponse> =
+    private fun listStudentProfiles(): List<UserProfileResponse> =
         userRepo.findByRoleOrdered(MetaData.Roles.STUDENT)
             .map { profile -> profile.toResponse() }
 
@@ -137,6 +147,23 @@ class UserProfileStore(
     private fun saveProfile(profile: AppUserEntity): AppUserEntity =
         // Other stores still write through legacy SQL during this migration, so FK users must be visible immediately.
         userRepo.saveAndFlush(profile)
+
+    private fun requireAdmin(authentication: JwtAuthenticationToken) {
+        if (authentication.authorities.none { authority -> authority.authority == MetaData.Authorities.ADMIN }) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.ADMIN_ROLE_REQUIRED)
+        }
+    }
+
+    private fun requireTeacherOrAdmin(authentication: JwtAuthenticationToken) {
+        if (authentication.authorities.none { authority ->
+            authority.authority == MetaData.Authorities.TEACHER || authority.authority == MetaData.Authorities.ADMIN
+        }) {
+            throw ProjectResponseException.localized(
+                HttpStatus.FORBIDDEN,
+                MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED,
+            )
+        }
+    }
 }
 
 private data class CurrentIdentity(

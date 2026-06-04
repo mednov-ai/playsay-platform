@@ -1,4 +1,4 @@
-package com.playsay.media
+package com.playsay.media.service
 
 import java.net.URI
 import java.net.http.HttpClient

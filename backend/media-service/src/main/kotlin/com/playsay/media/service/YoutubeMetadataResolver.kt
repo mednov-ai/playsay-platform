@@ -1,4 +1,4 @@
-package com.playsay.media
+package com.playsay.media.service
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper

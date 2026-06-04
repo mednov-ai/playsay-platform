@@ -1,10 +1,9 @@
-package com.playsay.media
+package com.playsay.media.service
 
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 
 enum class YoutubePlaybackQuality(val targetHeight: Int) {
@@ -127,10 +126,3 @@ class YoutubePlaybackSessionStore(
         sessions.entries.removeIf { (_, session) -> !session.expiresAt.isAfter(now) }
     }
 }
-
-class MediaServiceException(
-    val status: HttpStatus,
-    val code: String,
-    message: String = code,
-    cause: Throwable? = null,
-) : RuntimeException(message, cause)

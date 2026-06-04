@@ -1,4 +1,4 @@
-package com.playsay.payment
+package com.playsay.payment.service
 
 import java.util.UUID
 

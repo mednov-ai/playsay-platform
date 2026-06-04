@@ -1,5 +1,13 @@
-package com.playsay.payment
+package com.playsay.payment.config
 
+import com.playsay.payment.repo.PaymentAttemptRepository
+import com.playsay.payment.repo.PaymentInvoiceRepository
+import com.playsay.payment.repo.PaymentProviderEventRepository
+import com.playsay.payment.service.DisabledPaymentProviderClient
+import com.playsay.payment.service.PaymentInvoiceOperations
+import com.playsay.payment.service.PaymentProviderClient
+import com.playsay.payment.service.PersistentPaymentInvoiceStore
+import com.playsay.payment.service.YooKassaPaymentProviderClient
 import java.time.Clock
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean

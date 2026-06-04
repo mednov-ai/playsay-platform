@@ -1,5 +1,6 @@
 package com.playsay.media
 
+import com.playsay.media.service.YoutubeMetadataResolver
 import java.nio.file.Files
 import kotlin.io.path.writeText
 import kotlin.test.Test

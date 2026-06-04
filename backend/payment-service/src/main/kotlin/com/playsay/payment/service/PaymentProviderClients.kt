@@ -1,7 +1,10 @@
-package com.playsay.payment
+package com.playsay.payment.service
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.playsay.payment.dto.PaymentProviderHttpRequest
+import com.playsay.payment.dto.PaymentProviderHttpResponse
+import com.playsay.payment.utils.minorToDecimalString
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.net.URI
@@ -20,18 +23,6 @@ class DisabledPaymentProviderClient : PaymentProviderClient {
         throw IllegalStateException("Payment provider is not configured")
     }
 }
-
-data class PaymentProviderHttpRequest(
-    val method: String,
-    val url: String,
-    val headers: Map<String, String> = emptyMap(),
-    val body: String? = null,
-)
-
-data class PaymentProviderHttpResponse(
-    val statusCode: Int,
-    val body: String,
-)
 
 interface PaymentProviderHttpClient {
     fun send(request: PaymentProviderHttpRequest): PaymentProviderHttpResponse

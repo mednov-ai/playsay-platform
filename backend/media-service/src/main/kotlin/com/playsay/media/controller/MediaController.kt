@@ -1,13 +1,23 @@
-package com.playsay.media
+package com.playsay.media.controller
 
+import com.playsay.media.dto.YoutubeMetadataRequest
+import com.playsay.media.dto.YoutubeMetadataResponse
+import com.playsay.media.dto.YoutubePlaybackSessionRequest
+import com.playsay.media.dto.YoutubePlaybackSessionResponse
+import com.playsay.media.service.MediaInternalAuth
+import com.playsay.media.service.MediaServiceException
+import com.playsay.media.service.YoutubeMetadataResolver
+import com.playsay.media.service.YoutubePlaybackQuality
+import com.playsay.media.service.YoutubePlaybackSessionStore
+import com.playsay.media.service.YoutubeQualitySelector
+import com.playsay.media.service.YoutubeRelayStreamService
+import com.playsay.media.service.YoutubeThumbnailService
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.ControllerAdvice
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -92,68 +102,4 @@ class MediaController(
         @RequestHeader(HttpHeaders.RANGE, required = false) rangeHeader: String?,
     ): ResponseEntity<StreamingResponseBody> =
         streamService.stream(sessionId, rangeHeader)
-}
-
-data class YoutubeMetadataRequest(
-    val videoId: String,
-)
-
-data class YoutubeMetadataResponse(
-    val videoId: String,
-    val durationSeconds: Int?,
-    val language: String?,
-    val thumbnailUrl: String?,
-)
-
-data class YoutubePlaybackSessionRequest(
-    val subject: String,
-    val materialId: UUID,
-    val blockId: String,
-    val videoId: String,
-    val requestedQuality: String?,
-    val thumbnailStorageKey: String?,
-)
-
-data class YoutubePlaybackSessionResponse(
-    val sessionId: UUID,
-    val expiresAt: String,
-    val requestedQuality: String,
-    val selectedQuality: String,
-    val selectedHeight: Int?,
-    val thumbnailSourceUrl: String?,
-    val thumbnailStored: Boolean,
-    val thumbnailContentType: String?,
-    val thumbnailByteSize: Long?,
-)
-
-@RestController
-class HealthController {
-    @GetMapping("/healthz")
-    fun health(): Map<String, String> = mapOf("status" to "ok")
-}
-
-class MediaInternalAuth(
-    private val serviceToken: String,
-) {
-    fun requireValid(value: String?) {
-        val expected = serviceToken.trim()
-        if (expected.length < 16 || value?.trim() != expected) {
-            throw MediaServiceException(HttpStatus.UNAUTHORIZED, "MEDIA_SERVICE_TOKEN_REQUIRED")
-        }
-    }
-}
-
-@org.springframework.context.annotation.Configuration
-class MediaInternalAuthConfig {
-    @org.springframework.context.annotation.Bean
-    fun mediaInternalAuth(
-        @Value("\${playsay.media-service.service-token:}") serviceToken: String,
-    ): MediaInternalAuth = MediaInternalAuth(serviceToken)
-}
-
-@ControllerAdvice
-class MediaExceptionHandler {
-    @ExceptionHandler(MediaServiceException::class)
-    fun handle(exception: MediaServiceException): ResponseEntity<Map<String, String>> =
-        ResponseEntity.status(exception.status).body(mapOf("code" to exception.code))
 }

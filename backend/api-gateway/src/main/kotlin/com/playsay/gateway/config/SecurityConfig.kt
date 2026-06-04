@@ -3,6 +3,7 @@ package com.playsay.gateway.config
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.convert.converter.Converter
+import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -19,6 +20,10 @@ class SecurityConfig {
             .csrf { csrf -> csrf.disable() }
             .authorizeHttpRequests { requests ->
                 requests
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/materials/video-playback-sessions/*/stream",
+                    ).permitAll()
                     .requestMatchers(
                         "/hello",
                         "/actuator/health",

@@ -36,4 +36,20 @@ describe("materialVideoEmbedFrame", () => {
       title: "Warm-up",
     });
   });
+
+  it("does not silently fall back to youtube embed when backend marks playback unavailable", () => {
+    const frame = materialVideoEmbedFrame(youtubeBlock, {
+      embedUrl: "https://www.youtube-nocookie.com/embed/5l-fo-d0gt8?rel=0",
+      mode: "NEEDS_REVIEW",
+      reason: "YOUTUBE_METADATA_MISSING",
+    });
+
+    expect(frame).toEqual({
+      kind: "UNAVAILABLE",
+      mode: "NEEDS_REVIEW",
+      reason: "YOUTUBE_METADATA_MISSING",
+      src: "",
+      title: "Warm-up",
+    });
+  });
 });

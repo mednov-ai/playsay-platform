@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { ImageIcon, Video } from "lucide-react";
+import { CircleAlert, ImageIcon, Video } from "lucide-react";
 import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
 import {
   materialAnswerContextForBlock,
@@ -56,6 +56,13 @@ export function RenderedMaterialBlock({
       };
     }
 
+    setVideoPlayback({
+      materialId,
+      blockId: block.id,
+      mode: "NEEDS_REVIEW",
+      reason: "VIDEO_PLAYBACK_LOADING",
+    });
+
     createMaterialVideoPlayback(materialId, { blockId: block.id })
       .then((decision) => {
         if (active) {
@@ -64,7 +71,12 @@ export function RenderedMaterialBlock({
       })
       .catch(() => {
         if (active) {
-          setVideoPlayback(null);
+          setVideoPlayback({
+            materialId,
+            blockId: block.id,
+            mode: "BLOCKED",
+            reason: "VIDEO_PLAYBACK_DECISION_FAILED",
+          });
         }
       });
 
@@ -96,17 +108,39 @@ export function RenderedMaterialBlock({
     case "videoEmbed":
       {
         const frame = materialVideoEmbedFrame(block, videoPlayback);
+        const reasonKey = frame?.reason ? `materials.renderer.videoRelayReasons.${frame.reason}` : "materials.renderer.videoRelayReasons.UNKNOWN";
+        const reasonLabel = frame?.reason
+          ? t(reasonKey, { defaultValue: t("materials.renderer.videoRelayReasons.UNKNOWN") })
+          : t("materials.renderer.videoRelayReasons.UNKNOWN");
         return blockSection(
           <>
             <h4>{block.title}</h4>
             {frame?.kind === "RF_RELAY" ? (
-              <div className="playsay-video-embed">
+              <div
+                className="playsay-video-embed"
+                data-playsay-video-playback-mode="RF_RELAY"
+              >
                 <video controls preload="metadata" src={frame.src} title={frame.title}>
                   {t("materials.renderer.videoPlaybackUnsupported")}
                 </video>
               </div>
+            ) : frame?.kind === "UNAVAILABLE" ? (
+              <div
+                className="playsay-video-relay-unavailable"
+                data-playsay-video-playback-mode={frame.mode ?? "UNKNOWN"}
+                data-playsay-video-playback-reason={frame.reason ?? "UNKNOWN"}
+                role="status"
+              >
+                <CircleAlert className="h-5 w-5 text-primary" />
+                <span>{t("materials.renderer.videoRelayUnavailable")}</span>
+                <small>{reasonLabel}</small>
+                {frame.reason ? <code>{t("materials.renderer.videoRelayReasonCode", { reason: frame.reason })}</code> : null}
+              </div>
             ) : frame ? (
-              <div className="playsay-video-embed">
+              <div
+                className="playsay-video-embed"
+                data-playsay-video-playback-mode="EMBED"
+              >
                 <iframe
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen

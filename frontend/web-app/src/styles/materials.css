@@ -398,6 +398,7 @@
 }
 
 .playsay-video-embed-placeholder,
+.playsay-video-relay-unavailable,
 .playsay-image-placeholder {
   display: grid;
   min-height: 11rem;
@@ -412,7 +413,31 @@
   text-align: center;
 }
 
+.playsay-video-relay-unavailable {
+  width: min(100%, 44rem);
+  border-style: solid;
+  background: #fff9f2;
+}
+
+.playsay-video-relay-unavailable span {
+  color: hsl(var(--foreground));
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.playsay-video-relay-unavailable code {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  background: rgb(17 17 17 / 0.06);
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.25rem 0.4rem;
+  overflow-wrap: anywhere;
+}
+
 .playsay-video-embed-placeholder small,
+.playsay-video-relay-unavailable small,
 .playsay-image-placeholder figcaption {
   max-width: 100%;
   overflow-wrap: anywhere;

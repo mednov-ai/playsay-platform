@@ -3,8 +3,9 @@ import type { MaterialVideoPlayback } from "../../../../shared/api/playsay";
 
 export function materialVideoEmbedFrame(
   block: MaterialEditorBlock,
-  playback?: Pick<MaterialVideoPlayback, "embedUrl" | "mode" | "relayUrl"> | null,
+  playback?: Pick<MaterialVideoPlayback, "embedUrl" | "mode" | "reason" | "relayUrl"> | null,
 ): MaterialVideoEmbedFrame | null {
+  const provider = (block.provider ?? "").toUpperCase();
   if (playback?.mode === "RF_RELAY" && playback.relayUrl?.trim()) {
     return {
       kind: "RF_RELAY",
@@ -12,15 +13,23 @@ export function materialVideoEmbedFrame(
       title: block.title || "YouTube video",
     };
   }
-  if (playback?.embedUrl?.trim()) {
+  if (playback?.mode === "EMBED" && playback.embedUrl?.trim()) {
     return {
       kind: "EMBED",
       src: playback.embedUrl,
       title: block.title || "YouTube video",
     };
   }
+  if (playback && provider === "YOUTUBE") {
+    return {
+      kind: "UNAVAILABLE",
+      mode: playback.mode,
+      reason: playback.reason,
+      src: "",
+      title: block.title || "YouTube video",
+    };
+  }
 
-  const provider = (block.provider ?? "").toUpperCase();
   if (provider === "YOUTUBE") {
     return youtubeEmbedFrame(block.url, block.title);
   }

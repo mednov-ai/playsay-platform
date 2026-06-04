@@ -13,6 +13,7 @@ import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -80,6 +81,16 @@ class MaterialVideoPlaybackService(
         }
 
         val session = createSession(profile.subject, materialId, request.blockId, meta.videoId)
+        logger.info(
+            "YouTube RF relay playback decision materialId={} blockId={} videoId={} mode={} reason={} requireGeoCountry={} ipCountryPresent={}",
+            materialId,
+            request.blockId,
+            meta.videoId,
+            "RF_RELAY",
+            null,
+            requireGeoCountry,
+            ipCountry != null,
+        )
         return MaterialVideoPlaybackResponse(
             materialId = materialId,
             blockId = request.blockId,
@@ -156,8 +167,17 @@ class MaterialVideoPlaybackService(
         mode: String,
         reason: String?,
         embedUrl: String?,
-    ): MaterialVideoPlaybackResponse =
-        MaterialVideoPlaybackResponse(
+    ): MaterialVideoPlaybackResponse {
+        logger.info(
+            "YouTube RF relay playback decision materialId={} blockId={} videoId={} mode={} reason={} requireGeoCountry={}",
+            materialId,
+            blockId,
+            videoId,
+            mode,
+            reason,
+            requireGeoCountry,
+        )
+        return MaterialVideoPlaybackResponse(
             materialId = materialId,
             blockId = blockId,
             videoId = videoId,
@@ -168,9 +188,11 @@ class MaterialVideoPlaybackService(
             sessionId = null,
             expiresAt = null,
         )
+    }
 
     companion object {
         private val countryCodePattern = Regex("^[A-Z]{2}$")
+        private val logger = LoggerFactory.getLogger(MaterialVideoPlaybackService::class.java)
     }
 }
 

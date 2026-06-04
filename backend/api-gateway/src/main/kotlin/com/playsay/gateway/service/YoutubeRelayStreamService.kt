@@ -6,7 +6,12 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.Clock
 import java.time.Duration
+import java.time.Instant
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.CacheControl
 import org.springframework.http.HttpHeaders
@@ -23,9 +28,12 @@ class YoutubeRelayStreamService(
         .followRedirects(HttpClient.Redirect.NORMAL)
         .connectTimeout(Duration.ofSeconds(10))
         .build(),
+    private val clock: Clock = Clock.systemUTC(),
 ) {
+    private val upstreamUrlCache = ConcurrentHashMap<UUID, CachedUpstreamUrl>()
+
     fun stream(session: YoutubePlaybackSession, rangeHeader: String?): ResponseEntity<StreamingResponseBody> {
-        val upstreamUrl = resolveUpstreamUrl(session.videoId)
+        val upstreamUrl = cachedUpstreamUrl(session)
         val requestBuilder = HttpRequest.newBuilder(URI.create(upstreamUrl))
             .timeout(Duration.ofSeconds(20))
             .GET()
@@ -36,11 +44,31 @@ class YoutubeRelayStreamService(
         val upstreamResponse = runCatching {
             httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofInputStream())
         }.getOrElse {
+            logger.warn(
+                "YouTube RF relay upstream request failed sessionId={} materialId={} blockId={} videoId={} rangePresent={}",
+                session.id,
+                session.materialId,
+                session.blockId,
+                session.videoId,
+                !rangeHeader.isNullOrBlank(),
+                it,
+            )
             throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
         }
 
+        logger.info(
+            "YouTube RF relay stream response sessionId={} materialId={} blockId={} videoId={} status={} rangePresent={}",
+            session.id,
+            session.materialId,
+            session.blockId,
+            session.videoId,
+            upstreamResponse.statusCode(),
+            !rangeHeader.isNullOrBlank(),
+        )
+
         val headers = HttpHeaders()
         headers.setCacheControl(CacheControl.noStore())
+        headers["X-Accel-Buffering"] = "no"
         copyHeader(upstreamResponse, headers, HttpHeaders.CONTENT_TYPE)
         copyHeader(upstreamResponse, headers, HttpHeaders.CONTENT_LENGTH)
         copyHeader(upstreamResponse, headers, HttpHeaders.CONTENT_RANGE)
@@ -53,6 +81,26 @@ class YoutubeRelayStreamService(
         return ResponseEntity.status(upstreamResponse.statusCode())
             .headers(headers)
             .body(body)
+    }
+
+    private fun cachedUpstreamUrl(session: YoutubePlaybackSession): String {
+        val now = clock.instant()
+        upstreamUrlCache.entries.removeIf { (_, cached) -> !cached.expiresAt.isAfter(now) }
+        upstreamUrlCache[session.id]?.takeIf { cached -> cached.expiresAt.isAfter(now) }?.let { cached ->
+            return cached.url
+        }
+
+        val resolvedUrl = resolveUpstreamUrl(session.videoId)
+        upstreamUrlCache[session.id] = CachedUpstreamUrl(url = resolvedUrl, expiresAt = session.expiresAt)
+        logger.info(
+            "YouTube RF relay resolved upstream for sessionId={} materialId={} blockId={} videoId={} expiresAt={}",
+            session.id,
+            session.materialId,
+            session.blockId,
+            session.videoId,
+            session.expiresAt,
+        )
+        return resolvedUrl
     }
 
     private fun resolveUpstreamUrl(videoId: String): String {
@@ -94,4 +142,13 @@ class YoutubeRelayStreamService(
     ) {
         response.headers().firstValue(headerName).ifPresent { value -> headers[headerName] = value }
     }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(YoutubeRelayStreamService::class.java)
+    }
 }
+
+private data class CachedUpstreamUrl(
+    val url: String,
+    val expiresAt: Instant,
+)

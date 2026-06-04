@@ -50,9 +50,56 @@ class YoutubeRelayStreamServiceTest {
             assertNotNull(response.body).writeTo(body)
 
             assertEquals(HttpStatus.PARTIAL_CONTENT, response.statusCode)
+            assertEquals("no", response.headers.getFirst("X-Accel-Buffering"))
             assertEquals("bytes=0-4", receivedRange)
             assertEquals("video-bytes", body.toString(Charsets.UTF_8))
             assertFalse(response.headers.toString().contains(upstreamUrl))
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `reuses resolved media url for the same playback session`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/video") { exchange ->
+            val body = "video-bytes".encodeToByteArray()
+            exchange.responseHeaders.add("Content-Type", "video/mp4")
+            exchange.sendResponseHeaders(206, body.size.toLong())
+            exchange.responseBody.use { output -> output.write(body) }
+        }
+        server.start()
+
+        try {
+            val upstreamUrl = "http://127.0.0.1:${server.address.port}/video"
+            val invocationFile = Files.createTempFile("playsay-ytdlp-count", ".txt")
+            val ytdlp = Files.createTempFile("playsay-ytdlp", ".sh")
+            ytdlp.writeText(
+                """
+                #!/usr/bin/env sh
+                printf 'x' >> '$invocationFile'
+                printf '%s\n' '$upstreamUrl'
+                """.trimIndent(),
+            )
+            ytdlp.toFile().setExecutable(true)
+            val service = YoutubeRelayStreamService(ytdlpPath = ytdlp.toString())
+            val session = YoutubePlaybackSession(
+                id = UUID.randomUUID(),
+                subject = "teacher-1",
+                materialId = UUID.randomUUID(),
+                blockId = "video-1",
+                videoId = "5l-fo-d0gt8",
+                expiresAt = Instant.now().plusSeconds(900),
+            )
+
+            repeat(2) {
+                val response = service.stream(session = session, rangeHeader = "bytes=0-4")
+                val body = ByteArrayOutputStream()
+                assertNotNull(response.body).writeTo(body)
+                assertEquals(HttpStatus.PARTIAL_CONTENT, response.statusCode)
+            }
+
+            assertEquals("x", invocationFile.toFile().readText())
         } finally {
             server.stop(0)
         }

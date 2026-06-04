@@ -52,6 +52,30 @@ import { useMaterialActions } from "./controller/useMaterialActions";
 import { useProfileActions } from "./controller/useProfileActions";
 import { useScheduleActions } from "./controller/useScheduleActions";
 
+export async function loadInitialPaymentInvoices({
+  canManagePeople,
+  loadInvoices,
+  onUnavailable,
+}: {
+  canManagePeople: boolean;
+  loadInvoices: () => Promise<PaymentInvoice[]>;
+  onUnavailable: (caught: unknown) => void;
+}): Promise<PaymentInvoice[]> {
+  if (!canManagePeople) {
+    return [];
+  }
+
+  try {
+    return await loadInvoices();
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status === 401) {
+      throw caught;
+    }
+    onUnavailable(caught);
+    return [];
+  }
+}
+
 export function useAppController(): AppShellProps {
   const { i18n, t } = useAppTranslation();
   const [profile, setProfile] = useState<MeProfile | null>(null);
@@ -122,7 +146,15 @@ export function useAppController(): AppShellProps {
           fetchMaterials(),
           fetchScheduledLessons(),
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
-          canManagePeople ? fetchPaymentInvoices() : Promise.resolve([]),
+          loadInitialPaymentInvoices({
+            canManagePeople,
+            loadInvoices: fetchPaymentInvoices,
+            onUnavailable: () => {
+              if (!cancelled) {
+                setPaymentMessage(t("payments.messages.refreshFailed"));
+              }
+            },
+          }),
         ]);
         if (!cancelled) {
           let authenticatedAppProfile = currentAppProfile;

@@ -15,6 +15,7 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
   const { t } = useAppTranslation();
   const shellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const previousSrcRef = useRef(src);
   const [activated, setActivated] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -24,6 +25,10 @@ export function PlaySayRelayVideoPlayer({ src, title }: PlaySayRelayVideoPlayerP
   const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
+    if (previousSrcRef.current === src) {
+      return;
+    }
+    previousSrcRef.current = src;
     setActivated(false);
     setCurrentTime(0);
     setDuration(0);

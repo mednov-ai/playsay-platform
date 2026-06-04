@@ -24,6 +24,8 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 class YoutubeRelayStreamService(
     @param:Value("\${playsay.video.youtube.rf-relay.ytdlp-path:yt-dlp}")
     private val ytdlpPath: String,
+    @param:Value("\${playsay.video.youtube.rf-relay.max-upstream-range-bytes:1048576}")
+    private val maxUpstreamRangeBytes: Long = DEFAULT_MAX_UPSTREAM_RANGE_BYTES,
     private val httpClient: HttpClient = HttpClient.newBuilder()
         .followRedirects(HttpClient.Redirect.NORMAL)
         .connectTimeout(Duration.ofSeconds(10))
@@ -34,10 +36,11 @@ class YoutubeRelayStreamService(
 
     fun stream(session: YoutubePlaybackSession, rangeHeader: String?): ResponseEntity<StreamingResponseBody> {
         val upstreamUrl = cachedUpstreamUrl(session)
+        val upstreamRangeHeader = boundedRangeHeader(rangeHeader)
         val requestBuilder = HttpRequest.newBuilder(URI.create(upstreamUrl))
             .timeout(Duration.ofSeconds(20))
             .GET()
-        rangeHeader?.trim()?.takeIf { value -> value.startsWith("bytes=") }?.let { range ->
+        upstreamRangeHeader?.let { range ->
             requestBuilder.header(HttpHeaders.RANGE, range)
         }
 
@@ -45,13 +48,14 @@ class YoutubeRelayStreamService(
             httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofInputStream())
         }.getOrElse {
             logger.warn(
-                "YouTube RF relay upstream request failed sessionId={} materialId={} blockId={} videoId={} rangeHeader={} rangePresent={}",
+                "YouTube RF relay upstream request failed sessionId={} materialId={} blockId={} videoId={} rangeHeader={} upstreamRangeHeader={} rangePresent={}",
                 session.id,
                 session.materialId,
                 session.blockId,
                 session.videoId,
                 sanitizedRange(rangeHeader),
-                !rangeHeader.isNullOrBlank(),
+                upstreamRangeHeader,
+                upstreamRangeHeader != null,
                 it,
             )
             throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
@@ -59,14 +63,16 @@ class YoutubeRelayStreamService(
 
         val upstreamHeaders = upstreamResponse.headers()
         logger.info(
-            "YouTube RF relay stream response sessionId={} materialId={} blockId={} videoId={} status={} rangeHeader={} rangePresent={} contentType={} contentLength={} contentRange={} acceptRanges={}",
+            "YouTube RF relay stream response sessionId={} materialId={} blockId={} videoId={} status={} rangeHeader={} upstreamRangeHeader={} rangeLimited={} rangePresent={} contentType={} contentLength={} contentRange={} acceptRanges={}",
             session.id,
             session.materialId,
             session.blockId,
             session.videoId,
             upstreamResponse.statusCode(),
             sanitizedRange(rangeHeader),
-            !rangeHeader.isNullOrBlank(),
+            upstreamRangeHeader,
+            upstreamRangeHeader != sanitizedRange(rangeHeader),
+            upstreamRangeHeader != null,
             upstreamHeaders.firstValue(HttpHeaders.CONTENT_TYPE).orElse(null),
             upstreamHeaders.firstValue(HttpHeaders.CONTENT_LENGTH).orElse(null),
             upstreamHeaders.firstValue(HttpHeaders.CONTENT_RANGE).orElse(null),
@@ -196,8 +202,38 @@ class YoutubeRelayStreamService(
     private fun sanitizedRange(rangeHeader: String?): String? =
         rangeHeader?.trim()?.takeIf { range -> range.startsWith("bytes=") }?.take(64)
 
+    private fun boundedRangeHeader(rangeHeader: String?): String? {
+        val maxBytes = maxUpstreamRangeBytes.coerceAtLeast(1)
+        val cleanRange = rangeHeader?.trim()?.takeIf { range -> range.startsWith("bytes=") }
+        if (cleanRange.isNullOrBlank()) {
+            return "bytes=0-${maxBytes - 1}"
+        }
+
+        val match = singleRangePattern.matchEntire(cleanRange) ?: return cleanRange.take(64)
+        val startText = match.groupValues[1]
+        if (startText.isBlank()) {
+            return cleanRange.take(64)
+        }
+
+        val start = startText.toLongOrNull() ?: return cleanRange.take(64)
+        val requestedEnd = match.groupValues[2].takeIf { value -> value.isNotBlank() }?.toLongOrNull()
+        if (requestedEnd != null && requestedEnd < start) {
+            return cleanRange.take(64)
+        }
+
+        val maxEnd = if (Long.MAX_VALUE - start < maxBytes - 1) {
+            Long.MAX_VALUE
+        } else {
+            start + maxBytes - 1
+        }
+        val boundedEnd = requestedEnd?.coerceAtMost(maxEnd) ?: maxEnd
+        return "bytes=$start-$boundedEnd"
+    }
+
     companion object {
+        private const val DEFAULT_MAX_UPSTREAM_RANGE_BYTES = 1_048_576L
         private val logger = LoggerFactory.getLogger(YoutubeRelayStreamService::class.java)
+        private val singleRangePattern = Regex("^bytes=(\\d*)-(\\d*)$")
     }
 }
 

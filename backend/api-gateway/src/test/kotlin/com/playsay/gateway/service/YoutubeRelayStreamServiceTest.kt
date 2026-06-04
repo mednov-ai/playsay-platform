@@ -60,6 +60,96 @@ class YoutubeRelayStreamServiceTest {
     }
 
     @Test
+    fun `caps open ended browser range before requesting upstream media`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        var receivedRange: String? = null
+        server.createContext("/video") { exchange ->
+            receivedRange = exchange.requestHeaders.getFirst("Range")
+            val body = "chunk".encodeToByteArray()
+            exchange.responseHeaders.add("Content-Type", "video/mp4")
+            exchange.responseHeaders.add("Accept-Ranges", "bytes")
+            exchange.responseHeaders.add("Content-Range", "bytes 5-8/100")
+            exchange.sendResponseHeaders(206, body.size.toLong())
+            exchange.responseBody.use { output -> output.write(body) }
+        }
+        server.start()
+
+        try {
+            val upstreamUrl = "http://127.0.0.1:${server.address.port}/video"
+            val ytdlp = Files.createTempFile("playsay-ytdlp", ".sh")
+            ytdlp.writeText("#!/usr/bin/env sh\nprintf '%s\\n' '$upstreamUrl'\n")
+            ytdlp.toFile().setExecutable(true)
+            val service = YoutubeRelayStreamService(ytdlpPath = ytdlp.toString(), maxUpstreamRangeBytes = 4)
+
+            val response = service.stream(
+                session = YoutubePlaybackSession(
+                    id = UUID.randomUUID(),
+                    subject = "teacher-1",
+                    materialId = UUID.randomUUID(),
+                    blockId = "video-1",
+                    videoId = "5l-fo-d0gt8",
+                    expiresAt = Instant.now().plusSeconds(900),
+                ),
+                rangeHeader = "bytes=5-",
+            )
+            val body = ByteArrayOutputStream()
+            assertNotNull(response.body).writeTo(body)
+
+            assertEquals(HttpStatus.PARTIAL_CONTENT, response.statusCode)
+            assertEquals("bytes=5-8", receivedRange)
+            assertEquals("bytes 5-8/100", response.headers.getFirst("Content-Range"))
+            assertEquals("chunk", body.toString(Charsets.UTF_8))
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `synthesizes bounded initial range when browser sends no range`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        var receivedRange: String? = null
+        server.createContext("/video") { exchange ->
+            receivedRange = exchange.requestHeaders.getFirst("Range")
+            val body = "chunk".encodeToByteArray()
+            exchange.responseHeaders.add("Content-Type", "video/mp4")
+            exchange.responseHeaders.add("Accept-Ranges", "bytes")
+            exchange.responseHeaders.add("Content-Range", "bytes 0-3/100")
+            exchange.sendResponseHeaders(206, body.size.toLong())
+            exchange.responseBody.use { output -> output.write(body) }
+        }
+        server.start()
+
+        try {
+            val upstreamUrl = "http://127.0.0.1:${server.address.port}/video"
+            val ytdlp = Files.createTempFile("playsay-ytdlp", ".sh")
+            ytdlp.writeText("#!/usr/bin/env sh\nprintf '%s\\n' '$upstreamUrl'\n")
+            ytdlp.toFile().setExecutable(true)
+            val service = YoutubeRelayStreamService(ytdlpPath = ytdlp.toString(), maxUpstreamRangeBytes = 4)
+
+            val response = service.stream(
+                session = YoutubePlaybackSession(
+                    id = UUID.randomUUID(),
+                    subject = "teacher-1",
+                    materialId = UUID.randomUUID(),
+                    blockId = "video-1",
+                    videoId = "5l-fo-d0gt8",
+                    expiresAt = Instant.now().plusSeconds(900),
+                ),
+                rangeHeader = null,
+            )
+            val body = ByteArrayOutputStream()
+            assertNotNull(response.body).writeTo(body)
+
+            assertEquals(HttpStatus.PARTIAL_CONTENT, response.statusCode)
+            assertEquals("bytes=0-3", receivedRange)
+            assertEquals("bytes 0-3/100", response.headers.getFirst("Content-Range"))
+            assertEquals("chunk", body.toString(Charsets.UTF_8))
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `reuses resolved media url for the same playback session`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/video") { exchange ->

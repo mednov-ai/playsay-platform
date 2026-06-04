@@ -44,6 +44,9 @@ export function PlaySayRelayVideoPlayer({
   const playbackKey = `${src}|${normalizedClip?.startSeconds ?? 0}|${normalizedClip?.endSeconds ?? ""}`;
   const previousPlaybackKeyRef = useRef(playbackKey);
   const activatedRef = useRef(false);
+  const playPromisePendingRef = useRef(false);
+  const playRequestedRef = useRef(false);
+  const playRetryCountRef = useRef(0);
   const [activated, setActivated] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -79,15 +82,16 @@ export function PlaySayRelayVideoPlayer({
     setHasError(false);
     setIsLoading(false);
     setIsPlaying(false);
+    playPromisePendingRef.current = false;
+    playRequestedRef.current = false;
+    playRetryCountRef.current = 0;
     const video = videoRef.current;
     if (video) {
       video.pause();
       video.removeAttribute("src");
       video.load();
       if (shouldResume) {
-        video.src = src;
-        video.preload = "metadata";
-        video.load();
+        attachRelayVideoSourceForPlayback(video, src);
         seekVideo(video, resumeTime);
         playVideo(video);
       }
@@ -117,9 +121,8 @@ export function PlaySayRelayVideoPlayer({
     if (!activated) {
       setActivated(true);
       if (video) {
-        video.src = src;
-        video.preload = "metadata";
-        video.load();
+        playRetryCountRef.current = 0;
+        attachRelayVideoSourceForPlayback(video, src);
         const startSeconds = safeResumeTime(resumeAtSeconds, normalizedClip?.startSeconds ?? 0);
         seekVideo(video, startSeconds);
         setCurrentTime(startSeconds);
@@ -130,9 +133,13 @@ export function PlaySayRelayVideoPlayer({
     if (!video) {
       return;
     }
-    if (video.paused) {
+    if (video.paused && !playRequestedRef.current) {
       playVideo(video);
     } else {
+      playRequestedRef.current = false;
+      playPromisePendingRef.current = false;
+      playRetryCountRef.current = 0;
+      setIsLoading(false);
       video.pause();
     }
   }
@@ -171,10 +178,11 @@ export function PlaySayRelayVideoPlayer({
       return;
     }
     const startSeconds = normalizedClip?.startSeconds ?? 0;
+    playRetryCountRef.current = 0;
+    attachRelayVideoSourceForPlayback(video, src);
     seekVideo(video, startSeconds);
     setCurrentTime(startSeconds);
     setHasError(false);
-    video.load();
     playVideo(video);
   }
 
@@ -193,7 +201,8 @@ export function PlaySayRelayVideoPlayer({
     }
   }
 
-  const playLabel = isPlaying ? t("materials.renderer.videoPause") : t("materials.renderer.videoPlay");
+  const playButtonShowsPause = isPlaying || isLoading;
+  const playLabel = playButtonShowsPause ? t("materials.renderer.videoPause") : t("materials.renderer.videoPlay");
   const muteLabel = volume === 0 ? t("materials.renderer.videoUnmute") : t("materials.renderer.videoMute");
   const volumeLabel = t("materials.renderer.videoVolume", { value: volume });
   const fullscreenLabel = isFullscreen ? t("materials.renderer.videoExitFullscreen") : t("materials.renderer.videoFullscreen");
@@ -204,14 +213,43 @@ export function PlaySayRelayVideoPlayer({
     : undefined;
 
   function playVideo(video: HTMLVideoElement) {
+    playRequestedRef.current = true;
+    if (playPromisePendingRef.current) {
+      return;
+    }
     setIsLoading(true);
-    void video.play().catch(() => {
-      setIsLoading(false);
-      setIsPlaying(false);
-      if (video.error) {
-        setHasError(true);
-      }
-    });
+    playPromisePendingRef.current = true;
+    void video.play()
+      .then(() => {
+        playPromisePendingRef.current = false;
+        playRequestedRef.current = false;
+        playRetryCountRef.current = 0;
+      })
+      .catch((error: unknown) => {
+        playPromisePendingRef.current = false;
+        if (playRequestedRef.current && isRetryableRelayPlayInterruption(error, video)) {
+          if (playRetryCountRef.current < 2) {
+            playRetryCountRef.current += 1;
+            playVideo(video);
+          }
+          return;
+        }
+        playRequestedRef.current = false;
+        playRetryCountRef.current = 0;
+        setIsLoading(false);
+        setIsPlaying(false);
+        if (video.error) {
+          setHasError(true);
+        }
+      });
+  }
+
+  function retryPendingPlay(video: HTMLVideoElement) {
+    if (playRequestedRef.current && video.paused) {
+      playVideo(video);
+      return;
+    }
+    setIsLoading(false);
   }
 
   return (
@@ -219,12 +257,18 @@ export function PlaySayRelayVideoPlayer({
       <video
         aria-label={title}
         muted={volume === 0}
-        onCanPlay={() => setIsLoading(false)}
+        onCanPlay={(event) => retryPendingPlay(event.currentTarget)}
         onEnded={() => {
+          playRequestedRef.current = false;
+          playPromisePendingRef.current = false;
+          playRetryCountRef.current = 0;
           setIsLoading(false);
           setIsPlaying(false);
         }}
         onError={() => {
+          playRequestedRef.current = false;
+          playPromisePendingRef.current = false;
+          playRetryCountRef.current = 0;
           setHasError(true);
           setIsLoading(false);
           setIsPlaying(false);
@@ -236,9 +280,17 @@ export function PlaySayRelayVideoPlayer({
             seekVideo(video, normalizedClip?.startSeconds ?? 0);
             setCurrentTime(normalizedClip?.startSeconds ?? 0);
           }
+          retryPendingPlay(video);
         }}
-        onPause={() => setIsPlaying(false)}
+        onPause={() => {
+          if (!playRequestedRef.current) {
+            setIsPlaying(false);
+          }
+        }}
         onPlay={() => {
+          playRequestedRef.current = false;
+          playPromisePendingRef.current = false;
+          playRetryCountRef.current = 0;
           setHasError(false);
           setIsLoading(false);
           setIsPlaying(true);
@@ -258,7 +310,6 @@ export function PlaySayRelayVideoPlayer({
         playsInline
         preload={activated ? "metadata" : "none"}
         ref={videoRef}
-        src={activated ? src : undefined}
       >
         {t("materials.renderer.videoPlaybackUnsupported")}
       </video>
@@ -285,7 +336,7 @@ export function PlaySayRelayVideoPlayer({
       {activated && !hasError ? (
         <div className="playsay-relay-player-controls" data-fullscreen={allowFullscreen ? "true" : "false"}>
           <button aria-label={playLabel} onClick={activateAndPlay} title={playLabel} type="button">
-            {isPlaying ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+            {playButtonShowsPause ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
           </button>
           <span className="playsay-relay-player-time">{formatMediaTime(displayCurrentTime)}</span>
           <input
@@ -338,6 +389,25 @@ function normalizedQuality(value: string): MaterialVideoQuality {
 
 function safeResumeTime(value: number | null | undefined, fallback: number): number {
   return Number.isFinite(value) && (value ?? 0) >= 0 ? value ?? fallback : fallback;
+}
+
+type RelayVideoSourceTarget = Pick<HTMLVideoElement, "getAttribute" | "load" | "preload" | "setAttribute">;
+type RelayVideoPlayState = Pick<HTMLVideoElement, "error" | "readyState">;
+
+export function attachRelayVideoSourceForPlayback(video: RelayVideoSourceTarget, src: string) {
+  if (video.getAttribute("src") !== src) {
+    video.setAttribute("src", src);
+  }
+  video.preload = "metadata";
+  video.load();
+}
+
+export function isRetryableRelayPlayInterruption(error: unknown, video: RelayVideoPlayState): boolean {
+  if (video.error) {
+    return false;
+  }
+  const errorName = error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
+  return errorName === "AbortError" || (errorName === "" && video.readyState < 3);
 }
 
 function seekVideo(video: HTMLVideoElement, value: number) {

@@ -18,6 +18,7 @@ import { Metronome } from "../../features/metronome/Metronome";
 import { suggestMetronomeBpm } from "../../features/metronome/metronomeTempo";
 import { StatsPanel } from "../../features/stats/StatsPanel";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
+import { chooseResultAdvice } from "../../features/typing/resultAdvice";
 import { computeCadence, computeScore } from "../../features/typing/scoring";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
 import {
@@ -490,6 +491,18 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const score = sessionResult
     ? computeScore(sessionResult.speedCpm, sessionResult.accuracy, sessionResult.cadence)
     : null;
+  const resultAdvice = sessionResult
+    ? chooseResultAdvice({
+        accuracy: sessionResult.accuracy,
+        speedCpm: sessionResult.speedCpm,
+        cadence: sessionResult.cadence,
+        errors: sessionResult.errors,
+        perChar: sessionResult.perChar,
+        perChord: sessionResult.perChord,
+        nextKind: nextDecision?.kind,
+      })
+    : null;
+  const resultAdviceText = resultAdvice ? t(`resultAdvice.${resultAdvice.kind}`, { value: resultAdvice.value }) : null;
   const suggestedMetronomeBpm = sessionResult ? suggestMetronomeBpm(intervals, sessionResult.cadence) : null;
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
@@ -981,10 +994,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
           {renderCountdownOverlay ? (
             <div className={`practice-overlay practice-overlay--countdown ${closingOverlay?.kind === "countdown" ? "is-exiting" : ""}`} role="presentation">
-              <div className="practice-overlay__content countdown-card" aria-live="assertive" aria-label={t("trainer.countdown")}>
+              <div className="practice-overlay__content countdown-arena" aria-live="assertive" aria-label={t("trainer.countdown")}>
+                <span className="countdown-kicker">{t("trainer.countdownReady")}</span>
                 <span className="countdown-number" key={countdownOverlayValue}>
                   {countdownOverlayValue}
                 </span>
+                <span className="countdown-fight">{t("trainer.countdownFight")}</span>
                 <span className="countdown-hint">{t("trainer.countdownShortcut")}</span>
                 <button type="button" className="secondary-button" onClick={cancelCountdown}>
                   <X size={18} aria-hidden="true" />
@@ -996,8 +1011,33 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
           {renderFinishedOverlay ? (
             <div className={`practice-overlay practice-overlay--finished ${closingOverlay?.kind === "finished" ? "is-exiting" : ""}`} role="presentation">
-              <div className="practice-overlay__content">
-                <strong>{t("trainer.resultReady")}</strong>
+              <div className="practice-overlay__content result-card">
+                <span className="result-card__eyebrow">{t("trainer.resultReady")}</span>
+                {score && sessionResult ? (
+                  <>
+                    <strong className="result-card__score">{`${score.total} ${score.grade}`}</strong>
+                    <div className="result-card__stats" aria-label={t("trainer.resultStats")}>
+                      <span>
+                        <small>{t("stats.speed")}</small>
+                        <b>{`${Math.round(sessionResult.speedCpm)} ${t("units.cpm")}`}</b>
+                      </span>
+                      <span>
+                        <small>{t("stats.accuracy")}</small>
+                        <b>{`${Math.round(sessionResult.accuracy * 100)}${t("units.percent")}`}</b>
+                      </span>
+                      <span>
+                        <small>{t("stats.errors")}</small>
+                        <b>{sessionResult.errors}</b>
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+                {resultAdviceText ? (
+                  <div className="result-card__advice">
+                    <span>{t("trainer.resultAdviceTitle")}</span>
+                    <p>{resultAdviceText}</p>
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className="play-button"

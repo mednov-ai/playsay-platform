@@ -1,13 +1,19 @@
 package com.playsay.keyboard
 
 import com.playsay.keyboard.controller.ChordSetController
+import com.playsay.keyboard.controller.AnonymousController
 import com.playsay.keyboard.controller.MeController
 import com.playsay.keyboard.controller.TrainingController
+import com.playsay.keyboard.dto.ResolveAnonymousProfileRequest
+import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitResultRequest
+import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
+import com.playsay.keyboard.repo.AnonymousProfileRepo
 import com.playsay.keyboard.repo.TrainingResultRepo
 import liquibase.integration.spring.SpringLiquibase
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
+import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -25,13 +31,16 @@ import kotlin.test.assertTrue
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=true",
+        "playsay.keyboard.anonymous.fingerprint-secret=test-secret",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class KeyboardApiTest @Autowired constructor(
+    private val anonymousController: AnonymousController,
     private val chordSetController: ChordSetController,
     private val trainingController: TrainingController,
     private val meController: MeController,
+    private val anonymousProfileRepo: AnonymousProfileRepo,
     private val trainingResultRepo: TrainingResultRepo,
     private val dataSource: DataSource,
 ) {
@@ -84,6 +93,127 @@ class KeyboardApiTest @Autowired constructor(
         assertEquals(2, progress.weakFingers[0].errors)
     }
 
+    @Test
+    fun `authenticated severe errors return a focus lesson`() {
+        trainingResultRepo.deleteAllInBatch()
+
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val saved = trainingController.submit(
+            keyboardAuthentication(),
+            SubmitResultRequest(
+                chordSetId = chordSetId,
+                lessonKind = "STANDARD",
+                speedCpm = 120.0,
+                accuracy = 0.72,
+                errors = 5,
+                durationMs = 35_000,
+                perFinger = mapOf("leftIndex" to 5),
+                perChar = mapOf("t" to 4),
+                perChord = mapOf("th" to 3),
+            ),
+        )
+
+        assertEquals("SEVERE", saved.focusLesson?.reason)
+        assertTrue(saved.focusLesson?.problemKeys.orEmpty().contains("th"))
+        assertTrue(saved.focusLesson?.chords.orEmpty().isNotEmpty())
+    }
+
+    @Test
+    fun `anonymous profile can be resolved and named without jwt`() {
+        trainingResultRepo.deleteAllInBatch()
+        anonymousProfileRepo.deleteAllInBatch()
+
+        val request = anonymousRequest()
+        val resolved = anonymousController.resolve(
+            ResolveAnonymousProfileRequest(deviceId = "device-1"),
+            request,
+        )
+        assertEquals("device-1", resolved.deviceId)
+        assertEquals(null, resolved.displayName)
+
+        val updated = anonymousController.update(
+            UpdateAnonymousProfileRequest(deviceId = "device-1", displayName = "  Masha  "),
+            request,
+        )
+
+        assertEquals(resolved.id, updated.id)
+        assertEquals("Masha", updated.displayName)
+        assertEquals("Masha", anonymousController.resolve(ResolveAnonymousProfileRequest("device-1"), request).displayName)
+    }
+
+    @Test
+    fun `anonymous severe result returns a focus lesson`() {
+        trainingResultRepo.deleteAllInBatch()
+        anonymousProfileRepo.deleteAllInBatch()
+
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val saved = anonymousController.submit(
+            SubmitAnonymousResultRequest(
+                deviceId = "device-2",
+                chordSetId = chordSetId,
+                lessonKind = "STANDARD",
+                speedCpm = 118.0,
+                accuracy = 0.7,
+                errors = 5,
+                durationMs = 35_000,
+                perFinger = mapOf("leftIndex" to 5),
+                perChar = mapOf("t" to 4),
+                perChord = mapOf("th" to 3),
+            ),
+            anonymousRequest(),
+        )
+
+        assertEquals("SEVERE", saved.focusLesson?.reason)
+        assertTrue(saved.focusLesson?.problemKeys.orEmpty().contains("th"))
+    }
+
+    @Test
+    fun `anonymous moderate repeated errors return focus after three sessions`() {
+        trainingResultRepo.deleteAllInBatch()
+        anonymousProfileRepo.deleteAllInBatch()
+
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val request = anonymousRequest()
+
+        repeat(2) {
+            val saved = anonymousController.submit(
+                SubmitAnonymousResultRequest(
+                    deviceId = "device-3",
+                    chordSetId = chordSetId,
+                    lessonKind = "STANDARD",
+                    speedCpm = 180.0,
+                    accuracy = 0.9,
+                    errors = 2,
+                    durationMs = 30_000,
+                    perFinger = mapOf("leftIndex" to 2),
+                    perChar = mapOf("t" to 2),
+                    perChord = mapOf("th" to 2),
+                ),
+                request,
+            )
+            assertEquals(null, saved.focusLesson)
+        }
+
+        val third = anonymousController.submit(
+            SubmitAnonymousResultRequest(
+                deviceId = "device-3",
+                chordSetId = chordSetId,
+                lessonKind = "STANDARD",
+                speedCpm = 180.0,
+                accuracy = 0.9,
+                errors = 2,
+                durationMs = 30_000,
+                perFinger = mapOf("leftIndex" to 2),
+                perChar = mapOf("t" to 2),
+                perChord = mapOf("th" to 2),
+            ),
+            request,
+        )
+
+        assertEquals("MODERATE", third.focusLesson?.reason)
+        assertTrue(third.focusLesson?.problemKeys.orEmpty().contains("th"))
+    }
+
     private fun keyboardAuthentication(): JwtAuthenticationToken =
         JwtAuthenticationToken(
             Jwt.withTokenValue("keyboard-test-token")
@@ -94,4 +224,11 @@ class KeyboardApiTest @Autowired constructor(
                 .build(),
             listOf(SimpleGrantedAuthority("ROLE_STUDENT")),
         )
+
+    private fun anonymousRequest(): MockHttpServletRequest =
+        MockHttpServletRequest().apply {
+            remoteAddr = "203.0.113.42"
+            addHeader("User-Agent", "KeyboardApiTest")
+            addHeader("X-Forwarded-For", "203.0.113.42")
+        }
 }

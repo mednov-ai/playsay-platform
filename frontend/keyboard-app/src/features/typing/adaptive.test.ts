@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ChordSet } from "../../shared/types";
-import { decideNext, remedialId } from "./adaptive";
+import { buildRemedialSet, decideNext, remedialId } from "./adaptive";
 
 const sets: ChordSet[] = [
-  { id: 1, layout: "EN", title: "Level 1", difficulty: 1, chords: ["th"] },
-  { id: 2, layout: "EN", title: "Level 2", difficulty: 2, chords: ["er"] },
-  { id: 3, layout: "EN", title: "Level 3", difficulty: 3, chords: ["ing"] },
-  { id: 4, layout: "EN", title: "Level 4", difficulty: 4, chords: ["tion"] },
+  { id: 1, layout: "EN", title: "Level 1", difficulty: 1, tier: "beginner", chords: ["th"] },
+  { id: 2, layout: "EN", title: "Level 2", difficulty: 2, tier: "beginner", chords: ["er"] },
+  { id: 3, layout: "EN", title: "Level 3", difficulty: 3, tier: "confident", chords: ["ing"] },
+  { id: 4, layout: "EN", title: "Level 4", difficulty: 4, tier: "middle", chords: ["tion"] },
 ];
 
 const baseParams = {
@@ -65,5 +65,16 @@ describe("keyboard adaptive level selection", () => {
 
     expect(decision.kind).toBe("down");
     expect(decision.set.id).toBe(remedialId);
+  });
+
+  it("builds remedial focus sets deterministically from the same problem keys and seed", () => {
+    const first = buildRemedialSet("EN", ["t", "h", "e"], "Focus", "profile-a:session-4");
+    const second = buildRemedialSet("EN", ["t", "h", "e"], "Focus", "profile-a:session-4");
+    const otherSeed = buildRemedialSet("EN", ["t", "h", "e"], "Focus", "profile-b:session-4");
+
+    expect(first.chords).toEqual(second.chords);
+    expect(first.chords).not.toEqual(otherSeed.chords);
+    expect(first.chords).toHaveLength(18);
+    expect(first.chords).toContain("th");
   });
 });

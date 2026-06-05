@@ -1,14 +1,18 @@
 import { LogIn, LogOut, Play, RotateCcw, Save, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { getLocalChordSets } from "../../entities/chordSets";
+import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
 import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/VirtualKeyboard";
 import {
   dismissRegistrationPrompt,
+  getOrCreateAnonymousDeviceId,
+  readGuestDisplayName,
   readDismissedPromptCount,
   readGuestSessionCount,
   recordGuestSession,
+  shouldShowNamePrompt,
   shouldShowRegistrationPrompt,
+  writeGuestDisplayName,
 } from "../../features/guest/guestProgress";
 import { Metronome } from "../../features/metronome/Metronome";
 import { suggestMetronomeBpm } from "../../features/metronome/metronomeTempo";
@@ -16,14 +20,21 @@ import { StatsPanel } from "../../features/stats/StatsPanel";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { computeCadence, computeScore } from "../../features/typing/scoring";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
-import { buildTypingWindow, computeTypingLineCapacity, typingWindowLineLength, typingWindowRows } from "../../features/typing/typingWindow";
+import {
+  buildMeasuredTypingWindow,
+  buildTypingWindow,
+  computeTypingLineCapacity,
+  type TypingWidthMetrics,
+  typingWindowLineLength,
+  typingWindowRows,
+} from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
 import { useTypingStore } from "../../features/typing/typingStore";
-import { fetchProgress, submitResult } from "../../shared/api/keyboardApi";
+import { fetchProgress, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
-import type { ChordSet, LayoutId, Me, Progress } from "../../shared/types";
+import type { ChordSet, FocusLesson, LayoutId, Me, Progress, TrainingLessonKind } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
 
 interface Props {
@@ -46,6 +57,21 @@ const emptyProgress: Progress = {
   recent: [],
 };
 
+function focusLessonToChordSet(focusLesson: FocusLesson): ChordSet {
+  return {
+    id: -1,
+    layout: focusLesson.layout,
+    title: focusLesson.title,
+    difficulty: 0,
+    tier: "beginner",
+    chords: focusLesson.chords,
+  };
+}
+
+function lessonKindForSet(chordSet: ChordSet | null): TrainingLessonKind {
+  return chordSet?.id === -1 ? "FOCUS" : "STANDARD";
+}
+
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
   if (!element) {
@@ -56,29 +82,46 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
 
 let typingMeasureCanvas: HTMLCanvasElement | null = null;
 
-function measureTypingLineCapacity(element: HTMLElement): number {
+function measureTypingStripMetrics(element: HTMLElement): { capacity: number; metrics: TypingWidthMetrics } {
   const styles = window.getComputedStyle(element);
   const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
   const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
-  const usableWidth = Math.max(0, element.clientWidth - paddingLeft - paddingRight);
+  const usableWidth = Math.max(1, element.clientWidth - paddingLeft - paddingRight - 4);
   typingMeasureCanvas ??= document.createElement("canvas");
   const context = typingMeasureCanvas.getContext("2d");
   const fontSize = Number.parseFloat(styles.fontSize) || 16;
 
   if (!context) {
-    return computeTypingLineCapacity({ usableWidth, characterWidth: fontSize });
+    const defaultCharacterWidth = fontSize * 0.82;
+    return {
+      capacity: computeTypingLineCapacity({ usableWidth, characterWidth: defaultCharacterWidth }),
+      metrics: {
+        maxLineWidth: usableWidth,
+        defaultCharacterWidth,
+        spaceWidth: defaultCharacterWidth * 0.58,
+      },
+    };
   }
 
   context.font = styles.font;
-  const characterWidth = Math.max(
+  const defaultCharacterWidth = Math.max(
     context.measureText("w").width,
     context.measureText("m").width,
     context.measureText("ш").width,
+    context.measureText("щ").width,
     context.measureText("W").width,
-    fontSize * 0.58,
+    fontSize * 0.82,
   );
+  const spaceWidth = Math.max(context.measureText(" ").width, defaultCharacterWidth * 0.52);
 
-  return computeTypingLineCapacity({ usableWidth, characterWidth });
+  return {
+    capacity: computeTypingLineCapacity({ usableWidth, characterWidth: defaultCharacterWidth }),
+    metrics: {
+      maxLineWidth: usableWidth,
+      defaultCharacterWidth,
+      spaceWidth,
+    },
+  };
 }
 
 export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, onLogout, onSignIn }: Props) {
@@ -89,18 +132,24 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(authError ?? null);
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [anonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const [guestSessionCount, setGuestSessionCount] = useState(() => readGuestSessionCount());
+  const [guestDisplayName, setGuestDisplayName] = useState<string | null>(() => readGuestDisplayName());
   const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [guestNameDraft, setGuestNameDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [guestRecorded, setGuestRecorded] = useState(false);
   const [nextDecision, setNextDecision] = useState<AdaptiveDecision | null>(null);
   const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
   const [typingLineCapacity, setTypingLineCapacity] = useState(typingWindowLineLength);
+  const [typingMetrics, setTypingMetrics] = useState<TypingWidthMetrics | null>(null);
   const visibleCapacity = typingLineCapacity * typingWindowRows;
   const submittedResultRef = useRef<string | null>(null);
   const typingStripRef = useRef<HTMLDivElement | null>(null);
   const visibleCapacityRef = useRef(visibleCapacity);
+  const profileSeed = me?.subject ?? anonymousDeviceId;
 
   const loadSet = useTypingStore((state) => state.loadSet);
   const reset = useTypingStore((state) => state.reset);
@@ -123,14 +172,46 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [visibleCapacity]);
 
   useEffect(() => {
+    if (isAuthenticated) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    void resolveAnonymousProfile({ deviceId: anonymousDeviceId })
+      .then((profile) => {
+        if (cancelled) {
+          return;
+        }
+        setGuestSessionCount((current) => Math.max(current, profile.sessions));
+        if (profile.displayName) {
+          writeGuestDisplayName(profile.displayName);
+          setGuestDisplayName(profile.displayName);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [anonymousDeviceId, isAuthenticated]);
+
+  useEffect(() => {
     const element = typingStripRef.current;
     if (!element) {
       return undefined;
     }
 
     const updateCapacity = () => {
-      const nextCapacity = measureTypingLineCapacity(element);
-      setTypingLineCapacity((current) => (current === nextCapacity ? current : nextCapacity));
+      const measured = measureTypingStripMetrics(element);
+      setTypingLineCapacity((current) => (current === measured.capacity ? current : measured.capacity));
+      setTypingMetrics((current) =>
+        current &&
+        current.maxLineWidth === measured.metrics.maxLineWidth &&
+        current.defaultCharacterWidth === measured.metrics.defaultCharacterWidth &&
+        current.spaceWidth === measured.metrics.spaceWidth
+          ? current
+          : measured.metrics,
+      );
     };
 
     updateCapacity();
@@ -159,7 +240,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     const loadedSets = getLocalChordSets(layoutId);
     setSets(loadedSets);
     if (loadedSets.length > 0) {
-      loadSet(layoutId, loadedSets[0], visibleCapacityRef.current);
+      loadSet(
+        layoutId,
+        materializeChordSet(loadedSets[0], profileSeed, isAuthenticated ? 1 : readGuestSessionCount() + 1),
+        visibleCapacityRef.current,
+      );
     }
 
     if (!isAuthenticated) {
@@ -190,7 +275,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, layoutId, loadSet]);
+  }, [isAuthenticated, layoutId, loadSet, profileSeed]);
 
   useEffect(() => {
     if (sessionFlow.phase !== "idle" || !chordSet) {
@@ -234,8 +319,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setGuestRecorded(false);
     const currentSet = chordSet;
 
-    const updateNextDecision = () => {
+    const updateNextDecision = (focusLesson?: FocusLesson) => {
       if (!currentSet) {
+        return;
+      }
+      if (focusLesson) {
+        setNextDecision({ kind: "down", set: focusLessonToChordSet(focusLesson) });
         return;
       }
       const problemChars = Object.entries(perChar)
@@ -252,6 +341,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           currentSet,
           sets,
           remedialTitle: t("trainer.remedialTitle", { chars: problemChars.join(" ") }),
+          remedialSeed: `${profileSeed}:${sessionResult.chordSetId}:${sessionResult.durationMs}`,
         }),
       );
     };
@@ -262,6 +352,25 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       setGuestSessionCount(nextCount);
       setGuestRecorded(true);
       updateNextDecision();
+      void submitAnonymousResult({
+        deviceId: anonymousDeviceId,
+        displayName: guestDisplayName ?? undefined,
+        chordSetId: sessionResult.chordSetId,
+        lessonKind: lessonKindForSet(currentSet),
+        speedCpm: sessionResult.speedCpm,
+        accuracy: sessionResult.accuracy,
+        errors: sessionResult.errors,
+        durationMs: sessionResult.durationMs,
+        perFinger: sessionResult.perFinger,
+        perChar: sessionResult.perChar,
+        perChord: sessionResult.perChord,
+      })
+        .then((savedResult) => updateNextDecision(savedResult.focusLesson))
+        .catch(() => undefined);
+      if (shouldShowNamePrompt(nextCount, guestDisplayName)) {
+        setGuestNameDraft(guestDisplayName ?? "");
+        setShowNamePrompt(true);
+      }
       if (shouldShowRegistrationPrompt(nextCount, dismissedCount)) {
         setShowRegistrationPrompt(true);
       }
@@ -272,19 +381,25 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
     const save = async () => {
       if (sessionResult.chordSetId > 0) {
-        await submitResult({
+        const savedResult = await submitResult({
           chordSetId: sessionResult.chordSetId,
+          lessonKind: lessonKindForSet(currentSet),
           speedCpm: sessionResult.speedCpm,
           accuracy: sessionResult.accuracy,
           errors: sessionResult.errors,
           durationMs: sessionResult.durationMs,
           perFinger: sessionResult.perFinger,
+          perChar: sessionResult.perChar,
+          perChord: sessionResult.perChord,
         });
+        updateNextDecision(savedResult.focusLesson);
       }
       const loadedProgress = await fetchProgress();
       setProgress(loadedProgress);
       setSaved(true);
-      updateNextDecision();
+      if (sessionResult.chordSetId <= 0) {
+        updateNextDecision();
+      }
     };
 
     void save()
@@ -292,7 +407,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         setLoadError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => setSaving(false));
-  }, [chordSet, isAuthenticated, layoutId, perChar, resultKey, sessionResult, sets, t]);
+  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, layoutId, perChar, profileSeed, resultKey, sessionResult, sets, t]);
 
   const liveStats = useMemo(() => {
     const elapsedMs = startedAt == null ? 0 : Math.max(1, (finishedAt ?? Date.now()) - startedAt);
@@ -308,8 +423,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [correctCount, errorCount, finishedAt, intervals, pos, startedAt, stream.length]);
 
   const typingWindow = useMemo(
-    () => buildTypingWindow(stream, statuses, pos, typingLineCapacity, typingWindowRows),
-    [pos, statuses, stream, typingLineCapacity],
+    () =>
+      typingMetrics
+        ? buildMeasuredTypingWindow(stream, statuses, pos, typingMetrics, typingWindowRows)
+        : buildTypingWindow(stream, statuses, pos, typingLineCapacity, typingWindowRows),
+    [pos, statuses, stream, typingLineCapacity, typingMetrics],
   );
 
   const score = sessionResult
@@ -347,13 +465,19 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     submittedResultRef.current = null;
   }, []);
 
+  const materializePracticeSet = useCallback(
+    (set: ChordSet): ChordSet =>
+      set.id < 0 ? set : materializeChordSet(set, profileSeed, (progress?.sessions ?? guestSessionCount) + 1),
+    [guestSessionCount, profileSeed, progress?.sessions],
+  );
+
   const selectSet = (setId: string) => {
     const nextSet = sets.find((set) => set.id === Number(setId));
     if (nextSet) {
       setNextDecision(null);
       clearSessionResult();
       dispatchSessionFlow({ type: "reset" });
-      loadSet(layoutId, nextSet, visibleCapacity);
+      loadSet(layoutId, materializePracticeSet(nextSet), visibleCapacity);
     }
   };
 
@@ -367,16 +491,16 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     clearSessionResult();
 
     if (sessionFlow.phase === "finished") {
-      loadSet(layoutId, nextDecision?.set ?? activeSet, visibleCapacity);
+      loadSet(layoutId, materializePracticeSet(nextDecision?.set ?? activeSet), visibleCapacity);
       setNextDecision(null);
     } else if (!chordSet) {
-      loadSet(layoutId, activeSet, visibleCapacity);
+      loadSet(layoutId, materializePracticeSet(activeSet), visibleCapacity);
     } else {
       reset();
     }
 
     dispatchSessionFlow({ type: "start" });
-  }, [canStartSession, chordSet, clearSessionResult, layoutId, loadSet, nextDecision, reset, sessionFlow.phase, sets, visibleCapacity]);
+  }, [canStartSession, chordSet, clearSessionResult, layoutId, loadSet, materializePracticeSet, nextDecision, reset, sessionFlow.phase, sets, visibleCapacity]);
 
   const restartSession = useCallback(() => {
     if (!chordSet) {
@@ -405,6 +529,28 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setShowRegistrationPrompt(false);
   }, [guestSessionCount]);
 
+  const dismissNamePrompt = useCallback(() => {
+    setShowNamePrompt(false);
+  }, []);
+
+  const saveGuestName = useCallback(() => {
+    const displayName = writeGuestDisplayName(guestNameDraft);
+    if (!displayName) {
+      return;
+    }
+    setGuestDisplayName(displayName);
+    setShowNamePrompt(false);
+    void updateAnonymousProfile({ deviceId: anonymousDeviceId, displayName })
+      .then((profile) => {
+        if (profile.displayName) {
+          setGuestDisplayName(profile.displayName);
+          writeGuestDisplayName(profile.displayName);
+        }
+        setGuestSessionCount((current) => Math.max(current, profile.sessions));
+      })
+      .catch(() => undefined);
+  }, [anonymousDeviceId, guestNameDraft]);
+
   useEffect(() => {
     if (sessionFlow.phase !== "running" || sessionResult) {
       return undefined;
@@ -421,6 +567,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       }
 
       if (event.code === "Escape") {
+        if (showNamePrompt) {
+          event.preventDefault();
+          dismissNamePrompt();
+          return;
+        }
         if (showRegistrationPrompt) {
           event.preventDefault();
           dismissPrompt();
@@ -443,13 +594,13 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         return;
       }
 
-      if (event.code === "Space" && canResumeSession && !showRegistrationPrompt) {
+      if (event.code === "Space" && canResumeSession && !showRegistrationPrompt && !showNamePrompt) {
         event.preventDefault();
         resumeSession();
         return;
       }
 
-      if (event.code === "Space" && canStartSession && !showRegistrationPrompt) {
+      if (event.code === "Space" && canStartSession && !showRegistrationPrompt && !showNamePrompt) {
         event.preventDefault();
         startSession();
       }
@@ -462,18 +613,20 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     canStartSession,
     cancelCountdown,
     dismissFinishOverlay,
+    dismissNamePrompt,
     dismissPrompt,
     restartSession,
     resumeSession,
     sessionFlow.finishOverlayVisible,
     sessionFlow.phase,
+    showNamePrompt,
     showRegistrationPrompt,
     startSession,
   ]);
 
   const startLabel = sessionFlow.phase === "finished" ? t("trainer.next") : t("trainer.start");
   const accountLabel = isAuthenticated ? t("auth.signedInAs") : t("auth.guestAccount");
-  const accountValue = isAuthenticated ? me.email ?? me.username : t("auth.guestProgress");
+  const accountValue = isAuthenticated ? me.email ?? me.username : guestDisplayName ?? t("auth.guestProgress");
 
   return (
     <main className="keyboard-app">
@@ -592,7 +745,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 <span>{startLabel}</span>
               </button>
               {chordSet ? (
-                <span className="level-pill">{t("trainer.difficulty", { level: chordSet.difficulty })}</span>
+                <span className="level-pill">{t(`level.${chordSet.tier}`)}</span>
               ) : null}
               <button type="button" className="secondary-button" onClick={restartSession} disabled={!chordSet || sessionFlow.phase === "running"}>
                 <RotateCcw size={18} aria-hidden="true" />
@@ -741,7 +894,44 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         </section>
       </section>
 
-      {showRegistrationPrompt ? (
+      {showNamePrompt ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="registration-modal" role="dialog" aria-modal="true" aria-labelledby="guest-name-prompt-title">
+            <button type="button" className="icon-button registration-modal__close" onClick={dismissNamePrompt} aria-label={t("trainer.continueGuest")}>
+              <X size={18} aria-hidden="true" />
+            </button>
+            <h2 id="guest-name-prompt-title">{t("trainer.guestNameTitle")}</h2>
+            <p>{t("trainer.guestNameBody")}</p>
+            <label className="field guest-name-field">
+              <span>{t("trainer.guestNameLabel")}</span>
+              <input
+                value={guestNameDraft}
+                maxLength={64}
+                autoFocus
+                placeholder={t("trainer.guestNamePlaceholder")}
+                onChange={(event) => setGuestNameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    saveGuestName();
+                  }
+                }}
+              />
+            </label>
+            <div className="registration-modal__actions">
+              <button type="button" className="primary-button" onClick={saveGuestName}>
+                <Save size={18} aria-hidden="true" />
+                <span>{t("trainer.guestNameSave")}</span>
+              </button>
+              <button type="button" className="secondary-button" onClick={dismissNamePrompt}>
+                <span>{t("trainer.continueGuest")}</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {showRegistrationPrompt && !showNamePrompt ? (
         <div className="modal-backdrop" role="presentation">
           <section className="registration-modal" role="dialog" aria-modal="true" aria-labelledby="registration-prompt-title">
             <button type="button" className="icon-button registration-modal__close" onClick={dismissPrompt} aria-label={t("trainer.continueGuest")}>

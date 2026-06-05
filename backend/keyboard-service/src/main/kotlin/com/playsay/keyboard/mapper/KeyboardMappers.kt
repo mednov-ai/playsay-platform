@@ -17,6 +17,7 @@ fun ChordSetEntity.toResponse(): ChordSetResponse =
         layout = layout,
         title = title,
         difficulty = difficulty,
+        tier = levelTierForDifficulty(difficulty),
         chords = chords.toList(),
     )
 
@@ -24,10 +25,14 @@ fun TrainingResultEntity.toResponse(): TrainingResultResponse =
     TrainingResultResponse(
         id = id,
         chordSetId = chordSetId,
+        lessonKind = lessonKind,
         speedCpm = speedCpm,
         accuracy = accuracy,
         errors = errors,
         durationMs = durationMs,
+        perChar = perChar,
+        perChord = perChord,
+        focusProblemKeys = focusProblemKeys,
         createdAt = createdAt.toString(),
     )
 
@@ -56,4 +61,30 @@ class PerFingerErrorMapConverter : AttributeConverter<Map<String, Int>, String> 
     }
 }
 
+@Converter
+class StringListConverter : AttributeConverter<List<String>, String> {
+    override fun convertToDatabaseColumn(attribute: List<String>?): String =
+        objectMapper.writeValueAsString(attribute.orEmpty())
+
+    override fun convertToEntityAttribute(dbData: String?): List<String> {
+        if (dbData.isNullOrBlank()) {
+            return emptyList()
+        }
+        return objectMapper.readValue(dbData, listType)
+    }
+
+    private companion object {
+        val objectMapper: ObjectMapper = jacksonObjectMapper()
+        val listType = object : TypeReference<List<String>>() {}
+    }
+}
+
 private const val rolePrefix = "ROLE_"
+
+private fun levelTierForDifficulty(difficulty: Int): String =
+    when {
+        difficulty <= 2 -> "beginner"
+        difficulty == 3 -> "confident"
+        difficulty <= 5 -> "middle"
+        else -> "professional"
+    }

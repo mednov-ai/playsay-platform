@@ -22,6 +22,7 @@ class SecurityConfig {
                     .requestMatchers(
                         "/actuator/health",
                         "/actuator/health/**",
+                        "/api/anonymous/**",
                     ).permitAll()
                     .anyRequest().authenticated()
             }

@@ -29,6 +29,12 @@ export const ru = {
     light: "Светлая тема",
     dark: "Темная тема",
   },
+  level: {
+    beginner: "Начинающий",
+    confident: "Уверенный",
+    middle: "Средний",
+    professional: "Профессиональный",
+  },
   trainer: {
     layout: "Раскладка",
     set: "Набор",
@@ -69,6 +75,11 @@ export const ru = {
     registrationTitle: "Сохранить прогресс?",
     registrationBody: "Вы прошли 5 тренировок. Зарегистрируйтесь, чтобы сохранять результаты и видеть слабые зоны.",
     continueGuest: "Продолжить гостем",
+    guestNameTitle: "Как вас называть?",
+    guestNameBody: "Можно оставить имя, и в следующий раз тренажер узнает вас без входа.",
+    guestNameLabel: "Имя",
+    guestNamePlaceholder: "Например, Маша",
+    guestNameSave: "Сохранить",
   },
   stats: {
     speed: "Скорость",

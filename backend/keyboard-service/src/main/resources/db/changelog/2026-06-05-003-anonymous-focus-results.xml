@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-05-003-create-keyboard-anonymous-profiles" author="codex">
+        <createTable tableName="keyboard_anonymous_profiles">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_keyboard_anonymous_profiles"/>
+            </column>
+            <column name="device_id" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="fingerprint_hash" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_name" type="VARCHAR(64)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_seen_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="keyboard_anonymous_profiles"
+            columnNames="device_id"
+            constraintName="uk_keyboard_anonymous_profiles_device_id"/>
+    </changeSet>
+
+    <changeSet id="2026-06-05-003-extend-keyboard-training-results" author="codex">
+        <dropNotNullConstraint
+            tableName="keyboard_training_results"
+            columnName="keycloak_subject"
+            columnDataType="VARCHAR(255)"/>
+        <addColumn tableName="keyboard_training_results">
+            <column name="anonymous_profile_id" type="BIGINT"/>
+            <column name="lesson_kind" type="VARCHAR(16)" defaultValue="STANDARD">
+                <constraints nullable="false"/>
+            </column>
+            <column name="per_char" type="VARCHAR(2048)" defaultValue="{}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="per_chord" type="VARCHAR(2048)" defaultValue="{}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="focus_problem_keys" type="VARCHAR(1024)" defaultValue="[]">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="keyboard_training_results"
+            baseColumnNames="anonymous_profile_id"
+            constraintName="fk_keyboard_training_results_anonymous_profile"
+            referencedTableName="keyboard_anonymous_profiles"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <createIndex tableName="keyboard_training_results" indexName="idx_keyboard_training_results_anonymous_created">
+            <column name="anonymous_profile_id"/>
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2026-06-05-003-expand-first-keyboard-chord-pools" author="codex">
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="15"/><column name="chord_value" value="he"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="16"/><column name="chord_value" value="in"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="17"/><column name="chord_value" value="an"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="18"/><column name="chord_value" value="on"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="19"/><column name="chord_value" value="to"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="20"/><column name="chord_value" value="ou"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="21"/><column name="chord_value" value="is"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="22"/><column name="chord_value" value="it"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="23"/><column name="chord_value" value="or"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="24"/><column name="chord_value" value="as"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="25"/><column name="chord_value" value="at"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="26"/><column name="chord_value" value="hi"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="27"/><column name="chord_value" value="ha"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="28"/><column name="chord_value" value="ea"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="29"/><column name="chord_value" value="ve"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="30"/><column name="chord_value" value="co"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="31"/><column name="chord_value" value="me"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="16"/><column name="chord_value" value="но"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="17"/><column name="chord_value" value="на"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="18"/><column name="chord_value" value="по"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="19"/><column name="chord_value" value="то"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="20"/><column name="chord_value" value="ел"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="21"/><column name="chord_value" value="от"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="22"/><column name="chord_value" value="ос"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="23"/><column name="chord_value" value="та"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="24"/><column name="chord_value" value="ла"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="25"/><column name="chord_value" value="де"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="26"/><column name="chord_value" value="ол"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="27"/><column name="chord_value" value="ть"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="28"/><column name="chord_value" value="ес"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="29"/><column name="chord_value" value="ом"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="30"/><column name="chord_value" value="ит"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="31"/><column name="chord_value" value="ан"/></insert>
+    </changeSet>
+</databaseChangeLog>

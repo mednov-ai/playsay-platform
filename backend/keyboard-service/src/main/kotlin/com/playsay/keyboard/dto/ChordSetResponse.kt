@@ -5,5 +5,6 @@ data class ChordSetResponse(
     val layout: String,
     val title: String,
     val difficulty: Int,
+    val tier: String,
     val chords: List<String>,
 )

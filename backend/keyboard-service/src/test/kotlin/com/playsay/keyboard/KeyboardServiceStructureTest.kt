@@ -112,6 +112,16 @@ class KeyboardServiceStructureTest {
         )
     }
 
+    @Test
+    fun `anonymous keyboard endpoints are explicitly public`() {
+        val securityConfig = sourceRoot.resolve("config/SecurityConfig.kt").readText()
+
+        assertTrue(
+            securityConfig.contains("\"/api/anonymous/**\""),
+            "SecurityConfig must keep anonymous keyboard ingestion public while protected progress APIs stay authenticated.",
+        )
+    }
+
     private fun kotlinSources(): List<KotlinSource> =
         allKotlinSourcePaths().map { path ->
             val text = path.readText()

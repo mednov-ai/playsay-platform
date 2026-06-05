@@ -1,41 +1,90 @@
 package com.playsay.keyboard.service
 
+import com.playsay.keyboard.dto.AnonymousProfileResponse
 import com.playsay.keyboard.dto.FingerErrorsResponse
+import com.playsay.keyboard.dto.FocusLessonResponse
 import com.playsay.keyboard.dto.ProgressResponse
+import com.playsay.keyboard.dto.ResolveAnonymousProfileRequest
+import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitResultRequest
 import com.playsay.keyboard.dto.TrainingResultResponse
+import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
+import com.playsay.keyboard.entity.AnonymousProfileEntity
+import com.playsay.keyboard.entity.ChordSetEntity
 import com.playsay.keyboard.entity.TrainingResultEntity
 import com.playsay.keyboard.mapper.toResponse
+import com.playsay.keyboard.repo.AnonymousProfileRepo
 import com.playsay.keyboard.repo.ChordSetRepo
 import com.playsay.keyboard.repo.TrainingResultRepo
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 
 @Service
 class TrainingService(
     private val chordSetRepo: ChordSetRepo,
     private val trainingResultRepo: TrainingResultRepo,
+    private val anonymousProfileRepo: AnonymousProfileRepo,
+    private val anonymousFingerprintService: AnonymousFingerprintService,
 ) {
     @Transactional
     fun submit(subject: String, request: SubmitResultRequest): TrainingResultResponse {
-        if (!chordSetRepo.existsById(request.chordSetId)) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Chord set not found.")
-        }
-
+        val chordSet = requireChordSet(request.chordSetId)
         val saved = trainingResultRepo.save(
             TrainingResultEntity(
                 keycloakSubject = subject,
                 chordSetId = request.chordSetId,
+                lessonKind = normalizeLessonKind(request.lessonKind),
                 speedCpm = request.speedCpm,
                 accuracy = request.accuracy,
                 errors = request.errors,
                 durationMs = request.durationMs,
-                perFinger = request.perFinger.filterValues { errors -> errors > 0 },
+                perFinger = sanitizeErrorMap(request.perFinger),
+                perChar = sanitizeErrorMap(request.perChar),
+                perChord = sanitizeErrorMap(request.perChord),
+                focusProblemKeys = sanitizeProblemKeys(request.focusProblemKeys),
             ),
         )
-        return saved.toResponse()
+        val recent = trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc(subject)
+        return saved.toResponse().copy(focusLesson = focusLesson(saved, recent, chordSet))
+    }
+
+    @Transactional
+    fun resolveAnonymousProfile(request: ResolveAnonymousProfileRequest, servletRequest: HttpServletRequest): AnonymousProfileResponse {
+        val profile = upsertAnonymousProfile(request.deviceId, servletRequest, displayName = null)
+        return profile.toResponse()
+    }
+
+    @Transactional
+    fun updateAnonymousProfile(request: UpdateAnonymousProfileRequest, servletRequest: HttpServletRequest): AnonymousProfileResponse {
+        val profile = upsertAnonymousProfile(request.deviceId, servletRequest, cleanDisplayName(request.displayName))
+        return profile.toResponse()
+    }
+
+    @Transactional
+    fun submitAnonymous(request: SubmitAnonymousResultRequest, servletRequest: HttpServletRequest): TrainingResultResponse {
+        val chordSet = requireChordSet(request.chordSetId)
+        val profile = upsertAnonymousProfile(request.deviceId, servletRequest, cleanDisplayName(request.displayName))
+        val saved = trainingResultRepo.save(
+            TrainingResultEntity(
+                anonymousProfileId = profile.id,
+                chordSetId = request.chordSetId,
+                lessonKind = normalizeLessonKind(request.lessonKind),
+                speedCpm = request.speedCpm,
+                accuracy = request.accuracy,
+                errors = request.errors,
+                durationMs = request.durationMs,
+                perFinger = sanitizeErrorMap(request.perFinger),
+                perChar = sanitizeErrorMap(request.perChar),
+                perChord = sanitizeErrorMap(request.perChord),
+                focusProblemKeys = sanitizeProblemKeys(request.focusProblemKeys),
+            ),
+        )
+        val recent = trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id)
+        return saved.toResponse().copy(focusLesson = focusLesson(saved, recent, chordSet))
     }
 
     @Transactional(readOnly = true)
@@ -66,5 +115,189 @@ class TrainingService(
             weakFingers = weakFingers,
             recent = results.take(10).map { result -> result.toResponse() },
         )
+    }
+
+    private fun requireChordSet(chordSetId: Long): ChordSetEntity =
+        chordSetRepo.findById(chordSetId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Chord set not found.") }
+
+    private fun upsertAnonymousProfile(
+        rawDeviceId: String,
+        servletRequest: HttpServletRequest,
+        displayName: String?,
+    ): AnonymousProfileEntity {
+        val deviceId = normalizeDeviceId(rawDeviceId)
+        val fingerprintHash = anonymousFingerprintService.fingerprintHash(servletRequest)
+        val profile = anonymousProfileRepo.findByDeviceId(deviceId)
+            ?: AnonymousProfileEntity(deviceId = deviceId, fingerprintHash = fingerprintHash)
+
+        profile.fingerprintHash = fingerprintHash
+        profile.lastSeenAt = Instant.now()
+        if (displayName != null) {
+            profile.displayName = displayName
+        }
+        return anonymousProfileRepo.save(profile)
+    }
+
+    private fun AnonymousProfileEntity.toResponse(): AnonymousProfileResponse =
+        AnonymousProfileResponse(
+            id = id,
+            deviceId = deviceId,
+            displayName = displayName,
+            sessions = trainingResultRepo.countByAnonymousProfileId(id),
+        )
+
+    private fun focusLesson(
+        saved: TrainingResultEntity,
+        recentResults: List<TrainingResultEntity>,
+        chordSet: ChordSetEntity,
+    ): FocusLessonResponse? {
+        val severeKeys = severeProblemKeys(saved)
+        if (severeKeys.isNotEmpty()) {
+            return buildFocusLesson(chordSet, "SEVERE", severeKeys)
+        }
+
+        val moderateKeys = moderateProblemKeys(recentResults.take(3))
+        if (moderateKeys.isNotEmpty()) {
+            return buildFocusLesson(chordSet, "MODERATE", moderateKeys)
+        }
+
+        return null
+    }
+
+    private fun severeProblemKeys(result: TrainingResultEntity): List<String> {
+        val chordKeys = result.perChord
+            .filterValues { errors -> errors >= 3 }
+            .entries
+        val charKeys = result.perChar
+            .filterValues { errors -> errors >= 4 }
+            .entries
+        return (chordKeys + charKeys)
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { entry -> entry.value }.thenBy { entry -> entry.key })
+            .map { entry -> entry.key }
+            .distinct()
+            .take(3)
+    }
+
+    private fun moderateProblemKeys(results: List<TrainingResultEntity>): List<String> {
+        if (results.size < 3) {
+            return emptyList()
+        }
+
+        val totals = mutableMapOf<String, Int>()
+        val sessions = mutableMapOf<String, Int>()
+        results.forEach { result ->
+            mergeProblemMaps(result).forEach { (key, count) ->
+                if (count > 0) {
+                    totals[key] = (totals[key] ?: 0) + count
+                    sessions[key] = (sessions[key] ?: 0) + 1
+                }
+            }
+        }
+
+        return totals.keys
+            .filter { key ->
+                val sessionCount = sessions[key] ?: 0
+                sessionCount >= 3 || ((totals[key] ?: 0) >= 5 && sessionCount >= 2)
+            }
+            .sortedWith(compareByDescending<String> { key -> totals[key] ?: 0 }.thenBy { key -> key })
+            .take(3)
+    }
+
+    private fun mergeProblemMaps(result: TrainingResultEntity): Map<String, Int> {
+        val merged = mutableMapOf<String, Int>()
+        (result.perChord.entries + result.perChar.entries).forEach { entry ->
+            merged[entry.key] = (merged[entry.key] ?: 0) + entry.value
+        }
+        return merged
+    }
+
+    private fun buildFocusLesson(chordSet: ChordSetEntity, reason: String, problemKeys: List<String>): FocusLessonResponse {
+        val cleanKeys = sanitizeProblemKeys(problemKeys)
+        return FocusLessonResponse(
+            sourceChordSetId = chordSet.id,
+            layout = chordSet.layout,
+            reason = reason,
+            problemKeys = cleanKeys,
+            chords = buildFocusChords(cleanKeys, chordSet.chords),
+            title = "Focus: ${cleanKeys.joinToString(" ")}",
+        )
+    }
+
+    private fun buildFocusChords(problemKeys: List<String>, fallbackChords: List<String>): List<String> {
+        val combos = linkedSetOf<String>()
+        problemKeys.forEach { key ->
+            combos += key
+            if (key.length == 1) {
+                combos += key + key
+            } else {
+                combos += key.reversed()
+                key.toList().forEach { char ->
+                    combos += "$char$char"
+                }
+            }
+        }
+        problemKeys.forEach { left ->
+            problemKeys.forEach { right ->
+                if (left != right && left.length == 1 && right.length == 1) {
+                    combos += left + right
+                }
+            }
+        }
+
+        if (combos.isEmpty()) {
+            combos.addAll(fallbackChords.take(18))
+        }
+
+        val ordered = combos.toList()
+        val repeated = mutableListOf<String>()
+        while (repeated.size < 18 && ordered.isNotEmpty()) {
+            repeated += ordered
+        }
+        return repeated.take(18)
+    }
+
+    private fun sanitizeErrorMap(values: Map<String, Int>): Map<String, Int> =
+        values.asSequence()
+            .map { (key, value) -> key.trim() to value }
+            .filter { (key, value) -> key.length in 1..16 && value > 0 }
+            .sortedWith(compareByDescending<Pair<String, Int>> { (_, value) -> value }.thenBy { (key) -> key })
+            .take(maxMapEntries)
+            .associate { (key, value) -> key to value.coerceAtMost(maxErrorsPerKey) }
+
+    private fun sanitizeProblemKeys(values: List<String>): List<String> =
+        values.asSequence()
+            .map { value -> value.trim() }
+            .filter { value -> value.length in 1..16 }
+            .distinct()
+            .take(maxProblemKeys)
+            .toList()
+
+    private fun normalizeDeviceId(value: String): String {
+        val normalized = value.trim()
+        if (normalized.length !in 8..128) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Anonymous device id is invalid.")
+        }
+        return normalized
+    }
+
+    private fun cleanDisplayName(value: String?): String? {
+        val normalized = value?.trim()?.take(64)
+        return normalized?.ifBlank { null }
+    }
+
+    private fun normalizeLessonKind(value: String): String {
+        val normalized = value.trim().uppercase()
+        if (normalized !in supportedLessonKinds) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported lesson kind.")
+        }
+        return normalized
+    }
+
+    private companion object {
+        val supportedLessonKinds = setOf("STANDARD", "FOCUS")
+        const val maxMapEntries = 32
+        const val maxProblemKeys = 8
+        const val maxErrorsPerKey = 999
     }
 }

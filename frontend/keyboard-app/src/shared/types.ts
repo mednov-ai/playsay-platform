@@ -1,5 +1,7 @@
 export type LayoutId = "EN" | "RU";
 
+export type LevelTier = "beginner" | "confident" | "middle" | "professional";
+
 export type Finger =
   | "leftPinky"
   | "leftRing"
@@ -45,16 +47,33 @@ export interface ChordSet {
   layout: LayoutId;
   title: string;
   difficulty: number;
+  tier: LevelTier;
   chords: string[];
+}
+
+export type TrainingLessonKind = "STANDARD" | "FOCUS";
+
+export interface FocusLesson {
+  kind: "FOCUS";
+  sourceChordSetId: number;
+  layout: LayoutId;
+  reason: "SEVERE" | "MODERATE";
+  problemKeys: string[];
+  chords: string[];
+  title: string;
 }
 
 export interface SubmitResult {
   chordSetId: number;
+  lessonKind?: TrainingLessonKind;
   speedCpm: number;
   accuracy: number;
   errors: number;
   durationMs: number;
   perFinger: Record<string, number>;
+  perChar?: Record<string, number>;
+  perChord?: Record<string, number>;
+  focusProblemKeys?: string[];
 }
 
 export interface TrainingResult {
@@ -65,7 +84,11 @@ export interface TrainingResult {
   errors: number;
   durationMs: number;
   perFinger: Record<string, number>;
+  perChar?: Record<string, number>;
+  perChord?: Record<string, number>;
+  focusProblemKeys?: string[];
   createdAt: string;
+  focusLesson?: FocusLesson;
 }
 
 export interface FingerErrors {
@@ -87,4 +110,25 @@ export interface Me {
   username: string;
   email?: string;
   roles: string[];
+}
+
+export interface AnonymousProfile {
+  id: number;
+  deviceId: string;
+  displayName?: string;
+  sessions: number;
+}
+
+export interface ResolveAnonymousProfileRequest {
+  deviceId: string;
+}
+
+export interface UpdateAnonymousProfileRequest {
+  deviceId: string;
+  displayName: string;
+}
+
+export interface SubmitAnonymousResult extends SubmitResult {
+  deviceId: string;
+  displayName?: string;
 }

@@ -9,6 +9,7 @@ describe("typing stream", () => {
       layout: "EN",
       title: "Short",
       difficulty: 1,
+      tier: "beginner",
       chords: ["th", "er"],
     };
 
@@ -25,6 +26,7 @@ describe("typing stream", () => {
       layout: "EN",
       title: "Short",
       difficulty: 1,
+      tier: "beginner",
       chords: ["th", "er"],
     };
 

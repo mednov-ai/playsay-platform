@@ -6,4 +6,5 @@
 
     <include file="2026-06-05-001-create-keyboard-tables.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-05-002-seed-keyboard-chordsets.xml" relativeToChangelogFile="true"/>
+    <include file="2026-06-05-003-anonymous-focus-results.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

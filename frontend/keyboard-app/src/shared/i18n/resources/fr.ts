@@ -31,6 +31,12 @@ export const fr: TranslationResource = {
     light: "Thème clair",
     dark: "Thème sombre",
   },
+  level: {
+    beginner: "Débutant",
+    confident: "Assuré",
+    middle: "Intermédiaire",
+    professional: "Professionnel",
+  },
   trainer: {
     layout: "Disposition",
     set: "Série",
@@ -71,6 +77,11 @@ export const fr: TranslationResource = {
     registrationTitle: "Sauvegarder la progression ?",
     registrationBody: "Vous avez terminé 5 entraînements. Inscrivez-vous pour sauvegarder les résultats et voir les zones à travailler.",
     continueGuest: "Continuer invité",
+    guestNameTitle: "Comment vous appeler ?",
+    guestNameBody: "Ajoutez un prénom pour que le clavier vous reconnaisse sans connexion.",
+    guestNameLabel: "Prénom",
+    guestNamePlaceholder: "Par exemple, Masha",
+    guestNameSave: "Enregistrer",
   },
   stats: {
     speed: "Vitesse",

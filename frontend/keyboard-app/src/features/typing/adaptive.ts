@@ -1,4 +1,5 @@
 import { LAYOUTS } from "../../entities/layouts";
+import { seededShuffle } from "../../shared/deterministic";
 import type { ChordSet, LayoutId } from "../../shared/types";
 
 export const upThreshold = 0.95;
@@ -13,7 +14,7 @@ export interface AdaptiveDecision {
   set: ChordSet;
 }
 
-export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], title: string): ChordSet {
+export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], title: string, seed = "focus"): ChordSet {
   const layout = LAYOUTS[layoutId];
   const homeAnchors: Record<string, string> = {};
   layout.keys.forEach((key) => {
@@ -42,9 +43,10 @@ export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], tit
   });
 
   const unique = Array.from(new Set(combos));
+  const shuffledUnique = seededShuffle(unique, `${layoutId}:${seed}:${chars.join("")}`);
   const repeated: string[] = [];
   while (repeated.length < 18 && unique.length > 0) {
-    repeated.push(...unique);
+    repeated.push(...shuffledUnique);
   }
 
   return {
@@ -52,7 +54,8 @@ export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], tit
     layout: layoutId,
     title,
     difficulty: 0,
-    chords: shuffle(repeated).slice(0, 18),
+    tier: "beginner",
+    chords: repeated.slice(0, 18),
   };
 }
 
@@ -65,15 +68,16 @@ export function decideNext(params: {
   currentSet: ChordSet;
   sets: ChordSet[];
   remedialTitle: string;
+  remedialSeed?: string;
 }): AdaptiveDecision {
-  const { layoutId, accuracy, speedCpm, cadence, perChar, currentSet, sets, remedialTitle } = params;
+  const { layoutId, accuracy, speedCpm, cadence, perChar, currentSet, sets, remedialTitle, remedialSeed } = params;
 
   if (accuracy < downThreshold) {
     const problems = topProblemChars(perChar);
     if (problems.length > 0) {
       return {
         kind: "down",
-        set: buildRemedialSet(layoutId, problems, remedialTitle),
+        set: buildRemedialSet(layoutId, problems, remedialTitle, remedialSeed),
       };
     }
   }
@@ -115,13 +119,4 @@ function topProblemChars(perChar: Record<string, number>): string[] {
     .filter(([, count]) => count > 0)
     .sort((left, right) => right[1] - left[1])
     .map(([char]) => char);
-}
-
-function shuffle<T>(values: T[]): T[] {
-  const result = values.slice();
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
-  }
-  return result;
 }

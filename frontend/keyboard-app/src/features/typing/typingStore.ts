@@ -10,6 +10,7 @@ export interface StreamItem {
   char: string;
   finger: Finger;
   chordIndex: number;
+  chord: string;
   isChordStart: boolean;
   isSpace?: boolean;
 }
@@ -21,6 +22,8 @@ export interface SessionResult {
   errors: number;
   durationMs: number;
   perFinger: Record<string, number>;
+  perChar: Record<string, number>;
+  perChord: Record<string, number>;
   cadence: number;
 }
 
@@ -36,6 +39,7 @@ interface TypingState {
   errorCount: number;
   perFinger: Record<string, number>;
   perChar: Record<string, number>;
+  perChord: Record<string, number>;
   errorFlash: number | null;
   intervals: number[];
   lastCorrectAt: number | null;
@@ -62,7 +66,7 @@ export function buildStream(layoutId: LayoutId, chordSet: ChordSet, visibleCapac
   const baseStream: StreamItem[] = [];
   chordSet.chords.forEach((chord, chordIndex) => {
     if (chordIndex > 0) {
-      baseStream.push({ char: " ", finger: "rightIndex", chordIndex, isChordStart: false, isSpace: true });
+      baseStream.push({ char: " ", finger: "rightIndex", chordIndex, chord: " ", isChordStart: false, isSpace: true });
     }
 
     Array.from(chord).forEach((char, charIndex) => {
@@ -71,6 +75,7 @@ export function buildStream(layoutId: LayoutId, chordSet: ChordSet, visibleCapac
         char,
         finger: key?.finger ?? "rightIndex",
         chordIndex,
+        chord,
         isChordStart: charIndex === 0,
       });
     });
@@ -84,7 +89,7 @@ export function buildStream(layoutId: LayoutId, chordSet: ChordSet, visibleCapac
   let cycle = 0;
   while (stream.length < targetLength) {
     if (cycle > 0) {
-      stream.push({ char: " ", finger: "rightIndex", chordIndex: cycle * chordSet.chords.length, isChordStart: false, isSpace: true });
+      stream.push({ char: " ", finger: "rightIndex", chordIndex: cycle * chordSet.chords.length, chord: " ", isChordStart: false, isSpace: true });
     }
     baseStream.forEach((item) => {
       stream.push({
@@ -110,6 +115,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
   errorCount: 0,
   perFinger: {},
   perChar: {},
+  perChord: {},
   errorFlash: null,
   intervals: [],
   lastCorrectAt: null,
@@ -128,6 +134,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errorCount: 0,
       perFinger: {},
       perChar: {},
+      perChord: {},
       errorFlash: null,
       intervals: [],
       lastCorrectAt: null,
@@ -145,6 +152,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errorCount: 0,
       perFinger: {},
       perChar: {},
+      perChord: {},
       errorFlash: null,
       intervals: [],
       lastCorrectAt: null,
@@ -191,9 +199,11 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     statuses[pos] = "error";
     const perFinger = { ...state.perFinger };
     const perChar = { ...state.perChar };
+    const perChord = { ...state.perChord };
     if (target.char !== " ") {
       perFinger[target.finger] = (perFinger[target.finger] ?? 0) + 1;
       perChar[target.char] = (perChar[target.char] ?? 0) + 1;
+      perChord[target.chord] = (perChord[target.chord] ?? 0) + 1;
     }
     set({
       statuses,
@@ -201,12 +211,13 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errorCount: state.errorCount + 1,
       perFinger,
       perChar,
+      perChord,
       errorFlash: pos,
     });
   },
 
   result: () => {
-    const { chordSet, startedAt, finishedAt, correctCount, errorCount, perFinger, intervals } = get();
+    const { chordSet, startedAt, finishedAt, correctCount, errorCount, perFinger, perChar, perChord, intervals } = get();
     if (!chordSet || startedAt == null || finishedAt == null) {
       return null;
     }
@@ -223,6 +234,8 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errors: errorCount,
       durationMs,
       perFinger,
+      perChar,
+      perChord,
       cadence: Math.round(computeCadence(intervals) * 1_000) / 1_000,
     };
   },

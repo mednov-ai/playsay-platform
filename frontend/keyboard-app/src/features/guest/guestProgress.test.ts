@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  anonymousDeviceIdStorageKey,
+  guestDisplayNameStorageKey,
   guestPromptDismissedStorageKey,
   guestSessionStorageKey,
+  getOrCreateAnonymousDeviceId,
+  readGuestDisplayName,
   readDismissedPromptCount,
   readGuestSessionCount,
   recordGuestSession,
+  shouldShowNamePrompt,
   shouldShowRegistrationPrompt,
+  writeGuestDisplayName,
 } from "./guestProgress";
 
 class MemoryStorage implements Pick<Storage, "getItem" | "setItem"> {
@@ -24,6 +30,17 @@ describe("guest keyboard progress", () => {
   it("uses the Play&Say key guest session storage contract", () => {
     expect(guestSessionStorageKey).toBe("playsay.key.guestSessions");
     expect(guestPromptDismissedStorageKey).toBe("playsay.key.registrationPromptDismissedAt");
+    expect(anonymousDeviceIdStorageKey).toBe("playsay.key.anonymousDeviceId");
+    expect(guestDisplayNameStorageKey).toBe("playsay.key.guestDisplayName");
+  });
+
+  it("creates a stable anonymous device id", () => {
+    const storage = new MemoryStorage();
+    const factory = () => "device-123";
+
+    expect(getOrCreateAnonymousDeviceId(storage, factory)).toBe("device-123");
+    expect(getOrCreateAnonymousDeviceId(storage, () => "device-456")).toBe("device-123");
+    expect(storage.getItem(anonymousDeviceIdStorageKey)).toBe("device-123");
   });
 
   it("increments anonymous completed sessions", () => {
@@ -41,6 +58,22 @@ describe("guest keyboard progress", () => {
     expect(shouldShowRegistrationPrompt(5, 5)).toBe(false);
     expect(shouldShowRegistrationPrompt(6, 5)).toBe(false);
     expect(shouldShowRegistrationPrompt(10, 5)).toBe(true);
+  });
+
+  it("prompts for a guest name after two sessions until a name exists", () => {
+    expect(shouldShowNamePrompt(1, null)).toBe(false);
+    expect(shouldShowNamePrompt(2, null)).toBe(true);
+    expect(shouldShowNamePrompt(3, "Masha")).toBe(false);
+  });
+
+  it("stores a trimmed guest display name and ignores empty values", () => {
+    const storage = new MemoryStorage();
+
+    writeGuestDisplayName("  Masha  ", storage);
+    expect(readGuestDisplayName(storage)).toBe("Masha");
+
+    writeGuestDisplayName("   ", storage);
+    expect(readGuestDisplayName(storage)).toBe("Masha");
   });
 
   it("treats invalid stored values as empty", () => {

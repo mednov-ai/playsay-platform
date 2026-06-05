@@ -31,6 +31,12 @@ export const de: TranslationResource = {
     light: "Helles Design",
     dark: "Dunkles Design",
   },
+  level: {
+    beginner: "Anfänger",
+    confident: "Sicher",
+    middle: "Mittel",
+    professional: "Profi",
+  },
   trainer: {
     layout: "Layout",
     set: "Satz",
@@ -71,6 +77,11 @@ export const de: TranslationResource = {
     registrationTitle: "Fortschritt speichern?",
     registrationBody: "Du hast 5 Übungen abgeschlossen. Registriere dich, um Ergebnisse und Fokuszonen zu speichern.",
     continueGuest: "Als Gast weiter",
+    guestNameTitle: "Wie sollen wir dich nennen?",
+    guestNameBody: "Speichere einen Namen, damit der Trainer dich beim nächsten Mal ohne Anmeldung erkennt.",
+    guestNameLabel: "Name",
+    guestNamePlaceholder: "Zum Beispiel Masha",
+    guestNameSave: "Speichern",
   },
   stats: {
     speed: "Tempo",

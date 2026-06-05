@@ -593,6 +593,15 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     dispatchSessionFlow({ type: "cancel" });
   }, [sessionFlow.countdownValue, showClosingOverlay]);
 
+  const skipCountdown = useCallback(() => {
+    if (overlayCloseTimerRef.current != null) {
+      window.clearTimeout(overlayCloseTimerRef.current);
+      overlayCloseTimerRef.current = null;
+    }
+    setClosingOverlay(null);
+    dispatchSessionFlow({ type: "skipCountdown" });
+  }, []);
+
   const dismissFinishOverlay = useCallback(() => {
     showClosingOverlay("finished");
     dispatchSessionFlow({ type: "dismissFinishOverlay" });
@@ -684,6 +693,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         return;
       }
 
+      if (event.code === "Space" && sessionFlow.phase === "countdown" && !showRegistrationPrompt && !showNamePrompt) {
+        event.preventDefault();
+        skipCountdown();
+        return;
+      }
+
       if (event.code === "Space" && canStartSession && !showRegistrationPrompt && !showNamePrompt) {
         event.preventDefault();
         startSession();
@@ -705,6 +720,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     sessionFlow.phase,
     showNamePrompt,
     showRegistrationPrompt,
+    skipCountdown,
     startSession,
   ]);
 
@@ -965,8 +981,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
           {renderCountdownOverlay ? (
             <div className={`practice-overlay practice-overlay--countdown ${closingOverlay?.kind === "countdown" ? "is-exiting" : ""}`} role="presentation">
-              <div className="practice-overlay__content" aria-live="assertive" aria-label={t("trainer.countdown")}>
-                <span className="countdown-number">{countdownOverlayValue}</span>
+              <div className="practice-overlay__content countdown-card" aria-live="assertive" aria-label={t("trainer.countdown")}>
+                <span className="countdown-number" key={countdownOverlayValue}>
+                  {countdownOverlayValue}
+                </span>
+                <span className="countdown-hint">{t("trainer.countdownShortcut")}</span>
                 <button type="button" className="secondary-button" onClick={cancelCountdown}>
                   <X size={18} aria-hidden="true" />
                   <span>{t("trainer.cancel")}</span>

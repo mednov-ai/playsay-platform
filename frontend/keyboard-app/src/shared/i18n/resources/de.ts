@@ -74,6 +74,7 @@ export const de: TranslationResource = {
     nextRepeat: "Wiederholen",
     signInForProgress: "Anmelden, um Fortschritt zu speichern",
     countdown: "Countdown",
+    countdownShortcut: "Space startet sofort",
     registrationTitle: "Fortschritt speichern?",
     registrationBody: "Du hast 5 Übungen abgeschlossen. Registriere dich, um Ergebnisse und Fokuszonen zu speichern.",
     continueGuest: "Als Gast weiter",

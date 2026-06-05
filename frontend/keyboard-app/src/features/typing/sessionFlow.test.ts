@@ -1,17 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { initialSessionFlow, sessionFlowReducer } from "./sessionFlow";
+import type { SessionFlowState } from "./sessionFlow";
+
+function finishCountdown(state: SessionFlowState): SessionFlowState {
+  let next = state;
+  for (let tick = 0; tick < 5; tick += 1) {
+    next = sessionFlowReducer(next, { type: "countdownTick" });
+  }
+  return next;
+}
 
 describe("keyboard session flow", () => {
   it("starts with a blocked countdown before typing runs", () => {
     const state = sessionFlowReducer(initialSessionFlow(), { type: "start" });
 
     expect(state.phase).toBe("countdown");
-    expect(state.countdownValue).toBe(3);
+    expect(state.countdownValue).toBe(5);
     expect(state.acceptsTyping).toBe(false);
   });
 
-  it("enters running only after the 3-2-1 countdown completes", () => {
+  it("enters running only after the 5-4-3-2-1 countdown completes", () => {
     let state = sessionFlowReducer(initialSessionFlow(), { type: "start" });
+    state = sessionFlowReducer(state, { type: "countdownTick" });
+    expect(state.countdownValue).toBe(4);
+    state = sessionFlowReducer(state, { type: "countdownTick" });
+    expect(state.countdownValue).toBe(3);
     state = sessionFlowReducer(state, { type: "countdownTick" });
     expect(state.countdownValue).toBe(2);
     state = sessionFlowReducer(state, { type: "countdownTick" });
@@ -21,6 +34,15 @@ describe("keyboard session flow", () => {
     expect(state.phase).toBe("running");
     expect(state.countdownValue).toBeNull();
     expect(state.acceptsTyping).toBe(true);
+  });
+
+  it("skips countdown into a running session when requested", () => {
+    const countdown = sessionFlowReducer(initialSessionFlow(), { type: "start" });
+    const skipped = sessionFlowReducer(countdown, { type: "skipCountdown" });
+
+    expect(skipped.phase).toBe("running");
+    expect(skipped.countdownValue).toBeNull();
+    expect(skipped.acceptsTyping).toBe(true);
   });
 
   it("cancels countdown with escape without accepting typing", () => {
@@ -34,9 +56,7 @@ describe("keyboard session flow", () => {
 
   it("finishes into a result-first state and waits for the next explicit start", () => {
     let state = sessionFlowReducer(initialSessionFlow(), { type: "start" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = finishCountdown(state);
     state = sessionFlowReducer(state, { type: "finish" });
 
     expect(state.phase).toBe("finished");
@@ -45,15 +65,13 @@ describe("keyboard session flow", () => {
 
     const next = sessionFlowReducer(state, { type: "start" });
     expect(next.phase).toBe("countdown");
-    expect(next.countdownValue).toBe(3);
+    expect(next.countdownValue).toBe(5);
     expect(next.finishOverlayVisible).toBe(false);
   });
 
   it("shows a blocking play overlay when a running session finishes", () => {
     let state = sessionFlowReducer(initialSessionFlow(), { type: "start" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = finishCountdown(state);
 
     const finished = sessionFlowReducer(state, { type: "finish" });
 
@@ -64,9 +82,7 @@ describe("keyboard session flow", () => {
 
   it("dismisses only the finished play overlay without resetting the result state", () => {
     let state = sessionFlowReducer(initialSessionFlow(), { type: "start" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = finishCountdown(state);
     state = sessionFlowReducer(state, { type: "finish" });
 
     const dismissed = sessionFlowReducer(state, { type: "dismissFinishOverlay" });
@@ -79,9 +95,7 @@ describe("keyboard session flow", () => {
 
   it("pauses a running session and resumes without a new countdown", () => {
     let state = sessionFlowReducer(initialSessionFlow(), { type: "start" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
-    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = finishCountdown(state);
 
     const paused = sessionFlowReducer(state, { type: "pause" });
     expect(paused.phase).toBe("paused");

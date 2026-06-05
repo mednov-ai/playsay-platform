@@ -74,6 +74,7 @@ export const en: TranslationResource = {
     nextRepeat: "Repeat",
     signInForProgress: "Sign in to save progress",
     countdown: "Countdown",
+    countdownShortcut: "Space starts now",
     registrationTitle: "Save your progress?",
     registrationBody: "You have completed 5 practices. Register to save results and see focus zones.",
     continueGuest: "Continue as guest",

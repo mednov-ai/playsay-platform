@@ -72,6 +72,7 @@ export const ru = {
     nextRepeat: "Повторить",
     signInForProgress: "Войдите, чтобы сохранять прогресс",
     countdown: "Обратный отсчет",
+    countdownShortcut: "Space - начать сразу",
     registrationTitle: "Сохранить прогресс?",
     registrationBody: "Вы прошли 5 тренировок. Зарегистрируйтесь, чтобы сохранять результаты и видеть слабые зоны.",
     continueGuest: "Продолжить гостем",

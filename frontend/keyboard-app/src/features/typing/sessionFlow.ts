@@ -10,6 +10,7 @@ export interface SessionFlowState {
 export type SessionFlowEvent =
   | { type: "start" }
   | { type: "countdownTick" }
+  | { type: "skipCountdown" }
   | { type: "cancel" }
   | { type: "pause" }
   | { type: "resume" }
@@ -31,7 +32,7 @@ export function sessionFlowReducer(state: SessionFlowState, event: SessionFlowEv
     case "start":
       return {
         phase: "countdown",
-        countdownValue: 3,
+        countdownValue: 5,
         acceptsTyping: false,
         finishOverlayVisible: false,
       };
@@ -51,6 +52,16 @@ export function sessionFlowReducer(state: SessionFlowState, event: SessionFlowEv
         phase: "countdown",
         countdownValue: state.countdownValue - 1,
         acceptsTyping: false,
+        finishOverlayVisible: false,
+      };
+    case "skipCountdown":
+      if (state.phase !== "countdown") {
+        return state;
+      }
+      return {
+        phase: "running",
+        countdownValue: null,
+        acceptsTyping: true,
         finishOverlayVisible: false,
       };
     case "cancel":

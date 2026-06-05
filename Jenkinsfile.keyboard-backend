@@ -166,13 +166,32 @@ spec:
               curl -fsSL "https://repo1.maven.org/maven2/org/postgresql/postgresql/${POSTGRES_JDBC_VERSION}/postgresql-${POSTGRES_JDBC_VERSION}.jar" -o "$POSTGRES_JDBC_JAR"
             fi
             CHANGELOG="backend/keyboard-service/src/main/resources/db/changelog/db.changelog-master.xml"
-            liquibase \
-              --changelog-file="$CHANGELOG" \
-              --classpath="$POSTGRES_JDBC_JAR" \
-              --url="$PLAYSAY_KEYBOARD_DB_JDBC_URL" \
-              --username="$PLAYSAY_KEYBOARD_DB_USERNAME" \
-              --password="$PLAYSAY_KEYBOARD_DB_PASSWORD" \
-              status --verbose
+            STATUS_LOG="/tmp/keyboard-liquibase-status.log"
+            for attempt in $(seq 1 18); do
+              if liquibase \
+                --changelog-file="$CHANGELOG" \
+                --classpath="$POSTGRES_JDBC_JAR" \
+                --url="$PLAYSAY_KEYBOARD_DB_JDBC_URL" \
+                --username="$PLAYSAY_KEYBOARD_DB_USERNAME" \
+                --password="$PLAYSAY_KEYBOARD_DB_PASSWORD" \
+                status --verbose > "$STATUS_LOG" 2>&1; then
+                cat "$STATUS_LOG"
+                break
+              fi
+
+              if [ "$attempt" -eq 18 ]; then
+                cat "$STATUS_LOG"
+                exit 1
+              fi
+
+              if grep -Eiq 'Connection could not be created|password authentication failed|connection refused|timeout|does not exist' "$STATUS_LOG"; then
+                echo "Waiting for keyboard database credentials to be ready ($attempt/18)"
+                sleep 10
+              else
+                cat "$STATUS_LOG"
+                exit 1
+              fi
+            done
             liquibase \
               --changelog-file="$CHANGELOG" \
               --classpath="$POSTGRES_JDBC_JAR" \

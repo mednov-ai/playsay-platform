@@ -1,10 +1,12 @@
 import { Bell, BellOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { maxMetronomeBpm, metronomeStepBpm, minMetronomeBpm } from "./metronomeTempo";
 
 interface Props {
   label: string;
   tempoLabel: string;
   bpmUnit: string;
+  suggestedBpm?: number | null;
 }
 
 function scheduleClick(ctx: AudioContext, time: number, accent: boolean) {
@@ -20,12 +22,21 @@ function scheduleClick(ctx: AudioContext, time: number, accent: boolean) {
   oscillator.stop(time + 0.06);
 }
 
-export function Metronome({ label, tempoLabel, bpmUnit }: Props) {
+export function Metronome({ label, tempoLabel, bpmUnit, suggestedBpm = null }: Props) {
   const [enabled, setEnabled] = useState(false);
   const [bpm, setBpm] = useState(120);
+  const [draggingTempo, setDraggingTempo] = useState(false);
   const ctxRef = useRef<AudioContext | null>(null);
   const nextNoteRef = useRef(0);
   const beatRef = useRef(0);
+
+  useEffect(() => {
+    if (suggestedBpm == null || draggingTempo) {
+      return;
+    }
+
+    setBpm(suggestedBpm);
+  }, [draggingTempo, suggestedBpm]);
 
   useEffect(() => {
     if (!enabled) {
@@ -82,10 +93,13 @@ export function Metronome({ label, tempoLabel, bpmUnit }: Props) {
         <span>{tempoLabel}</span>
         <input
           type="range"
-          min={60}
-          max={240}
-          step={5}
+          min={minMetronomeBpm}
+          max={maxMetronomeBpm}
+          step={metronomeStepBpm}
           value={bpm}
+          onPointerDown={() => setDraggingTempo(true)}
+          onPointerUp={() => setDraggingTempo(false)}
+          onBlur={() => setDraggingTempo(false)}
           onChange={(event) => setBpm(Number(event.target.value))}
         />
         <strong>{`${bpm} ${bpmUnit}`}</strong>

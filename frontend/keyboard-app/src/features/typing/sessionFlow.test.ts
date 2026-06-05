@@ -46,6 +46,35 @@ describe("keyboard session flow", () => {
     const next = sessionFlowReducer(state, { type: "start" });
     expect(next.phase).toBe("countdown");
     expect(next.countdownValue).toBe(3);
+    expect(next.finishOverlayVisible).toBe(false);
+  });
+
+  it("shows a blocking play overlay when a running session finishes", () => {
+    let state = sessionFlowReducer(initialSessionFlow(), { type: "start" });
+    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = sessionFlowReducer(state, { type: "countdownTick" });
+
+    const finished = sessionFlowReducer(state, { type: "finish" });
+
+    expect(finished.phase).toBe("finished");
+    expect(finished.acceptsTyping).toBe(false);
+    expect(finished.finishOverlayVisible).toBe(true);
+  });
+
+  it("dismisses only the finished play overlay without resetting the result state", () => {
+    let state = sessionFlowReducer(initialSessionFlow(), { type: "start" });
+    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = sessionFlowReducer(state, { type: "countdownTick" });
+    state = sessionFlowReducer(state, { type: "finish" });
+
+    const dismissed = sessionFlowReducer(state, { type: "dismissFinishOverlay" });
+
+    expect(dismissed.phase).toBe("finished");
+    expect(dismissed.acceptsTyping).toBe(false);
+    expect(dismissed.countdownValue).toBeNull();
+    expect(dismissed.finishOverlayVisible).toBe(false);
   });
 
   it("pauses a running session and resumes without a new countdown", () => {

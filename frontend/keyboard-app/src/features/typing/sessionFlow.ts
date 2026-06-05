@@ -4,6 +4,7 @@ export interface SessionFlowState {
   phase: SessionPhase;
   countdownValue: number | null;
   acceptsTyping: boolean;
+  finishOverlayVisible: boolean;
 }
 
 export type SessionFlowEvent =
@@ -13,6 +14,7 @@ export type SessionFlowEvent =
   | { type: "pause" }
   | { type: "resume" }
   | { type: "finish" }
+  | { type: "dismissFinishOverlay" }
   | { type: "reset" };
 
 export function initialSessionFlow(): SessionFlowState {
@@ -20,6 +22,7 @@ export function initialSessionFlow(): SessionFlowState {
     phase: "idle",
     countdownValue: null,
     acceptsTyping: false,
+    finishOverlayVisible: false,
   };
 }
 
@@ -30,6 +33,7 @@ export function sessionFlowReducer(state: SessionFlowState, event: SessionFlowEv
         phase: "countdown",
         countdownValue: 3,
         acceptsTyping: false,
+        finishOverlayVisible: false,
       };
     case "countdownTick":
       if (state.phase !== "countdown" || state.countdownValue == null) {
@@ -40,12 +44,14 @@ export function sessionFlowReducer(state: SessionFlowState, event: SessionFlowEv
           phase: "running",
           countdownValue: null,
           acceptsTyping: true,
+          finishOverlayVisible: false,
         };
       }
       return {
         phase: "countdown",
         countdownValue: state.countdownValue - 1,
         acceptsTyping: false,
+        finishOverlayVisible: false,
       };
     case "cancel":
       if (state.phase !== "countdown") {
@@ -60,6 +66,7 @@ export function sessionFlowReducer(state: SessionFlowState, event: SessionFlowEv
         phase: "paused",
         countdownValue: null,
         acceptsTyping: false,
+        finishOverlayVisible: false,
       };
     case "resume":
       if (state.phase !== "paused") {
@@ -69,6 +76,7 @@ export function sessionFlowReducer(state: SessionFlowState, event: SessionFlowEv
         phase: "running",
         countdownValue: null,
         acceptsTyping: true,
+        finishOverlayVisible: false,
       };
     case "finish":
       if (state.phase !== "running") {
@@ -78,6 +86,15 @@ export function sessionFlowReducer(state: SessionFlowState, event: SessionFlowEv
         phase: "finished",
         countdownValue: null,
         acceptsTyping: false,
+        finishOverlayVisible: true,
+      };
+    case "dismissFinishOverlay":
+      if (state.phase !== "finished") {
+        return state;
+      }
+      return {
+        ...state,
+        finishOverlayVisible: false,
       };
     case "reset":
       return initialSessionFlow();

@@ -11,11 +11,12 @@ import {
   shouldShowRegistrationPrompt,
 } from "../../features/guest/guestProgress";
 import { Metronome } from "../../features/metronome/Metronome";
+import { suggestMetronomeBpm } from "../../features/metronome/metronomeTempo";
 import { StatsPanel } from "../../features/stats/StatsPanel";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { computeCadence, computeScore } from "../../features/typing/scoring";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
-import { buildTypingWindow } from "../../features/typing/typingWindow";
+import { buildTypingWindow, computeTypingLineCapacity, typingWindowLineLength, typingWindowRows } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
 import { useTypingStore } from "../../features/typing/typingStore";
 import { fetchProgress, submitResult } from "../../shared/api/keyboardApi";
@@ -53,6 +54,33 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
   return ["A", "BUTTON", "INPUT", "SELECT", "TEXTAREA"].includes(element.tagName);
 }
 
+let typingMeasureCanvas: HTMLCanvasElement | null = null;
+
+function measureTypingLineCapacity(element: HTMLElement): number {
+  const styles = window.getComputedStyle(element);
+  const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
+  const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
+  const usableWidth = Math.max(0, element.clientWidth - paddingLeft - paddingRight);
+  typingMeasureCanvas ??= document.createElement("canvas");
+  const context = typingMeasureCanvas.getContext("2d");
+  const fontSize = Number.parseFloat(styles.fontSize) || 16;
+
+  if (!context) {
+    return computeTypingLineCapacity({ usableWidth, characterWidth: fontSize });
+  }
+
+  context.font = styles.font;
+  const characterWidth = Math.max(
+    context.measureText("w").width,
+    context.measureText("m").width,
+    context.measureText("ш").width,
+    context.measureText("W").width,
+    fontSize * 0.58,
+  );
+
+  return computeTypingLineCapacity({ usableWidth, characterWidth });
+}
+
 export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, onLogout, onSignIn }: Props) {
   const { t, i18n } = useTranslation();
   const isAuthenticated = me != null;
@@ -68,7 +96,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [guestRecorded, setGuestRecorded] = useState(false);
   const [nextDecision, setNextDecision] = useState<AdaptiveDecision | null>(null);
   const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
+  const [typingLineCapacity, setTypingLineCapacity] = useState(typingWindowLineLength);
+  const visibleCapacity = typingLineCapacity * typingWindowRows;
   const submittedResultRef = useRef<string | null>(null);
+  const typingStripRef = useRef<HTMLDivElement | null>(null);
+  const visibleCapacityRef = useRef(visibleCapacity);
 
   const loadSet = useTypingStore((state) => state.loadSet);
   const reset = useTypingStore((state) => state.reset);
@@ -87,6 +119,34 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   useTypingEngine(Boolean(chordSet) && sessionFlow.acceptsTyping);
 
   useEffect(() => {
+    visibleCapacityRef.current = visibleCapacity;
+  }, [visibleCapacity]);
+
+  useEffect(() => {
+    const element = typingStripRef.current;
+    if (!element) {
+      return undefined;
+    }
+
+    const updateCapacity = () => {
+      const nextCapacity = measureTypingLineCapacity(element);
+      setTypingLineCapacity((current) => (current === nextCapacity ? current : nextCapacity));
+    };
+
+    updateCapacity();
+
+    const ResizeObserverCtor = (window as Window & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+    if (ResizeObserverCtor) {
+      const observer = new ResizeObserverCtor(updateCapacity);
+      observer.observe(element);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener("resize", updateCapacity);
+    return () => window.removeEventListener("resize", updateCapacity);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
@@ -99,7 +159,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     const loadedSets = getLocalChordSets(layoutId);
     setSets(loadedSets);
     if (loadedSets.length > 0) {
-      loadSet(layoutId, loadedSets[0]);
+      loadSet(layoutId, loadedSets[0], visibleCapacityRef.current);
     }
 
     if (!isAuthenticated) {
@@ -131,6 +191,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       cancelled = true;
     };
   }, [isAuthenticated, layoutId, loadSet]);
+
+  useEffect(() => {
+    if (sessionFlow.phase !== "idle" || !chordSet) {
+      return;
+    }
+
+    loadSet(layoutId, chordSet, visibleCapacity);
+  }, [chordSet, layoutId, loadSet, sessionFlow.phase, visibleCapacity]);
 
   useEffect(() => {
     if (authError) {
@@ -178,6 +246,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         decideNext({
           layoutId,
           accuracy: sessionResult.accuracy,
+          speedCpm: sessionResult.speedCpm,
+          cadence: sessionResult.cadence,
           perChar,
           currentSet,
           sets,
@@ -237,14 +307,22 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     };
   }, [correctCount, errorCount, finishedAt, intervals, pos, startedAt, stream.length]);
 
-  const typingWindow = useMemo(() => buildTypingWindow(stream, statuses, pos), [pos, statuses, stream]);
+  const typingWindow = useMemo(
+    () => buildTypingWindow(stream, statuses, pos, typingLineCapacity, typingWindowRows),
+    [pos, statuses, stream, typingLineCapacity],
+  );
 
   const score = sessionResult
     ? computeScore(sessionResult.speedCpm, sessionResult.accuracy, sessionResult.cadence)
     : null;
+  const suggestedMetronomeBpm = sessionResult ? suggestMetronomeBpm(intervals, sessionResult.cadence) : null;
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
-  const isSessionLocked = sessionFlow.phase === "countdown" || sessionFlow.phase === "running" || sessionFlow.phase === "paused";
+  const isSessionLocked =
+    sessionFlow.phase === "countdown" ||
+    sessionFlow.phase === "running" ||
+    sessionFlow.phase === "paused" ||
+    sessionFlow.finishOverlayVisible;
   const canStartSession = Boolean((chordSet ?? sets[0]) && (sessionFlow.phase === "idle" || sessionFlow.phase === "finished"));
   const canResumeSession = sessionFlow.phase === "paused";
 
@@ -275,7 +353,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       setNextDecision(null);
       clearSessionResult();
       dispatchSessionFlow({ type: "reset" });
-      loadSet(layoutId, nextSet);
+      loadSet(layoutId, nextSet, visibleCapacity);
     }
   };
 
@@ -288,17 +366,17 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setLoadError(null);
     clearSessionResult();
 
-    if (sessionFlow.phase === "finished" && nextDecision) {
-      loadSet(layoutId, nextDecision.set);
+    if (sessionFlow.phase === "finished") {
+      loadSet(layoutId, nextDecision?.set ?? activeSet, visibleCapacity);
       setNextDecision(null);
     } else if (!chordSet) {
-      loadSet(layoutId, activeSet);
+      loadSet(layoutId, activeSet, visibleCapacity);
     } else {
       reset();
     }
 
     dispatchSessionFlow({ type: "start" });
-  }, [canStartSession, chordSet, clearSessionResult, layoutId, loadSet, nextDecision, reset, sessionFlow.phase, sets]);
+  }, [canStartSession, chordSet, clearSessionResult, layoutId, loadSet, nextDecision, reset, sessionFlow.phase, sets, visibleCapacity]);
 
   const restartSession = useCallback(() => {
     if (!chordSet) {
@@ -312,6 +390,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
   const cancelCountdown = useCallback(() => {
     dispatchSessionFlow({ type: "cancel" });
+  }, []);
+
+  const dismissFinishOverlay = useCallback(() => {
+    dispatchSessionFlow({ type: "dismissFinishOverlay" });
   }, []);
 
   const resumeSession = useCallback(() => {
@@ -349,6 +431,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           restartSession();
           return;
         }
+        if (sessionFlow.phase === "finished" && sessionFlow.finishOverlayVisible) {
+          event.preventDefault();
+          dismissFinishOverlay();
+          return;
+        }
         if (sessionFlow.phase === "countdown") {
           event.preventDefault();
           cancelCountdown();
@@ -374,9 +461,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     canResumeSession,
     canStartSession,
     cancelCountdown,
+    dismissFinishOverlay,
     dismissPrompt,
     restartSession,
     resumeSession,
+    sessionFlow.finishOverlayVisible,
     sessionFlow.phase,
     showRegistrationPrompt,
     startSession,
@@ -540,7 +629,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           />
 
           <div className="typing-stage">
-            <div className="typing-strip" aria-live="polite" aria-label={t("trainer.typingLineAria")}>
+            <div ref={typingStripRef} className="typing-strip" aria-live="polite" aria-label={t("trainer.typingLineAria")}>
               {typingWindow.rows.map((row, rowIndex) => (
                 <div className="typing-strip__line" key={`${typingWindow.start}-${rowIndex}`}>
                   {row.map(({ item, index, status }) => (
@@ -559,7 +648,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           <VirtualKeyboard labels={keyboardLabels} layoutId={layoutId} nextChar={nextChar} />
 
           <div className="trainer-footer">
-            <Metronome label={t("metronome.label")} tempoLabel={t("metronome.tempo")} bpmUnit={t("units.bpm")} />
+            <Metronome
+              label={t("metronome.label")}
+              tempoLabel={t("metronome.tempo")}
+              bpmUnit={t("units.bpm")}
+              suggestedBpm={suggestedMetronomeBpm}
+            />
             <div className="result-box">
               {saving ? (
                 <>
@@ -621,6 +715,26 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                   <X size={18} aria-hidden="true" />
                   <span>{t("trainer.cancel")}</span>
                 </button>
+              </div>
+            </div>
+          ) : null}
+
+          {sessionFlow.phase === "finished" && sessionFlow.finishOverlayVisible ? (
+            <div className="practice-overlay practice-overlay--finished" role="presentation">
+              <div className="practice-overlay__content">
+                <strong>{t("trainer.resultReady")}</strong>
+                <button
+                  type="button"
+                  className="play-button"
+                  onClick={startSession}
+                  disabled={!canStartSession}
+                  aria-label={t("trainer.playAria")}
+                  title={t("trainer.playAria")}
+                >
+                  <Play size={58} fill="currentColor" aria-hidden="true" />
+                  <span>{startLabel}</span>
+                </button>
+                <span>{t("trainer.startShortcut")}</span>
               </div>
             </div>
           ) : null}

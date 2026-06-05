@@ -39,16 +39,26 @@ interface TypingState {
   errorFlash: number | null;
   intervals: number[];
   lastCorrectAt: number | null;
-  loadSet: (layoutId: LayoutId, chordSet: ChordSet) => void;
+  loadSet: (layoutId: LayoutId, chordSet: ChordSet, visibleCapacity?: number) => void;
   reset: () => void;
   handleKey: (code: string) => void;
   result: () => SessionResult | null;
 }
 
 export const minimumPracticeStreamLength = typingWindowLineLength * typingWindowRows;
+export const defaultPracticeVisibleCapacity = minimumPracticeStreamLength;
 
-export function buildStream(layoutId: LayoutId, chordSet: ChordSet): StreamItem[] {
+function cleanVisibleCapacity(visibleCapacity: number | undefined): number {
+  if (visibleCapacity == null || !Number.isFinite(visibleCapacity)) {
+    return defaultPracticeVisibleCapacity;
+  }
+
+  return Math.max(1, Math.floor(visibleCapacity));
+}
+
+export function buildStream(layoutId: LayoutId, chordSet: ChordSet, visibleCapacity?: number): StreamItem[] {
   const layout = LAYOUTS[layoutId];
+  const targetLength = cleanVisibleCapacity(visibleCapacity);
   const baseStream: StreamItem[] = [];
   chordSet.chords.forEach((chord, chordIndex) => {
     if (chordIndex > 0) {
@@ -66,13 +76,13 @@ export function buildStream(layoutId: LayoutId, chordSet: ChordSet): StreamItem[
     });
   });
 
-  if (baseStream.length === 0 || baseStream.length >= minimumPracticeStreamLength) {
+  if (baseStream.length === 0 || baseStream.length >= targetLength) {
     return baseStream;
   }
 
   const stream: StreamItem[] = [];
   let cycle = 0;
-  while (stream.length < minimumPracticeStreamLength) {
+  while (stream.length < targetLength) {
     if (cycle > 0) {
       stream.push({ char: " ", finger: "rightIndex", chordIndex: cycle * chordSet.chords.length, isChordStart: false, isSpace: true });
     }
@@ -104,8 +114,8 @@ export const useTypingStore = create<TypingState>((set, get) => ({
   intervals: [],
   lastCorrectAt: null,
 
-  loadSet: (layoutId, chordSet) => {
-    const stream = buildStream(layoutId, chordSet);
+  loadSet: (layoutId, chordSet, visibleCapacity) => {
+    const stream = buildStream(layoutId, chordSet, visibleCapacity);
     set({
       layoutId,
       chordSet,

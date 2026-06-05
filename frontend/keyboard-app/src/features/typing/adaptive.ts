@@ -3,6 +3,9 @@ import type { ChordSet, LayoutId } from "../../shared/types";
 
 export const upThreshold = 0.95;
 export const downThreshold = 0.85;
+export const stableCadenceThreshold = 0.65;
+export const fastSpeedCpm = 200;
+export const expertSpeedCpm = 250;
 export const remedialId = -1;
 
 export interface AdaptiveDecision {
@@ -56,12 +59,14 @@ export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], tit
 export function decideNext(params: {
   layoutId: LayoutId;
   accuracy: number;
+  speedCpm: number;
+  cadence: number;
   perChar: Record<string, number>;
   currentSet: ChordSet;
   sets: ChordSet[];
   remedialTitle: string;
 }): AdaptiveDecision {
-  const { layoutId, accuracy, perChar, currentSet, sets, remedialTitle } = params;
+  const { layoutId, accuracy, speedCpm, cadence, perChar, currentSet, sets, remedialTitle } = params;
 
   if (accuracy < downThreshold) {
     const problems = topProblemChars(perChar);
@@ -73,10 +78,17 @@ export function decideNext(params: {
     }
   }
 
-  if (accuracy >= upThreshold) {
-    const harder = sets
-      .filter((set) => set.difficulty > currentSet.difficulty)
-      .sort((left, right) => left.difficulty - right.difficulty)[0];
+  const cadenceIsStable = cadence > stableCadenceThreshold;
+  const harder = nextHarderSet(currentSet, sets);
+
+  if (cadenceIsStable && speedCpm > expertSpeedCpm) {
+    const hardest = hardestSet(sets);
+    if (hardest && hardest.id !== currentSet.id) {
+      return { kind: "up", set: hardest };
+    }
+  }
+
+  if ((cadenceIsStable && speedCpm >= fastSpeedCpm) || accuracy >= upThreshold) {
     if (harder) {
       return { kind: "up", set: harder };
     }
@@ -86,6 +98,16 @@ export function decideNext(params: {
     kind: "repeat",
     set: sets.find((set) => set.id === currentSet.id) ?? currentSet,
   };
+}
+
+function nextHarderSet(currentSet: ChordSet, sets: ChordSet[]): ChordSet | undefined {
+  return sets
+    .filter((set) => set.difficulty > currentSet.difficulty)
+    .sort((left, right) => left.difficulty - right.difficulty)[0];
+}
+
+function hardestSet(sets: ChordSet[]): ChordSet | undefined {
+  return sets.slice().sort((left, right) => right.difficulty - left.difficulty)[0];
 }
 
 function topProblemChars(perChar: Record<string, number>): string[] {

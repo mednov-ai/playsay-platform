@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-05-004-load-corpus-keyboard-chords" author="codex">
+        <delete tableName="keyboard_chords">
+            <where>chord_set_id IN (1,2,3,4,5,6,7,8,9,10,11,12)</where>
+        </delete>
+        <loadData
+            tableName="keyboard_chords"
+            file="data/keyboard-corpus-chords.csv"
+            relativeToChangelogFile="true"
+            separator=","
+            encoding="UTF-8">
+            <column name="chord_set_id" type="NUMERIC"/>
+            <column name="position" type="NUMERIC"/>
+            <column name="chord_value" type="STRING"/>
+        </loadData>
+    </changeSet>
+</databaseChangeLog>

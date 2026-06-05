@@ -39,13 +39,26 @@ describe("local keyboard chord sets", () => {
     expect(orderChordSetChords(set, "device-a", 2)).not.toEqual(orderChordSetChords(set, "device-a", 3));
   });
 
-  it("expands the first-level pools beyond the prototype-size seed", () => {
-    expect(getLocalChordSets("EN")[0].chords.length).toBeGreaterThanOrEqual(28);
-    expect(getLocalChordSets("RU")[0].chords.length).toBeGreaterThanOrEqual(28);
+  it("uses restart variants to regenerate a deterministic new order for the same lesson", () => {
+    const set = getLocalChordSets("EN").find((chordSet) => chordSet.difficulty === 6)!;
+
+    expect(orderChordSetChords(set, "device-a", 2, 0)).toEqual(orderChordSetChords(set, "device-a", 2, 0));
+    expect(orderChordSetChords(set, "device-a", 2, 0)).not.toEqual(orderChordSetChords(set, "device-a", 2, 1));
   });
 
-  it("keeps chord order stable for saved result ids", () => {
-    expect(getLocalChordSets("EN")[0].chords.slice(0, 5)).toEqual(["th", "er", "re", "nd", "st"]);
-    expect(getLocalChordSets("RU")[0].chords.slice(0, 5)).toEqual(["ст", "ен", "ни", "ра", "ко"]);
+  it("loads corpus-sized pools for every visible set", () => {
+    localChordSets.forEach((set) => {
+      expect(set.chords.length).toBeGreaterThanOrEqual(48);
+      expect(new Set(set.chords).size).toBe(set.chords.length);
+    });
+  });
+
+  it("does not pin the same prototype head on advanced lessons", () => {
+    const longSet = getLocalChordSets("EN").find((set) => set.difficulty === 5)!;
+    const firstOrder = orderChordSetChords(longSet, "device-a", 2, 0).slice(0, 5);
+    const secondOrder = orderChordSetChords(longSet, "device-a", 3, 0).slice(0, 5);
+
+    expect(firstOrder).not.toEqual(["atio", "tion", "ther", "ment", "ould"]);
+    expect(firstOrder).not.toEqual(secondOrder);
   });
 });

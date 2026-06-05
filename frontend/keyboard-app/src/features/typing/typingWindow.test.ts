@@ -129,6 +129,42 @@ describe("typing window", () => {
     });
   });
 
+  it("wraps only between chord tokens, never inside an ngram token", () => {
+    const stream = streamFromText("ation ition ement practice");
+    const statuses = stream.map(() => "pending" as const);
+    const metrics = buildTypingWidthMetrics({
+      maxLineWidth: 210,
+      fontSize: 34,
+      characters: stream.map((item) => item.char),
+      measureText: measureManropeLike,
+    });
+
+    const window = buildMeasuredTypingWindow(stream, statuses, "ation ition ement ".length, metrics, 2);
+    const rowTexts = window.rows.map(rowText);
+
+    expect(rowTexts.some((text) => text.includes("practic") && !text.includes("practice"))).toBe(false);
+    expect(rowTexts).toContain("practice");
+    window.rows.forEach((row) => {
+      expect(measureTypingWindowRowWidth(row, metrics)).toBeLessThanOrEqual(metrics.maxLineWidth);
+    });
+  });
+
+  it("keeps measured non-final rows close to the available width when tokens remain", () => {
+    const stream = streamFromText("ation ition ement ently ssion through sider ntial iness struct tinue ction fulness ability practice");
+    const statuses = stream.map(() => "pending" as const);
+    const metrics = buildTypingWidthMetrics({
+      maxLineWidth: 920,
+      fontSize: 34,
+      characters: stream.map((item) => item.char),
+      measureText: measureManropeLike,
+    });
+
+    const window = buildMeasuredTypingWindow(stream, statuses, 0, metrics, 2);
+
+    expect(measureTypingWindowRowWidth(window.rows[0], metrics)).toBeGreaterThan(metrics.maxLineWidth * 0.85);
+    expect(measureTypingWindowRowWidth(window.rows[1], metrics)).toBeGreaterThan(metrics.maxLineWidth * 0.85);
+  });
+
   it("renders exactly two filled rows when enough stream items are available", () => {
     const stream = Array.from({ length: 200 }, (_, index) => makeItem(index));
     const statuses = stream.map(() => "pending" as const);

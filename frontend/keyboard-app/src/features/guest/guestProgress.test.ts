@@ -76,6 +76,15 @@ describe("guest keyboard progress", () => {
     expect(readGuestDisplayName(storage)).toBe("Masha");
   });
 
+  it("overwrites a saved guest display name when the user edits it", () => {
+    const storage = new MemoryStorage();
+
+    writeGuestDisplayName("Masha", storage);
+    writeGuestDisplayName("Zhenya", storage);
+
+    expect(readGuestDisplayName(storage)).toBe("Zhenya");
+  });
+
   it("treats invalid stored values as empty", () => {
     const storage = new MemoryStorage();
     storage.setItem(guestSessionStorageKey, "oops");

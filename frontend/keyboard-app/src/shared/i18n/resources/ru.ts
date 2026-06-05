@@ -80,6 +80,7 @@ export const ru = {
     guestNameLabel: "Имя",
     guestNamePlaceholder: "Например, Маша",
     guestNameSave: "Сохранить",
+    editGuestName: "Сменить имя",
   },
   stats: {
     speed: "Скорость",

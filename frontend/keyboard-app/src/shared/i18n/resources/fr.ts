@@ -82,6 +82,7 @@ export const fr: TranslationResource = {
     guestNameLabel: "Prénom",
     guestNamePlaceholder: "Par exemple, Masha",
     guestNameSave: "Enregistrer",
+    editGuestName: "Modifier le prénom",
   },
   stats: {
     speed: "Vitesse",

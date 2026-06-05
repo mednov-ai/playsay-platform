@@ -189,23 +189,19 @@ function splitMeasuredLines(
 ): TypingWindowItem[][] {
   const maxLineWidth = Math.max(1, metrics.maxLineWidth);
   const lines: TypingWindowItem[][] = [];
+  const units = buildMeasuredUnits(stream, statuses, metrics, maxLineWidth);
   let currentLine: TypingWindowItem[] = [];
   let currentWidth = 0;
 
-  stream.forEach((item, index) => {
-    const width = Math.max(1, Math.min(typingItemWidth(item, metrics), maxLineWidth));
-    if (currentLine.length > 0 && currentWidth + width > maxLineWidth) {
+  units.forEach((unit) => {
+    if (currentLine.length > 0 && currentWidth + unit.width > maxLineWidth) {
       lines.push(currentLine);
       currentLine = [];
       currentWidth = 0;
     }
 
-    currentLine.push({
-      index,
-      item,
-      status: statuses[index] ?? "pending",
-    });
-    currentWidth += width;
+    currentLine.push(...unit.items);
+    currentWidth += unit.width;
   });
 
   if (currentLine.length > 0) {
@@ -215,6 +211,54 @@ function splitMeasuredLines(
   mergeShortFinalLine(lines, metrics);
 
   return lines;
+}
+
+function buildMeasuredUnits(
+  stream: StreamItem[],
+  statuses: CharStatus[],
+  metrics: TypingWidthMetrics,
+  maxLineWidth: number,
+): Array<{ items: TypingWindowItem[]; width: number }> {
+  const units: Array<{ items: TypingWindowItem[]; width: number }> = [];
+  let index = 0;
+
+  while (index < stream.length) {
+    const items: TypingWindowItem[] = [];
+
+    while (index < stream.length && stream[index].isSpace) {
+      items.push(toWindowItem(stream[index], statuses, index));
+      index += 1;
+    }
+
+    while (index < stream.length && !stream[index].isSpace) {
+      items.push(toWindowItem(stream[index], statuses, index));
+      index += 1;
+    }
+
+    while (index < stream.length && stream[index].isSpace) {
+      items.push(toWindowItem(stream[index], statuses, index));
+      index += 1;
+    }
+
+    if (items.length === 0) {
+      continue;
+    }
+
+    units.push({
+      items,
+      width: Math.max(1, Math.min(measureTypingWindowRowWidth(items, metrics), maxLineWidth)),
+    });
+  }
+
+  return units;
+}
+
+function toWindowItem(streamItem: StreamItem, statuses: CharStatus[], index: number): TypingWindowItem {
+  return {
+    index,
+    item: streamItem,
+    status: statuses[index] ?? "pending",
+  };
 }
 
 function typingItemWidth(item: StreamItem, metrics: TypingWidthMetrics): number {

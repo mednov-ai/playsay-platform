@@ -94,6 +94,20 @@ class KeyboardApiTest @Autowired constructor(
     }
 
     @Test
+    fun `liquibase loads corpus chord rows while preserving seed set ids`() {
+        val chordSets = chordSetController.list(layout = "EN", difficulty = null) +
+            chordSetController.list(layout = "RU", difficulty = null)
+
+        assertEquals((1L..12L).toList(), chordSets.map { it.id }.sorted())
+        chordSets.forEach { chordSet ->
+            assertTrue(chordSet.chords.size >= 48, "set ${chordSet.id} should have a corpus-sized pool")
+            assertEquals(chordSet.chords.size, chordSet.chords.toSet().size, "set ${chordSet.id} should not contain duplicate chords")
+        }
+        assertTrue(chordSets.first { it.id == 10L }.chords.contains("ation"))
+        assertTrue(chordSets.first { it.id == 12L }.chords.contains("аться"))
+    }
+
+    @Test
     fun `authenticated severe errors return a focus lesson`() {
         trainingResultRepo.deleteAllInBatch()
 

@@ -1,4 +1,4 @@
-import { LogIn, LogOut, Play, RotateCcw, Save, X } from "lucide-react";
+import { LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
@@ -49,6 +49,12 @@ interface Props {
 }
 
 const layouts: LayoutId[] = ["EN", "RU"];
+
+type ClosingOverlay = {
+  id: number;
+  kind: "countdown" | "paused" | "finished";
+  countdownValue?: number | null;
+};
 
 const emptyProgress: Progress = {
   sessions: 0,
@@ -171,10 +177,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
   const [typingLineCapacity, setTypingLineCapacity] = useState(typingWindowLineLength);
   const [typingMetrics, setTypingMetrics] = useState<TypingWidthMetrics | null>(null);
+  const [restartVariant, setRestartVariant] = useState(0);
+  const [closingOverlay, setClosingOverlay] = useState<ClosingOverlay | null>(null);
   const visibleCapacity = typingLineCapacity * typingWindowRows;
   const submittedResultRef = useRef<string | null>(null);
   const typingStripRef = useRef<HTMLDivElement | null>(null);
   const visibleCapacityRef = useRef(visibleCapacity);
+  const overlayCloseTimerRef = useRef<number | null>(null);
+  const overlayCloseIdRef = useRef(0);
   const profileSeed = me?.subject ?? anonymousDeviceId;
 
   const loadSet = useTypingStore((state) => state.loadSet);
@@ -196,6 +206,15 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   useEffect(() => {
     visibleCapacityRef.current = visibleCapacity;
   }, [visibleCapacity]);
+
+  useEffect(
+    () => () => {
+      if (overlayCloseTimerRef.current != null) {
+        window.clearTimeout(overlayCloseTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -271,6 +290,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setNextDecision(null);
     setSaved(false);
     setGuestRecorded(false);
+    setRestartVariant(0);
     submittedResultRef.current = null;
     dispatchSessionFlow({ type: "reset" });
 
@@ -503,18 +523,31 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, []);
 
   const materializePracticeSet = useCallback(
-    (set: ChordSet): ChordSet =>
-      set.id < 0 ? set : materializeChordSet(set, profileSeed, (progress?.sessions ?? guestSessionCount) + 1),
-    [guestSessionCount, profileSeed, progress?.sessions],
+    (set: ChordSet, variant = restartVariant): ChordSet =>
+      set.id < 0 ? set : materializeChordSet(set, profileSeed, (progress?.sessions ?? guestSessionCount) + 1, variant),
+    [guestSessionCount, profileSeed, progress?.sessions, restartVariant],
   );
+
+  const showClosingOverlay = useCallback((kind: ClosingOverlay["kind"], countdownValue?: number | null) => {
+    if (overlayCloseTimerRef.current != null) {
+      window.clearTimeout(overlayCloseTimerRef.current);
+    }
+    overlayCloseIdRef.current += 1;
+    const id = overlayCloseIdRef.current;
+    setClosingOverlay({ id, kind, countdownValue });
+    overlayCloseTimerRef.current = window.setTimeout(() => {
+      setClosingOverlay((current) => (current?.id === id ? null : current));
+    }, 180);
+  }, []);
 
   const selectSet = (setId: string) => {
     const nextSet = sets.find((set) => set.id === Number(setId));
     if (nextSet) {
       setNextDecision(null);
       clearSessionResult();
+      setRestartVariant(0);
       dispatchSessionFlow({ type: "reset" });
-      loadSet(layoutId, materializePracticeSet(nextSet), visibleCapacity);
+      loadSet(layoutId, materializePracticeSet(nextSet, 0), visibleCapacity);
     }
   };
 
@@ -528,7 +561,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     clearSessionResult();
 
     if (sessionFlow.phase === "finished") {
-      loadSet(layoutId, materializePracticeSet(nextDecision?.set ?? activeSet), visibleCapacity);
+      setRestartVariant(0);
+      loadSet(layoutId, materializePracticeSet(nextDecision?.set ?? activeSet, 0), visibleCapacity);
       setNextDecision(null);
     } else if (!chordSet) {
       loadSet(layoutId, materializePracticeSet(activeSet), visibleCapacity);
@@ -545,21 +579,29 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     }
     setNextDecision(null);
     clearSessionResult();
-    reset();
+    const baseSet = chordSet.id > 0 ? sets.find((set) => set.id === chordSet.id) ?? chordSet : chordSet;
+    setRestartVariant((current) => {
+      const nextVariant = current + 1;
+      loadSet(layoutId, materializePracticeSet(baseSet, nextVariant), visibleCapacity);
+      return nextVariant;
+    });
     dispatchSessionFlow({ type: "reset" });
-  }, [chordSet, clearSessionResult, reset]);
+  }, [chordSet, clearSessionResult, layoutId, loadSet, materializePracticeSet, sets, visibleCapacity]);
 
   const cancelCountdown = useCallback(() => {
+    showClosingOverlay("countdown", sessionFlow.countdownValue);
     dispatchSessionFlow({ type: "cancel" });
-  }, []);
+  }, [sessionFlow.countdownValue, showClosingOverlay]);
 
   const dismissFinishOverlay = useCallback(() => {
+    showClosingOverlay("finished");
     dispatchSessionFlow({ type: "dismissFinishOverlay" });
-  }, []);
+  }, [showClosingOverlay]);
 
   const resumeSession = useCallback(() => {
+    showClosingOverlay("paused");
     dispatchSessionFlow({ type: "resume" });
-  }, []);
+  }, [showClosingOverlay]);
 
   const dismissPrompt = useCallback(() => {
     dismissRegistrationPrompt(guestSessionCount);
@@ -569,6 +611,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const dismissNamePrompt = useCallback(() => {
     setShowNamePrompt(false);
   }, []);
+
+  const openGuestNamePrompt = useCallback(() => {
+    setGuestNameDraft(guestDisplayName ?? "");
+    setShowNamePrompt(true);
+  }, [guestDisplayName]);
 
   const saveGuestName = useCallback(() => {
     const displayName = writeGuestDisplayName(guestNameDraft);
@@ -664,6 +711,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const startLabel = sessionFlow.phase === "finished" ? t("trainer.next") : t("trainer.start");
   const accountLabel = isAuthenticated ? t("auth.signedInAs") : t("auth.guestAccount");
   const accountValue = isAuthenticated ? me.email ?? me.username : guestDisplayName ?? t("auth.guestProgress");
+  const countdownOverlayValue =
+    sessionFlow.phase === "countdown" ? sessionFlow.countdownValue : closingOverlay?.kind === "countdown" ? closingOverlay.countdownValue : null;
+  const renderCountdownOverlay = sessionFlow.phase === "countdown" || closingOverlay?.kind === "countdown";
+  const renderPausedOverlay = sessionFlow.phase === "paused" || closingOverlay?.kind === "paused";
+  const renderFinishedOverlay =
+    (sessionFlow.phase === "finished" && sessionFlow.finishOverlayVisible) || closingOverlay?.kind === "finished";
 
   return (
     <main className="keyboard-app">
@@ -710,7 +763,20 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         <aside className="side-panel">
           <div className="account-strip">
             <span>{accountLabel}</span>
-            <strong>{accountValue}</strong>
+            <div className="account-strip__value">
+              <strong>{accountValue}</strong>
+              {!isAuthenticated ? (
+                <button
+                  type="button"
+                  className="account-strip__edit"
+                  onClick={openGuestNamePrompt}
+                  aria-label={t("trainer.editGuestName")}
+                  title={t("trainer.editGuestName")}
+                >
+                  <Pencil size={14} aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <label className="field">
@@ -877,8 +943,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </div>
           </div>
 
-          {sessionFlow.phase === "paused" ? (
-            <div className="practice-overlay practice-overlay--paused" role="presentation">
+          {renderPausedOverlay ? (
+            <div className={`practice-overlay practice-overlay--paused ${closingOverlay?.kind === "paused" ? "is-exiting" : ""}`} role="presentation">
               <div className="practice-overlay__content">
                 <strong>{t("trainer.paused")}</strong>
                 <button
@@ -897,10 +963,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </div>
           ) : null}
 
-          {sessionFlow.phase === "countdown" ? (
-            <div className="practice-overlay practice-overlay--countdown" role="presentation">
+          {renderCountdownOverlay ? (
+            <div className={`practice-overlay practice-overlay--countdown ${closingOverlay?.kind === "countdown" ? "is-exiting" : ""}`} role="presentation">
               <div className="practice-overlay__content" aria-live="assertive" aria-label={t("trainer.countdown")}>
-                <span className="countdown-number">{sessionFlow.countdownValue}</span>
+                <span className="countdown-number">{countdownOverlayValue}</span>
                 <button type="button" className="secondary-button" onClick={cancelCountdown}>
                   <X size={18} aria-hidden="true" />
                   <span>{t("trainer.cancel")}</span>
@@ -909,8 +975,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </div>
           ) : null}
 
-          {sessionFlow.phase === "finished" && sessionFlow.finishOverlayVisible ? (
-            <div className="practice-overlay practice-overlay--finished" role="presentation">
+          {renderFinishedOverlay ? (
+            <div className={`practice-overlay practice-overlay--finished ${closingOverlay?.kind === "finished" ? "is-exiting" : ""}`} role="presentation">
               <div className="practice-overlay__content">
                 <strong>{t("trainer.resultReady")}</strong>
                 <button

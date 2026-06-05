@@ -88,6 +88,7 @@ spec:
                 exit 1
               fi
             fi
+            git config --global --add safe.directory "$WORKSPACE"
             GITHUB_BEFORE="${GITHUB_BEFORE:-}" \
             GITHUB_AFTER="${GITHUB_AFTER:-}" \
             FORCE_TARGETS="${FORCE_TARGETS:-}" \

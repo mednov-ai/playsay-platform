@@ -77,6 +77,8 @@ spec:
 
   parameters {
     string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev', trim: true)
+    string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
+    string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
   }
 
   environment {
@@ -92,6 +94,7 @@ spec:
       steps {
         script {
           def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
+          def requestedCommit = params.GITHUB_AFTER?.trim()
           def scmVars = checkout([
             $class: 'GitSCM',
             branches: [[name: "*/${requestedBranch}"]],
@@ -100,7 +103,11 @@ spec:
             submoduleCfg: [],
             userRemoteConfigs: [[url: env.PLATFORM_REPO]]
           ])
-          env.GIT_COMMIT = scmVars.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          if (requestedCommit) {
+            sh "git fetch --no-tags origin +refs/heads/${requestedBranch}:refs/remotes/origin/${requestedBranch}"
+            sh "git checkout --detach ${requestedCommit}"
+          }
+          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
           env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
 
@@ -176,19 +183,33 @@ EOF
             sh '''
               set -eu
               apk add --no-cache git yq
-              rm -rf infra
               AUTH_REPO="$(echo "$INFRA_REPO" | sed "s#https://#https://${GITHUB_USER}:${GITHUB_TOKEN}@#")"
-              git clone --branch "$INFRA_BRANCH" "$AUTH_REPO" infra
-              cd infra
-              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/keyboard-app/values-dev.yaml
-              git config user.email "jenkins@play-and-say.ru"
-              git config user.name "Play&Say Jenkins"
-              git add helm-charts/keyboard-app/values-dev.yaml
-              git commit \
-                -m "chore: deploy ${BUILD_LABEL} to dev" \
-                -m "Source branch: ${CI_BRANCH}" \
-                -m "Source commit: ${GIT_COMMIT}" || exit 0
-              git push origin "HEAD:${INFRA_BRANCH}"
+              for attempt in 1 2 3 4 5; do
+                rm -rf infra
+                git clone --branch "$INFRA_BRANCH" "$AUTH_REPO" infra
+                cd infra
+                yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/keyboard-app/values-dev.yaml
+                git config user.email "jenkins@play-and-say.ru"
+                git config user.name "Play&Say Jenkins"
+                git add helm-charts/keyboard-app/values-dev.yaml
+                if git diff --cached --quiet; then
+                  echo "No dev image tag changes for ${BUILD_LABEL}"
+                  exit 0
+                fi
+                git commit \
+                  -m "chore: deploy ${BUILD_LABEL} to dev" \
+                  -m "Source branch: ${CI_BRANCH}" \
+                  -m "Source commit: ${GIT_COMMIT}"
+                git pull --rebase origin "$INFRA_BRANCH"
+                if git push origin "HEAD:${INFRA_BRANCH}"; then
+                  exit 0
+                fi
+                cd ..
+                echo "Infra push race for ${BUILD_LABEL}; retrying ${attempt}/5"
+                sleep $((attempt * 3))
+              done
+              echo "Could not push dev image tag update for ${BUILD_LABEL} after retries"
+              exit 1
             '''
           }
         }

@@ -1,0 +1,124 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  securityContext:
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+  containers:
+    - name: node
+      image: node:22
+      command: ["cat"]
+      tty: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 192Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+"""
+    }
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '30'))
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timestamps()
+  }
+
+  parameters {
+    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch received from GitHub push event.', trim: true)
+    string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA.', trim: true)
+    string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA.', trim: true)
+    string(name: 'FORCE_TARGETS', defaultValue: '', description: 'Optional manual override: all or comma-separated deploy targets.', trim: true)
+  }
+
+  environment {
+    PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script {
+          def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
+          def requestedCommit = params.GITHUB_AFTER?.trim()
+          def scmVars = checkout([
+            $class: 'GitSCM',
+            branches: [[name: "*/${requestedBranch}"]],
+            doGenerateSubmoduleConfigurations: false,
+            extensions: [],
+            submoduleCfg: [],
+            userRemoteConfigs: [[url: env.PLATFORM_REPO]]
+          ])
+          if (requestedCommit) {
+            sh "git fetch --no-tags origin +refs/heads/${requestedBranch}:refs/remotes/origin/${requestedBranch}"
+            sh "git checkout --detach ${requestedCommit}"
+          }
+          env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
+          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
+          currentBuild.displayName = "dispatch-${env.BUILD_NUMBER}"
+          currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
+          echo "Dispatcher source branch: ${env.CI_BRANCH}"
+          echo "Dispatcher source commit: ${env.GIT_COMMIT}"
+        }
+      }
+    }
+
+    stage('Detect affected targets') {
+      steps {
+        container('node') {
+          sh '''
+            set -eu
+            GITHUB_BEFORE="${GITHUB_BEFORE:-}" \
+            GITHUB_AFTER="${GITHUB_AFTER:-}" \
+            FORCE_TARGETS="${FORCE_TARGETS:-}" \
+              node scripts/ci/detect-affected-targets.mjs > affected-targets.json
+            cat affected-targets.json
+          '''
+        }
+      }
+    }
+
+    stage('Dispatch downstream jobs') {
+      steps {
+        script {
+          def detection = new groovy.json.JsonSlurperClassic().parseText(readFile('affected-targets.json'))
+          def jobs = detection.jobs ?: []
+          echo "Affected targets: ${(detection.targets ?: []).join(', ') ?: '(none)'}"
+          echo "Detection reason: ${detection.reason}"
+          if (jobs.isEmpty()) {
+            echo 'No downstream jobs needed for this change.'
+            return
+          }
+
+          jobs.each { jobSpec ->
+            def downstreamParams = [
+              string(name: 'BRANCH_NAME', value: env.CI_BRANCH),
+              string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
+              string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
+            ]
+            (jobSpec.parameters ?: [:]).each { key, value ->
+              downstreamParams.add(string(name: key.toString(), value: value.toString()))
+            }
+            echo "Triggering ${jobSpec.name} for ${(jobSpec.targets ?: []).join(', ')}"
+            build job: jobSpec.name.toString(), parameters: downstreamParams, wait: false, propagate: false
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "Dispatcher ${env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
+    }
+  }
+}

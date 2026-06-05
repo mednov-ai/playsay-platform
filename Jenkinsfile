@@ -212,6 +212,9 @@ spec:
 
   parameters {
     string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev, for example develop, codex/task-1, feature/task-1, release/1.001.00', trim: true)
+    string(name: 'AFFECTED_TARGETS', defaultValue: 'all', description: 'Comma-separated deploy targets to build: all, api-gateway, web-app, collaboration-service, media-service, payment-service.', trim: true)
+    string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
+    string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
   }
 
   environment {
@@ -231,6 +234,7 @@ spec:
       steps {
         script {
           def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
+          def requestedCommit = params.GITHUB_AFTER?.trim()
           echo "Checking out playsay-platform branch '${requestedBranch}'"
           def scmVars = checkout([
             $class: 'GitSCM',
@@ -240,9 +244,33 @@ spec:
             submoduleCfg: [],
             userRemoteConfigs: [[url: env.PLATFORM_REPO]]
           ])
-          env.GIT_COMMIT = scmVars.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          if (requestedCommit) {
+            sh "git fetch --no-tags origin +refs/heads/${requestedBranch}:refs/remotes/origin/${requestedBranch}"
+            sh "git checkout --detach ${requestedCommit}"
+          }
+          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
           env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
+
+          def targetParam = params.AFFECTED_TARGETS?.trim() ?: 'all'
+          def validTargets = ['api-gateway', 'web-app', 'collaboration-service', 'media-service', 'payment-service'] as Set
+          def requestedTargets = [] as Set
+          if (targetParam == 'all') {
+            requestedTargets.addAll(validTargets)
+          } else {
+            targetParam.split(',').collect { it.trim() }.findAll { it }.each { requestedTargets.add(it) }
+          }
+          def invalidTargets = requestedTargets.findAll { !validTargets.contains(it) }
+          if (invalidTargets) {
+            error "Unknown AFFECTED_TARGETS value(s): ${invalidTargets.join(', ')}"
+          }
+          env.RUN_API_GATEWAY = requestedTargets.contains('api-gateway').toString()
+          env.RUN_WEB_APP = requestedTargets.contains('web-app').toString()
+          env.RUN_COLLABORATION_SERVICE = requestedTargets.contains('collaboration-service').toString()
+          env.RUN_MEDIA_SERVICE = requestedTargets.contains('media-service').toString()
+          env.RUN_PAYMENT_SERVICE = requestedTargets.contains('payment-service').toString()
+          env.RUN_ANY_TARGET = (!requestedTargets.isEmpty()).toString()
+          env.AFFECTED_TARGETS_RESOLVED = requestedTargets.join(',')
 
           def buildPrefix = env.CI_BRANCH
           if (env.CI_BRANCH == 'develop') {
@@ -281,6 +309,7 @@ spec:
           echo "Source branch: ${env.CI_BRANCH}"
           echo "Source commit: ${env.GIT_COMMIT}"
           echo "Deploy to dev: ${env.DEPLOY_TO_DEV}"
+          echo "Affected targets: ${env.AFFECTED_TARGETS_RESOLVED ?: '(none)'}"
         }
       }
     }
@@ -288,13 +317,23 @@ spec:
     stage('Build, test, and validate') {
       parallel {
         stage('Backend validation') {
+          when {
+            expression { env.RUN_API_GATEWAY == 'true' || env.RUN_MEDIA_SERVICE == 'true' || env.RUN_PAYMENT_SERVICE == 'true' }
+          }
           stages {
             stage('Backend tests') {
               steps {
                 container('gradle') {
                   dir('backend') {
                     echo "Running backend tests for ${env.BUILD_LABEL}"
-                    sh 'gradle :api-gateway:test :media-service:test :payment-service:test --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+                    sh '''
+                      set -eu
+                      TASKS=""
+                      if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:test"; fi
+                      if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:test"; fi
+                      if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:test"; fi
+                      gradle $TASKS --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process
+                    '''
                   }
                 }
               }
@@ -304,14 +343,24 @@ spec:
               steps {
                 container('gradle') {
                   dir('backend') {
-                    echo "Packaging api-gateway for ${env.BUILD_LABEL}"
-                    sh 'gradle :api-gateway:bootJar :media-service:bootJar :payment-service:bootJar --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+                    echo "Packaging affected backend services for ${env.BUILD_LABEL}"
+                    sh '''
+                      set -eu
+                      TASKS=""
+                      if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:bootJar"; fi
+                      if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:bootJar"; fi
+                      if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:bootJar"; fi
+                      gradle $TASKS --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process
+                    '''
                   }
                 }
               }
             }
 
             stage('OpenAPI contract') {
+              when {
+                expression { env.RUN_API_GATEWAY == 'true' }
+              }
               steps {
                 container('gradle') {
                   dir('backend') {
@@ -333,6 +382,9 @@ spec:
         }
 
         stage('Frontend build') {
+          when {
+            expression { env.RUN_WEB_APP == 'true' }
+          }
           steps {
             container('node-frontend') {
               dir('frontend') {
@@ -352,6 +404,9 @@ spec:
         }
 
         stage('Collaboration service build') {
+          when {
+            expression { env.RUN_COLLABORATION_SERVICE == 'true' }
+          }
           steps {
             container('node-collaboration') {
               dir('collaboration-service') {
@@ -370,11 +425,11 @@ spec:
 
     stage('DB migrate') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && (env.RUN_API_GATEWAY == 'true' || env.RUN_PAYMENT_SERVICE == 'true') }
       }
       steps {
         container('liquibase') {
-          echo "Applying api-gateway database migrations for ${env.BUILD_LABEL}"
+          echo "Applying affected database migrations for ${env.BUILD_LABEL}"
           sh '''
             set -eu
             POSTGRES_JDBC_VERSION="42.7.8"
@@ -382,10 +437,14 @@ spec:
             if [ ! -f "$POSTGRES_JDBC_JAR" ]; then
               curl -fsSL "https://repo1.maven.org/maven2/org/postgresql/postgresql/${POSTGRES_JDBC_VERSION}/postgresql-${POSTGRES_JDBC_VERSION}.jar" -o "$POSTGRES_JDBC_JAR"
             fi
-            for CHANGELOG in \
-              backend/api-gateway/src/main/resources/db/changelog/db.changelog-master.xml \
-              backend/payment-service/src/main/resources/db/changelog/db.changelog-master.xml
-            do
+            CHANGELOGS=""
+            if [ "$RUN_API_GATEWAY" = "true" ]; then
+              CHANGELOGS="$CHANGELOGS backend/api-gateway/src/main/resources/db/changelog/db.changelog-master.xml"
+            fi
+            if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then
+              CHANGELOGS="$CHANGELOGS backend/payment-service/src/main/resources/db/changelog/db.changelog-master.xml"
+            fi
+            for CHANGELOG in $CHANGELOGS; do
               echo "Applying database changelog $CHANGELOG"
               liquibase \
                 --changelog-file="$CHANGELOG" \
@@ -409,10 +468,13 @@ spec:
 
     stage('Build and push images') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && env.RUN_ANY_TARGET == 'true' }
       }
       parallel {
         stage('Build and push backend image') {
+          when {
+            expression { env.RUN_API_GATEWAY == 'true' }
+          }
           steps {
             container('kaniko-backend') {
               withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
@@ -443,6 +505,9 @@ EOF
         }
 
         stage('Build and push frontend image') {
+          when {
+            expression { env.RUN_WEB_APP == 'true' }
+          }
           steps {
             container('kaniko-frontend') {
               withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
@@ -466,6 +531,9 @@ EOF
         }
 
         stage('Build and push collaboration service image') {
+          when {
+            expression { env.RUN_COLLABORATION_SERVICE == 'true' }
+          }
           steps {
             container('kaniko-collaboration') {
               withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
@@ -489,6 +557,9 @@ EOF
         }
 
         stage('Build and push media service image') {
+          when {
+            expression { env.RUN_MEDIA_SERVICE == 'true' }
+          }
           steps {
             container('kaniko-media') {
               withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
@@ -519,6 +590,9 @@ EOF
         }
 
         stage('Build and push payment service image') {
+          when {
+            expression { env.RUN_PAYMENT_SERVICE == 'true' }
+          }
           steps {
             container('kaniko-payment') {
               withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
@@ -558,7 +632,7 @@ EOF
 
     stage('Tag source commit') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && env.RUN_ANY_TARGET == 'true' }
       }
       steps {
         container('tools') {
@@ -591,7 +665,7 @@ EOF
 
     stage('Update dev image tags') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && env.RUN_ANY_TARGET == 'true' }
       }
       steps {
         container('tools') {
@@ -599,27 +673,66 @@ EOF
             sh '''
               set -eu
               apk add --no-cache git yq
-              rm -rf infra
               AUTH_REPO="$(echo "$INFRA_REPO" | sed "s#https://#https://${GITHUB_USER}:${GITHUB_TOKEN}@#")"
-              git clone --branch "$INFRA_BRANCH" "$AUTH_REPO" infra
-              cd infra
-              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/api-gateway/values-dev.yaml
-              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/web-app/values-dev.yaml
-              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/collaboration-service/values-dev.yaml
-              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/media-service/values-dev.yaml
-              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/payment-service/values-dev.yaml
-              git config user.email "jenkins@play-and-say.ru"
-              git config user.name "Play&Say Jenkins"
-              git add helm-charts/api-gateway/values-dev.yaml helm-charts/web-app/values-dev.yaml helm-charts/collaboration-service/values-dev.yaml helm-charts/media-service/values-dev.yaml helm-charts/payment-service/values-dev.yaml
-              git commit \
-                -m "chore: deploy ${BUILD_LABEL} to dev" \
-                -m "Source branch: ${CI_BRANCH}" \
-                -m "Source commit: ${GIT_COMMIT}" || exit 0
-              git tag -a "$BUILD_LABEL" \
-                -m "Play&Say dev deployment ${BUILD_LABEL}" \
-                -m "Source branch: ${CI_BRANCH}" \
-                -m "Source commit: ${GIT_COMMIT}"
-              git push origin "HEAD:${INFRA_BRANCH}" "refs/tags/${BUILD_LABEL}"
+              update_values() {
+                changed_files=""
+                if [ "$RUN_API_GATEWAY" = "true" ]; then
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/api-gateway/values-dev.yaml
+                  changed_files="$changed_files helm-charts/api-gateway/values-dev.yaml"
+                fi
+                if [ "$RUN_WEB_APP" = "true" ]; then
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/web-app/values-dev.yaml
+                  changed_files="$changed_files helm-charts/web-app/values-dev.yaml"
+                fi
+                if [ "$RUN_COLLABORATION_SERVICE" = "true" ]; then
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/collaboration-service/values-dev.yaml
+                  changed_files="$changed_files helm-charts/collaboration-service/values-dev.yaml"
+                fi
+                if [ "$RUN_MEDIA_SERVICE" = "true" ]; then
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/media-service/values-dev.yaml
+                  changed_files="$changed_files helm-charts/media-service/values-dev.yaml"
+                fi
+                if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/payment-service/values-dev.yaml
+                  changed_files="$changed_files helm-charts/payment-service/values-dev.yaml"
+                fi
+                git add $changed_files
+              }
+
+              for attempt in 1 2 3 4 5; do
+                rm -rf infra
+                git clone --branch "$INFRA_BRANCH" "$AUTH_REPO" infra
+                cd infra
+                git config user.email "jenkins@play-and-say.ru"
+                git config user.name "Play&Say Jenkins"
+                update_values
+                if git diff --cached --quiet; then
+                  echo "No dev image tag changes for ${BUILD_LABEL}"
+                  exit 0
+                fi
+                git commit \
+                  -m "chore: deploy ${BUILD_LABEL} to dev" \
+                  -m "Source branch: ${CI_BRANCH}" \
+                  -m "Source commit: ${GIT_COMMIT}"
+                git pull --rebase origin "$INFRA_BRANCH"
+                if git push origin "HEAD:${INFRA_BRANCH}"; then
+                  if git ls-remote --exit-code --tags origin "refs/tags/${BUILD_LABEL}" >/dev/null 2>&1; then
+                    echo "Infra tag ${BUILD_LABEL} already exists"
+                  else
+                    git tag -a "$BUILD_LABEL" \
+                      -m "Play&Say dev deployment ${BUILD_LABEL}" \
+                      -m "Source branch: ${CI_BRANCH}" \
+                      -m "Source commit: ${GIT_COMMIT}"
+                    git push origin "refs/tags/${BUILD_LABEL}"
+                  fi
+                  exit 0
+                fi
+                cd ..
+                echo "Infra push race for ${BUILD_LABEL}; retrying ${attempt}/5"
+                sleep $((attempt * 3))
+              done
+              echo "Could not push dev image tag update for ${BUILD_LABEL} after retries"
+              exit 1
             '''
           }
         }
@@ -628,7 +741,7 @@ EOF
 
     stage('Wait for dev rollout') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && env.RUN_ANY_TARGET == 'true' }
       }
       steps {
         container('tools') {
@@ -640,10 +753,15 @@ EOF
             EXPECTED_BUILD="$BUILD_LABEL"
             TIMEOUT_SECONDS="${PLAYSAY_DEV_ROLLOUT_TIMEOUT_SECONDS:-420}"
             POLL_SECONDS="${PLAYSAY_DEV_ROLLOUT_POLL_SECONDS:-10}"
-            APPS="api-gateway web-app collaboration-service media-service payment-service"
+            APPS=""
+            if [ "$RUN_API_GATEWAY" = "true" ]; then APPS="$APPS api-gateway"; fi
+            if [ "$RUN_WEB_APP" = "true" ]; then APPS="$APPS web-app"; fi
+            if [ "$RUN_COLLABORATION_SERVICE" = "true" ]; then APPS="$APPS collaboration-service"; fi
+            if [ "$RUN_MEDIA_SERVICE" = "true" ]; then APPS="$APPS media-service"; fi
+            if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then APPS="$APPS payment-service"; fi
             DEADLINE="$(( $(date +%s) + TIMEOUT_SECONDS ))"
 
-            kubectl -n argocd annotate application api-gateway web-app collaboration-service media-service payment-service argocd.argoproj.io/refresh=hard --overwrite
+            kubectl -n argocd annotate application $APPS argocd.argoproj.io/refresh=hard --overwrite
 
             while true; do
               all_ready="true"
@@ -688,9 +806,9 @@ EOF
 
               if [ "$(date +%s)" -ge "$DEADLINE" ]; then
                 echo "Timed out waiting for dev rollout ${EXPECTED_BUILD}"
-                kubectl -n argocd get applications api-gateway web-app collaboration-service media-service payment-service \
+                kubectl -n argocd get applications $APPS \
                   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision || true
-                kubectl -n playsay-dev get deployments api-gateway web-app collaboration-service media-service payment-service \
+                kubectl -n playsay-dev get deployments $APPS \
                   -o custom-columns=NAME:.metadata.name,BUILD:.spec.template.metadata.labels.playsay\\.io/build-name,UPDATED:.status.updatedReplicas,READY:.status.readyReplicas,AVAILABLE:.status.availableReplicas || true
                 kubectl -n playsay-dev get pods --show-labels || true
                 exit 1
@@ -705,7 +823,7 @@ EOF
 
     stage('Sprint 5 UI smoke') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && (env.RUN_API_GATEWAY == 'true' || env.RUN_WEB_APP == 'true' || env.RUN_COLLABORATION_SERVICE == 'true') }
       }
       steps {
         container('smoke') {
@@ -762,7 +880,7 @@ JSON
 
     stage('Sprint 6 Homework smoke') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && (env.RUN_API_GATEWAY == 'true' || env.RUN_WEB_APP == 'true') }
       }
       steps {
         container('smoke') {

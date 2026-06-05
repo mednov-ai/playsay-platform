@@ -128,9 +128,6 @@ spec:
               string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
               string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
             ]
-            if (jobName == 'playsay-platform-develop') {
-              downstreamParams.add(string(name: 'AFFECTED_TARGETS', value: detection.AFFECTED_CORE_TARGETS ?: 'all'))
-            }
             echo "Triggering ${jobName}"
             build job: jobName, parameters: downstreamParams, wait: false, propagate: false
           }

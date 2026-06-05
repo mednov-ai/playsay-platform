@@ -10,21 +10,21 @@ spec:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch
   containers:
-    - name: node
-      image: node:22
+    - name: gradle
+      image: gradle:8-jdk21
       command: ["cat"]
       tty: true
       volumeMounts:
         - name: jenkins-agent-cache
-          mountPath: /cache/npm
-          subPath: npm
+          mountPath: /home/gradle/.gradle
+          subPath: gradle
       resources:
         requests:
-          cpu: 250m
-          memory: 512Mi
-        limits:
-          cpu: 1500m
+          cpu: 450m
           memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 3Gi
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]
@@ -43,21 +43,6 @@ spec:
       image: alpine:3.20
       command: ["cat"]
       tty: true
-    - name: smoke
-      image: mcr.microsoft.com/playwright:v1.56.1-noble
-      command: ["cat"]
-      tty: true
-      volumeMounts:
-        - name: jenkins-agent-cache
-          mountPath: /cache/npm
-          subPath: npm
-      resources:
-        requests:
-          cpu: 250m
-          memory: 512Mi
-        limits:
-          cpu: "1"
-          memory: 1536Mi
   volumes:
     - name: kaniko-docker-config
       emptyDir: {}
@@ -76,7 +61,7 @@ spec:
   }
 
   parameters {
-    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev', trim: true)
+    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev.', trim: true)
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
     string(name: 'ARGOCD_REFRESH_MODE', defaultValue: 'webhook', description: 'ArgoCD refresh mode: webhook or annotate.', trim: true)
@@ -84,7 +69,7 @@ spec:
 
   environment {
     GITHUB_OWNER = 'mednov-ai'
-    KEYBOARD_APP_IMAGE_NAME = 'playsay-keyboard-app'
+    MEDIA_IMAGE_NAME = 'playsay-media-service'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
@@ -96,7 +81,7 @@ spec:
         script {
           def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
           def requestedCommit = params.GITHUB_AFTER?.trim()
-          def scmVars = checkout([
+          checkout([
             $class: 'GitSCM',
             branches: [[name: "*/${requestedBranch}"]],
             doGenerateSubmoduleConfigurations: false,
@@ -112,14 +97,14 @@ spec:
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
           env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
 
-          def buildPrefix = env.CI_BRANCH == 'develop' ? 'key-frontend-dev' : "key-frontend-${env.CI_BRANCH}"
+          def buildPrefix = env.CI_BRANCH == 'develop' ? 'media-dev' : "media-${env.CI_BRANCH}"
           buildPrefix = buildPrefix.replaceAll(/[^A-Za-z0-9_.-]/, '-')
           buildPrefix = buildPrefix.replaceAll(/^[^A-Za-z0-9]+/, '').replaceAll(/[^A-Za-z0-9]+$/, '')
           int maxPrefixLength = 63 - env.BUILD_NUMBER.length() - 1
           if (buildPrefix.length() > maxPrefixLength) {
             buildPrefix = buildPrefix.take(maxPrefixLength).replaceAll(/[^A-Za-z0-9]+$/, '')
           }
-          env.BUILD_LABEL_PREFIX = buildPrefix ?: 'key-frontend'
+          env.BUILD_LABEL_PREFIX = buildPrefix ?: 'media'
           env.BUILD_LABEL = "${env.BUILD_LABEL_PREFIX}-${env.BUILD_NUMBER}"
           env.DEPLOY_TO_DEV = (
             env.CI_BRANCH == 'develop' ||
@@ -135,14 +120,11 @@ spec:
       }
     }
 
-    stage('Lint, test, and build') {
+    stage('Test and package') {
       steps {
-        container('node') {
-          dir('frontend') {
-            sh 'npm install --cache /cache/npm --prefer-offline'
-            sh 'npm --workspace keyboard-app run lint'
-            sh 'npm --workspace keyboard-app run test'
-            sh 'npm --workspace keyboard-app run build'
+        container('gradle') {
+          dir('backend') {
+            sh 'gradle :media-service:test :media-service:bootJar --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
       }
@@ -157,17 +139,23 @@ spec:
           withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
             sh '''
               set -eu
+              JAR_COUNT="$(find "$WORKSPACE/backend/media-service/build/libs" -maxdepth 1 -name "*.jar" | wc -l | tr -d " ")"
+              if [ "$JAR_COUNT" != "1" ]; then
+                echo "Expected exactly one media-service bootJar, found $JAR_COUNT"
+                find "$WORKSPACE/backend/media-service/build/libs" -maxdepth 1 -type f -print || true
+                exit 1
+              fi
               mkdir -p /kaniko/.docker
               AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
               cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
               /kaniko/executor \
-                --context "$WORKSPACE/frontend" \
-                --dockerfile "$WORKSPACE/frontend/keyboard-app/Dockerfile" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${KEYBOARD_APP_IMAGE_NAME}:${GIT_COMMIT}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${KEYBOARD_APP_IMAGE_NAME}:${BUILD_LABEL}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${KEYBOARD_APP_IMAGE_NAME}:dev"
+                --context "$WORKSPACE/backend" \
+                --dockerfile "$WORKSPACE/backend/media-service/Dockerfile" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:${GIT_COMMIT}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:${BUILD_LABEL}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:dev"
             '''
           }
         }
@@ -194,7 +182,7 @@ EOF
       steps {
         container('tools') {
           withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
-            sh 'apk add --no-cache git yq && CHART_VALUES_FILE=helm-charts/keyboard-app/values-dev.yaml ./scripts/ci/update-dev-image-tag.sh'
+            sh 'apk add --no-cache git yq && CHART_VALUES_FILE=helm-charts/media-service/values-dev.yaml ./scripts/ci/update-dev-image-tag.sh'
           }
         }
       }
@@ -206,54 +194,7 @@ EOF
       }
       steps {
         container('tools') {
-          sh 'apk add --no-cache jq kubectl && APP=keyboard-app ./scripts/ci/wait-for-argocd-rollout.sh'
-        }
-      }
-    }
-
-    stage('Browser smoke') {
-      when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
-      }
-      steps {
-        container('smoke') {
-          sh '''
-            set -eu
-            export PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-            SMOKE_NODE_DIR="/tmp/playsay-keyboard-smoke"
-            if [ ! -d "$SMOKE_NODE_DIR/node_modules/playwright" ]; then
-              rm -rf "$SMOKE_NODE_DIR"
-              mkdir -p "$SMOKE_NODE_DIR"
-              cat > "$SMOKE_NODE_DIR/package.json" <<'JSON'
-{"private":true,"dependencies":{"playwright":"1.56.1"}}
-JSON
-              npm --prefix "$SMOKE_NODE_DIR" install --cache /cache/npm --prefer-offline --ignore-scripts --no-audit --no-fund
-            fi
-            node <<'NODE'
-const { chromium } = require("/tmp/playsay-keyboard-smoke/node_modules/playwright");
-
-(async () => {
-  const baseUrl = process.env.PLAY_SAY_KEYBOARD_SMOKE_URL || "https://key.play-and-say.ru";
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
-  const page = await context.newPage();
-  const response = await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-  if (!response || response.status() >= 500) {
-    throw new Error(`Keyboard app returned HTTP ${response ? response.status() : "no response"}`);
-  }
-  await page.waitForSelector("text=Play&Say", { timeout: 15000 });
-  const loginButtons = await page.locator("button").filter({ hasText: /Войти|Sign in|Anmelden|Se connecter/ }).count();
-  if (loginButtons < 1) {
-    throw new Error("Keyboard app did not show the authenticated entry flow");
-  }
-  await browser.close();
-})().catch(async (error) => {
-  console.error(error);
-  process.exit(1);
-});
-NODE
-          '''
+          sh 'apk add --no-cache jq kubectl && APP=media-service ./scripts/ci/wait-for-argocd-rollout.sh'
         }
       }
     }

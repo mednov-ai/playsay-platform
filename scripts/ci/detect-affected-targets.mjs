@@ -12,12 +12,20 @@ export const TARGETS = Object.freeze([
   "keyboard-app",
 ]);
 
-const CORE_TARGETS = new Set(["api-gateway", "web-app", "collaboration-service", "media-service", "payment-service"]);
 const KEYBOARD_BACKEND_TARGETS = new Set(["keyboard-service"]);
 const KEYBOARD_FRONTEND_TARGETS = new Set(["keyboard-app"]);
 const ALL_TARGETS = new Set(TARGETS);
 const BACKEND_TARGETS = new Set(["api-gateway", "media-service", "payment-service", "keyboard-service"]);
 const FRONTEND_TARGETS = new Set(["web-app", "keyboard-app"]);
+const TARGET_JOBS = Object.freeze({
+  "api-gateway": "playsay-api-gateway-develop",
+  "web-app": "playsay-web-app-develop",
+  "collaboration-service": "playsay-collaboration-service-develop",
+  "media-service": "playsay-media-service-develop",
+  "payment-service": "playsay-payment-service-develop",
+  "keyboard-service": "playsay-keyboard-backend-develop",
+  "keyboard-app": "playsay-keyboard-frontend-develop",
+});
 
 function addAll(targets, source) {
   for (const target of source) {
@@ -162,38 +170,14 @@ export function detectTargetsForPaths(paths, options = {}) {
 
 export function buildDetectionResult(targets, metadata = {}) {
   const targetList = TARGETS.filter((target) => targets.has(target));
-  const coreTargets = targetList.filter((target) => CORE_TARGETS.has(target));
-  const jobs = [];
-
-  if (coreTargets.length > 0) {
-    jobs.push({
-      name: "playsay-platform-develop",
-      targets: coreTargets,
-      parameters: {
-        AFFECTED_TARGETS: coreTargets.join(","),
-      },
-    });
-  }
-
-  if (targetList.some((target) => KEYBOARD_BACKEND_TARGETS.has(target))) {
-    jobs.push({
-      name: "playsay-keyboard-backend-develop",
-      targets: ["keyboard-service"],
-      parameters: {},
-    });
-  }
-
-  if (targetList.some((target) => KEYBOARD_FRONTEND_TARGETS.has(target))) {
-    jobs.push({
-      name: "playsay-keyboard-frontend-develop",
-      targets: ["keyboard-app"],
-      parameters: {},
-    });
-  }
+  const jobs = targetList.map((target) => ({
+    name: TARGET_JOBS[target],
+    targets: [target],
+    parameters: {},
+  }));
 
   return {
     targets: targetList,
-    coreTargets,
     jobs,
     reason: metadata.reason ?? "paths",
     changedFiles: metadata.changedFiles ?? [],
@@ -264,7 +248,6 @@ export function detectTargetsFromGitRange({ before, after, forceTargets }) {
 function renderEnv(result) {
   return [
     `AFFECTED_TARGETS=${result.targets.join(",")}`,
-    `AFFECTED_CORE_TARGETS=${result.coreTargets.join(",")}`,
     `AFFECTED_JOBS=${result.jobs.map((job) => job.name).join(",")}`,
     `AFFECTED_REASON=${result.reason}`,
   ].join("\n");

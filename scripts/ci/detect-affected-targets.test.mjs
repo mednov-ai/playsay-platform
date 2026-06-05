@@ -28,23 +28,39 @@ test("keyboard backend changes trigger only keyboard backend job", () => {
   );
 });
 
-test("web-app changes trigger core job with web-app only", () => {
-  const result = detectTargetsForPaths(["frontend/web-app/src/App.tsx"]);
-  assert.deepEqual(result.targets, ["web-app"]);
-  assert.deepEqual(result.jobs, [
-    {
-      name: "playsay-platform-develop",
-      targets: ["web-app"],
-      parameters: { AFFECTED_TARGETS: "web-app" },
-    },
-  ]);
+test("web-app changes trigger only web-app job", () => {
+  assertDetection(["frontend/web-app/src/App.tsx"], ["web-app"], ["playsay-web-app-develop"]);
 });
 
 test("api-gateway and contract changes trigger api-gateway and web-app", () => {
   assertDetection(
     ["backend/api-gateway/src/main/kotlin/com/playsay/gateway/GatewayController.kt", "contracts/openapi.yaml"],
     ["api-gateway", "web-app"],
-    ["playsay-platform-develop"],
+    ["playsay-api-gateway-develop", "playsay-web-app-develop"],
+  );
+});
+
+test("media-service changes trigger only media-service job", () => {
+  assertDetection(
+    ["backend/media-service/src/main/kotlin/com/playsay/media/MediaController.kt"],
+    ["media-service"],
+    ["playsay-media-service-develop"],
+  );
+});
+
+test("payment-service changes trigger only payment-service job", () => {
+  assertDetection(
+    ["backend/payment-service/src/main/kotlin/com/playsay/payment/PaymentController.kt"],
+    ["payment-service"],
+    ["playsay-payment-service-develop"],
+  );
+});
+
+test("collaboration-service changes trigger only collaboration-service job", () => {
+  assertDetection(
+    ["collaboration-service/src/server.ts"],
+    ["collaboration-service"],
+    ["playsay-collaboration-service-develop"],
   );
 });
 
@@ -52,7 +68,12 @@ test("shared backend changes trigger all backend targets including keyboard back
   assertDetection(
     ["backend/shared-kotlin/src/main/kotlin/com/playsay/shared/Clock.kt"],
     ["api-gateway", "media-service", "payment-service", "keyboard-service"],
-    ["playsay-platform-develop", "playsay-keyboard-backend-develop"],
+    [
+      "playsay-api-gateway-develop",
+      "playsay-media-service-develop",
+      "playsay-payment-service-develop",
+      "playsay-keyboard-backend-develop",
+    ],
   );
 });
 
@@ -60,7 +81,7 @@ test("shared frontend lockfile changes trigger web-app and keyboard frontend", (
   assertDetection(
     ["frontend/package-lock.json"],
     ["web-app", "keyboard-app"],
-    ["playsay-platform-develop", "playsay-keyboard-frontend-develop"],
+    ["playsay-web-app-develop", "playsay-keyboard-frontend-develop"],
   );
 });
 
@@ -84,7 +105,15 @@ test("unknown source paths fail safe to all targets", () => {
   ]);
   assert.deepEqual(
     result.jobs.map((job) => job.name),
-    ["playsay-platform-develop", "playsay-keyboard-backend-develop", "playsay-keyboard-frontend-develop"],
+    [
+      "playsay-api-gateway-develop",
+      "playsay-web-app-develop",
+      "playsay-collaboration-service-develop",
+      "playsay-media-service-develop",
+      "playsay-payment-service-develop",
+      "playsay-keyboard-backend-develop",
+      "playsay-keyboard-frontend-develop",
+    ],
   );
   assert.equal(result.reason, "unknown-path");
 });
@@ -103,6 +132,18 @@ test("invalid diff base fails safe to all targets", () => {
     "keyboard-service",
     "keyboard-app",
   ]);
+  assert.deepEqual(
+    result.jobs.map((job) => job.name),
+    [
+      "playsay-api-gateway-develop",
+      "playsay-web-app-develop",
+      "playsay-collaboration-service-develop",
+      "playsay-media-service-develop",
+      "playsay-payment-service-develop",
+      "playsay-keyboard-backend-develop",
+      "playsay-keyboard-frontend-develop",
+    ],
+  );
   assert.equal(result.reason, "invalid-range");
 });
 
@@ -111,7 +152,7 @@ test("force targets override path detection", () => {
   assert.deepEqual(result.targets, ["web-app", "keyboard-app"]);
   assert.deepEqual(
     result.jobs.map((job) => job.name),
-    ["playsay-platform-develop", "playsay-keyboard-frontend-develop"],
+    ["playsay-web-app-develop", "playsay-keyboard-frontend-develop"],
   );
   assert.equal(result.reason, "forced");
 });

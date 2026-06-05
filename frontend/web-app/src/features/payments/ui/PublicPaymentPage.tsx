@@ -6,11 +6,14 @@ import { useAppTranslation } from "../../../shared/i18n";
 import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
 import { BrandMark } from "../../../shared/ui/BrandMark";
 import { Button } from "../../../components/ui/button";
+import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
+import { useAppTheme } from "../../../app/AppProviders";
 
 const mainSiteUrl = "https://play-and-say.ru";
 
 export function PublicPaymentPage({ publicToken }: { publicToken: string }) {
   const { i18n, t } = useAppTranslation();
+  const theme = useAppTheme();
   const [invoice, setInvoice] = useState<PublicPaymentInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -66,6 +69,7 @@ export function PublicPaymentPage({ publicToken }: { publicToken: string }) {
           <BrandMark />
           <div className="flex flex-wrap items-center justify-end gap-2">
             <LanguageSwitcher disabled={loading || checkoutLoading} />
+            <ThemeToggle mode={theme.mode} onModeChange={theme.setMode} resolvedTheme={theme.resolvedTheme} />
             <Button onClick={() => void startLogin()} type="button" variant="outline">
               {t("auth.login")}
             </Button>
@@ -73,7 +77,7 @@ export function PublicPaymentPage({ publicToken }: { publicToken: string }) {
         </header>
 
         <section className="grid flex-1 content-center gap-5">
-          <div className="rounded-[1.5rem] border border-border bg-white/85 p-5 shadow-sm sm:p-7">
+          <div className="rounded-[1.5rem] border border-border bg-background/85 p-5 shadow-sm sm:p-7">
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
               <div className="flex items-center gap-3">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">

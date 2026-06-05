@@ -35,6 +35,12 @@ export const ru = {
     aria: {
       logout: "Выйти",
     },
+    theme: {
+      system: "Системная",
+      light: "Светлая",
+      dark: "Темная",
+      toggleAria: "Тема: {{theme}}",
+    },
   },
   profile: {
     sections: {

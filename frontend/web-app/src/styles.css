@@ -10,10 +10,27 @@
   --border: 28 43% 90%;
   --primary: 22 100% 50%;
   --primary-foreground: 0 0% 100%;
+  --surface: 0 0% 100%;
+  --surface-muted: 21 100% 97%;
+  --surface-strong: 24 100% 99%;
 }
 
 html {
   background: hsl(var(--background));
+}
+
+html.dark {
+  --background: 24 28% 8%;
+  --foreground: 30 50% 96%;
+  --muted: 24 24% 13%;
+  --muted-foreground: 29 18% 72%;
+  --border: 26 18% 24%;
+  --primary: 22 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --surface: 24 24% 11%;
+  --surface-muted: 24 22% 15%;
+  --surface-strong: 25 21% 18%;
+  color-scheme: dark;
 }
 
 body {
@@ -26,6 +43,13 @@ body {
     radial-gradient(circle at 92% 28%, rgba(223, 248, 238, 0.7), transparent 24rem),
     linear-gradient(180deg, #fffdfb 0%, #ffffff 58%, #fff8f4 100%);
   overflow-x: hidden;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 92, 0, 0.16), transparent 26rem),
+    radial-gradient(circle at 92% 28%, rgba(116, 219, 190, 0.08), transparent 24rem),
+    linear-gradient(180deg, #17100c 0%, #110d0a 58%, #1d120d 100%);
 }
 
 body.playsay-classroom-active {
@@ -60,6 +84,10 @@ textarea {
     background 0.2s ease;
 }
 
+.dark .playsay-input {
+  background: hsl(var(--surface));
+}
+
 .playsay-input:focus {
   border-color: hsl(var(--primary));
   box-shadow: 0 0 0 4px rgba(255, 92, 0, 0.14);
@@ -80,6 +108,11 @@ textarea {
   font-size: 0.8125rem;
   font-weight: 800;
   padding: 0.75rem;
+}
+
+.dark .playsay-file-input,
+.dark .playsay-draft-image-preview {
+  background: hsl(var(--surface));
 }
 
 .playsay-file-input::file-selector-button {
@@ -143,6 +176,16 @@ textarea {
   content: "";
 }
 
+.dark .playsay-welcome-scene::before {
+  border-color: rgb(255 92 0 / 0.16);
+  background:
+    radial-gradient(circle at 18% 18%, rgb(255 92 0 / 0.14), transparent 14rem),
+    radial-gradient(circle at 82% 24%, rgb(116 219 190 / 0.1), transparent 16rem),
+    radial-gradient(circle at 58% 88%, rgb(255 224 122 / 0.08), transparent 18rem),
+    hsl(var(--surface));
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.34);
+}
+
 .playsay-welcome-motion {
   position: absolute;
   inset: 0;
@@ -187,8 +230,17 @@ textarea {
   fill: rgb(255 253 248 / 0.82);
 }
 
+.dark .playsay-welcome-logo-paper {
+  fill: rgb(43 31 24 / 0.9);
+}
+
 .playsay-welcome-logo-art {
   mix-blend-mode: multiply;
+}
+
+.dark .playsay-welcome-logo-art {
+  mix-blend-mode: normal;
+  opacity: 0.92;
 }
 
 .playsay-welcome-logo-shine {
@@ -213,6 +265,13 @@ textarea {
   margin-top: clamp(0.875rem, 3vw, 1.5rem);
 }
 
+.playsay-welcome-preferences {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.625rem;
+}
+
 .playsay-welcome-language {
   display: inline-flex;
   align-items: center;
@@ -227,6 +286,35 @@ textarea {
   font-weight: 900;
   box-shadow: 0 14px 34px rgb(255 92 0 / 0.12);
   backdrop-filter: blur(12px);
+}
+
+.playsay-theme-toggle {
+  min-height: 2.75rem;
+  border-radius: 999px;
+  padding-inline: 0.85rem;
+  font-weight: 900;
+  box-shadow: 0 14px 34px rgb(255 92 0 / 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.playsay-theme-toggle-control {
+  background-color: rgb(255 255 255 / 0.88);
+  color: #111111;
+}
+
+.dark .playsay-welcome-language,
+.dark .playsay-theme-toggle {
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.24);
+}
+
+.dark .playsay-welcome-language {
+  background-color: rgb(34 25 20 / 0.92) !important;
+  color: rgb(250 242 235);
+}
+
+.dark .playsay-theme-toggle-control {
+  background-color: rgb(34 25 20 / 0.92);
+  color: rgb(250 242 235);
 }
 
 .playsay-welcome-language select {
@@ -618,4 +706,19 @@ textarea {
   .playsay-welcome-login:focus-visible::after {
     animation: none;
   }
+}
+
+.dark [class*="bg-white"],
+.dark [class*="bg-[#fff"],
+.dark [class*="bg-[#FFF"] {
+  background-color: hsl(var(--surface)) !important;
+}
+
+.dark [class*="shadow-"] {
+  --tw-shadow-color: rgb(0 0 0 / 0.34);
+}
+
+.dark select option {
+  background: hsl(var(--surface));
+  color: hsl(var(--foreground));
 }

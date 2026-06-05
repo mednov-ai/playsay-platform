@@ -16,6 +16,8 @@ import type { LessonRoomSession } from "../model/session";
 import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoStage";
 import { LessonWorkspace } from "./LessonWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
+import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
+import { useAppTheme } from "../../../app/AppProviders";
 
 export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
 
@@ -57,6 +59,7 @@ export function LiveLessonExperience({
   session: LessonRoomSession;
 }) {
   const { t } = useAppTranslation();
+  const theme = useAppTheme();
   const shellRef = useRef<HTMLDivElement>(null);
   const [fullscreenActive, setFullscreenActive] = useState(() => classroomFullscreenActive());
   const [fullscreenPending, setFullscreenPending] = useState(false);
@@ -143,6 +146,7 @@ export function LiveLessonExperience({
             </p>
           </div>
           <div className="playsay-video-actions">
+            <ThemeToggle className="playsay-classroom-theme-toggle" mode={theme.mode} onModeChange={theme.setMode} resolvedTheme={theme.resolvedTheme} />
             {videoExpanded ? (
               <Button
                 aria-label={fullscreenLabel}

@@ -36,6 +36,8 @@ type CompletedLoginFlow = {
   state: string;
 };
 
+type ThemeMode = "system" | "light" | "dark";
+
 export const authConfig: AuthConfig = {
   issuer:
     import.meta.env.VITE_AUTH_ISSUER ??
@@ -48,6 +50,7 @@ const tokenStorageKey = "playsay.auth.tokens";
 const flowStorageKey = "playsay.auth.loginFlow";
 const completedFlowStorageKey = "playsay.auth.completedLoginFlow";
 const skipSilentLoginStorageKey = "playsay.auth.skipSilentLoginOnce";
+const themeStorageKey = "playsay.theme";
 const expirySkewMs = 30_000;
 const loginCompletionRequests = new Map<string, Promise<TokenSet>>();
 
@@ -102,6 +105,7 @@ export async function startLogin(config = authConfig): Promise<void> {
       redirectUri,
       state,
       codeChallenge,
+      themeMode: readStoredThemeMode(),
       uiLocales: language,
     }).toString(),
   );
@@ -122,6 +126,7 @@ export async function startSilentLogin(config = authConfig): Promise<void> {
       state,
       codeChallenge,
       prompt: "none",
+      themeMode: readStoredThemeMode(),
       uiLocales: currentApiLanguage(),
     }).toString(),
   );
@@ -230,6 +235,7 @@ export function buildAuthorizeUrl(input: {
   state: string;
   codeChallenge: string;
   prompt?: "none";
+  themeMode?: string;
   uiLocales?: string;
 }): URL {
   const url = new URL(`${trimTrailingSlash(input.config.issuer)}/protocol/openid-connect/auth`);
@@ -246,7 +252,23 @@ export function buildAuthorizeUrl(input: {
   if (input.uiLocales) {
     url.searchParams.set("ui_locales", normalizeLanguage(input.uiLocales));
   }
+  if (isThemeMode(input.themeMode)) {
+    url.searchParams.set("playsay_theme", input.themeMode);
+  }
   return url;
+}
+
+function readStoredThemeMode(): ThemeMode {
+  if (typeof window === "undefined") {
+    return "system";
+  }
+
+  const value = window.localStorage?.getItem(themeStorageKey);
+  return isThemeMode(value) ? value : "system";
+}
+
+function isThemeMode(value: unknown): value is ThemeMode {
+  return value === "system" || value === "light" || value === "dark";
 }
 
 function isKeycloakSilentLoginError(error: string): boolean {

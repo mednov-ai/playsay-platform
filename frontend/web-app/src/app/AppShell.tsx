@@ -39,6 +39,8 @@ import type { LessonRoomSession } from "../features/classroom";
 import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 import officialLogoUrl from "../shared/assets/playsay-official-logo.jpg";
+import { ThemeToggle } from "../shared/theme/ThemeToggle";
+import { useAppTheme } from "./AppProviders";
 
 const mainSiteUrl = "https://play-and-say.ru";
 const BillingPanel = lazy(() => import("../features/payments/ui/BillingPanel").then((module) => ({ default: module.BillingPanel })));
@@ -132,6 +134,7 @@ export type AppShellProps = {
 
 export function AppShell(props: AppShellProps) {
   const { t } = useAppTranslation();
+  const theme = useAppTheme();
   const {
     adminLoading,
     adminMessage,
@@ -218,6 +221,7 @@ export function AppShell(props: AppShellProps) {
           <header className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <BrandMark />
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <ThemeToggle mode={theme.mode} onModeChange={theme.setMode} resolvedTheme={theme.resolvedTheme} />
               <Button
                 className="min-w-40"
                 disabled={!nextJoinableLesson || anyLessonLoading}
@@ -391,6 +395,7 @@ function WelcomeLanding({
   status: SessionStatus;
 }) {
   const { t } = useAppTranslation();
+  const theme = useAppTheme();
   const isBusy = status === "checking" || status === "loggingOut";
 
   return (
@@ -425,10 +430,13 @@ function WelcomeLanding({
           <PlaySayAnimatedLogo label={t("common.appName")} />
         </a>
         <div className="playsay-welcome-actions">
-          <LanguageSwitcher
-            className="playsay-welcome-language"
-            disabled={profileSaving || isBusy}
-          />
+          <div className="playsay-welcome-preferences">
+            <LanguageSwitcher
+              className="playsay-welcome-language"
+              disabled={profileSaving || isBusy}
+            />
+            <ThemeToggle className="playsay-theme-toggle" mode={theme.mode} onModeChange={theme.setMode} resolvedTheme={theme.resolvedTheme} />
+          </div>
           <button
             className="playsay-welcome-login"
             disabled={isBusy}

@@ -990,3 +990,44 @@
   background: #fff7f1;
   box-shadow: inset 0 0 0 1px rgb(255 92 0 / 0.08);
 }
+
+.dark .playsay-classroom-shell,
+.dark .playsay-workbench,
+.dark .playsay-task-board,
+.dark .playsay-page-button,
+.dark .playsay-collaboration-empty,
+.dark .playsay-teacher-live-editor,
+.dark .playsay-material-list-item {
+  background: hsl(var(--surface));
+}
+
+.dark .playsay-workbench-topbar,
+.dark .playsay-annotation-toolbar,
+.dark .playsay-student-health-card,
+.dark .playsay-submission-monitor-error {
+  background: hsl(var(--surface-muted));
+}
+
+.dark .playsay-assignment-card[data-active="true"],
+.dark .playsay-submission-monitor,
+.dark .playsay-collaboration-doc-status[data-active="true"],
+.dark .playsay-material-list-item[data-active="true"] {
+  background: hsl(var(--surface-strong));
+}
+
+.dark .playsay-student-health-card[data-health="clear"],
+.dark .playsay-student-health-card[data-health="watch"],
+.dark .playsay-student-health-card[data-health="warm"],
+.dark .playsay-student-health-card[data-health="hot"] {
+  background: hsl(var(--surface-strong));
+}
+
+.playsay-classroom-theme-toggle {
+  border-color: rgb(255 255 255 / 0.2);
+  background: rgb(255 255 255 / 0.1);
+  color: #ffffff;
+}
+
+.playsay-classroom-theme-toggle:hover {
+  background: rgb(255 255 255 / 0.16);
+}

@@ -35,6 +35,12 @@ export const de = {
     aria: {
       logout: "Abmelden",
     },
+    theme: {
+      system: "System",
+      light: "Hell",
+      dark: "Dunkel",
+      toggleAria: "Theme: {{theme}}",
+    },
   },
   profile: {
     sections: {

@@ -53,6 +53,32 @@ describe("auth helpers", () => {
     expect(url.searchParams.get("prompt")).toBe("none");
   });
 
+  it("passes the selected app theme to Keycloak authorization", () => {
+    const url = buildAuthorizeUrl({
+      config,
+      redirectUri: "https://online.play-and-say.ru/auth/callback",
+      state: "state-1",
+      codeChallenge: "challenge-1",
+      themeMode: "dark",
+      uiLocales: "en",
+    });
+
+    expect(url.searchParams.get("playsay_theme")).toBe("dark");
+    expect(url.searchParams.get("ui_locales")).toBe("en");
+  });
+
+  it("does not pass invalid theme values to Keycloak authorization", () => {
+    const url = buildAuthorizeUrl({
+      config,
+      redirectUri: "https://online.play-and-say.ru/auth/callback",
+      state: "state-1",
+      codeChallenge: "challenge-1",
+      themeMode: "sepia",
+    });
+
+    expect(url.searchParams.has("playsay_theme")).toBe(false);
+  });
+
   it("maps token expiration to an absolute timestamp", () => {
     expect(
       mapTokenResponse(

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CharStatus, StreamItem } from "./typingStore";
 import {
+  buildCanvasFont,
   buildMeasuredTypingWindow,
   buildTypingWindow,
+  buildTypingWidthMetrics,
   computeTypingLineCapacity,
   measureTypingWindowRowWidth,
   typingWindowLineLength,
@@ -17,7 +19,78 @@ const makeItem = (index: number): StreamItem => ({
   isChordStart: index % 3 === 0,
 });
 
+const manropeLikeWidths: Record<string, number> = {
+  a: 19.82,
+  b: 21.62,
+  c: 19.82,
+  d: 21.62,
+  e: 20.67,
+  f: 11.8,
+  g: 21.22,
+  h: 21.62,
+  i: 10.06,
+  l: 10.06,
+  m: 31.14,
+  n: 21.62,
+  o: 21.32,
+  p: 21.62,
+  r: 14.01,
+  s: 18.6,
+  t: 15.1,
+  u: 21.62,
+  v: 18.7,
+  w: 27.68,
+  y: 19.38,
+  W: 32.1,
+  ш: 33.4,
+  щ: 35.2,
+};
+
+const measureManropeLike = (text: string) =>
+  Array.from(text).reduce((sum, char) => sum + (manropeLikeWidths[char] ?? 20), 0);
+
+function streamFromText(text: string): StreamItem[] {
+  return Array.from(text).map((char, index) => ({
+    char,
+    finger: "leftIndex",
+    chordIndex: 0,
+    chord: text,
+    isChordStart: index === 0 || text[index - 1] === " ",
+    isSpace: char === " ",
+  }));
+}
+
+const rowText = (row: { item: StreamItem }[]) => row.map(({ item }) => item.char).join("");
+
 describe("typing window", () => {
+  it("builds a canvas font from longhand styles when computed font shorthand is empty", () => {
+    expect(
+      buildCanvasFont({
+        font: "",
+        fontStyle: "normal",
+        fontVariant: "none",
+        fontWeight: "800",
+        fontSize: "34px",
+        lineHeight: "38px",
+        fontFamily: 'Manrope, system-ui, "Segoe UI", sans-serif',
+      }),
+    ).toBe('800 34px/38px Manrope, system-ui, "Segoe UI", sans-serif');
+  });
+
+  it("builds per-character metrics for the active stream and uses the rendered css space width", () => {
+    const metrics = buildTypingWidthMetrics({
+      maxLineWidth: 920,
+      fontSize: 34,
+      characters: Array.from("practice "),
+      measureText: measureManropeLike,
+    });
+
+    expect(metrics.spaceWidth).toBeCloseTo(34 * 0.58, 5);
+    expect(metrics.characterWidths?.p).toBeCloseTo(manropeLikeWidths.p, 5);
+    expect(metrics.characterWidths?.i).toBeCloseTo(manropeLikeWidths.i, 5);
+    expect(metrics.characterWidths?.[" "]).toBeUndefined();
+  });
+
   it("computes line capacity from rendered width without a fixed upper maximum", () => {
     expect(computeTypingLineCapacity({ usableWidth: 240, characterWidth: 12 })).toBe(17);
     expect(computeTypingLineCapacity({ usableWidth: 720, characterWidth: 12 })).toBe(53);
@@ -91,5 +164,44 @@ describe("typing window", () => {
     expect(window.end).toBe(96);
     expect(visibleCurrent).toBeDefined();
     expect(visibleCurrent?.status).toBe("pending");
+  });
+
+  it("packs screenshot-like EN rows from actual character widths instead of worst-case glyph width", () => {
+    const stream = streamFromText("ation ition ement ently ssion through sider ntial iness struct tinue ction fulness ability practice");
+    const statuses = stream.map(() => "pending" as const);
+    const metrics = buildTypingWidthMetrics({
+      maxLineWidth: 920,
+      fontSize: 34,
+      characters: stream.map((item) => item.char),
+      measureText: measureManropeLike,
+    });
+
+    const window = buildMeasuredTypingWindow(stream, statuses, 0, metrics, 2);
+
+    window.rows.forEach((row) => {
+      expect(measureTypingWindowRowWidth(row, metrics)).toBeLessThanOrEqual(metrics.maxLineWidth);
+    });
+    expect(window.rows[0].length).toBeGreaterThan(35);
+    expect(measureTypingWindowRowWidth(window.rows[0], metrics)).toBeGreaterThan(780);
+  });
+
+  it("keeps the final e of practice on the same measured line before completion", () => {
+    const text = "lity ction fulness through sider ntial tinue practice";
+    const stream = streamFromText(text);
+    const statuses: CharStatus[] = stream.map((_, index) => (index < text.length - 1 ? "correct" : "pending"));
+    const metrics = buildTypingWidthMetrics({
+      maxLineWidth: 940,
+      fontSize: 34,
+      characters: stream.map((item) => item.char),
+      measureText: measureManropeLike,
+    });
+    const finalIndex = text.length - 1;
+
+    const window = buildMeasuredTypingWindow(stream, statuses, finalIndex, metrics, 2);
+    const rowWithFinalE = window.rows.find((row) => row.some((item) => item.index === finalIndex));
+
+    expect(rowWithFinalE).toBeDefined();
+    expect(rowText(rowWithFinalE ?? [])).toContain("practice");
+    expect(rowWithFinalE?.length).toBeGreaterThan(2);
   });
 });

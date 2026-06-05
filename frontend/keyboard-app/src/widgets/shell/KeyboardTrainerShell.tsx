@@ -21,15 +21,17 @@ import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptiv
 import { computeCadence, computeScore } from "../../features/typing/scoring";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
 import {
+  buildCanvasFont,
   buildMeasuredTypingWindow,
   buildTypingWindow,
+  buildTypingWidthMetrics,
   computeTypingLineCapacity,
   type TypingWidthMetrics,
   typingWindowLineLength,
   typingWindowRows,
 } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
-import { useTypingStore } from "../../features/typing/typingStore";
+import { useTypingStore, type StreamItem } from "../../features/typing/typingStore";
 import { fetchProgress, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
@@ -82,7 +84,27 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
 
 let typingMeasureCanvas: HTMLCanvasElement | null = null;
 
-function measureTypingStripMetrics(element: HTMLElement): { capacity: number; metrics: TypingWidthMetrics } {
+function sameTypingMetrics(left: TypingWidthMetrics, right: TypingWidthMetrics): boolean {
+  if (
+    left.maxLineWidth !== right.maxLineWidth ||
+    left.defaultCharacterWidth !== right.defaultCharacterWidth ||
+    left.spaceWidth !== right.spaceWidth
+  ) {
+    return false;
+  }
+
+  const leftWidths = left.characterWidths ?? {};
+  const rightWidths = right.characterWidths ?? {};
+  const leftKeys = Object.keys(leftWidths);
+  const rightKeys = Object.keys(rightWidths);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => leftWidths[key] === rightWidths[key]);
+}
+
+function measureTypingStripMetrics(element: HTMLElement, stream: StreamItem[]): { capacity: number; metrics: TypingWidthMetrics } {
   const styles = window.getComputedStyle(element);
   const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
   const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
@@ -90,37 +112,41 @@ function measureTypingStripMetrics(element: HTMLElement): { capacity: number; me
   typingMeasureCanvas ??= document.createElement("canvas");
   const context = typingMeasureCanvas.getContext("2d");
   const fontSize = Number.parseFloat(styles.fontSize) || 16;
+  const characters = stream.map((item) => item.char);
 
   if (!context) {
-    const defaultCharacterWidth = fontSize * 0.82;
+    const fallbackCharacterWidth = fontSize * 0.82;
+    const metrics = buildTypingWidthMetrics({
+      maxLineWidth: usableWidth,
+      fontSize,
+      characters,
+      measureText: (text) => Array.from(text).reduce((sum) => sum + fallbackCharacterWidth, 0),
+    });
     return {
-      capacity: computeTypingLineCapacity({ usableWidth, characterWidth: defaultCharacterWidth }),
-      metrics: {
-        maxLineWidth: usableWidth,
-        defaultCharacterWidth,
-        spaceWidth: defaultCharacterWidth * 0.58,
-      },
+      capacity: computeTypingLineCapacity({ usableWidth, characterWidth: metrics.defaultCharacterWidth }),
+      metrics,
     };
   }
 
-  context.font = styles.font;
-  const defaultCharacterWidth = Math.max(
-    context.measureText("w").width,
-    context.measureText("m").width,
-    context.measureText("ш").width,
-    context.measureText("щ").width,
-    context.measureText("W").width,
-    fontSize * 0.82,
-  );
-  const spaceWidth = Math.max(context.measureText(" ").width, defaultCharacterWidth * 0.52);
+  context.font = buildCanvasFont({
+    font: styles.font,
+    fontStyle: styles.fontStyle,
+    fontVariant: styles.fontVariant,
+    fontWeight: styles.fontWeight,
+    fontSize: styles.fontSize,
+    lineHeight: styles.lineHeight,
+    fontFamily: styles.fontFamily,
+  });
+  const metrics = buildTypingWidthMetrics({
+    maxLineWidth: usableWidth,
+    fontSize,
+    characters,
+    measureText: (text) => context.measureText(text).width,
+  });
 
   return {
-    capacity: computeTypingLineCapacity({ usableWidth, characterWidth: defaultCharacterWidth }),
-    metrics: {
-      maxLineWidth: usableWidth,
-      defaultCharacterWidth,
-      spaceWidth,
-    },
+    capacity: computeTypingLineCapacity({ usableWidth, characterWidth: metrics.defaultCharacterWidth }),
+    metrics,
   };
 }
 
@@ -201,14 +227,15 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       return undefined;
     }
 
+    let active = true;
     const updateCapacity = () => {
-      const measured = measureTypingStripMetrics(element);
+      if (!active) {
+        return;
+      }
+      const measured = measureTypingStripMetrics(element, stream);
       setTypingLineCapacity((current) => (current === measured.capacity ? current : measured.capacity));
       setTypingMetrics((current) =>
-        current &&
-        current.maxLineWidth === measured.metrics.maxLineWidth &&
-        current.defaultCharacterWidth === measured.metrics.defaultCharacterWidth &&
-        current.spaceWidth === measured.metrics.spaceWidth
+        current && sameTypingMetrics(current, measured.metrics)
           ? current
           : measured.metrics,
       );
@@ -220,12 +247,22 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     if (ResizeObserverCtor) {
       const observer = new ResizeObserverCtor(updateCapacity);
       observer.observe(element);
-      return () => observer.disconnect();
+      const fontSet = document.fonts;
+      void fontSet?.ready.then(updateCapacity).catch(() => undefined);
+      return () => {
+        active = false;
+        observer.disconnect();
+      };
     }
 
     window.addEventListener("resize", updateCapacity);
-    return () => window.removeEventListener("resize", updateCapacity);
-  }, []);
+    const fontSet = document.fonts;
+    void fontSet?.ready.then(updateCapacity).catch(() => undefined);
+    return () => {
+      active = false;
+      window.removeEventListener("resize", updateCapacity);
+    };
+  }, [stream, themeMode]);
 
   useEffect(() => {
     let cancelled = false;

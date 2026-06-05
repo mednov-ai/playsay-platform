@@ -19,8 +19,28 @@ export interface TypingWidthMetrics {
   characterWidths?: Record<string, number>;
 }
 
+export interface TypingFontStyles {
+  font?: string | null;
+  fontStyle?: string | null;
+  fontVariant?: string | null;
+  fontWeight?: string | null;
+  fontSize?: string | null;
+  lineHeight?: string | null;
+  fontFamily?: string | null;
+}
+
+export interface BuildTypingWidthMetricsInput {
+  maxLineWidth: number;
+  fontSize: number;
+  characters: Iterable<string>;
+  measureText: (text: string) => number;
+}
+
 export const typingWindowLineLength = 48;
 export const typingWindowRows = 2;
+export const typingSpaceEm = 0.58;
+
+const sampleWideCharacters = ["w", "m", "ш", "щ", "W"];
 
 export function computeTypingLineCapacity({
   usableWidth,
@@ -34,6 +54,59 @@ export function computeTypingLineCapacity({
   }
 
   return Math.max(1, Math.floor(usableWidth / (characterWidth * 1.125)));
+}
+
+export function buildCanvasFont(styles: TypingFontStyles): string {
+  const shorthand = styles.font?.trim();
+  if (shorthand) {
+    return shorthand;
+  }
+
+  const fontStyle = styles.fontStyle?.trim();
+  const fontVariant = styles.fontVariant?.trim();
+  const fontWeight = styles.fontWeight?.trim() || "400";
+  const fontSize = styles.fontSize?.trim() || "16px";
+  const lineHeight = styles.lineHeight?.trim();
+  const sizeWithLineHeight = lineHeight && lineHeight !== "normal" ? `${fontSize}/${lineHeight}` : fontSize;
+  const fontFamily = styles.fontFamily?.trim() || "sans-serif";
+  const fontParts = [];
+  if (fontStyle && fontStyle !== "normal") {
+    fontParts.push(fontStyle);
+  }
+  if (fontVariant && fontVariant !== "normal" && fontVariant !== "none") {
+    fontParts.push(fontVariant);
+  }
+  fontParts.push(fontWeight, sizeWithLineHeight, fontFamily);
+
+  return fontParts.join(" ");
+}
+
+export function buildTypingWidthMetrics({
+  maxLineWidth,
+  fontSize,
+  characters,
+  measureText,
+}: BuildTypingWidthMetricsInput): TypingWidthMetrics {
+  const characterWidths: Record<string, number> = {};
+  const measuredWideCharacterWidth = sampleWideCharacters.reduce(
+    (maxWidth, char) => Math.max(maxWidth, measureText(char)),
+    0,
+  );
+  const defaultCharacterWidth = Math.max(1, measuredWideCharacterWidth, fontSize * 0.58);
+
+  Array.from(new Set(characters)).forEach((char) => {
+    if (char === " ") {
+      return;
+    }
+    characterWidths[char] = Math.max(1, measureText(char));
+  });
+
+  return {
+    maxLineWidth: Math.max(1, maxLineWidth),
+    defaultCharacterWidth,
+    spaceWidth: Math.max(1, fontSize * typingSpaceEm),
+    characterWidths,
+  };
 }
 
 export function buildTypingWindow(
@@ -139,6 +212,8 @@ function splitMeasuredLines(
     lines.push(currentLine);
   }
 
+  mergeShortFinalLine(lines, metrics);
+
   return lines;
 }
 
@@ -147,4 +222,24 @@ function typingItemWidth(item: StreamItem, metrics: TypingWidthMetrics): number 
     return metrics.spaceWidth;
   }
   return metrics.characterWidths?.[item.char] ?? metrics.defaultCharacterWidth;
+}
+
+function mergeShortFinalLine(lines: TypingWindowItem[][], metrics: TypingWidthMetrics): void {
+  if (lines.length < 2) {
+    return;
+  }
+
+  const finalLine = lines[lines.length - 1];
+  if (finalLine.length === 0 || finalLine.length > 2) {
+    return;
+  }
+
+  const previousLine = lines[lines.length - 2];
+  const mergedWidth = measureTypingWindowRowWidth(previousLine, metrics) + measureTypingWindowRowWidth(finalLine, metrics);
+  if (mergedWidth > Math.max(1, metrics.maxLineWidth)) {
+    return;
+  }
+
+  previousLine.push(...finalLine);
+  lines.pop();
 }

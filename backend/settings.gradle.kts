@@ -14,6 +14,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "playsay-backend"
 include("api-gateway")
+include("keyboard-service")
 include("media-service")
 include("payment-service")
 include("shared-kotlin")

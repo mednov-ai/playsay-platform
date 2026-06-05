@@ -4,3 +4,8 @@
 !web-app/nginx.conf
 !web-app/dist/
 !web-app/dist/**
+!keyboard-app/
+!keyboard-app/Dockerfile
+!keyboard-app/nginx.conf
+!keyboard-app/dist/
+!keyboard-app/dist/**

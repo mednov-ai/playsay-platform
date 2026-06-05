@@ -2,6 +2,7 @@
   "private": true,
   "workspaces": [
     "web-app",
+    "keyboard-app",
     "shared-ui"
   ],
   "scripts": {

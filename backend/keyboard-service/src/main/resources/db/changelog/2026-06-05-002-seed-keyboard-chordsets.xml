@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-05-002-seed-keyboard-chord-sets" author="codex">
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="1"/><column name="layout" value="EN"/><column name="title" value="EN · Bigrams I (home keys)"/><column name="difficulty" valueNumeric="1"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="2"/><column name="layout" value="EN"/><column name="title" value="EN · Bigrams II"/><column name="difficulty" valueNumeric="2"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="3"/><column name="layout" value="EN"/><column name="title" value="EN · Trigrams"/><column name="difficulty" valueNumeric="3"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="4"/><column name="layout" value="EN"/><column name="title" value="EN · Quadgrams"/><column name="difficulty" valueNumeric="4"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="5"/><column name="layout" value="RU"/><column name="title" value="RU · Биграммы I"/><column name="difficulty" valueNumeric="1"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="6"/><column name="layout" value="RU"/><column name="title" value="RU · Биграммы II"/><column name="difficulty" valueNumeric="2"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="7"/><column name="layout" value="RU"/><column name="title" value="RU · Триграммы"/><column name="difficulty" valueNumeric="3"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="8"/><column name="layout" value="RU"/><column name="title" value="RU · Четырёхграммы"/><column name="difficulty" valueNumeric="4"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="9"/><column name="layout" value="EN"/><column name="title" value="EN · Длинные I"/><column name="difficulty" valueNumeric="5"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="10"/><column name="layout" value="EN"/><column name="title" value="EN · Длинные II"/><column name="difficulty" valueNumeric="6"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="11"/><column name="layout" value="RU"/><column name="title" value="RU · Длинные I"/><column name="difficulty" valueNumeric="5"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="12"/><column name="layout" value="RU"/><column name="title" value="RU · Длинные II"/><column name="difficulty" valueNumeric="6"/></insert>
+    </changeSet>
+
+    <changeSet id="2026-06-05-002-seed-keyboard-chords" author="codex">
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="0"/><column name="chord_value" value="th"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="1"/><column name="chord_value" value="er"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="2"/><column name="chord_value" value="re"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="3"/><column name="chord_value" value="nd"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="4"/><column name="chord_value" value="st"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="5"/><column name="chord_value" value="se"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="6"/><column name="chord_value" value="le"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="7"/><column name="chord_value" value="al"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="8"/><column name="chord_value" value="ar"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="9"/><column name="chord_value" value="te"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="10"/><column name="chord_value" value="ed"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ng"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="12"/><column name="chord_value" value="ti"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="13"/><column name="chord_value" value="en"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="1"/><column name="position" valueNumeric="14"/><column name="chord_value" value="es"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ha"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="1"/><column name="chord_value" value="ou"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="2"/><column name="chord_value" value="io"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ve"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="4"/><column name="chord_value" value="co"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="5"/><column name="chord_value" value="de"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="6"/><column name="chord_value" value="hi"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ri"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="8"/><column name="chord_value" value="ro"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="9"/><column name="chord_value" value="ic"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="10"/><column name="chord_value" value="ne"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ea"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="12"/><column name="chord_value" value="ra"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="13"/><column name="chord_value" value="ce"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="14"/><column name="chord_value" value="li"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="15"/><column name="chord_value" value="ch"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="16"/><column name="chord_value" value="ll"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="17"/><column name="chord_value" value="ma"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="18"/><column name="chord_value" value="si"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="19"/><column name="chord_value" value="om"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="20"/><column name="chord_value" value="ur"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="2"/><column name="position" valueNumeric="21"/><column name="chord_value" value="nt"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ing"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="1"/><column name="chord_value" value="ion"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="2"/><column name="chord_value" value="tio"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ent"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="4"/><column name="chord_value" value="ati"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ter"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="6"/><column name="chord_value" value="tha"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="7"/><column name="chord_value" value="res"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="8"/><column name="chord_value" value="ver"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="9"/><column name="chord_value" value="ons"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="10"/><column name="chord_value" value="nce"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ith"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="12"/><column name="chord_value" value="ted"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="13"/><column name="chord_value" value="ers"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="14"/><column name="chord_value" value="thi"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="15"/><column name="chord_value" value="ect"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="16"/><column name="chord_value" value="rea"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="17"/><column name="chord_value" value="com"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="18"/><column name="chord_value" value="int"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="19"/><column name="chord_value" value="est"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="20"/><column name="chord_value" value="sta"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="21"/><column name="chord_value" value="cti"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="22"/><column name="chord_value" value="ica"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="23"/><column name="chord_value" value="ist"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="24"/><column name="chord_value" value="ain"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="3"/><column name="position" valueNumeric="25"/><column name="chord_value" value="iti"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="0"/><column name="chord_value" value="tion"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="1"/><column name="chord_value" value="atio"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ther"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ment"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="4"/><column name="chord_value" value="ould"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ical"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="6"/><column name="chord_value" value="ions"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ance"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="8"/><column name="chord_value" value="ence"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="9"/><column name="chord_value" value="ngth"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="10"/><column name="chord_value" value="ight"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ttle"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="12"/><column name="chord_value" value="sion"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="4"/><column name="position" valueNumeric="13"/><column name="chord_value" value="ound"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ст"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="1"/><column name="chord_value" value="ен"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ни"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ра"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="4"/><column name="chord_value" value="ко"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ка"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="6"/><column name="chord_value" value="ро"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ов"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="8"/><column name="chord_value" value="го"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="9"/><column name="chord_value" value="ор"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="10"/><column name="chord_value" value="ли"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ал"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="12"/><column name="chord_value" value="ер"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="13"/><column name="chord_value" value="пр"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="14"/><column name="chord_value" value="ре"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="5"/><column name="position" valueNumeric="15"/><column name="chord_value" value="ва"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ос"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="1"/><column name="chord_value" value="та"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ан"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ло"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="4"/><column name="chord_value" value="ри"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ес"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="6"/><column name="chord_value" value="ом"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ел"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="8"/><column name="chord_value" value="ет"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="9"/><column name="chord_value" value="ой"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="10"/><column name="chord_value" value="ит"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ть"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="12"/><column name="chord_value" value="ну"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="13"/><column name="chord_value" value="тр"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="14"/><column name="chord_value" value="ск"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="15"/><column name="chord_value" value="ил"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="6"/><column name="position" valueNumeric="16"/><column name="chord_value" value="ир"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ост"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="1"/><column name="chord_value" value="ени"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ого"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ние"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="4"/><column name="chord_value" value="ств"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ани"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="6"/><column name="chord_value" value="тор"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ско"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="8"/><column name="chord_value" value="тел"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="9"/><column name="chord_value" value="ова"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="10"/><column name="chord_value" value="ало"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="11"/><column name="chord_value" value="сто"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="12"/><column name="chord_value" value="тся"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="13"/><column name="chord_value" value="ест"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="14"/><column name="chord_value" value="ред"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="15"/><column name="chord_value" value="при"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="16"/><column name="chord_value" value="чес"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="17"/><column name="chord_value" value="тра"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="7"/><column name="position" valueNumeric="18"/><column name="chord_value" value="нич"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ость"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="1"/><column name="chord_value" value="ение"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ного"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ства"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="4"/><column name="chord_value" value="тель"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ован"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="6"/><column name="chord_value" value="ался"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ться"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="8"/><column name="chord_value" value="ация"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="9"/><column name="chord_value" value="енно"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="10"/><column name="chord_value" value="ствен"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="8"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ально"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="0"/><column name="chord_value" value="atio"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="1"/><column name="chord_value" value="tion"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ther"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ment"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="4"/><column name="chord_value" value="ould"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ight"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="6"/><column name="chord_value" value="ound"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ence"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="8"/><column name="chord_value" value="ance"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="9"/><column name="chord_value" value="ical"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="10"/><column name="chord_value" value="sion"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ttle"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="12"/><column name="chord_value" value="ngth"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="13"/><column name="chord_value" value="stra"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="14"/><column name="chord_value" value="ster"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="9"/><column name="position" valueNumeric="15"/><column name="chord_value" value="ient"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ation"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="1"/><column name="chord_value" value="ition"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ement"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ently"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="4"/><column name="chord_value" value="ssion"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="5"/><column name="chord_value" value="iness"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="6"/><column name="chord_value" value="ously"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ction"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="8"/><column name="chord_value" value="tinue"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="9"/><column name="chord_value" value="sider"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="10"/><column name="chord_value" value="struct"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="10"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ntial"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ость"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="1"/><column name="chord_value" value="ение"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ного"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ства"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="4"/><column name="chord_value" value="тель"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ован"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="6"/><column name="chord_value" value="ться"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="7"/><column name="chord_value" value="ация"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="8"/><column name="chord_value" value="енно"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="9"/><column name="chord_value" value="ально"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="10"/><column name="chord_value" value="ствен"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="11"/><column name="chord_value" value="ирова"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="12"/><column name="chord_value" value="еског"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="11"/><column name="position" valueNumeric="13"/><column name="chord_value" value="ателн"/></insert>
+
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="0"/><column name="chord_value" value="ование"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="1"/><column name="chord_value" value="ительн"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="2"/><column name="chord_value" value="ательн"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="3"/><column name="chord_value" value="ственн"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="4"/><column name="chord_value" value="оторый"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="5"/><column name="chord_value" value="ирован"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="6"/><column name="chord_value" value="еского"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="7"/><column name="chord_value" value="остями"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="8"/><column name="chord_value" value="ивание"/></insert>
+        <insert tableName="keyboard_chords"><column name="chord_set_id" valueNumeric="12"/><column name="position" valueNumeric="9"/><column name="chord_value" value="енного"/></insert>
+    </changeSet>
+</databaseChangeLog>

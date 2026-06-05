@@ -1,0 +1,96 @@
+export const ru = {
+  app: {
+    title: "Play&Say Key",
+    wordmark: "Play&Say",
+    product: "Key",
+  },
+  auth: {
+    loading: "Проверяем вход",
+    callback: "Возвращаемся в тренажер",
+    signIn: "Войти",
+    signingIn: "Открываем вход",
+    logout: "Выйти",
+    failed: "Не удалось войти",
+    retry: "Повторить",
+    signedInAs: "Аккаунт",
+  },
+  language: {
+    label: "Язык",
+    ru: "Русский",
+    en: "English",
+    de: "Deutsch",
+    fr: "Français",
+  },
+  theme: {
+    system: "Системная тема",
+    light: "Светлая тема",
+    dark: "Темная тема",
+  },
+  trainer: {
+    layout: "Раскладка",
+    set: "Набор",
+    difficulty: "Уровень {{level}}",
+    start: "Старт",
+    restart: "Сначала",
+    next: "Следующий",
+    saving: "Сохраняем",
+    saved: "Сохранено",
+    loadError: "Не удалось загрузить тренажер",
+    noSet: "Нет наборов для этой раскладки",
+    current: "Текущий набор",
+    score: "Оценка",
+    sessions: "Сессии",
+    best: "Лучший темп",
+    avgSpeed: "Средний темп",
+    avgAccuracy: "Средняя точность",
+    weakFingers: "Зоны внимания",
+    noWeakFingers: "Ошибок по пальцам пока нет",
+    recent: "Последние сессии",
+    remedialTitle: "Фокус: {{chars}}",
+    nextUp: "Усложнить",
+    nextDown: "Фокус",
+    nextRepeat: "Повторить",
+  },
+  stats: {
+    speed: "Скорость",
+    accuracy: "Точность",
+    cadence: "Каденс",
+    errors: "Ошибки",
+    progress: "Прогресс",
+  },
+  units: {
+    cpm: "зн/мин",
+    bpm: "BPM",
+    percent: "%",
+  },
+  metronome: {
+    label: "Метроном",
+    tempo: "Темп",
+  },
+  keyboard: {
+    backspace: "⌫",
+    tab: "Tab",
+    caps: "Caps",
+    enter: "Enter",
+    shift: "Shift",
+    control: "Ctrl",
+    alt: "Alt",
+    space: "Space",
+  },
+  finger: {
+    leftPinky: "Левый мизинец",
+    leftRing: "Левый безымянный",
+    leftMiddle: "Левый средний",
+    leftIndex: "Левый указательный",
+    rightIndex: "Правый указательный",
+    rightMiddle: "Правый средний",
+    rightRing: "Правый безымянный",
+    rightPinky: "Правый мизинец",
+  },
+} as const;
+
+export type TranslationResource = {
+  [Section in keyof typeof ru]: {
+    [Key in keyof (typeof ru)[Section]]: string;
+  };
+};

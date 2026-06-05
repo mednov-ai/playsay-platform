@@ -1,0 +1,294 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  securityContext:
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+  containers:
+    - name: node
+      image: node:22
+      command: ["cat"]
+      tty: true
+      volumeMounts:
+        - name: jenkins-agent-cache
+          mountPath: /cache/npm
+          subPath: npm
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1500m
+          memory: 1Gi
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:debug
+      command: ["/busybox/cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 150m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1024Mi
+    - name: tools
+      image: alpine:3.20
+      command: ["cat"]
+      tty: true
+    - name: smoke
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      command: ["cat"]
+      tty: true
+      volumeMounts:
+        - name: jenkins-agent-cache
+          mountPath: /cache/npm
+          subPath: npm
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1536Mi
+  volumes:
+    - name: kaniko-docker-config
+      emptyDir: {}
+    - name: jenkins-agent-cache
+      persistentVolumeClaim:
+        claimName: jenkins-agent-cache
+"""
+    }
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timestamps()
+  }
+
+  parameters {
+    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev', trim: true)
+  }
+
+  environment {
+    GITHUB_OWNER = 'mednov-ai'
+    KEYBOARD_APP_IMAGE_NAME = 'playsay-keyboard-app'
+    PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
+    INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
+    INFRA_BRANCH = 'develop'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script {
+          def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
+          def scmVars = checkout([
+            $class: 'GitSCM',
+            branches: [[name: "*/${requestedBranch}"]],
+            doGenerateSubmoduleConfigurations: false,
+            extensions: [],
+            submoduleCfg: [],
+            userRemoteConfigs: [[url: env.PLATFORM_REPO]]
+          ])
+          env.GIT_COMMIT = scmVars.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
+          env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
+
+          def buildPrefix = env.CI_BRANCH == 'develop' ? 'key-frontend-dev' : "key-frontend-${env.CI_BRANCH}"
+          buildPrefix = buildPrefix.replaceAll(/[^A-Za-z0-9_.-]/, '-')
+          buildPrefix = buildPrefix.replaceAll(/^[^A-Za-z0-9]+/, '').replaceAll(/[^A-Za-z0-9]+$/, '')
+          int maxPrefixLength = 63 - env.BUILD_NUMBER.length() - 1
+          if (buildPrefix.length() > maxPrefixLength) {
+            buildPrefix = buildPrefix.take(maxPrefixLength).replaceAll(/[^A-Za-z0-9]+$/, '')
+          }
+          env.BUILD_LABEL_PREFIX = buildPrefix ?: 'key-frontend'
+          env.BUILD_LABEL = "${env.BUILD_LABEL_PREFIX}-${env.BUILD_NUMBER}"
+          env.DEPLOY_TO_DEV = (
+            env.CI_BRANCH == 'develop' ||
+            env.CI_BRANCH.startsWith('codex/') ||
+            env.CI_BRANCH.startsWith('feature/') ||
+            env.CI_BRANCH.startsWith('release/') ||
+            env.CI_BRANCH.startsWith('hotfix/')
+          ).toString()
+
+          currentBuild.displayName = env.BUILD_LABEL
+          currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
+        }
+      }
+    }
+
+    stage('Lint, test, and build') {
+      steps {
+        container('node') {
+          dir('frontend') {
+            sh 'npm install --cache /cache/npm --prefer-offline'
+            sh 'npm --workspace keyboard-app run lint'
+            sh 'npm --workspace keyboard-app run test'
+            sh 'npm --workspace keyboard-app run build'
+          }
+        }
+      }
+    }
+
+    stage('Build and push image') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('kaniko') {
+          withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+            sh '''
+              set -eu
+              mkdir -p /kaniko/.docker
+              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+              cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
+EOF
+              /kaniko/executor \
+                --context "$WORKSPACE/frontend" \
+                --dockerfile "$WORKSPACE/frontend/keyboard-app/Dockerfile" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${KEYBOARD_APP_IMAGE_NAME}:${GIT_COMMIT}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${KEYBOARD_APP_IMAGE_NAME}:${BUILD_LABEL}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${KEYBOARD_APP_IMAGE_NAME}:dev"
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Update dev image tag') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('tools') {
+          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+            sh '''
+              set -eu
+              apk add --no-cache git yq
+              rm -rf infra
+              AUTH_REPO="$(echo "$INFRA_REPO" | sed "s#https://#https://${GITHUB_USER}:${GITHUB_TOKEN}@#")"
+              git clone --branch "$INFRA_BRANCH" "$AUTH_REPO" infra
+              cd infra
+              yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/keyboard-app/values-dev.yaml
+              git config user.email "jenkins@play-and-say.ru"
+              git config user.name "Play&Say Jenkins"
+              git add helm-charts/keyboard-app/values-dev.yaml
+              git commit \
+                -m "chore: deploy ${BUILD_LABEL} to dev" \
+                -m "Source branch: ${CI_BRANCH}" \
+                -m "Source commit: ${GIT_COMMIT}" || exit 0
+              git push origin "HEAD:${INFRA_BRANCH}"
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Wait for rollout') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('tools') {
+          sh '''
+            set -eu
+            apk add --no-cache jq kubectl
+            EXPECTED_BUILD="$BUILD_LABEL"
+            APP="keyboard-app"
+            TIMEOUT_SECONDS="${PLAYSAY_DEV_ROLLOUT_TIMEOUT_SECONDS:-420}"
+            POLL_SECONDS="${PLAYSAY_DEV_ROLLOUT_POLL_SECONDS:-10}"
+            DEADLINE="$(( $(date +%s) + TIMEOUT_SECONDS ))"
+            kubectl -n argocd annotate application "$APP" argocd.argoproj.io/refresh=hard --overwrite || true
+            while true; do
+              sync_status="$(kubectl -n argocd get application "$APP" -o jsonpath='{.status.sync.status}' 2>/dev/null || true)"
+              health_status="$(kubectl -n argocd get application "$APP" -o jsonpath='{.status.health.status}' 2>/dev/null || true)"
+              deployment_json="$(kubectl -n playsay-dev get deployment "$APP" -o json 2>/dev/null || true)"
+              if [ -n "$deployment_json" ]; then
+                deploy_build="$(printf "%s" "$deployment_json" | jq -r '.spec.template.metadata.labels["playsay.io/build-name"] // ""')"
+                desired="$(printf "%s" "$deployment_json" | jq -r '.spec.replicas // 1')"
+                ready="$(printf "%s" "$deployment_json" | jq -r '.status.readyReplicas // 0')"
+                available="$(printf "%s" "$deployment_json" | jq -r '.status.availableReplicas // 0')"
+                echo "${APP}: argocd=${sync_status}/${health_status} build=${deploy_build} ready=${ready}/${desired} available=${available}"
+                if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ] && [ "$deploy_build" = "$EXPECTED_BUILD" ] && [ "$ready" -ge "$desired" ] && [ "$available" -ge "$desired" ]; then
+                  exit 0
+                fi
+              else
+                echo "${APP}: deployment is not visible yet"
+              fi
+              if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                kubectl -n argocd get application "$APP" -o yaml || true
+                kubectl -n playsay-dev get deployments,pods --show-labels || true
+                exit 1
+              fi
+              sleep "$POLL_SECONDS"
+            done
+          '''
+        }
+      }
+    }
+
+    stage('Browser smoke') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('smoke') {
+          sh '''
+            set -eu
+            export PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+            export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+            SMOKE_NODE_DIR="/tmp/playsay-keyboard-smoke"
+            if [ ! -d "$SMOKE_NODE_DIR/node_modules/playwright" ]; then
+              rm -rf "$SMOKE_NODE_DIR"
+              mkdir -p "$SMOKE_NODE_DIR"
+              cat > "$SMOKE_NODE_DIR/package.json" <<'JSON'
+{"private":true,"dependencies":{"playwright":"1.56.1"}}
+JSON
+              npm --prefix "$SMOKE_NODE_DIR" install --cache /cache/npm --prefer-offline --ignore-scripts --no-audit --no-fund
+            fi
+            node <<'NODE'
+const { chromium } = require("/tmp/playsay-keyboard-smoke/node_modules/playwright");
+
+(async () => {
+  const baseUrl = process.env.PLAY_SAY_KEYBOARD_SMOKE_URL || "https://key.play-and-say.ru";
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const page = await context.newPage();
+  const response = await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+  if (!response || response.status() >= 500) {
+    throw new Error(`Keyboard app returned HTTP ${response ? response.status() : "no response"}`);
+  }
+  await page.waitForSelector("text=Play&Say", { timeout: 15000 });
+  const loginButtons = await page.locator("button").filter({ hasText: /Войти|Sign in|Anmelden|Se connecter/ }).count();
+  if (loginButtons < 1) {
+    throw new Error("Keyboard app did not show the authenticated entry flow");
+  }
+  await browser.close();
+})().catch(async (error) => {
+  console.error(error);
+  process.exit(1);
+});
+NODE
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
+    }
+  }
+}

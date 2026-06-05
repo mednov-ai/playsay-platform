@@ -42,6 +42,7 @@ export const ru = {
     resume: "Продолжить",
     playAria: "Запустить тренировку",
     resumeAria: "Продолжить тренировку",
+    typingLineAria: "Строка ввода",
     saving: "Сохраняем",
     saved: "Сохранено",
     guestSaved: "Локально",

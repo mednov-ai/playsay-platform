@@ -80,7 +80,7 @@ button:disabled {
 }
 
 select {
-  min-height: 40px;
+  min-height: 34px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
@@ -110,7 +110,7 @@ select {
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -132,6 +132,7 @@ select {
 .icon-text-button,
 .primary-button,
 .secondary-button,
+.session-play-button,
 .play-button {
   min-height: 40px;
   border-radius: 8px;
@@ -145,7 +146,7 @@ select {
 }
 
 .icon-button {
-  width: 40px;
+  width: 36px;
   padding: 0;
   background: var(--surface);
   color: var(--foreground);
@@ -153,16 +154,30 @@ select {
 
 .icon-text-button,
 .secondary-button {
-  padding: 0 14px;
+  padding: 0 12px;
   background: var(--surface);
   color: var(--foreground);
 }
 
 .primary-button {
-  padding: 0 16px;
+  padding: 0 14px;
   border-color: var(--primary);
   background: var(--primary);
   color: white;
+}
+
+.session-play-button {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  min-height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 12px 22px rgb(255 92 0 / 0.22);
+  padding: 0;
 }
 
 .play-button {
@@ -179,6 +194,7 @@ select {
   padding: 0;
 }
 
+.session-play-button span,
 .play-button span {
   position: absolute;
   width: 1px;
@@ -190,6 +206,8 @@ select {
 
 .primary-button:hover,
 .primary-button:focus-visible,
+.session-play-button:hover,
+.session-play-button:focus-visible,
 .play-button:hover,
 .play-button:focus-visible {
   border-color: var(--primary-hover);
@@ -273,8 +291,8 @@ select {
   height: 100dvh;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
-  padding: 12px;
-  gap: 10px;
+  padding: 8px;
+  gap: 6px;
   overflow: hidden;
 }
 
@@ -283,14 +301,14 @@ select {
   border-radius: 16px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow: var(--shadow);
-  padding: 10px 14px;
+  padding: 6px 10px;
 }
 
 .trainer-layout {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 6px;
   min-height: 0;
   overflow: hidden;
 }
@@ -306,16 +324,16 @@ select {
   display: grid;
   grid-template-columns: minmax(140px, 1fr) 120px minmax(220px, 1.3fr) minmax(390px, 2fr) minmax(160px, 0.8fr);
   align-items: end;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
   overflow: hidden;
   border-radius: 16px;
-  padding: 10px 12px;
+  padding: 6px 10px;
 }
 
 .account-strip {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -401,7 +419,7 @@ select {
 .trainer-surface {
   display: grid;
   position: relative;
-  grid-template-rows: auto auto minmax(74px, 0.7fr) auto auto;
+  grid-template-rows: auto auto 128px auto auto;
   gap: 8px;
   min-width: 0;
   min-height: 0;
@@ -415,13 +433,13 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .trainer-toolbar h1 {
-  margin: 3px 0 0;
-  font-size: 28px;
+  margin: 2px 0 0;
+  font-size: 22px;
   line-height: 1.08;
 }
 
@@ -435,7 +453,7 @@ select {
 .level-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
+  min-height: 34px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--surface-strong);
@@ -453,26 +471,26 @@ select {
 
 .stats-panel {
   display: grid;
-  gap: 7px;
+  gap: 5px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface-strong);
-  padding: 8px 12px;
+  padding: 6px 10px;
 }
 
 .stats-panel__grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(104px, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .stat {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .stat strong {
-  font-size: 19px;
+  font-size: 17px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -498,24 +516,38 @@ select {
 .typing-stage {
   position: relative;
   min-height: 0;
+  border: 2px solid color-mix(in srgb, var(--primary) 58%, var(--line));
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent 18%),
+    var(--surface);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--surface) 80%, transparent),
+    0 14px 28px rgb(255 92 0 / 0.1);
 }
 
 .typing-strip {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 4px;
   align-self: stretch;
   height: 100%;
-  min-height: 76px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-  padding: 14px 18px;
-  overflow: auto;
-  overflow-wrap: anywhere;
-  font-size: 36px;
+  min-height: 124px;
+  border-radius: 14px;
+  padding: 10px 18px;
+  overflow: hidden;
+  font-size: 34px;
   font-weight: 800;
   font-variant-ligatures: none;
   letter-spacing: 0;
   word-spacing: 0;
-  line-height: 1.32;
+  line-height: 1.12;
+}
+
+.typing-strip__line {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .typing-char {
@@ -551,6 +583,11 @@ select {
   border-radius: 999px;
   background: var(--primary);
   content: "";
+}
+
+.typing-char.is-current {
+  color: var(--foreground);
+  text-shadow: 0 0 0.01px currentColor;
 }
 
 .practice-overlay {

@@ -44,6 +44,7 @@ export const en: TranslationResource = {
     resume: "Resume",
     playAria: "Start practice",
     resumeAria: "Resume practice",
+    typingLineAria: "Typing line",
     saving: "Saving",
     saved: "Saved",
     guestSaved: "Local",

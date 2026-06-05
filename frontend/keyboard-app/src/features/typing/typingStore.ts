@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { LAYOUTS } from "../../entities/layouts";
 import type { ChordSet, Finger, LayoutId } from "../../shared/types";
 import { computeCadence } from "./scoring";
+import { typingWindowLineLength, typingWindowRows } from "./typingWindow";
 
 export type CharStatus = "pending" | "correct" | "error";
 
@@ -44,17 +45,19 @@ interface TypingState {
   result: () => SessionResult | null;
 }
 
-function buildStream(layoutId: LayoutId, chordSet: ChordSet): StreamItem[] {
+export const minimumPracticeStreamLength = typingWindowLineLength * typingWindowRows;
+
+export function buildStream(layoutId: LayoutId, chordSet: ChordSet): StreamItem[] {
   const layout = LAYOUTS[layoutId];
-  const stream: StreamItem[] = [];
+  const baseStream: StreamItem[] = [];
   chordSet.chords.forEach((chord, chordIndex) => {
     if (chordIndex > 0) {
-      stream.push({ char: " ", finger: "rightIndex", chordIndex, isChordStart: false, isSpace: true });
+      baseStream.push({ char: " ", finger: "rightIndex", chordIndex, isChordStart: false, isSpace: true });
     }
 
     Array.from(chord).forEach((char, charIndex) => {
       const key = layout.byChar[char];
-      stream.push({
+      baseStream.push({
         char,
         finger: key?.finger ?? "rightIndex",
         chordIndex,
@@ -62,6 +65,26 @@ function buildStream(layoutId: LayoutId, chordSet: ChordSet): StreamItem[] {
       });
     });
   });
+
+  if (baseStream.length === 0 || baseStream.length >= minimumPracticeStreamLength) {
+    return baseStream;
+  }
+
+  const stream: StreamItem[] = [];
+  let cycle = 0;
+  while (stream.length < minimumPracticeStreamLength) {
+    if (cycle > 0) {
+      stream.push({ char: " ", finger: "rightIndex", chordIndex: cycle * chordSet.chords.length, isChordStart: false, isSpace: true });
+    }
+    baseStream.forEach((item) => {
+      stream.push({
+        ...item,
+        chordIndex: item.chordIndex + cycle * chordSet.chords.length,
+      });
+    });
+    cycle += 1;
+  }
+
   return stream;
 }
 

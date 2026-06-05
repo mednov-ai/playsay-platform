@@ -15,6 +15,7 @@ import { StatsPanel } from "../../features/stats/StatsPanel";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { computeCadence, computeScore } from "../../features/typing/scoring";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
+import { buildTypingWindow } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
 import { useTypingStore } from "../../features/typing/typingStore";
 import { fetchProgress, submitResult } from "../../shared/api/keyboardApi";
@@ -236,6 +237,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     };
   }, [correctCount, errorCount, finishedAt, intervals, pos, startedAt, stream.length]);
 
+  const typingWindow = useMemo(() => buildTypingWindow(stream, statuses, pos), [pos, statuses, stream]);
+
   const score = sessionResult
     ? computeScore(sessionResult.speedCpm, sessionResult.accuracy, sessionResult.cadence)
     : null;
@@ -341,6 +344,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           dismissPrompt();
           return;
         }
+        if (sessionFlow.phase === "paused") {
+          event.preventDefault();
+          restartSession();
+          return;
+        }
         if (sessionFlow.phase === "countdown") {
           event.preventDefault();
           cancelCountdown();
@@ -362,15 +370,19 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [canResumeSession, canStartSession, cancelCountdown, dismissPrompt, resumeSession, sessionFlow.phase, showRegistrationPrompt, startSession]);
+  }, [
+    canResumeSession,
+    canStartSession,
+    cancelCountdown,
+    dismissPrompt,
+    restartSession,
+    resumeSession,
+    sessionFlow.phase,
+    showRegistrationPrompt,
+    startSession,
+  ]);
 
   const startLabel = sessionFlow.phase === "finished" ? t("trainer.next") : t("trainer.start");
-  const overlayTitle =
-    sessionFlow.phase === "paused"
-      ? t("trainer.paused")
-      : sessionFlow.phase === "finished"
-        ? t("trainer.resultReady")
-        : t("trainer.ready");
   const accountLabel = isAuthenticated ? t("auth.signedInAs") : t("auth.guestAccount");
   const accountValue = isAuthenticated ? me.email ?? me.username : t("auth.guestProgress");
 
@@ -479,6 +491,17 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               <h1>{chordSet?.title ?? (loading ? t("auth.loading") : t("trainer.noSet"))}</h1>
             </div>
             <div className="trainer-toolbar__actions">
+              <button
+                type="button"
+                className="session-play-button"
+                onClick={startSession}
+                disabled={!canStartSession}
+                aria-label={t("trainer.playAria")}
+                title={t("trainer.playAria")}
+              >
+                <Play size={24} fill="currentColor" aria-hidden="true" />
+                <span>{startLabel}</span>
+              </button>
               {chordSet ? (
                 <span className="level-pill">{t("trainer.difficulty", { level: chordSet.difficulty })}</span>
               ) : null}
@@ -517,14 +540,18 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           />
 
           <div className="typing-stage">
-            <div className="typing-strip" aria-live="polite">
-              {stream.map((item, index) => (
-                <span
-                  key={`${item.chordIndex}-${index}`}
-                  className={`typing-char typing-char--${statuses[index]} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""}`}
-                >
-                  {item.isSpace ? "\u00a0" : item.char}
-                </span>
+            <div className="typing-strip" aria-live="polite" aria-label={t("trainer.typingLineAria")}>
+              {typingWindow.rows.map((row, rowIndex) => (
+                <div className="typing-strip__line" key={`${typingWindow.start}-${rowIndex}`}>
+                  {row.map(({ item, index, status }) => (
+                    <span
+                      key={index}
+                      className={`typing-char typing-char--${status} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""}`}
+                    >
+                      {item.isSpace ? "\u00a0" : item.char}
+                    </span>
+                  ))}
+                </div>
               ))}
             </div>
           </div>
@@ -566,22 +593,22 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </div>
           </div>
 
-          {sessionFlow.phase === "idle" || sessionFlow.phase === "finished" || sessionFlow.phase === "paused" ? (
-            <div className={`practice-overlay practice-overlay--${sessionFlow.phase}`} role="presentation">
+          {sessionFlow.phase === "paused" ? (
+            <div className="practice-overlay practice-overlay--paused" role="presentation">
               <div className="practice-overlay__content">
-                <strong>{overlayTitle}</strong>
+                <strong>{t("trainer.paused")}</strong>
                 <button
                   type="button"
                   className="play-button"
-                  onClick={sessionFlow.phase === "paused" ? resumeSession : startSession}
-                  disabled={sessionFlow.phase === "paused" ? !canResumeSession : !canStartSession}
-                  aria-label={sessionFlow.phase === "paused" ? t("trainer.resumeAria") : t("trainer.playAria")}
-                  title={sessionFlow.phase === "paused" ? t("trainer.resumeAria") : t("trainer.playAria")}
+                  onClick={resumeSession}
+                  disabled={!canResumeSession}
+                  aria-label={t("trainer.resumeAria")}
+                  title={t("trainer.resumeAria")}
                 >
                   <Play size={58} fill="currentColor" aria-hidden="true" />
-                  <span>{sessionFlow.phase === "paused" ? t("trainer.resume") : startLabel}</span>
+                  <span>{t("trainer.resume")}</span>
                 </button>
-                <span>{sessionFlow.phase === "paused" ? t("trainer.resumeShortcut") : t("trainer.startShortcut")}</span>
+                <span>{t("trainer.resumeShortcut")}</span>
               </div>
             </div>
           ) : null}

@@ -44,6 +44,7 @@ export const fr: TranslationResource = {
     resume: "Reprendre",
     playAria: "Démarrer l'entraînement",
     resumeAria: "Reprendre l'entraînement",
+    typingLineAria: "Ligne de saisie",
     saving: "Enregistrement",
     saved: "Enregistré",
     guestSaved: "Local",

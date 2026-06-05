@@ -46,10 +46,18 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow: hidden;
   background:
     radial-gradient(circle at 6% 4%, var(--yellow), transparent 23rem),
     radial-gradient(circle at 95% 12%, var(--mint), transparent 22rem),
@@ -123,7 +131,8 @@ select {
 .icon-button,
 .icon-text-button,
 .primary-button,
-.secondary-button {
+.secondary-button,
+.play-button {
   min-height: 40px;
   border-radius: 8px;
   border: 1px solid var(--line);
@@ -156,8 +165,33 @@ select {
   color: white;
 }
 
+.play-button {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  min-height: 132px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 22px 46px rgb(255 92 0 / 0.3);
+  padding: 0;
+}
+
+.play-button span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .primary-button:hover,
-.primary-button:focus-visible {
+.primary-button:focus-visible,
+.play-button:hover,
+.play-button:focus-visible {
   border-color: var(--primary-hover);
   background: var(--primary-hover);
 }
@@ -236,24 +270,29 @@ select {
 
 .keyboard-app {
   display: grid;
-  grid-template-rows: auto 1fr;
-  padding: 18px;
-  gap: 18px;
+  height: 100dvh;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 12px;
+  gap: 10px;
+  overflow: hidden;
 }
 
 .app-header {
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow: var(--shadow);
-  padding: 14px 16px;
+  padding: 10px 14px;
 }
 
 .trainer-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) 1fr;
-  gap: 18px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: 1fr;
+  gap: 10px;
   min-height: 0;
+  overflow: hidden;
 }
 
 .side-panel,
@@ -265,17 +304,19 @@ select {
 
 .side-panel {
   display: grid;
-  align-content: start;
-  gap: 16px;
-  border-radius: 20px;
-  padding: 18px;
+  grid-template-columns: minmax(140px, 1fr) 120px minmax(220px, 1.3fr) minmax(390px, 2fr) minmax(160px, 0.8fr);
+  align-items: end;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 10px 12px;
 }
 
 .account-strip {
   display: grid;
   gap: 4px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
+  min-width: 0;
 }
 
 .account-strip span,
@@ -290,30 +331,45 @@ select {
 
 .account-strip strong {
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .progress-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(76px, 1fr));
+  gap: 8px;
 }
 
 .metric {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-strong);
-  padding: 12px;
+  padding: 8px 10px;
 }
 
 .metric strong {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .weak-fingers {
-  display: grid;
-  gap: 10px;
+  align-self: stretch;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  padding: 8px 10px;
+  overflow: auto;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.weak-fingers summary {
+  cursor: pointer;
+  color: var(--foreground);
+  font-weight: 800;
 }
 
 .weak-fingers h2 {
@@ -323,8 +379,8 @@ select {
 
 .weak-fingers ul {
   display: grid;
-  gap: 8px;
-  margin: 0;
+  gap: 6px;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -338,17 +394,20 @@ select {
 }
 
 .weak-fingers p {
-  margin: 0;
+  margin: 8px 0 0;
   color: var(--muted);
 }
 
 .trainer-surface {
   display: grid;
-  grid-template-rows: auto auto minmax(120px, 1fr) auto auto;
-  gap: 16px;
+  position: relative;
+  grid-template-rows: auto auto minmax(74px, 0.7fr) auto auto;
+  gap: 8px;
   min-width: 0;
-  border-radius: 20px;
-  padding: 18px;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 10px;
 }
 
 .trainer-toolbar,
@@ -362,7 +421,7 @@ select {
 
 .trainer-toolbar h1 {
   margin: 3px 0 0;
-  font-size: clamp(24px, 3vw, 40px);
+  font-size: 28px;
   line-height: 1.08;
 }
 
@@ -394,17 +453,17 @@ select {
 
 .stats-panel {
   display: grid;
-  gap: 12px;
+  gap: 7px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface-strong);
-  padding: 14px;
+  padding: 8px 12px;
 }
 
 .stats-panel__grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(104px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .stat {
@@ -413,7 +472,7 @@ select {
 }
 
 .stat strong {
-  font-size: 22px;
+  font-size: 19px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -436,28 +495,43 @@ select {
   transition: width 0.15s ease;
 }
 
+.typing-stage {
+  position: relative;
+  min-height: 0;
+}
+
 .typing-strip {
   align-self: stretch;
-  min-height: 136px;
+  height: 100%;
+  min-height: 76px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
-  padding: 22px;
+  padding: 14px 18px;
+  overflow: auto;
   overflow-wrap: anywhere;
-  font-size: clamp(28px, 4vw, 54px);
+  font-size: 36px;
   font-weight: 800;
-  line-height: 1.45;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: 1.32;
 }
 
 .typing-char {
   position: relative;
   display: inline-block;
-  min-width: 0.72em;
+  min-width: 0;
   color: color-mix(in srgb, var(--foreground) 62%, var(--muted));
 }
 
 .typing-char.is-chord-start {
-  margin-left: 0.18em;
+  margin-left: 0;
+}
+
+.typing-char.is-space {
+  width: 0.58em;
+  min-width: 0.58em;
 }
 
 .typing-char--correct {
@@ -479,29 +553,76 @@ select {
   content: "";
 }
 
+.practice-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(1.5px) saturate(0.9);
+}
+
+.practice-overlay__content {
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
+}
+
+.practice-overlay__content strong {
+  color: var(--foreground);
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.practice-overlay__content > span {
+  min-height: 24px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.countdown-number {
+  color: var(--primary);
+  font-size: 112px;
+  font-weight: 800;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
 .virtual-keyboard {
+  --key-unit: clamp(54px, calc((100vw - 80px) / 16), 84px);
+  --key-gap: clamp(4px, 0.3vw, 6px);
+  --key-height: 50px;
   width: 100%;
+  max-width: 1368px;
+  min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 6px);
+  justify-self: center;
   overflow-x: auto;
-  padding: 4px 0 8px;
+  overflow-y: visible;
+  padding: 2px 0 4px;
 }
 
 .virtual-keyboard__row {
   display: flex;
-  gap: 6px;
+  gap: var(--key-gap);
   justify-content: center;
   min-width: max-content;
-  margin-bottom: 6px;
+  margin-bottom: var(--key-gap);
 }
 
 .virtual-keyboard__key {
-  width: calc(var(--key-width) * 44px + (var(--key-width) - 1) * 6px);
-  height: 44px;
+  width: calc(var(--key-width) * var(--key-unit) + (var(--key-width) - 1) * var(--key-gap));
+  height: var(--key-height);
   display: grid;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--finger-color) 58%, var(--key-border));
   border-radius: 8px;
   background: color-mix(in srgb, var(--finger-color) 17%, var(--surface));
   color: var(--foreground);
+  font-size: 17px;
   font-weight: 800;
   transition: 0.12s ease;
 }
@@ -562,9 +683,69 @@ select {
   color: var(--foreground);
 }
 
+.next-decision {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--foreground);
+  padding: 0 10px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgb(17 17 17 / 0.36);
+  padding: 18px;
+}
+
+.registration-modal {
+  position: relative;
+  width: min(420px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.registration-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.registration-modal h2 {
+  margin: 0 36px 10px 0;
+  font-size: 26px;
+  line-height: 1.16;
+}
+
+.registration-modal p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.registration-modal__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 1100px) {
-  .trainer-layout {
-    grid-template-columns: 1fr;
+  .side-panel {
+    grid-template-columns: minmax(150px, 1fr) 116px minmax(210px, 1.4fr);
+  }
+
+  .progress-summary,
+  .weak-fingers {
+    display: none;
   }
 
   .stats-panel__grid {
@@ -572,10 +753,37 @@ select {
   }
 }
 
+@media (max-width: 1500px) {
+  .side-panel {
+    grid-template-columns: minmax(150px, 1fr) 116px minmax(260px, 1.6fr);
+  }
+
+  .progress-summary,
+  .weak-fingers {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
+  html,
+  body,
+  #root {
+    height: auto;
+  }
+
+  body {
+    overflow: auto;
+  }
+
   .auth-page,
   .keyboard-app {
     padding: 12px;
+  }
+
+  .keyboard-app {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
   }
 
   .auth-page__topbar,
@@ -591,6 +799,12 @@ select {
     width: 100%;
   }
 
+  .side-panel {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    overflow: visible;
+  }
+
   .language-select,
   .topbar-actions select,
   .icon-text-button,
@@ -604,8 +818,50 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .progress-summary,
+  .weak-fingers {
+    display: grid;
+  }
+
+  .trainer-surface {
+    overflow: visible;
+  }
+
+  .trainer-toolbar h1 {
+    font-size: 24px;
+  }
+
   .typing-strip {
-    min-height: 112px;
+    min-height: 118px;
     padding: 16px;
+    font-size: 30px;
+  }
+
+  .play-button {
+    width: 104px;
+    height: 104px;
+    min-height: 104px;
+  }
+
+  .practice-overlay__content strong {
+    font-size: 22px;
+  }
+
+  .countdown-number {
+    font-size: 92px;
+  }
+
+  .virtual-keyboard {
+    --key-unit: 50px;
+    --key-gap: 5px;
+    --key-height: 48px;
+  }
+
+  .virtual-keyboard__row {
+    justify-content: flex-start;
+  }
+
+  .virtual-keyboard__key {
+    font-size: 15px;
   }
 }

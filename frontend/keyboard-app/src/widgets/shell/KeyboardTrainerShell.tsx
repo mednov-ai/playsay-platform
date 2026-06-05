@@ -1,39 +1,72 @@
-import { LogOut, Play, RotateCcw, Save, StepForward } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { LogIn, LogOut, Play, RotateCcw, Save, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { getLocalChordSets } from "../../entities/chordSets";
+import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/VirtualKeyboard";
+import {
+  dismissRegistrationPrompt,
+  readDismissedPromptCount,
+  readGuestSessionCount,
+  recordGuestSession,
+  shouldShowRegistrationPrompt,
+} from "../../features/guest/guestProgress";
+import { Metronome } from "../../features/metronome/Metronome";
+import { StatsPanel } from "../../features/stats/StatsPanel";
+import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
+import { computeCadence, computeScore } from "../../features/typing/scoring";
+import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
+import { useTypingEngine } from "../../features/typing/useTypingEngine";
+import { useTypingStore } from "../../features/typing/typingStore";
+import { fetchProgress, submitResult } from "../../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
 import type { ChordSet, LayoutId, Me, Progress } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
-import { fetchChordSets, fetchProgress, submitResult } from "../../shared/api/keyboardApi";
-import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/VirtualKeyboard";
-import { Metronome } from "../../features/metronome/Metronome";
-import { StatsPanel } from "../../features/stats/StatsPanel";
-import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
-import { computeCadence, computeScore } from "../../features/typing/scoring";
-import { useTypingEngine } from "../../features/typing/useTypingEngine";
-import { useTypingStore } from "../../features/typing/typingStore";
 
 interface Props {
-  me: Me;
+  me: Me | null;
+  authError?: string;
   themeMode: ThemeMode;
   onThemeChange: (mode: ThemeMode) => void;
   onLogout: () => void;
+  onSignIn: () => void;
 }
 
 const layouts: LayoutId[] = ["EN", "RU"];
 
-export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }: Props) {
+const emptyProgress: Progress = {
+  sessions: 0,
+  bestSpeedCpm: 0,
+  avgSpeedCpm: 0,
+  avgAccuracy: 0,
+  weakFingers: [],
+  recent: [],
+};
+
+function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  if (!element) {
+    return false;
+  }
+  return ["A", "BUTTON", "INPUT", "SELECT", "TEXTAREA"].includes(element.tagName);
+}
+
+export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, onLogout, onSignIn }: Props) {
   const { t, i18n } = useTranslation();
+  const isAuthenticated = me != null;
   const [layoutId, setLayoutId] = useState<LayoutId>("EN");
   const [sets, setSets] = useState<ChordSet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(authError ?? null);
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [guestSessionCount, setGuestSessionCount] = useState(() => readGuestSessionCount());
+  const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [guestRecorded, setGuestRecorded] = useState(false);
   const [nextDecision, setNextDecision] = useState<AdaptiveDecision | null>(null);
+  const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
   const submittedResultRef = useRef<string | null>(null);
 
   const loadSet = useTypingStore((state) => state.loadSet);
@@ -50,24 +83,36 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
   const intervals = useTypingStore((state) => state.intervals);
   const perChar = useTypingStore((state) => state.perChar);
 
-  useTypingEngine(Boolean(chordSet));
+  useTypingEngine(Boolean(chordSet) && sessionFlow.acceptsTyping);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
     setNextDecision(null);
+    setSaved(false);
+    setGuestRecorded(false);
     submittedResultRef.current = null;
+    dispatchSessionFlow({ type: "reset" });
 
-    Promise.all([fetchChordSets(layoutId), fetchProgress()])
-      .then(([loadedSets, loadedProgress]) => {
-        if (cancelled) {
-          return;
-        }
-        setSets(loadedSets);
-        setProgress(loadedProgress);
-        if (loadedSets.length > 0) {
-          loadSet(layoutId, loadedSets[0]);
+    const loadedSets = getLocalChordSets(layoutId);
+    setSets(loadedSets);
+    if (loadedSets.length > 0) {
+      loadSet(layoutId, loadedSets[0]);
+    }
+
+    if (!isAuthenticated) {
+      setProgress(null);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    fetchProgress()
+      .then((loadedProgress) => {
+        if (!cancelled) {
+          setProgress(loadedProgress);
         }
       })
       .catch((error: unknown) => {
@@ -84,10 +129,31 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
     return () => {
       cancelled = true;
     };
-  }, [layoutId, loadSet]);
+  }, [isAuthenticated, layoutId, loadSet]);
+
+  useEffect(() => {
+    if (authError) {
+      setLoadError(authError);
+    }
+  }, [authError]);
+
+  useEffect(() => {
+    if (sessionFlow.phase !== "countdown") {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => dispatchSessionFlow({ type: "countdownTick" }), 1_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [sessionFlow.countdownValue, sessionFlow.phase]);
 
   const sessionResult = result();
   const resultKey = sessionResult ? `${sessionResult.chordSetId}:${sessionResult.durationMs}:${sessionResult.errors}` : null;
+
+  useEffect(() => {
+    if (sessionResult && sessionFlow.phase === "running") {
+      dispatchSessionFlow({ type: "finish" });
+    }
+  }, [sessionFlow.phase, sessionResult]);
 
   useEffect(() => {
     if (!sessionResult || !resultKey || submittedResultRef.current === resultKey) {
@@ -95,9 +161,43 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
     }
 
     submittedResultRef.current = resultKey;
-    setSaving(true);
     setSaved(false);
+    setGuestRecorded(false);
     const currentSet = chordSet;
+
+    const updateNextDecision = () => {
+      if (!currentSet) {
+        return;
+      }
+      const problemChars = Object.entries(perChar)
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 3)
+        .map(([char]) => char);
+      setNextDecision(
+        decideNext({
+          layoutId,
+          accuracy: sessionResult.accuracy,
+          perChar,
+          currentSet,
+          sets,
+          remedialTitle: t("trainer.remedialTitle", { chars: problemChars.join(" ") }),
+        }),
+      );
+    };
+
+    if (!isAuthenticated) {
+      const nextCount = recordGuestSession();
+      const dismissedCount = readDismissedPromptCount();
+      setGuestSessionCount(nextCount);
+      setGuestRecorded(true);
+      updateNextDecision();
+      if (shouldShowRegistrationPrompt(nextCount, dismissedCount)) {
+        setShowRegistrationPrompt(true);
+      }
+      return;
+    }
+
+    setSaving(true);
 
     const save = async () => {
       if (sessionResult.chordSetId > 0) {
@@ -113,22 +213,7 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
       const loadedProgress = await fetchProgress();
       setProgress(loadedProgress);
       setSaved(true);
-      if (currentSet) {
-        const problemChars = Object.entries(perChar)
-          .sort((left, right) => right[1] - left[1])
-          .slice(0, 3)
-          .map(([char]) => char);
-        setNextDecision(
-          decideNext({
-            layoutId,
-            accuracy: sessionResult.accuracy,
-            perChar,
-            currentSet,
-            sets,
-            remedialTitle: t("trainer.remedialTitle", { chars: problemChars.join(" ") }),
-          }),
-        );
-      }
+      updateNextDecision();
     };
 
     void save()
@@ -136,7 +221,7 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
         setLoadError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => setSaving(false));
-  }, [chordSet, layoutId, perChar, resultKey, sessionResult, sets, t]);
+  }, [chordSet, isAuthenticated, layoutId, perChar, resultKey, sessionResult, sets, t]);
 
   const liveStats = useMemo(() => {
     const elapsedMs = startedAt == null ? 0 : Math.max(1, (finishedAt ?? Date.now()) - startedAt);
@@ -154,7 +239,11 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
   const score = sessionResult
     ? computeScore(sessionResult.speedCpm, sessionResult.accuracy, sessionResult.cadence)
     : null;
-  const nextChar = stream[pos]?.char ?? null;
+  const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
+  const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
+  const isSessionLocked = sessionFlow.phase === "countdown" || sessionFlow.phase === "running" || sessionFlow.phase === "paused";
+  const canStartSession = Boolean((chordSet ?? sets[0]) && (sessionFlow.phase === "idle" || sessionFlow.phase === "finished"));
+  const canResumeSession = sessionFlow.phase === "paused";
 
   const keyboardLabels: KeyboardLabels = {
     backspace: t("keyboard.backspace"),
@@ -171,23 +260,119 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
     void changeAppLanguage(language);
   };
 
+  const clearSessionResult = useCallback(() => {
+    setSaved(false);
+    setGuestRecorded(false);
+    submittedResultRef.current = null;
+  }, []);
+
   const selectSet = (setId: string) => {
     const nextSet = sets.find((set) => set.id === Number(setId));
     if (nextSet) {
       setNextDecision(null);
-      submittedResultRef.current = null;
+      clearSessionResult();
+      dispatchSessionFlow({ type: "reset" });
       loadSet(layoutId, nextSet);
     }
   };
 
-  const acceptNext = () => {
-    if (!nextDecision) {
+  const startSession = useCallback(() => {
+    const activeSet = chordSet ?? sets[0];
+    if (!activeSet || !canStartSession) {
+      return;
+    }
+
+    setLoadError(null);
+    clearSessionResult();
+
+    if (sessionFlow.phase === "finished" && nextDecision) {
+      loadSet(layoutId, nextDecision.set);
+      setNextDecision(null);
+    } else if (!chordSet) {
+      loadSet(layoutId, activeSet);
+    } else {
+      reset();
+    }
+
+    dispatchSessionFlow({ type: "start" });
+  }, [canStartSession, chordSet, clearSessionResult, layoutId, loadSet, nextDecision, reset, sessionFlow.phase, sets]);
+
+  const restartSession = useCallback(() => {
+    if (!chordSet) {
       return;
     }
     setNextDecision(null);
-    submittedResultRef.current = null;
-    loadSet(layoutId, nextDecision.set);
-  };
+    clearSessionResult();
+    reset();
+    dispatchSessionFlow({ type: "reset" });
+  }, [chordSet, clearSessionResult, reset]);
+
+  const cancelCountdown = useCallback(() => {
+    dispatchSessionFlow({ type: "cancel" });
+  }, []);
+
+  const resumeSession = useCallback(() => {
+    dispatchSessionFlow({ type: "resume" });
+  }, []);
+
+  const dismissPrompt = useCallback(() => {
+    dismissRegistrationPrompt(guestSessionCount);
+    setShowRegistrationPrompt(false);
+  }, [guestSessionCount]);
+
+  useEffect(() => {
+    if (sessionFlow.phase !== "running" || sessionResult) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => dispatchSessionFlow({ type: "pause" }), 3_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [correctCount, errorCount, pos, sessionFlow.phase, sessionResult]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || shouldIgnoreShortcutTarget(event.target)) {
+        return;
+      }
+
+      if (event.code === "Escape") {
+        if (showRegistrationPrompt) {
+          event.preventDefault();
+          dismissPrompt();
+          return;
+        }
+        if (sessionFlow.phase === "countdown") {
+          event.preventDefault();
+          cancelCountdown();
+        }
+        return;
+      }
+
+      if (event.code === "Space" && canResumeSession && !showRegistrationPrompt) {
+        event.preventDefault();
+        resumeSession();
+        return;
+      }
+
+      if (event.code === "Space" && canStartSession && !showRegistrationPrompt) {
+        event.preventDefault();
+        startSession();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [canResumeSession, canStartSession, cancelCountdown, dismissPrompt, resumeSession, sessionFlow.phase, showRegistrationPrompt, startSession]);
+
+  const startLabel = sessionFlow.phase === "finished" ? t("trainer.next") : t("trainer.start");
+  const overlayTitle =
+    sessionFlow.phase === "paused"
+      ? t("trainer.paused")
+      : sessionFlow.phase === "finished"
+        ? t("trainer.resultReady")
+        : t("trainer.ready");
+  const accountLabel = isAuthenticated ? t("auth.signedInAs") : t("auth.guestAccount");
+  const accountValue = isAuthenticated ? me.email ?? me.username : t("auth.guestProgress");
 
   return (
     <main className="keyboard-app">
@@ -216,23 +401,30 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
             }}
             onChange={onThemeChange}
           />
-          <button type="button" className="icon-text-button" onClick={onLogout} title={t("auth.logout")}>
-            <LogOut size={18} aria-hidden="true" />
-            <span>{t("auth.logout")}</span>
-          </button>
+          {isAuthenticated ? (
+            <button type="button" className="icon-text-button" onClick={onLogout} title={t("auth.logout")}>
+              <LogOut size={18} aria-hidden="true" />
+              <span>{t("auth.logout")}</span>
+            </button>
+          ) : (
+            <button type="button" className="icon-text-button" onClick={onSignIn} title={t("auth.signInToSave")}>
+              <LogIn size={18} aria-hidden="true" />
+              <span>{t("auth.signIn")}</span>
+            </button>
+          )}
         </div>
       </header>
 
       <section className="trainer-layout">
         <aside className="side-panel">
           <div className="account-strip">
-            <span>{t("auth.signedInAs")}</span>
-            <strong>{me.email ?? me.username}</strong>
+            <span>{accountLabel}</span>
+            <strong>{accountValue}</strong>
           </div>
 
           <label className="field">
             <span>{t("trainer.layout")}</span>
-            <select value={layoutId} onChange={(event) => setLayoutId(event.target.value as LayoutId)}>
+            <select value={layoutId} onChange={(event) => setLayoutId(event.target.value as LayoutId)} disabled={isSessionLocked}>
               {layouts.map((layout) => (
                 <option key={layout} value={layout}>
                   {layout}
@@ -241,9 +433,13 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
             </select>
           </label>
 
-          <label className="field">
+          <label className="field field--set">
             <span>{t("trainer.set")}</span>
-            <select value={chordSet && chordSet.id > 0 ? String(chordSet.id) : ""} onChange={(event) => selectSet(event.target.value)} disabled={sets.length === 0}>
+            <select
+              value={chordSet && chordSet.id > 0 ? String(chordSet.id) : ""}
+              onChange={(event) => selectSet(event.target.value)}
+              disabled={sets.length === 0 || isSessionLocked}
+            >
               {sets.map((set) => (
                 <option key={set.id} value={set.id}>
                   {set.title}
@@ -253,17 +449,17 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
           </label>
 
           <div className="progress-summary">
-            <Metric label={t("trainer.sessions")} value={String(progress?.sessions ?? 0)} />
-            <Metric label={t("trainer.best")} value={`${Math.round(progress?.bestSpeedCpm ?? 0)} ${t("units.cpm")}`} />
-            <Metric label={t("trainer.avgSpeed")} value={`${Math.round(progress?.avgSpeedCpm ?? 0)} ${t("units.cpm")}`} />
-            <Metric label={t("trainer.avgAccuracy")} value={`${Math.round((progress?.avgAccuracy ?? 0) * 100)}${t("units.percent")}`} />
+            <Metric label={t("trainer.sessions")} value={String(effectiveProgress.sessions)} />
+            <Metric label={t("trainer.best")} value={`${Math.round(effectiveProgress.bestSpeedCpm)} ${t("units.cpm")}`} />
+            <Metric label={t("trainer.avgSpeed")} value={`${Math.round(effectiveProgress.avgSpeedCpm)} ${t("units.cpm")}`} />
+            <Metric label={t("trainer.avgAccuracy")} value={`${Math.round(effectiveProgress.avgAccuracy * 100)}${t("units.percent")}`} />
           </div>
 
-          <section className="weak-fingers">
-            <h2>{t("trainer.weakFingers")}</h2>
-            {progress && progress.weakFingers.length > 0 ? (
+          <details className="weak-fingers">
+            <summary>{t("trainer.weakFingers")}</summary>
+            {effectiveProgress.weakFingers.length > 0 ? (
               <ul>
-                {progress.weakFingers.map((finger) => (
+                {effectiveProgress.weakFingers.map((finger) => (
                   <li key={finger.finger}>
                     <span>{t(`finger.${finger.finger as (typeof FINGER_ORDER)[number]}`)}</span>
                     <strong>{finger.errors}</strong>
@@ -271,9 +467,9 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
                 ))}
               </ul>
             ) : (
-              <p>{t("trainer.noWeakFingers")}</p>
+              <p>{isAuthenticated ? t("trainer.noWeakFingers") : t("trainer.signInForProgress")}</p>
             )}
-          </section>
+          </details>
         </aside>
 
         <section className="trainer-surface" aria-busy={loading || saving}>
@@ -286,14 +482,16 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
               {chordSet ? (
                 <span className="level-pill">{t("trainer.difficulty", { level: chordSet.difficulty })}</span>
               ) : null}
-              <button type="button" className="secondary-button" onClick={reset} disabled={!chordSet}>
+              <button type="button" className="secondary-button" onClick={restartSession} disabled={!chordSet || sessionFlow.phase === "running"}>
                 <RotateCcw size={18} aria-hidden="true" />
                 <span>{t("trainer.restart")}</span>
               </button>
-              <button type="button" className="primary-button" onClick={reset} disabled={!chordSet}>
-                <Play size={18} aria-hidden="true" />
-                <span>{t("trainer.start")}</span>
-              </button>
+              {sessionFlow.phase === "countdown" ? (
+                <button type="button" className="secondary-button" onClick={cancelCountdown}>
+                  <X size={18} aria-hidden="true" />
+                  <span>{t("trainer.cancel")}</span>
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -318,15 +516,17 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
             progress={liveStats.progress}
           />
 
-          <div className="typing-strip" aria-live="polite">
-            {stream.map((item, index) => (
-              <span
-                key={`${item.chordIndex}-${index}`}
-                className={`typing-char typing-char--${statuses[index]} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""}`}
-              >
-                {item.isSpace ? "\u00a0" : item.char}
-              </span>
-            ))}
+          <div className="typing-stage">
+            <div className="typing-strip" aria-live="polite">
+              {stream.map((item, index) => (
+                <span
+                  key={`${item.chordIndex}-${index}`}
+                  className={`typing-char typing-char--${statuses[index]} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""}`}
+                >
+                  {item.isSpace ? "\u00a0" : item.char}
+                </span>
+              ))}
+            </div>
           </div>
 
           <VirtualKeyboard labels={keyboardLabels} layoutId={layoutId} nextChar={nextChar} />
@@ -344,23 +544,82 @@ export function KeyboardTrainerShell({ me, themeMode, onThemeChange, onLogout }:
                   <strong>{`${t("trainer.score")}: ${score.total} ${score.grade}`}</strong>
                   <span>{t("trainer.saved")}</span>
                 </>
-              ) : null}
+              ) : guestRecorded && score ? (
+                <>
+                  <strong>{`${t("trainer.score")}: ${score.total} ${score.grade}`}</strong>
+                  <span>{t("trainer.guestSaved")}</span>
+                </>
+              ) : sessionFlow.phase === "finished" ? (
+                <span>{t("trainer.resultReady")}</span>
+              ) : (
+                <span>{t("trainer.startShortcut")}</span>
+              )}
               {nextDecision ? (
-                <button type="button" className="secondary-button" onClick={acceptNext}>
-                  <StepForward size={18} aria-hidden="true" />
-                  <span>
-                    {nextDecision.kind === "up"
-                      ? t("trainer.nextUp")
-                      : nextDecision.kind === "down"
-                        ? t("trainer.nextDown")
-                        : t("trainer.nextRepeat")}
-                  </span>
-                </button>
+                <span className="next-decision">
+                  {nextDecision.kind === "up"
+                    ? t("trainer.nextUp")
+                    : nextDecision.kind === "down"
+                      ? t("trainer.nextDown")
+                      : t("trainer.nextRepeat")}
+                </span>
               ) : null}
             </div>
           </div>
+
+          {sessionFlow.phase === "idle" || sessionFlow.phase === "finished" || sessionFlow.phase === "paused" ? (
+            <div className={`practice-overlay practice-overlay--${sessionFlow.phase}`} role="presentation">
+              <div className="practice-overlay__content">
+                <strong>{overlayTitle}</strong>
+                <button
+                  type="button"
+                  className="play-button"
+                  onClick={sessionFlow.phase === "paused" ? resumeSession : startSession}
+                  disabled={sessionFlow.phase === "paused" ? !canResumeSession : !canStartSession}
+                  aria-label={sessionFlow.phase === "paused" ? t("trainer.resumeAria") : t("trainer.playAria")}
+                  title={sessionFlow.phase === "paused" ? t("trainer.resumeAria") : t("trainer.playAria")}
+                >
+                  <Play size={58} fill="currentColor" aria-hidden="true" />
+                  <span>{sessionFlow.phase === "paused" ? t("trainer.resume") : startLabel}</span>
+                </button>
+                <span>{sessionFlow.phase === "paused" ? t("trainer.resumeShortcut") : t("trainer.startShortcut")}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {sessionFlow.phase === "countdown" ? (
+            <div className="practice-overlay practice-overlay--countdown" role="presentation">
+              <div className="practice-overlay__content" aria-live="assertive" aria-label={t("trainer.countdown")}>
+                <span className="countdown-number">{sessionFlow.countdownValue}</span>
+                <button type="button" className="secondary-button" onClick={cancelCountdown}>
+                  <X size={18} aria-hidden="true" />
+                  <span>{t("trainer.cancel")}</span>
+                </button>
+              </div>
+            </div>
+          ) : null}
         </section>
       </section>
+
+      {showRegistrationPrompt ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="registration-modal" role="dialog" aria-modal="true" aria-labelledby="registration-prompt-title">
+            <button type="button" className="icon-button registration-modal__close" onClick={dismissPrompt} aria-label={t("trainer.continueGuest")}>
+              <X size={18} aria-hidden="true" />
+            </button>
+            <h2 id="registration-prompt-title">{t("trainer.registrationTitle")}</h2>
+            <p>{t("trainer.registrationBody")}</p>
+            <div className="registration-modal__actions">
+              <button type="button" className="primary-button" onClick={onSignIn}>
+                <LogIn size={18} aria-hidden="true" />
+                <span>{t("auth.signIn")}</span>
+              </button>
+              <button type="button" className="secondary-button" onClick={dismissPrompt}>
+                <span>{t("trainer.continueGuest")}</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

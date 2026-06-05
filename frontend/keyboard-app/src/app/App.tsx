@@ -71,35 +71,44 @@ export function App() {
     window.location.assign(logoutUrl);
   };
 
-  if (status === "authenticated" && me) {
-    return <KeyboardTrainerShell me={me} themeMode={mode} onThemeChange={setMode} onLogout={handleLogout} />;
+  if (status === "checking" || status === "callback") {
+    return (
+      <AuthGate
+        status={status === "callback" ? "callback" : "checking"}
+        error={error}
+        language={(i18n.resolvedLanguage ?? "ru") as SupportedLanguage}
+        languages={Object.fromEntries(
+          supportedLanguages.map((language) => [language, t(`language.${language}`)]),
+        ) as Record<SupportedLanguage, string>}
+        languageLabel={t("language.label")}
+        themeMode={mode}
+        themeLabels={{
+          system: t("theme.system"),
+          light: t("theme.light"),
+          dark: t("theme.dark"),
+        } as Record<ThemeMode, string>}
+        title={t("app.title")}
+        wordmark={t("app.wordmark")}
+        product={t("app.product")}
+        signInLabel={t("auth.signIn")}
+        loadingLabel={t("auth.loading")}
+        callbackLabel={t("auth.callback")}
+        errorLabel={t("auth.failed")}
+        retryLabel={t("auth.retry")}
+        onLanguageChange={handleLanguageChange}
+        onThemeChange={setMode}
+        onSignIn={handleSignIn}
+      />
+    );
   }
 
   return (
-    <AuthGate
-      status={status === "callback" ? "callback" : status === "error" ? "error" : status === "checking" ? "checking" : "idle"}
-      error={error}
-      language={(i18n.resolvedLanguage ?? "ru") as SupportedLanguage}
-      languages={Object.fromEntries(
-        supportedLanguages.map((language) => [language, t(`language.${language}`)]),
-      ) as Record<SupportedLanguage, string>}
-      languageLabel={t("language.label")}
+    <KeyboardTrainerShell
+      me={status === "authenticated" ? me : null}
+      authError={status === "error" ? error : undefined}
       themeMode={mode}
-      themeLabels={{
-        system: t("theme.system"),
-        light: t("theme.light"),
-        dark: t("theme.dark"),
-      } as Record<ThemeMode, string>}
-      title={t("app.title")}
-      wordmark={t("app.wordmark")}
-      product={t("app.product")}
-      signInLabel={t("auth.signIn")}
-      loadingLabel={t("auth.loading")}
-      callbackLabel={t("auth.callback")}
-      errorLabel={t("auth.failed")}
-      retryLabel={t("auth.retry")}
-      onLanguageChange={handleLanguageChange}
       onThemeChange={setMode}
+      onLogout={handleLogout}
       onSignIn={handleSignIn}
     />
   );

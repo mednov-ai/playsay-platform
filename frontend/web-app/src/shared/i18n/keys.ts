@@ -1,6 +1,7 @@
 export const translationDomains = [
   "common",
   "auth",
+  "registration",
   "shell",
   "profile",
   "workspace",

@@ -62,6 +62,8 @@ playsay:
   payment-service:
     base-url: ${PLAYSAY_PAYMENT_SERVICE_BASE_URL:http://payment-service.playsay-dev.svc.cluster.local}
     service-token: ${PLAYSAY_PAYMENT_SERVICE_TOKEN:}
+  registration-service:
+    base-url: ${PLAYSAY_REGISTRATION_SERVICE_BASE_URL:http://registration-service.playsay-dev.svc.cluster.local}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
     s3:

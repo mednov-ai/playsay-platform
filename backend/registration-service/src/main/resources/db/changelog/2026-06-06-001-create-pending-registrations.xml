@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-06-001-create-pending-registrations" author="codex">
+        <createTable tableName="pending_registrations">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_pending_registrations"/>
+            </column>
+            <column name="email_normalized" type="VARCHAR(320)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="email_original" type="VARCHAR(320)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_name" type="VARCHAR(120)"/>
+            <column name="locale" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="return_to" type="VARCHAR(1024)"/>
+            <column name="token_hash" type="VARCHAR(64)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_pending_registration_token_hash"/>
+            </column>
+            <column name="status" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="keycloak_created" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="requested_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="email_sent_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="confirmed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="pending_registrations" indexName="idx_pending_registration_email_status">
+            <column name="email_normalized"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

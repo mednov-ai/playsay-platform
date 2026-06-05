@@ -11,6 +11,7 @@ export const en: TranslationResource = {
     callback: "Returning to the trainer",
     signIn: "Sign in",
     signingIn: "Opening sign-in",
+    register: "Register",
     logout: "Sign out",
     failed: "Sign-in failed",
     retry: "Retry",

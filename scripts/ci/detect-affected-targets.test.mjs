@@ -40,6 +40,14 @@ test("api-gateway and contract changes trigger api-gateway and web-app", () => {
   );
 });
 
+test("registration contract changes trigger registration-service and web-app", () => {
+  assertDetection(
+    ["contracts/registration-openapi.yaml"],
+    ["web-app", "registration-service"],
+    ["playsay-web-app-develop", "playsay-registration-service-develop"],
+  );
+});
+
 test("media-service changes trigger only media-service job", () => {
   assertDetection(
     ["backend/media-service/src/main/kotlin/com/playsay/media/MediaController.kt"],
@@ -56,6 +64,22 @@ test("payment-service changes trigger only payment-service job", () => {
   );
 });
 
+test("registration-service changes trigger only registration-service job", () => {
+  assertDetection(
+    ["backend/registration-service/src/main/kotlin/com/playsay/registration/controller/RegistrationController.kt"],
+    ["registration-service"],
+    ["playsay-registration-service-develop"],
+  );
+});
+
+test("email-service changes trigger only email-service job", () => {
+  assertDetection(
+    ["backend/email-service/src/main/kotlin/com/playsay/email/controller/EmailInternalController.kt"],
+    ["email-service"],
+    ["playsay-email-service-develop"],
+  );
+});
+
 test("collaboration-service changes trigger only collaboration-service job", () => {
   assertDetection(
     ["collaboration-service/src/server.ts"],
@@ -67,11 +91,13 @@ test("collaboration-service changes trigger only collaboration-service job", () 
 test("shared backend changes trigger all backend targets including keyboard backend", () => {
   assertDetection(
     ["backend/shared-kotlin/src/main/kotlin/com/playsay/shared/Clock.kt"],
-    ["api-gateway", "media-service", "payment-service", "keyboard-service"],
+    ["api-gateway", "media-service", "payment-service", "registration-service", "email-service", "keyboard-service"],
     [
       "playsay-api-gateway-develop",
       "playsay-media-service-develop",
       "playsay-payment-service-develop",
+      "playsay-registration-service-develop",
+      "playsay-email-service-develop",
       "playsay-keyboard-backend-develop",
     ],
   );
@@ -100,6 +126,8 @@ test("unknown source paths fail safe to all targets", () => {
     "collaboration-service",
     "media-service",
     "payment-service",
+    "registration-service",
+    "email-service",
     "keyboard-service",
     "keyboard-app",
   ]);
@@ -111,6 +139,8 @@ test("unknown source paths fail safe to all targets", () => {
       "playsay-collaboration-service-develop",
       "playsay-media-service-develop",
       "playsay-payment-service-develop",
+      "playsay-registration-service-develop",
+      "playsay-email-service-develop",
       "playsay-keyboard-backend-develop",
       "playsay-keyboard-frontend-develop",
     ],
@@ -129,6 +159,8 @@ test("invalid diff base fails safe to all targets", () => {
     "collaboration-service",
     "media-service",
     "payment-service",
+    "registration-service",
+    "email-service",
     "keyboard-service",
     "keyboard-app",
   ]);
@@ -140,6 +172,8 @@ test("invalid diff base fails safe to all targets", () => {
       "playsay-collaboration-service-develop",
       "playsay-media-service-develop",
       "playsay-payment-service-develop",
+      "playsay-registration-service-develop",
+      "playsay-email-service-develop",
       "playsay-keyboard-backend-develop",
       "playsay-keyboard-frontend-develop",
     ],

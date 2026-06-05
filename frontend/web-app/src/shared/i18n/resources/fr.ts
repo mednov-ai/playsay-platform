@@ -23,6 +23,41 @@ export const fr = {
     logout: "Se déconnecter",
     sessionExpired: "La session a expiré. Veuillez vous reconnecter.",
   },
+  registration: {
+    start: {
+      title: "Inscription",
+      subtitle: "Créez un compte élève Play&Say avec votre email.",
+    },
+    "check-email": {
+      title: "Vérifiez l'email",
+      subtitle: "Nous avons envoyé un lien de confirmation.",
+    },
+    confirm: {
+      title: "Confirmation",
+      subtitle: "Fin de l'inscription et activation de l'accès élève.",
+    },
+    form: {
+      email: "Email",
+      password: "Mot de passe",
+      displayName: "Nom en cours",
+    },
+    actions: {
+      create: "Créer le compte",
+      resend: "Renvoyer",
+      signIn: "Se connecter",
+      continue: "Continuer",
+    },
+    messages: {
+      checkEmail: "Nous avons envoyé un email à {{email}}. Ouvrez le lien pour confirmer le compte.",
+      resent: "L'email a été renvoyé.",
+      confirming: "Vérification du lien de confirmation...",
+      confirmed: "Email confirmé. Vous pouvez vous connecter.",
+      missingToken: "Le lien de confirmation n'a pas de jeton.",
+      startFailed: "Impossible de démarrer l'inscription. Vérifiez l'email et le mot de passe.",
+      resendFailed: "Impossible de renvoyer l'email.",
+      confirmFailed: "Impossible de confirmer l'inscription. Le lien a peut-être expiré.",
+    },
+  },
   welcome: {
     logoLinkAria: "Ouvrir le site principal Play&Say",
     returnToSite: "Retour au site",

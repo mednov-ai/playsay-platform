@@ -8,6 +8,8 @@ export const TARGETS = Object.freeze([
   "collaboration-service",
   "media-service",
   "payment-service",
+  "registration-service",
+  "email-service",
   "keyboard-service",
   "keyboard-app",
 ]);
@@ -15,7 +17,14 @@ export const TARGETS = Object.freeze([
 const KEYBOARD_BACKEND_TARGETS = new Set(["keyboard-service"]);
 const KEYBOARD_FRONTEND_TARGETS = new Set(["keyboard-app"]);
 const ALL_TARGETS = new Set(TARGETS);
-const BACKEND_TARGETS = new Set(["api-gateway", "media-service", "payment-service", "keyboard-service"]);
+const BACKEND_TARGETS = new Set([
+  "api-gateway",
+  "media-service",
+  "payment-service",
+  "registration-service",
+  "email-service",
+  "keyboard-service",
+]);
 const FRONTEND_TARGETS = new Set(["web-app", "keyboard-app"]);
 const TARGET_JOBS = Object.freeze({
   "api-gateway": "playsay-api-gateway-develop",
@@ -23,6 +32,8 @@ const TARGET_JOBS = Object.freeze({
   "collaboration-service": "playsay-collaboration-service-develop",
   "media-service": "playsay-media-service-develop",
   "payment-service": "playsay-payment-service-develop",
+  "registration-service": "playsay-registration-service-develop",
+  "email-service": "playsay-email-service-develop",
   "keyboard-service": "playsay-keyboard-backend-develop",
   "keyboard-app": "playsay-keyboard-frontend-develop",
 });
@@ -96,6 +107,12 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path === "contracts/registration-openapi.yaml") {
+      targets.add("registration-service");
+      targets.add("web-app");
+      continue;
+    }
+
     if (path.startsWith("backend/media-service/")) {
       targets.add("media-service");
       continue;
@@ -103,6 +120,16 @@ export function detectTargetsForPaths(paths, options = {}) {
 
     if (path.startsWith("backend/payment-service/")) {
       targets.add("payment-service");
+      continue;
+    }
+
+    if (path.startsWith("backend/registration-service/")) {
+      targets.add("registration-service");
+      continue;
+    }
+
+    if (path.startsWith("backend/email-service/")) {
+      targets.add("email-service");
       continue;
     }
 

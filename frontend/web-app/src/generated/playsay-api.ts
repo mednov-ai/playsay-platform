@@ -574,6 +574,71 @@ export interface CreateCollaborationDocumentRequest {
   scope: CreateCollaborationDocumentRequestScope;
 }
 
+export interface StartRegistrationRequest {
+  /**
+     * @minLength 0
+     * @maxLength 320
+     */
+  email: string;
+  /**
+     * @minLength 8
+     * @maxLength 200
+     */
+  password: string;
+  /**
+     * @minLength 0
+     * @maxLength 120
+     * @nullable
+     */
+  displayName?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 16
+     * @nullable
+     */
+  locale?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 1024
+     * @nullable
+     */
+  returnTo?: string | null;
+}
+
+export interface RegistrationResponse {
+  status: string;
+  /** @nullable */
+  continueUrl?: string | null;
+}
+
+export interface ResendRegistrationRequest {
+  /**
+     * @minLength 0
+     * @maxLength 320
+     */
+  email: string;
+  /**
+     * @minLength 0
+     * @maxLength 16
+     * @nullable
+     */
+  locale?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 1024
+     * @nullable
+     */
+  returnTo?: string | null;
+}
+
+export interface ConfirmRegistrationRequest {
+  /**
+     * @minLength 0
+     * @maxLength 255
+     */
+  token: string;
+}
+
 export interface PublicPaymentCheckoutResponse {
   confirmationUrl: string;
 }
@@ -2815,6 +2880,126 @@ export const createCurrentCollaborationDocument = async (lessonId: string,
 
   const data: createCurrentCollaborationDocumentResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createCurrentCollaborationDocumentResponse
+}
+
+
+
+export type startResponse202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type startResponseSuccess = (startResponse202) & {
+  headers: Headers;
+};
+;
+
+export type startResponse = (startResponseSuccess)
+
+export const getStartUrl = () => {
+
+
+
+
+  return `/api/registration/start`
+}
+
+export const start = async (startRegistrationRequest: StartRegistrationRequest, options?: RequestInit): Promise<startResponse> => {
+
+  const res = await fetch(getStartUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(startRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: startResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as startResponse
+}
+
+
+
+export type resendResponse202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type resendResponseSuccess = (resendResponse202) & {
+  headers: Headers;
+};
+;
+
+export type resendResponse = (resendResponseSuccess)
+
+export const getResendUrl = () => {
+
+
+
+
+  return `/api/registration/resend`
+}
+
+export const resend = async (resendRegistrationRequest: ResendRegistrationRequest, options?: RequestInit): Promise<resendResponse> => {
+
+  const res = await fetch(getResendUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resendRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resendResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resendResponse
+}
+
+
+
+export type confirmResponse200 = {
+  data: RegistrationResponse
+  status: 200
+}
+
+export type confirmResponseSuccess = (confirmResponse200) & {
+  headers: Headers;
+};
+;
+
+export type confirmResponse = (confirmResponseSuccess)
+
+export const getConfirmUrl = () => {
+
+
+
+
+  return `/api/registration/confirm`
+}
+
+export const confirm = async (confirmRegistrationRequest: ConfirmRegistrationRequest, options?: RequestInit): Promise<confirmResponse> => {
+
+  const res = await fetch(getConfirmUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(confirmRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: confirmResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as confirmResponse
 }
 
 

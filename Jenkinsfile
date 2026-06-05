@@ -125,6 +125,34 @@ spec:
         limits:
           cpu: "1"
           memory: 1024Mi
+    - name: kaniko-registration
+      image: gcr.io/kaniko-project/executor:debug
+      command: ["/busybox/cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 150m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1024Mi
+    - name: kaniko-email
+      image: gcr.io/kaniko-project/executor:debug
+      command: ["/busybox/cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 150m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1024Mi
     - name: tools
       image: alpine:3.20
       command: ["cat"]
@@ -212,7 +240,7 @@ spec:
 
   parameters {
     string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev, for example develop, codex/task-1, feature/task-1, release/1.001.00', trim: true)
-    string(name: 'AFFECTED_TARGETS', defaultValue: 'all', description: 'Comma-separated deploy targets to build: all, api-gateway, web-app, collaboration-service, media-service, payment-service.', trim: true)
+    string(name: 'AFFECTED_TARGETS', defaultValue: 'all', description: 'Comma-separated deploy targets to build: all, api-gateway, web-app, collaboration-service, media-service, payment-service, registration-service, email-service.', trim: true)
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
   }
@@ -224,6 +252,8 @@ spec:
     COLLABORATION_IMAGE_NAME = 'playsay-collaboration-service'
     MEDIA_IMAGE_NAME = 'playsay-media-service'
     PAYMENT_IMAGE_NAME = 'playsay-payment-service'
+    REGISTRATION_IMAGE_NAME = 'playsay-registration-service'
+    EMAIL_IMAGE_NAME = 'playsay-email-service'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
@@ -253,7 +283,7 @@ spec:
           env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
 
           def targetParam = params.AFFECTED_TARGETS?.trim() ?: 'all'
-          def validTargets = ['api-gateway', 'web-app', 'collaboration-service', 'media-service', 'payment-service'] as Set
+          def validTargets = ['api-gateway', 'web-app', 'collaboration-service', 'media-service', 'payment-service', 'registration-service', 'email-service'] as Set
           def requestedTargets = [] as Set
           if (targetParam == 'all') {
             requestedTargets.addAll(validTargets)
@@ -269,6 +299,8 @@ spec:
           env.RUN_COLLABORATION_SERVICE = requestedTargets.contains('collaboration-service').toString()
           env.RUN_MEDIA_SERVICE = requestedTargets.contains('media-service').toString()
           env.RUN_PAYMENT_SERVICE = requestedTargets.contains('payment-service').toString()
+          env.RUN_REGISTRATION_SERVICE = requestedTargets.contains('registration-service').toString()
+          env.RUN_EMAIL_SERVICE = requestedTargets.contains('email-service').toString()
           env.RUN_ANY_TARGET = (!requestedTargets.isEmpty()).toString()
           env.AFFECTED_TARGETS_RESOLVED = requestedTargets.join(',')
 
@@ -318,7 +350,7 @@ spec:
       parallel {
         stage('Backend validation') {
           when {
-            expression { env.RUN_API_GATEWAY == 'true' || env.RUN_MEDIA_SERVICE == 'true' || env.RUN_PAYMENT_SERVICE == 'true' }
+            expression { env.RUN_API_GATEWAY == 'true' || env.RUN_MEDIA_SERVICE == 'true' || env.RUN_PAYMENT_SERVICE == 'true' || env.RUN_REGISTRATION_SERVICE == 'true' || env.RUN_EMAIL_SERVICE == 'true' }
           }
           stages {
             stage('Backend tests') {
@@ -332,6 +364,8 @@ spec:
                       if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:test"; fi
                       if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:test"; fi
                       if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:test"; fi
+                      if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then TASKS="$TASKS :registration-service:test"; fi
+                      if [ "$RUN_EMAIL_SERVICE" = "true" ]; then TASKS="$TASKS :email-service:test"; fi
                       gradle $TASKS --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process
                     '''
                   }
@@ -350,6 +384,8 @@ spec:
                       if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:bootJar"; fi
                       if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:bootJar"; fi
                       if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:bootJar"; fi
+                      if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then TASKS="$TASKS :registration-service:bootJar"; fi
+                      if [ "$RUN_EMAIL_SERVICE" = "true" ]; then TASKS="$TASKS :email-service:bootJar"; fi
                       gradle $TASKS --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process
                     '''
                   }
@@ -425,7 +461,7 @@ spec:
 
     stage('DB migrate') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' && (env.RUN_API_GATEWAY == 'true' || env.RUN_PAYMENT_SERVICE == 'true') }
+        expression { env.DEPLOY_TO_DEV == 'true' && (env.RUN_API_GATEWAY == 'true' || env.RUN_PAYMENT_SERVICE == 'true' || env.RUN_REGISTRATION_SERVICE == 'true' || env.RUN_EMAIL_SERVICE == 'true') }
       }
       steps {
         container('liquibase') {
@@ -443,6 +479,12 @@ spec:
             fi
             if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then
               CHANGELOGS="$CHANGELOGS backend/payment-service/src/main/resources/db/changelog/db.changelog-master.xml"
+            fi
+            if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then
+              CHANGELOGS="$CHANGELOGS backend/registration-service/src/main/resources/db/changelog/db.changelog-master.xml"
+            fi
+            if [ "$RUN_EMAIL_SERVICE" = "true" ]; then
+              CHANGELOGS="$CHANGELOGS backend/email-service/src/main/resources/db/changelog/db.changelog-master.xml"
             fi
             for CHANGELOG in $CHANGELOGS; do
               echo "Applying database changelog $CHANGELOG"
@@ -627,6 +669,84 @@ EOF
             }
           }
         }
+
+        stage('Build and push registration service image') {
+          when {
+            expression { env.RUN_REGISTRATION_SERVICE == 'true' }
+          }
+          steps {
+            container('kaniko-registration') {
+              withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+                sh '''
+                  set -eu
+                  JAR_COUNT="$(find "$WORKSPACE/backend/registration-service/build/libs" -maxdepth 1 -name "*.jar" | wc -l | tr -d " ")"
+                  if [ "$JAR_COUNT" != "1" ]; then
+                    echo "Expected exactly one registration-service bootJar, found $JAR_COUNT"
+                    find "$WORKSPACE/backend/registration-service/build/libs" -maxdepth 1 -type f -print || true
+                    exit 1
+                  fi
+                  ls -lh "$WORKSPACE/backend/registration-service/build/libs"/*.jar
+                  for INCLUDE in '!registration-service/build/' '!registration-service/build/libs/' '!registration-service/build/libs/*.jar'; do
+                    if ! grep -Fxq "$INCLUDE" "$WORKSPACE/backend/.dockerignore"; then
+                      echo "registration-service bootJar is not included in the backend Docker context: missing $INCLUDE"
+                      exit 1
+                    fi
+                  done
+                  mkdir -p /kaniko/.docker
+                  AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+                  cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
+EOF
+                  /kaniko/executor \
+                    --context "$WORKSPACE/backend" \
+                    --dockerfile "$WORKSPACE/backend/registration-service/Dockerfile" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}:${GIT_COMMIT}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}:${BUILD_LABEL}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}:dev"
+                '''
+              }
+            }
+          }
+        }
+
+        stage('Build and push email service image') {
+          when {
+            expression { env.RUN_EMAIL_SERVICE == 'true' }
+          }
+          steps {
+            container('kaniko-email') {
+              withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+                sh '''
+                  set -eu
+                  JAR_COUNT="$(find "$WORKSPACE/backend/email-service/build/libs" -maxdepth 1 -name "*.jar" | wc -l | tr -d " ")"
+                  if [ "$JAR_COUNT" != "1" ]; then
+                    echo "Expected exactly one email-service bootJar, found $JAR_COUNT"
+                    find "$WORKSPACE/backend/email-service/build/libs" -maxdepth 1 -type f -print || true
+                    exit 1
+                  fi
+                  ls -lh "$WORKSPACE/backend/email-service/build/libs"/*.jar
+                  for INCLUDE in '!email-service/build/' '!email-service/build/libs/' '!email-service/build/libs/*.jar'; do
+                    if ! grep -Fxq "$INCLUDE" "$WORKSPACE/backend/.dockerignore"; then
+                      echo "email-service bootJar is not included in the backend Docker context: missing $INCLUDE"
+                      exit 1
+                    fi
+                  done
+                  mkdir -p /kaniko/.docker
+                  AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+                  cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
+EOF
+                  /kaniko/executor \
+                    --context "$WORKSPACE/backend" \
+                    --dockerfile "$WORKSPACE/backend/email-service/Dockerfile" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}:${GIT_COMMIT}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}:${BUILD_LABEL}" \
+                    --destination "ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}:dev"
+                '''
+              }
+            }
+          }
+        }
       }
     }
 
@@ -696,6 +816,14 @@ EOF
                   yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/payment-service/values-dev.yaml
                   changed_files="$changed_files helm-charts/payment-service/values-dev.yaml"
                 fi
+                if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/registration-service/values-dev.yaml
+                  changed_files="$changed_files helm-charts/registration-service/values-dev.yaml"
+                fi
+                if [ "$RUN_EMAIL_SERVICE" = "true" ]; then
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/email-service/values-dev.yaml
+                  changed_files="$changed_files helm-charts/email-service/values-dev.yaml"
+                fi
                 git add $changed_files
               }
 
@@ -759,6 +887,8 @@ EOF
             if [ "$RUN_COLLABORATION_SERVICE" = "true" ]; then APPS="$APPS collaboration-service"; fi
             if [ "$RUN_MEDIA_SERVICE" = "true" ]; then APPS="$APPS media-service"; fi
             if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then APPS="$APPS payment-service"; fi
+            if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then APPS="$APPS registration-service"; fi
+            if [ "$RUN_EMAIL_SERVICE" = "true" ]; then APPS="$APPS email-service"; fi
             DEADLINE="$(( $(date +%s) + TIMEOUT_SECONDS ))"
 
             kubectl -n argocd annotate application $APPS argocd.argoproj.io/refresh=hard --overwrite

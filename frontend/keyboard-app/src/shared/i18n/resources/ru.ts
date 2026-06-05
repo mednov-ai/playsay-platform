@@ -9,6 +9,7 @@ export const ru = {
     callback: "Возвращаемся в тренажер",
     signIn: "Войти",
     signingIn: "Открываем вход",
+    register: "Зарегистрироваться",
     logout: "Выйти",
     failed: "Не удалось войти",
     retry: "Повторить",

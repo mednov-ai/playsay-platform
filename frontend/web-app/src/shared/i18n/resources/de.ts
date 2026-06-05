@@ -23,6 +23,41 @@ export const de = {
     logout: "Abmelden",
     sessionExpired: "Die Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
   },
+  registration: {
+    start: {
+      title: "Registrierung",
+      subtitle: "Erstellen Sie ein Play&Say Schülerkonto per E-Mail.",
+    },
+    "check-email": {
+      title: "E-Mail prüfen",
+      subtitle: "Wir haben einen Bestätigungslink gesendet.",
+    },
+    confirm: {
+      title: "Bestätigung",
+      subtitle: "Registrierung abschließen und Schülerzugang aktivieren.",
+    },
+    form: {
+      email: "E-Mail",
+      password: "Passwort",
+      displayName: "Name im Unterricht",
+    },
+    actions: {
+      create: "Konto erstellen",
+      resend: "Erneut senden",
+      signIn: "Anmelden",
+      continue: "Weiter",
+    },
+    messages: {
+      checkEmail: "Wir haben eine E-Mail an {{email}} gesendet. Öffnen Sie den Link, um das Konto zu bestätigen.",
+      resent: "Die E-Mail wurde erneut gesendet.",
+      confirming: "Bestätigungslink wird geprüft...",
+      confirmed: "E-Mail bestätigt. Sie können sich jetzt anmelden.",
+      missingToken: "Der Bestätigungslink enthält keinen Token.",
+      startFailed: "Registrierung konnte nicht gestartet werden. Prüfen Sie E-Mail und Passwort.",
+      resendFailed: "Die E-Mail konnte nicht erneut gesendet werden.",
+      confirmFailed: "Registrierung konnte nicht bestätigt werden. Der Link ist eventuell abgelaufen.",
+    },
+  },
   welcome: {
     logoLinkAria: "Hauptwebsite von Play&Say öffnen",
     returnToSite: "Zur Website zurück",

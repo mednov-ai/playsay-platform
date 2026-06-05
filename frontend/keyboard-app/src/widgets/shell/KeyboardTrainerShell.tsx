@@ -40,6 +40,7 @@ import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
 import type { ChordSet, FocusLesson, LayoutId, Me, Progress, TrainingLessonKind } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
+import { registrationUrlForKeyboard } from "./registrationLink";
 
 interface Props {
   me: Me | null;
@@ -188,6 +189,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const overlayCloseTimerRef = useRef<number | null>(null);
   const overlayCloseIdRef = useRef(0);
   const profileSeed = me?.subject ?? anonymousDeviceId;
+  const keyboardRegistrationUrl = registrationUrlForKeyboard(`${window.location.origin}/`);
 
   const loadSet = useTypingStore((state) => state.loadSet);
   const reset = useTypingStore((state) => state.reset);
@@ -1107,9 +1109,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             <h2 id="registration-prompt-title">{t("trainer.registrationTitle")}</h2>
             <p>{t("trainer.registrationBody")}</p>
             <div className="registration-modal__actions">
-              <button type="button" className="primary-button" onClick={onSignIn}>
+              <button type="button" className="primary-button" onClick={() => window.location.assign(keyboardRegistrationUrl)}>
                 <LogIn size={18} aria-hidden="true" />
-                <span>{t("auth.signIn")}</span>
+                <span>{t("auth.register")}</span>
               </button>
               <button type="button" className="secondary-button" onClick={dismissPrompt}>
                 <span>{t("trainer.continueGuest")}</span>

@@ -27,6 +27,7 @@ class SecurityConfig {
                         "/v3/api-docs.yaml",
                         "/v3/api-docs/**",
                         "/livekit/webhook",
+                        "/registration/**",
                         "/public/payment-invoices/**",
                         "/payment-webhooks/yookassa",
                         "/schedule/lessons/*/collaboration-documents/*/snapshot",

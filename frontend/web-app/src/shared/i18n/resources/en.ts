@@ -23,6 +23,41 @@ export const en = {
     logout: "Sign out",
     sessionExpired: "Your session has expired. Please sign in again.",
   },
+  registration: {
+    start: {
+      title: "Registration",
+      subtitle: "Create a Play&Say student account with email.",
+    },
+    "check-email": {
+      title: "Check your email",
+      subtitle: "We sent a confirmation link for your account.",
+    },
+    confirm: {
+      title: "Confirmation",
+      subtitle: "Finishing registration and enabling student access.",
+    },
+    form: {
+      email: "Email",
+      password: "Password",
+      displayName: "Lesson name",
+    },
+    actions: {
+      create: "Create account",
+      resend: "Send again",
+      signIn: "Sign in",
+      continue: "Continue",
+    },
+    messages: {
+      checkEmail: "We sent an email to {{email}}. Open the link in the email to confirm your account.",
+      resent: "The email has been sent again.",
+      confirming: "Checking the confirmation link...",
+      confirmed: "Email confirmed. You can sign in now.",
+      missingToken: "The confirmation link has no token.",
+      startFailed: "Could not start registration. Check the email and password.",
+      resendFailed: "Could not send the email again.",
+      confirmFailed: "Could not confirm registration. The link may have expired.",
+    },
+  },
   welcome: {
     logoLinkAria: "Open the main Play&Say website",
     returnToSite: "Back to website",

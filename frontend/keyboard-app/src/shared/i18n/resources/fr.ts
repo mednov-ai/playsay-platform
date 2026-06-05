@@ -11,6 +11,7 @@ export const fr: TranslationResource = {
     callback: "Retour au clavier",
     signIn: "Se connecter",
     signingIn: "Ouverture de la connexion",
+    register: "S'inscrire",
     logout: "Se déconnecter",
     failed: "Connexion impossible",
     retry: "Réessayer",

@@ -1,0 +1,132 @@
+openapi: 3.0.3
+info:
+  title: Play&Say Registration API
+  version: 0.1.0
+paths:
+  /registration/start:
+    post:
+      operationId: startRegistration
+      summary: Start email registration
+      description: Creates or refreshes a pending email registration and sends a confirmation email.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRegistrationRequest"
+      responses:
+        "202":
+          description: Generic check-email response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid registration payload.
+        "429":
+          description: Registration rate limit exceeded.
+  /registration/resend:
+    post:
+      operationId: resendRegistration
+      summary: Resend confirmation email
+      description: Resends a registration confirmation email when a pending registration exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendRegistrationRequest"
+      responses:
+        "202":
+          description: Generic check-email response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid resend payload.
+        "429":
+          description: Registration rate limit exceeded.
+  /registration/confirm:
+    post:
+      operationId: confirmRegistration
+      summary: Confirm email registration
+      description: Confirms a pending registration token and activates the Keycloak student account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmRegistrationRequest"
+      responses:
+        "200":
+          description: Confirmed registration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid or expired confirmation token.
+components:
+  schemas:
+    StartRegistrationRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+        displayName:
+          type: string
+          nullable: true
+          maxLength: 120
+        locale:
+          type: string
+          nullable: true
+          maxLength: 16
+        returnTo:
+          type: string
+          nullable: true
+          maxLength: 1024
+    ResendRegistrationRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        locale:
+          type: string
+          nullable: true
+          maxLength: 16
+        returnTo:
+          type: string
+          nullable: true
+          maxLength: 1024
+    ConfirmRegistrationRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          maxLength: 255
+    RegistrationResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+        continueUrl:
+          type: string
+          nullable: true

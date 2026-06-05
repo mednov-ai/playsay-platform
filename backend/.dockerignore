@@ -10,6 +10,12 @@
 !payment-service/build/
 !payment-service/build/libs/
 !payment-service/build/libs/*.jar
+!registration-service/build/
+!registration-service/build/libs/
+!registration-service/build/libs/*.jar
+!email-service/build/
+!email-service/build/libs/
+!email-service/build/libs/*.jar
 !keyboard-service/build/
 !keyboard-service/build/libs/
 !keyboard-service/build/libs/*.jar

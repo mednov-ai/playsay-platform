@@ -1001,6 +1001,60 @@ paths:
           description: Current user cannot access the document
       security:
       - bearerAuth: []
+  /registration/start:
+    post:
+      tags:
+      - registration-controller
+      operationId: start
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRegistrationRequest"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+  /registration/resend:
+    post:
+      tags:
+      - registration-controller
+      operationId: resend
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendRegistrationRequest"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+  /registration/confirm:
+    post:
+      tags:
+      - registration-controller
+      operationId: confirm
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmRegistrationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
   /public/payment-invoices/{publicToken}/checkout:
     post:
       tags:
@@ -3112,6 +3166,81 @@ components:
       - documentKind
       - materialId
       - scope
+    StartRegistrationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          minLength: 0
+        password:
+          type: string
+          maxLength: 200
+          minLength: 8
+        displayName:
+          type:
+          - string
+          - "null"
+          maxLength: 120
+          minLength: 0
+        locale:
+          type:
+          - string
+          - "null"
+          maxLength: 16
+          minLength: 0
+        returnTo:
+          type:
+          - string
+          - "null"
+          maxLength: 1024
+          minLength: 0
+      required:
+      - email
+      - password
+    RegistrationResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        continueUrl:
+          type:
+          - string
+          - "null"
+      required:
+      - status
+    ResendRegistrationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          minLength: 0
+        locale:
+          type:
+          - string
+          - "null"
+          maxLength: 16
+          minLength: 0
+        returnTo:
+          type:
+          - string
+          - "null"
+          maxLength: 1024
+          minLength: 0
+      required:
+      - email
+    ConfirmRegistrationRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - token
     PublicPaymentCheckoutResponse:
       type: object
       properties:

@@ -1,0 +1,210 @@
+import { CheckCircle2, Loader2, Mail, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { startLogin } from "../../../shared/api/playsay";
+import {
+  confirmRegistrationRequest,
+  resendRegistrationRequest,
+  startRegistrationRequest,
+} from "../../../shared/api/registration";
+import { useAppTranslation } from "../../../shared/i18n";
+import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
+import { BrandMark } from "../../../shared/ui/BrandMark";
+import { Button } from "../../../components/ui/button";
+import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
+import { useAppTheme } from "../../../app/AppProviders";
+import type { RegistrationRoute } from "../../../app/routes";
+
+const mainSiteUrl = "https://play-and-say.ru";
+
+export function RegistrationPage({ route }: { route: RegistrationRoute }) {
+  const { i18n, t } = useAppTranslation();
+  const theme = useAppTheme();
+  const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const initialReturnTo = params.get("returnTo") ?? "";
+  const [email, setEmail] = useState(params.get("email") ?? "");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [confirmedContinueUrl, setConfirmedContinueUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (route.kind !== "confirm") {
+      return;
+    }
+    const token = params.get("token") ?? "";
+    if (!token) {
+      setMessage(t("registration.messages.missingToken"));
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setMessage(null);
+    void confirmRegistrationRequest({ token })
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        setConfirmedContinueUrl(result.continueUrl ?? null);
+        setMessage(t("registration.messages.confirmed"));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMessage(t("registration.messages.confirmFailed"));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [params, route.kind, t]);
+
+  async function submitStart() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      await startRegistrationRequest({
+        displayName: displayName.trim() || undefined,
+        email: email.trim(),
+        locale: i18n.language,
+        password,
+        returnTo: initialReturnTo || undefined,
+      });
+      const next = new URL("/register/check-email", window.location.origin);
+      next.searchParams.set("email", email.trim());
+      if (initialReturnTo) {
+        next.searchParams.set("returnTo", initialReturnTo);
+      }
+      window.history.pushState({}, document.title, next.pathname + next.search);
+      window.dispatchEvent(new Event("popstate"));
+    } catch {
+      setMessage(t("registration.messages.startFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resend() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      await resendRegistrationRequest({
+        email: email.trim(),
+        locale: i18n.language,
+        returnTo: initialReturnTo || undefined,
+      });
+      setMessage(t("registration.messages.resent"));
+    } catch {
+      setMessage(t("registration.messages.resendFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <section className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-5 py-6 sm:px-8">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <BrandMark />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <LanguageSwitcher disabled={loading} />
+            <ThemeToggle mode={theme.mode} onModeChange={theme.setMode} resolvedTheme={theme.resolvedTheme} />
+            <Button onClick={() => void startLogin()} type="button" variant="outline">
+              {t("auth.login")}
+            </Button>
+          </div>
+        </header>
+
+        <section className="grid flex-1 content-center gap-5">
+          <div className="rounded-[1.5rem] border border-border bg-background/85 p-5 shadow-sm sm:p-7">
+            <div className="flex items-center gap-3 border-b border-border pb-5">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
+                {route.kind === "confirm" ? <CheckCircle2 className="h-5 w-5" /> : route.kind === "check-email" ? <Mail className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+              </span>
+              <div>
+                <h1 className="text-2xl font-extrabold">{t(`registration.${route.kind}.title`)}</h1>
+                <p className="text-sm font-semibold text-muted-foreground">{t(`registration.${route.kind}.subtitle`)}</p>
+              </div>
+            </div>
+
+            {route.kind === "start" ? (
+              <form
+                className="grid gap-4 pt-5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submitStart();
+                }}
+              >
+                <label className="grid gap-1 text-sm font-bold">
+                  <span>{t("registration.form.email")}</span>
+                  <input className="playsay-input" disabled={loading} maxLength={320} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  <span>{t("registration.form.password")}</span>
+                  <input className="playsay-input" disabled={loading} minLength={8} maxLength={200} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} />
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  <span>{t("registration.form.displayName")}</span>
+                  <input className="playsay-input" disabled={loading} maxLength={120} onChange={(event) => setDisplayName(event.target.value)} type="text" value={displayName} />
+                </label>
+                {message ? <RegistrationMessage message={message} /> : null}
+                <Button disabled={loading} type="submit">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                  {t("registration.actions.create")}
+                </Button>
+              </form>
+            ) : null}
+
+            {route.kind === "check-email" ? (
+              <div className="grid gap-4 pt-5">
+                <RegistrationMessage message={message ?? t("registration.messages.checkEmail", { email })} />
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={loading || !email} onClick={() => void resend()} type="button">
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                    {t("registration.actions.resend")}
+                  </Button>
+                  <Button onClick={() => void startLogin()} type="button" variant="outline">
+                    {t("auth.login")}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {route.kind === "confirm" ? (
+              <div className="grid gap-4 pt-5">
+                <RegistrationMessage message={message ?? t("registration.messages.confirming")} />
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={loading} onClick={() => void startLogin()} type="button">
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {t("registration.actions.signIn")}
+                  </Button>
+                  {confirmedContinueUrl ? (
+                    <Button asChild variant="outline">
+                      <a href={confirmedContinueUrl}>{t("registration.actions.continue")}</a>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            <a className="mt-5 inline-flex text-sm font-extrabold text-primary" href={mainSiteUrl}>
+              {t("welcome.returnToSite")}
+            </a>
+          </div>
+        </section>
+      </section>
+    </main>
+  );
+}
+
+function RegistrationMessage({ message }: { message: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+      {message}
+    </div>
+  );
+}

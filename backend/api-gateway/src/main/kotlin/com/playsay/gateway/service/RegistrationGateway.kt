@@ -1,0 +1,87 @@
+package com.playsay.gateway.service
+
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.playsay.gateway.dto.ConfirmRegistrationRequest
+import com.playsay.gateway.dto.RegistrationResponse
+import com.playsay.gateway.dto.ResendRegistrationRequest
+import com.playsay.gateway.dto.StartRegistrationRequest
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.utils.MetaData
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.stereotype.Component
+
+interface RegistrationGateway {
+    fun start(request: StartRegistrationRequest): RegistrationResponse
+    fun resend(request: ResendRegistrationRequest): RegistrationResponse
+    fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse
+}
+
+@Component
+class HttpRegistrationGateway(
+    @param:Value("\${playsay.registration-service.base-url:http://registration-service.playsay-dev.svc.cluster.local}")
+    private val baseUrl: String,
+    private val objectMapper: ObjectMapper = jacksonObjectMapper(),
+    private val httpClient: HttpClient = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(5))
+        .followRedirects(HttpClient.Redirect.NORMAL)
+        .build(),
+) : RegistrationGateway {
+    override fun start(request: StartRegistrationRequest): RegistrationResponse =
+        postJson("/api/registration/start", request, HttpStatus.ACCEPTED)
+
+    override fun resend(request: ResendRegistrationRequest): RegistrationResponse =
+        postJson("/api/registration/resend", request, HttpStatus.ACCEPTED)
+
+    override fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse =
+        postJson("/api/registration/confirm", request, HttpStatus.OK)
+
+    private fun postJson(path: String, body: Any, expectedStatus: HttpStatus): RegistrationResponse {
+        val response = send(path, objectMapper.writeValueAsString(body))
+        if (response.statusCode() != expectedStatus.value()) {
+            logger.warn("registration-service request failed path={} status={}", path, response.statusCode())
+            val status = runCatching { HttpStatus.valueOf(response.statusCode()) }.getOrNull()
+            throw ProjectResponseException.localized(
+                status?.takeIf { it.is4xxClientError } ?: HttpStatus.SERVICE_UNAVAILABLE,
+                status?.takeIf { it.is4xxClientError }?.let { MetaData.ErrorCodes.INVALID_REQUEST }
+                    ?: MetaData.ErrorCodes.REGISTRATION_SERVICE_UNAVAILABLE,
+            )
+        }
+        return runCatching { objectMapper.readValue(response.body(), RegistrationResponse::class.java) }.getOrElse {
+            logger.warn("registration-service response could not be parsed path={}", path, it)
+            throw registrationUnavailable()
+        }
+    }
+
+    private fun send(path: String, body: String): HttpResponse<String> {
+        val endpoint = baseUrl.trimEnd('/') + path
+        val request = HttpRequest.newBuilder(URI.create(endpoint))
+            .timeout(Duration.ofSeconds(20))
+            .header(HttpHeaders.ACCEPT, "application/json")
+            .header(HttpHeaders.CONTENT_TYPE, "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+        return runCatching { httpClient.send(request, HttpResponse.BodyHandlers.ofString()) }.getOrElse {
+            logger.warn("registration-service request failed path={}", path, it)
+            throw registrationUnavailable()
+        }
+    }
+
+    private fun registrationUnavailable(): ProjectResponseException =
+        ProjectResponseException.localized(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            MetaData.ErrorCodes.REGISTRATION_SERVICE_UNAVAILABLE,
+        )
+
+    private companion object {
+        private val logger = LoggerFactory.getLogger(HttpRegistrationGateway::class.java)
+    }
+}

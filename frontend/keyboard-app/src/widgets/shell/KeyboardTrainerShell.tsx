@@ -17,6 +17,7 @@ import {
 import { Metronome } from "../../features/metronome/Metronome";
 import { suggestMetronomeBpm } from "../../features/metronome/metronomeTempo";
 import { StatsPanel } from "../../features/stats/StatsPanel";
+import { shouldReloadActiveSetForLayout } from "../../features/typing/activeSetSync";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { chooseResultAdvice } from "../../features/typing/resultAdvice";
 import { computeCadence, computeScore } from "../../features/typing/scoring";
@@ -336,7 +337,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [isAuthenticated, layoutId, loadSet, profileSeed]);
 
   useEffect(() => {
-    if (sessionFlow.phase !== "idle" || !chordSet) {
+    if (!shouldReloadActiveSetForLayout({ layoutId, chordSet, phase: sessionFlow.phase })) {
+      return;
+    }
+
+    if (!chordSet) {
       return;
     }
 

@@ -33,7 +33,7 @@ import {
   typingWindowRows,
 } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
-import { useTypingStore, type StreamItem } from "../../features/typing/typingStore";
+import { computeActiveDurationMs, useTypingStore, type StreamItem } from "../../features/typing/typingStore";
 import { fetchProgress, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
@@ -193,6 +193,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
   const loadSet = useTypingStore((state) => state.loadSet);
   const reset = useTypingStore((state) => state.reset);
+  const pauseTiming = useTypingStore((state) => state.pauseTiming);
+  const resumeTiming = useTypingStore((state) => state.resumeTiming);
   const result = useTypingStore((state) => state.result);
   const chordSet = useTypingStore((state) => state.chordSet);
   const stream = useTypingStore((state) => state.stream);
@@ -203,6 +205,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const correctCount = useTypingStore((state) => state.correctCount);
   const errorCount = useTypingStore((state) => state.errorCount);
   const intervals = useTypingStore((state) => state.intervals);
+  const excludedDurationMs = useTypingStore((state) => state.excludedDurationMs);
+  const pausedAt = useTypingStore((state) => state.pausedAt);
   const perChar = useTypingStore((state) => state.perChar);
 
   useTypingEngine(Boolean(chordSet) && sessionFlow.acceptsTyping);
@@ -475,7 +479,15 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, layoutId, perChar, profileSeed, resultKey, sessionResult, sets, t]);
 
   const liveStats = useMemo(() => {
-    const elapsedMs = startedAt == null ? 0 : Math.max(1, (finishedAt ?? Date.now()) - startedAt);
+    const elapsedMs =
+      startedAt == null
+        ? 0
+        : computeActiveDurationMs({
+            startedAt,
+            endedAt: finishedAt ?? Date.now(),
+            excludedDurationMs,
+            pausedAt,
+          });
     const total = correctCount + errorCount;
     const speedCpm = elapsedMs > 0 ? correctCount / (elapsedMs / 60_000) : 0;
     return {
@@ -485,7 +497,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       errors: errorCount,
       progress: stream.length === 0 ? 0 : pos / stream.length,
     };
-  }, [correctCount, errorCount, finishedAt, intervals, pos, startedAt, stream.length]);
+  }, [correctCount, errorCount, excludedDurationMs, finishedAt, intervals, pausedAt, pos, startedAt, stream.length]);
 
   const typingWindow = useMemo(
     () =>
@@ -628,9 +640,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [showClosingOverlay]);
 
   const resumeSession = useCallback(() => {
+    resumeTiming();
     showClosingOverlay("paused");
     dispatchSessionFlow({ type: "resume" });
-  }, [showClosingOverlay]);
+  }, [resumeTiming, showClosingOverlay]);
 
   const dismissPrompt = useCallback(() => {
     dismissRegistrationPrompt(guestSessionCount);
@@ -669,9 +682,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       return undefined;
     }
 
-    const timeoutId = window.setTimeout(() => dispatchSessionFlow({ type: "pause" }), 3_000);
+    const timeoutId = window.setTimeout(() => {
+      pauseTiming();
+      dispatchSessionFlow({ type: "pause" });
+    }, 3_000);
     return () => window.clearTimeout(timeoutId);
-  }, [correctCount, errorCount, pos, sessionFlow.phase, sessionResult]);
+  }, [correctCount, errorCount, pauseTiming, pos, sessionFlow.phase, sessionResult]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

@@ -43,14 +43,38 @@ interface TypingState {
   errorFlash: number | null;
   intervals: number[];
   lastCorrectAt: number | null;
+  lastInputAt: number | null;
+  excludedDurationMs: number;
+  pausedAt: number | null;
   loadSet: (layoutId: LayoutId, chordSet: ChordSet, visibleCapacity?: number) => void;
   reset: () => void;
+  pauseTiming: () => void;
+  resumeTiming: () => void;
   handleKey: (code: string) => void;
   result: () => SessionResult | null;
 }
 
 export const minimumPracticeStreamLength = typingWindowLineLength * typingWindowRows;
 export const defaultPracticeVisibleCapacity = minimumPracticeStreamLength;
+export const automaticPauseTimingGraceMs = 6_000;
+
+export interface ActiveDurationInput {
+  startedAt: number | null;
+  endedAt: number | null;
+  excludedDurationMs: number;
+  pausedAt: number | null;
+}
+
+export function computeActiveDurationMs({ startedAt, endedAt, excludedDurationMs, pausedAt }: ActiveDurationInput): number {
+  if (startedAt == null || endedAt == null) {
+    return 0;
+  }
+
+  const safeEndedAt = Math.max(startedAt, endedAt);
+  const activePauseDurationMs = pausedAt == null ? 0 : Math.max(0, safeEndedAt - pausedAt);
+  const inactiveDurationMs = Math.max(0, excludedDurationMs) + activePauseDurationMs;
+  return Math.max(1, safeEndedAt - startedAt - inactiveDurationMs);
+}
 
 function cleanVisibleCapacity(visibleCapacity: number | undefined): number {
   if (visibleCapacity == null || !Number.isFinite(visibleCapacity)) {
@@ -119,6 +143,9 @@ export const useTypingStore = create<TypingState>((set, get) => ({
   errorFlash: null,
   intervals: [],
   lastCorrectAt: null,
+  lastInputAt: null,
+  excludedDurationMs: 0,
+  pausedAt: null,
 
   loadSet: (layoutId, chordSet, visibleCapacity) => {
     const stream = buildStream(layoutId, chordSet, visibleCapacity);
@@ -138,6 +165,9 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errorFlash: null,
       intervals: [],
       lastCorrectAt: null,
+      lastInputAt: null,
+      excludedDurationMs: 0,
+      pausedAt: null,
     });
   },
 
@@ -156,6 +186,43 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       errorFlash: null,
       intervals: [],
       lastCorrectAt: null,
+      lastInputAt: null,
+      excludedDurationMs: 0,
+      pausedAt: null,
+    });
+  },
+
+  pauseTiming: () => {
+    const state = get();
+    if (state.startedAt == null || state.pausedAt != null) {
+      return;
+    }
+
+    const timestamp = Date.now();
+    const lastActivityAt = state.lastInputAt ?? state.lastCorrectAt ?? state.startedAt;
+    const pauseStart = Math.min(
+      timestamp,
+      Math.max(state.startedAt, lastActivityAt, timestamp - automaticPauseTimingGraceMs),
+    );
+
+    set({
+      pausedAt: pauseStart,
+      lastCorrectAt: null,
+    });
+  },
+
+  resumeTiming: () => {
+    const state = get();
+    if (state.pausedAt == null) {
+      return;
+    }
+
+    const timestamp = Date.now();
+    set({
+      excludedDurationMs: state.excludedDurationMs + Math.max(0, timestamp - state.pausedAt),
+      pausedAt: null,
+      lastCorrectAt: null,
+      lastInputAt: timestamp,
     });
   },
 
@@ -191,6 +258,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
         errorFlash: null,
         intervals,
         lastCorrectAt: timestamp,
+        lastInputAt: timestamp,
       });
       return;
     }
@@ -213,16 +281,29 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       perChar,
       perChord,
       errorFlash: pos,
+      lastInputAt: timestamp,
     });
   },
 
   result: () => {
-    const { chordSet, startedAt, finishedAt, correctCount, errorCount, perFinger, perChar, perChord, intervals } = get();
+    const {
+      chordSet,
+      startedAt,
+      finishedAt,
+      correctCount,
+      errorCount,
+      perFinger,
+      perChar,
+      perChord,
+      intervals,
+      excludedDurationMs,
+      pausedAt,
+    } = get();
     if (!chordSet || startedAt == null || finishedAt == null) {
       return null;
     }
 
-    const durationMs = Math.max(1, finishedAt - startedAt);
+    const durationMs = computeActiveDurationMs({ startedAt, endedAt: finishedAt, excludedDurationMs, pausedAt });
     const speedCpm = correctCount / (durationMs / 60_000);
     const total = correctCount + errorCount;
     const accuracy = total === 0 ? 1 : correctCount / total;

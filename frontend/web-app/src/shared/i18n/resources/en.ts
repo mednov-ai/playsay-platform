@@ -36,9 +36,20 @@ export const en = {
       title: "Confirmation",
       subtitle: "Finishing registration and enabling student access.",
     },
+    "forgot-password": {
+      title: "Reset password",
+      subtitle: "Get a confirmation code at your account email.",
+    },
+    "reset-password": {
+      title: "New password",
+      subtitle: "Enter the email code and choose a new password.",
+    },
     form: {
       email: "Email",
       password: "Password",
+      confirmPassword: "Repeat password",
+      newPassword: "New password",
+      code: "Email code",
       displayName: "Lesson name",
     },
     actions: {
@@ -46,6 +57,19 @@ export const en = {
       resend: "Send again",
       signIn: "Sign in",
       continue: "Continue",
+      forgotPassword: "Forgot password?",
+      sendResetCode: "Get code",
+      resetPassword: "Reset password",
+      backToRegister: "Back to registration",
+    },
+    password: {
+      tooShort: "At least 8 characters",
+      tooLong: "No more than 128 characters",
+      tooCommon: "Avoid obvious words and Play&Say",
+      containsEmail: "Does not contain part of the email",
+      containsName: "Does not contain the lesson name",
+      needsVariety: "Uses mixed case, digits, or symbols",
+      match: "Passwords match",
     },
     messages: {
       checkEmail: "We sent an email to {{email}}. Open the link in the email to confirm your account.",
@@ -56,6 +80,11 @@ export const en = {
       startFailed: "Could not start registration. Check the email and password.",
       resendFailed: "Could not send the email again.",
       confirmFailed: "Could not confirm registration. The link may have expired.",
+      passwordInvalid: "The password does not meet the requirements or the fields do not match.",
+      resetCodeSent: "If the account exists, a code has been sent to the email.",
+      resetStartFailed: "Could not send the code. Check the email.",
+      resetFailed: "Could not reset the password. Check the code and the new password.",
+      passwordReset: "Password changed. You can sign in now.",
     },
   },
   welcome: {

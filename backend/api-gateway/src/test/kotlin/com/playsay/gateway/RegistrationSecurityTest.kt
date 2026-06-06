@@ -1,7 +1,9 @@
 package com.playsay.gateway
 
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
+import com.playsay.gateway.dto.ForgotPasswordRequest
 import com.playsay.gateway.dto.RegistrationResponse
+import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
 import com.playsay.gateway.service.RegistrationGateway
@@ -77,6 +79,28 @@ class RegistrationSecurityTest @Autowired constructor(
 
         assertEquals(HttpStatus.BAD_REQUEST.value(), response.statusCode(), response.body())
     }
+
+    @Test
+    fun `same-origin api password reset endpoints do not require bearer token`() {
+        val httpClient = HttpClient.newHttpClient()
+        val forgot = httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/forgot-password"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""{"email":"student@example.com","locale":"en"}"""))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+        val reset = httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/reset-password"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""{"email":"student@example.com","code":"123456","newPassword":"River2026!"}"""))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(HttpStatus.ACCEPTED.value(), forgot.statusCode(), forgot.body())
+        assertEquals(HttpStatus.OK.value(), reset.statusCode(), reset.body())
+    }
 }
 
 private class AnonymousRegistrationGateway : RegistrationGateway {
@@ -88,4 +112,10 @@ private class AnonymousRegistrationGateway : RegistrationGateway {
 
     override fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse =
         RegistrationResponse(status = "CONFIRMED")
+
+    override fun forgotPassword(request: ForgotPasswordRequest): RegistrationResponse =
+        RegistrationResponse(status = "CHECK_EMAIL")
+
+    override fun resetPassword(request: ResetPasswordRequest): RegistrationResponse =
+        RegistrationResponse(status = "PASSWORD_RESET")
 }

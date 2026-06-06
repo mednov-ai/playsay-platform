@@ -3,7 +3,9 @@ package com.playsay.gateway.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
+import com.playsay.gateway.dto.ForgotPasswordRequest
 import com.playsay.gateway.dto.RegistrationResponse
+import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
 import com.playsay.gateway.error.ProjectResponseException
@@ -23,6 +25,8 @@ interface RegistrationGateway {
     fun start(request: StartRegistrationRequest): RegistrationResponse
     fun resend(request: ResendRegistrationRequest): RegistrationResponse
     fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse
+    fun forgotPassword(request: ForgotPasswordRequest): RegistrationResponse
+    fun resetPassword(request: ResetPasswordRequest): RegistrationResponse
 }
 
 @Component
@@ -43,6 +47,12 @@ class HttpRegistrationGateway(
 
     override fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse =
         postJson("/api/registration/confirm", request, HttpStatus.OK)
+
+    override fun forgotPassword(request: ForgotPasswordRequest): RegistrationResponse =
+        postJson("/api/registration/forgot-password", request, HttpStatus.ACCEPTED)
+
+    override fun resetPassword(request: ResetPasswordRequest): RegistrationResponse =
+        postJson("/api/registration/reset-password", request, HttpStatus.OK)
 
     private fun postJson(path: String, body: Any, expectedStatus: HttpStatus): RegistrationResponse {
         val response = send(path, objectMapper.writeValueAsString(body))

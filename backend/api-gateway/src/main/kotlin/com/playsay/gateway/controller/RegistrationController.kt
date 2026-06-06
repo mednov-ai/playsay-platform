@@ -1,7 +1,9 @@
 package com.playsay.gateway.controller
 
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
+import com.playsay.gateway.dto.ForgotPasswordRequest
 import com.playsay.gateway.dto.RegistrationResponse
+import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
 import com.playsay.gateway.service.RegistrationGateway
@@ -42,4 +44,21 @@ class RegistrationController(
     )
     fun confirm(@Valid @RequestBody request: ConfirmRegistrationRequest): RegistrationResponse =
         registrationGateway.confirm(request)
+
+    @PostMapping(
+        path = ["/registration/forgot-password", "/api/registration/forgot-password"],
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun forgotPassword(@Valid @RequestBody request: ForgotPasswordRequest): RegistrationResponse =
+        registrationGateway.forgotPassword(request)
+
+    @PostMapping(
+        path = ["/registration/reset-password", "/api/registration/reset-password"],
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    fun resetPassword(@Valid @RequestBody request: ResetPasswordRequest): RegistrationResponse =
+        registrationGateway.resetPassword(request)
 }

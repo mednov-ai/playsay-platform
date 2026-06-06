@@ -36,9 +36,20 @@ export const ru = {
       title: "Подтверждение",
       subtitle: "Завершаем регистрацию и включаем доступ ученика.",
     },
+    "forgot-password": {
+      title: "Смена пароля",
+      subtitle: "Получите код подтверждения на email аккаунта.",
+    },
+    "reset-password": {
+      title: "Новый пароль",
+      subtitle: "Введите код из письма и задайте новый пароль.",
+    },
     form: {
       email: "Email",
       password: "Пароль",
+      confirmPassword: "Повторите пароль",
+      newPassword: "Новый пароль",
+      code: "Код из письма",
       displayName: "Имя на уроках",
     },
     actions: {
@@ -46,6 +57,19 @@ export const ru = {
       resend: "Отправить ещё раз",
       signIn: "Войти",
       continue: "Продолжить",
+      forgotPassword: "Забыли пароль?",
+      sendResetCode: "Получить код",
+      resetPassword: "Сменить пароль",
+      backToRegister: "Вернуться к регистрации",
+    },
+    password: {
+      tooShort: "Минимум 8 символов",
+      tooLong: "Не больше 128 символов",
+      tooCommon: "Без очевидных слов и Play&Say",
+      containsEmail: "Не содержит часть email",
+      containsName: "Не содержит имя",
+      needsVariety: "Есть буквы разного регистра, цифры или символы",
+      match: "Пароли совпадают",
     },
     messages: {
       checkEmail: "Письмо отправлено на {{email}}. Откройте ссылку в письме, чтобы подтвердить аккаунт.",
@@ -56,6 +80,11 @@ export const ru = {
       startFailed: "Не удалось начать регистрацию. Проверьте email и пароль.",
       resendFailed: "Не удалось отправить письмо повторно.",
       confirmFailed: "Не удалось подтвердить регистрацию. Ссылка могла устареть.",
+      passwordInvalid: "Пароль не соответствует требованиям или поля не совпадают.",
+      resetCodeSent: "Если аккаунт существует, код отправлен на email.",
+      resetStartFailed: "Не удалось отправить код. Проверьте email.",
+      resetFailed: "Не удалось сменить пароль. Проверьте код и новый пароль.",
+      passwordReset: "Пароль изменён. Теперь можно войти.",
     },
   },
   welcome: {

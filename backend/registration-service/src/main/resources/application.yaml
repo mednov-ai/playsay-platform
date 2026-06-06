@@ -35,6 +35,8 @@ playsay:
     public-base-url: ${PLAYSAY_REGISTRATION_PUBLIC_BASE_URL:https://online.play-and-say.ru}
     token-ttl-hours: ${PLAYSAY_REGISTRATION_TOKEN_TTL_HOURS:24}
     resend-cooldown-seconds: ${PLAYSAY_REGISTRATION_RESEND_COOLDOWN_SECONDS:300}
+    password-reset-code-ttl-minutes: ${PLAYSAY_REGISTRATION_PASSWORD_RESET_CODE_TTL_MINUTES:15}
+    password-reset-max-attempts: ${PLAYSAY_REGISTRATION_PASSWORD_RESET_MAX_ATTEMPTS:5}
     rate-limit:
       window-seconds: ${PLAYSAY_REGISTRATION_RATE_LIMIT_WINDOW_SECONDS:3600}
       max-per-email: ${PLAYSAY_REGISTRATION_RATE_LIMIT_MAX_PER_EMAIL:5}

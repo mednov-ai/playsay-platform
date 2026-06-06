@@ -1,5 +1,5 @@
 import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
-import { Loader2, LogIn, LogOut, User, Video } from "lucide-react";
+import { Loader2, LogIn, LogOut, User, UserPlus, Video } from "lucide-react";
 import { type WorkspaceTab, type WorkspaceTabDefinition } from "../entities/workspace/model";
 import type { CourseLessonMap } from "../entities/schedule/model";
 import {
@@ -446,6 +446,10 @@ function WelcomeLanding({
             {isBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
             <span>{t("auth.login")}</span>
           </button>
+          <a className="playsay-welcome-register" href="/register">
+            <UserPlus className="h-4 w-4" />
+            <span>{t("registration.actions.create")}</span>
+          </a>
           <a className="playsay-welcome-return" href={mainSiteUrl}>
             {t("welcome.returnToSite")}
           </a>

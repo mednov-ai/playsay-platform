@@ -36,9 +36,20 @@ export const de = {
       title: "Bestätigung",
       subtitle: "Registrierung abschließen und Schülerzugang aktivieren.",
     },
+    "forgot-password": {
+      title: "Passwort ändern",
+      subtitle: "Erhalten Sie einen Bestätigungscode per E-Mail.",
+    },
+    "reset-password": {
+      title: "Neues Passwort",
+      subtitle: "Geben Sie den Code aus der E-Mail ein und wählen Sie ein neues Passwort.",
+    },
     form: {
       email: "E-Mail",
       password: "Passwort",
+      confirmPassword: "Passwort wiederholen",
+      newPassword: "Neues Passwort",
+      code: "Code aus der E-Mail",
       displayName: "Name im Unterricht",
     },
     actions: {
@@ -46,6 +57,19 @@ export const de = {
       resend: "Erneut senden",
       signIn: "Anmelden",
       continue: "Weiter",
+      forgotPassword: "Passwort vergessen?",
+      sendResetCode: "Code erhalten",
+      resetPassword: "Passwort ändern",
+      backToRegister: "Zur Registrierung",
+    },
+    password: {
+      tooShort: "Mindestens 8 Zeichen",
+      tooLong: "Höchstens 128 Zeichen",
+      tooCommon: "Keine offensichtlichen Wörter und kein Play&Say",
+      containsEmail: "Enthält keinen Teil der E-Mail",
+      containsName: "Enthält nicht den Unterrichtsnamen",
+      needsVariety: "Verwendet Groß-/Kleinbuchstaben, Ziffern oder Symbole",
+      match: "Passwörter stimmen überein",
     },
     messages: {
       checkEmail: "Wir haben eine E-Mail an {{email}} gesendet. Öffnen Sie den Link, um das Konto zu bestätigen.",
@@ -56,6 +80,11 @@ export const de = {
       startFailed: "Registrierung konnte nicht gestartet werden. Prüfen Sie E-Mail und Passwort.",
       resendFailed: "Die E-Mail konnte nicht erneut gesendet werden.",
       confirmFailed: "Registrierung konnte nicht bestätigt werden. Der Link ist eventuell abgelaufen.",
+      passwordInvalid: "Das Passwort erfüllt die Anforderungen nicht oder die Felder stimmen nicht überein.",
+      resetCodeSent: "Wenn das Konto existiert, wurde ein Code per E-Mail gesendet.",
+      resetStartFailed: "Der Code konnte nicht gesendet werden. Prüfen Sie die E-Mail.",
+      resetFailed: "Das Passwort konnte nicht geändert werden. Prüfen Sie Code und neues Passwort.",
+      passwordReset: "Passwort geändert. Sie können sich jetzt anmelden.",
     },
   },
   welcome: {

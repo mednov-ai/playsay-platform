@@ -82,14 +82,29 @@ class EmailInternalControllerTest @Autowired constructor(
         assertEquals("no-reply@play-and-say.ru", sent.from)
         assertTrue(sent.subject.contains("Play&Say"))
         assertTrue(sent.textBody.contains("https://online.play-and-say.ru/register/confirm?token=token-1"))
+        assertTrue(sent.htmlBody.contains("https://online.play-and-say.ru/register/confirm?token=token-1"))
+        assertTrue(sent.htmlBody.contains("<a"))
     }
 
-    private fun sendTransactionalEmail(): HttpResponse<String> =
+    @Test
+    fun `sends localized password reset code email from database template`() {
+        val response = sendTransactionalEmail(passwordResetEmailBody())
+
+        assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+        val sent = RecordingOutboundEmailSender.sent.last()
+        assertEquals("student@example.com", sent.to)
+        assertTrue(sent.subject.contains("Play&Say"))
+        assertTrue(sent.textBody.contains("123456"))
+        assertTrue(sent.textBody.contains("15"))
+        assertTrue(sent.htmlBody.contains("123456"))
+    }
+
+    private fun sendTransactionalEmail(body: String = transactionalEmailBody()): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/internal/emails/transactional"))
                 .header("content-type", "application/json")
                 .header("X-PlaySay-Email-Service-Token", "test-email-token-0123456789")
-                .POST(HttpRequest.BodyPublishers.ofString(transactionalEmailBody()))
+                .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build(),
             HttpResponse.BodyHandlers.ofString(),
         )
@@ -104,6 +119,21 @@ class EmailInternalControllerTest @Autowired constructor(
           "model": {
             "displayName": "Student",
             "confirmationUrl": "https://online.play-and-say.ru/register/confirm?token=token-1"
+          }
+        }
+        """.trimIndent()
+
+    private fun passwordResetEmailBody(): String =
+        """
+        {
+          "to": "student@example.com",
+          "templateKey": "password-reset-code",
+          "locale": "en",
+          "idempotencyKey": "password-reset:student@example.com:code-1",
+          "model": {
+            "displayName": "Student",
+            "code": "123456",
+            "expiresMinutes": "15"
           }
         }
         """.trimIndent()

@@ -6,5 +6,7 @@ describe("registration routes", () => {
     expect(registrationRouteFromPath("/register")).toEqual({ kind: "start" });
     expect(registrationRouteFromPath("/register/check-email")).toEqual({ kind: "check-email" });
     expect(registrationRouteFromPath("/register/confirm")).toEqual({ kind: "confirm" });
+    expect(registrationRouteFromPath("/forgot-password")).toEqual({ kind: "forgot-password" });
+    expect(registrationRouteFromPath("/reset-password")).toEqual({ kind: "reset-password" });
   });
 });

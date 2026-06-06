@@ -1,10 +1,14 @@
 package com.playsay.registration.controller
 
 import com.playsay.registration.dto.ConfirmRegistrationRequest
+import com.playsay.registration.dto.ForgotPasswordRequest
 import com.playsay.registration.dto.RegistrationResponse
+import com.playsay.registration.dto.ResetPasswordRequest
 import com.playsay.registration.dto.ResendRegistrationRequest
 import com.playsay.registration.dto.StartRegistrationRequest
+import com.playsay.registration.service.ForgotPasswordCommand
 import com.playsay.registration.service.RegistrationService
+import com.playsay.registration.service.ResetPasswordCommand
 import com.playsay.registration.service.ResendRegistrationCommand
 import com.playsay.registration.service.StartRegistrationCommand
 import jakarta.servlet.http.HttpServletRequest
@@ -73,6 +77,47 @@ class RegistrationController(
     )
     fun confirm(@Valid @RequestBody request: ConfirmRegistrationRequest): RegistrationResponse {
         val result = registrationService.confirm(request.token)
+        return RegistrationResponse(status = result.status, continueUrl = result.continueUrl)
+    }
+
+    @PostMapping(
+        "/forgot-password",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun forgotPassword(
+        @Valid @RequestBody request: ForgotPasswordRequest,
+        servletRequest: HttpServletRequest,
+    ): RegistrationResponse {
+        val result = registrationService.forgotPassword(
+            ForgotPasswordCommand(
+                email = request.email,
+                locale = request.locale,
+                returnTo = request.returnTo,
+                remoteAddress = servletRequest.remoteAddr,
+            ),
+        )
+        return RegistrationResponse(status = result.status, continueUrl = result.continueUrl)
+    }
+
+    @PostMapping(
+        "/reset-password",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    fun resetPassword(
+        @Valid @RequestBody request: ResetPasswordRequest,
+        servletRequest: HttpServletRequest,
+    ): RegistrationResponse {
+        val result = registrationService.resetPassword(
+            ResetPasswordCommand(
+                email = request.email,
+                code = request.code,
+                newPassword = request.newPassword,
+                remoteAddress = servletRequest.remoteAddr,
+            ),
+        )
         return RegistrationResponse(status = result.status, continueUrl = result.continueUrl)
     }
 }

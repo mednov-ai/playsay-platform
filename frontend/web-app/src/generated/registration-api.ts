@@ -9,7 +9,7 @@ export interface StartRegistrationRequest {
   email: string;
   /**
      * @minLength 8
-     * @maxLength 200
+     * @maxLength 128
      */
   password: string;
   /**
@@ -47,6 +47,36 @@ export interface ResendRegistrationRequest {
 export interface ConfirmRegistrationRequest {
   /** @maxLength 255 */
   token: string;
+}
+
+export interface ForgotPasswordRequest {
+  /** @maxLength 320 */
+  email: string;
+  /**
+     * @maxLength 16
+     * @nullable
+     */
+  locale?: string | null;
+  /**
+     * @maxLength 1024
+     * @nullable
+     */
+  returnTo?: string | null;
+}
+
+export interface ResetPasswordRequest {
+  /** @maxLength 320 */
+  email: string;
+  /**
+     * @minLength 6
+     * @maxLength 12
+     */
+  code: string;
+  /**
+     * @minLength 8
+     * @maxLength 128
+     */
+  newPassword: string;
 }
 
 export interface RegistrationResponse {
@@ -214,4 +244,111 @@ export const confirmRegistration = async (confirmRegistrationRequest: ConfirmReg
 
   const data: confirmRegistrationResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as confirmRegistrationResponse
+}
+
+
+
+export type forgotPasswordResponse202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type forgotPasswordResponse400 = {
+  data: void
+  status: 400
+}
+
+export type forgotPasswordResponse429 = {
+  data: void
+  status: 429
+}
+
+export type forgotPasswordResponseSuccess = (forgotPasswordResponse202) & {
+  headers: Headers;
+};
+export type forgotPasswordResponseError = (forgotPasswordResponse400 | forgotPasswordResponse429) & {
+  headers: Headers;
+};
+
+export type forgotPasswordResponse = (forgotPasswordResponseSuccess | forgotPasswordResponseError)
+
+export const getForgotPasswordUrl = () => {
+
+
+
+
+  return `/api/registration/forgot-password`
+}
+
+/**
+ * Sends a generic response and, when an active account exists, sends a one-time password reset code by email.
+ * @summary Request password reset code
+ */
+export const forgotPassword = async (forgotPasswordRequest: ForgotPasswordRequest, options?: RequestInit): Promise<forgotPasswordResponse> => {
+
+  const res = await fetch(getForgotPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(forgotPasswordRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: forgotPasswordResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as forgotPasswordResponse
+}
+
+
+
+export type resetPasswordResponse200 = {
+  data: RegistrationResponse
+  status: 200
+}
+
+export type resetPasswordResponse400 = {
+  data: void
+  status: 400
+}
+
+export type resetPasswordResponseSuccess = (resetPasswordResponse200) & {
+  headers: Headers;
+};
+export type resetPasswordResponseError = (resetPasswordResponse400) & {
+  headers: Headers;
+};
+
+export type resetPasswordResponse = (resetPasswordResponseSuccess | resetPasswordResponseError)
+
+export const getResetPasswordUrl = () => {
+
+
+
+
+  return `/api/registration/reset-password`
+}
+
+/**
+ * Verifies a one-time code and updates the Keycloak user password.
+ * @summary Reset password with email code
+ */
+export const resetPassword = async (resetPasswordRequest: ResetPasswordRequest, options?: RequestInit): Promise<resetPasswordResponse> => {
+
+  const res = await fetch(getResetPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resetPasswordRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resetPasswordResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resetPasswordResponse
 }

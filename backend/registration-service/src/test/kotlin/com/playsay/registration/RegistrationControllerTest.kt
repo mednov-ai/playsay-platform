@@ -1,10 +1,12 @@
 package com.playsay.registration
 
 import com.playsay.registration.service.KeycloakRegistrationClient
+import com.playsay.registration.service.KeycloakRegistrationUser
 import com.playsay.registration.service.KeycloakUserCreateCommand
 import com.playsay.registration.repo.PendingRegistrationRepo
 import com.playsay.registration.service.RegistrationEmailClient
 import com.playsay.registration.service.RegistrationEmailCommand
+import com.playsay.registration.service.PasswordResetEmailCommand
 import java.time.Instant
 import java.net.URI
 import java.net.http.HttpClient
@@ -74,7 +76,7 @@ class RegistrationControllerTest @Autowired constructor(
     @BeforeEach
     fun resetRecorders() {
         RecordingKeycloakRegistrationClient.reset()
-        RecordingRegistrationEmailClient.sent.clear()
+        RecordingRegistrationEmailClient.reset()
     }
 
     @Test
@@ -93,7 +95,10 @@ class RegistrationControllerTest @Autowired constructor(
         assertEquals("student@example.com", createdUser.email)
         assertFalse(createdUser.enabled)
         assertFalse(createdUser.emailVerified)
-        assertTrue(RecordingRegistrationEmailClient.sent.single().confirmationUrl.startsWith("https://online.play-and-say.ru/register/confirm?token="))
+        assertTrue(
+            RecordingRegistrationEmailClient.registrationConfirmations.single().confirmationUrl
+                .startsWith("https://online.play-and-say.ru/register/confirm?token="),
+        )
 
         val confirmed = confirmRegistration(lastConfirmationToken())
 
@@ -117,17 +122,90 @@ class RegistrationControllerTest @Autowired constructor(
     @Test
     fun `existing keycloak email receives generic response without a new pending token`() {
         val email = "existing@example.com"
-        RecordingKeycloakRegistrationClient.existingEmails += email
+        RecordingKeycloakRegistrationClient.existingUsers[email] = KeycloakRegistrationUser(
+            email = email,
+            enabled = true,
+            emailVerified = true,
+        )
 
         val response = startRegistration(email)
 
         assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
         assertTrue(response.body().contains("CHECK_EMAIL"))
         assertTrue(RecordingKeycloakRegistrationClient.createdUsers.isEmpty())
-        assertTrue(RecordingRegistrationEmailClient.sent.isEmpty())
+        assertTrue(RecordingRegistrationEmailClient.registrationConfirmations.isEmpty())
+        assertEquals(email, RecordingRegistrationEmailClient.passwordResets.single().to)
+        assertEquals(6, RecordingRegistrationEmailClient.passwordResets.single().code.length)
         assertTrue(
             pendingRegistrationRepo.findFirstByEmailNormalizedAndStatusOrderByCreatedAtDesc(email, "PENDING") == null,
         )
+    }
+
+    @Test
+    fun `registration start rejects weak passwords`() {
+        val response = startRegistration(email = "weak@example.com", password = "password")
+
+        assertEquals(HttpStatus.BAD_REQUEST.value(), response.statusCode(), response.body())
+        assertTrue(RecordingKeycloakRegistrationClient.createdUsers.isEmpty())
+        assertTrue(RecordingRegistrationEmailClient.registrationConfirmations.isEmpty())
+        assertTrue(RecordingRegistrationEmailClient.passwordResets.isEmpty())
+    }
+
+    @Test
+    fun `forgot password sends generic response and reset code for existing user`() {
+        val email = "forgot@example.com"
+        RecordingKeycloakRegistrationClient.existingUsers[email] = KeycloakRegistrationUser(
+            email = email,
+            enabled = true,
+            emailVerified = true,
+        )
+
+        val response = forgotPassword(email)
+
+        assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+        assertTrue(response.body().contains("CHECK_EMAIL"))
+        val reset = RecordingRegistrationEmailClient.passwordResets.single()
+        assertEquals(email, reset.to)
+        assertEquals("en", reset.locale)
+        assertEquals(6, reset.code.length)
+    }
+
+    @Test
+    fun `reset password consumes one-time code and updates keycloak password`() {
+        val email = "reset@example.com"
+        RecordingKeycloakRegistrationClient.existingUsers[email] = KeycloakRegistrationUser(
+            email = email,
+            enabled = true,
+            emailVerified = true,
+        )
+        forgotPassword(email)
+        val code = RecordingRegistrationEmailClient.passwordResets.single().code
+
+        val reset = resetPassword(email = email, code = code, newPassword = "Better2026!")
+        val repeated = resetPassword(email = email, code = code, newPassword = "Better2027!")
+
+        assertEquals(HttpStatus.OK.value(), reset.statusCode(), reset.body())
+        assertTrue(reset.body().contains("PASSWORD_RESET"))
+        assertEquals("Better2026!", RecordingKeycloakRegistrationClient.updatedPasswords[email])
+        assertEquals(HttpStatus.BAD_REQUEST.value(), repeated.statusCode(), repeated.body())
+        assertEquals("Better2026!", RecordingKeycloakRegistrationClient.updatedPasswords[email])
+    }
+
+    @Test
+    fun `reset password rejects weak new password before keycloak update`() {
+        val email = "reset-weak@example.com"
+        RecordingKeycloakRegistrationClient.existingUsers[email] = KeycloakRegistrationUser(
+            email = email,
+            enabled = true,
+            emailVerified = true,
+        )
+        forgotPassword(email)
+        val code = RecordingRegistrationEmailClient.passwordResets.single().code
+
+        val reset = resetPassword(email = email, code = code, newPassword = "12345678")
+
+        assertEquals(HttpStatus.BAD_REQUEST.value(), reset.statusCode(), reset.body())
+        assertTrue(RecordingKeycloakRegistrationClient.updatedPasswords.isEmpty())
     }
 
     @Test
@@ -136,12 +214,12 @@ class RegistrationControllerTest @Autowired constructor(
         val started = startRegistration(email)
 
         assertEquals(HttpStatus.ACCEPTED.value(), started.statusCode())
-        assertEquals(1, RecordingRegistrationEmailClient.sent.size)
-        val firstConfirmationUrl = RecordingRegistrationEmailClient.sent.single().confirmationUrl
+        assertEquals(1, RecordingRegistrationEmailClient.registrationConfirmations.size)
+        val firstConfirmationUrl = RecordingRegistrationEmailClient.registrationConfirmations.single().confirmationUrl
 
         val throttled = resendRegistration(email)
         assertEquals(HttpStatus.ACCEPTED.value(), throttled.statusCode())
-        assertEquals(1, RecordingRegistrationEmailClient.sent.size)
+        assertEquals(1, RecordingRegistrationEmailClient.registrationConfirmations.size)
 
         val pending = pendingRegistration(email)
         pending.emailSentAt = Instant.EPOCH
@@ -150,8 +228,8 @@ class RegistrationControllerTest @Autowired constructor(
 
         val resent = resendRegistration(email)
         assertEquals(HttpStatus.ACCEPTED.value(), resent.statusCode())
-        assertEquals(2, RecordingRegistrationEmailClient.sent.size)
-        assertTrue(RecordingRegistrationEmailClient.sent.last().confirmationUrl != firstConfirmationUrl)
+        assertEquals(2, RecordingRegistrationEmailClient.registrationConfirmations.size)
+        assertTrue(RecordingRegistrationEmailClient.registrationConfirmations.last().confirmationUrl != firstConfirmationUrl)
     }
 
     @Test
@@ -208,6 +286,15 @@ class RegistrationControllerTest @Autowired constructor(
             HttpResponse.BodyHandlers.ofString(),
         )
 
+    private fun startRegistration(email: String, password: String): HttpResponse<String> =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
+                .header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(startRegistrationBody(email = email, password = password)))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
     private fun resendRegistration(email: String): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/resend"))
@@ -230,8 +317,34 @@ class RegistrationControllerTest @Autowired constructor(
             HttpResponse.BodyHandlers.ofString(),
         )
 
+    private fun forgotPassword(email: String): HttpResponse<String> =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/forgot-password"))
+                .header("content-type", "application/json")
+                .POST(
+                    HttpRequest.BodyPublishers.ofString(
+                        """{"email":"$email","locale":"en","returnTo":"https://key.play-and-say.ru/"}""",
+                    ),
+                )
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+    private fun resetPassword(email: String, code: String, newPassword: String): HttpResponse<String> =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/reset-password"))
+                .header("content-type", "application/json")
+                .POST(
+                    HttpRequest.BodyPublishers.ofString(
+                        """{"email":"$email","code":"$code","newPassword":"$newPassword"}""",
+                    ),
+                )
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
     private fun lastConfirmationToken(): String =
-        URI.create(RecordingRegistrationEmailClient.sent.last().confirmationUrl)
+        URI.create(RecordingRegistrationEmailClient.registrationConfirmations.last().confirmationUrl)
             .query
             .split("&")
             .single { parameter -> parameter.startsWith("token=") }
@@ -241,11 +354,14 @@ class RegistrationControllerTest @Autowired constructor(
         pendingRegistrationRepo.findFirstByEmailNormalizedAndStatusOrderByCreatedAtDesc(email, "PENDING")
             ?: error("Pending registration was not saved for $email")
 
-    private fun startRegistrationBody(email: String = "student@example.com"): String =
+    private fun startRegistrationBody(
+        email: String = "student@example.com",
+        password: String = "River2026!",
+    ): String =
         """
         {
           "email": "$email",
-          "password": "correct horse battery staple",
+          "password": "$password",
           "displayName": "Student",
           "locale": "en",
           "returnTo": "https://key.play-and-say.ru/"
@@ -254,39 +370,65 @@ class RegistrationControllerTest @Autowired constructor(
 }
 
 private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient {
-    val existingEmails = mutableSetOf<String>()
+    val existingUsers = mutableMapOf<String, KeycloakRegistrationUser>()
     val createdUsers = mutableListOf<KeycloakUserCreateCommand>()
     val enabledUsers = mutableListOf<String>()
     val assignedRoles = mutableListOf<String>()
+    val updatedPasswords = mutableMapOf<String, String>()
 
     fun reset() {
-        existingEmails.clear()
+        existingUsers.clear()
         createdUsers.clear()
         enabledUsers.clear()
         assignedRoles.clear()
+        updatedPasswords.clear()
     }
 
     override fun createDisabledUser(command: KeycloakUserCreateCommand): Boolean {
-        if (command.email in existingEmails) {
+        if (command.email in existingUsers) {
             return false
         }
         createdUsers += command
+        existingUsers[command.email] = KeycloakRegistrationUser(
+            email = command.email,
+            enabled = command.enabled,
+            emailVerified = command.emailVerified,
+        )
         return true
     }
 
+    override fun findUserByEmail(email: String): KeycloakRegistrationUser? =
+        existingUsers[email]
+
     override fun enableVerifiedUser(email: String) {
         enabledUsers += email
+        existingUsers[email] = existingUsers[email]?.copy(enabled = true, emailVerified = true)
+            ?: KeycloakRegistrationUser(email = email, enabled = true, emailVerified = true)
     }
 
     override fun assignRealmRole(email: String, role: String) {
         assignedRoles += role
     }
+
+    override fun updatePassword(email: String, newPassword: String) {
+        updatedPasswords[email] = newPassword
+    }
 }
 
 private object RecordingRegistrationEmailClient : RegistrationEmailClient {
-    val sent = mutableListOf<RegistrationEmailCommand>()
+    val registrationConfirmations = mutableListOf<RegistrationEmailCommand>()
+    val passwordResets = mutableListOf<PasswordResetEmailCommand>()
+
+    fun reset() {
+        registrationConfirmations.clear()
+        passwordResets.clear()
+    }
 
     override fun sendRegistrationConfirmation(command: RegistrationEmailCommand) {
-        sent += command
+        registrationConfirmations += command
+    }
+
+    override fun sendPasswordResetCode(command: PasswordResetEmailCommand) {
+        passwordResets += command
     }
 }

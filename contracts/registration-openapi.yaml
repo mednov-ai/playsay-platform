@@ -67,6 +67,48 @@ paths:
                 $ref: "#/components/schemas/RegistrationResponse"
         "400":
           description: Invalid or expired confirmation token.
+  /registration/forgot-password:
+    post:
+      operationId: forgotPassword
+      summary: Request password reset code
+      description: Sends a generic response and, when an active account exists, sends a one-time password reset code by email.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "202":
+          description: Generic check-email response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid password reset request payload.
+        "429":
+          description: Password reset rate limit exceeded.
+  /registration/reset-password:
+    post:
+      operationId: resetPassword
+      summary: Reset password with email code
+      description: Verifies a one-time code and updates the Keycloak user password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid code, expired code, or weak password.
 components:
   schemas:
     StartRegistrationRequest:
@@ -82,7 +124,7 @@ components:
         password:
           type: string
           minLength: 8
-          maxLength: 200
+          maxLength: 128
         displayName:
           type: string
           nullable: true
@@ -120,6 +162,42 @@ components:
         token:
           type: string
           maxLength: 255
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        locale:
+          type: string
+          nullable: true
+          maxLength: 16
+        returnTo:
+          type: string
+          nullable: true
+          maxLength: 1024
+    ResetPasswordRequest:
+      type: object
+      required:
+        - email
+        - code
+        - newPassword
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        code:
+          type: string
+          minLength: 6
+          maxLength: 12
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 128
     RegistrationResponse:
       type: object
       required:

@@ -1,6 +1,7 @@
 package com.playsay.registration.client
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.playsay.registration.service.PasswordResetEmailCommand
 import com.playsay.registration.service.RegistrationEmailClient
 import com.playsay.registration.service.RegistrationEmailCommand
 import java.net.URI
@@ -23,6 +24,29 @@ class EmailServiceRegistrationEmailClient(
             "model" to mapOf(
                 "displayName" to command.displayName,
                 "confirmationUrl" to command.confirmationUrl,
+            ),
+        )
+        val request = HttpRequest.newBuilder(URI.create("${emailServiceBaseUrl.trimEnd('/')}/internal/emails/transactional"))
+            .header("content-type", "application/json")
+            .header("X-PlaySay-Email-Service-Token", serviceToken)
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+            .build()
+        val response = httpClient.send(request, HttpResponse.BodyHandlers.discarding())
+        if (response.statusCode() !in 200..299) {
+            error("email-service returned HTTP ${response.statusCode()}")
+        }
+    }
+
+    override fun sendPasswordResetCode(command: PasswordResetEmailCommand) {
+        val payload = mapOf(
+            "to" to command.to,
+            "templateKey" to "password-reset-code",
+            "locale" to command.locale,
+            "idempotencyKey" to command.idempotencyKey,
+            "model" to mapOf(
+                "displayName" to command.displayName,
+                "code" to command.code,
+                "expiresMinutes" to command.expiresMinutes.toString(),
             ),
         )
         val request = HttpRequest.newBuilder(URI.create("${emailServiceBaseUrl.trimEnd('/')}/internal/emails/transactional"))

@@ -6,7 +6,6 @@ import org.springframework.mail.MailSendException
 import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
-import org.springframework.web.util.HtmlUtils
 
 class UnisenderApiOutboundEmailSender(
     private val restClient: RestClient,
@@ -43,7 +42,7 @@ class UnisenderApiOutboundEmailSender(
             userId = userId,
             message = UnisenderMessage(
                 body = UnisenderBody(
-                    html = textBody.toSimpleHtml(),
+                    html = htmlBody,
                     plaintext = textBody,
                 ),
                 subject = subject,
@@ -52,9 +51,6 @@ class UnisenderApiOutboundEmailSender(
                 recipients = listOf(UnisenderRecipient(email = to)),
             ),
         )
-
-    private fun String.toSimpleHtml(): String =
-        lineSequence().joinToString("<br>") { HtmlUtils.htmlEscape(it) }
 
     private data class UnisenderEmailSendRequest(
         @get:JsonProperty("api_key")

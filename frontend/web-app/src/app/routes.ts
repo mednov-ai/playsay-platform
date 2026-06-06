@@ -19,7 +19,9 @@ export function paymentTokenFromPath(pathname: string): string | null {
 export type RegistrationRoute =
   | { kind: "start" }
   | { kind: "check-email" }
-  | { kind: "confirm" };
+  | { kind: "confirm" }
+  | { kind: "forgot-password" }
+  | { kind: "reset-password" };
 
 export function registrationRouteFromPath(pathname: string): RegistrationRoute | null {
   if (/^\/register\/?$/.test(pathname)) {
@@ -30,6 +32,12 @@ export function registrationRouteFromPath(pathname: string): RegistrationRoute |
   }
   if (/^\/register\/confirm\/?$/.test(pathname)) {
     return { kind: "confirm" };
+  }
+  if (/^\/forgot-password\/?$/.test(pathname)) {
+    return { kind: "forgot-password" };
+  }
+  if (/^\/reset-password\/?$/.test(pathname)) {
+    return { kind: "reset-password" };
   }
   return null;
 }

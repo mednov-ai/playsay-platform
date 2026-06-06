@@ -10,7 +10,7 @@ data class StartRegistrationRequest(
     @field:Size(max = 320)
     val email: String,
     @field:NotBlank
-    @field:Size(min = 8, max = 200)
+    @field:Size(min = 8, max = 128)
     val password: String,
     @field:Size(max = 120)
     val displayName: String? = null,
@@ -35,6 +35,30 @@ data class ConfirmRegistrationRequest(
     @field:NotBlank
     @field:Size(max = 255)
     val token: String,
+)
+
+data class ForgotPasswordRequest(
+    @field:Email
+    @field:NotBlank
+    @field:Size(max = 320)
+    val email: String,
+    @field:Size(max = 16)
+    val locale: String? = null,
+    @field:Size(max = 1024)
+    val returnTo: String? = null,
+)
+
+data class ResetPasswordRequest(
+    @field:Email
+    @field:NotBlank
+    @field:Size(max = 320)
+    val email: String,
+    @field:NotBlank
+    @field:Size(min = 6, max = 12)
+    val code: String,
+    @field:NotBlank
+    @field:Size(min = 8, max = 128)
+    val newPassword: String,
 )
 
 data class RegistrationResponse(

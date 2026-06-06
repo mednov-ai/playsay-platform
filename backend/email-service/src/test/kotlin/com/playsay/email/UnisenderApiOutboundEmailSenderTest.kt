@@ -47,6 +47,7 @@ class UnisenderApiOutboundEmailSenderTest {
                 to = "student@example.com",
                 subject = "Confirm your Play&Say account",
                 textBody = "Hello!\nConfirm here: https://online.play-and-say.ru/register/confirm?token=token-1",
+                htmlBody = "<p>Hello!</p><p><a href=\"https://online.play-and-say.ru/register/confirm?token=token-1\">Confirm email</a></p>",
             ),
         )
 
@@ -58,6 +59,6 @@ class UnisenderApiOutboundEmailSenderTest {
         assertTrue(body.contains(""""email":"student@example.com""""))
         assertTrue(body.contains(""""template_engine":"velocity""""))
         assertTrue(body.contains(""""plaintext":"Hello!\nConfirm here: https://online.play-and-say.ru/register/confirm?token=token-1""""))
-        assertTrue(body.contains(""""html":"Hello!<br>Confirm here: https://online.play-and-say.ru/register/confirm?token=token-1""""))
+        assertTrue(body.contains(""""html":"<p>Hello!</p><p><a href=\"https://online.play-and-say.ru/register/confirm?token=token-1\">Confirm email</a></p>""""))
     }
 }

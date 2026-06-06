@@ -36,9 +36,20 @@ export const fr = {
       title: "Confirmation",
       subtitle: "Fin de l'inscription et activation de l'accès élève.",
     },
+    "forgot-password": {
+      title: "Changer le mot de passe",
+      subtitle: "Recevez un code de confirmation par email.",
+    },
+    "reset-password": {
+      title: "Nouveau mot de passe",
+      subtitle: "Saisissez le code reçu par email et choisissez un nouveau mot de passe.",
+    },
     form: {
       email: "Email",
       password: "Mot de passe",
+      confirmPassword: "Répéter le mot de passe",
+      newPassword: "Nouveau mot de passe",
+      code: "Code reçu par email",
       displayName: "Nom en cours",
     },
     actions: {
@@ -46,6 +57,19 @@ export const fr = {
       resend: "Renvoyer",
       signIn: "Se connecter",
       continue: "Continuer",
+      forgotPassword: "Mot de passe oublié ?",
+      sendResetCode: "Recevoir le code",
+      resetPassword: "Changer le mot de passe",
+      backToRegister: "Retour à l'inscription",
+    },
+    password: {
+      tooShort: "Au moins 8 caractères",
+      tooLong: "Pas plus de 128 caractères",
+      tooCommon: "Évitez les mots évidents et Play&Say",
+      containsEmail: "Ne contient pas une partie de l'email",
+      containsName: "Ne contient pas le nom en cours",
+      needsVariety: "Utilise majuscules, minuscules, chiffres ou symboles",
+      match: "Les mots de passe correspondent",
     },
     messages: {
       checkEmail: "Nous avons envoyé un email à {{email}}. Ouvrez le lien pour confirmer le compte.",
@@ -56,6 +80,11 @@ export const fr = {
       startFailed: "Impossible de démarrer l'inscription. Vérifiez l'email et le mot de passe.",
       resendFailed: "Impossible de renvoyer l'email.",
       confirmFailed: "Impossible de confirmer l'inscription. Le lien a peut-être expiré.",
+      passwordInvalid: "Le mot de passe ne respecte pas les règles ou les champs ne correspondent pas.",
+      resetCodeSent: "Si le compte existe, un code a été envoyé par email.",
+      resetStartFailed: "Impossible d'envoyer le code. Vérifiez l'email.",
+      resetFailed: "Impossible de changer le mot de passe. Vérifiez le code et le nouveau mot de passe.",
+      passwordReset: "Mot de passe modifié. Vous pouvez vous connecter.",
     },
   },
   welcome: {

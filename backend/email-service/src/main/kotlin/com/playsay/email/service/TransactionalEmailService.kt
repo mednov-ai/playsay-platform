@@ -46,6 +46,7 @@ class TransactionalEmailService(
                     to = command.to,
                     subject = rendered.subject,
                     textBody = rendered.textBody,
+                    htmlBody = rendered.htmlBody,
                 ),
             )
             attempt.status = emailStatusSent

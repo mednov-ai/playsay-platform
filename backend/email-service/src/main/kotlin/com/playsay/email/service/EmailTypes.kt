@@ -11,6 +11,7 @@ data class TransactionalEmailCommand(
 data class RenderedEmail(
     val subject: String,
     val textBody: String,
+    val htmlBody: String,
 )
 
 data class OutboundEmail(
@@ -18,6 +19,7 @@ data class OutboundEmail(
     val to: String,
     val subject: String,
     val textBody: String,
+    val htmlBody: String,
 )
 
 interface OutboundEmailSender {

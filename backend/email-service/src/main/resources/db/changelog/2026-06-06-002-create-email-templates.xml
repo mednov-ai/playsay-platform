@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-06-002-create-email-templates" author="codex">
+        <createTable tableName="email_templates">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_email_templates"/>
+            </column>
+            <column name="template_key" type="VARCHAR(120)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="locale" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subject_template" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_template" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="html_template" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="INT" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="email_templates"
+            columnNames="template_key, locale, version"
+            constraintName="uq_email_template_key_locale_version"/>
+        <createIndex tableName="email_templates" indexName="idx_email_template_lookup">
+            <column name="template_key"/>
+            <column name="locale"/>
+            <column name="enabled"/>
+        </createIndex>
+
+        <sql><![CDATA[
+INSERT INTO email_templates (id, template_key, locale, subject_template, text_template, html_template, version, enabled, created_at, updated_at) VALUES
+('10000000-0000-0000-0000-000000000101', 'registration-confirmation', 'ru', 'Подтвердите аккаунт Play&Say',
+'Здравствуйте, ${displayName!"ученик Play&Say"}!
+
+Подтвердите email, чтобы завершить создание ученического аккаунта Play&Say:
+${confirmationUrl}
+
+Если вы не запрашивали регистрацию, просто проигнорируйте письмо.',
+'<p>Здравствуйте, ${displayName!"ученик Play&Say"}!</p><p>Подтвердите email, чтобы завершить создание ученического аккаунта Play&Say.</p><p><a href="${confirmationUrl}">Подтвердить email</a></p><p>Если вы не запрашивали регистрацию, просто проигнорируйте письмо.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000102', 'registration-confirmation', 'en', 'Confirm your Play&Say account',
+'Hello, ${displayName!"Play&Say student"}!
+
+Confirm your email to finish creating your Play&Say student account:
+${confirmationUrl}
+
+If you did not request this, ignore this email.',
+'<p>Hello, ${displayName!"Play&Say student"}!</p><p>Confirm your email to finish creating your Play&Say student account.</p><p><a href="${confirmationUrl}">Confirm email</a></p><p>If you did not request this, ignore this email.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000103', 'registration-confirmation', 'de', 'Play&Say Konto bestätigen',
+'Hallo, ${displayName!"Play&Say Schüler"}!
+
+Bestätigen Sie Ihre E-Mail-Adresse, um Ihr Play&Say Schülerkonto fertig einzurichten:
+${confirmationUrl}
+
+Falls Sie dies nicht angefordert haben, ignorieren Sie diese E-Mail.',
+'<p>Hallo, ${displayName!"Play&Say Schüler"}!</p><p>Bestätigen Sie Ihre E-Mail-Adresse, um Ihr Play&Say Schülerkonto fertig einzurichten.</p><p><a href="${confirmationUrl}">E-Mail bestätigen</a></p><p>Falls Sie dies nicht angefordert haben, ignorieren Sie diese E-Mail.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000104', 'registration-confirmation', 'fr', 'Confirmez votre compte Play&Say',
+'Bonjour, ${displayName!"élève Play&Say"} !
+
+Confirmez votre adresse e-mail pour terminer la création de votre compte étudiant Play&Say :
+${confirmationUrl}
+
+Si vous n''avez rien demandé, ignorez cet e-mail.',
+'<p>Bonjour, ${displayName!"élève Play&Say"} !</p><p>Confirmez votre adresse e-mail pour terminer la création de votre compte étudiant Play&Say.</p><p><a href="${confirmationUrl}">Confirmer l''email</a></p><p>Si vous n''avez rien demandé, ignorez cet e-mail.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000201', 'password-reset-code', 'ru', 'Код сброса пароля Play&Say',
+'Здравствуйте, ${displayName!"ученик Play&Say"}!
+
+Ваш код для смены пароля Play&Say: ${code}
+
+Код действует ${expiresMinutes} минут. Если вы не запрашивали смену пароля, просто проигнорируйте письмо.',
+'<p>Здравствуйте, ${displayName!"ученик Play&Say"}!</p><p>Ваш код для смены пароля Play&Say:</p><p><strong>${code}</strong></p><p>Код действует ${expiresMinutes} минут. Если вы не запрашивали смену пароля, просто проигнорируйте письмо.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000202', 'password-reset-code', 'en', 'Your Play&Say password reset code',
+'Hello, ${displayName!"Play&Say student"}!
+
+Your Play&Say password reset code is: ${code}
+
+The code is valid for ${expiresMinutes} minutes. If you did not request a password reset, ignore this email.',
+'<p>Hello, ${displayName!"Play&Say student"}!</p><p>Your Play&Say password reset code is:</p><p><strong>${code}</strong></p><p>The code is valid for ${expiresMinutes} minutes. If you did not request a password reset, ignore this email.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000203', 'password-reset-code', 'de', 'Ihr Play&Say Code zum Zurücksetzen des Passworts',
+'Hallo, ${displayName!"Play&Say Schüler"}!
+
+Ihr Play&Say Code zum Zurücksetzen des Passworts lautet: ${code}
+
+Der Code ist ${expiresMinutes} Minuten gültig. Falls Sie kein neues Passwort angefordert haben, ignorieren Sie diese E-Mail.',
+'<p>Hallo, ${displayName!"Play&Say Schüler"}!</p><p>Ihr Play&Say Code zum Zurücksetzen des Passworts lautet:</p><p><strong>${code}</strong></p><p>Der Code ist ${expiresMinutes} Minuten gültig. Falls Sie kein neues Passwort angefordert haben, ignorieren Sie diese E-Mail.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000204', 'password-reset-code', 'fr', 'Votre code de réinitialisation Play&Say',
+'Bonjour, ${displayName!"élève Play&Say"} !
+
+Votre code de réinitialisation du mot de passe Play&Say est : ${code}
+
+Le code est valable ${expiresMinutes} minutes. Si vous n''avez pas demandé de nouveau mot de passe, ignorez cet e-mail.',
+'<p>Bonjour, ${displayName!"élève Play&Say"} !</p><p>Votre code de réinitialisation du mot de passe Play&Say est :</p><p><strong>${code}</strong></p><p>Le code est valable ${expiresMinutes} minutes. Si vous n''avez pas demandé de nouveau mot de passe, ignorez cet e-mail.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

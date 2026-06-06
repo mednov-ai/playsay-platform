@@ -18,7 +18,7 @@ class RegistrationController(
     private val registrationGateway: RegistrationGateway,
 ) {
     @PostMapping(
-        "/registration/start",
+        path = ["/registration/start", "/api/registration/start"],
         consumes = [MediaType.APPLICATION_JSON_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
@@ -27,7 +27,7 @@ class RegistrationController(
         registrationGateway.start(request)
 
     @PostMapping(
-        "/registration/resend",
+        path = ["/registration/resend", "/api/registration/resend"],
         consumes = [MediaType.APPLICATION_JSON_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
@@ -36,7 +36,7 @@ class RegistrationController(
         registrationGateway.resend(request)
 
     @PostMapping(
-        "/registration/confirm",
+        path = ["/registration/confirm", "/api/registration/confirm"],
         consumes = [MediaType.APPLICATION_JSON_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )

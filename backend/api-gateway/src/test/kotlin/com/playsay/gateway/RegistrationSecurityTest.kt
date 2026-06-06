@@ -64,6 +64,19 @@ class RegistrationSecurityTest @Autowired constructor(
 
         assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
     }
+
+    @Test
+    fun `same-origin api registration validation errors are not converted to unauthorized`() {
+        val response = HttpClient.newHttpClient().send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{}"))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(HttpStatus.BAD_REQUEST.value(), response.statusCode(), response.body())
+    }
 }
 
 private class AnonymousRegistrationGateway : RegistrationGateway {

@@ -4,6 +4,7 @@ import { startLogin } from "../../../shared/api/playsay";
 import {
   confirmRegistrationRequest,
   forgotPasswordRequest,
+  isRegistrationRateLimitError,
   resendRegistrationRequest,
   resetPasswordRequest,
   startRegistrationRequest,
@@ -32,6 +33,7 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [rateLimitDialogOpen, setRateLimitDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmedContinueUrl, setConfirmedContinueUrl] = useState<string | null>(null);
   const startPasswordCheck = useMemo(
@@ -100,8 +102,8 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
       }
       window.history.pushState({}, document.title, next.pathname + next.search);
       window.dispatchEvent(new Event("popstate"));
-    } catch {
-      setMessage(t("registration.messages.startFailed"));
+    } catch (caught) {
+      handleRegistrationError(caught, t("registration.messages.startFailed"));
     } finally {
       setLoading(false);
     }
@@ -124,8 +126,8 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
       setMessage(t("registration.messages.resetCodeSent"));
       window.history.pushState({}, document.title, next.pathname + next.search);
       window.dispatchEvent(new Event("popstate"));
-    } catch {
-      setMessage(t("registration.messages.resetStartFailed"));
+    } catch (caught) {
+      handleRegistrationError(caught, t("registration.messages.resetStartFailed"));
     } finally {
       setLoading(false);
     }
@@ -148,8 +150,8 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
       setNewPassword("");
       setNewPasswordConfirm("");
       setMessage(t("registration.messages.passwordReset"));
-    } catch {
-      setMessage(t("registration.messages.resetFailed"));
+    } catch (caught) {
+      handleRegistrationError(caught, t("registration.messages.resetFailed"));
     } finally {
       setLoading(false);
     }
@@ -165,11 +167,19 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
         returnTo: initialReturnTo || undefined,
       });
       setMessage(t("registration.messages.resent"));
-    } catch {
-      setMessage(t("registration.messages.resendFailed"));
+    } catch (caught) {
+      handleRegistrationError(caught, t("registration.messages.resendFailed"));
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleRegistrationError(caught: unknown, fallbackMessage: string) {
+    if (isRegistrationRateLimitError(caught)) {
+      setRateLimitDialogOpen(true);
+      return;
+    }
+    setMessage(fallbackMessage);
   }
 
   return (
@@ -341,7 +351,55 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
           </div>
         </section>
       </section>
+      <RegistrationRateLimitDialog
+        body={t("registration.rateLimit.body")}
+        closeLabel={t("common.actions.close")}
+        onClose={() => setRateLimitDialogOpen(false)}
+        open={rateLimitDialogOpen}
+        title={t("registration.rateLimit.title")}
+      />
     </main>
+  );
+}
+
+export function RegistrationRateLimitDialog({
+  body,
+  closeLabel,
+  onClose,
+  open,
+  title,
+}: {
+  body: string;
+  closeLabel: string;
+  onClose: () => void;
+  open: boolean;
+  title: string;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 px-4 py-6">
+      <div
+        aria-labelledby="registration-rate-limit-title"
+        aria-modal="true"
+        className="grid w-full max-w-md gap-4 rounded-[1.5rem] border border-border bg-background p-5 text-foreground shadow-xl"
+        role="dialog"
+      >
+        <div className="grid gap-2">
+          <h2 className="text-xl font-extrabold" id="registration-rate-limit-title">
+            {title}
+          </h2>
+          <p className="text-sm font-semibold leading-6 text-muted-foreground">{body}</p>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={onClose} type="button">
+            {closeLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

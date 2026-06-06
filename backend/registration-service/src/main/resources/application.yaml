@@ -39,7 +39,7 @@ playsay:
     password-reset-max-attempts: ${PLAYSAY_REGISTRATION_PASSWORD_RESET_MAX_ATTEMPTS:5}
     rate-limit:
       window-seconds: ${PLAYSAY_REGISTRATION_RATE_LIMIT_WINDOW_SECONDS:3600}
-      max-per-email: ${PLAYSAY_REGISTRATION_RATE_LIMIT_MAX_PER_EMAIL:5}
+      max-per-email: ${PLAYSAY_REGISTRATION_RATE_LIMIT_MAX_PER_EMAIL:20}
       max-per-ip: ${PLAYSAY_REGISTRATION_RATE_LIMIT_MAX_PER_IP:30}
     keycloak:
       base-url: ${PLAYSAY_KEYCLOAK_BASE_URL:https://ops.play-and-say.ru:18443/keycloak}

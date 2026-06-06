@@ -11,6 +11,7 @@ import {
   type ResendRegistrationRequest,
   type StartRegistrationRequest,
 } from "../../generated/registration-api";
+import { ApiError, isApiStatus } from "./errors";
 
 export type RegistrationStartInput = StartRegistrationRequest;
 export type RegistrationResendInput = ResendRegistrationRequest;
@@ -22,7 +23,7 @@ export type RegistrationResult = RegistrationResponse;
 export async function startRegistrationRequest(input: RegistrationStartInput): Promise<RegistrationResult> {
   const response = await startRegistration(input);
   if (response.status !== 202) {
-    throw new Error(`Registration failed with HTTP ${response.status}.`);
+    throw registrationRequestError(response.status, `Registration failed with HTTP ${response.status}.`);
   }
   return response.data;
 }
@@ -30,7 +31,7 @@ export async function startRegistrationRequest(input: RegistrationStartInput): P
 export async function resendRegistrationRequest(input: RegistrationResendInput): Promise<RegistrationResult> {
   const response = await resendRegistration(input);
   if (response.status !== 202) {
-    throw new Error(`Registration resend failed with HTTP ${response.status}.`);
+    throw registrationRequestError(response.status, `Registration resend failed with HTTP ${response.status}.`);
   }
   return response.data;
 }
@@ -38,7 +39,7 @@ export async function resendRegistrationRequest(input: RegistrationResendInput):
 export async function confirmRegistrationRequest(input: RegistrationConfirmInput): Promise<RegistrationResult> {
   const response = await confirmRegistration(input);
   if (response.status !== 200) {
-    throw new Error(`Registration confirmation failed with HTTP ${response.status}.`);
+    throw registrationRequestError(response.status, `Registration confirmation failed with HTTP ${response.status}.`);
   }
   return response.data;
 }
@@ -46,7 +47,7 @@ export async function confirmRegistrationRequest(input: RegistrationConfirmInput
 export async function forgotPasswordRequest(input: ForgotPasswordInput): Promise<RegistrationResult> {
   const response = await forgotPassword(input);
   if (response.status !== 202) {
-    throw new Error(`Password reset request failed with HTTP ${response.status}.`);
+    throw registrationRequestError(response.status, `Password reset request failed with HTTP ${response.status}.`);
   }
   return response.data;
 }
@@ -54,7 +55,19 @@ export async function forgotPasswordRequest(input: ForgotPasswordInput): Promise
 export async function resetPasswordRequest(input: ResetPasswordInput): Promise<RegistrationResult> {
   const response = await resetPassword(input);
   if (response.status !== 200) {
-    throw new Error(`Password reset failed with HTTP ${response.status}.`);
+    throw registrationRequestError(response.status, `Password reset failed with HTTP ${response.status}.`);
   }
   return response.data;
+}
+
+export function isRegistrationRateLimitError(caught: unknown): boolean {
+  return isApiStatus(caught, 429);
+}
+
+function registrationRequestError(status: number, message: string): ApiError {
+  return new ApiError(
+    status,
+    status === 429 ? "REGISTRATION_RATE_LIMITED" : "REGISTRATION_REQUEST_FAILED",
+    message,
+  );
 }

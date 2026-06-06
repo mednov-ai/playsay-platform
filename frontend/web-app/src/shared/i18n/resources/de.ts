@@ -86,6 +86,10 @@ export const de = {
       resetFailed: "Das Passwort konnte nicht geändert werden. Prüfen Sie Code und neues Passwort.",
       passwordReset: "Passwort geändert. Sie können sich jetzt anmelden.",
     },
+    rateLimit: {
+      title: "Zu viele Versuche",
+      body: "Wir haben den E-Mail-Versand für diese Adresse oder dieses Gerät vorübergehend begrenzt. Bitte warten Sie kurz und versuchen Sie es erneut.",
+    },
   },
   welcome: {
     logoLinkAria: "Hauptwebsite von Play&Say öffnen",

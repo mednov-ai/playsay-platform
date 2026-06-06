@@ -86,6 +86,10 @@ export const en = {
       resetFailed: "Could not reset the password. Check the code and the new password.",
       passwordReset: "Password changed. You can sign in now.",
     },
+    rateLimit: {
+      title: "Too many attempts",
+      body: "We temporarily limited email sending for this address or device. Please wait a little and try again.",
+    },
   },
   welcome: {
     logoLinkAria: "Open the main Play&Say website",

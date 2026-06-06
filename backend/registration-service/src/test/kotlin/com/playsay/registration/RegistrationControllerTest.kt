@@ -64,6 +64,7 @@ class RegistrationControllerTest @Autowired constructor(
     }
 
     private val httpClient = HttpClient.newHttpClient()
+    private var requestIpCounter = 0
 
     @BeforeAll
     fun migrateDatabase() {
@@ -286,13 +287,13 @@ class RegistrationControllerTest @Autowired constructor(
     fun `start is rate limited per email with generic responses before the limit`() {
         val email = "limited@example.com"
 
-        repeat(5) {
-            val response = startRegistration(email)
+        repeat(20) { index ->
+            val response = startRegistration(email, forwardedFor = "203.0.113.${index + 1}")
             assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
             assertTrue(response.body().contains("CHECK_EMAIL"))
         }
 
-        val limited = startRegistration(email)
+        val limited = startRegistration(email, forwardedFor = "203.0.113.250")
         assertEquals(HttpStatus.TOO_MANY_REQUESTS.value(), limited.statusCode())
     }
 
@@ -308,7 +309,7 @@ class RegistrationControllerTest @Autowired constructor(
         }
     }
 
-    private fun startRegistration(email: String, forwardedFor: String? = null): HttpResponse<String> =
+    private fun startRegistration(email: String, forwardedFor: String? = nextForwardedFor()): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
                 .header("content-type", "application/json")
@@ -320,7 +321,11 @@ class RegistrationControllerTest @Autowired constructor(
             HttpResponse.BodyHandlers.ofString(),
         )
 
-    private fun startRegistration(email: String, password: String, forwardedFor: String? = null): HttpResponse<String> =
+    private fun startRegistration(
+        email: String,
+        password: String,
+        forwardedFor: String? = nextForwardedFor(),
+    ): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
                 .header("content-type", "application/json")
@@ -332,10 +337,13 @@ class RegistrationControllerTest @Autowired constructor(
             HttpResponse.BodyHandlers.ofString(),
         )
 
-    private fun resendRegistration(email: String): HttpResponse<String> =
+    private fun resendRegistration(email: String, forwardedFor: String? = nextForwardedFor()): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/resend"))
                 .header("content-type", "application/json")
+                .apply {
+                    forwardedFor?.let { header("X-Forwarded-For", it) }
+                }
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
                         """{"email":"$email","locale":"en","returnTo":"https://key.play-and-say.ru/"}""",
@@ -354,10 +362,13 @@ class RegistrationControllerTest @Autowired constructor(
             HttpResponse.BodyHandlers.ofString(),
         )
 
-    private fun forgotPassword(email: String): HttpResponse<String> =
+    private fun forgotPassword(email: String, forwardedFor: String? = nextForwardedFor()): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/forgot-password"))
                 .header("content-type", "application/json")
+                .apply {
+                    forwardedFor?.let { header("X-Forwarded-For", it) }
+                }
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
                         """{"email":"$email","locale":"en","returnTo":"https://key.play-and-say.ru/"}""",
@@ -367,10 +378,18 @@ class RegistrationControllerTest @Autowired constructor(
             HttpResponse.BodyHandlers.ofString(),
         )
 
-    private fun resetPassword(email: String, code: String, newPassword: String): HttpResponse<String> =
+    private fun resetPassword(
+        email: String,
+        code: String,
+        newPassword: String,
+        forwardedFor: String? = nextForwardedFor(),
+    ): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/reset-password"))
                 .header("content-type", "application/json")
+                .apply {
+                    forwardedFor?.let { header("X-Forwarded-For", it) }
+                }
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
                         """{"email":"$email","code":"$code","newPassword":"$newPassword"}""",
@@ -390,6 +409,13 @@ class RegistrationControllerTest @Autowired constructor(
     private fun pendingRegistration(email: String) =
         pendingRegistrationRepo.findFirstByEmailNormalizedAndStatusOrderByCreatedAtDesc(email, "PENDING")
             ?: error("Pending registration was not saved for $email")
+
+    private fun nextForwardedFor(): String {
+        requestIpCounter += 1
+        val thirdOctet = 2 + (requestIpCounter / 250)
+        val fourthOctet = 1 + (requestIpCounter % 250)
+        return "192.0.$thirdOctet.$fourthOctet"
+    }
 
     private fun startRegistrationBody(
         email: String = "student@example.com",

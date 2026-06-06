@@ -86,6 +86,10 @@ export const fr = {
       resetFailed: "Impossible de changer le mot de passe. Vérifiez le code et le nouveau mot de passe.",
       passwordReset: "Mot de passe modifié. Vous pouvez vous connecter.",
     },
+    rateLimit: {
+      title: "Trop de tentatives",
+      body: "Nous avons temporairement limité l'envoi d'emails pour cette adresse ou cet appareil. Patientez un peu, puis réessayez.",
+    },
   },
   welcome: {
     logoLinkAria: "Ouvrir le site principal Play&Say",

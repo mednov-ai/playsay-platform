@@ -574,71 +574,6 @@ export interface CreateCollaborationDocumentRequest {
   scope: CreateCollaborationDocumentRequestScope;
 }
 
-export interface StartRegistrationRequest {
-  /**
-     * @minLength 0
-     * @maxLength 320
-     */
-  email: string;
-  /**
-     * @minLength 8
-     * @maxLength 200
-     */
-  password: string;
-  /**
-     * @minLength 0
-     * @maxLength 120
-     * @nullable
-     */
-  displayName?: string | null;
-  /**
-     * @minLength 0
-     * @maxLength 16
-     * @nullable
-     */
-  locale?: string | null;
-  /**
-     * @minLength 0
-     * @maxLength 1024
-     * @nullable
-     */
-  returnTo?: string | null;
-}
-
-export interface RegistrationResponse {
-  status: string;
-  /** @nullable */
-  continueUrl?: string | null;
-}
-
-export interface ResendRegistrationRequest {
-  /**
-     * @minLength 0
-     * @maxLength 320
-     */
-  email: string;
-  /**
-     * @minLength 0
-     * @maxLength 16
-     * @nullable
-     */
-  locale?: string | null;
-  /**
-     * @minLength 0
-     * @maxLength 1024
-     * @nullable
-     */
-  returnTo?: string | null;
-}
-
-export interface ConfirmRegistrationRequest {
-  /**
-     * @minLength 0
-     * @maxLength 255
-     */
-  token: string;
-}
-
 export interface PublicPaymentCheckoutResponse {
   confirmationUrl: string;
 }
@@ -902,6 +837,109 @@ export interface HomeworkAssignmentRequest {
   instructions?: string | null;
   /** @nullable */
   dueAt?: string | null;
+}
+
+export interface StartRegistrationRequest {
+  /**
+     * @minLength 0
+     * @maxLength 320
+     */
+  email: string;
+  /**
+     * @minLength 8
+     * @maxLength 128
+     */
+  password: string;
+  /**
+     * @minLength 0
+     * @maxLength 120
+     * @nullable
+     */
+  displayName?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 16
+     * @nullable
+     */
+  locale?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 1024
+     * @nullable
+     */
+  returnTo?: string | null;
+}
+
+export interface RegistrationResponse {
+  status: string;
+  /** @nullable */
+  continueUrl?: string | null;
+}
+
+export interface ResetPasswordRequest {
+  /**
+     * @minLength 0
+     * @maxLength 320
+     */
+  email: string;
+  /**
+     * @minLength 6
+     * @maxLength 12
+     */
+  code: string;
+  /**
+     * @minLength 8
+     * @maxLength 128
+     */
+  newPassword: string;
+}
+
+export interface ResendRegistrationRequest {
+  /**
+     * @minLength 0
+     * @maxLength 320
+     */
+  email: string;
+  /**
+     * @minLength 0
+     * @maxLength 16
+     * @nullable
+     */
+  locale?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 1024
+     * @nullable
+     */
+  returnTo?: string | null;
+}
+
+export interface ForgotPasswordRequest {
+  /**
+     * @minLength 0
+     * @maxLength 320
+     */
+  email: string;
+  /**
+     * @minLength 0
+     * @maxLength 16
+     * @nullable
+     */
+  locale?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 1024
+     * @nullable
+     */
+  returnTo?: string | null;
+}
+
+export interface ConfirmRegistrationRequest {
+  /**
+     * @minLength 0
+     * @maxLength 255
+     */
+  token: string;
 }
 
 export interface MaterialAssetUpdateRequest {
@@ -2884,126 +2922,6 @@ export const createCurrentCollaborationDocument = async (lessonId: string,
 
 
 
-export type startResponse202 = {
-  data: RegistrationResponse
-  status: 202
-}
-
-export type startResponseSuccess = (startResponse202) & {
-  headers: Headers;
-};
-;
-
-export type startResponse = (startResponseSuccess)
-
-export const getStartUrl = () => {
-
-
-
-
-  return `/api/registration/start`
-}
-
-export const start = async (startRegistrationRequest: StartRegistrationRequest, options?: RequestInit): Promise<startResponse> => {
-
-  const res = await fetch(getStartUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(startRegistrationRequest)
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: startResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as startResponse
-}
-
-
-
-export type resendResponse202 = {
-  data: RegistrationResponse
-  status: 202
-}
-
-export type resendResponseSuccess = (resendResponse202) & {
-  headers: Headers;
-};
-;
-
-export type resendResponse = (resendResponseSuccess)
-
-export const getResendUrl = () => {
-
-
-
-
-  return `/api/registration/resend`
-}
-
-export const resend = async (resendRegistrationRequest: ResendRegistrationRequest, options?: RequestInit): Promise<resendResponse> => {
-
-  const res = await fetch(getResendUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(resendRegistrationRequest)
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: resendResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as resendResponse
-}
-
-
-
-export type confirmResponse200 = {
-  data: RegistrationResponse
-  status: 200
-}
-
-export type confirmResponseSuccess = (confirmResponse200) & {
-  headers: Headers;
-};
-;
-
-export type confirmResponse = (confirmResponseSuccess)
-
-export const getConfirmUrl = () => {
-
-
-
-
-  return `/api/registration/confirm`
-}
-
-export const confirm = async (confirmRegistrationRequest: ConfirmRegistrationRequest, options?: RequestInit): Promise<confirmResponse> => {
-
-  const res = await fetch(getConfirmUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(confirmRegistrationRequest)
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: confirmResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as confirmResponse
-}
-
-
-
 export type createPublicCheckoutResponse200 = {
   data: PublicPaymentCheckoutResponse
   status: 200
@@ -4054,6 +3972,406 @@ export const createHomeworkAssignment = async (homeworkAssignmentRequest: Homewo
 
   const data: createHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createHomeworkAssignmentResponse
+}
+
+
+
+export type startResponse202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type startResponseSuccess = (startResponse202) & {
+  headers: Headers;
+};
+;
+
+export type startResponse = (startResponseSuccess)
+
+export const getStartUrl = () => {
+
+
+
+
+  return `/api/api/registration/start`
+}
+
+export const start = async (startRegistrationRequest: StartRegistrationRequest, options?: RequestInit): Promise<startResponse> => {
+
+  const res = await fetch(getStartUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(startRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: startResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as startResponse
+}
+
+
+
+export type start1Response202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type start1ResponseSuccess = (start1Response202) & {
+  headers: Headers;
+};
+;
+
+export type start1Response = (start1ResponseSuccess)
+
+export const getStart1Url = () => {
+
+
+
+
+  return `/api/registration/start`
+}
+
+export const start1 = async (startRegistrationRequest: StartRegistrationRequest, options?: RequestInit): Promise<start1Response> => {
+
+  const res = await fetch(getStart1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(startRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: start1Response['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as start1Response
+}
+
+
+
+export type resetPasswordResponse200 = {
+  data: RegistrationResponse
+  status: 200
+}
+
+export type resetPasswordResponseSuccess = (resetPasswordResponse200) & {
+  headers: Headers;
+};
+;
+
+export type resetPasswordResponse = (resetPasswordResponseSuccess)
+
+export const getResetPasswordUrl = () => {
+
+
+
+
+  return `/api/registration/reset-password`
+}
+
+export const resetPassword = async (resetPasswordRequest: ResetPasswordRequest, options?: RequestInit): Promise<resetPasswordResponse> => {
+
+  const res = await fetch(getResetPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resetPasswordRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resetPasswordResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resetPasswordResponse
+}
+
+
+
+export type resetPassword1Response200 = {
+  data: RegistrationResponse
+  status: 200
+}
+
+export type resetPassword1ResponseSuccess = (resetPassword1Response200) & {
+  headers: Headers;
+};
+;
+
+export type resetPassword1Response = (resetPassword1ResponseSuccess)
+
+export const getResetPassword1Url = () => {
+
+
+
+
+  return `/api/api/registration/reset-password`
+}
+
+export const resetPassword1 = async (resetPasswordRequest: ResetPasswordRequest, options?: RequestInit): Promise<resetPassword1Response> => {
+
+  const res = await fetch(getResetPassword1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resetPasswordRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resetPassword1Response['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resetPassword1Response
+}
+
+
+
+export type resendResponse202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type resendResponseSuccess = (resendResponse202) & {
+  headers: Headers;
+};
+;
+
+export type resendResponse = (resendResponseSuccess)
+
+export const getResendUrl = () => {
+
+
+
+
+  return `/api/api/registration/resend`
+}
+
+export const resend = async (resendRegistrationRequest: ResendRegistrationRequest, options?: RequestInit): Promise<resendResponse> => {
+
+  const res = await fetch(getResendUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resendRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resendResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resendResponse
+}
+
+
+
+export type resend1Response202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type resend1ResponseSuccess = (resend1Response202) & {
+  headers: Headers;
+};
+;
+
+export type resend1Response = (resend1ResponseSuccess)
+
+export const getResend1Url = () => {
+
+
+
+
+  return `/api/registration/resend`
+}
+
+export const resend1 = async (resendRegistrationRequest: ResendRegistrationRequest, options?: RequestInit): Promise<resend1Response> => {
+
+  const res = await fetch(getResend1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resendRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resend1Response['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resend1Response
+}
+
+
+
+export type forgotPasswordResponse202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type forgotPasswordResponseSuccess = (forgotPasswordResponse202) & {
+  headers: Headers;
+};
+;
+
+export type forgotPasswordResponse = (forgotPasswordResponseSuccess)
+
+export const getForgotPasswordUrl = () => {
+
+
+
+
+  return `/api/api/registration/forgot-password`
+}
+
+export const forgotPassword = async (forgotPasswordRequest: ForgotPasswordRequest, options?: RequestInit): Promise<forgotPasswordResponse> => {
+
+  const res = await fetch(getForgotPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(forgotPasswordRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: forgotPasswordResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as forgotPasswordResponse
+}
+
+
+
+export type forgotPassword1Response202 = {
+  data: RegistrationResponse
+  status: 202
+}
+
+export type forgotPassword1ResponseSuccess = (forgotPassword1Response202) & {
+  headers: Headers;
+};
+;
+
+export type forgotPassword1Response = (forgotPassword1ResponseSuccess)
+
+export const getForgotPassword1Url = () => {
+
+
+
+
+  return `/api/registration/forgot-password`
+}
+
+export const forgotPassword1 = async (forgotPasswordRequest: ForgotPasswordRequest, options?: RequestInit): Promise<forgotPassword1Response> => {
+
+  const res = await fetch(getForgotPassword1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(forgotPasswordRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: forgotPassword1Response['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as forgotPassword1Response
+}
+
+
+
+export type confirmResponse200 = {
+  data: RegistrationResponse
+  status: 200
+}
+
+export type confirmResponseSuccess = (confirmResponse200) & {
+  headers: Headers;
+};
+;
+
+export type confirmResponse = (confirmResponseSuccess)
+
+export const getConfirmUrl = () => {
+
+
+
+
+  return `/api/api/registration/confirm`
+}
+
+export const confirm = async (confirmRegistrationRequest: ConfirmRegistrationRequest, options?: RequestInit): Promise<confirmResponse> => {
+
+  const res = await fetch(getConfirmUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(confirmRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: confirmResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as confirmResponse
+}
+
+
+
+export type confirm1Response200 = {
+  data: RegistrationResponse
+  status: 200
+}
+
+export type confirm1ResponseSuccess = (confirm1Response200) & {
+  headers: Headers;
+};
+;
+
+export type confirm1Response = (confirm1ResponseSuccess)
+
+export const getConfirm1Url = () => {
+
+
+
+
+  return `/api/registration/confirm`
+}
+
+export const confirm1 = async (confirmRegistrationRequest: ConfirmRegistrationRequest, options?: RequestInit): Promise<confirm1Response> => {
+
+  const res = await fetch(getConfirm1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(confirmRegistrationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: confirm1Response['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as confirm1Response
 }
 
 

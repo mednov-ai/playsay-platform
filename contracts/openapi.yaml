@@ -1558,6 +1558,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RegistrationResponse"
+  /registration/reset-password:
+    post:
+      tags:
+      - registration-controller
+      operationId: resetPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+  /api/registration/reset-password:
+    post:
+      tags:
+      - registration-controller
+      operationId: resetPassword_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
   /api/registration/resend:
     post:
       tags:
@@ -1586,6 +1622,42 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ResendRegistrationRequest"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+  /api/registration/forgot-password:
+    post:
+      tags:
+      - registration-controller
+      operationId: forgotPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+  /registration/forgot-password:
+    post:
+      tags:
+      - registration-controller
+      operationId: forgotPassword_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
         required: true
       responses:
         "202":
@@ -3676,7 +3748,7 @@ components:
           minLength: 0
         password:
           type: string
-          maxLength: 200
+          maxLength: 128
           minLength: 8
         displayName:
           type:
@@ -3710,7 +3782,49 @@ components:
           - "null"
       required:
       - status
+    ResetPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          minLength: 0
+        code:
+          type: string
+          maxLength: 12
+          minLength: 6
+        newPassword:
+          type: string
+          maxLength: 128
+          minLength: 8
+      required:
+      - code
+      - email
+      - newPassword
     ResendRegistrationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          minLength: 0
+        locale:
+          type:
+          - string
+          - "null"
+          maxLength: 16
+          minLength: 0
+        returnTo:
+          type:
+          - string
+          - "null"
+          maxLength: 1024
+          minLength: 0
+      required:
+      - email
+    ForgotPasswordRequest:
       type: object
       properties:
         email:

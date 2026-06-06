@@ -36,6 +36,12 @@ import org.springframework.http.HttpStatus
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=true",
         "playsay.registration.public-base-url=https://online.play-and-say.ru",
+        "playsay.registration.keycloak.base-url=http://127.0.0.1:18080",
+        "playsay.registration.keycloak.realm=playsay-dev",
+        "playsay.registration.keycloak.client-id=playsay-registration-service",
+        "playsay.registration.keycloak.client-secret=test-secret",
+        "playsay.registration.email-service.base-url=http://127.0.0.1:18086",
+        "playsay.registration.email-service.service-token=test-token",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

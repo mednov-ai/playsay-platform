@@ -10,19 +10,14 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
-import org.springframework.stereotype.Component
 
-@Component
-@ConditionalOnMissingBean(KeycloakRegistrationClient::class)
 class KeycloakAdminRegistrationClient(
     private val httpClient: HttpClient,
     private val objectMapper: ObjectMapper,
-    @param:Value("\${playsay.registration.keycloak.base-url}") private val keycloakBaseUrl: String,
-    @param:Value("\${playsay.registration.keycloak.realm}") private val realm: String,
-    @param:Value("\${playsay.registration.keycloak.client-id}") private val clientId: String,
-    @param:Value("\${playsay.registration.keycloak.client-secret}") private val clientSecret: String,
+    private val keycloakBaseUrl: String,
+    private val realm: String,
+    private val clientId: String,
+    private val clientSecret: String,
 ) : KeycloakRegistrationClient {
     override fun createDisabledUser(command: KeycloakUserCreateCommand): Boolean {
         val payload = mapOf(

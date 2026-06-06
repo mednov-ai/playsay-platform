@@ -99,6 +99,15 @@ export const fr: TranslationResource = {
     levelUp: "Vous pouvez monter : précision et rythme sont prêts pour la série suivante.",
     steady: "Refaites cette série une fois et gardez le même rythme sans tension inutile.",
   },
+  scoreExplanation: {
+    ariaLabel: "Comment le résultat est calculé",
+    compact: "{{total}} pts · Rang {{grade}}",
+    visibleTitle: "Pourquoi ce score",
+    tooltipTitle: "Comment le résultat est calculé",
+    formula: "Score = précision {{accuracyWeight}}% + vitesse {{speedWeight}}% + cadence {{cadenceWeight}}%.",
+    current: "Cet exercice : précision {{accuracyScore}}%, vitesse {{speedScore}}%, cadence {{cadenceScore}}%.",
+    grades: "Barème : S {{sBand}}, A {{aBand}}, B {{bBand}}, C {{cBand}}, D {{dBand}}.",
+  },
   stats: {
     speed: "Vitesse",
     accuracy: "Précision",

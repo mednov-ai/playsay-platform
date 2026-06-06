@@ -1,4 +1,4 @@
-import { LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
+import { Info, LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
@@ -20,7 +20,7 @@ import { StatsPanel } from "../../features/stats/StatsPanel";
 import { shouldReloadActiveSetForLayout } from "../../features/typing/activeSetSync";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { chooseResultAdvice } from "../../features/typing/resultAdvice";
-import { computeCadence, computeScore } from "../../features/typing/scoring";
+import { computeCadence, computeScore, scoreGradeBands, scoreWeights } from "../../features/typing/scoring";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
 import {
   buildCanvasFont,
@@ -66,6 +66,20 @@ const emptyProgress: Progress = {
   avgAccuracy: 0,
   weakFingers: [],
   recent: [],
+};
+
+const scoreWeightPercents = {
+  accuracy: Math.round(scoreWeights.accuracy * 100),
+  speed: Math.round(scoreWeights.speed * 100),
+  cadence: Math.round(scoreWeights.cadence * 100),
+};
+
+const scoreGradeBandLabels = {
+  s: scoreGradeBands.find((band) => band.grade === "S")?.label ?? "90-100",
+  a: scoreGradeBands.find((band) => band.grade === "A")?.label ?? "80-89",
+  b: scoreGradeBands.find((band) => band.grade === "B")?.label ?? "70-79",
+  c: scoreGradeBands.find((band) => band.grade === "C")?.label ?? "55-69",
+  d: scoreGradeBands.find((band) => band.grade === "D")?.label ?? "0-54",
 };
 
 function focusLessonToChordSet(focusLesson: FocusLesson): ChordSet {
@@ -510,6 +524,31 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const score = sessionResult
     ? computeScore(sessionResult.speedCpm, sessionResult.accuracy, sessionResult.cadence)
     : null;
+  const scoreExplanationParams = score
+    ? {
+        total: score.total,
+        grade: score.grade,
+        accuracyWeight: scoreWeightPercents.accuracy,
+        speedWeight: scoreWeightPercents.speed,
+        cadenceWeight: scoreWeightPercents.cadence,
+        accuracyScore: Math.round(score.accuracyScore * 100),
+        speedScore: Math.round(score.speedScore * 100),
+        cadenceScore: Math.round(score.cadenceScore * 100),
+        sBand: scoreGradeBandLabels.s,
+        aBand: scoreGradeBandLabels.a,
+        bBand: scoreGradeBandLabels.b,
+        cBand: scoreGradeBandLabels.c,
+        dBand: scoreGradeBandLabels.d,
+      }
+    : null;
+  const scoreSummaryText = scoreExplanationParams ? t("scoreExplanation.compact", scoreExplanationParams) : null;
+  const scoreFormulaText = scoreExplanationParams ? t("scoreExplanation.formula", scoreExplanationParams) : null;
+  const scoreCurrentText = scoreExplanationParams ? t("scoreExplanation.current", scoreExplanationParams) : null;
+  const scoreGradesText = scoreExplanationParams ? t("scoreExplanation.grades", scoreExplanationParams) : null;
+  const scoreTooltipText =
+    scoreExplanationParams && scoreFormulaText && scoreCurrentText && scoreGradesText
+      ? `${t("scoreExplanation.tooltipTitle", scoreExplanationParams)}. ${scoreFormulaText} ${scoreCurrentText} ${scoreGradesText}`
+      : "";
   const resultAdvice = sessionResult
     ? chooseResultAdvice({
         accuracy: sessionResult.accuracy,
@@ -970,12 +1009,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 </>
               ) : saved && score ? (
                 <>
-                  <strong>{`${t("trainer.score")}: ${score.total} ${score.grade}`}</strong>
+                  <strong>{`${t("trainer.score")}: ${scoreSummaryText ?? `${score.total} ${score.grade}`}`}</strong>
                   <span>{t("trainer.saved")}</span>
                 </>
               ) : guestRecorded && score ? (
                 <>
-                  <strong>{`${t("trainer.score")}: ${score.total} ${score.grade}`}</strong>
+                  <strong>{`${t("trainer.score")}: ${scoreSummaryText ?? `${score.total} ${score.grade}`}`}</strong>
                   <span>{t("trainer.guestSaved")}</span>
                 </>
               ) : sessionFlow.phase === "finished" ? (
@@ -1038,7 +1077,25 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 <span className="result-card__eyebrow">{t("trainer.resultReady")}</span>
                 {score && sessionResult ? (
                   <>
-                    <strong className="result-card__score">{`${score.total} ${score.grade}`}</strong>
+                    <div className="result-card__score-row">
+                      <strong className="result-card__score">{scoreSummaryText}</strong>
+                      <span className="score-help-wrap">
+                        <button
+                          type="button"
+                          className="score-help"
+                          aria-label={t("scoreExplanation.ariaLabel")}
+                          title={scoreTooltipText}
+                        >
+                          <Info size={17} aria-hidden="true" />
+                        </button>
+                        <span className="score-help__tooltip" role="tooltip">
+                          <strong>{t("scoreExplanation.tooltipTitle", scoreExplanationParams ?? {})}</strong>
+                          <span>{scoreFormulaText}</span>
+                          <span>{scoreCurrentText}</span>
+                          <span>{scoreGradesText}</span>
+                        </span>
+                      </span>
+                    </div>
                     <div className="result-card__stats" aria-label={t("trainer.resultStats")}>
                       <span>
                         <small>{t("stats.speed")}</small>
@@ -1052,6 +1109,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                         <small>{t("stats.errors")}</small>
                         <b>{sessionResult.errors}</b>
                       </span>
+                    </div>
+                    <div className="result-card__score-explanation">
+                      <span>{t("scoreExplanation.visibleTitle")}</span>
+                      <p>{scoreFormulaText}</p>
+                      <p>{scoreCurrentText}</p>
                     </div>
                   </>
                 ) : null}

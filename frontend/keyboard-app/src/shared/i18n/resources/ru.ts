@@ -97,6 +97,15 @@ export const ru = {
     levelUp: "Можно идти выше: точность и ритм уже готовы к следующему набору.",
     steady: "Закрепите этот набор еще раз и постарайтесь сохранить тот же ритм без лишнего напряжения.",
   },
+  scoreExplanation: {
+    ariaLabel: "Как считается результат",
+    compact: "{{total}} баллов · Ранг {{grade}}",
+    visibleTitle: "Почему так",
+    tooltipTitle: "Как считается результат",
+    formula: "Балл = точность {{accuracyWeight}}% + скорость {{speedWeight}}% + каденс {{cadenceWeight}}%.",
+    current: "В этом упражнении: точность {{accuracyScore}}%, скорость {{speedScore}}%, каденс {{cadenceScore}}%.",
+    grades: "Шкала: S {{sBand}}, A {{aBand}}, B {{bBand}}, C {{cBand}}, D {{dBand}}.",
+  },
   stats: {
     speed: "Скорость",
     accuracy: "Точность",

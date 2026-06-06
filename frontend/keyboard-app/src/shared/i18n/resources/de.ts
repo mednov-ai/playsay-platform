@@ -99,6 +99,15 @@ export const de: TranslationResource = {
     levelUp: "Du kannst höher gehen: Genauigkeit und Rhythmus sind bereit für den nächsten Satz.",
     steady: "Wiederhole diesen Satz noch einmal und halte denselben Rhythmus ohne extra Spannung.",
   },
+  scoreExplanation: {
+    ariaLabel: "Wie das Ergebnis berechnet wird",
+    compact: "{{total}} Pkt. · Rang {{grade}}",
+    visibleTitle: "Warum dieses Ergebnis",
+    tooltipTitle: "Wie das Ergebnis berechnet wird",
+    formula: "Punkte = Genauigkeit {{accuracyWeight}}% + Tempo {{speedWeight}}% + Kadenz {{cadenceWeight}}%.",
+    current: "Diese Übung: Genauigkeit {{accuracyScore}}%, Tempo {{speedScore}}%, Kadenz {{cadenceScore}}%.",
+    grades: "Skala: S {{sBand}}, A {{aBand}}, B {{bBand}}, C {{cBand}}, D {{dBand}}.",
+  },
   stats: {
     speed: "Tempo",
     accuracy: "Genauigkeit",

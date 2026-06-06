@@ -104,18 +104,18 @@ class RegistrationSecurityTest @Autowired constructor(
 }
 
 private class AnonymousRegistrationGateway : RegistrationGateway {
-    override fun start(request: StartRegistrationRequest): RegistrationResponse =
+    override fun start(request: StartRegistrationRequest, clientAddress: String?): RegistrationResponse =
         RegistrationResponse(status = "CHECK_EMAIL")
 
-    override fun resend(request: ResendRegistrationRequest): RegistrationResponse =
+    override fun resend(request: ResendRegistrationRequest, clientAddress: String?): RegistrationResponse =
         RegistrationResponse(status = "CHECK_EMAIL")
 
     override fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse =
         RegistrationResponse(status = "CONFIRMED")
 
-    override fun forgotPassword(request: ForgotPasswordRequest): RegistrationResponse =
+    override fun forgotPassword(request: ForgotPasswordRequest, clientAddress: String?): RegistrationResponse =
         RegistrationResponse(status = "CHECK_EMAIL")
 
-    override fun resetPassword(request: ResetPasswordRequest): RegistrationResponse =
+    override fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse =
         RegistrationResponse(status = "PASSWORD_RESET")
 }

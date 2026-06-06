@@ -7,6 +7,7 @@ import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
 import com.playsay.gateway.service.RegistrationGateway
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -25,8 +26,11 @@ class RegistrationController(
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun start(@Valid @RequestBody request: StartRegistrationRequest): RegistrationResponse =
-        registrationGateway.start(request)
+    fun start(
+        @Valid @RequestBody request: StartRegistrationRequest,
+        servletRequest: HttpServletRequest,
+    ): RegistrationResponse =
+        registrationGateway.start(request, clientAddress(servletRequest))
 
     @PostMapping(
         path = ["/registration/resend", "/api/registration/resend"],
@@ -34,8 +38,11 @@ class RegistrationController(
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun resend(@Valid @RequestBody request: ResendRegistrationRequest): RegistrationResponse =
-        registrationGateway.resend(request)
+    fun resend(
+        @Valid @RequestBody request: ResendRegistrationRequest,
+        servletRequest: HttpServletRequest,
+    ): RegistrationResponse =
+        registrationGateway.resend(request, clientAddress(servletRequest))
 
     @PostMapping(
         path = ["/registration/confirm", "/api/registration/confirm"],
@@ -51,14 +58,30 @@ class RegistrationController(
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
     @ResponseStatus(HttpStatus.ACCEPTED)
-    fun forgotPassword(@Valid @RequestBody request: ForgotPasswordRequest): RegistrationResponse =
-        registrationGateway.forgotPassword(request)
+    fun forgotPassword(
+        @Valid @RequestBody request: ForgotPasswordRequest,
+        servletRequest: HttpServletRequest,
+    ): RegistrationResponse =
+        registrationGateway.forgotPassword(request, clientAddress(servletRequest))
 
     @PostMapping(
         path = ["/registration/reset-password", "/api/registration/reset-password"],
         consumes = [MediaType.APPLICATION_JSON_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
-    fun resetPassword(@Valid @RequestBody request: ResetPasswordRequest): RegistrationResponse =
-        registrationGateway.resetPassword(request)
+    fun resetPassword(
+        @Valid @RequestBody request: ResetPasswordRequest,
+        servletRequest: HttpServletRequest,
+    ): RegistrationResponse =
+        registrationGateway.resetPassword(request, clientAddress(servletRequest))
+
+    private fun clientAddress(request: HttpServletRequest): String? =
+        request.getHeader(xForwardedForHeader)?.takeIf { it.isNotBlank() }
+            ?: request.getHeader(xRealIpHeader)?.takeIf { it.isNotBlank() }
+            ?: request.remoteAddr?.takeIf { it.isNotBlank() }
+
+    private companion object {
+        const val xForwardedForHeader = "X-Forwarded-For"
+        const val xRealIpHeader = "X-Real-IP"
+    }
 }

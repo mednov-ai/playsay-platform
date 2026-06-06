@@ -142,6 +142,25 @@ class RegistrationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `existing disabled keycloak email receives a new confirmation token`() {
+        val email = "disabled-existing@example.com"
+        RecordingKeycloakRegistrationClient.existingUsers[email] = KeycloakRegistrationUser(
+            email = email,
+            enabled = false,
+            emailVerified = false,
+        )
+
+        val response = startRegistration(email, password = "NewRiver2026!")
+
+        assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+        assertTrue(response.body().contains("CHECK_EMAIL"))
+        assertTrue(RecordingKeycloakRegistrationClient.createdUsers.isEmpty())
+        assertEquals("NewRiver2026!", RecordingKeycloakRegistrationClient.updatedPasswords[email])
+        assertEquals(email, RecordingRegistrationEmailClient.registrationConfirmations.single().to)
+        assertTrue(pendingRegistration(email).expiresAt.isAfter(Instant.EPOCH))
+    }
+
+    @Test
     fun `registration start rejects weak passwords`() {
         val response = startRegistration(email = "weak@example.com", password = "password")
 
@@ -277,19 +296,37 @@ class RegistrationControllerTest @Autowired constructor(
         assertEquals(HttpStatus.TOO_MANY_REQUESTS.value(), limited.statusCode())
     }
 
-    private fun startRegistration(email: String): HttpResponse<String> =
+    @Test
+    fun `start rate limit uses forwarded client address instead of gateway remote address`() {
+        repeat(31) { index ->
+            val response = startRegistration(
+                email = "forwarded-$index@example.com",
+                forwardedFor = "198.51.100.$index",
+            )
+
+            assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+        }
+    }
+
+    private fun startRegistration(email: String, forwardedFor: String? = null): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
                 .header("content-type", "application/json")
+                .apply {
+                    forwardedFor?.let { header("X-Forwarded-For", it) }
+                }
                 .POST(HttpRequest.BodyPublishers.ofString(startRegistrationBody(email)))
                 .build(),
             HttpResponse.BodyHandlers.ofString(),
         )
 
-    private fun startRegistration(email: String, password: String): HttpResponse<String> =
+    private fun startRegistration(email: String, password: String, forwardedFor: String? = null): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
                 .header("content-type", "application/json")
+                .apply {
+                    forwardedFor?.let { header("X-Forwarded-For", it) }
+                }
                 .POST(HttpRequest.BodyPublishers.ofString(startRegistrationBody(email = email, password = password)))
                 .build(),
             HttpResponse.BodyHandlers.ofString(),

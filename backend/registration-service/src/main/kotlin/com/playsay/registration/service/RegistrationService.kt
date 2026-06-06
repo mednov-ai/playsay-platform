@@ -81,6 +81,13 @@ class RegistrationService(
             ),
         )
         if (!created) {
+            val user = keycloak.findUserByEmail(email)
+            if (user?.enabled == false) {
+                keycloak.updatePassword(email, command.password)
+                repo.saveAndFlush(pending)
+                emailClient.sendRegistrationConfirmation(pending.toEmailCommand(token))
+                return RegistrationResult(status = registrationStatusCheckEmail)
+            }
             sendPasswordResetForActiveUser(
                 email = email,
                 emailOriginal = command.email.trim(),

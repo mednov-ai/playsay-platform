@@ -11,6 +11,7 @@ import com.playsay.registration.service.RegistrationService
 import com.playsay.registration.service.ResetPasswordCommand
 import com.playsay.registration.service.ResendRegistrationCommand
 import com.playsay.registration.service.StartRegistrationCommand
+import com.playsay.registration.utils.ClientIpResolver
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/registration")
 class RegistrationController(
     private val registrationService: RegistrationService,
+    private val clientIpResolver: ClientIpResolver,
 ) {
     @PostMapping(
         "/start",
@@ -43,7 +45,7 @@ class RegistrationController(
                 displayName = request.displayName,
                 locale = request.locale,
                 returnTo = request.returnTo,
-                remoteAddress = servletRequest.remoteAddr,
+                remoteAddress = clientIpResolver.resolve(servletRequest),
             ),
         )
         return RegistrationResponse(status = result.status, continueUrl = result.continueUrl)
@@ -64,7 +66,7 @@ class RegistrationController(
                 email = request.email,
                 locale = request.locale,
                 returnTo = request.returnTo,
-                remoteAddress = servletRequest.remoteAddr,
+                remoteAddress = clientIpResolver.resolve(servletRequest),
             ),
         )
         return RegistrationResponse(status = result.status, continueUrl = result.continueUrl)
@@ -95,7 +97,7 @@ class RegistrationController(
                 email = request.email,
                 locale = request.locale,
                 returnTo = request.returnTo,
-                remoteAddress = servletRequest.remoteAddr,
+                remoteAddress = clientIpResolver.resolve(servletRequest),
             ),
         )
         return RegistrationResponse(status = result.status, continueUrl = result.continueUrl)
@@ -115,7 +117,7 @@ class RegistrationController(
                 email = request.email,
                 code = request.code,
                 newPassword = request.newPassword,
-                remoteAddress = servletRequest.remoteAddr,
+                remoteAddress = clientIpResolver.resolve(servletRequest),
             ),
         )
         return RegistrationResponse(status = result.status, continueUrl = result.continueUrl)

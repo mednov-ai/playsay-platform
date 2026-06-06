@@ -57,6 +57,8 @@ class UnisenderApiOutboundEmailSender(
         lineSequence().joinToString("<br>") { HtmlUtils.htmlEscape(it) }
 
     private data class UnisenderEmailSendRequest(
+        @get:JsonProperty("api_key")
+        @param:JsonProperty("api_key")
         val apiKey: String,
         @param:JsonProperty("user_id")
         val userId: Long,

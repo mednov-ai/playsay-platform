@@ -51,7 +51,7 @@ class UnisenderApiOutboundEmailSenderTest {
         )
 
         val body = requireNotNull(capturedBody)
-        assertTrue(body.contains(""""apiKey":"test-api-key""""))
+        assertTrue(body.contains(""""api_key":"test-api-key""""))
         assertTrue(body.contains(""""user_id":8236338"""))
         assertTrue(body.contains(""""from_email":"no-reply@play-and-say.ru""""))
         assertTrue(body.contains(""""from_name":"Play&Say""""))

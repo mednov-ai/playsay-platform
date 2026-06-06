@@ -43,5 +43,11 @@ logging:
 
 playsay:
   email-service:
+    delivery-provider: ${PLAYSAY_EMAIL_DELIVERY_PROVIDER:smtp}
     service-token: ${PLAYSAY_EMAIL_SERVICE_TOKEN:}
     from-address: ${PLAYSAY_EMAIL_FROM_ADDRESS:no-reply@play-and-say.ru}
+    from-name: ${PLAYSAY_EMAIL_FROM_NAME:Play&Say}
+    unisender:
+      api-base-url: ${PLAYSAY_EMAIL_UNISENDER_API_BASE_URL:https://goapi.unisender.ru/ru/transactional/api/v1}
+      user-id: ${PLAYSAY_EMAIL_UNISENDER_USER_ID:0}
+      api-key: ${PLAYSAY_EMAIL_UNISENDER_API_KEY:}

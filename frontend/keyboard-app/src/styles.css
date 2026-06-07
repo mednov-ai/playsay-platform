@@ -566,6 +566,213 @@ input {
   padding: 10px;
 }
 
+.trainer-layout--intro {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.trainer-surface--visible {
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  padding: clamp(18px, 4vw, 44px);
+}
+
+.trainer-intro {
+  display: grid;
+  justify-items: center;
+  width: min(820px, 100%);
+  gap: 14px;
+  text-align: center;
+}
+
+.trainer-intro__eyebrow,
+.trainer-intro__shortcut,
+.trainer-intro__meta {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.trainer-intro h1 {
+  max-width: 820px;
+  margin: 0;
+  color: var(--foreground);
+  font-size: clamp(36px, 5.2vw, 72px);
+  line-height: 0.98;
+}
+
+.trainer-intro p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(17px, 1.7vw, 23px);
+  font-weight: 700;
+  line-height: 1.42;
+}
+
+.trainer-intro__samples {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 2px 0;
+}
+
+.trainer-intro__sample {
+  display: inline-grid;
+  min-width: 58px;
+  min-height: 46px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  color: var(--primary);
+  font-size: 23px;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgb(255 92 0 / 0.08);
+}
+
+.trainer-intro__microcopy {
+  max-width: 620px;
+}
+
+.intro-play-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 62px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--primary);
+  color: white;
+  padding: 0 26px;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow:
+    0 16px 32px rgb(255 92 0 / 0.26),
+    0 0 0 8px rgb(255 92 0 / 0.08);
+  animation: intro-play-pulse 1.55s ease-in-out infinite;
+}
+
+.intro-play-button:hover,
+.intro-play-button:focus-visible {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.intro-play-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  animation: none;
+}
+
+.trainer-intro__shortcut {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.trainer-reveal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, rgb(255 92 0 / 0.16), transparent 42%),
+    linear-gradient(110deg, rgb(255 92 0 / 0.11), transparent 30%, rgb(17 17 17 / 0.05) 70%, transparent);
+  animation: trainer-reveal-overlay 0.68s ease-out both;
+}
+
+.trainer-reveal-arena {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  min-width: min(430px, calc(100vw - 56px));
+  min-height: 244px;
+  border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--line));
+  border-radius: 16px;
+  background:
+    linear-gradient(112deg, rgb(255 92 0 / 0.24), transparent 28%),
+    linear-gradient(292deg, rgb(17 17 17 / 0.09), transparent 35%),
+    color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--primary);
+  box-shadow:
+    0 22px 44px rgb(255 92 0 / 0.2),
+    inset 0 0 0 1px rgb(255 255 255 / 0.62);
+  isolation: isolate;
+  overflow: hidden;
+  padding: 28px 34px 24px;
+  text-align: center;
+  text-transform: uppercase;
+  animation: trainer-reveal-arena 0.68s cubic-bezier(0.18, 1.35, 0.26, 1) both;
+}
+
+.trainer-reveal-arena::before,
+.trainer-reveal-arena::after {
+  position: absolute;
+  z-index: -1;
+  content: "";
+}
+
+.trainer-reveal-arena::before {
+  inset: 0;
+  background:
+    repeating-linear-gradient(116deg, transparent 0 16px, rgb(255 92 0 / 0.18) 16px 18px),
+    linear-gradient(90deg, transparent, rgb(255 92 0 / 0.18), transparent);
+  animation: countdown-arena-sweep 0.68s ease-out both;
+}
+
+.trainer-reveal-arena::after {
+  right: -48px;
+  bottom: -88px;
+  width: 210px;
+  height: 210px;
+  border: 2px solid color-mix(in srgb, var(--primary) 38%, transparent);
+  border-radius: 999px;
+  animation: countdown-ring 0.68s ease-out both;
+}
+
+.trainer-reveal-arena svg {
+  filter: drop-shadow(0 16px 24px rgb(255 92 0 / 0.28));
+  animation: trainer-reveal-play 0.52s cubic-bezier(0.18, 1.45, 0.28, 1) both;
+}
+
+.trainer-reveal-arena .countdown-kicker,
+.trainer-reveal-arena .countdown-fight {
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.trainer-reveal-arena .countdown-fight {
+  min-height: 28px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: white;
+  padding: 3px 12px 4px;
+  box-shadow: 0 8px 18px rgb(255 92 0 / 0.28);
+}
+
+.trainer-surface--revealing .trainer-toolbar,
+.trainer-surface--revealing .stats-panel,
+.trainer-surface--revealing .trainer-footer {
+  animation: trainer-chrome-reveal 0.52s ease-out both;
+}
+
+.trainer-surface--revealing .typing-stage {
+  animation: typing-stage-reveal 0.62s cubic-bezier(0.18, 1.15, 0.3, 1) both;
+}
+
+.trainer-surface--revealing .virtual-keyboard {
+  animation: keyboard-reveal 0.62s cubic-bezier(0.18, 1.15, 0.3, 1) both;
+}
+
 .trainer-toolbar,
 .trainer-footer {
   display: flex;
@@ -1323,6 +1530,121 @@ input {
   }
 }
 
+@keyframes intro-play-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 16px 32px rgb(255 92 0 / 0.24),
+      0 0 0 8px rgb(255 92 0 / 0.08);
+  }
+
+  50% {
+    box-shadow:
+      0 18px 36px rgb(255 92 0 / 0.3),
+      0 0 0 13px rgb(255 92 0 / 0.11);
+  }
+}
+
+@keyframes trainer-reveal-overlay {
+  0% {
+    opacity: 0;
+  }
+
+  18%,
+  78% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes trainer-reveal-arena {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.9) skewX(-4deg);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.03) skewX(2deg);
+  }
+
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1) skewX(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+
+@keyframes trainer-reveal-play {
+  0% {
+    opacity: 0;
+    transform: scale(0.34) rotate(-8deg);
+  }
+
+  44% {
+    opacity: 1;
+    transform: scale(1.18) rotate(3deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes trainer-chrome-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typing-stage-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scaleX(0.92);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translateY(2px) scaleX(1.015);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleX(1);
+  }
+}
+
+@keyframes keyboard-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(34px) scale(0.98);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.005);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .registration-modal__close {
   position: absolute;
   top: 12px;
@@ -1457,6 +1779,35 @@ input {
     overflow: visible;
   }
 
+  .trainer-surface--visible {
+    min-height: calc(100dvh - 120px);
+    padding: 20px 14px;
+  }
+
+  .trainer-intro {
+    gap: 12px;
+  }
+
+  .trainer-intro h1 {
+    font-size: 34px;
+    line-height: 1.02;
+  }
+
+  .trainer-intro p {
+    font-size: 16px;
+  }
+
+  .trainer-intro__sample {
+    min-width: 48px;
+    min-height: 40px;
+    font-size: 20px;
+  }
+
+  .intro-play-button {
+    width: 100%;
+    min-height: 58px;
+  }
+
   .trainer-toolbar h1 {
     font-size: 24px;
   }
@@ -1478,6 +1829,12 @@ input {
   }
 
   .countdown-arena {
+    min-width: min(330px, calc(100vw - 28px));
+    min-height: 210px;
+    padding: 24px 22px 20px;
+  }
+
+  .trainer-reveal-arena {
     min-width: min(330px, calc(100vw - 28px));
     min-height: 210px;
     padding: 24px 22px 20px;

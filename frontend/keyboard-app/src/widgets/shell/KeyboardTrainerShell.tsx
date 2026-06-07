@@ -24,6 +24,13 @@ import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptiv
 import { chooseResultAdvice } from "../../features/typing/resultAdvice";
 import { computeCadence, computeScore, scoreGradeBands, scoreWeights } from "../../features/typing/scoring";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
+import {
+  initialTrainerIntroPhase,
+  isTrainerChromeVisible,
+  isTrainerIntroBlocking,
+  trainerIntroReducer,
+  trainerIntroRevealMs,
+} from "../../features/typing/trainerIntro";
 import { buildTrainingSubmitPayload } from "../../features/typing/trainingPayload";
 import {
   buildCanvasFont,
@@ -194,6 +201,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [guestRecorded, setGuestRecorded] = useState(false);
   const [nextDecision, setNextDecision] = useState<AdaptiveDecision | null>(null);
   const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
+  const [trainerIntroPhase, dispatchTrainerIntro] = useReducer(trainerIntroReducer, undefined, initialTrainerIntroPhase);
   const [typingLineCapacity, setTypingLineCapacity] = useState(typingWindowLineLength);
   const [typingMetrics, setTypingMetrics] = useState<TypingWidthMetrics | null>(null);
   const [restartVariant, setRestartVariant] = useState(0);
@@ -204,6 +212,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const visibleCapacityRef = useRef(visibleCapacity);
   const overlayCloseTimerRef = useRef<number | null>(null);
   const overlayCloseIdRef = useRef(0);
+  const trainerRevealTimerRef = useRef<number | null>(null);
   const profileSeed = me?.subject ?? anonymousDeviceId;
   const keyboardRegistrationUrl = registrationUrlForKeyboard(`${window.location.origin}/`);
 
@@ -235,6 +244,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     () => () => {
       if (overlayCloseTimerRef.current != null) {
         window.clearTimeout(overlayCloseTimerRef.current);
+      }
+      if (trainerRevealTimerRef.current != null) {
+        window.clearTimeout(trainerRevealTimerRef.current);
       }
     },
     [],
@@ -561,7 +573,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const suggestedMetronomeBpm = sessionResult ? suggestMetronomeBpm(intervals, sessionResult.cadence) : null;
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
+  const trainerIntroBlocking = isTrainerIntroBlocking(trainerIntroPhase);
+  const trainerChromeVisible = isTrainerChromeVisible(trainerIntroPhase);
   const isSessionLocked =
+    trainerIntroBlocking ||
     sessionFlow.phase === "countdown" ||
     sessionFlow.phase === "running" ||
     sessionFlow.phase === "paused" ||
@@ -640,6 +655,29 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
     dispatchSessionFlow({ type: "start" });
   }, [canStartSession, chordSet, clearSessionResult, layoutId, loadSet, materializePracticeSet, nextDecision, reset, sessionFlow.phase, sets, visibleCapacity]);
+
+  const revealTrainerAndStart = useCallback(() => {
+    if (trainerIntroPhase === "dismissed") {
+      startSession();
+      return;
+    }
+    if (trainerIntroPhase !== "visible" || !canStartSession) {
+      return;
+    }
+
+    setLoadError(null);
+    clearSessionResult();
+    dispatchTrainerIntro({ type: "startReveal" });
+
+    if (trainerRevealTimerRef.current != null) {
+      window.clearTimeout(trainerRevealTimerRef.current);
+    }
+    trainerRevealTimerRef.current = window.setTimeout(() => {
+      trainerRevealTimerRef.current = null;
+      dispatchTrainerIntro({ type: "completeReveal" });
+      startSession();
+    }, trainerIntroRevealMs);
+  }, [canStartSession, clearSessionResult, startSession, trainerIntroPhase]);
 
   const restartSession = useCallback(() => {
     if (!chordSet) {
@@ -765,6 +803,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         return;
       }
 
+      if (event.code === "Space" && trainerIntroPhase !== "dismissed" && !showRegistrationPrompt && !showNamePrompt) {
+        event.preventDefault();
+        revealTrainerAndStart();
+        return;
+      }
+
       if (event.code === "Space" && sessionFlow.phase === "countdown" && !showRegistrationPrompt && !showNamePrompt) {
         event.preventDefault();
         skipCountdown();
@@ -786,6 +830,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     dismissFinishOverlay,
     dismissNamePrompt,
     dismissPrompt,
+    revealTrainerAndStart,
     restartSession,
     resumeSession,
     sessionFlow.finishOverlayVisible,
@@ -794,6 +839,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     showRegistrationPrompt,
     skipCountdown,
     startSession,
+    trainerIntroPhase,
   ]);
 
   const startLabel = sessionFlow.phase === "finished" ? t("trainer.next") : t("trainer.start");
@@ -805,6 +851,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const renderPausedOverlay = sessionFlow.phase === "paused" || closingOverlay?.kind === "paused";
   const renderFinishedOverlay =
     (sessionFlow.phase === "finished" && sessionFlow.finishOverlayVisible) || closingOverlay?.kind === "finished";
+  const trainerLayoutClassName = `trainer-layout ${trainerIntroPhase !== "dismissed" ? "trainer-layout--intro" : ""}`;
+  const trainerSurfaceClassName = `trainer-surface trainer-surface--${trainerIntroPhase}`;
 
   return (
     <main className="keyboard-app">
@@ -847,7 +895,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         </div>
       </header>
 
-      <section className="trainer-layout">
+      <section className={trainerLayoutClassName}>
+        {trainerIntroPhase === "dismissed" ? (
         <aside className="side-panel">
           <div className="account-strip">
             <span>{accountLabel}</span>
@@ -938,8 +987,39 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             recent={effectiveProgress.recent}
           />
         </aside>
+        ) : null}
 
-        <section className="trainer-surface" aria-busy={loading || saving}>
+        <section className={trainerSurfaceClassName} aria-busy={loading || saving}>
+          {trainerIntroPhase === "visible" ? (
+            <div className="trainer-intro" aria-label={t("trainerIntro.ariaLabel")}>
+              <span className="trainer-intro__eyebrow">{t("trainerIntro.eyebrow")}</span>
+              <h1>{t("trainerIntro.title")}</h1>
+              <p>{t("trainerIntro.body")}</p>
+              <div className="trainer-intro__samples" aria-label={t("trainerIntro.samplesLabel")}>
+                {t("trainerIntro.samples")
+                  .split(" ")
+                  .map((sample) => (
+                    <span className="trainer-intro__sample" key={sample}>
+                      {sample}
+                    </span>
+                  ))}
+              </div>
+              <p className="trainer-intro__microcopy">{t("trainerIntro.microcopy")}</p>
+              <button
+                type="button"
+                className="intro-play-button"
+                onClick={revealTrainerAndStart}
+                disabled={!canStartSession}
+                aria-label={t("trainerIntro.startAria")}
+              >
+                <Play size={34} fill="currentColor" aria-hidden="true" />
+                <span>{t("trainerIntro.start")}</span>
+              </button>
+              <span className="trainer-intro__shortcut">{t("trainerIntro.shortcut")}</span>
+              <span className="trainer-intro__meta">{t("trainerIntro.meta")}</span>
+            </div>
+          ) : (
+            <>
           <div className="trainer-toolbar">
             <div>
               <span>{t("trainer.current")}</span>
@@ -950,7 +1030,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 type="button"
                 className="session-play-button"
                 onClick={startSession}
-                disabled={!canStartSession}
+                disabled={!canStartSession || trainerIntroPhase === "revealing"}
                 aria-label={t("trainer.playAria")}
                 title={t("trainer.playAria")}
               >
@@ -1157,6 +1237,18 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               </div>
             </div>
           ) : null}
+
+          {trainerIntroPhase === "revealing" && trainerChromeVisible ? (
+            <div className="trainer-reveal-overlay" role="presentation">
+              <div className="trainer-reveal-arena" aria-live="assertive" aria-label={t("trainerIntro.revealAria")}>
+                <span className="countdown-kicker">{t("trainerIntro.revealKicker")}</span>
+                <Play size={86} fill="currentColor" aria-hidden="true" />
+                <span className="countdown-fight">{t("trainerIntro.revealFight")}</span>
+              </div>
+            </div>
+          ) : null}
+            </>
+          )}
         </section>
       </section>
 

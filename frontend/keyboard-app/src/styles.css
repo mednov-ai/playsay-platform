@@ -327,6 +327,8 @@ input {
 }
 
 .keyboard-app {
+  --trainer-frame-width: 1368px;
+
   display: grid;
   height: 100dvh;
   min-height: 0;
@@ -337,6 +339,8 @@ input {
 }
 
 .app-header {
+  width: min(100%, var(--trainer-frame-width));
+  justify-self: center;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
@@ -362,7 +366,9 @@ input {
 
 .side-panel {
   display: grid;
+  width: min(100%, var(--trainer-frame-width));
   grid-template-columns: minmax(140px, 1fr) 120px minmax(220px, 1.3fr) minmax(390px, 2fr) minmax(160px, 0.8fr);
+  justify-self: center;
   align-items: end;
   gap: 8px;
   min-height: 0;
@@ -557,7 +563,10 @@ input {
 .trainer-surface {
   display: grid;
   position: relative;
+  width: min(100%, var(--trainer-frame-width));
   grid-template-rows: auto auto 128px auto auto;
+  justify-items: center;
+  justify-self: center;
   gap: 8px;
   min-width: 0;
   min-height: 0;
@@ -1325,12 +1334,20 @@ input {
   --key-gap: clamp(4px, 0.3vw, 6px);
   --key-height: 50px;
   width: 100%;
-  max-width: 1368px;
+  max-width: var(--trainer-frame-width);
   min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 6px);
   justify-self: center;
   overflow-x: auto;
   overflow-y: visible;
   padding: 2px 0 4px;
+}
+
+.trainer-toolbar,
+.stats-panel,
+.typing-stage,
+.virtual-keyboard,
+.trainer-footer {
+  width: min(100%, var(--trainer-frame-width));
 }
 
 .virtual-keyboard__row {

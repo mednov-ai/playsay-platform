@@ -3,6 +3,8 @@ export const ru = {
     title: "Play&Say Key",
     wordmark: "Play&Say",
     product: "Key",
+    publicSiteAria: "Открыть основной сайт Play&Say",
+    returnToSite: "Вернуться на сайт",
   },
   auth: {
     loading: "Проверяем вход",

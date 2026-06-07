@@ -1,3 +1,4 @@
+import { publicSiteUrl } from "@playsay/shared-ui";
 import { Info, LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -808,10 +809,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   return (
     <main className="keyboard-app">
       <header className="app-header">
-        <div className="brand-lockup" aria-label={t("app.title")}>
+        <a className="brand-lockup" href={publicSiteUrl} aria-label={t("app.publicSiteAria")}>
           <span>{t("app.wordmark")}</span>
           <strong>{t("app.product")}</strong>
-        </div>
+        </a>
         <div className="topbar-actions">
           <label className="language-select">
             <span>{t("language.label")}</span>
@@ -1212,6 +1213,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               <button type="button" className="secondary-button" onClick={dismissPrompt}>
                 <span>{t("trainer.continueGuest")}</span>
               </button>
+              <a className="registration-modal__site-link" href={publicSiteUrl}>
+                {t("app.returnToSite")}
+              </a>
             </div>
           </section>
         </div>

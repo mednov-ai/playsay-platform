@@ -1,4 +1,5 @@
 import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
+import { publicSiteUrl } from "@playsay/shared-ui";
 import { Loader2, LogIn, LogOut, User, UserPlus, Video } from "lucide-react";
 import { type WorkspaceTab, type WorkspaceTabDefinition } from "../entities/workspace/model";
 import type { CourseLessonMap } from "../entities/schedule/model";
@@ -42,7 +43,6 @@ import officialLogoUrl from "../shared/assets/playsay-official-logo.jpg";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
 import { useAppTheme } from "./AppProviders";
 
-const mainSiteUrl = "https://play-and-say.ru";
 const BillingPanel = lazy(() => import("../features/payments/ui/BillingPanel").then((module) => ({ default: module.BillingPanel })));
 const CourseWorkspacePanel = lazy(() => (
   import("../features/courses/ui/CourseWorkspacePanel").then((module) => ({ default: module.CourseWorkspacePanel }))
@@ -387,7 +387,7 @@ function PanelFallback() {
   return <div aria-hidden="true" className="min-h-40" />;
 }
 
-function WelcomeLanding({
+export function WelcomeLanding({
   profileSaving,
   status,
 }: {
@@ -426,7 +426,7 @@ function WelcomeLanding({
       </div>
 
       <div className="playsay-welcome-content">
-        <a className="playsay-welcome-logo-link" href={mainSiteUrl} aria-label={t("welcome.logoLinkAria")}>
+        <a className="playsay-welcome-logo-link" href={publicSiteUrl} aria-label={t("welcome.logoLinkAria")}>
           <PlaySayAnimatedLogo label={t("common.appName")} />
         </a>
         <div className="playsay-welcome-actions">
@@ -450,7 +450,7 @@ function WelcomeLanding({
             <UserPlus className="h-4 w-4" />
             <span>{t("registration.actions.create")}</span>
           </a>
-          <a className="playsay-welcome-return" href={mainSiteUrl}>
+          <a className="playsay-welcome-return" href={publicSiteUrl}>
             {t("welcome.returnToSite")}
           </a>
         </div>

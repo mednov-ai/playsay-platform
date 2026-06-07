@@ -1,3 +1,4 @@
+import { publicSiteUrl } from "@playsay/shared-ui";
 import { LogIn, RefreshCw } from "lucide-react";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
@@ -14,6 +15,7 @@ interface Props {
   title: string;
   wordmark: string;
   product: string;
+  publicSiteAriaLabel: string;
   signInLabel: string;
   loadingLabel: string;
   callbackLabel: string;
@@ -35,6 +37,7 @@ export function AuthGate({
   title,
   wordmark,
   product,
+  publicSiteAriaLabel,
   signInLabel,
   loadingLabel,
   callbackLabel,
@@ -49,10 +52,10 @@ export function AuthGate({
   return (
     <main className="auth-page">
       <div className="auth-page__topbar">
-        <div className="brand-lockup" aria-label={title}>
+        <a className="brand-lockup" href={publicSiteUrl} aria-label={publicSiteAriaLabel}>
           <span>{wordmark}</span>
           <strong>{product}</strong>
-        </div>
+        </a>
         <div className="topbar-actions">
           <label className="language-select">
             <span>{languageLabel}</span>

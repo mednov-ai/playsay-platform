@@ -1,3 +1,4 @@
+import { publicSiteUrl } from "@playsay/shared-ui";
 import { CheckCircle2, KeyRound, Loader2, Mail, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { startLogin } from "../../../shared/api/playsay";
@@ -17,8 +18,6 @@ import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
 import { useAppTheme } from "../../../app/AppProviders";
 import type { RegistrationRoute } from "../../../app/routes";
 import { checkPassword, type PasswordCheck, type PasswordIssue } from "../model/passwordPolicy";
-
-const mainSiteUrl = "https://play-and-say.ru";
 
 export function RegistrationPage({ route }: { route: RegistrationRoute }) {
   const { i18n, t } = useAppTranslation();
@@ -341,7 +340,7 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
               </form>
             ) : null}
 
-            <a className="mt-5 inline-flex text-sm font-extrabold text-primary" href={mainSiteUrl}>
+            <a className="mt-5 inline-flex text-sm font-extrabold text-primary" href={publicSiteUrl}>
               {t("welcome.returnToSite")}
             </a>
           </div>
@@ -361,6 +360,8 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
         continueLabel={t("registration.actions.checkEmailPage")}
         onClose={() => setStartSuccessHref(null)}
         open={startSuccessHref != null}
+        returnToSiteHref={publicSiteUrl}
+        returnToSiteLabel={t("welcome.returnToSite")}
         title={t("registration.startSuccess.title")}
       />
     </main>
@@ -374,6 +375,8 @@ export function RegistrationStartSuccessDialog({
   continueLabel,
   onClose,
   open,
+  returnToSiteHref,
+  returnToSiteLabel,
   title,
 }: {
   body: string;
@@ -382,6 +385,8 @@ export function RegistrationStartSuccessDialog({
   continueLabel: string;
   onClose: () => void;
   open: boolean;
+  returnToSiteHref: string;
+  returnToSiteLabel: string;
   title: string;
 }) {
   if (!open) {
@@ -403,6 +408,9 @@ export function RegistrationStartSuccessDialog({
           <p className="text-sm font-semibold leading-6 text-muted-foreground">{body}</p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
+          <a className="inline-flex h-10 items-center justify-center px-2 text-sm font-extrabold text-primary" href={returnToSiteHref}>
+            {returnToSiteLabel}
+          </a>
           <Button onClick={onClose} type="button" variant="outline">
             {closeLabel}
           </Button>

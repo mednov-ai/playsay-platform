@@ -5,6 +5,8 @@ export const en: TranslationResource = {
     title: "Play&Say Key",
     wordmark: "Play&Say",
     product: "Key",
+    publicSiteAria: "Open the main Play&Say website",
+    returnToSite: "Back to website",
   },
   auth: {
     loading: "Checking sign-in",

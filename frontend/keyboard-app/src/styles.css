@@ -103,6 +103,12 @@ input {
   gap: 8px;
   color: var(--foreground);
   font-weight: 800;
+  text-decoration: none;
+}
+
+.brand-lockup:hover,
+.brand-lockup:focus-visible {
+  color: var(--primary);
 }
 
 .brand-lockup span {
@@ -1338,8 +1344,24 @@ input {
 
 .registration-modal__actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.registration-modal__site-link {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.registration-modal__site-link:hover,
+.registration-modal__site-link:focus-visible {
+  color: var(--primary-hover);
 }
 
 .guest-name-field {

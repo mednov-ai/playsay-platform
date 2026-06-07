@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { publicSiteUrl } from "@playsay/shared-ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -45,6 +46,8 @@ describe("RegistrationStartSuccessDialog", () => {
       continueLabel: "Continue",
       onClose: vi.fn(),
       open: true,
+      returnToSiteHref: publicSiteUrl,
+      returnToSiteLabel: "Back to website",
       title: "Confirmation email sent",
     }));
 
@@ -52,6 +55,8 @@ describe("RegistrationStartSuccessDialog", () => {
     expect(markup).toContain("Confirmation email sent");
     expect(markup).toContain("Open your mailbox and confirm the account.");
     expect(markup).toContain("/register/check-email?email=student%40example.com&amp;returnTo=https%3A%2F%2Fkey.play-and-say.ru%2F");
+    expect(markup).toContain(`href="${publicSiteUrl}"`);
+    expect(markup).toContain("Back to website");
   });
 });
 

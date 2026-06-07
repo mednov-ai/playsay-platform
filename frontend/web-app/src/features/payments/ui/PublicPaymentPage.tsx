@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { publicSiteUrl } from "@playsay/shared-ui";
 import { CreditCard, Loader2 } from "lucide-react";
 import { startLogin, type PublicPaymentInvoice } from "../../../shared/api/playsay";
 import { createPublicPaymentCheckout, fetchPublicPaymentInvoice } from "../../../shared/api/payments";
@@ -8,8 +9,6 @@ import { BrandMark } from "../../../shared/ui/BrandMark";
 import { Button } from "../../../components/ui/button";
 import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
 import { useAppTheme } from "../../../app/AppProviders";
-
-const mainSiteUrl = "https://play-and-say.ru";
 
 export function PublicPaymentPage({ publicToken }: { publicToken: string }) {
   const { i18n, t } = useAppTranslation();
@@ -134,15 +133,21 @@ export function PublicPaymentPage({ publicToken }: { publicToken: string }) {
                 <div className="rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
                   {message ?? t("payments.messages.loadFailed")}
                 </div>
-                <a className="text-sm font-extrabold text-primary" href={mainSiteUrl}>
-                  {t("welcome.returnToSite")}
-                </a>
+                <PublicPaymentReturnLink label={t("welcome.returnToSite")} />
               </div>
             )}
           </div>
         </section>
       </section>
     </main>
+  );
+}
+
+export function PublicPaymentReturnLink({ label }: { label: string }) {
+  return (
+    <a className="text-sm font-extrabold text-primary" href={publicSiteUrl}>
+      {label}
+    </a>
   );
 }
 

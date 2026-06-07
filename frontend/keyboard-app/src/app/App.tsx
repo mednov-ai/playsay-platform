@@ -90,6 +90,7 @@ export function App() {
         title={t("app.title")}
         wordmark={t("app.wordmark")}
         product={t("app.product")}
+        publicSiteAriaLabel={t("app.publicSiteAria")}
         signInLabel={t("auth.signIn")}
         loadingLabel={t("auth.loading")}
         callbackLabel={t("auth.callback")}

@@ -31,6 +31,7 @@ import {
   trainerIntroReducer,
   trainerIntroRevealMs,
 } from "../../features/typing/trainerIntro";
+import { formatChordSetTitle, selectResultWeakness, trainingSetHintKind, type ChordSetTitleLabels } from "../../features/typing/trainerCopy";
 import { buildTrainingSubmitPayload } from "../../features/typing/trainingPayload";
 import {
   buildCanvasFont,
@@ -570,6 +571,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       })
     : null;
   const resultAdviceText = resultAdvice ? t(`resultAdvice.${resultAdvice.kind}`, { value: resultAdvice.value }) : null;
+  const resultWeakness = sessionResult
+    ? selectResultWeakness({
+        perChord: sessionResult.perChord,
+        perChar: sessionResult.perChar,
+      })
+    : null;
   const suggestedMetronomeBpm = sessionResult ? suggestMetronomeBpm(intervals, sessionResult.cadence) : null;
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
@@ -594,6 +601,29 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     alt: t("keyboard.alt"),
     space: t("keyboard.space"),
   };
+  const chordSetTitleLabels: ChordSetTitleLabels = {
+    letterPairs: t("trainerSetTitle.letterPairs"),
+    letterTriples: t("trainerSetTitle.letterTriples"),
+    letterQuadgrams: t("trainerSetTitle.letterQuadgrams"),
+    longFirst: t("trainerSetTitle.longFirst"),
+    longSecond: t("trainerSetTitle.longSecond"),
+    homeRow: t("trainerSetTitle.homeRow"),
+  };
+  const formatTrainingSetTitle = useCallback(
+    (set: ChordSet) => formatChordSetTitle(set, chordSetTitleLabels),
+    [
+      chordSetTitleLabels.homeRow,
+      chordSetTitleLabels.letterPairs,
+      chordSetTitleLabels.letterQuadgrams,
+      chordSetTitleLabels.letterTriples,
+      chordSetTitleLabels.longFirst,
+      chordSetTitleLabels.longSecond,
+    ],
+  );
+  const activeSetTitle = chordSet ? formatTrainingSetTitle(chordSet) : loading ? t("auth.loading") : t("trainer.noSet");
+  const activeSetHint = chordSet
+    ? t(trainingSetHintKind(chordSet) === "pairs" ? "trainer.setHintPairs" : "trainer.setHintCombinations")
+    : null;
 
   const changeLanguage = (language: SupportedLanguage) => {
     void changeAppLanguage(language);
@@ -936,7 +966,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             >
               {sets.map((set) => (
                 <option key={set.id} value={set.id}>
-                  {set.title}
+                  {formatTrainingSetTitle(set)}
                 </option>
               ))}
             </select>
@@ -1023,7 +1053,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           <div className="trainer-toolbar">
             <div>
               <span>{t("trainer.current")}</span>
-              <h1>{chordSet?.title ?? (loading ? t("auth.loading") : t("trainer.noSet"))}</h1>
+              <h1>{activeSetTitle}</h1>
+              {activeSetHint ? <p className="trainer-toolbar__hint">{activeSetHint}</p> : null}
             </div>
             <div className="trainer-toolbar__actions">
               <button
@@ -1214,6 +1245,31 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                       <p>{scoreFormulaText}</p>
                       <p>{scoreCurrentText}</p>
                     </div>
+                    {resultWeakness ? (
+                      <div className="result-card__weakness">
+                        <span>
+                          {resultWeakness.kind === "chords"
+                            ? t("trainer.resultWeaknessChordsTitle")
+                            : resultWeakness.kind === "chars"
+                              ? t("trainer.resultWeaknessCharsTitle")
+                              : t("trainer.resultWeaknessCleanTitle")}
+                        </span>
+                        {resultWeakness.values.length > 0 ? (
+                          <div className="result-card__weakness-list">
+                            {resultWeakness.values.map((value) => (
+                              <b key={value}>{value}</b>
+                            ))}
+                          </div>
+                        ) : null}
+                        <p>
+                          {resultWeakness.kind === "chords"
+                            ? t("trainer.resultWeaknessChordsBody")
+                            : resultWeakness.kind === "chars"
+                              ? t("trainer.resultWeaknessCharsBody")
+                              : t("trainer.resultWeaknessCleanBody")}
+                        </p>
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
                 {resultAdviceText ? (
@@ -1233,6 +1289,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                   <Play size={58} fill="currentColor" aria-hidden="true" />
                   <span>{startLabel}</span>
                 </button>
+                {!isAuthenticated ? (
+                  <button type="button" className="secondary-button result-card__save-progress" onClick={onSignIn}>
+                    <LogIn size={18} aria-hidden="true" />
+                    <span>{t("trainer.saveProgress")}</span>
+                  </button>
+                ) : null}
                 <span>{t("trainer.startShortcut")}</span>
               </div>
             </div>

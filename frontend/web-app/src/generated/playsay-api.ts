@@ -154,6 +154,8 @@ export interface JsonNode {}
 export interface MaterialSubmissionRequest {
   content: JsonNode;
   submitted: boolean;
+  /** @nullable */
+  targetStudentSubject?: string | null;
 }
 
 export interface MaterialSubmissionResponse {

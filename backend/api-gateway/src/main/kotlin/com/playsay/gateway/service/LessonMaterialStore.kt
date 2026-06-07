@@ -105,6 +105,31 @@ class LessonMaterialStore(
         lessonId: UUID,
         request: MaterialSubmissionRequest,
     ): MaterialSubmissionResponse {
+        val targetStudentSubject = request.targetStudentSubject?.trim()?.takeIf { subject -> subject.isNotEmpty() }
+        if (targetStudentSubject != null) {
+            lessonMaterialCatalogService.requireMaterialManager(authentication)
+            val lookup = lessonRepo.findScheduledMaterialLookupForStudent(lessonId, targetStudentSubject)
+                ?: throw ProjectResponseException.localized(
+                    HttpStatus.NOT_FOUND,
+                    MetaData.ErrorCodes.UNKNOWN_PARTICIPANT_SUBJECT,
+                    targetStudentSubject,
+                )
+            val materialId = lookup.materialId
+                ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+            val participant = lessonParticipantRepo.findParticipantRowByLessonIdAndSubject(lessonId, targetStudentSubject)
+                ?: throw ProjectResponseException.localized(
+                    HttpStatus.NOT_FOUND,
+                    MetaData.ErrorCodes.UNKNOWN_PARTICIPANT_SUBJECT,
+                    targetStudentSubject,
+                )
+            return materialSubmissionService.saveForScheduledLesson(
+                lessonId = lessonId,
+                material = lessonMaterialCatalogService.requireActive(materialId),
+                userId = participant.userId,
+                request = request,
+            )
+        }
+
         val material = materialForAccessibleScheduledLesson(authentication, lessonId)
         val userId = lessonMaterialCatalogService.currentUserId(authentication)
         return materialSubmissionService.saveForScheduledLesson(lessonId, material, userId, request)

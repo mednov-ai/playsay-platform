@@ -1,4 +1,4 @@
-import { BookOpen, Clock3, Loader2, Plus, Users } from "lucide-react";
+import { BookOpen, Clock3, Eye, Loader2, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { canAssignLessons } from "../../../entities/workspace/model";
@@ -61,6 +61,8 @@ export function LessonWorkspace({
   const isParallelWork = session.workMode === "PARALLEL" &&
     session.participants.length > 1 &&
     assignedParticipants.length === session.participants.length;
+  const teacherWorkParticipants = isParallelWork ? assignedParticipants : session.participants;
+  const teacherWorkParticipantKey = teacherWorkParticipants.map((participant) => participant.subject).join("|");
   const studentSharedPresenceEnabled = !canMonitorSubmissions &&
     !isParallelWork &&
     session.lessonType === "GROUP" &&
@@ -68,10 +70,11 @@ export function LessonWorkspace({
     session.participants.length > 1;
   const canManageMaterial = canAssignLessons(profile) && !isParallelWork;
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
-  const activeParticipant = isParallelWork
-    ? assignedParticipants.find((participant) => participant.subject === activeStudentSubject) ?? assignedParticipants[0] ?? null
+  const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
+  const activeParticipant = canMonitorSubmissions
+    ? teacherWorkParticipants.find((participant) => participant.subject === activeStudentSubject) ?? teacherWorkParticipants[0] ?? null
     : null;
-  const activeAssignedMaterial = canMonitorSubmissions && activeParticipant?.materialId
+  const activeAssignedMaterial = canMonitorSubmissions && isParallelWork && activeParticipant?.materialId
     ? materials.find((item) => item.id === activeParticipant.materialId) ?? null
     : null;
   const visibleMaterial = activeAssignedMaterial ?? material;
@@ -83,11 +86,11 @@ export function LessonWorkspace({
     submissionSaving,
     submissionSnapshots,
   } = useLessonSubmission({ canMonitorSubmissions, material: visibleMaterial, session });
-  const activeStudentSubmission = isParallelWork
+  const activeStudentSubmission = canMonitorSubmissions
     ? submissionSnapshots.find((item) => item.userSubject === activeParticipant?.subject) ?? null
     : null;
   const selectableMaterials = materials.filter((item) => item.status !== "ARCHIVED");
-  const lessonScore = isParallelWork
+  const lessonScore = canMonitorSubmissions && activeParticipant
     ? activeStudentSubmission?.score ?? null
     : canMonitorSubmissions
       ? averageSubmissionScore(submissionSnapshots)
@@ -128,15 +131,17 @@ export function LessonWorkspace({
   ]);
 
   useEffect(() => {
-    if (!isParallelWork) {
+    if (!canMonitorSubmissions || teacherWorkParticipants.length === 0) {
       setActiveStudentSubject(null);
+      setTeacherTaskVisible(false);
       return;
     }
 
-    if (!activeStudentSubject || !assignedParticipants.some((participant) => participant.subject === activeStudentSubject)) {
-      setActiveStudentSubject(assignedParticipants[0]?.subject ?? null);
+    if (!activeStudentSubject || !teacherWorkParticipants.some((participant) => participant.subject === activeStudentSubject)) {
+      setActiveStudentSubject(teacherWorkParticipants[0]?.subject ?? null);
+      setTeacherTaskVisible(false);
     }
-  }, [activeStudentSubject, assignedParticipants, isParallelWork]);
+  }, [activeStudentSubject, canMonitorSubmissions, teacherWorkParticipantKey]);
 
   useEffect(() => {
     if (!isParallelWork || !canMonitorSubmissions) {
@@ -149,8 +154,11 @@ export function LessonWorkspace({
 
   function selectStudentWork(subject: string) {
     setActiveStudentSubject(subject);
+    setTeacherTaskVisible(false);
     setStudentHealthState((current) => acknowledgeStudentHealth(current, subject));
   }
+
+  const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
     <section className="playsay-workbench">
@@ -162,6 +170,22 @@ export function LessonWorkspace({
         </nav>
 
         <div className="playsay-workbench-tools">
+          {canMonitorSubmissions && teacherWorkParticipants.length > 0 ? (
+            <label className="playsay-teacher-target-picker">
+              <span>{t("classroom.teacherTask.targetLabel")}</span>
+              <select
+                className="playsay-input"
+                onChange={(event) => selectStudentWork(event.target.value)}
+                value={activeParticipant?.subject ?? ""}
+              >
+                {teacherWorkParticipants.map((participant) => (
+                  <option key={participant.subject} value={participant.subject}>
+                    {participant.displayName ?? participant.username ?? participant.subject}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {canManageMaterial ? (
             <div className="playsay-lesson-material-picker">
               <select
@@ -244,18 +268,32 @@ export function LessonWorkspace({
           </div>
         ) : visibleMaterial ? (
           canMonitorSubmissions ? (
-            <LessonTaskCanvas
-              collaborationControls={null}
-              lessonId={session.lessonId}
-              material={visibleMaterial}
-              annotationSync={isParallelWork ? null : teacherAnnotationSync}
-              onSaveAnswers={(content) => void saveMaterialAnswers(content)}
-              score={lessonScore}
-              submission={isParallelWork ? activeStudentSubmission : submission}
-              submissionMessage={submissionMessage}
-              submissionSaving={submissionSaving}
-              teacherName={session.teacherName ?? displayName}
-            />
+            teacherTaskVisible ? (
+              <LessonTaskCanvas
+                collaborationControls={null}
+                lessonId={session.lessonId}
+                material={visibleMaterial}
+                annotationSync={isParallelWork ? null : teacherAnnotationSync}
+                onSaveAnswers={(content) => void saveMaterialAnswers(content, activeParticipant?.subject)}
+                score={lessonScore}
+                submission={activeStudentSubmission}
+                submissionMessage={submissionMessage}
+                submissionSaving={submissionSaving}
+                teacherName={session.teacherName ?? displayName}
+              />
+            ) : (
+              <div className="playsay-task-board playsay-teacher-task-reveal">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <div>
+                  <strong>{t("classroom.teacherTask.hiddenTitle")}</strong>
+                  <span>{t("classroom.teacherTask.credit", { name: activeParticipantLabel })}</span>
+                </div>
+                <Button disabled={!activeParticipant} onClick={() => setTeacherTaskVisible(true)} type="button">
+                  <Eye className="h-4 w-4" />
+                  {t("classroom.teacherTask.show")}
+                </Button>
+              </div>
+            )
           ) : isParallelWork ? (
             <LessonTaskCanvas
               lessonId={session.lessonId}

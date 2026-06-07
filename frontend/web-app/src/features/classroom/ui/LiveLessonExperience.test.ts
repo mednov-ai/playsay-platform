@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { classroomViewportModeFromSnapshot, requestClassroomFullscreen } from "./LiveLessonExperience";
+import {
+  classroomViewportModeFromSnapshot,
+  effectiveClassroomViewportMode,
+  requestClassroomFullscreen,
+  shouldShowLessonWorkspace,
+} from "./LiveLessonExperience";
 
 describe("classroomViewportMode", () => {
   afterEach(() => {
@@ -30,6 +35,29 @@ describe("classroomViewportMode", () => {
       ...viewportSnapshot(920, 600),
       coarsePointer: false,
     })).toBe("desktop");
+  });
+
+  it("keeps teachers in desktop classroom layout even on narrow touch viewports", () => {
+    expect(effectiveClassroomViewportMode("mobilePortrait", true)).toBe("desktop");
+    expect(effectiveClassroomViewportMode("mobileLandscape", true)).toBe("desktop");
+  });
+
+  it("hides lesson workspace from mobile students while keeping desktop student work visible", () => {
+    expect(shouldShowLessonWorkspace({
+      canManageLesson: false,
+      videoOnly: false,
+      viewportMode: "mobilePortrait",
+    })).toBe(false);
+    expect(shouldShowLessonWorkspace({
+      canManageLesson: false,
+      videoOnly: false,
+      viewportMode: "mobileLandscape",
+    })).toBe(false);
+    expect(shouldShowLessonWorkspace({
+      canManageLesson: false,
+      videoOnly: false,
+      viewportMode: "desktop",
+    })).toBe(true);
   });
 
   it("requests browser fullscreen for the classroom shell when supported", async () => {

@@ -473,6 +473,81 @@ class MaterialControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher can save scheduled material submission for selected lesson participant`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(studentOne)
+        userProfileStore.currentUserId(studentTwo)
+        val material = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Shared teacher-led material", status = "PUBLISHED"),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = material.id,
+                scheduledStart = Instant.now().plusSeconds(3600),
+                scheduledEnd = Instant.now().plusSeconds(7200),
+                type = "GROUP",
+                workMode = "SHARED",
+                participantSubjects = listOf("student-1", "student-2"),
+            ),
+        ).body!!
+
+        val teacherLedSubmission = scheduledMaterialController.saveScheduledLessonMaterialSubmission(
+            teacher,
+            lesson.id,
+            MaterialSubmissionRequest(
+                content = objectMapper.readTree(
+                    """
+                    {
+                      "schemaVersion": 1,
+                      "materialId": "${material.id}",
+                      "answers": {
+                        "teacherLed": {
+                          "type": "choice",
+                          "items": {
+                            "question-1": "A"
+                          }
+                        }
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+                submitted = true,
+                targetStudentSubject = "student-2",
+            ),
+        )
+
+        assertEquals("student-2", teacherLedSubmission.userSubject)
+        assertEquals("Student two", teacherLedSubmission.userName)
+        assertEquals(
+            teacherLedSubmission.id,
+            scheduledMaterialController.scheduledLessonMaterialSubmission(studentTwo, lesson.id).id,
+        )
+        assertEquals(
+            setOf("student-2"),
+            scheduledMaterialController.scheduledLessonMaterialSubmissions(teacher, lesson.id)
+                .mapNotNull { submission -> submission.userSubject }
+                .toSet(),
+        )
+
+        val nonParticipantError = assertFailsWith<ResponseStatusException> {
+            scheduledMaterialController.saveScheduledLessonMaterialSubmission(
+                teacher,
+                lesson.id,
+                MaterialSubmissionRequest(
+                    content = objectMapper.createObjectNode(),
+                    submitted = true,
+                    targetStudentSubject = "student-404",
+                ),
+            )
+        }
+        assertEquals(HttpStatus.NOT_FOUND, nonParticipantError.statusCode)
+    }
+
+    @Test
     fun `first classroom material state returns empty submission and annotation`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")

@@ -2366,6 +2366,10 @@ components:
           $ref: "#/components/schemas/JsonNode"
         submitted:
           type: boolean
+        targetStudentSubject:
+          type:
+          - string
+          - "null"
       required:
       - content
       - submitted

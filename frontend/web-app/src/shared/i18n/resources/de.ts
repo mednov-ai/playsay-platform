@@ -836,6 +836,12 @@ export const de = {
       loading: "Material wird geladen",
       selectForLesson: "Material für die Stunde auswählen",
     },
+    teacherTask: {
+      targetLabel: "Gutschrift für",
+      hiddenTitle: "Aufgabe verborgen",
+      credit: "Antworten zählen für: {{name}}",
+      show: "Aufgabe zeigen",
+    },
     messages: {
       materialAssigned: "Material zugewiesen",
       materialUnassigned: "Material entfernt",

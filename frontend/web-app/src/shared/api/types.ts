@@ -187,6 +187,7 @@ export type LessonMaterialSubmission = {
 export type LessonMaterialSubmissionInput = {
   content: LessonMaterialJson;
   submitted?: boolean;
+  targetStudentSubject?: string | null;
 };
 export type HomeworkAssignmentInput = {
   dueAt?: string | null;

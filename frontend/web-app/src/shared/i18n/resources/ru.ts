@@ -858,6 +858,12 @@ export const ru = {
       loading: "Материал загружается",
       selectForLesson: "Выберите материал для урока",
     },
+    teacherTask: {
+      targetLabel: "Зачёт ученику",
+      hiddenTitle: "Задание скрыто",
+      credit: "Ответы пойдут в зачёт: {{name}}",
+      show: "Показать задание",
+    },
     messages: {
       materialAssigned: "Материал назначен",
       materialUnassigned: "Материал снят",

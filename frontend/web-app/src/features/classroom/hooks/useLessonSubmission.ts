@@ -90,15 +90,20 @@ export function useLessonSubmission({
     };
   }, [canMonitorSubmissions, material?.id, session.lessonId]);
 
-  async function saveMaterialAnswers(content: LessonMaterialJson) {
+  async function saveMaterialAnswers(content: LessonMaterialJson, targetStudentSubject?: string | null) {
     setSubmissionSaving(true);
     setSubmissionMessage(null);
     try {
       const savedSubmission = await saveScheduledLessonMaterialSubmission(session.lessonId, {
         content,
         submitted: true,
+        targetStudentSubject,
       });
       setSubmission(savedSubmission);
+      setSubmissionSnapshots((current) => {
+        const next = current.filter((item) => item.id !== savedSubmission.id && item.userSubject !== savedSubmission.userSubject);
+        return [savedSubmission, ...next].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+      });
       setSubmissionMessage(t("classroom.messages.answerSent"));
     } catch (caught) {
       setSubmissionMessage(caught instanceof Error ? caught.message : t("classroom.messages.answerSendFailed"));

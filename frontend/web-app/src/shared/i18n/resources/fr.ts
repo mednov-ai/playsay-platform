@@ -836,6 +836,12 @@ export const fr = {
       loading: "Chargement du support",
       selectForLesson: "Choisissez un support pour le cours",
     },
+    teacherTask: {
+      targetLabel: "Crédit pour",
+      hiddenTitle: "Exercice masqué",
+      credit: "Les réponses comptent pour : {{name}}",
+      show: "Afficher l'exercice",
+    },
     messages: {
       materialAssigned: "Support attribué",
       materialUnassigned: "Support retiré",

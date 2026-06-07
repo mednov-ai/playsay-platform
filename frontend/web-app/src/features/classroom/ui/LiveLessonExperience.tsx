@@ -68,14 +68,15 @@ export function LiveLessonExperience({
   const lessonTypeLabel = formatLessonType(session.lessonType, translate);
   const canManageLesson = canAssignLessons(profile);
   const videoOnly = !session.materialId && !canManageLesson;
-  const viewportMode = useClassroomViewportMode();
+  const rawViewportMode = useClassroomViewportMode();
+  const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const videoExpanded = viewportMode === "mobileLandscape";
   const classroomVideoMode: ClassroomVideoMode = videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
     ? "focusOnly"
     : videoOnly
       ? "videoOnly"
       : "lesson";
-  const showWorkspace = !videoOnly && !videoExpanded;
+  const showWorkspace = shouldShowLessonWorkspace({ canManageLesson, videoOnly, viewportMode });
 
   useEffect(() => {
     document.body.classList.toggle("playsay-classroom-video-expanded", videoExpanded);
@@ -228,6 +229,33 @@ function useClassroomViewportMode(): ClassroomViewportMode {
 
 export function classroomViewportMode(): ClassroomViewportMode {
   return classroomViewportModeFromSnapshot(readClassroomViewportSnapshot());
+}
+
+export function effectiveClassroomViewportMode(
+  viewportMode: ClassroomViewportMode,
+  canManageLesson: boolean,
+): ClassroomViewportMode {
+  return canManageLesson ? "desktop" : viewportMode;
+}
+
+export function shouldShowLessonWorkspace({
+  canManageLesson,
+  videoOnly,
+  viewportMode,
+}: {
+  canManageLesson: boolean;
+  videoOnly: boolean;
+  viewportMode: ClassroomViewportMode;
+}): boolean {
+  if (videoOnly) {
+    return false;
+  }
+
+  if (canManageLesson) {
+    return true;
+  }
+
+  return viewportMode === "desktop";
 }
 
 export function classroomFullscreenActive(shell?: HTMLElement | null): boolean {

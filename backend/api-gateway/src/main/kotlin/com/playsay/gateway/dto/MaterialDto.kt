@@ -177,6 +177,7 @@ data class LessonMaterialDraftResponse(
 data class MaterialSubmissionRequest(
     val content: JsonNode,
     val submitted: Boolean = true,
+    val targetStudentSubject: String? = null,
 )
 
 data class MaterialSubmissionResponse(

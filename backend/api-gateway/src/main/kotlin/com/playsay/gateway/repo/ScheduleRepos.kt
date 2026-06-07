@@ -339,6 +339,27 @@ interface LessonParticipantRepo : JpaRepository<LessonParticipantEntity, UUID> {
 
     @Query(
         """
+        select new com.playsay.gateway.repo.LessonParticipantRow(
+            lp.lessonId,
+            lp.studentUserId,
+            student.keycloakSubject,
+            student.username,
+            student.displayName,
+            lp.attendanceStatus,
+            lp.materialId,
+            lm.title
+        )
+          from LessonParticipantEntity lp
+          join AppUserEntity student on student.id = lp.studentUserId
+          left join LessonMaterialEntity lm on lm.id = lp.materialId
+         where lp.lessonId = :lessonId
+           and student.keycloakSubject = :subject
+        """,
+    )
+    fun findParticipantRowByLessonIdAndSubject(lessonId: UUID, subject: String): LessonParticipantRow?
+
+    @Query(
+        """
         select distinct lp.materialId
           from LessonParticipantEntity lp
          where lp.lessonId = :lessonId

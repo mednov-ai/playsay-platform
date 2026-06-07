@@ -836,6 +836,12 @@ export const en = {
       loading: "Material is loading",
       selectForLesson: "Choose material for the lesson",
     },
+    teacherTask: {
+      targetLabel: "Credit to",
+      hiddenTitle: "Task hidden",
+      credit: "Answers count for: {{name}}",
+      show: "Show task",
+    },
     messages: {
       materialAssigned: "Material assigned",
       materialUnassigned: "Material removed",

@@ -1,5 +1,6 @@
 package com.playsay.registration.dto
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
@@ -61,6 +62,7 @@ data class ResetPasswordRequest(
     val newPassword: String,
 )
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class RegistrationResponse(
     val status: String,
     val continueUrl: String? = null,

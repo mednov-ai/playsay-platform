@@ -16,12 +16,14 @@ import {
 } from "../../features/guest/guestProgress";
 import { Metronome } from "../../features/metronome/Metronome";
 import { suggestMetronomeBpm } from "../../features/metronome/metronomeTempo";
+import { RecentDynamicsPanel } from "../../features/stats/RecentDynamicsPanel";
 import { StatsPanel } from "../../features/stats/StatsPanel";
 import { shouldReloadActiveSetForLayout } from "../../features/typing/activeSetSync";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { chooseResultAdvice } from "../../features/typing/resultAdvice";
 import { computeCadence, computeScore, scoreGradeBands, scoreWeights } from "../../features/typing/scoring";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
+import { buildTrainingSubmitPayload } from "../../features/typing/trainingPayload";
 import {
   buildCanvasFont,
   buildMeasuredTypingWindow,
@@ -34,11 +36,11 @@ import {
 } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
 import { computeActiveDurationMs, useTypingStore, type StreamItem } from "../../features/typing/typingStore";
-import { fetchProgress, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
+import { claimAnonymousProgress, fetchProgress, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
-import type { ChordSet, FocusLesson, LayoutId, Me, Progress, TrainingLessonKind } from "../../shared/types";
+import type { ChordSet, FocusLesson, LayoutId, Me, Progress } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
 import { registrationUrlForKeyboard } from "./registrationLink";
 
@@ -85,16 +87,14 @@ const scoreGradeBandLabels = {
 function focusLessonToChordSet(focusLesson: FocusLesson): ChordSet {
   return {
     id: -1,
+    sourceChordSetId: focusLesson.sourceChordSetId,
+    focusProblemKeys: focusLesson.problemKeys,
     layout: focusLesson.layout,
     title: focusLesson.title,
     difficulty: 0,
     tier: "beginner",
     chords: focusLesson.chords,
   };
-}
-
-function lessonKindForSet(chordSet: ChordSet | null): TrainingLessonKind {
-  return chordSet?.id === -1 ? "FOCUS" : "STANDARD";
 }
 
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -181,6 +181,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(authError ?? null);
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [progressImportMessage, setProgressImportMessage] = useState<string | null>(null);
   const [anonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const [guestSessionCount, setGuestSessionCount] = useState(() => readGuestSessionCount());
   const [guestDisplayName, setGuestDisplayName] = useState<string | null>(() => readGuestDisplayName());
@@ -334,15 +335,24 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       };
     }
 
-    fetchProgress()
-      .then((loadedProgress) => {
+    claimAnonymousProgress({ deviceId: anonymousDeviceId })
+      .then((claim) => {
         if (!cancelled) {
-          setProgress(loadedProgress);
+          setProgress(claim.progress);
+          setProgressImportMessage(
+            claim.claimedResults > 0
+              ? t("trainer.guestProgressImported", { count: claim.claimedResults })
+              : null,
+          );
         }
       })
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : String(error));
+          try {
+            setProgress(await fetchProgress());
+          } catch {
+            setLoadError(error instanceof Error ? error.message : String(error));
+          }
         }
       })
       .finally(() => {
@@ -354,7 +364,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, layoutId, loadSet, profileSeed]);
+  }, [anonymousDeviceId, isAuthenticated, layoutId, loadSet, profileSeed, t]);
 
   useEffect(() => {
     if (!shouldReloadActiveSetForLayout({ layoutId, chordSet, phase: sessionFlow.phase })) {
@@ -401,6 +411,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setSaved(false);
     setGuestRecorded(false);
     const currentSet = chordSet;
+    const submitPayload = buildTrainingSubmitPayload(sessionResult, currentSet);
 
     const updateNextDecision = (focusLesson?: FocusLesson) => {
       if (!currentSet) {
@@ -435,18 +446,13 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       setGuestSessionCount(nextCount);
       setGuestRecorded(true);
       updateNextDecision();
+      if (!submitPayload) {
+        return;
+      }
       void submitAnonymousResult({
+        ...submitPayload,
         deviceId: anonymousDeviceId,
         displayName: guestDisplayName ?? undefined,
-        chordSetId: sessionResult.chordSetId,
-        lessonKind: lessonKindForSet(currentSet),
-        speedCpm: sessionResult.speedCpm,
-        accuracy: sessionResult.accuracy,
-        errors: sessionResult.errors,
-        durationMs: sessionResult.durationMs,
-        perFinger: sessionResult.perFinger,
-        perChar: sessionResult.perChar,
-        perChord: sessionResult.perChord,
       })
         .then((savedResult) => updateNextDecision(savedResult.focusLesson))
         .catch(() => undefined);
@@ -463,24 +469,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setSaving(true);
 
     const save = async () => {
-      if (sessionResult.chordSetId > 0) {
-        const savedResult = await submitResult({
-          chordSetId: sessionResult.chordSetId,
-          lessonKind: lessonKindForSet(currentSet),
-          speedCpm: sessionResult.speedCpm,
-          accuracy: sessionResult.accuracy,
-          errors: sessionResult.errors,
-          durationMs: sessionResult.durationMs,
-          perFinger: sessionResult.perFinger,
-          perChar: sessionResult.perChar,
-          perChord: sessionResult.perChord,
-        });
+      if (submitPayload) {
+        const savedResult = await submitResult(submitPayload);
         updateNextDecision(savedResult.focusLesson);
       }
       const loadedProgress = await fetchProgress();
       setProgress(loadedProgress);
       setSaved(true);
-      if (sessionResult.chordSetId <= 0) {
+      if (!submitPayload) {
         updateNextDecision();
       }
     };
@@ -918,6 +914,28 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               <p>{isAuthenticated ? t("trainer.noWeakFingers") : t("trainer.signInForProgress")}</p>
             )}
           </details>
+
+          {progressImportMessage ? <div className="progress-import-status">{progressImportMessage}</div> : null}
+
+          <RecentDynamicsPanel
+            labels={{
+              title: t("trainer.recentDynamics"),
+              empty: t("trainer.noRecentDynamics"),
+              speed: t("stats.speed"),
+              accuracy: t("stats.accuracy"),
+              errors: t("stats.errors"),
+              standard: t("trainer.standardLesson"),
+              focus: t("trainer.focusLesson"),
+              deltaUp: t("trainer.deltaUp"),
+              deltaDown: t("trainer.deltaDown"),
+              deltaFlat: t("trainer.deltaFlat"),
+            }}
+            units={{
+              cpm: t("units.cpm"),
+              percent: t("units.percent"),
+            }}
+            recent={effectiveProgress.recent}
+          />
         </aside>
 
         <section className="trainer-surface" aria-busy={loading || saving}>

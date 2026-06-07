@@ -284,6 +284,29 @@ class RegistrationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `confirmed registration returns allowed keyboard continue url`() {
+        val email = "keyboard-return@example.com"
+        startRegistration(email, returnTo = "https://key.play-and-say.ru/")
+
+        val confirmed = confirmRegistration(lastConfirmationToken())
+
+        assertEquals(HttpStatus.OK.value(), confirmed.statusCode(), confirmed.body())
+        assertTrue(confirmed.body().contains("\"continueUrl\":\"https://key.play-and-say.ru/\""))
+    }
+
+    @Test
+    fun `confirmed registration drops unsafe external return url`() {
+        val email = "unsafe-return@example.com"
+        startRegistration(email, returnTo = "https://evil.example/phish")
+
+        val confirmed = confirmRegistration(lastConfirmationToken())
+
+        assertEquals(HttpStatus.OK.value(), confirmed.statusCode(), confirmed.body())
+        assertFalse(confirmed.body().contains("evil.example"), confirmed.body())
+        assertFalse(confirmed.body().contains("continueUrl"), confirmed.body())
+    }
+
+    @Test
     fun `start is rate limited per email with generic responses before the limit`() {
         val email = "limited@example.com"
 
@@ -309,22 +332,11 @@ class RegistrationControllerTest @Autowired constructor(
         }
     }
 
-    private fun startRegistration(email: String, forwardedFor: String? = nextForwardedFor()): HttpResponse<String> =
-        httpClient.send(
-            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
-                .header("content-type", "application/json")
-                .apply {
-                    forwardedFor?.let { header("X-Forwarded-For", it) }
-                }
-                .POST(HttpRequest.BodyPublishers.ofString(startRegistrationBody(email)))
-                .build(),
-            HttpResponse.BodyHandlers.ofString(),
-        )
-
     private fun startRegistration(
         email: String,
-        password: String,
+        password: String = "River2026!",
         forwardedFor: String? = nextForwardedFor(),
+        returnTo: String? = "https://key.play-and-say.ru/",
     ): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
@@ -332,7 +344,7 @@ class RegistrationControllerTest @Autowired constructor(
                 .apply {
                     forwardedFor?.let { header("X-Forwarded-For", it) }
                 }
-                .POST(HttpRequest.BodyPublishers.ofString(startRegistrationBody(email = email, password = password)))
+                .POST(HttpRequest.BodyPublishers.ofString(startRegistrationBody(email, password, returnTo)))
                 .build(),
             HttpResponse.BodyHandlers.ofString(),
         )
@@ -420,16 +432,11 @@ class RegistrationControllerTest @Autowired constructor(
     private fun startRegistrationBody(
         email: String = "student@example.com",
         password: String = "River2026!",
-    ): String =
-        """
-        {
-          "email": "$email",
-          "password": "$password",
-          "displayName": "Student",
-          "locale": "en",
-          "returnTo": "https://key.play-and-say.ru/"
-        }
-        """.trimIndent()
+        returnTo: String? = "https://key.play-and-say.ru/",
+    ): String {
+        val returnToLine = returnTo?.let { ",\"returnTo\":\"$it\"" } ?: ""
+        return """{"email":"$email","password":"$password","displayName":"Student","locale":"en"$returnToLine}"""
+    }
 }
 
 private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient {

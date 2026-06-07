@@ -56,11 +56,18 @@ export const fr = {
       create: "Créer le compte",
       resend: "Renvoyer",
       signIn: "Se connecter",
+      signInOnline: "Se connecter à l'école",
       continue: "Continuer",
+      openTrainer: "Ouvrir le trainer",
+      checkEmailPage: "Aller à la confirmation",
       forgotPassword: "Mot de passe oublié ?",
       sendResetCode: "Recevoir le code",
       resetPassword: "Changer le mot de passe",
       backToRegister: "Retour à l'inscription",
+    },
+    startSuccess: {
+      title: "Email envoyé",
+      body: "Nous avons envoyé un email à {{email}}. Ouvrez le lien pour confirmer le compte.",
     },
     password: {
       tooShort: "Au moins 8 caractères",

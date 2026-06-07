@@ -1,6 +1,8 @@
 package com.playsay.keyboard.service
 
 import com.playsay.keyboard.dto.AnonymousProfileResponse
+import com.playsay.keyboard.dto.ClaimAnonymousProgressRequest
+import com.playsay.keyboard.dto.ClaimAnonymousProgressResponse
 import com.playsay.keyboard.dto.FingerErrorsResponse
 import com.playsay.keyboard.dto.FocusLessonResponse
 import com.playsay.keyboard.dto.ProgressResponse
@@ -87,6 +89,23 @@ class TrainingService(
         return saved.toResponse().copy(focusLesson = focusLesson(saved, recent, chordSet))
     }
 
+    @Transactional
+    fun claimAnonymous(subject: String, request: ClaimAnonymousProgressRequest): ClaimAnonymousProgressResponse {
+        val deviceId = normalizeDeviceId(request.deviceId)
+        val profile = anonymousProfileRepo.findByDeviceId(deviceId)
+            ?: return ClaimAnonymousProgressResponse(claimedResults = 0, progress = progress(subject))
+        val anonymousResults = trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id)
+        anonymousResults.forEach { result ->
+            result.keycloakSubject = subject
+            result.anonymousProfileId = null
+        }
+        trainingResultRepo.saveAll(anonymousResults)
+        return ClaimAnonymousProgressResponse(
+            claimedResults = anonymousResults.size,
+            progress = progress(subject),
+        )
+    }
+
     @Transactional(readOnly = true)
     fun progress(subject: String): ProgressResponse {
         val results = trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc(subject)
@@ -157,7 +176,8 @@ class TrainingService(
             return buildFocusLesson(chordSet, "SEVERE", severeKeys)
         }
 
-        val moderateKeys = moderateProblemKeys(recentResults.take(3))
+        val lessonsSinceFocus = recentResults.takeWhile { result -> result.lessonKind != "FOCUS" }
+        val moderateKeys = moderateProblemKeys(lessonsSinceFocus.take(5))
         if (moderateKeys.isNotEmpty()) {
             return buildFocusLesson(chordSet, "MODERATE", moderateKeys)
         }
@@ -245,16 +265,39 @@ class TrainingService(
             }
         }
 
+        val cleanedFallback = fallbackChords
+            .asSequence()
+            .map { chord -> chord.trim() }
+            .filter { chord -> chord.isNotEmpty() }
+            .distinct()
+            .toList()
         if (combos.isEmpty()) {
-            combos.addAll(fallbackChords.take(18))
+            return cleanedFallback.take(18)
         }
 
-        val ordered = combos.toList()
-        val repeated = mutableListOf<String>()
-        while (repeated.size < 18 && ordered.isNotEmpty()) {
-            repeated += ordered
+        val problemLimit = focusChordCount / 2
+        val problemPart = combos.take(problemLimit)
+        val supportingPart = cleanedFallback.filterNot { chord -> chord in combos }
+        val mixed = mutableListOf<String>()
+        var problemIndex = 0
+        var supportIndex = 0
+        while (mixed.size < focusChordCount && (problemIndex < problemPart.size || supportIndex < supportingPart.size)) {
+            if (supportIndex < supportingPart.size) {
+                mixed += supportingPart[supportIndex]
+                supportIndex += 1
+            }
+            if (mixed.size < focusChordCount && problemIndex < problemPart.size) {
+                mixed += problemPart[problemIndex]
+                problemIndex += 1
+            }
         }
-        return repeated.take(18)
+        while (mixed.size < focusChordCount && cleanedFallback.isNotEmpty()) {
+            mixed += cleanedFallback[mixed.size % cleanedFallback.size]
+        }
+        while (mixed.size < focusChordCount && problemPart.isNotEmpty()) {
+            mixed += problemPart[mixed.size % problemPart.size]
+        }
+        return mixed.take(focusChordCount)
     }
 
     private fun sanitizeErrorMap(values: Map<String, Int>): Map<String, Int> =
@@ -299,5 +342,6 @@ class TrainingService(
         const val maxMapEntries = 32
         const val maxProblemKeys = 8
         const val maxErrorsPerKey = 999
+        const val focusChordCount = 18
     }
 }

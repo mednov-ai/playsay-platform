@@ -79,6 +79,15 @@ data class ProgressResponse(
     val recent: List<TrainingResultResponse>,
 )
 
+data class ClaimAnonymousProgressRequest(
+    val deviceId: String,
+)
+
+data class ClaimAnonymousProgressResponse(
+    val claimedResults: Int,
+    val progress: ProgressResponse,
+)
+
 data class FingerErrorsResponse(
     val finger: String,
     val errors: Int,

@@ -4,6 +4,7 @@ import com.playsay.keyboard.controller.ChordSetController
 import com.playsay.keyboard.controller.AnonymousController
 import com.playsay.keyboard.controller.MeController
 import com.playsay.keyboard.controller.TrainingController
+import com.playsay.keyboard.dto.ClaimAnonymousProgressRequest
 import com.playsay.keyboard.dto.ResolveAnonymousProfileRequest
 import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitResultRequest
@@ -111,7 +112,8 @@ class KeyboardApiTest @Autowired constructor(
     fun `authenticated severe errors return a focus lesson`() {
         trainingResultRepo.deleteAllInBatch()
 
-        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val chordSet = chordSetController.list(layout = "EN", difficulty = null)[0]
+        val chordSetId = chordSet.id
         val saved = trainingController.submit(
             keyboardAuthentication(),
             SubmitResultRequest(
@@ -130,6 +132,15 @@ class KeyboardApiTest @Autowired constructor(
         assertEquals("SEVERE", saved.focusLesson?.reason)
         assertTrue(saved.focusLesson?.problemKeys.orEmpty().contains("th"))
         assertTrue(saved.focusLesson?.chords.orEmpty().isNotEmpty())
+        assertTrue(
+            saved.focusLesson?.chords.orEmpty().any { chord -> chord in chordSet.chords && chord != "th" },
+            "focus lesson should mix critical ngrams with supporting source-set chords",
+        )
+        assertTrue(
+            saved.focusLesson?.chords.orEmpty().count { chord -> chord in setOf("th", "ht", "t", "tt", "h", "hh") } <=
+                saved.focusLesson?.chords.orEmpty().size / 2,
+            "direct critical ngram repeats should not dominate the whole focus lesson",
+        )
     }
 
     @Test
@@ -226,6 +237,47 @@ class KeyboardApiTest @Autowired constructor(
 
         assertEquals("MODERATE", third.focusLesson?.reason)
         assertTrue(third.focusLesson?.problemKeys.orEmpty().contains("th"))
+    }
+
+    @Test
+    fun `authenticated user can claim anonymous progress once`() {
+        trainingResultRepo.deleteAllInBatch()
+        anonymousProfileRepo.deleteAllInBatch()
+
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val request = anonymousRequest()
+        anonymousController.submit(
+            SubmitAnonymousResultRequest(
+                deviceId = "device-claim",
+                chordSetId = chordSetId,
+                lessonKind = "STANDARD",
+                speedCpm = 172.0,
+                accuracy = 0.91,
+                errors = 3,
+                durationMs = 31_000,
+                perFinger = mapOf("leftIndex" to 3),
+                perChar = mapOf("t" to 3),
+                perChord = mapOf("th" to 3),
+            ),
+            request,
+        )
+
+        val profile = anonymousProfileRepo.findByDeviceId("device-claim") ?: error("anonymous profile was not created")
+        val claimed = trainingController.claimAnonymous(
+            keyboardAuthentication(),
+            ClaimAnonymousProgressRequest(deviceId = "device-claim"),
+        )
+        val repeated = trainingController.claimAnonymous(
+            keyboardAuthentication(),
+            ClaimAnonymousProgressRequest(deviceId = "device-claim"),
+        )
+
+        assertEquals(1, claimed.claimedResults)
+        assertEquals(1, claimed.progress.sessions)
+        assertEquals(0, repeated.claimedResults)
+        assertEquals(1, repeated.progress.sessions)
+        assertTrue(trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id).isEmpty())
+        assertEquals(1, trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc("student-keycloak-subject").size)
     }
 
     private fun keyboardAuthentication(): JwtAuthenticationToken =

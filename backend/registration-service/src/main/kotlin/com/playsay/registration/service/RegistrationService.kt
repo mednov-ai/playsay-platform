@@ -31,6 +31,7 @@ class RegistrationService(
     @param:Value("\${playsay.registration.password-reset-max-attempts}") private val passwordResetMaxAttempts: Int,
 ) {
     private val resetCodeRandom = SecureRandom()
+    private val returnToPolicy = ReturnToUrlPolicy()
 
     @Transactional
     fun start(command: StartRegistrationCommand): RegistrationResult {
@@ -60,7 +61,7 @@ class RegistrationService(
             emailOriginal = command.email.trim(),
             displayName = clean(command.displayName, 120),
             locale = command.locale.normalizedLocale(),
-            returnTo = clean(command.returnTo, 1024),
+            returnTo = allowedReturnTo(command.returnTo),
             tokenHash = tokenService.hash(token),
             status = registrationStatusPending,
             keycloakCreated = true,
@@ -93,7 +94,7 @@ class RegistrationService(
                 emailOriginal = command.email.trim(),
                 displayName = clean(command.displayName, 120),
                 locale = command.locale.normalizedLocale(),
-                returnTo = clean(command.returnTo, 1024),
+                returnTo = allowedReturnTo(command.returnTo),
                 now = now,
             )
             return RegistrationResult(status = registrationStatusCheckEmail)
@@ -141,6 +142,7 @@ class RegistrationService(
         pending.status = registrationStatusConfirmed
         pending.confirmedAt = now
         pending.updatedAt = now
+        pending.returnTo = allowedReturnTo(pending.returnTo)
         repo.saveAndFlush(pending)
         return RegistrationResult(status = registrationStatusConfirmed, continueUrl = pending.returnTo)
     }
@@ -155,7 +157,7 @@ class RegistrationService(
             emailOriginal = command.email.trim(),
             displayName = null,
             locale = command.locale.normalizedLocale(),
-            returnTo = clean(command.returnTo, 1024),
+            returnTo = allowedReturnTo(command.returnTo),
             now = now,
         )
         return RegistrationResult(status = registrationStatusCheckEmail)
@@ -204,7 +206,7 @@ class RegistrationService(
         pending.tokenHash = tokenService.hash(token)
         pending.displayName = clean(displayName, 120) ?: pending.displayName
         pending.locale = locale.normalizedLocale()
-        pending.returnTo = clean(returnTo, 1024) ?: pending.returnTo
+        pending.returnTo = allowedReturnTo(returnTo) ?: pending.returnTo
         pending.emailSentAt = now
         pending.expiresAt = now.plusSeconds(tokenTtlHours * 3600)
         pending.updatedAt = now
@@ -344,6 +346,9 @@ class RegistrationService(
         }
         return cleaned
     }
+
+    private fun allowedReturnTo(value: String?): String? =
+        returnToPolicy.allow(clean(value, 1024))
 
     private companion object {
         const val registrationStatusPending = "PENDING"

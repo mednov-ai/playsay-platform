@@ -34,6 +34,7 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [rateLimitDialogOpen, setRateLimitDialogOpen] = useState(false);
+  const [startSuccessHref, setStartSuccessHref] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmedContinueUrl, setConfirmedContinueUrl] = useState<string | null>(null);
   const startPasswordCheck = useMemo(
@@ -100,8 +101,7 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
       if (initialReturnTo) {
         next.searchParams.set("returnTo", initialReturnTo);
       }
-      window.history.pushState({}, document.title, next.pathname + next.search);
-      window.dispatchEvent(new Event("popstate"));
+      setStartSuccessHref(next.pathname + next.search);
     } catch (caught) {
       handleRegistrationError(caught, t("registration.messages.startFailed"));
     } finally {
@@ -270,17 +270,13 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
             {route.kind === "confirm" ? (
               <div className="grid gap-4 pt-5">
                 <RegistrationMessage message={message ?? t("registration.messages.confirming")} />
-                <div className="flex flex-wrap gap-2">
-                  <Button disabled={loading} onClick={() => void startLogin()} type="button">
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    {t("registration.actions.signIn")}
-                  </Button>
-                  {confirmedContinueUrl ? (
-                    <Button asChild variant="outline">
-                      <a href={confirmedContinueUrl}>{t("registration.actions.continue")}</a>
-                    </Button>
-                  ) : null}
-                </div>
+                <RegistrationConfirmActions
+                  continueLabel={t("registration.actions.openTrainer")}
+                  continueUrl={confirmedContinueUrl}
+                  loading={loading}
+                  onSignIn={() => void startLogin()}
+                  signInLabel={confirmedContinueUrl ? t("registration.actions.signInOnline") : t("registration.actions.signIn")}
+                />
               </div>
             ) : null}
 
@@ -358,7 +354,104 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
         open={rateLimitDialogOpen}
         title={t("registration.rateLimit.title")}
       />
+      <RegistrationStartSuccessDialog
+        body={t("registration.startSuccess.body", { email: email.trim() })}
+        checkEmailHref={startSuccessHref ?? "/register/check-email"}
+        closeLabel={t("common.actions.close")}
+        continueLabel={t("registration.actions.checkEmailPage")}
+        onClose={() => setStartSuccessHref(null)}
+        open={startSuccessHref != null}
+        title={t("registration.startSuccess.title")}
+      />
     </main>
+  );
+}
+
+export function RegistrationStartSuccessDialog({
+  body,
+  checkEmailHref,
+  closeLabel,
+  continueLabel,
+  onClose,
+  open,
+  title,
+}: {
+  body: string;
+  checkEmailHref: string;
+  closeLabel: string;
+  continueLabel: string;
+  onClose: () => void;
+  open: boolean;
+  title: string;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 px-4 py-6">
+      <div
+        aria-labelledby="registration-start-success-title"
+        aria-modal="true"
+        className="grid w-full max-w-md gap-4 rounded-[1.5rem] border border-border bg-background p-5 text-foreground shadow-xl"
+        role="dialog"
+      >
+        <div className="grid gap-2">
+          <h2 className="text-xl font-extrabold" id="registration-start-success-title">
+            {title}
+          </h2>
+          <p className="text-sm font-semibold leading-6 text-muted-foreground">{body}</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button onClick={onClose} type="button" variant="outline">
+            {closeLabel}
+          </Button>
+          <Button asChild>
+            <a href={checkEmailHref}>{continueLabel}</a>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function RegistrationConfirmActions({
+  continueLabel,
+  continueUrl,
+  loading,
+  onSignIn,
+  signInLabel,
+}: {
+  continueLabel: string;
+  continueUrl: string | null;
+  loading: boolean;
+  onSignIn: () => void;
+  signInLabel: string;
+}) {
+  if (continueUrl) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button asChild disabled={loading}>
+          <a href={continueUrl}>
+            <CheckCircle2 className="h-4 w-4" />
+            {continueLabel}
+          </a>
+        </Button>
+        <Button disabled={loading} onClick={onSignIn} type="button" variant="outline">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+          {signInLabel}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button disabled={loading} onClick={onSignIn} type="button">
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+        {signInLabel}
+      </Button>
+    </div>
   );
 }
 

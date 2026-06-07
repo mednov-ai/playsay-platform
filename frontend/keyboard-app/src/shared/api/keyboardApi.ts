@@ -8,6 +8,8 @@ import { apiErrorFromResponse } from "./errors";
 import { currentApiLanguage } from "./locale";
 import type {
   AnonymousProfile,
+  ClaimAnonymousProgressRequest,
+  ClaimAnonymousProgressResponse,
   ChordSet,
   LayoutId,
   Me,
@@ -107,6 +109,13 @@ export function submitResult(body: SubmitResult): Promise<TrainingResult> {
 
 export function fetchProgress(): Promise<Progress> {
   return apiJson<Progress>(keyboardApiPath("/training/progress"), { method: "GET" });
+}
+
+export function claimAnonymousProgress(body: ClaimAnonymousProgressRequest): Promise<ClaimAnonymousProgressResponse> {
+  return apiJson<ClaimAnonymousProgressResponse>(
+    keyboardApiPath("/training/claim-anonymous"),
+    { method: "POST", body: JSON.stringify(body) },
+  );
 }
 
 export function resolveAnonymousProfile(body: ResolveAnonymousProfileRequest): Promise<AnonymousProfile> {

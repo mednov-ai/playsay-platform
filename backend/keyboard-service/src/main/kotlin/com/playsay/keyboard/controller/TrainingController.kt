@@ -1,5 +1,7 @@
 package com.playsay.keyboard.controller
 
+import com.playsay.keyboard.dto.ClaimAnonymousProgressRequest
+import com.playsay.keyboard.dto.ClaimAnonymousProgressResponse
 import com.playsay.keyboard.dto.ProgressResponse
 import com.playsay.keyboard.dto.SubmitResultRequest
 import com.playsay.keyboard.dto.TrainingResultResponse
@@ -30,4 +32,11 @@ class TrainingController(
     @GetMapping("/progress")
     fun progress(authentication: JwtAuthenticationToken): ProgressResponse =
         trainingService.progress(authentication.token.subject)
+
+    @PostMapping("/claim-anonymous")
+    fun claimAnonymous(
+        authentication: JwtAuthenticationToken,
+        @Valid @RequestBody request: ClaimAnonymousProgressRequest,
+    ): ClaimAnonymousProgressResponse =
+        trainingService.claimAnonymous(authentication.token.subject, request)
 }

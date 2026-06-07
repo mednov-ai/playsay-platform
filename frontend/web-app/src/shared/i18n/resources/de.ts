@@ -56,11 +56,18 @@ export const de = {
       create: "Konto erstellen",
       resend: "Erneut senden",
       signIn: "Anmelden",
+      signInOnline: "In der Online-Schule anmelden",
       continue: "Weiter",
+      openTrainer: "Trainer öffnen",
+      checkEmailPage: "Zur Bestätigung",
       forgotPassword: "Passwort vergessen?",
       sendResetCode: "Code erhalten",
       resetPassword: "Passwort ändern",
       backToRegister: "Zur Registrierung",
+    },
+    startSuccess: {
+      title: "E-Mail gesendet",
+      body: "Wir haben eine E-Mail an {{email}} gesendet. Öffnen Sie den Link, um das Konto zu bestätigen.",
     },
     password: {
       tooShort: "Mindestens 8 Zeichen",

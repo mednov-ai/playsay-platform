@@ -56,11 +56,18 @@ export const ru = {
       create: "Создать аккаунт",
       resend: "Отправить ещё раз",
       signIn: "Войти",
+      signInOnline: "Войти в онлайн-школу",
       continue: "Продолжить",
+      openTrainer: "Открыть тренажер",
+      checkEmailPage: "Перейти к подтверждению",
       forgotPassword: "Забыли пароль?",
       sendResetCode: "Получить код",
       resetPassword: "Сменить пароль",
       backToRegister: "Вернуться к регистрации",
+    },
+    startSuccess: {
+      title: "Письмо отправлено",
+      body: "Мы отправили письмо на {{email}}. Откройте ссылку в письме, чтобы подтвердить аккаунт.",
     },
     password: {
       tooShort: "Минимум 8 символов",

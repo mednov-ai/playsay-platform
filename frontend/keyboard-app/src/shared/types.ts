@@ -44,6 +44,8 @@ export const FINGER_ORDER: Finger[] = FINGERS.map((finger) => finger.id);
 
 export interface ChordSet {
   id: number;
+  sourceChordSetId?: number;
+  focusProblemKeys?: string[];
   layout: LayoutId;
   title: string;
   difficulty: number;
@@ -79,6 +81,7 @@ export interface SubmitResult {
 export interface TrainingResult {
   id: number;
   chordSetId: number;
+  lessonKind?: TrainingLessonKind;
   speedCpm: number;
   accuracy: number;
   errors: number;
@@ -131,4 +134,13 @@ export interface UpdateAnonymousProfileRequest {
 export interface SubmitAnonymousResult extends SubmitResult {
   deviceId: string;
   displayName?: string;
+}
+
+export interface ClaimAnonymousProgressRequest {
+  deviceId: string;
+}
+
+export interface ClaimAnonymousProgressResponse {
+  claimedResults: number;
+  progress: Progress;
 }

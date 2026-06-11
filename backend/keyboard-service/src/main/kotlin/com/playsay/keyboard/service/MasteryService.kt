@@ -3,13 +3,13 @@ package com.playsay.keyboard.service
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.playsay.keyboard.entity.GamificationProfileEntity
+import com.playsay.keyboard.entity.LayoutMasteryProfileEntity
 import org.springframework.stereotype.Service
 import kotlin.math.round
 
 @Service
 class MasteryService {
-    fun update(profile: GamificationProfileEntity, averageCpm: Double, accuracy: Double, cadence: Double): MasteryUpdate {
+    fun update(profile: LayoutMasteryProfileEntity, averageCpm: Double, accuracy: Double, cadence: Double): MasteryUpdate {
         val cleanAverage = cleanPositiveDouble(averageCpm, 0.0)
         val cleanAccuracy = cleanRatio(accuracy)
         val cleanCadence = cleanRatio(cadence)

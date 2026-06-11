@@ -5,11 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.keyboard.dto.GamificationEventResponse
 import com.playsay.keyboard.dto.GamificationProfileResponse
+import com.playsay.keyboard.dto.LayoutMasteryProfileResponse
 import com.playsay.keyboard.entity.GamificationEventEntity
 import com.playsay.keyboard.entity.GamificationProfileEntity
+import com.playsay.keyboard.entity.LayoutMasteryProfileEntity
 import com.playsay.keyboard.entity.TrainingResultEntity
 import com.playsay.keyboard.repo.GamificationEventRepo
 import com.playsay.keyboard.repo.GamificationProfileRepo
+import com.playsay.keyboard.repo.LayoutMasteryProfileRepo
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.time.LocalDate
@@ -21,36 +24,54 @@ import kotlin.math.round
 class GamificationService(
     private val gamificationProfileRepo: GamificationProfileRepo,
     private val gamificationEventRepo: GamificationEventRepo,
+    private val layoutMasteryProfileRepo: LayoutMasteryProfileRepo,
 ) {
     fun updateProfileBeforeSave(
         profile: GamificationProfileEntity,
+        layoutProfile: LayoutMasteryProfileEntity,
         masteryCpm: Double,
         accuracy: Double,
         cadence: Double,
         lessonKind: String,
         localDate: LocalDate?,
     ) {
-        updateCalibrationAndLeague(profile, masteryCpm, accuracy, cadence, lessonKind)
+        updateCalibrationAndLeague(layoutProfile, masteryCpm, accuracy, cadence, lessonKind)
         localDate?.let { updateStreak(profile, it) }
         profile.updatedAt = Instant.now()
+        layoutProfile.updatedAt = Instant.now()
+        layoutMasteryProfileRepo.save(layoutProfile)
         gamificationProfileRepo.save(profile)
     }
 
-    fun eventsAfterSave(profile: GamificationProfileEntity, result: TrainingResultEntity): List<GamificationEventEntity> {
+    fun eventsAfterSave(
+        profile: GamificationProfileEntity,
+        layoutProfile: LayoutMasteryProfileEntity,
+        result: TrainingResultEntity,
+    ): List<GamificationEventEntity> {
         val events = mutableListOf<GamificationEventEntity>()
         if (result.masteryDelta > 0) {
-            events += event(profile, result, "MASTERY_UP", mapOf("delta" to result.masteryDelta.toString()))
+            events += event(profile, result, "MASTERY_UP", mapOf("delta" to result.masteryDelta.toString(), "layout" to layoutProfile.layout))
         }
-        if (profile.calibrationCompletedAt != null && profile.calibrationSessionCount == calibrationTarget) {
+        if (layoutProfile.calibrationCompletedAt != null && layoutProfile.calibrationSessionCount == calibrationTarget) {
             val alreadyEmitted = gamificationEventRepo
                 .findByOwner(profile)
-                .any { existing -> existing.eventType == "CALIBRATION_COMPLETE" }
+                .any { existing -> existing.eventType == "CALIBRATION_COMPLETE" && readStringMap(existing.payloadJson)["layout"] == layoutProfile.layout }
             if (!alreadyEmitted) {
-                events += event(profile, result, "CALIBRATION_COMPLETE", mapOf("masteryCpm" to profile.masteryCpm.toString()))
+                events += event(
+                    profile,
+                    result,
+                    "CALIBRATION_COMPLETE",
+                    mapOf("masteryCpm" to layoutProfile.masteryCpm.toString(), "layout" to layoutProfile.layout),
+                )
             }
         }
-        if (result.masteryCpm != null && profile.leagueLevel != null) {
-            events += event(profile, result, "LEAGUE_PROGRESS", mapOf("leagueLevel" to profile.leagueLevel.toString()))
+        if (result.masteryCpm != null && layoutProfile.leagueLevel != null) {
+            events += event(
+                profile,
+                result,
+                "LEAGUE_PROGRESS",
+                mapOf("leagueLevel" to layoutProfile.leagueLevel.toString(), "layout" to layoutProfile.layout),
+            )
         }
         val achievements = readStringList(profile.achievementsJson).toMutableSet()
         val newAchievements = achievementCodes(result, profile).filter { code -> achievements.add(code) }
@@ -67,8 +88,40 @@ class GamificationService(
 
     fun emptyProfile(): GamificationProfileEntity = GamificationProfileEntity()
 
-    fun toResponse(profile: GamificationProfileEntity): GamificationProfileResponse =
-        GamificationProfileResponse(
+    fun toResponse(
+        profile: GamificationProfileEntity,
+        layoutProfiles: List<LayoutMasteryProfileEntity> = emptyList(),
+        activeLayout: String? = null,
+    ): GamificationProfileResponse {
+        val layoutResponses = layoutProfiles
+            .sortedBy { layoutProfile -> layoutProfile.layout }
+            .associate { layoutProfile -> layoutProfile.layout to layoutToResponse(layoutProfile) }
+        val active = activeLayout
+            ?.let { layout -> layoutProfiles.firstOrNull { layoutProfile -> layoutProfile.layout == layout } }
+            ?: layoutProfiles.firstOrNull()
+
+        return GamificationProfileResponse(
+            calibrated = active?.baselineMasteryCpm != null,
+            calibrationSessions = active?.calibrationSessionCount?.coerceIn(0, calibrationTarget) ?: 0,
+            calibrationTarget = calibrationTarget,
+            masteryCpm = active?.masteryCpm ?: profile.masteryCpm,
+            baselineMasteryCpm = active?.baselineMasteryCpm,
+            leagueLevel = active?.leagueLevel,
+            leagueProgress = active?.let { leagueProgress(it.masteryCpm) } ?: 0,
+            currentStreak = profile.currentStreak,
+            bestStreak = profile.bestStreak,
+            streakFreezes = profile.streakFreezes,
+            lastTrainingDate = profile.lastTrainingDate?.toString(),
+            trend = active?.let { readDoubleList(it.trendJson) } ?: emptyList(),
+            achievements = readStringList(profile.achievementsJson),
+            layoutMastery = layoutResponses,
+            activeLayoutMastery = active?.let { layoutToResponse(it) },
+        )
+    }
+
+    fun layoutToResponse(profile: LayoutMasteryProfileEntity): LayoutMasteryProfileResponse =
+        LayoutMasteryProfileResponse(
+            layout = profile.layout,
             calibrated = profile.baselineMasteryCpm != null,
             calibrationSessions = profile.calibrationSessionCount.coerceIn(0, calibrationTarget),
             calibrationTarget = calibrationTarget,
@@ -76,12 +129,7 @@ class GamificationService(
             baselineMasteryCpm = profile.baselineMasteryCpm,
             leagueLevel = profile.leagueLevel,
             leagueProgress = leagueProgress(profile.masteryCpm),
-            currentStreak = profile.currentStreak,
-            bestStreak = profile.bestStreak,
-            streakFreezes = profile.streakFreezes,
-            lastTrainingDate = profile.lastTrainingDate?.toString(),
             trend = readDoubleList(profile.trendJson),
-            achievements = readStringList(profile.achievementsJson),
         )
 
     fun eventToResponse(event: GamificationEventEntity): GamificationEventResponse =
@@ -93,7 +141,7 @@ class GamificationService(
         )
 
     private fun updateCalibrationAndLeague(
-        profile: GamificationProfileEntity,
+        profile: LayoutMasteryProfileEntity,
         masteryCpm: Double,
         accuracy: Double,
         cadence: Double,

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-11-006-create-keyboard-layout-mastery-profiles" author="codex">
+        <createTable tableName="keyboard_layout_mastery_profiles">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_keyboard_layout_mastery_profiles"/>
+            </column>
+            <column name="keycloak_subject" type="VARCHAR(255)"/>
+            <column name="anonymous_profile_id" type="BIGINT"/>
+            <column name="layout" type="VARCHAR(8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="mastery_cpm" type="DOUBLE" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="baseline_mastery_cpm" type="DOUBLE"/>
+            <column name="league_level" type="INT"/>
+            <column name="calibration_session_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="calibration_mastery_total" type="DOUBLE" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="calibration_completed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="trend_json" type="VARCHAR(2048)" defaultValue="[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="keyboard_layout_mastery_profiles"
+            columnNames="keycloak_subject, layout"
+            constraintName="uk_keyboard_layout_mastery_subject_layout"/>
+        <addUniqueConstraint
+            tableName="keyboard_layout_mastery_profiles"
+            columnNames="anonymous_profile_id, layout"
+            constraintName="uk_keyboard_layout_mastery_anonymous_layout"/>
+        <addForeignKeyConstraint
+            baseTableName="keyboard_layout_mastery_profiles"
+            baseColumnNames="anonymous_profile_id"
+            constraintName="fk_keyboard_layout_mastery_anonymous"
+            referencedTableName="keyboard_anonymous_profiles"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+</databaseChangeLog>

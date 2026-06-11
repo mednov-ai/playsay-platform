@@ -1,9 +1,13 @@
+import type { LayoutId } from "../../shared/types";
+
 export const guestSessionStorageKey = "playsay.key.guestSessions";
 export const guestPromptDismissedStorageKey = "playsay.key.registrationPromptDismissedAt";
 export const anonymousDeviceIdStorageKey = "playsay.key.anonymousDeviceId";
 export const guestDisplayNameStorageKey = "playsay.key.guestDisplayName";
+export const guestLayoutMasteryStorageKey = "playsay.key.layoutMastery";
 
 type GuestStorage = Pick<Storage, "getItem" | "setItem">;
+export type GuestLayoutMastery = Partial<Record<LayoutId, { masteryCpm: number }>>;
 
 export function browserStorage(): GuestStorage | null {
   return typeof window === "undefined" ? null : window.localStorage;
@@ -51,6 +55,29 @@ export function writeGuestDisplayName(value: string, storage: GuestStorage | nul
   return trimmed;
 }
 
+export function readGuestLayoutMastery(storage: GuestStorage | null = browserStorage()): GuestLayoutMastery {
+  const value = storage?.getItem(guestLayoutMasteryStorageKey);
+  if (!value) {
+    return {};
+  }
+  return sanitizeGuestLayoutMastery(value);
+}
+
+export function writeGuestLayoutMastery(
+  layoutId: LayoutId,
+  masteryCpm: number,
+  storage: GuestStorage | null = browserStorage(),
+): GuestLayoutMastery {
+  const current = readGuestLayoutMastery(storage);
+  const cleanMastery = Number.isFinite(masteryCpm) && masteryCpm > 0 ? Math.round(masteryCpm * 10) / 10 : 0;
+  const next = {
+    ...current,
+    [layoutId]: { masteryCpm: cleanMastery },
+  };
+  storage?.setItem(guestLayoutMasteryStorageKey, JSON.stringify(next));
+  return next;
+}
+
 export function dismissRegistrationPrompt(count: number, storage: GuestStorage | null = browserStorage()): void {
   storage?.setItem(guestPromptDismissedStorageKey, String(Math.max(0, Math.floor(count))));
 }
@@ -66,6 +93,22 @@ export function shouldShowNamePrompt(sessionCount: number, displayName: string |
 function readNonNegativeInt(value: string | null | undefined): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function sanitizeGuestLayoutMastery(value: string): GuestLayoutMastery {
+  try {
+    const parsed = JSON.parse(value) as Record<string, { masteryCpm?: unknown }>;
+    const next: GuestLayoutMastery = {};
+    (["EN", "RU"] as const).forEach((layoutId) => {
+      const masteryCpm = parsed[layoutId]?.masteryCpm;
+      if (typeof masteryCpm === "number" && Number.isFinite(masteryCpm) && masteryCpm >= 0) {
+        next[layoutId] = { masteryCpm };
+      }
+    });
+    return next;
+  } catch {
+    return {};
+  }
 }
 
 function createAnonymousDeviceId(): string {

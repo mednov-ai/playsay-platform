@@ -40,6 +40,14 @@ export const en: TranslationResource = {
     middle: "Intermediate",
     professional: "Professional",
   },
+  masteryLevel: {
+    starter: "Starter",
+    beginner: "Beginner",
+    confident: "Confident",
+    middle: "Intermediate",
+    strong: "Strong",
+    pro: "Pro",
+  },
   trainer: {
     layout: "Practice",
     set: "Set",
@@ -177,6 +185,7 @@ export const en: TranslationResource = {
     steady: "Repeat this set once more and keep the same rhythm without extra tension.",
   },
   stats: {
+    mastery: "Mastery",
     speed: "Speed",
     averageTempo: "Average tempo",
     accuracy: "Accuracy",

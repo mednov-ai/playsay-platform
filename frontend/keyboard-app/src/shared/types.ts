@@ -127,6 +127,18 @@ export interface Progress {
   gamification?: GamificationProfile;
 }
 
+export interface LayoutMasteryProfile {
+  layout: LayoutId;
+  calibrated: boolean;
+  calibrationSessions: number;
+  calibrationTarget: number;
+  masteryCpm: number;
+  baselineMasteryCpm?: number;
+  leagueLevel?: number;
+  leagueProgress: number;
+  trend: number[];
+}
+
 export interface GamificationProfile {
   calibrated: boolean;
   calibrationSessions: number;
@@ -141,6 +153,8 @@ export interface GamificationProfile {
   lastTrainingDate?: string;
   trend: number[];
   achievements: string[];
+  layoutMastery?: Partial<Record<LayoutId, LayoutMasteryProfile>>;
+  activeLayoutMastery?: LayoutMasteryProfile;
 }
 
 export interface GamificationEvent {

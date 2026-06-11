@@ -38,6 +38,14 @@ export const ru = {
     middle: "Средний",
     professional: "Профессиональный",
   },
+  masteryLevel: {
+    starter: "Стартовый",
+    beginner: "Начинающий",
+    confident: "Уверенный",
+    middle: "Средний",
+    strong: "Сильный",
+    pro: "Профи",
+  },
   trainer: {
     layout: "Тренировка",
     set: "Набор",
@@ -175,6 +183,7 @@ export const ru = {
     steady: "Закрепите этот набор еще раз и постарайтесь сохранить тот же ритм без лишнего напряжения.",
   },
   stats: {
+    mastery: "Мастерство",
     speed: "Скорость",
     averageTempo: "Средний темп",
     accuracy: "Точность",

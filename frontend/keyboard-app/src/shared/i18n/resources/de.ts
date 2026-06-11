@@ -40,6 +40,14 @@ export const de: TranslationResource = {
     middle: "Mittel",
     professional: "Profi",
   },
+  masteryLevel: {
+    starter: "Start",
+    beginner: "Anfänger",
+    confident: "Sicher",
+    middle: "Mittel",
+    strong: "Stark",
+    pro: "Profi",
+  },
   trainer: {
     layout: "Training",
     set: "Satz",
@@ -177,6 +185,7 @@ export const de: TranslationResource = {
     steady: "Wiederhole diesen Satz noch einmal und halte denselben Rhythmus ohne extra Spannung.",
   },
   stats: {
+    mastery: "Meisterschaft",
     speed: "Tempo",
     averageTempo: "Durchschnittstempo",
     accuracy: "Genauigkeit",

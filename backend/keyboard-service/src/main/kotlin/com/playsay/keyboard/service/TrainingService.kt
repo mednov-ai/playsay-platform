@@ -21,11 +21,13 @@ import com.playsay.keyboard.entity.AnonymousProfileEntity
 import com.playsay.keyboard.entity.ChordSetEntity
 import com.playsay.keyboard.entity.GamificationEventEntity
 import com.playsay.keyboard.entity.GamificationProfileEntity
+import com.playsay.keyboard.entity.LayoutMasteryProfileEntity
 import com.playsay.keyboard.entity.TrainingResultEntity
 import com.playsay.keyboard.mapper.toResponse
 import com.playsay.keyboard.repo.AnonymousProfileRepo
 import com.playsay.keyboard.repo.ChordSetRepo
 import com.playsay.keyboard.repo.GamificationProfileRepo
+import com.playsay.keyboard.repo.LayoutMasteryProfileRepo
 import com.playsay.keyboard.repo.TrainingResultRepo
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
@@ -43,6 +45,7 @@ class TrainingService(
     private val chordSetRepo: ChordSetRepo,
     private val trainingResultRepo: TrainingResultRepo,
     private val gamificationProfileRepo: GamificationProfileRepo,
+    private val layoutMasteryProfileRepo: LayoutMasteryProfileRepo,
     private val anonymousProfileRepo: AnonymousProfileRepo,
     private val anonymousFingerprintService: AnonymousFingerprintService,
     private val masteryService: MasteryService,
@@ -61,8 +64,9 @@ class TrainingService(
         val profile = profileForSubject(subject)
         val lessonKind = normalizeLessonKind(request.lessonKind)
         val localDate = parseLocalDate(request.localTrainingDate, request.clientTimezone)
-        val mastery = masteryService.update(profile, request.averageCpm, request.accuracy, request.cadence)
-        gamificationService.updateProfileBeforeSave(profile, mastery.masteryCpm, request.accuracy, request.cadence, lessonKind, localDate)
+        val layoutProfile = layoutProfileForSubject(subject, chordSet.layout)
+        val mastery = masteryService.update(layoutProfile, request.averageCpm, request.accuracy, request.cadence)
+        gamificationService.updateProfileBeforeSave(profile, layoutProfile, mastery.masteryCpm, request.accuracy, request.cadence, lessonKind, localDate)
         val saved = trainingResultRepo.save(
             TrainingResultEntity(
                 clientResultId = cleanClientResultId(request.clientResultId),
@@ -88,7 +92,7 @@ class TrainingService(
                 focusProblemKeys = sanitizeProblemKeys(request.focusProblemKeys),
             ),
         )
-        val events = gamificationService.eventsAfterSave(profile, saved)
+        val events = gamificationService.eventsAfterSave(profile, layoutProfile, saved)
         val recent = trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc(subject)
         return submitResponse(saved, subject, null, events, chordSet, recent)
     }
@@ -118,8 +122,9 @@ class TrainingService(
         val gamificationProfile = profileForAnonymous(profile.id)
         val lessonKind = normalizeLessonKind(request.lessonKind)
         val localDate = parseLocalDate(request.localTrainingDate, request.clientTimezone)
-        val mastery = masteryService.update(gamificationProfile, request.averageCpm, request.accuracy, request.cadence)
-        gamificationService.updateProfileBeforeSave(gamificationProfile, mastery.masteryCpm, request.accuracy, request.cadence, lessonKind, localDate)
+        val layoutProfile = layoutProfileForAnonymous(profile.id, chordSet.layout)
+        val mastery = masteryService.update(layoutProfile, request.averageCpm, request.accuracy, request.cadence)
+        gamificationService.updateProfileBeforeSave(gamificationProfile, layoutProfile, mastery.masteryCpm, request.accuracy, request.cadence, lessonKind, localDate)
         val saved = trainingResultRepo.save(
             TrainingResultEntity(
                 clientResultId = cleanClientResultId(request.clientResultId),
@@ -145,7 +150,7 @@ class TrainingService(
                 focusProblemKeys = sanitizeProblemKeys(request.focusProblemKeys),
             ),
         )
-        val events = gamificationService.eventsAfterSave(gamificationProfile, saved)
+        val events = gamificationService.eventsAfterSave(gamificationProfile, layoutProfile, saved)
         val recent = trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id)
         return submitResponse(saved, null, profile.id, events, chordSet, recent)
     }
@@ -161,6 +166,8 @@ class TrainingService(
             result.anonymousProfileId = null
         }
         trainingResultRepo.saveAll(anonymousResults)
+        profileForSubject(subject)
+        claimAnonymousLayoutMastery(subject, profile.id)
         return ClaimAnonymousProgressResponse(
             claimedResults = anonymousResults.size,
             progress = progress(subject),
@@ -171,16 +178,17 @@ class TrainingService(
     fun progress(subject: String): ProgressResponse {
         val results = trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc(subject)
         val gamification = gamificationProfileRepo.findByKeycloakSubject(subject)
+        val layoutProfiles = layoutMasteryProfileRepo.findByKeycloakSubjectOrderByLayoutAsc(subject)
         if (results.isEmpty()) {
             return ProgressResponse(
                 sessions = 0,
                 bestSpeedCpm = 0.0,
                 avgSpeedCpm = 0.0,
                 avgAccuracy = 0.0,
-                masteryCpm = gamification?.masteryCpm,
+                masteryCpm = layoutProfiles.firstOrNull()?.masteryCpm ?: gamification?.masteryCpm,
                 weakFingers = emptyList(),
                 recent = emptyList(),
-                gamification = gamification?.let { gamificationService.toResponse(it) },
+                gamification = gamification?.let { gamificationService.toResponse(it, layoutProfiles) },
             )
         }
 
@@ -195,10 +203,10 @@ class TrainingService(
             bestSpeedCpm = results.maxOf { result -> result.speedCpm },
             avgSpeedCpm = results.map { result -> result.speedCpm }.average(),
             avgAccuracy = results.map { result -> result.accuracy }.average(),
-            masteryCpm = gamification?.masteryCpm ?: results.firstOrNull()?.masteryCpm,
+            masteryCpm = layoutProfiles.firstOrNull()?.masteryCpm ?: gamification?.masteryCpm ?: results.firstOrNull()?.masteryCpm,
             weakFingers = weakFingers,
             recent = results.take(10).map { result -> result.toResponse() },
-            gamification = gamification?.let { gamificationService.toResponse(it) },
+            gamification = gamification?.let { gamificationService.toResponse(it, layoutProfiles) },
         )
     }
 
@@ -217,12 +225,15 @@ class TrainingService(
         val focusLesson = focusLesson(saved, recent, chordSet)
         val profile = subject?.let { gamificationProfileRepo.findByKeycloakSubject(it) }
             ?: anonymousProfileId?.let { gamificationProfileRepo.findByAnonymousProfileId(it) }
+        val layoutProfiles = subject?.let { layoutMasteryProfileRepo.findByKeycloakSubjectOrderByLayoutAsc(it) }
+            ?: anonymousProfileId?.let { layoutMasteryProfileRepo.findByAnonymousProfileIdOrderByLayoutAsc(it) }
+            ?: emptyList()
         val progress = subject?.let { progress(it) }
             ?: anonymousProgress(anonymousProfileId, recent, profile)
         return SubmitTrainingResultResponse(
             trainingResult = saved.toResponse().copy(focusLesson = focusLesson),
             progress = progress,
-            gamification = gamificationService.toResponse(profile ?: gamificationService.emptyProfile()),
+            gamification = gamificationService.toResponse(profile ?: gamificationService.emptyProfile(), layoutProfiles, chordSet.layout),
             events = events.map { event -> gamificationService.eventToResponse(event) },
             techniqueAdvice = techniqueAdviceService.advice(saved, recent),
         )
@@ -234,17 +245,19 @@ class TrainingService(
         profile: GamificationProfileEntity?,
     ): ProgressResponse =
         if (results.isEmpty()) {
+            val layoutProfiles = anonymousProfileId?.let { layoutMasteryProfileRepo.findByAnonymousProfileIdOrderByLayoutAsc(it) }.orEmpty()
             ProgressResponse(
                 sessions = 0,
                 bestSpeedCpm = 0.0,
                 avgSpeedCpm = 0.0,
                 avgAccuracy = 0.0,
-                masteryCpm = profile?.masteryCpm,
+                masteryCpm = layoutProfiles.firstOrNull()?.masteryCpm ?: profile?.masteryCpm,
                 weakFingers = emptyList(),
                 recent = emptyList(),
-                gamification = profile?.let { gamificationService.toResponse(it) },
+                gamification = profile?.let { gamificationService.toResponse(it, layoutProfiles) },
             )
         } else {
+            val layoutProfiles = anonymousProfileId?.let { layoutMasteryProfileRepo.findByAnonymousProfileIdOrderByLayoutAsc(it) }.orEmpty()
             val weakFingers = results
                 .flatMap { result -> result.perFinger.entries }
                 .groupBy({ entry -> entry.key }, { entry -> entry.value })
@@ -255,10 +268,10 @@ class TrainingService(
                 bestSpeedCpm = results.maxOf { result -> result.speedCpm },
                 avgSpeedCpm = results.map { result -> result.speedCpm }.average(),
                 avgAccuracy = results.map { result -> result.accuracy }.average(),
-                masteryCpm = profile?.masteryCpm ?: results.firstOrNull()?.masteryCpm,
+                masteryCpm = layoutProfiles.firstOrNull()?.masteryCpm ?: profile?.masteryCpm ?: results.firstOrNull()?.masteryCpm,
                 weakFingers = weakFingers,
                 recent = results.take(10).map { result -> result.toResponse() },
-                gamification = profile?.let { gamificationService.toResponse(it) },
+                gamification = profile?.let { gamificationService.toResponse(it, layoutProfiles) },
             )
         }
 
@@ -269,6 +282,33 @@ class TrainingService(
     private fun profileForAnonymous(anonymousProfileId: Long): GamificationProfileEntity =
         gamificationProfileRepo.findByAnonymousProfileId(anonymousProfileId)
             ?: gamificationProfileRepo.save(GamificationProfileEntity(anonymousProfileId = anonymousProfileId))
+
+    private fun layoutProfileForSubject(subject: String, layout: String): LayoutMasteryProfileEntity =
+        layoutMasteryProfileRepo.findByKeycloakSubjectAndLayout(subject, layout)
+            ?: layoutMasteryProfileRepo.save(LayoutMasteryProfileEntity(keycloakSubject = subject, layout = layout))
+
+    private fun layoutProfileForAnonymous(anonymousProfileId: Long, layout: String): LayoutMasteryProfileEntity =
+        layoutMasteryProfileRepo.findByAnonymousProfileIdAndLayout(anonymousProfileId, layout)
+            ?: layoutMasteryProfileRepo.save(LayoutMasteryProfileEntity(anonymousProfileId = anonymousProfileId, layout = layout))
+
+    private fun claimAnonymousLayoutMastery(subject: String, anonymousProfileId: Long) {
+        val anonymousProfiles = layoutMasteryProfileRepo.findByAnonymousProfileIdOrderByLayoutAsc(anonymousProfileId)
+        anonymousProfiles.forEach { anonymousLayoutProfile ->
+            val subjectLayoutProfile = layoutProfileForSubject(subject, anonymousLayoutProfile.layout)
+            if (anonymousLayoutProfile.masteryCpm >= subjectLayoutProfile.masteryCpm) {
+                subjectLayoutProfile.masteryCpm = anonymousLayoutProfile.masteryCpm
+                subjectLayoutProfile.baselineMasteryCpm = anonymousLayoutProfile.baselineMasteryCpm
+                subjectLayoutProfile.leagueLevel = anonymousLayoutProfile.leagueLevel
+                subjectLayoutProfile.calibrationSessionCount = anonymousLayoutProfile.calibrationSessionCount
+                subjectLayoutProfile.calibrationMasteryTotal = anonymousLayoutProfile.calibrationMasteryTotal
+                subjectLayoutProfile.calibrationCompletedAt = anonymousLayoutProfile.calibrationCompletedAt
+                subjectLayoutProfile.trendJson = anonymousLayoutProfile.trendJson
+            }
+            subjectLayoutProfile.updatedAt = Instant.now()
+            layoutMasteryProfileRepo.save(subjectLayoutProfile)
+        }
+        layoutMasteryProfileRepo.deleteAll(anonymousProfiles)
+    }
 
     private fun requireChordSet(chordSetId: Long): ChordSetEntity =
         chordSetRepo.findById(chordSetId)

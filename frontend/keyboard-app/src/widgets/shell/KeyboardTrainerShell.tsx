@@ -9,6 +9,7 @@ import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/Vi
 import {
   dismissRegistrationPrompt,
   getOrCreateAnonymousDeviceId,
+  readGuestLayoutMastery,
   readGuestDisplayName,
   readDismissedPromptCount,
   readGuestSessionCount,
@@ -16,10 +17,11 @@ import {
   shouldShowNamePrompt,
   shouldShowRegistrationPrompt,
   writeGuestDisplayName,
+  writeGuestLayoutMastery,
 } from "../../features/guest/guestProgress";
 import { Metronome } from "../../features/metronome/Metronome";
 import { suggestMetronomeBpm } from "../../features/metronome/metronomeTempo";
-import { StatsPanel } from "../../features/stats/StatsPanel";
+import { masteryLevelForCpm, StatsPanel, type MasteryLevelId } from "../../features/stats/StatsPanel";
 import { shouldReloadActiveSetForLayout } from "../../features/typing/activeSetSync";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { computeCadence, estimateSessionMastery, masteryDeltaLabel } from "../../features/typing/mastery";
@@ -50,7 +52,7 @@ import { claimAnonymousProgress, fetchProgress, resolveAnonymousProfile, submitA
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
-import type { ChordSet, FocusLesson, GamificationEvent, LayoutId, Me, Progress, TrainingResult } from "../../shared/types";
+import type { ChordSet, FocusLesson, GamificationEvent, GamificationProfile, LayoutId, Me, Progress, TrainingResult } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
 import { shouldBlockDeferredPrompts, shouldShowDeferredPrompt } from "./promptFlow";
 import { registrationUrlForKeyboard } from "./registrationLink";
@@ -80,6 +82,30 @@ const emptyProgress: Progress = {
   weakFingers: [],
   recent: [],
 };
+
+export function layoutMasteryCpm(progress: Progress | null, guestLayoutMastery: ReturnType<typeof readGuestLayoutMastery>, layoutId: LayoutId): number | undefined {
+  return progress?.gamification?.layoutMastery?.[layoutId]?.masteryCpm ?? guestLayoutMastery[layoutId]?.masteryCpm;
+}
+
+export function activeLayoutGamification(gamification: GamificationProfile | undefined, layoutId: LayoutId): GamificationProfile | undefined {
+  const layoutMastery = gamification?.layoutMastery?.[layoutId];
+  if (!gamification || !layoutMastery) {
+    return gamification;
+  }
+
+  return {
+    ...gamification,
+    calibrated: layoutMastery.calibrated,
+    calibrationSessions: layoutMastery.calibrationSessions,
+    calibrationTarget: layoutMastery.calibrationTarget,
+    masteryCpm: layoutMastery.masteryCpm,
+    baselineMasteryCpm: layoutMastery.baselineMasteryCpm,
+    leagueLevel: layoutMastery.leagueLevel,
+    leagueProgress: layoutMastery.leagueProgress,
+    trend: layoutMastery.trend,
+    activeLayoutMastery: layoutMastery,
+  };
+}
 
 function focusLessonToChordSet(focusLesson: FocusLesson): ChordSet {
   return {
@@ -182,6 +208,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [anonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const [guestSessionCount, setGuestSessionCount] = useState(() => readGuestSessionCount());
   const [guestDisplayName, setGuestDisplayName] = useState<string | null>(() => readGuestDisplayName());
+  const [guestLayoutMastery, setGuestLayoutMastery] = useState(() => readGuestLayoutMastery());
   const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [pendingRegistrationPrompt, setPendingRegistrationPrompt] = useState(false);
@@ -406,6 +433,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
   const sessionResult = result();
   const resultKey = sessionResult ? `${sessionResult.chordSetId}:${sessionResult.durationMs}:${sessionResult.errors}` : null;
+  const savedLayoutMasteryCpm = layoutMasteryCpm(progress, isAuthenticated ? {} : guestLayoutMastery, layoutId);
 
   useEffect(() => {
     if (sessionResult && sessionFlow.phase === "running") {
@@ -456,7 +484,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     if (!isAuthenticated) {
       const nextCount = recordGuestSession();
       const dismissedCount = readDismissedPromptCount();
+      const localMastery = estimateSessionMastery({
+        previousMasteryCpm: savedLayoutMasteryCpm,
+        averageCpm: sessionResult.averageCpm,
+        accuracy: sessionResult.accuracy,
+        cadence: sessionResult.cadence,
+      });
       setGuestSessionCount(nextCount);
+      setGuestLayoutMastery(writeGuestLayoutMastery(layoutId, localMastery.masteryCpm));
       setGuestRecorded(true);
       updateNextDecision();
       if (!submitPayload) {
@@ -508,7 +543,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         setLoadError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => setSaving(false));
-  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, layoutId, perChar, profileSeed, resultKey, sessionResult, sets, t]);
+  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, layoutId, perChar, profileSeed, resultKey, savedLayoutMasteryCpm, sessionResult, sets, t]);
 
   const liveStats = useMemo(() => {
     const elapsedMs =
@@ -546,7 +581,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           masteryDelta: savedTrainingResult.masteryDelta,
         }
       : estimateSessionMastery({
-          previousMasteryCpm: progress?.masteryCpm ?? progress?.gamification?.masteryCpm,
+          previousMasteryCpm: savedLayoutMasteryCpm,
           averageCpm: sessionResult.averageCpm,
           accuracy: sessionResult.accuracy,
           cadence: sessionResult.cadence,
@@ -580,7 +615,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const suggestedMetronomeBpm = sessionResult ? suggestMetronomeBpm(intervals, sessionResult.cadence) : null;
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
-  const effectiveGamification = progress?.gamification;
+  const effectiveGamification = activeLayoutGamification(progress?.gamification, layoutId);
+  const displayedMasteryCpm = effectiveMastery?.masteryCpm ?? savedLayoutMasteryCpm ?? 0;
+  const displayedMasteryLevelId: MasteryLevelId = masteryLevelForCpm(displayedMasteryCpm);
+  const displayedMasteryLevel = t(`masteryLevel.${displayedMasteryLevelId}`);
   const gamificationLabels: GamificationProfileLabels = {
     title: t("gamification.title"),
     calibration: t("gamification.calibration"),
@@ -1185,6 +1223,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
           <StatsPanel
             labels={{
+              mastery: t("stats.mastery"),
               speed: t("stats.speed"),
               accuracy: t("stats.accuracy"),
               cadence: t("stats.cadence"),
@@ -1195,6 +1234,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               cpm: t("units.cpm"),
               percent: t("units.percent"),
             }}
+            masteryCpm={displayedMasteryCpm}
+            masteryLevel={displayedMasteryLevel}
             speedCpm={liveStats.speedCpm}
             accuracy={liveStats.accuracy}
             cadence={liveStats.cadence}

@@ -139,6 +139,20 @@ data class GamificationProfileResponse(
     val lastTrainingDate: String?,
     val trend: List<Double>,
     val achievements: List<String>,
+    val layoutMastery: Map<String, LayoutMasteryProfileResponse> = emptyMap(),
+    val activeLayoutMastery: LayoutMasteryProfileResponse? = null,
+)
+
+data class LayoutMasteryProfileResponse(
+    val layout: String,
+    val calibrated: Boolean,
+    val calibrationSessions: Int,
+    val calibrationTarget: Int,
+    val masteryCpm: Double,
+    val baselineMasteryCpm: Double?,
+    val leagueLevel: Int?,
+    val leagueProgress: Int,
+    val trend: List<Double>,
 )
 
 data class GamificationEventResponse(

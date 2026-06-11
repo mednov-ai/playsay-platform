@@ -12,6 +12,7 @@ import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
 import com.playsay.keyboard.repo.AnonymousProfileRepo
 import com.playsay.keyboard.repo.GamificationEventRepo
 import com.playsay.keyboard.repo.GamificationProfileRepo
+import com.playsay.keyboard.repo.LayoutMasteryProfileRepo
 import com.playsay.keyboard.repo.TrainingResultRepo
 import liquibase.integration.spring.SpringLiquibase
 import org.junit.jupiter.api.BeforeAll
@@ -47,6 +48,7 @@ class KeyboardApiTest @Autowired constructor(
     private val anonymousProfileRepo: AnonymousProfileRepo,
     private val gamificationEventRepo: GamificationEventRepo,
     private val gamificationProfileRepo: GamificationProfileRepo,
+    private val layoutMasteryProfileRepo: LayoutMasteryProfileRepo,
     private val trainingResultRepo: TrainingResultRepo,
     private val dataSource: DataSource,
 ) {
@@ -71,6 +73,7 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `authenticated user can train and see progress`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
 
         val chordSets = chordSetController.list(layout = "EN", difficulty = null)
         assertTrue(chordSets.isNotEmpty())
@@ -102,6 +105,7 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `authenticated result submission is idempotent by client result id and updates mastery once`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
 
         val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
         val request = SubmitResultRequest(
@@ -137,6 +141,7 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `mastery rewards stable rhythm and penalizes unstable rhythm`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
 
         val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
         val first = trainingController.submit(
@@ -181,6 +186,7 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `mastery treats seventy percent rhythm as good when accuracy is high`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
         gamificationProfileRepo.deleteAllInBatch()
 
         val auth = keyboardAuthentication(subject = "seventy-rhythm-subject")
@@ -196,9 +202,49 @@ class KeyboardApiTest @Autowired constructor(
     }
 
     @Test
+    fun `mastery is tracked independently for each keyboard layout`() {
+        trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
+        gamificationProfileRepo.deleteAllInBatch()
+
+        val auth = keyboardAuthentication(subject = "layout-mastery-subject")
+        val enChordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val ruChordSetId = chordSetController.list(layout = "RU", difficulty = null)[0].id
+
+        val firstEn = trainingController.submit(auth, calibrationRequest(enChordSetId, "layout-mastery-en-1", 300.0))
+        val firstRu = trainingController.submit(auth, calibrationRequest(ruChordSetId, "layout-mastery-ru-1", 80.0))
+        val secondEn = trainingController.submit(auth, calibrationRequest(enChordSetId, "layout-mastery-en-2", 300.0))
+
+        assertTrue(assertNotNull(firstEn.trainingResult.masteryCpm) >= 295.0)
+        assertTrue(assertNotNull(firstRu.trainingResult.masteryCpm) < 100.0)
+        assertTrue(assertNotNull(secondEn.trainingResult.masteryCpm) >= 295.0)
+    }
+
+    @Test
+    fun `progress exposes mastery profiles for every trained layout`() {
+        trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
+        gamificationProfileRepo.deleteAllInBatch()
+
+        val auth = keyboardAuthentication(subject = "layout-progress-subject")
+        val enChordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val ruChordSetId = chordSetController.list(layout = "RU", difficulty = null)[0].id
+
+        trainingController.submit(auth, calibrationRequest(enChordSetId, "layout-progress-en", 260.0))
+        trainingController.submit(auth, calibrationRequest(ruChordSetId, "layout-progress-ru", 140.0))
+
+        val progress = trainingController.progress(auth)
+
+        assertEquals(setOf("EN", "RU"), progress.gamification?.layoutMastery?.keys)
+        assertTrue(assertNotNull(progress.gamification?.layoutMastery?.get("EN")?.masteryCpm) > 250.0)
+        assertTrue(assertNotNull(progress.gamification?.layoutMastery?.get("RU")?.masteryCpm) < 150.0)
+    }
+
+    @Test
     fun `calibration completes after three saved standard lessons and emits one completion event`() {
         gamificationEventRepo.deleteAllInBatch()
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
         gamificationProfileRepo.deleteAllInBatch()
 
         val auth = keyboardAuthentication(subject = "calibration-three-subject")
@@ -229,6 +275,7 @@ class KeyboardApiTest @Autowired constructor(
     fun `strong calibration starts above beginner league`() {
         gamificationEventRepo.deleteAllInBatch()
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
         gamificationProfileRepo.deleteAllInBatch()
 
         val auth = keyboardAuthentication(subject = "strong-calibration-subject")
@@ -245,6 +292,7 @@ class KeyboardApiTest @Autowired constructor(
     fun `streak achievements are emitted once when local training dates advance`() {
         gamificationEventRepo.deleteAllInBatch()
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
         gamificationProfileRepo.deleteAllInBatch()
 
         val auth = keyboardAuthentication(subject = "streak-subject")
@@ -291,6 +339,7 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `authenticated severe errors return a focus lesson`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
 
         val chordSet = chordSetController.list(layout = "EN", difficulty = null)[0]
         val chordSetId = chordSet.id
@@ -326,6 +375,7 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `anonymous profile can be resolved and named without jwt`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
         anonymousProfileRepo.deleteAllInBatch()
 
         val request = anonymousRequest()
@@ -349,6 +399,7 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `anonymous severe result returns a focus lesson`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
         anonymousProfileRepo.deleteAllInBatch()
 
         val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
@@ -375,6 +426,7 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `anonymous moderate repeated errors return focus after three sessions`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
         anonymousProfileRepo.deleteAllInBatch()
 
         val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
@@ -422,7 +474,9 @@ class KeyboardApiTest @Autowired constructor(
     @Test
     fun `authenticated user can claim anonymous progress once`() {
         trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
         anonymousProfileRepo.deleteAllInBatch()
+        gamificationProfileRepo.deleteAllInBatch()
 
         val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
         val request = anonymousRequest()
@@ -458,6 +512,7 @@ class KeyboardApiTest @Autowired constructor(
         assertEquals(1, repeated.progress.sessions)
         assertTrue(trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id).isEmpty())
         assertEquals(1, trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc("student-keycloak-subject").size)
+        assertTrue(assertNotNull(claimed.progress.gamification?.layoutMastery?.get("EN")?.masteryCpm) > 0.0)
     }
 
     private fun calibrationRequest(chordSetId: Long, clientResultId: String, averageCpm: Double): SubmitResultRequest =

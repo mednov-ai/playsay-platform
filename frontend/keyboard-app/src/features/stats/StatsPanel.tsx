@@ -1,5 +1,6 @@
 interface Props {
   labels: {
+    mastery: string;
     speed: string;
     accuracy: string;
     cadence: string;
@@ -10,11 +11,35 @@ interface Props {
     cpm: string;
     percent: string;
   };
+  masteryCpm: number;
+  masteryLevel: string;
   speedCpm: number;
   accuracy: number;
   cadence: number;
   errors: number;
   progress: number;
+}
+
+export type MasteryLevelId = "starter" | "beginner" | "confident" | "middle" | "strong" | "pro";
+
+export function masteryLevelForCpm(cpm: number): MasteryLevelId {
+  const cleanCpm = Number.isFinite(cpm) ? cpm : 0;
+  if (cleanCpm >= 450) {
+    return "pro";
+  }
+  if (cleanCpm >= 350) {
+    return "strong";
+  }
+  if (cleanCpm >= 250) {
+    return "middle";
+  }
+  if (cleanCpm >= 180) {
+    return "confident";
+  }
+  if (cleanCpm >= 100) {
+    return "beginner";
+  }
+  return "starter";
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
@@ -26,11 +51,12 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-export function StatsPanel({ labels, units, speedCpm, accuracy, cadence, errors, progress }: Props) {
+export function StatsPanel({ labels, units, masteryCpm, masteryLevel, speedCpm, accuracy, cadence, errors, progress }: Props) {
   return (
     <div className="stats-panel">
       <div className="stats-panel__grid">
-        <Stat label={labels.speed} value={`${Math.round(speedCpm)} ${units.cpm}`} accent />
+        <Stat label={labels.mastery} value={`${Math.round(masteryCpm)} ${units.cpm} · ${masteryLevel}`} accent />
+        <Stat label={labels.speed} value={`${Math.round(speedCpm)} ${units.cpm}`} />
         <Stat label={labels.accuracy} value={`${Math.round(accuracy * 100)}${units.percent}`} />
         <Stat label={labels.cadence} value={`${Math.round(cadence * 100)}${units.percent}`} />
         <Stat label={labels.errors} value={String(errors)} accent={errors > 0} />

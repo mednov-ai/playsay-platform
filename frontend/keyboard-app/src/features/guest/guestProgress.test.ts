@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   anonymousDeviceIdStorageKey,
   guestDisplayNameStorageKey,
+  guestLayoutMasteryStorageKey,
   guestPromptDismissedStorageKey,
   guestSessionStorageKey,
   getOrCreateAnonymousDeviceId,
+  readGuestLayoutMastery,
   readGuestDisplayName,
   readDismissedPromptCount,
   readGuestSessionCount,
@@ -12,6 +14,7 @@ import {
   shouldShowNamePrompt,
   shouldShowRegistrationPrompt,
   writeGuestDisplayName,
+  writeGuestLayoutMastery,
 } from "./guestProgress";
 
 class MemoryStorage implements Pick<Storage, "getItem" | "setItem"> {
@@ -32,6 +35,7 @@ describe("guest keyboard progress", () => {
     expect(guestPromptDismissedStorageKey).toBe("playsay.key.registrationPromptDismissedAt");
     expect(anonymousDeviceIdStorageKey).toBe("playsay.key.anonymousDeviceId");
     expect(guestDisplayNameStorageKey).toBe("playsay.key.guestDisplayName");
+    expect(guestLayoutMasteryStorageKey).toBe("playsay.key.layoutMastery");
   });
 
   it("creates a stable anonymous device id", () => {
@@ -83,6 +87,18 @@ describe("guest keyboard progress", () => {
     writeGuestDisplayName("Zhenya", storage);
 
     expect(readGuestDisplayName(storage)).toBe("Zhenya");
+  });
+
+  it("stores guest mastery separately for each layout", () => {
+    const storage = new MemoryStorage();
+
+    writeGuestLayoutMastery("EN", 212.34, storage);
+    writeGuestLayoutMastery("RU", 88.2, storage);
+
+    expect(readGuestLayoutMastery(storage)).toEqual({
+      EN: { masteryCpm: 212.3 },
+      RU: { masteryCpm: 88.2 },
+    });
   });
 
   it("treats invalid stored values as empty", () => {

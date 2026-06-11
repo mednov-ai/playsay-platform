@@ -8,13 +8,14 @@ export const stableCadenceThreshold = 0.65;
 export const fastSpeedCpm = 200;
 export const expertSpeedCpm = 250;
 export const remedialId = -1;
+export const remedialChordCount = 32;
 
 export interface AdaptiveDecision {
   kind: "up" | "down" | "repeat";
   set: ChordSet;
 }
 
-export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], title: string, seed = "focus"): ChordSet {
+export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], title: string, seed = "focus", sourceChords: string[] = []): ChordSet {
   const layout = LAYOUTS[layoutId];
   const homeAnchors: Record<string, string> = {};
   layout.keys.forEach((key) => {
@@ -42,10 +43,14 @@ export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], tit
     });
   });
 
-  const unique = Array.from(new Set(combos));
+  const support = sourceChords
+    .map((chord) => chord.trim())
+    .filter((chord) => chord.length > 0)
+    .filter((chord) => chars.some((char) => chord.includes(char)));
+  const unique = Array.from(new Set([...combos, ...support, ...sourceChords]));
   const shuffledUnique = seededShuffle(unique, `${layoutId}:${seed}:${chars.join("")}`);
   const repeated: string[] = [];
-  while (repeated.length < 18 && unique.length > 0) {
+  while (repeated.length < remedialChordCount && unique.length > 0) {
     repeated.push(...shuffledUnique);
   }
 
@@ -55,7 +60,7 @@ export function buildRemedialSet(layoutId: LayoutId, problemChars: string[], tit
     title,
     difficulty: 0,
     tier: "beginner",
-    chords: repeated.slice(0, 18),
+    chords: repeated.slice(0, remedialChordCount),
   };
 }
 
@@ -77,7 +82,7 @@ export function decideNext(params: {
     if (problems.length > 0) {
       return {
         kind: "down",
-        set: buildRemedialSet(layoutId, problems, remedialTitle, remedialSeed),
+        set: buildRemedialSet(layoutId, problems, remedialTitle, remedialSeed, currentSet.chords),
       };
     }
   }

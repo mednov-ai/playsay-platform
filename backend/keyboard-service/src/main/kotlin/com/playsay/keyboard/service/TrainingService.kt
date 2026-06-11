@@ -515,12 +515,14 @@ class TrainingService(
             .distinct()
             .toList()
         if (combos.isEmpty()) {
-            return cleanedFallback.take(18)
+            return repeatToFocusCount(cleanedFallback)
         }
 
         val problemLimit = focusChordCount / 2
         val problemPart = combos.take(problemLimit)
-        val supportingPart = cleanedFallback.filterNot { chord -> chord in combos }
+        val supportingPart = cleanedFallback
+            .filterNot { chord -> chord in combos }
+            .sortedWith(compareByDescending<String> { chord -> supportScore(chord, problemKeys) }.thenBy { chord -> chord })
         val mixed = mutableListOf<String>()
         var problemIndex = 0
         var supportIndex = 0
@@ -542,6 +544,31 @@ class TrainingService(
         }
         return mixed.take(focusChordCount)
     }
+
+    private fun repeatToFocusCount(chords: List<String>): List<String> {
+        if (chords.isEmpty()) {
+            return emptyList()
+        }
+        val repeated = mutableListOf<String>()
+        while (repeated.size < focusChordCount) {
+            chords.forEach { chord ->
+                if (repeated.size < focusChordCount) {
+                    repeated += chord
+                }
+            }
+        }
+        return repeated
+    }
+
+    private fun supportScore(chord: String, problemKeys: List<String>): Int =
+        problemKeys.maxOfOrNull { key ->
+            when {
+                key.isNotEmpty() && chord.contains(key) -> 4
+                key.length > 1 && (chord.startsWith(key.first()) || chord.endsWith(key.last())) -> 3
+                key.any { char -> chord.contains(char) } -> 2
+                else -> 0
+            }
+        } ?: 0
 
     private fun sanitizeErrorMap(values: Map<String, Int>): Map<String, Int> =
         values.asSequence()
@@ -685,6 +712,6 @@ class TrainingService(
         const val maxMapEntries = 32
         const val maxProblemKeys = 8
         const val maxErrorsPerKey = 999
-        const val focusChordCount = 18
+        const val focusChordCount = 32
     }
 }

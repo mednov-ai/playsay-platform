@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { TrainingResult } from "../../shared/types";
 
 interface Props {
@@ -24,14 +25,25 @@ interface Props {
 
 export function RecentDynamicsPanel({ labels, recent, units }: Props) {
   const lessons = recent.slice(0, 5);
+  const maxMastery = Math.max(1, ...lessons.map((lesson) => lesson.masteryCpm ?? lesson.averageCpm));
   return (
-    <details className="recent-dynamics" open={lessons.length > 0}>
-      <summary>{labels.title}</summary>
+    <div className="recent-dynamics" role="document">
       {lessons.length > 0 ? (
-        <ol>
-          {lessons.map((lesson, index) => {
-            const previous = lessons[index + 1];
-            return (
+        <>
+          <div className="recent-dynamics__chart" aria-label={labels.mastery}>
+            {lessons.slice().reverse().map((lesson) => (
+              <span
+                key={`chart-${lesson.id}`}
+                style={{ "--bar-height": `${Math.max(8, Math.round(((lesson.masteryCpm ?? lesson.averageCpm) / maxMastery) * 100))}%` } as CSSProperties}
+              >
+                <b>{Math.round(lesson.masteryCpm ?? lesson.averageCpm)}</b>
+              </span>
+            ))}
+          </div>
+          <ol>
+            {lessons.map((lesson, index) => {
+              const previous = lessons[index + 1];
+              return (
               <li key={lesson.id}>
                 <span className="recent-dynamics__kind">
                   {lesson.lessonKind === "FOCUS" ? labels.focus : labels.standard}
@@ -64,13 +76,14 @@ export function RecentDynamicsPanel({ labels, recent, units }: Props) {
                   <small>{previous ? formatDelta(lesson.errors - previous.errors, labels) : labels.deltaFlat}</small>
                 </span>
               </li>
-            );
-          })}
-        </ol>
+              );
+            })}
+          </ol>
+        </>
       ) : (
         <p>{labels.empty}</p>
       )}
-    </details>
+    </div>
   );
 }
 

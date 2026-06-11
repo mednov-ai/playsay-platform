@@ -20,7 +20,13 @@ describe("active keyboard set sync", () => {
     expect(shouldReloadActiveSetForLayout({ layoutId: "EN", chordSet: enSet, phase: "idle" })).toBe(true);
   });
 
-  it("does not reload while a session is locked", () => {
-    expect(shouldReloadActiveSetForLayout({ layoutId: "EN", chordSet: enSet, phase: "countdown" })).toBe(false);
+  it("reloads a matching countdown set before typing is accepted", () => {
+    expect(shouldReloadActiveSetForLayout({ layoutId: "EN", chordSet: enSet, phase: "countdown" })).toBe(true);
+  });
+
+  it("does not reload while a session has user input state", () => {
+    expect(shouldReloadActiveSetForLayout({ layoutId: "EN", chordSet: enSet, phase: "running" })).toBe(false);
+    expect(shouldReloadActiveSetForLayout({ layoutId: "EN", chordSet: enSet, phase: "paused" })).toBe(false);
+    expect(shouldReloadActiveSetForLayout({ layoutId: "EN", chordSet: enSet, phase: "finished" })).toBe(false);
   });
 });

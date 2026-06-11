@@ -30,6 +30,7 @@ export type KeyboardLabels = {
 };
 
 const isSpecial = (key: Key): key is SpecialKey => (key as SpecialKey).special === true;
+const homeKeyChars = new Set(["a", "s", "d", "f", "j", "k", "l", ";"]);
 
 const rows: Key[][] = [
   [
@@ -136,13 +137,17 @@ export function VirtualKeyboard({ labels, layoutId, nextChar }: Props) {
 
             const char = layoutId === "RU" ? key.ru : key.en;
             const active = nextChar != null && char === nextChar;
+            const homeKey = homeKeyChars.has(key.en);
             return (
               <div
                 key={`${rowIndex}-${keyIndex}`}
-                className={`virtual-keyboard__key ${active ? "is-active" : ""}`}
+                className={`virtual-keyboard__key ${active ? "is-active" : ""} ${homeKey ? "is-home-key" : ""}`}
+                data-home-key={homeKey ? "true" : undefined}
+                data-home-char={homeKey ? key.en : undefined}
                 style={style}
               >
                 {/\p{L}/u.test(char) ? char.toUpperCase() : char}
+                {homeKey ? <span className="virtual-keyboard__home-pad" aria-hidden="true" /> : null}
               </div>
             );
           })}

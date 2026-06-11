@@ -211,7 +211,7 @@ class KeyboardApiTest @Autowired constructor(
 
         assertEquals("SEVERE", saved.focusLesson?.reason)
         assertTrue(saved.focusLesson?.problemKeys.orEmpty().contains("th"))
-        assertTrue(saved.focusLesson?.chords.orEmpty().isNotEmpty())
+        assertEquals(32, saved.focusLesson?.chords.orEmpty().size)
         assertTrue(
             saved.focusLesson?.chords.orEmpty().any { chord -> chord in chordSet.chords && chord != "th" },
             "focus lesson should mix critical ngrams with supporting source-set chords",

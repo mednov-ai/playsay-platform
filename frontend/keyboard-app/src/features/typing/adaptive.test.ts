@@ -74,7 +74,26 @@ describe("keyboard adaptive level selection", () => {
 
     expect(first.chords).toEqual(second.chords);
     expect(first.chords).not.toEqual(otherSeed.chords);
-    expect(first.chords).toHaveLength(18);
+    expect(first.chords).toHaveLength(32);
     expect(first.chords).toContain("th");
+  });
+
+  it("mixes remedial problem keys with nearby source-set candidates", () => {
+    const decision = decideNext({
+      ...baseParams,
+      accuracy: 0.8,
+      perChar: { t: 3 },
+      currentSet: {
+        id: 9,
+        layout: "EN",
+        title: "Source",
+        difficulty: 3,
+        tier: "confident",
+        chords: ["th", "st", "tr", "ta", "re", "ou", "ng", "er", "ti"],
+      },
+    });
+
+    expect(decision.set.chords).toHaveLength(32);
+    expect(decision.set.chords.some((chord) => ["th", "st", "tr", "ta", "ti"].includes(chord))).toBe(true);
   });
 });

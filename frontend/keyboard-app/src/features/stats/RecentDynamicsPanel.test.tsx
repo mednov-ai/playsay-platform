@@ -62,11 +62,39 @@ describe("RecentDynamicsPanel", () => {
       ],
     }));
 
-    expect(markup).toContain("Recent dynamics");
     expect(markup).toContain("Focus");
     expect(markup).toContain("190 cpm");
     expect(markup).toContain("+20");
     expect(markup).toContain("+4%");
     expect(markup).toContain("-3");
+  });
+
+  it("renders as dialog content instead of an inline details block", () => {
+    const markup = renderToStaticMarkup(createElement(RecentDynamicsPanel, {
+      labels: {
+        title: "Recent dynamics",
+        empty: "No saved lessons yet",
+        mastery: "Mastery",
+        speed: "Speed",
+        averageTempo: "Average tempo",
+        accuracy: "Accuracy",
+        errors: "Errors",
+        standard: "Lesson",
+        focus: "Focus",
+        deltaUp: "+{{value}}",
+        deltaDown: "-{{value}}",
+        deltaFlat: "0",
+      },
+      units: {
+        cpm: "cpm",
+        percent: "%",
+      },
+      recent: [],
+    }));
+
+    expect(markup).toContain('class="recent-dynamics"');
+    expect(markup).toContain('role="document"');
+    expect(markup).not.toContain("<details");
+    expect(markup).not.toContain("<summary");
   });
 });

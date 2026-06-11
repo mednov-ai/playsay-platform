@@ -1,5 +1,5 @@
 import { publicSiteUrl } from "@playsay/shared-ui";
-import { LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
+import { BarChart3, LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
@@ -182,6 +182,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [guestDisplayName, setGuestDisplayName] = useState<string | null>(() => readGuestDisplayName());
   const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [showDynamicsModal, setShowDynamicsModal] = useState(false);
   const [guestNameDraft, setGuestNameDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -794,6 +795,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           dismissNamePrompt();
           return;
         }
+        if (showDynamicsModal) {
+          event.preventDefault();
+          setShowDynamicsModal(false);
+          return;
+        }
         if (showRegistrationPrompt) {
           event.preventDefault();
           dismissPrompt();
@@ -855,6 +861,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     sessionFlow.finishOverlayVisible,
     sessionFlow.phase,
     showNamePrompt,
+    showDynamicsModal,
     showRegistrationPrompt,
     skipCountdown,
     startSession,
@@ -961,6 +968,17 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </select>
           </label>
 
+          <button
+            type="button"
+            className="secondary-button dynamics-button"
+            onClick={() => setShowDynamicsModal(true)}
+            aria-label={t("trainer.openDynamics")}
+            title={t("trainer.openDynamics")}
+          >
+            <BarChart3 size={18} aria-hidden="true" />
+            <span>{t("trainer.recentDynamics")}</span>
+          </button>
+
           <div className="progress-summary">
             <Metric label={t("trainer.sessions")} value={String(effectiveProgress.sessions)} />
             <Metric label={t("trainer.best")} value={`${Math.round(effectiveProgress.bestSpeedCpm)} ${t("units.cpm")}`} />
@@ -986,27 +1004,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
           {progressImportMessage ? <div className="progress-import-status">{progressImportMessage}</div> : null}
 
-          <RecentDynamicsPanel
-            labels={{
-              title: t("trainer.recentDynamics"),
-              empty: t("trainer.noRecentDynamics"),
-              mastery: t("trainer.mastery"),
-              speed: t("stats.speed"),
-              averageTempo: t("stats.averageTempo"),
-              accuracy: t("stats.accuracy"),
-              errors: t("stats.errors"),
-              standard: t("trainer.standardLesson"),
-              focus: t("trainer.focusLesson"),
-              deltaUp: t("trainer.deltaUp"),
-              deltaDown: t("trainer.deltaDown"),
-              deltaFlat: t("trainer.deltaFlat"),
-            }}
-            units={{
-              cpm: t("units.cpm"),
-              percent: t("units.percent"),
-            }}
-            recent={effectiveProgress.recent}
-          />
         </aside>
         ) : null}
 
@@ -1324,6 +1321,38 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 <span>{t("trainer.continueGuest")}</span>
               </button>
             </div>
+          </section>
+        </div>
+      ) : null}
+
+      {showDynamicsModal ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="registration-modal dynamics-modal" role="dialog" aria-modal="true" aria-labelledby="dynamics-modal-title">
+            <button type="button" className="icon-button registration-modal__close" onClick={() => setShowDynamicsModal(false)} aria-label={t("trainer.closeDynamics")}>
+              <X size={18} aria-hidden="true" />
+            </button>
+            <h2 id="dynamics-modal-title">{t("trainer.recentDynamics")}</h2>
+            <RecentDynamicsPanel
+              labels={{
+                title: t("trainer.recentDynamics"),
+                empty: t("trainer.noRecentDynamics"),
+                mastery: t("trainer.mastery"),
+                speed: t("stats.speed"),
+                averageTempo: t("stats.averageTempo"),
+                accuracy: t("stats.accuracy"),
+                errors: t("stats.errors"),
+                standard: t("trainer.standardLesson"),
+                focus: t("trainer.focusLesson"),
+                deltaUp: t("trainer.deltaUp"),
+                deltaDown: t("trainer.deltaDown"),
+                deltaFlat: t("trainer.deltaFlat"),
+              }}
+              units={{
+                cpm: t("units.cpm"),
+                percent: t("units.percent"),
+              }}
+              recent={effectiveProgress.recent}
+            />
           </section>
         </div>
       ) : null}

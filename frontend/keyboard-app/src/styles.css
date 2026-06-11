@@ -367,7 +367,7 @@ input {
 .side-panel {
   display: grid;
   width: min(100%, var(--trainer-frame-width));
-  grid-template-columns: minmax(140px, 1fr) 120px minmax(220px, 1.3fr) minmax(390px, 2fr) minmax(160px, 0.8fr);
+  grid-template-columns: minmax(130px, 1fr) 110px minmax(210px, 1.15fr) minmax(124px, 0.58fr) minmax(320px, 1.5fr) minmax(150px, 0.68fr);
   justify-self: center;
   align-items: end;
   gap: 8px;
@@ -375,6 +375,12 @@ input {
   overflow: hidden;
   border-radius: 16px;
   padding: 6px 10px;
+}
+
+.dynamics-button {
+  min-height: 57px;
+  justify-content: center;
+  align-self: end;
 }
 
 .account-strip {
@@ -500,29 +506,54 @@ input {
 }
 
 .recent-dynamics {
-  align-self: stretch;
   min-width: 0;
-  max-height: 146px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-strong);
-  padding: 8px 10px;
-  overflow: auto;
-}
-
-.recent-dynamics summary {
-  cursor: pointer;
-  color: var(--foreground);
-  font-size: 13px;
-  font-weight: 800;
+  display: grid;
+  gap: 16px;
 }
 
 .recent-dynamics ol {
   display: grid;
   gap: 6px;
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.recent-dynamics__chart {
+  display: grid;
+  height: 150px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(34px, 1fr);
+  align-items: end;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, var(--surface)), var(--surface-strong));
+  padding: 16px;
+}
+
+.recent-dynamics__chart span {
+  position: relative;
+  display: flex;
+  min-height: 100%;
+  align-items: end;
+  justify-content: center;
+}
+
+.recent-dynamics__chart span::before {
+  content: "";
+  width: 100%;
+  height: var(--bar-height);
+  min-height: 8px;
+  border-radius: 999px 999px 8px 8px;
+  background: linear-gradient(180deg, var(--primary), color-mix(in srgb, var(--primary) 62%, var(--surface)));
+  box-shadow: 0 8px 18px rgb(255 92 0 / 0.18);
+}
+
+.recent-dynamics__chart b {
+  position: absolute;
+  bottom: calc(var(--bar-height) + 6px);
+  font-size: 11px;
 }
 
 .recent-dynamics li {
@@ -1261,6 +1292,7 @@ input {
 }
 
 .virtual-keyboard__key {
+  position: relative;
   width: calc(var(--key-width) * var(--key-unit) + (var(--key-width) - 1) * var(--key-gap));
   height: var(--key-height);
   display: grid;
@@ -1278,6 +1310,35 @@ input {
     color 0.12s ease;
 }
 
+.virtual-keyboard__home-pad {
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  width: 52%;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--finger-color) 82%, white);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.62),
+    0 3px 8px color-mix(in srgb, var(--finger-color) 34%, transparent);
+  transform: translateX(-50%);
+}
+
+.virtual-keyboard__key[data-home-char="f"]::before,
+.virtual-keyboard__key[data-home-char="j"]::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--foreground);
+  opacity: 0.42;
+  box-shadow: 10px 0 0 var(--foreground);
+  transform: translateX(-8px);
+}
+
 .virtual-keyboard__key--special {
   color: var(--muted);
   font-size: 12px;
@@ -1290,6 +1351,11 @@ input {
   box-shadow:
     inset 0 0 0 2px rgb(255 255 255 / 0.5),
     0 7px 16px rgb(255 92 0 / 0.24);
+}
+
+.virtual-keyboard__key.is-active .virtual-keyboard__home-pad {
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.7);
 }
 
 .metronome {
@@ -1364,6 +1430,10 @@ input {
   background: var(--surface);
   box-shadow: var(--shadow);
   padding: 28px;
+}
+
+.dynamics-modal {
+  width: min(760px, calc(100vw - 32px));
 }
 
 @keyframes play-ring {
@@ -1667,7 +1737,7 @@ input {
 
 @media (max-width: 1100px) {
   .side-panel {
-    grid-template-columns: minmax(150px, 1fr) 116px minmax(210px, 1.4fr);
+    grid-template-columns: minmax(150px, 1fr) 116px minmax(210px, 1.4fr) minmax(124px, 0.65fr);
   }
 
   .progress-summary,
@@ -1682,7 +1752,7 @@ input {
 
 @media (max-width: 1500px) {
   .side-panel {
-    grid-template-columns: minmax(150px, 1fr) 116px minmax(260px, 1.6fr);
+    grid-template-columns: minmax(150px, 1fr) 116px minmax(260px, 1.6fr) minmax(124px, 0.65fr);
   }
 
   .progress-summary,
@@ -1748,6 +1818,16 @@ input {
   .progress-summary,
   .weak-fingers {
     display: grid;
+  }
+
+  .dynamics-button {
+    width: 100%;
+  }
+
+  .recent-dynamics__chart {
+    height: 120px;
+    grid-auto-columns: minmax(28px, 1fr);
+    gap: 8px;
   }
 
   .trainer-surface {

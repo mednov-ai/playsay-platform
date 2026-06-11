@@ -70,6 +70,8 @@ export const ru = {
     noWeakFingers: "Ошибок по пальцам пока нет",
     recent: "Последние сессии",
     recentDynamics: "Динамика",
+    openDynamics: "Открыть динамику",
+    closeDynamics: "Закрыть динамику",
     noRecentDynamics: "Сохранённых уроков пока нет",
     standardLesson: "Урок",
     focusLesson: "Фокус",

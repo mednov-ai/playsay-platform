@@ -6,5 +6,5 @@ export function shouldReloadActiveSetForLayout(params: {
   chordSet: ChordSet | null;
   phase: SessionPhase;
 }): boolean {
-  return params.phase === "idle" && params.chordSet != null && params.chordSet.layout === params.layoutId;
+  return (params.phase === "idle" || params.phase === "countdown") && params.chordSet != null && params.chordSet.layout === params.layoutId;
 }

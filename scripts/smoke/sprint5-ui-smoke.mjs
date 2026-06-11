@@ -88,7 +88,7 @@ try {
   ]);
   addCheck("shared-collaboration-document-precreated");
 
-  await openClassroom(teacher.page, lesson.id, "[data-testid='lesson-material-surface']");
+  await openClassroom(teacher.page, lesson.id, "[data-testid='lesson-material-surface']", { revealTeacherTask: true });
   await Promise.all([
     openClassroom(studentA.page, lesson.id, "[data-testid='lesson-material-surface']"),
     openClassroom(studentB.page, lesson.id, "[data-testid='lesson-material-surface']"),
@@ -383,11 +383,16 @@ async function ensureCollaborationDocument(token, lessonId, materialId, scope) {
   });
 }
 
-async function openClassroom(page, lessonId, readySelector) {
+async function openClassroom(page, lessonId, readySelector, options = {}) {
   await page.goto(`${webBaseUrl}/lessons/${lessonId}/classroom`, {
     waitUntil: "domcontentloaded",
     timeout: timeoutMs,
   });
+  if (options.revealTeacherTask) {
+    const revealButton = page.locator("button").filter({ hasText: /Показать задание|Show task|Aufgabe anzeigen|Afficher la tâche/i }).first();
+    await revealButton.waitFor({ timeout: timeoutMs });
+    await revealButton.click();
+  }
   await page.locator(readySelector).waitFor({ timeout: timeoutMs });
   await page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
 }

@@ -72,6 +72,8 @@ export const de: TranslationResource = {
     noWeakFingers: "Noch keine Fingerfehler",
     recent: "Letzte Sitzungen",
     recentDynamics: "Dynamik",
+    openDynamics: "Dynamik öffnen",
+    closeDynamics: "Dynamik schließen",
     noRecentDynamics: "Noch keine gespeicherten Lektionen",
     standardLesson: "Lektion",
     focusLesson: "Fokus",

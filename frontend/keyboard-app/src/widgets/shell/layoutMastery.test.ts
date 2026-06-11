@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GamificationProfile, Progress } from "../../shared/types";
-import { activeLayoutGamification, layoutMasteryCpm } from "./KeyboardTrainerShell";
+import type { StreamItem } from "../../features/typing/typingStore";
+import { activeLayoutGamification, countCompletedChords, displayedMasteryCpm, layoutMasteryCpm } from "./KeyboardTrainerShell";
 
 const gamification: GamificationProfile = {
   calibrated: true,
@@ -62,4 +63,104 @@ describe("layout mastery display", () => {
     expect(layoutMasteryCpm(progress, { RU: { masteryCpm: 120 } }, "RU")).toBe(90);
     expect(layoutMasteryCpm(null, { RU: { masteryCpm: 120 } }, "RU")).toBe(120);
   });
+
+  it("counts completed non-space chord indexes, not raw characters", () => {
+    const stream: StreamItem[] = [
+      item("a", 0, "ab"),
+      item("b", 0, "ab"),
+      space(1),
+      item("c", 1, "cd"),
+      item("d", 1, "cd"),
+      space(2),
+      item("e", 2, "ef"),
+      item("f", 2, "ef"),
+    ];
+
+    expect(countCompletedChords(stream, 1)).toBe(0);
+    expect(countCompletedChords(stream, 2)).toBe(1);
+    expect(countCompletedChords(stream, 8)).toBe(3);
+  });
+
+  it("uses placeholder before three chords and provisional mastery after the bootstrap threshold", () => {
+    expect(
+      displayedMasteryCpm({
+        liveSpeedCpm: 240,
+        liveAccuracy: 1,
+        liveCadence: 1,
+        completedChordCount: 2,
+      }),
+    ).toBeNull();
+    expect(
+      displayedMasteryCpm({
+        liveSpeedCpm: 240,
+        liveAccuracy: 1,
+        liveCadence: 1,
+        completedChordCount: 3,
+      }),
+    ).toBe(240);
+  });
+
+  it("prefers saved and session mastery over provisional live mastery", () => {
+    expect(
+      displayedMasteryCpm({
+        savedLayoutMasteryCpm: 180,
+        liveSpeedCpm: 240,
+        liveAccuracy: 1,
+        liveCadence: 1,
+        completedChordCount: 3,
+      }),
+    ).toBe(180);
+    expect(
+      displayedMasteryCpm({
+        effectiveMasteryCpm: 210,
+        savedLayoutMasteryCpm: 180,
+        liveSpeedCpm: 240,
+        liveAccuracy: 1,
+        liveCadence: 1,
+        completedChordCount: 3,
+      }),
+    ).toBe(210);
+  });
+
+  it("treats zero saved layout mastery as missing until live bootstrap has enough chords", () => {
+    expect(
+      displayedMasteryCpm({
+        savedLayoutMasteryCpm: 0,
+        liveSpeedCpm: 240,
+        liveAccuracy: 1,
+        liveCadence: 1,
+        completedChordCount: 2,
+      }),
+    ).toBeNull();
+    expect(
+      displayedMasteryCpm({
+        savedLayoutMasteryCpm: 0,
+        liveSpeedCpm: 240,
+        liveAccuracy: 1,
+        liveCadence: 1,
+        completedChordCount: 3,
+      }),
+    ).toBe(240);
+  });
 });
+
+function item(char: string, chordIndex: number, chord: string): StreamItem {
+  return {
+    char,
+    chordIndex,
+    chord,
+    finger: "leftIndex",
+    isChordStart: char === chord[0],
+  };
+}
+
+function space(chordIndex: number): StreamItem {
+  return {
+    char: " ",
+    chordIndex,
+    chord: " ",
+    finger: "rightIndex",
+    isChordStart: false,
+    isSpace: true,
+  };
+}

@@ -67,6 +67,7 @@ interface Props {
 }
 
 const layouts: LayoutId[] = ["EN", "RU"];
+export const liveMasteryBootstrapChordThreshold = 3;
 
 type ClosingOverlay = {
   id: number;
@@ -105,6 +106,71 @@ export function activeLayoutGamification(gamification: GamificationProfile | und
     trend: layoutMastery.trend,
     activeLayoutMastery: layoutMastery,
   };
+}
+
+export function countCompletedChords(stream: StreamItem[], position: number): number {
+  const clampedPosition = Math.max(0, Math.min(position, stream.length));
+  const completed = new Set<number>();
+  const active = new Map<number, { seen: boolean; pending: boolean }>();
+
+  stream.forEach((item, index) => {
+    if (item.isSpace) {
+      return;
+    }
+
+    const state = active.get(item.chordIndex) ?? { seen: false, pending: false };
+    if (index < clampedPosition) {
+      state.seen = true;
+    } else {
+      state.pending = true;
+    }
+    active.set(item.chordIndex, state);
+  });
+
+  active.forEach((state, chordIndex) => {
+    if (state.seen && !state.pending) {
+      completed.add(chordIndex);
+    }
+  });
+
+  return completed.size;
+}
+
+interface DisplayedMasteryInput {
+  effectiveMasteryCpm?: number | null;
+  savedLayoutMasteryCpm?: number | null;
+  liveSpeedCpm: number;
+  liveAccuracy: number;
+  liveCadence: number;
+  completedChordCount: number;
+}
+
+export function displayedMasteryCpm({
+  effectiveMasteryCpm,
+  savedLayoutMasteryCpm,
+  liveSpeedCpm,
+  liveAccuracy,
+  liveCadence,
+  completedChordCount,
+}: DisplayedMasteryInput): number | null {
+  if (effectiveMasteryCpm != null && Number.isFinite(effectiveMasteryCpm)) {
+    return Math.max(0, effectiveMasteryCpm);
+  }
+
+  if (savedLayoutMasteryCpm != null && Number.isFinite(savedLayoutMasteryCpm) && savedLayoutMasteryCpm > 0) {
+    return savedLayoutMasteryCpm;
+  }
+
+  if (completedChordCount < liveMasteryBootstrapChordThreshold) {
+    return null;
+  }
+
+  return estimateSessionMastery({
+    previousMasteryCpm: null,
+    averageCpm: liveSpeedCpm,
+    accuracy: liveAccuracy,
+    cadence: liveCadence,
+  }).masteryCpm;
 }
 
 function focusLessonToChordSet(focusLesson: FocusLesson): ChordSet {
@@ -565,6 +631,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       progress: stream.length === 0 ? 0 : pos / stream.length,
     };
   }, [correctCount, errorCount, excludedDurationMs, finishedAt, intervals, pausedAt, pos, startedAt, stream.length]);
+  const completedChordCount = useMemo(() => countCompletedChords(stream, pos), [pos, stream]);
 
   const typingWindow = useMemo(
     () =>
@@ -616,8 +683,15 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
   const effectiveGamification = activeLayoutGamification(progress?.gamification, layoutId);
-  const displayedMasteryCpm = effectiveMastery?.masteryCpm ?? savedLayoutMasteryCpm ?? 0;
-  const displayedMasteryLevelId: MasteryLevelId = masteryLevelForCpm(displayedMasteryCpm);
+  const displayedMastery = displayedMasteryCpm({
+    effectiveMasteryCpm: effectiveMastery?.masteryCpm,
+    savedLayoutMasteryCpm,
+    liveSpeedCpm: liveStats.speedCpm,
+    liveAccuracy: liveStats.accuracy,
+    liveCadence: liveStats.cadence,
+    completedChordCount,
+  });
+  const displayedMasteryLevelId: MasteryLevelId = masteryLevelForCpm(displayedMastery ?? 0);
   const displayedMasteryLevel = t(`masteryLevel.${displayedMasteryLevelId}`);
   const gamificationLabels: GamificationProfileLabels = {
     title: t("gamification.title"),
@@ -1234,7 +1308,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               cpm: t("units.cpm"),
               percent: t("units.percent"),
             }}
-            masteryCpm={displayedMasteryCpm}
+            masteryCpm={displayedMastery}
             masteryLevel={displayedMasteryLevel}
             speedCpm={liveStats.speedCpm}
             accuracy={liveStats.accuracy}

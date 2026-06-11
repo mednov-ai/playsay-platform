@@ -33,6 +33,35 @@ describe("StatsPanel", () => {
     expect(markup).toContain("252 зн/мин · Средний");
   });
 
+  it("renders an empty mastery placeholder before live bootstrap has enough chords", () => {
+    const markup = renderToStaticMarkup(
+      createElement(StatsPanel, {
+        labels: {
+          mastery: "Мастерство",
+          speed: "Скорость",
+          accuracy: "Точность",
+          cadence: "Ритм",
+          errors: "Ошибки",
+          progress: "Прогресс",
+        },
+        units: {
+          cpm: "зн/мин",
+          percent: "%",
+        },
+        masteryCpm: null,
+        masteryLevel: "Стартовый",
+        speedCpm: 80,
+        accuracy: 1,
+        cadence: 1,
+        errors: 0,
+        progress: 0.05,
+      }),
+    );
+
+    expect(markup).toContain("— зн/мин · Стартовый");
+    expect(markup).not.toContain("0 зн/мин · Стартовый");
+  });
+
   it("derives named mastery levels from mastery cpm thresholds", () => {
     expect(masteryLevelForCpm(0)).toBe("starter");
     expect(masteryLevelForCpm(99)).toBe("starter");

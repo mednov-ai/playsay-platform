@@ -17,7 +17,7 @@ spec:
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /home/gradle/.gradle
-          subPath: gradle
+          subPath: gradle-keyboard-backend
       resources:
         requests:
           cpu: 350m

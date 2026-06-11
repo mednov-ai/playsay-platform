@@ -8,3 +8,6 @@ dist/
 .env.*
 !.env.example
 contracts/generated/
+
+# macOS
+.DS_Store

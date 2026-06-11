@@ -17,7 +17,7 @@ spec:
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /home/gradle/.gradle
-          subPath: gradle
+          subPath: gradle-media-service
       resources:
         requests:
           cpu: 450m

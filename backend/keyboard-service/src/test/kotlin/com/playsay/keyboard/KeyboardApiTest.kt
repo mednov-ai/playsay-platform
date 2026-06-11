@@ -23,6 +23,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import javax.sql.DataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @SpringBootTest(
@@ -83,8 +84,8 @@ class KeyboardApiTest @Autowired constructor(
                 perFinger = mapOf("leftIndex" to 2),
             ),
         )
-        assertEquals(chordSetId, saved.chordSetId)
-        assertEquals(180.5, saved.speedCpm)
+        assertEquals(chordSetId, saved.trainingResult.chordSetId)
+        assertEquals(180.5, saved.trainingResult.speedCpm)
 
         val progress = trainingController.progress(keyboardAuthentication())
         assertEquals(1, progress.sessions)
@@ -92,6 +93,85 @@ class KeyboardApiTest @Autowired constructor(
         assertEquals(0.96, progress.avgAccuracy)
         assertEquals("leftIndex", progress.weakFingers[0].finger)
         assertEquals(2, progress.weakFingers[0].errors)
+    }
+
+    @Test
+    fun `authenticated result submission is idempotent by client result id and updates mastery once`() {
+        trainingResultRepo.deleteAllInBatch()
+
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val request = SubmitResultRequest(
+            clientResultId = "client-result-1",
+            chordSetId = chordSetId,
+            lessonKind = "CALIBRATION",
+            speedCpm = 220.0,
+            averageCpm = 220.0,
+            cadence = 0.88,
+            accuracy = 0.97,
+            errors = 1,
+            characterCount = 220,
+            correctCount = 219,
+            durationMs = 60_000,
+            perFinger = mapOf("leftIndex" to 1),
+            clientTimezone = "Europe/Moscow",
+            localTrainingDate = "2026-06-11",
+        )
+
+        val first = trainingController.submit(keyboardAuthentication(), request)
+        val repeated = trainingController.submit(keyboardAuthentication(), request)
+
+        assertEquals(first.trainingResult.id, repeated.trainingResult.id)
+        assertEquals(1, trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc("student-keycloak-subject").size)
+        assertTrue(assertNotNull(first.trainingResult.masteryCpm) > 0.0)
+        assertEquals(0.0, repeated.trainingResult.masteryDelta)
+        assertEquals("RULES", first.techniqueAdvice.source)
+        assertEquals(1, first.progress.sessions)
+        assertEquals(1, repeated.progress.sessions)
+        assertEquals(first.gamification.masteryCpm, repeated.gamification.masteryCpm)
+    }
+
+    @Test
+    fun `mastery rewards stable rhythm and penalizes unstable rhythm`() {
+        trainingResultRepo.deleteAllInBatch()
+
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val first = trainingController.submit(
+            keyboardAuthentication(),
+            SubmitResultRequest(
+                clientResultId = "mastery-stable-1",
+                chordSetId = chordSetId,
+                lessonKind = "CALIBRATION",
+                speedCpm = 210.0,
+                averageCpm = 210.0,
+                cadence = 0.9,
+                accuracy = 0.98,
+                errors = 0,
+                characterCount = 210,
+                correctCount = 210,
+                durationMs = 60_000,
+            ),
+        )
+        val second = trainingController.submit(
+            keyboardAuthentication(),
+            SubmitResultRequest(
+                clientResultId = "mastery-unstable-2",
+                chordSetId = chordSetId,
+                speedCpm = 260.0,
+                averageCpm = 260.0,
+                cadence = 0.42,
+                accuracy = 0.9,
+                errors = 12,
+                characterCount = 260,
+                correctCount = 248,
+                durationMs = 60_000,
+            ),
+        )
+
+        assertTrue(assertNotNull(first.trainingResult.masteryCpm) <= 210.0)
+        assertTrue(assertNotNull(second.trainingResult.masteryCpm) < second.trainingResult.averageCpm)
+        assertTrue(second.techniqueAdvice.primaryAdvice.isNotBlank())
+        assertEquals("RHYTHM", second.techniqueAdvice.tone)
+        assertEquals("RULES", second.techniqueAdvice.source)
     }
 
     @Test

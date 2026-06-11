@@ -149,6 +149,22 @@ describe("typing window", () => {
     });
   });
 
+  it("fills the line with a fitting whole token instead of rejecting it because of trailing space", () => {
+    const stream = streamFromText("aaaaaaaa bbbbbbbb cccccccc");
+    const statuses = stream.map(() => "pending" as const);
+    const metrics = {
+      maxLineWidth: 168,
+      defaultCharacterWidth: 10,
+      spaceWidth: 5,
+      characterWidths: { a: 10, b: 10, c: 10 },
+    };
+
+    const window = buildMeasuredTypingWindow(stream, statuses, 0, metrics, 2);
+
+    expect(rowText(window.rows[0])).toBe("aaaaaaaa bbbbbbbb");
+    expect(measureTypingWindowRowWidth(window.rows[0], metrics)).toBeLessThanOrEqual(metrics.maxLineWidth);
+  });
+
   it("keeps measured non-final rows close to the available width when tokens remain", () => {
     const stream = streamFromText("ation ition ement ently ssion through sider ntial iness struct tinue ction fulness ability practice");
     const statuses = stream.map(() => "pending" as const);

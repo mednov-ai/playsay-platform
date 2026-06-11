@@ -954,9 +954,9 @@ input {
 }
 
 .practice-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 4;
+  z-index: 40;
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--surface) 66%, transparent);
@@ -1109,95 +1109,17 @@ input {
   text-transform: uppercase;
 }
 
-.practice-overlay__content .result-card__score {
+.practice-overlay__content .result-card__mastery {
   color: var(--primary);
   font-size: 42px;
   line-height: 0.95;
 }
 
-.result-card__score-row {
+.result-card__mastery-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-}
-
-.score-help-wrap {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-}
-
-.score-help {
-  display: inline-grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--primary) 44%, var(--line));
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--surface-strong) 86%, var(--primary) 14%);
-  color: var(--primary);
-  cursor: help;
-  padding: 0;
-}
-
-.score-help:hover,
-.score-help:focus-visible {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent);
-  outline: none;
-}
-
-.score-help__tooltip {
-  position: absolute;
-  bottom: calc(100% + 9px);
-  left: 50%;
-  z-index: 5;
-  display: grid;
-  width: min(360px, calc(100vw - 48px));
-  gap: 6px;
-  border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--line));
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  color: var(--foreground);
-  font-size: 13px;
-  font-weight: 750;
-  line-height: 1.35;
-  opacity: 0;
-  padding: 12px;
-  pointer-events: none;
-  text-align: left;
-  transform: translate(-50%, 6px);
-  transition:
-    opacity 160ms ease,
-    transform 160ms ease;
-}
-
-.score-help__tooltip strong {
-  color: var(--primary);
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.score-help-wrap:hover .score-help__tooltip,
-.score-help:focus-visible + .score-help__tooltip {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-.score-help__tooltip::after {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  width: 10px;
-  height: 10px;
-  border-right: 1px solid color-mix(in srgb, var(--primary) 26%, var(--line));
-  border-bottom: 1px solid color-mix(in srgb, var(--primary) 26%, var(--line));
-  background: var(--surface);
-  content: "";
-  transform: translateX(-50%) rotate(45deg);
 }
 
 .result-card__stats {
@@ -1219,7 +1141,6 @@ input {
 }
 
 .result-card__stats small,
-.result-card__score-explanation span,
 .result-card__weakness span,
 .result-card__advice span {
   color: var(--muted);
@@ -1232,25 +1153,6 @@ input {
 .result-card__stats b {
   color: var(--foreground);
   font-size: 17px;
-}
-
-.result-card__score-explanation {
-  display: grid;
-  gap: 6px;
-  width: 100%;
-  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-strong) 82%, var(--primary) 8%);
-  padding: 12px;
-  text-align: left;
-}
-
-.result-card__score-explanation p {
-  margin: 0;
-  color: var(--foreground);
-  font-size: 14px;
-  font-weight: 750;
-  line-height: 1.35;
 }
 
 .result-card__weakness {
@@ -1927,11 +1829,11 @@ input {
     padding: 20px;
   }
 
-  .practice-overlay__content .result-card__score {
+  .practice-overlay__content .result-card__mastery {
     font-size: 34px;
   }
 
-  .result-card__score-row {
+  .result-card__mastery-row {
     align-items: center;
     flex-wrap: wrap;
   }

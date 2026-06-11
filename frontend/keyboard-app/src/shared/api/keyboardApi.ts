@@ -17,7 +17,7 @@ import type {
   ResolveAnonymousProfileRequest,
   SubmitAnonymousResult,
   SubmitResult,
-  TrainingResult,
+  SubmitTrainingResultResponse,
   UpdateAnonymousProfileRequest,
 } from "../types";
 
@@ -98,8 +98,8 @@ export function fetchChordSets(layout: LayoutId, difficulty?: number): Promise<C
   return apiJson<ChordSet[]>(keyboardApiPath("/chord-sets", query), { method: "GET" });
 }
 
-export function submitResult(body: SubmitResult): Promise<TrainingResult> {
-  return apiJson<TrainingResult>(
+export function submitResult(body: SubmitResult): Promise<SubmitTrainingResultResponse> {
+  return apiJson<SubmitTrainingResultResponse>(
     keyboardApiPath("/training/results"),
     { method: "POST", body: JSON.stringify(body) },
     authConfig,
@@ -132,8 +132,8 @@ export function updateAnonymousProfile(body: UpdateAnonymousProfileRequest): Pro
   );
 }
 
-export function submitAnonymousResult(body: SubmitAnonymousResult): Promise<TrainingResult> {
-  return publicApiJson<TrainingResult>(
+export function submitAnonymousResult(body: SubmitAnonymousResult): Promise<SubmitTrainingResultResponse> {
+  return publicApiJson<SubmitTrainingResultResponse>(
     keyboardApiPath("/anonymous/training/results"),
     { method: "POST", body: JSON.stringify(body) },
     201,

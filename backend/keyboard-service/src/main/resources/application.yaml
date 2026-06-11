@@ -40,3 +40,8 @@ playsay:
   keyboard:
     anonymous:
       fingerprint-secret: ${PLAYSAY_KEYBOARD_ANONYMOUS_FINGERPRINT_SECRET:dev-keyboard-anonymous}
+    ai:
+      provider: ${PLAYSAY_KEYBOARD_AI_PROVIDER:}
+      model: ${PLAYSAY_KEYBOARD_AI_MODEL:}
+      api-key: ${PLAYSAY_KEYBOARD_AI_API_KEY:}
+      base-url: ${PLAYSAY_KEYBOARD_AI_BASE_URL:https://api.openai.com/v1}

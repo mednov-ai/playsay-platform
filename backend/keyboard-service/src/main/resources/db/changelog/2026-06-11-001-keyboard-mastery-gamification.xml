@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-11-001-extend-keyboard-training-results-mastery" author="codex">
+        <addColumn tableName="keyboard_training_results">
+            <column name="client_result_id" type="VARCHAR(128)"/>
+            <column name="character_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="correct_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="average_cpm" type="DOUBLE" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cadence" type="DOUBLE" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="mastery_cpm" type="DOUBLE"/>
+            <column name="mastery_delta" type="DOUBLE" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="window_metrics_json" type="VARCHAR(4000)" defaultValue="{}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="client_timezone" type="VARCHAR(64)" defaultValue="UTC">
+                <constraints nullable="false"/>
+            </column>
+            <column name="local_training_date" type="DATE"/>
+        </addColumn>
+        <addUniqueConstraint
+            tableName="keyboard_training_results"
+            columnNames="keycloak_subject, client_result_id"
+            constraintName="uk_keyboard_training_results_subject_client_result"/>
+        <addUniqueConstraint
+            tableName="keyboard_training_results"
+            columnNames="anonymous_profile_id, client_result_id"
+            constraintName="uk_keyboard_training_results_anonymous_client_result"/>
+    </changeSet>
+
+    <changeSet id="2026-06-11-002-create-keyboard-gamification-profiles" author="codex">
+        <createTable tableName="keyboard_gamification_profiles">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_keyboard_gamification_profiles"/>
+            </column>
+            <column name="keycloak_subject" type="VARCHAR(255)"/>
+            <column name="anonymous_profile_id" type="BIGINT"/>
+            <column name="mastery_cpm" type="DOUBLE" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="baseline_mastery_cpm" type="DOUBLE"/>
+            <column name="league_level" type="INT"/>
+            <column name="current_streak" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="best_streak" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="streak_freezes" type="INT" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_training_date" type="DATE"/>
+            <column name="trend_json" type="VARCHAR(2048)" defaultValue="[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="achievements_json" type="VARCHAR(2048)" defaultValue="[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="keyboard_gamification_profiles"
+            columnNames="keycloak_subject"
+            constraintName="uk_keyboard_gamification_profiles_subject"/>
+        <addUniqueConstraint
+            tableName="keyboard_gamification_profiles"
+            columnNames="anonymous_profile_id"
+            constraintName="uk_keyboard_gamification_profiles_anonymous"/>
+        <addForeignKeyConstraint
+            baseTableName="keyboard_gamification_profiles"
+            baseColumnNames="anonymous_profile_id"
+            constraintName="fk_keyboard_gamification_profiles_anonymous"
+            referencedTableName="keyboard_anonymous_profiles"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="2026-06-11-003-create-keyboard-gamification-events" author="codex">
+        <createTable tableName="keyboard_gamification_events">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_keyboard_gamification_events"/>
+            </column>
+            <column name="keycloak_subject" type="VARCHAR(255)"/>
+            <column name="anonymous_profile_id" type="BIGINT"/>
+            <column name="training_result_id" type="BIGINT"/>
+            <column name="event_type" type="VARCHAR(48)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload_json" type="VARCHAR(2000)" defaultValue="{}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="keyboard_gamification_events" indexName="idx_keyboard_gamification_events_subject_created">
+            <column name="keycloak_subject"/>
+            <column name="created_at"/>
+        </createIndex>
+        <createIndex tableName="keyboard_gamification_events" indexName="idx_keyboard_gamification_events_anonymous_created">
+            <column name="anonymous_profile_id"/>
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

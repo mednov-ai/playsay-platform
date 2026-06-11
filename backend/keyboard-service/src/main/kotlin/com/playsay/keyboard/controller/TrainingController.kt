@@ -4,7 +4,7 @@ import com.playsay.keyboard.dto.ClaimAnonymousProgressRequest
 import com.playsay.keyboard.dto.ClaimAnonymousProgressResponse
 import com.playsay.keyboard.dto.ProgressResponse
 import com.playsay.keyboard.dto.SubmitResultRequest
-import com.playsay.keyboard.dto.TrainingResultResponse
+import com.playsay.keyboard.dto.SubmitTrainingResultResponse
 import com.playsay.keyboard.service.TrainingService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -26,7 +26,7 @@ class TrainingController(
     fun submit(
         authentication: JwtAuthenticationToken,
         @Valid @RequestBody request: SubmitResultRequest,
-    ): TrainingResultResponse =
+    ): SubmitTrainingResultResponse =
         trainingService.submit(authentication.token.subject, request)
 
     @GetMapping("/progress")

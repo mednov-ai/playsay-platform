@@ -4,8 +4,10 @@ import type { SessionResult } from "./typingStore";
 import { buildTrainingSubmitPayload } from "./trainingPayload";
 
 const baseResult: SessionResult = {
+  clientResultId: "keyboard-test-result",
   chordSetId: -1,
   speedCpm: 168.4,
+  averageCpm: 168.4,
   accuracy: 0.91,
   errors: 4,
   durationMs: 31_000,
@@ -13,6 +15,8 @@ const baseResult: SessionResult = {
   perChar: { t: 3 },
   perChord: { th: 4 },
   cadence: 0.72,
+  characterCount: 220,
+  correctCount: 216,
 };
 
 describe("training submit payload", () => {
@@ -29,10 +33,17 @@ describe("training submit payload", () => {
     };
 
     expect(buildTrainingSubmitPayload(baseResult, focusSet)).toMatchObject({
+      clientResultId: expect.stringMatching(/^keyboard-/),
       chordSetId: 7,
       lessonKind: "FOCUS",
       focusProblemKeys: ["th", "t"],
       perChord: { th: 4 },
+      averageCpm: 168.4,
+      cadence: 0.72,
+      characterCount: 220,
+      correctCount: 216,
+      clientTimezone: expect.any(String),
+      localTrainingDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
   });
 

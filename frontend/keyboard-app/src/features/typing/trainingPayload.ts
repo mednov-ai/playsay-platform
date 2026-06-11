@@ -10,15 +10,31 @@ export function buildTrainingSubmitPayload(result: SessionResult, activeSet: Cho
 
   const lessonKind = activeSet?.id === -1 ? "FOCUS" : "STANDARD";
   return {
+    clientResultId: result.clientResultId,
     chordSetId,
     lessonKind,
     speedCpm: result.speedCpm,
+    averageCpm: result.averageCpm,
+    cadence: result.cadence,
     accuracy: result.accuracy,
     errors: result.errors,
+    characterCount: result.characterCount,
+    correctCount: result.correctCount,
     durationMs: result.durationMs,
     perFinger: result.perFinger,
     perChar: result.perChar,
     perChord: result.perChord,
     focusProblemKeys: lessonKind === "FOCUS" ? activeSet?.focusProblemKeys ?? [] : [],
+    windowMetrics: {},
+    clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    localTrainingDate: localTrainingDate(),
   };
+}
+
+function localTrainingDate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

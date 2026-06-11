@@ -24,15 +24,24 @@ fun ChordSetEntity.toResponse(): ChordSetResponse =
 fun TrainingResultEntity.toResponse(): TrainingResultResponse =
     TrainingResultResponse(
         id = id,
+        clientResultId = clientResultId,
         chordSetId = chordSetId,
         lessonKind = lessonKind,
         speedCpm = speedCpm,
+        averageCpm = averageCpm,
+        cadence = cadence,
+        masteryCpm = masteryCpm,
+        masteryDelta = masteryDelta,
         accuracy = accuracy,
         errors = errors,
+        characterCount = characterCount,
+        correctCount = correctCount,
         durationMs = durationMs,
         perChar = perChar,
         perChord = perChord,
         focusProblemKeys = focusProblemKeys,
+        clientTimezone = clientTimezone,
+        localTrainingDate = localTrainingDate?.toString(),
         createdAt = createdAt.toString(),
     )
 

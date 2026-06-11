@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { LAYOUTS } from "../../entities/layouts";
 import type { ChordSet, Finger, LayoutId } from "../../shared/types";
-import { computeCadence } from "./scoring";
+import { computeAverageTempo, computeCadence } from "./mastery";
 import { typingWindowLineLength, typingWindowRows } from "./typingWindow";
 
 export type CharStatus = "pending" | "correct" | "error";
@@ -16,10 +16,14 @@ export interface StreamItem {
 }
 
 export interface SessionResult {
+  clientResultId: string;
   chordSetId: number;
   speedCpm: number;
+  averageCpm: number;
   accuracy: number;
   errors: number;
+  characterCount: number;
+  correctCount: number;
   durationMs: number;
   perFinger: Record<string, number>;
   perChar: Record<string, number>;
@@ -304,15 +308,19 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     }
 
     const durationMs = computeActiveDurationMs({ startedAt, endedAt: finishedAt, excludedDurationMs, pausedAt });
-    const speedCpm = correctCount / (durationMs / 60_000);
+    const averageCpm = computeAverageTempo({ correctCount, durationMs });
     const total = correctCount + errorCount;
     const accuracy = total === 0 ? 1 : correctCount / total;
 
     return {
+      clientResultId: `keyboard-${chordSet.id}-${startedAt}-${finishedAt}-${correctCount}-${errorCount}`,
       chordSetId: chordSet.id,
-      speedCpm: Math.round(speedCpm * 10) / 10,
+      speedCpm: averageCpm,
+      averageCpm,
       accuracy: Math.round(accuracy * 1_000) / 1_000,
       errors: errorCount,
+      characterCount: total,
+      correctCount,
       durationMs,
       perFinger,
       perChar,

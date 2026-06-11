@@ -10,10 +10,14 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import java.time.Instant
+import java.time.LocalDate
 
 @Entity
 @Table(name = "keyboard_training_results")
 class TrainingResultEntity(
+    @Column(name = "client_result_id", length = 128)
+    var clientResultId: String? = null,
+
     @Column(name = "keycloak_subject", length = 255)
     var keycloakSubject: String? = null,
 
@@ -29,14 +33,41 @@ class TrainingResultEntity(
     @Column(name = "speed_cpm", nullable = false)
     var speedCpm: Double,
 
+    @Column(name = "average_cpm", nullable = false)
+    var averageCpm: Double = speedCpm,
+
+    @Column(nullable = false)
+    var cadence: Double = 1.0,
+
+    @Column(name = "mastery_cpm")
+    var masteryCpm: Double? = null,
+
+    @Column(name = "mastery_delta", nullable = false)
+    var masteryDelta: Double = 0.0,
+
     @Column(nullable = false)
     var accuracy: Double,
 
     @Column(nullable = false)
     var errors: Int,
 
+    @Column(name = "character_count", nullable = false)
+    var characterCount: Int = 0,
+
+    @Column(name = "correct_count", nullable = false)
+    var correctCount: Int = 0,
+
     @Column(name = "duration_ms", nullable = false)
     var durationMs: Long,
+
+    @Column(name = "window_metrics_json", nullable = false, length = 4000)
+    var windowMetricsJson: String = "{}",
+
+    @Column(name = "client_timezone", nullable = false, length = 64)
+    var clientTimezone: String = "UTC",
+
+    @Column(name = "local_training_date")
+    var localTrainingDate: LocalDate? = null,
 
     @Convert(converter = PerFingerErrorMapConverter::class)
     @Column(name = "per_finger", nullable = false, length = 2048)

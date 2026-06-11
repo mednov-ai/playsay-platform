@@ -6,58 +6,102 @@ import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.PositiveOrZero
 
 data class SubmitResultRequest(
+    val clientResultId: String? = null,
     @field:Min(1)
     val chordSetId: Long,
     val lessonKind: String = "STANDARD",
     @field:PositiveOrZero
     val speedCpm: Double,
+    @field:PositiveOrZero
+    val averageCpm: Double = speedCpm,
+    @field:DecimalMin("0.0")
+    @field:DecimalMax("1.0")
+    val cadence: Double = 1.0,
     @field:DecimalMin("0.0")
     @field:DecimalMax("1.0")
     val accuracy: Double,
     @field:PositiveOrZero
     val errors: Int,
+    @field:PositiveOrZero
+    val characterCount: Int = 0,
+    @field:PositiveOrZero
+    val correctCount: Int = 0,
     @field:Min(1)
     val durationMs: Long,
     val perFinger: Map<String, Int> = emptyMap(),
     val perChar: Map<String, Int> = emptyMap(),
     val perChord: Map<String, Int> = emptyMap(),
     val focusProblemKeys: List<String> = emptyList(),
+    val windowMetrics: Map<String, Double> = emptyMap(),
+    val clientTimezone: String = "UTC",
+    val localTrainingDate: String? = null,
 )
 
 data class SubmitAnonymousResultRequest(
     val deviceId: String,
     val displayName: String? = null,
+    val clientResultId: String? = null,
     @field:Min(1)
     val chordSetId: Long,
     val lessonKind: String = "STANDARD",
     @field:PositiveOrZero
     val speedCpm: Double,
+    @field:PositiveOrZero
+    val averageCpm: Double = speedCpm,
+    @field:DecimalMin("0.0")
+    @field:DecimalMax("1.0")
+    val cadence: Double = 1.0,
     @field:DecimalMin("0.0")
     @field:DecimalMax("1.0")
     val accuracy: Double,
     @field:PositiveOrZero
     val errors: Int,
+    @field:PositiveOrZero
+    val characterCount: Int = 0,
+    @field:PositiveOrZero
+    val correctCount: Int = 0,
     @field:Min(1)
     val durationMs: Long,
     val perFinger: Map<String, Int> = emptyMap(),
     val perChar: Map<String, Int> = emptyMap(),
     val perChord: Map<String, Int> = emptyMap(),
     val focusProblemKeys: List<String> = emptyList(),
+    val windowMetrics: Map<String, Double> = emptyMap(),
+    val clientTimezone: String = "UTC",
+    val localTrainingDate: String? = null,
 )
 
 data class TrainingResultResponse(
     val id: Long,
+    val clientResultId: String?,
     val chordSetId: Long,
     val lessonKind: String,
     val speedCpm: Double,
+    val averageCpm: Double,
+    val cadence: Double,
+    val masteryCpm: Double?,
+    val masteryDelta: Double,
     val accuracy: Double,
     val errors: Int,
+    val characterCount: Int,
+    val correctCount: Int,
     val durationMs: Long,
     val perChar: Map<String, Int>,
     val perChord: Map<String, Int>,
     val focusProblemKeys: List<String>,
+    val clientTimezone: String,
+    val localTrainingDate: String?,
     val createdAt: String,
     val focusLesson: FocusLessonResponse? = null,
+)
+
+data class SubmitTrainingResultResponse(
+    val trainingResult: TrainingResultResponse,
+    val progress: ProgressResponse,
+    val gamification: GamificationProfileResponse,
+    val events: List<GamificationEventResponse>,
+    val techniqueAdvice: TechniqueAdviceResponse,
+    val focusLesson: FocusLessonResponse? = trainingResult.focusLesson,
 )
 
 data class FocusLessonResponse(
@@ -75,8 +119,37 @@ data class ProgressResponse(
     val bestSpeedCpm: Double,
     val avgSpeedCpm: Double,
     val avgAccuracy: Double,
+    val masteryCpm: Double?,
     val weakFingers: List<FingerErrorsResponse>,
     val recent: List<TrainingResultResponse>,
+    val gamification: GamificationProfileResponse? = null,
+)
+
+data class GamificationProfileResponse(
+    val calibrated: Boolean,
+    val masteryCpm: Double,
+    val baselineMasteryCpm: Double?,
+    val leagueLevel: Int?,
+    val currentStreak: Int,
+    val bestStreak: Int,
+    val streakFreezes: Int,
+    val lastTrainingDate: String?,
+    val trend: List<Double>,
+    val achievements: List<String>,
+)
+
+data class GamificationEventResponse(
+    val id: Long,
+    val type: String,
+    val payload: Map<String, String>,
+    val createdAt: String,
+)
+
+data class TechniqueAdviceResponse(
+    val primaryAdvice: String,
+    val drillSuggestion: String,
+    val tone: String,
+    val source: String = "RULES",
 )
 
 data class ClaimAnonymousProgressRequest(

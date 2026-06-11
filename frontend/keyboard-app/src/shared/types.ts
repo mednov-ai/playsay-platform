@@ -53,7 +53,7 @@ export interface ChordSet {
   chords: string[];
 }
 
-export type TrainingLessonKind = "STANDARD" | "FOCUS";
+export type TrainingLessonKind = "CALIBRATION" | "STANDARD" | "FOCUS";
 
 export interface FocusLesson {
   kind: "FOCUS";
@@ -66,30 +66,47 @@ export interface FocusLesson {
 }
 
 export interface SubmitResult {
+  clientResultId: string;
   chordSetId: number;
   lessonKind?: TrainingLessonKind;
   speedCpm: number;
+  averageCpm: number;
+  cadence: number;
   accuracy: number;
   errors: number;
+  characterCount: number;
+  correctCount: number;
   durationMs: number;
   perFinger: Record<string, number>;
   perChar?: Record<string, number>;
   perChord?: Record<string, number>;
   focusProblemKeys?: string[];
+  windowMetrics?: Record<string, number>;
+  clientTimezone?: string;
+  localTrainingDate?: string;
 }
 
 export interface TrainingResult {
   id: number;
+  clientResultId?: string;
   chordSetId: number;
   lessonKind?: TrainingLessonKind;
   speedCpm: number;
+  averageCpm: number;
+  cadence: number;
+  masteryCpm?: number;
+  masteryDelta: number;
   accuracy: number;
   errors: number;
+  characterCount: number;
+  correctCount: number;
   durationMs: number;
   perFinger: Record<string, number>;
   perChar?: Record<string, number>;
   perChord?: Record<string, number>;
   focusProblemKeys?: string[];
+  clientTimezone?: string;
+  localTrainingDate?: string;
   createdAt: string;
   focusLesson?: FocusLesson;
 }
@@ -104,8 +121,46 @@ export interface Progress {
   bestSpeedCpm: number;
   avgSpeedCpm: number;
   avgAccuracy: number;
+  masteryCpm?: number;
   weakFingers: FingerErrors[];
   recent: TrainingResult[];
+  gamification?: GamificationProfile;
+}
+
+export interface GamificationProfile {
+  calibrated: boolean;
+  masteryCpm: number;
+  baselineMasteryCpm?: number;
+  leagueLevel?: number;
+  currentStreak: number;
+  bestStreak: number;
+  streakFreezes: number;
+  lastTrainingDate?: string;
+  trend: number[];
+  achievements: string[];
+}
+
+export interface GamificationEvent {
+  id: number;
+  type: string;
+  payload: Record<string, string>;
+  createdAt: string;
+}
+
+export interface TechniqueAdviceResponse {
+  primaryAdvice: string;
+  drillSuggestion: string;
+  tone: "ACCURACY" | "RHYTHM" | "STEADY";
+  source: "RULES" | "AI";
+}
+
+export interface SubmitTrainingResultResponse {
+  trainingResult: TrainingResult;
+  progress: Progress;
+  gamification: GamificationProfile;
+  events: GamificationEvent[];
+  techniqueAdvice: TechniqueAdviceResponse;
+  focusLesson?: FocusLesson;
 }
 
 export interface Me {

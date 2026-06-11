@@ -4,7 +4,9 @@ interface Props {
   labels: {
     title: string;
     empty: string;
+    mastery: string;
     speed: string;
+    averageTempo: string;
     accuracy: string;
     errors: string;
     standard: string;
@@ -35,10 +37,21 @@ export function RecentDynamicsPanel({ labels, recent, units }: Props) {
                   {lesson.lessonKind === "FOCUS" ? labels.focus : labels.standard}
                 </span>
                 <span>
-                  <b>{`${Math.round(lesson.speedCpm)} ${units.cpm}`}</b>
-                  <small>{previous ? formatDelta(Math.round(lesson.speedCpm - previous.speedCpm), labels) : labels.deltaFlat}</small>
+                  <small>{labels.mastery}</small>
+                  <b>{`${Math.round(lesson.masteryCpm ?? lesson.averageCpm)} ${units.cpm}`}</b>
+                  <small>
+                    {previous
+                      ? formatDelta(Math.round((lesson.masteryCpm ?? 0) - (previous.masteryCpm ?? 0)), labels)
+                      : labels.deltaFlat}
+                  </small>
                 </span>
                 <span>
+                  <small>{labels.averageTempo}</small>
+                  <b>{`${Math.round(lesson.averageCpm)} ${units.cpm}`}</b>
+                  <small>{previous ? formatDelta(Math.round(lesson.averageCpm - previous.averageCpm), labels) : labels.deltaFlat}</small>
+                </span>
+                <span>
+                  <small>{labels.accuracy}</small>
                   <b>{`${Math.round(lesson.accuracy * 100)}${units.percent}`}</b>
                   <small>
                     {previous

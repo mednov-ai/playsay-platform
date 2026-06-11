@@ -189,19 +189,37 @@ function splitMeasuredLines(
 ): TypingWindowItem[][] {
   const maxLineWidth = Math.max(1, metrics.maxLineWidth);
   const lines: TypingWindowItem[][] = [];
-  const units = buildMeasuredUnits(stream, statuses, metrics, maxLineWidth);
+  const units = buildMeasuredUnits(stream, statuses, metrics);
   let currentLine: TypingWindowItem[] = [];
   let currentWidth = 0;
 
   units.forEach((unit) => {
-    if (currentLine.length > 0 && currentWidth + unit.width > maxLineWidth) {
+    let nextItems = unit.items;
+    let nextWidth = unit.width;
+
+    if (currentLine.length > 0 && currentWidth + nextWidth > maxLineWidth) {
+      const leadingSpaces = takeLeadingSpaces(nextItems);
+      const tokenItems = nextItems.slice(leadingSpaces.length);
+      const leadingSpaceWidth = measureTypingWindowRowWidth(leadingSpaces, metrics);
+
+      if (leadingSpaces.length > 0 && currentWidth + leadingSpaceWidth <= maxLineWidth) {
+        currentLine.push(...leadingSpaces);
+        currentWidth += leadingSpaceWidth;
+        nextItems = tokenItems;
+        nextWidth = measureTypingWindowRowWidth(nextItems, metrics);
+      }
+
       lines.push(currentLine);
       currentLine = [];
       currentWidth = 0;
     }
 
-    currentLine.push(...unit.items);
-    currentWidth += unit.width;
+    if (nextItems.length === 0) {
+      return;
+    }
+
+    currentLine.push(...nextItems);
+    currentWidth += nextWidth;
   });
 
   if (currentLine.length > 0) {
@@ -217,7 +235,6 @@ function buildMeasuredUnits(
   stream: StreamItem[],
   statuses: CharStatus[],
   metrics: TypingWidthMetrics,
-  maxLineWidth: number,
 ): Array<{ items: TypingWindowItem[]; width: number }> {
   const units: Array<{ items: TypingWindowItem[]; width: number }> = [];
   let index = 0;
@@ -235,22 +252,28 @@ function buildMeasuredUnits(
       index += 1;
     }
 
-    while (index < stream.length && stream[index].isSpace) {
-      items.push(toWindowItem(stream[index], statuses, index));
-      index += 1;
-    }
-
     if (items.length === 0) {
       continue;
     }
 
     units.push({
       items,
-      width: Math.max(1, Math.min(measureTypingWindowRowWidth(items, metrics), maxLineWidth)),
+      width: Math.max(1, measureTypingWindowRowWidth(items, metrics)),
     });
   }
 
   return units;
+}
+
+function takeLeadingSpaces(items: TypingWindowItem[]): TypingWindowItem[] {
+  const spaces: TypingWindowItem[] = [];
+  for (const item of items) {
+    if (!item.item.isSpace) {
+      break;
+    }
+    spaces.push(item);
+  }
+  return spaces;
 }
 
 function toWindowItem(streamItem: StreamItem, statuses: CharStatus[], index: number): TypingWindowItem {

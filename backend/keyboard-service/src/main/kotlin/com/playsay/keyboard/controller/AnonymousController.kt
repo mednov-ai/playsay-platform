@@ -3,7 +3,7 @@ package com.playsay.keyboard.controller
 import com.playsay.keyboard.dto.AnonymousProfileResponse
 import com.playsay.keyboard.dto.ResolveAnonymousProfileRequest
 import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
-import com.playsay.keyboard.dto.TrainingResultResponse
+import com.playsay.keyboard.dto.SubmitTrainingResultResponse
 import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
 import com.playsay.keyboard.service.TrainingService
 import jakarta.servlet.http.HttpServletRequest
@@ -40,6 +40,6 @@ class AnonymousController(
     fun submit(
         @Valid @RequestBody request: SubmitAnonymousResultRequest,
         servletRequest: HttpServletRequest,
-    ): TrainingResultResponse =
+    ): SubmitTrainingResultResponse =
         trainingService.submitAnonymous(request, servletRequest)
 }

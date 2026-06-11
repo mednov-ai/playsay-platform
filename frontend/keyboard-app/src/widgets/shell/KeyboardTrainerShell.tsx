@@ -1,5 +1,5 @@
 import { publicSiteUrl } from "@playsay/shared-ui";
-import { Info, LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
+import { LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
@@ -21,9 +21,9 @@ import { RecentDynamicsPanel } from "../../features/stats/RecentDynamicsPanel";
 import { StatsPanel } from "../../features/stats/StatsPanel";
 import { shouldReloadActiveSetForLayout } from "../../features/typing/activeSetSync";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
-import { chooseResultAdvice } from "../../features/typing/resultAdvice";
-import { computeCadence, computeScore, scoreGradeBands, scoreWeights } from "../../features/typing/scoring";
+import { computeCadence, estimateSessionMastery, masteryDeltaLabel } from "../../features/typing/mastery";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
+import { chooseTechniqueAdvice } from "../../features/typing/techniqueAdvice";
 import {
   initialTrainerIntroPhase,
   isTrainerChromeVisible,
@@ -49,7 +49,7 @@ import { claimAnonymousProgress, fetchProgress, resolveAnonymousProfile, submitA
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
-import type { ChordSet, FocusLesson, LayoutId, Me, Progress } from "../../shared/types";
+import type { ChordSet, FocusLesson, LayoutId, Me, Progress, TrainingResult } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
 import { registrationUrlForKeyboard } from "./registrationLink";
 
@@ -77,20 +77,6 @@ const emptyProgress: Progress = {
   avgAccuracy: 0,
   weakFingers: [],
   recent: [],
-};
-
-const scoreWeightPercents = {
-  accuracy: Math.round(scoreWeights.accuracy * 100),
-  speed: Math.round(scoreWeights.speed * 100),
-  cadence: Math.round(scoreWeights.cadence * 100),
-};
-
-const scoreGradeBandLabels = {
-  s: scoreGradeBands.find((band) => band.grade === "S")?.label ?? "90-100",
-  a: scoreGradeBands.find((band) => band.grade === "A")?.label ?? "80-89",
-  b: scoreGradeBands.find((band) => band.grade === "B")?.label ?? "70-79",
-  c: scoreGradeBands.find((band) => band.grade === "C")?.label ?? "55-69",
-  d: scoreGradeBands.find((band) => band.grade === "D")?.label ?? "0-54",
 };
 
 function focusLessonToChordSet(focusLesson: FocusLesson): ChordSet {
@@ -200,6 +186,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [guestRecorded, setGuestRecorded] = useState(false);
+  const [savedTrainingResult, setSavedTrainingResult] = useState<TrainingResult | null>(null);
+  const [savedTechniqueAdvice, setSavedTechniqueAdvice] = useState<string | null>(null);
   const [nextDecision, setNextDecision] = useState<AdaptiveDecision | null>(null);
   const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
   const [trainerIntroPhase, dispatchTrainerIntro] = useReducer(trainerIntroReducer, undefined, initialTrainerIntroPhase);
@@ -468,7 +456,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         deviceId: anonymousDeviceId,
         displayName: guestDisplayName ?? undefined,
       })
-        .then((savedResult) => updateNextDecision(savedResult.focusLesson))
+        .then((savedResult) => {
+          setSavedTrainingResult(savedResult.trainingResult);
+          setSavedTechniqueAdvice(savedResult.techniqueAdvice.primaryAdvice);
+          setProgress(savedResult.progress);
+          updateNextDecision(savedResult.focusLesson);
+        })
         .catch(() => undefined);
       if (shouldShowNamePrompt(nextCount, guestDisplayName)) {
         setGuestNameDraft(guestDisplayName ?? "");
@@ -485,14 +478,16 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     const save = async () => {
       if (submitPayload) {
         const savedResult = await submitResult(submitPayload);
+        setSavedTrainingResult(savedResult.trainingResult);
+        setSavedTechniqueAdvice(savedResult.techniqueAdvice.primaryAdvice);
+        setProgress(savedResult.progress);
         updateNextDecision(savedResult.focusLesson);
-      }
-      const loadedProgress = await fetchProgress();
-      setProgress(loadedProgress);
-      setSaved(true);
-      if (!submitPayload) {
+      } else {
+        const loadedProgress = await fetchProgress();
+        setProgress(loadedProgress);
         updateNextDecision();
       }
+      setSaved(true);
     };
 
     void save()
@@ -531,46 +526,38 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     [pos, statuses, stream, typingLineCapacity, typingMetrics],
   );
 
-  const score = sessionResult
-    ? computeScore(sessionResult.speedCpm, sessionResult.accuracy, sessionResult.cadence)
+  const effectiveMastery = sessionResult
+    ? savedTrainingResult?.masteryCpm != null
+      ? {
+          masteryCpm: savedTrainingResult.masteryCpm,
+          masteryDelta: savedTrainingResult.masteryDelta,
+        }
+      : estimateSessionMastery({
+          previousMasteryCpm: progress?.masteryCpm ?? progress?.gamification?.masteryCpm,
+          averageCpm: sessionResult.averageCpm,
+          accuracy: sessionResult.accuracy,
+          cadence: sessionResult.cadence,
+        })
     : null;
-  const scoreExplanationParams = score
-    ? {
-        total: score.total,
-        grade: score.grade,
-        accuracyWeight: scoreWeightPercents.accuracy,
-        speedWeight: scoreWeightPercents.speed,
-        cadenceWeight: scoreWeightPercents.cadence,
-        accuracyScore: Math.round(score.accuracyScore * 100),
-        speedScore: Math.round(score.speedScore * 100),
-        cadenceScore: Math.round(score.cadenceScore * 100),
-        sBand: scoreGradeBandLabels.s,
-        aBand: scoreGradeBandLabels.a,
-        bBand: scoreGradeBandLabels.b,
-        cBand: scoreGradeBandLabels.c,
-        dBand: scoreGradeBandLabels.d,
-      }
+  const masterySummaryText = effectiveMastery
+    ? `${Math.round(effectiveMastery.masteryCpm)} ${t("units.cpm")}`
     : null;
-  const scoreSummaryText = scoreExplanationParams ? t("scoreExplanation.compact", scoreExplanationParams) : null;
-  const scoreFormulaText = scoreExplanationParams ? t("scoreExplanation.formula", scoreExplanationParams) : null;
-  const scoreCurrentText = scoreExplanationParams ? t("scoreExplanation.current", scoreExplanationParams) : null;
-  const scoreGradesText = scoreExplanationParams ? t("scoreExplanation.grades", scoreExplanationParams) : null;
-  const scoreTooltipText =
-    scoreExplanationParams && scoreFormulaText && scoreCurrentText && scoreGradesText
-      ? `${t("scoreExplanation.tooltipTitle", scoreExplanationParams)}. ${scoreFormulaText} ${scoreCurrentText} ${scoreGradesText}`
-      : "";
-  const resultAdvice = sessionResult
-    ? chooseResultAdvice({
+  const masteryDeltaText = effectiveMastery ? masteryDeltaLabel(effectiveMastery.masteryDelta) : null;
+  const techniqueAdvice = sessionResult
+    ? chooseTechniqueAdvice({
         accuracy: sessionResult.accuracy,
-        speedCpm: sessionResult.speedCpm,
+        averageCpm: sessionResult.averageCpm,
         cadence: sessionResult.cadence,
         errors: sessionResult.errors,
         perChar: sessionResult.perChar,
         perChord: sessionResult.perChord,
-        nextKind: nextDecision?.kind,
+        recent: (progress?.recent ?? []).map((item) => ({
+          accuracy: item.accuracy,
+          masteryCpm: item.masteryCpm,
+        })),
       })
     : null;
-  const resultAdviceText = resultAdvice ? t(`resultAdvice.${resultAdvice.kind}`, { value: resultAdvice.value }) : null;
+  const techniqueAdviceText = savedTechniqueAdvice ?? (techniqueAdvice ? t(`techniqueAdvice.${techniqueAdvice.kind}`, { value: techniqueAdvice.value }) : null);
   const resultWeakness = sessionResult
     ? selectResultWeakness({
         perChord: sessionResult.perChord,
@@ -632,6 +619,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const clearSessionResult = useCallback(() => {
     setSaved(false);
     setGuestRecorded(false);
+    setSavedTrainingResult(null);
+    setSavedTechniqueAdvice(null);
     submittedResultRef.current = null;
   }, []);
 
@@ -1001,7 +990,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             labels={{
               title: t("trainer.recentDynamics"),
               empty: t("trainer.noRecentDynamics"),
+              mastery: t("trainer.mastery"),
               speed: t("stats.speed"),
+              averageTempo: t("stats.averageTempo"),
               accuracy: t("stats.accuracy"),
               errors: t("stats.errors"),
               standard: t("trainer.standardLesson"),
@@ -1137,14 +1128,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                   <Save size={18} aria-hidden="true" />
                   <span>{t("trainer.saving")}</span>
                 </>
-              ) : saved && score ? (
+              ) : saved && masterySummaryText ? (
                 <>
-                  <strong>{`${t("trainer.score")}: ${scoreSummaryText ?? `${score.total} ${score.grade}`}`}</strong>
+                  <strong>{`${t("trainer.mastery")}: ${masterySummaryText}`}</strong>
                   <span>{t("trainer.saved")}</span>
                 </>
-              ) : guestRecorded && score ? (
+              ) : guestRecorded && masterySummaryText ? (
                 <>
-                  <strong>{`${t("trainer.score")}: ${scoreSummaryText ?? `${score.total} ${score.grade}`}`}</strong>
+                  <strong>{`${t("trainer.mastery")}: ${masterySummaryText}`}</strong>
                   <span>{t("trainer.guestSaved")}</span>
                 </>
               ) : sessionFlow.phase === "finished" ? (
@@ -1205,31 +1196,21 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             <div className={`practice-overlay practice-overlay--finished ${closingOverlay?.kind === "finished" ? "is-exiting" : ""}`} role="presentation">
               <div className="practice-overlay__content result-card">
                 <span className="result-card__eyebrow">{t("trainer.resultReady")}</span>
-                {score && sessionResult ? (
+                {effectiveMastery && sessionResult ? (
                   <>
-                    <div className="result-card__score-row">
-                      <strong className="result-card__score">{scoreSummaryText}</strong>
-                      <span className="score-help-wrap">
-                        <button
-                          type="button"
-                          className="score-help"
-                          aria-label={t("scoreExplanation.ariaLabel")}
-                          title={scoreTooltipText}
-                        >
-                          <Info size={17} aria-hidden="true" />
-                        </button>
-                        <span className="score-help__tooltip" role="tooltip">
-                          <strong>{t("scoreExplanation.tooltipTitle", scoreExplanationParams ?? {})}</strong>
-                          <span>{scoreFormulaText}</span>
-                          <span>{scoreCurrentText}</span>
-                          <span>{scoreGradesText}</span>
-                        </span>
-                      </span>
+                    <div className="result-card__mastery-row">
+                      <span>{t("trainer.mastery")}</span>
+                      <strong className="result-card__mastery">{masterySummaryText}</strong>
+                      {masteryDeltaText ? <small>{masteryDeltaText}</small> : null}
                     </div>
                     <div className="result-card__stats" aria-label={t("trainer.resultStats")}>
                       <span>
-                        <small>{t("stats.speed")}</small>
-                        <b>{`${Math.round(sessionResult.speedCpm)} ${t("units.cpm")}`}</b>
+                        <small>{t("stats.averageTempo")}</small>
+                        <b>{`${Math.round(sessionResult.averageCpm)} ${t("units.cpm")}`}</b>
+                      </span>
+                      <span>
+                        <small>{t("stats.cadence")}</small>
+                        <b>{`${Math.round(sessionResult.cadence * 100)}${t("units.percent")}`}</b>
                       </span>
                       <span>
                         <small>{t("stats.accuracy")}</small>
@@ -1239,11 +1220,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                         <small>{t("stats.errors")}</small>
                         <b>{sessionResult.errors}</b>
                       </span>
-                    </div>
-                    <div className="result-card__score-explanation">
-                      <span>{t("scoreExplanation.visibleTitle")}</span>
-                      <p>{scoreFormulaText}</p>
-                      <p>{scoreCurrentText}</p>
                     </div>
                     {resultWeakness ? (
                       <div className="result-card__weakness">
@@ -1272,10 +1248,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                     ) : null}
                   </>
                 ) : null}
-                {resultAdviceText ? (
+                {techniqueAdviceText ? (
                   <div className="result-card__advice">
-                    <span>{t("trainer.resultAdviceTitle")}</span>
-                    <p>{resultAdviceText}</p>
+                    <span>{t("trainer.techniqueAdviceTitle")}</span>
+                    <p>{techniqueAdviceText}</p>
+                    {savedTechniqueAdvice ? null : <small>{t("trainer.techniqueAdviceHistoryHint")}</small>}
                   </div>
                 ) : null}
                 <button

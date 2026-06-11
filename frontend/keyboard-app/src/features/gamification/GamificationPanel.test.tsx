@@ -16,17 +16,10 @@ const labels = {
   freezes: "Freezes",
   achievements: "Achievements",
   noAchievements: "No achievements yet",
-  events: "New events",
-  noEvents: "No new events",
-  masteryUp: "Mastery +{{delta}}",
-  calibrationComplete: "Calibration complete",
-  leagueProgressEvent: "League {{level}} progress",
-  achievementUnlocked: "Achievement {{code}}",
-  prizeHook: "Prize hook",
 };
 
 describe("GamificationPanel", () => {
-  it("renders calibration, league, streak, achievements and events without score language", () => {
+  it("renders calibration, league, streak and achievements without score language", () => {
     const markup = renderToStaticMarkup(createElement(GamificationPanel, {
       labels,
       gamification: {
@@ -43,14 +36,6 @@ describe("GamificationPanel", () => {
         trend: [160, 172, 188],
         achievements: ["METRONOME"],
       },
-      events: [
-        {
-          id: 1,
-          type: "MASTERY_UP",
-          payload: { delta: "8.5" },
-          createdAt: "2026-06-11T12:00:00Z",
-        },
-      ],
     }));
 
     expect(markup).toContain("Calibration");
@@ -59,7 +44,7 @@ describe("GamificationPanel", () => {
     expect(markup).toContain("42% to next league");
     expect(markup).toContain("4");
     expect(markup).toContain("METRONOME");
-    expect(markup).toContain("Mastery +8.5");
+    expect(markup).not.toContain("New events");
     expect(markup.toLowerCase()).not.toContain("score");
     expect(markup.toLowerCase()).not.toContain("rank");
   });

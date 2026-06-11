@@ -1,9 +1,10 @@
 import { publicSiteUrl } from "@playsay/shared-ui";
-import { BarChart3, LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "lucide-react";
+import { BarChart3, LogIn, LogOut, Pencil, Play, RotateCcw, Save, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
-import { GamificationPanel, type GamificationPanelLabels } from "../../features/gamification/GamificationPanel";
+import { GamificationEventQueue, type GamificationEventQueueLabels } from "../../features/gamification/GamificationEventQueue";
+import { GamificationProfilePanel, type GamificationProfileLabels } from "../../features/gamification/GamificationProfilePanel";
 import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/VirtualKeyboard";
 import {
   dismissRegistrationPrompt,
@@ -184,6 +185,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [showDynamicsModal, setShowDynamicsModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [guestNameDraft, setGuestNameDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -191,6 +193,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [savedTrainingResult, setSavedTrainingResult] = useState<TrainingResult | null>(null);
   const [savedTechniqueAdvice, setSavedTechniqueAdvice] = useState<string | null>(null);
   const [latestGamificationEvents, setLatestGamificationEvents] = useState<GamificationEvent[]>([]);
+  const [dismissedGamificationEventIds, setDismissedGamificationEventIds] = useState<number[]>([]);
   const [nextDecision, setNextDecision] = useState<AdaptiveDecision | null>(null);
   const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
   const [trainerIntroPhase, dispatchTrainerIntro] = useReducer(trainerIntroReducer, undefined, initialTrainerIntroPhase);
@@ -319,6 +322,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setSaved(false);
     setGuestRecorded(false);
     setLatestGamificationEvents([]);
+    setDismissedGamificationEventIds([]);
     setRestartVariant(0);
     submittedResultRef.current = null;
     dispatchSessionFlow({ type: "reset" });
@@ -417,6 +421,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setSaved(false);
     setGuestRecorded(false);
     setLatestGamificationEvents([]);
+    setDismissedGamificationEventIds([]);
     const currentSet = chordSet;
     const submitPayload = buildTrainingSubmitPayload(sessionResult, currentSet);
 
@@ -575,7 +580,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
   const effectiveGamification = progress?.gamification;
-  const gamificationLabels: GamificationPanelLabels = {
+  const gamificationLabels: GamificationProfileLabels = {
     title: t("gamification.title"),
     calibration: t("gamification.calibration"),
     calibrationProgress: t("gamification.calibrationProgress"),
@@ -588,14 +593,21 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     freezes: t("gamification.freezes"),
     achievements: t("gamification.achievements"),
     noAchievements: t("gamification.noAchievements"),
+    profileTitle: t("gamification.profileTitle"),
+    profileIntro: t("gamification.profileIntro"),
+    masteryTrend: t("gamification.masteryTrend"),
+    currentMastery: t("gamification.currentMastery"),
+  };
+  const gamificationEventLabels: GamificationEventQueueLabels = {
     events: t("gamification.events"),
-    noEvents: t("gamification.noEvents"),
     masteryUp: t("gamification.masteryUp"),
     calibrationComplete: t("gamification.calibrationComplete"),
     leagueProgressEvent: t("gamification.leagueProgressEvent"),
     achievementUnlocked: t("gamification.achievementUnlocked"),
     prizeHook: t("gamification.prizeHook"),
+    closeEvent: t("gamification.closeEvent"),
   };
+  const activeGamificationEvents = latestGamificationEvents.filter((event) => !dismissedGamificationEventIds.includes(event.id));
   const trainerIntroBlocking = isTrainerIntroBlocking(trainerIntroPhase);
   const trainerChromeVisible = isTrainerChromeVisible(trainerIntroPhase);
   const isSessionLocked =
@@ -828,6 +840,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           setShowDynamicsModal(false);
           return;
         }
+        if (showProfileModal) {
+          event.preventDefault();
+          setShowProfileModal(false);
+          return;
+        }
         if (showRegistrationPrompt) {
           event.preventDefault();
           dismissPrompt();
@@ -890,6 +907,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     sessionFlow.phase,
     showNamePrompt,
     showDynamicsModal,
+    showProfileModal,
     showRegistrationPrompt,
     skipCountdown,
     startSession,
@@ -996,16 +1014,28 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </select>
           </label>
 
-          <button
-            type="button"
-            className="secondary-button dynamics-button"
-            onClick={() => setShowDynamicsModal(true)}
-            aria-label={t("trainer.openDynamics")}
-            title={t("trainer.openDynamics")}
-          >
-            <BarChart3 size={18} aria-hidden="true" />
-            <span>{t("trainer.recentDynamics")}</span>
-          </button>
+          <div className="side-panel__actions">
+            <button
+              type="button"
+              className="secondary-button dynamics-button"
+              onClick={() => setShowProfileModal(true)}
+              aria-label={t("trainer.openProgressProfile")}
+              title={t("trainer.openProgressProfile")}
+            >
+              <Trophy size={18} aria-hidden="true" />
+              <span>{t("trainer.progressProfile")}</span>
+            </button>
+            <button
+              type="button"
+              className="secondary-button dynamics-button"
+              onClick={() => setShowDynamicsModal(true)}
+              aria-label={t("trainer.openDynamics")}
+              title={t("trainer.openDynamics")}
+            >
+              <BarChart3 size={18} aria-hidden="true" />
+              <span>{t("trainer.recentDynamics")}</span>
+            </button>
+          </div>
 
           <div className="progress-summary">
             <Metric label={t("trainer.sessions")} value={String(effectiveProgress.sessions)} />
@@ -1013,8 +1043,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             <Metric label={t("trainer.avgSpeed")} value={`${Math.round(effectiveProgress.avgSpeedCpm)} ${t("units.cpm")}`} />
             <Metric label={t("trainer.avgAccuracy")} value={`${Math.round(effectiveProgress.avgAccuracy * 100)}${t("units.percent")}`} />
           </div>
-
-          <GamificationPanel labels={gamificationLabels} gamification={effectiveGamification} events={latestGamificationEvents} compact />
 
           <details className="weak-fingers">
             <summary>{t("trainer.weakFingers")}</summary>
@@ -1248,7 +1276,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                         <b>{sessionResult.errors}</b>
                       </span>
                     </div>
-                    <GamificationPanel labels={gamificationLabels} gamification={effectiveGamification} events={latestGamificationEvents} compact />
                     {resultWeakness ? (
                       <div className="result-card__weakness">
                         <span>
@@ -1319,6 +1346,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         </section>
       </section>
 
+      <GamificationEventQueue
+        labels={gamificationEventLabels}
+        events={activeGamificationEvents}
+        onDismiss={(eventId) => setDismissedGamificationEventIds((current) => [...current, eventId])}
+      />
+
       {showNamePrompt ? (
         <div className="modal-backdrop" role="presentation">
           <section className="registration-modal" role="dialog" aria-modal="true" aria-labelledby="guest-name-prompt-title">
@@ -1383,6 +1416,22 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 percent: t("units.percent"),
               }}
               recent={effectiveProgress.recent}
+            />
+          </section>
+        </div>
+      ) : null}
+
+      {showProfileModal ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="registration-modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+            <button type="button" className="icon-button registration-modal__close" onClick={() => setShowProfileModal(false)} aria-label={t("trainer.closeProgressProfile")}>
+              <X size={18} aria-hidden="true" />
+            </button>
+            <h2 id="profile-modal-title">{t("trainer.progressProfile")}</h2>
+            <GamificationProfilePanel
+              labels={gamificationLabels}
+              units={{ cpm: t("units.cpm") }}
+              gamification={effectiveGamification}
             />
           </section>
         </div>

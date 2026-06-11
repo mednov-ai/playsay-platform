@@ -15,4 +15,12 @@ describe("keyboard trainer wide frame", () => {
     );
     expect(styles).toContain("max-width: var(--trainer-frame-width)");
   });
+
+  it("keeps the main trainer free of persistent gamification blocks", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).not.toContain("GamificationPanel");
+    expect(styles).not.toContain(".side-panel .gamification-panel");
+    expect(styles).not.toContain("gamification-panel__events");
+  });
 });

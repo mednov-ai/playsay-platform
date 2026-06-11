@@ -129,9 +129,12 @@ export interface Progress {
 
 export interface GamificationProfile {
   calibrated: boolean;
+  calibrationSessions: number;
+  calibrationTarget: number;
   masteryCpm: number;
   baselineMasteryCpm?: number;
   leagueLevel?: number;
+  leagueProgress: number;
   currentStreak: number;
   bestStreak: number;
   streakFreezes: number;

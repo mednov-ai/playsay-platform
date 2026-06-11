@@ -127,9 +127,12 @@ data class ProgressResponse(
 
 data class GamificationProfileResponse(
     val calibrated: Boolean,
+    val calibrationSessions: Int,
+    val calibrationTarget: Int,
     val masteryCpm: Double,
     val baselineMasteryCpm: Double?,
     val leagueLevel: Int?,
+    val leagueProgress: Int,
     val currentStreak: Int,
     val bestStreak: Int,
     val streakFreezes: Int,

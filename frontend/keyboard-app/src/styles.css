@@ -436,6 +436,91 @@ input {
   gap: 8px;
 }
 
+.gamification-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-strong);
+  padding: 10px;
+  text-align: left;
+}
+
+.side-panel .gamification-panel {
+  grid-column: 1 / -1;
+}
+
+.gamification-panel header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gamification-panel header span,
+.gamification-panel small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.gamification-panel header strong,
+.gamification-panel b {
+  color: var(--foreground);
+}
+
+.gamification-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.gamification-panel__grid span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  padding: 7px 8px;
+}
+
+.gamification-panel__grid b {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gamification-panel__chips,
+.gamification-panel__events {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.gamification-panel__chips b,
+.gamification-panel__events span {
+  min-height: 24px;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+  color: var(--primary);
+  padding: 3px 7px;
+  font-size: 12px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.gamification-panel--compact {
+  gap: 6px;
+  padding: 8px;
+}
+
+.gamification-panel--compact .gamification-panel__grid {
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+}
+
 .metric {
   display: grid;
   gap: 2px;
@@ -1812,6 +1897,11 @@ input {
 
   .stats-panel__grid,
   .progress-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gamification-panel__grid,
+  .gamification-panel--compact .gamification-panel__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

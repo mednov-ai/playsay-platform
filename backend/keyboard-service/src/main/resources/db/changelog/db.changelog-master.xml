@@ -9,4 +9,5 @@
     <include file="2026-06-05-003-anonymous-focus-results.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-05-004-corpus-keyboard-chords.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-11-001-keyboard-mastery-gamification.xml" relativeToChangelogFile="true"/>
+    <include file="2026-06-11-002-keyboard-gamification-main.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -27,6 +27,15 @@ class GamificationProfileEntity(
     @Column(name = "league_level")
     var leagueLevel: Int? = null,
 
+    @Column(name = "calibration_session_count", nullable = false)
+    var calibrationSessionCount: Int = 0,
+
+    @Column(name = "calibration_mastery_total", nullable = false)
+    var calibrationMasteryTotal: Double = 0.0,
+
+    @Column(name = "calibration_completed_at")
+    var calibrationCompletedAt: Instant? = null,
+
     @Column(name = "current_streak", nullable = false)
     var currentStreak: Int = 0,
 

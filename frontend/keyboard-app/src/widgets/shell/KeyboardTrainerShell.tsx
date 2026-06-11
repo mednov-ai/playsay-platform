@@ -3,6 +3,7 @@ import { BarChart3, LogIn, LogOut, Pencil, Play, RotateCcw, Save, X } from "luci
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
+import { GamificationPanel, type GamificationPanelLabels } from "../../features/gamification/GamificationPanel";
 import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/VirtualKeyboard";
 import {
   dismissRegistrationPrompt,
@@ -49,7 +50,7 @@ import { claimAnonymousProgress, fetchProgress, resolveAnonymousProfile, submitA
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
-import type { ChordSet, FocusLesson, LayoutId, Me, Progress, TrainingResult } from "../../shared/types";
+import type { ChordSet, FocusLesson, GamificationEvent, LayoutId, Me, Progress, TrainingResult } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
 import { registrationUrlForKeyboard } from "./registrationLink";
 
@@ -189,6 +190,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [guestRecorded, setGuestRecorded] = useState(false);
   const [savedTrainingResult, setSavedTrainingResult] = useState<TrainingResult | null>(null);
   const [savedTechniqueAdvice, setSavedTechniqueAdvice] = useState<string | null>(null);
+  const [latestGamificationEvents, setLatestGamificationEvents] = useState<GamificationEvent[]>([]);
   const [nextDecision, setNextDecision] = useState<AdaptiveDecision | null>(null);
   const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
   const [trainerIntroPhase, dispatchTrainerIntro] = useReducer(trainerIntroReducer, undefined, initialTrainerIntroPhase);
@@ -316,6 +318,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setNextDecision(null);
     setSaved(false);
     setGuestRecorded(false);
+    setLatestGamificationEvents([]);
     setRestartVariant(0);
     submittedResultRef.current = null;
     dispatchSessionFlow({ type: "reset" });
@@ -413,6 +416,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     submittedResultRef.current = resultKey;
     setSaved(false);
     setGuestRecorded(false);
+    setLatestGamificationEvents([]);
     const currentSet = chordSet;
     const submitPayload = buildTrainingSubmitPayload(sessionResult, currentSet);
 
@@ -460,6 +464,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         .then((savedResult) => {
           setSavedTrainingResult(savedResult.trainingResult);
           setSavedTechniqueAdvice(savedResult.techniqueAdvice.primaryAdvice);
+          setLatestGamificationEvents(savedResult.events);
           setProgress(savedResult.progress);
           updateNextDecision(savedResult.focusLesson);
         })
@@ -481,6 +486,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         const savedResult = await submitResult(submitPayload);
         setSavedTrainingResult(savedResult.trainingResult);
         setSavedTechniqueAdvice(savedResult.techniqueAdvice.primaryAdvice);
+        setLatestGamificationEvents(savedResult.events);
         setProgress(savedResult.progress);
         updateNextDecision(savedResult.focusLesson);
       } else {
@@ -568,6 +574,28 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const suggestedMetronomeBpm = sessionResult ? suggestMetronomeBpm(intervals, sessionResult.cadence) : null;
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
+  const effectiveGamification = progress?.gamification;
+  const gamificationLabels: GamificationPanelLabels = {
+    title: t("gamification.title"),
+    calibration: t("gamification.calibration"),
+    calibrationProgress: t("gamification.calibrationProgress"),
+    calibrated: t("gamification.calibrated"),
+    league: t("gamification.league"),
+    leagueFallback: t("gamification.leagueFallback"),
+    leagueProgress: t("gamification.leagueProgress"),
+    streak: t("gamification.streak"),
+    bestStreak: t("gamification.bestStreak"),
+    freezes: t("gamification.freezes"),
+    achievements: t("gamification.achievements"),
+    noAchievements: t("gamification.noAchievements"),
+    events: t("gamification.events"),
+    noEvents: t("gamification.noEvents"),
+    masteryUp: t("gamification.masteryUp"),
+    calibrationComplete: t("gamification.calibrationComplete"),
+    leagueProgressEvent: t("gamification.leagueProgressEvent"),
+    achievementUnlocked: t("gamification.achievementUnlocked"),
+    prizeHook: t("gamification.prizeHook"),
+  };
   const trainerIntroBlocking = isTrainerIntroBlocking(trainerIntroPhase);
   const trainerChromeVisible = isTrainerChromeVisible(trainerIntroPhase);
   const isSessionLocked =
@@ -986,6 +1014,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             <Metric label={t("trainer.avgAccuracy")} value={`${Math.round(effectiveProgress.avgAccuracy * 100)}${t("units.percent")}`} />
           </div>
 
+          <GamificationPanel labels={gamificationLabels} gamification={effectiveGamification} events={latestGamificationEvents} compact />
+
           <details className="weak-fingers">
             <summary>{t("trainer.weakFingers")}</summary>
             {effectiveProgress.weakFingers.length > 0 ? (
@@ -1218,6 +1248,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                         <b>{sessionResult.errors}</b>
                       </span>
                     </div>
+                    <GamificationPanel labels={gamificationLabels} gamification={effectiveGamification} events={latestGamificationEvents} compact />
                     {resultWeakness ? (
                       <div className="result-card__weakness">
                         <span>

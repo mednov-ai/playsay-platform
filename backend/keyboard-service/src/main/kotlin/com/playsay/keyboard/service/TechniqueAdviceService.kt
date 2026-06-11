@@ -4,23 +4,24 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.keyboard.dto.TechniqueAdviceResponse
+import com.playsay.keyboard.entity.TechniqueAdviceCacheEntity
 import com.playsay.keyboard.entity.TrainingResultEntity
+import com.playsay.keyboard.repo.TechniqueAdviceCacheRepo
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
-import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class TechniqueAdviceService(
+    private val adviceCacheRepo: TechniqueAdviceCacheRepo,
     @param:Value("\${playsay.keyboard.ai.provider:}") private val aiProvider: String,
     @param:Value("\${playsay.keyboard.ai.model:}") private val aiModel: String,
     @param:Value("\${playsay.keyboard.ai.api-key:}") private val aiApiKey: String,
     @param:Value("\${playsay.keyboard.ai.base-url:https://api.openai.com/v1}") private val aiBaseUrl: String,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
-    private val cache = ConcurrentHashMap<String, TechniqueAdviceResponse>()
 
     fun advice(result: TrainingResultEntity, recent: List<TrainingResultEntity>): TechniqueAdviceResponse {
         val rules = ruleAdvice(result, recent)
@@ -29,9 +30,26 @@ class TechniqueAdviceService(
         }
 
         val fingerprint = adviceFingerprint(result, recent)
-        return cache.computeIfAbsent(fingerprint) {
-            aiAdvice(result, recent, rules) ?: rules
+        adviceCacheRepo.findByFingerprint(fingerprint)?.let { cached ->
+            return TechniqueAdviceResponse(
+                primaryAdvice = cached.primaryAdvice,
+                drillSuggestion = cached.drillSuggestion,
+                tone = cached.tone,
+                source = cached.source,
+            )
         }
+        val aiAdvice = aiAdvice(result, recent, rules) ?: return rules
+        adviceCacheRepo.save(
+            TechniqueAdviceCacheEntity(
+                fingerprint = fingerprint,
+                trainingResultId = result.id,
+                source = aiAdvice.source,
+                primaryAdvice = aiAdvice.primaryAdvice,
+                drillSuggestion = aiAdvice.drillSuggestion,
+                tone = aiAdvice.tone,
+            ),
+        )
+        return aiAdvice
     }
 
     private fun aiEnabled(result: TrainingResultEntity, recent: List<TrainingResultEntity>): Boolean =

@@ -10,6 +10,8 @@ import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitResultRequest
 import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
 import com.playsay.keyboard.repo.AnonymousProfileRepo
+import com.playsay.keyboard.repo.GamificationEventRepo
+import com.playsay.keyboard.repo.GamificationProfileRepo
 import com.playsay.keyboard.repo.TrainingResultRepo
 import liquibase.integration.spring.SpringLiquibase
 import org.junit.jupiter.api.BeforeAll
@@ -43,6 +45,8 @@ class KeyboardApiTest @Autowired constructor(
     private val trainingController: TrainingController,
     private val meController: MeController,
     private val anonymousProfileRepo: AnonymousProfileRepo,
+    private val gamificationEventRepo: GamificationEventRepo,
+    private val gamificationProfileRepo: GamificationProfileRepo,
     private val trainingResultRepo: TrainingResultRepo,
     private val dataSource: DataSource,
 ) {
@@ -172,6 +176,69 @@ class KeyboardApiTest @Autowired constructor(
         assertTrue(second.techniqueAdvice.primaryAdvice.isNotBlank())
         assertEquals("RHYTHM", second.techniqueAdvice.tone)
         assertEquals("RULES", second.techniqueAdvice.source)
+    }
+
+    @Test
+    fun `calibration completes after three saved standard lessons and emits one completion event`() {
+        gamificationEventRepo.deleteAllInBatch()
+        trainingResultRepo.deleteAllInBatch()
+        gamificationProfileRepo.deleteAllInBatch()
+
+        val auth = keyboardAuthentication(subject = "calibration-three-subject")
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+
+        val first = trainingController.submit(auth, calibrationRequest(chordSetId, "calibration-three-1", 180.0))
+        val second = trainingController.submit(auth, calibrationRequest(chordSetId, "calibration-three-2", 190.0))
+        val third = trainingController.submit(auth, calibrationRequest(chordSetId, "calibration-three-3", 200.0))
+        val repeatedThird = trainingController.submit(auth, calibrationRequest(chordSetId, "calibration-three-3", 200.0))
+
+        assertEquals(false, first.gamification.calibrated)
+        assertEquals(1, first.gamification.calibrationSessions)
+        assertEquals(false, second.gamification.calibrated)
+        assertEquals(2, second.gamification.calibrationSessions)
+        assertEquals(true, third.gamification.calibrated)
+        assertEquals(3, third.gamification.calibrationSessions)
+        assertEquals(3, third.gamification.calibrationTarget)
+        assertNotNull(third.gamification.baselineMasteryCpm)
+        assertNotNull(third.gamification.leagueLevel)
+        assertTrue(third.events.any { event -> event.type == "CALIBRATION_COMPLETE" })
+        assertTrue(third.events.any { event -> event.type == "LEAGUE_PROGRESS" })
+        assertEquals(third.trainingResult.id, repeatedThird.trainingResult.id)
+        assertEquals(emptyList(), repeatedThird.events)
+        assertEquals(1, gamificationEventRepo.findByKeycloakSubjectOrderByCreatedAtDesc("calibration-three-subject").count { it.eventType == "CALIBRATION_COMPLETE" })
+    }
+
+    @Test
+    fun `streak achievements are emitted once when local training dates advance`() {
+        gamificationEventRepo.deleteAllInBatch()
+        trainingResultRepo.deleteAllInBatch()
+        gamificationProfileRepo.deleteAllInBatch()
+
+        val auth = keyboardAuthentication(subject = "streak-subject")
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+
+        (1..7).forEach { day ->
+            trainingController.submit(
+                auth,
+                calibrationRequest(chordSetId, "streak-result-$day", 205.0).copy(
+                    localTrainingDate = "2026-06-${day.toString().padStart(2, '0')}",
+                    clientTimezone = "Europe/Moscow",
+                ),
+            )
+        }
+        val repeatedSeventh = trainingController.submit(
+            auth,
+            calibrationRequest(chordSetId, "streak-result-7", 205.0).copy(
+                localTrainingDate = "2026-06-07",
+                clientTimezone = "Europe/Moscow",
+            ),
+        )
+
+        val progress = trainingController.progress(auth)
+        assertEquals(7, progress.gamification?.currentStreak)
+        assertTrue(progress.gamification?.achievements.orEmpty().contains("STREAK_7"))
+        assertEquals(emptyList(), repeatedSeventh.events)
+        assertEquals(1, gamificationEventRepo.findByKeycloakSubjectOrderByCreatedAtDesc("streak-subject").count { it.payloadJson.contains("STREAK_7") })
     }
 
     @Test
@@ -360,12 +427,30 @@ class KeyboardApiTest @Autowired constructor(
         assertEquals(1, trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc("student-keycloak-subject").size)
     }
 
-    private fun keyboardAuthentication(): JwtAuthenticationToken =
+    private fun calibrationRequest(chordSetId: Long, clientResultId: String, averageCpm: Double): SubmitResultRequest =
+        SubmitResultRequest(
+            clientResultId = clientResultId,
+            chordSetId = chordSetId,
+            lessonKind = "STANDARD",
+            speedCpm = averageCpm,
+            averageCpm = averageCpm,
+            cadence = 0.86,
+            accuracy = 0.98,
+            errors = 0,
+            characterCount = averageCpm.toInt(),
+            correctCount = averageCpm.toInt(),
+            durationMs = 60_000,
+        )
+
+    private fun keyboardAuthentication(
+        subject: String = "student-keycloak-subject",
+        email: String = "student@example.com",
+    ): JwtAuthenticationToken =
         JwtAuthenticationToken(
             Jwt.withTokenValue("keyboard-test-token")
                 .header("alg", "none")
-                .subject("student-keycloak-subject")
-                .claim("email", "student@example.com")
+                .subject(subject)
+                .claim("email", email)
                 .claim("preferred_username", "student")
                 .build(),
             listOf(SimpleGrantedAuthority("ROLE_STUDENT")),

@@ -1,9 +1,9 @@
 import { publicSiteUrl } from "@playsay/shared-ui";
-import { BarChart3, LogIn, LogOut, Pencil, Play, RotateCcw, Save, Trophy, X } from "lucide-react";
+import { LogIn, LogOut, Pencil, Play, RotateCcw, Save, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
-import { GamificationEventQueue, type GamificationEventQueueLabels } from "../../features/gamification/GamificationEventQueue";
+import { AchievementCelebrationQueue, type AchievementCelebrationLabels } from "../../features/gamification/AchievementCelebrationQueue";
 import { GamificationProfilePanel, type GamificationProfileLabels } from "../../features/gamification/GamificationProfilePanel";
 import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/VirtualKeyboard";
 import {
@@ -19,7 +19,6 @@ import {
 } from "../../features/guest/guestProgress";
 import { Metronome } from "../../features/metronome/Metronome";
 import { suggestMetronomeBpm } from "../../features/metronome/metronomeTempo";
-import { RecentDynamicsPanel } from "../../features/stats/RecentDynamicsPanel";
 import { StatsPanel } from "../../features/stats/StatsPanel";
 import { shouldReloadActiveSetForLayout } from "../../features/typing/activeSetSync";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
@@ -53,6 +52,7 @@ import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
 import type { ChordSet, FocusLesson, GamificationEvent, LayoutId, Me, Progress, TrainingResult } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
+import { shouldBlockDeferredPrompts, shouldShowDeferredPrompt } from "./promptFlow";
 import { registrationUrlForKeyboard } from "./registrationLink";
 
 interface Props {
@@ -184,7 +184,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [guestDisplayName, setGuestDisplayName] = useState<string | null>(() => readGuestDisplayName());
   const [showRegistrationPrompt, setShowRegistrationPrompt] = useState(false);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
-  const [showDynamicsModal, setShowDynamicsModal] = useState(false);
+  const [pendingRegistrationPrompt, setPendingRegistrationPrompt] = useState(false);
+  const [pendingNamePrompt, setPendingNamePrompt] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [guestNameDraft, setGuestNameDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -476,10 +477,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         .catch(() => undefined);
       if (shouldShowNamePrompt(nextCount, guestDisplayName)) {
         setGuestNameDraft(guestDisplayName ?? "");
-        setShowNamePrompt(true);
+        setPendingNamePrompt(true);
       }
       if (shouldShowRegistrationPrompt(nextCount, dismissedCount)) {
-        setShowRegistrationPrompt(true);
+        setPendingRegistrationPrompt(true);
       }
       return;
     }
@@ -593,12 +594,24 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     freezes: t("gamification.freezes"),
     achievements: t("gamification.achievements"),
     noAchievements: t("gamification.noAchievements"),
+    lockedAchievement: t("gamification.lockedAchievement"),
+    achievement_FIRST_HUNDRED_title: t("gamification.achievement_FIRST_HUNDRED_title"),
+    achievement_FIRST_HUNDRED_description: t("gamification.achievement_FIRST_HUNDRED_description"),
+    achievement_SNIPER_title: t("gamification.achievement_SNIPER_title"),
+    achievement_SNIPER_description: t("gamification.achievement_SNIPER_description"),
+    achievement_METRONOME_title: t("gamification.achievement_METRONOME_title"),
+    achievement_METRONOME_description: t("gamification.achievement_METRONOME_description"),
+    achievement_STREAK_7_title: t("gamification.achievement_STREAK_7_title"),
+    achievement_STREAK_7_description: t("gamification.achievement_STREAK_7_description"),
+    achievement_STREAK_30_title: t("gamification.achievement_STREAK_30_title"),
+    achievement_STREAK_30_description: t("gamification.achievement_STREAK_30_description"),
+    achievement_UNKNOWN_title: t("gamification.achievement_UNKNOWN_title"),
+    achievement_UNKNOWN_description: t("gamification.achievement_UNKNOWN_description"),
     profileTitle: t("gamification.profileTitle"),
     profileIntro: t("gamification.profileIntro"),
-    masteryTrend: t("gamification.masteryTrend"),
     currentMastery: t("gamification.currentMastery"),
   };
-  const gamificationEventLabels: GamificationEventQueueLabels = {
+  const gamificationEventLabels: AchievementCelebrationLabels = {
     events: t("gamification.events"),
     masteryUp: t("gamification.masteryUp"),
     calibrationComplete: t("gamification.calibrationComplete"),
@@ -606,6 +619,19 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     achievementUnlocked: t("gamification.achievementUnlocked"),
     prizeHook: t("gamification.prizeHook"),
     closeEvent: t("gamification.closeEvent"),
+    lockedAchievement: t("gamification.lockedAchievement"),
+    achievement_FIRST_HUNDRED_title: t("gamification.achievement_FIRST_HUNDRED_title"),
+    achievement_FIRST_HUNDRED_description: t("gamification.achievement_FIRST_HUNDRED_description"),
+    achievement_SNIPER_title: t("gamification.achievement_SNIPER_title"),
+    achievement_SNIPER_description: t("gamification.achievement_SNIPER_description"),
+    achievement_METRONOME_title: t("gamification.achievement_METRONOME_title"),
+    achievement_METRONOME_description: t("gamification.achievement_METRONOME_description"),
+    achievement_STREAK_7_title: t("gamification.achievement_STREAK_7_title"),
+    achievement_STREAK_7_description: t("gamification.achievement_STREAK_7_description"),
+    achievement_STREAK_30_title: t("gamification.achievement_STREAK_30_title"),
+    achievement_STREAK_30_description: t("gamification.achievement_STREAK_30_description"),
+    achievement_UNKNOWN_title: t("gamification.achievement_UNKNOWN_title"),
+    achievement_UNKNOWN_description: t("gamification.achievement_UNKNOWN_description"),
   };
   const activeGamificationEvents = latestGamificationEvents.filter((event) => !dismissedGamificationEventIds.includes(event.id));
   const trainerIntroBlocking = isTrainerIntroBlocking(trainerIntroPhase);
@@ -702,6 +728,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
     setLoadError(null);
     clearSessionResult();
+    setShowNamePrompt(false);
+    setShowRegistrationPrompt(false);
 
     if (sessionFlow.phase === "finished") {
       setRestartVariant(0);
@@ -781,17 +809,23 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
   const dismissPrompt = useCallback(() => {
     dismissRegistrationPrompt(guestSessionCount);
+    setPendingRegistrationPrompt(false);
     setShowRegistrationPrompt(false);
   }, [guestSessionCount]);
 
   const dismissNamePrompt = useCallback(() => {
+    setPendingNamePrompt(false);
     setShowNamePrompt(false);
   }, []);
 
   const openGuestNamePrompt = useCallback(() => {
     setGuestNameDraft(guestDisplayName ?? "");
+    if (sessionFlow.phase === "paused" || sessionFlow.phase === "countdown" || sessionFlow.phase === "running") {
+      setPendingNamePrompt(true);
+      return;
+    }
     setShowNamePrompt(true);
-  }, [guestDisplayName]);
+  }, [guestDisplayName, sessionFlow.phase]);
 
   const saveGuestName = useCallback(() => {
     const displayName = writeGuestDisplayName(guestNameDraft);
@@ -799,6 +833,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       return;
     }
     setGuestDisplayName(displayName);
+    setPendingNamePrompt(false);
     setShowNamePrompt(false);
     void updateAnonymousProfile({ deviceId: anonymousDeviceId, displayName })
       .then((profile) => {
@@ -835,11 +870,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           dismissNamePrompt();
           return;
         }
-        if (showDynamicsModal) {
-          event.preventDefault();
-          setShowDynamicsModal(false);
-          return;
-        }
         if (showProfileModal) {
           event.preventDefault();
           setShowProfileModal(false);
@@ -867,7 +897,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         return;
       }
 
-      if (event.code === "Space" && canResumeSession && !showRegistrationPrompt && !showNamePrompt) {
+      if (event.code === "Space" && canResumeSession) {
         event.preventDefault();
         resumeSession();
         return;
@@ -906,7 +936,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     sessionFlow.finishOverlayVisible,
     sessionFlow.phase,
     showNamePrompt,
-    showDynamicsModal,
     showProfileModal,
     showRegistrationPrompt,
     skipCountdown,
@@ -923,8 +952,42 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const renderPausedOverlay = sessionFlow.phase === "paused" || closingOverlay?.kind === "paused";
   const renderFinishedOverlay =
     (sessionFlow.phase === "finished" && sessionFlow.finishOverlayVisible) || closingOverlay?.kind === "finished";
+  const celebrationPaused =
+    renderCountdownOverlay ||
+    renderPausedOverlay ||
+    sessionFlow.phase === "running" ||
+    showNamePrompt ||
+    showRegistrationPrompt ||
+    showProfileModal;
+  const promptBlocked = shouldBlockDeferredPrompts({
+    sessionPhase: sessionFlow.phase,
+    hasNamePrompt: showNamePrompt,
+    hasRegistrationPrompt: showRegistrationPrompt,
+    hasCelebration: activeGamificationEvents.length > 0 && !celebrationPaused,
+    profileOpen: showProfileModal,
+  });
+  const canShowDeferredPrompt = shouldShowDeferredPrompt({
+    sessionPhase: sessionFlow.phase,
+    finishOverlayVisible: sessionFlow.finishOverlayVisible,
+    hasBlockingOverlay: promptBlocked,
+  });
   const trainerLayoutClassName = `trainer-layout ${trainerIntroPhase !== "dismissed" ? "trainer-layout--intro" : ""}`;
   const trainerSurfaceClassName = `trainer-surface trainer-surface--${trainerIntroPhase}`;
+
+  useEffect(() => {
+    if (!canShowDeferredPrompt) {
+      return;
+    }
+    if (pendingNamePrompt) {
+      setPendingNamePrompt(false);
+      setShowNamePrompt(true);
+      return;
+    }
+    if (pendingRegistrationPrompt) {
+      setPendingRegistrationPrompt(false);
+      setShowRegistrationPrompt(true);
+    }
+  }, [canShowDeferredPrompt, pendingNamePrompt, pendingRegistrationPrompt]);
 
   return (
     <main className="keyboard-app">
@@ -1017,23 +1080,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           <div className="side-panel__actions">
             <button
               type="button"
-              className="secondary-button dynamics-button"
+              className="secondary-button progress-profile-button"
               onClick={() => setShowProfileModal(true)}
+              disabled={isSessionLocked}
               aria-label={t("trainer.openProgressProfile")}
               title={t("trainer.openProgressProfile")}
             >
               <Trophy size={18} aria-hidden="true" />
               <span>{t("trainer.progressProfile")}</span>
-            </button>
-            <button
-              type="button"
-              className="secondary-button dynamics-button"
-              onClick={() => setShowDynamicsModal(true)}
-              aria-label={t("trainer.openDynamics")}
-              title={t("trainer.openDynamics")}
-            >
-              <BarChart3 size={18} aria-hidden="true" />
-              <span>{t("trainer.recentDynamics")}</span>
             </button>
           </div>
 
@@ -1114,9 +1168,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 <Play size={24} fill="currentColor" aria-hidden="true" />
                 <span>{startLabel}</span>
               </button>
-              {chordSet ? (
-                <span className="level-pill">{t(`level.${chordSet.tier}`)}</span>
-              ) : null}
               <button type="button" className="secondary-button" onClick={restartSession} disabled={!chordSet || sessionFlow.phase === "running"}>
                 <RotateCcw size={18} aria-hidden="true" />
                 <span>{t("trainer.restart")}</span>
@@ -1346,9 +1397,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         </section>
       </section>
 
-      <GamificationEventQueue
+      <AchievementCelebrationQueue
         labels={gamificationEventLabels}
         events={activeGamificationEvents}
+        paused={celebrationPaused}
         onDismiss={(eventId) => setDismissedGamificationEventIds((current) => [...current, eventId])}
       />
 
@@ -1385,38 +1437,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 <span>{t("trainer.continueGuest")}</span>
               </button>
             </div>
-          </section>
-        </div>
-      ) : null}
-
-      {showDynamicsModal ? (
-        <div className="modal-backdrop" role="presentation">
-          <section className="registration-modal dynamics-modal" role="dialog" aria-modal="true" aria-labelledby="dynamics-modal-title">
-            <button type="button" className="icon-button registration-modal__close" onClick={() => setShowDynamicsModal(false)} aria-label={t("trainer.closeDynamics")}>
-              <X size={18} aria-hidden="true" />
-            </button>
-            <h2 id="dynamics-modal-title">{t("trainer.recentDynamics")}</h2>
-            <RecentDynamicsPanel
-              labels={{
-                title: t("trainer.recentDynamics"),
-                empty: t("trainer.noRecentDynamics"),
-                mastery: t("trainer.mastery"),
-                speed: t("stats.speed"),
-                averageTempo: t("stats.averageTempo"),
-                accuracy: t("stats.accuracy"),
-                errors: t("stats.errors"),
-                standard: t("trainer.standardLesson"),
-                focus: t("trainer.focusLesson"),
-                deltaUp: t("trainer.deltaUp"),
-                deltaDown: t("trainer.deltaDown"),
-                deltaFlat: t("trainer.deltaFlat"),
-              }}
-              units={{
-                cpm: t("units.cpm"),
-                percent: t("units.percent"),
-              }}
-              recent={effectiveProgress.recent}
-            />
           </section>
         </div>
       ) : null}

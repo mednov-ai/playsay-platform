@@ -1,9 +1,9 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { GamificationPanel } from "./GamificationPanel";
+import { GamificationPanel, type GamificationPanelLabels } from "./GamificationPanel";
 
-const labels = {
+const labels: GamificationPanelLabels = {
   title: "Growth",
   calibration: "Calibration",
   calibrationProgress: "{{done}}/{{total}} lessons",
@@ -16,6 +16,19 @@ const labels = {
   freezes: "Freezes",
   achievements: "Achievements",
   noAchievements: "No achievements yet",
+  lockedAchievement: "Locked achievement",
+  achievement_FIRST_HUNDRED_title: "First hundred",
+  achievement_FIRST_HUNDRED_description: "Reach 100 cpm.",
+  achievement_SNIPER_title: "Sniper",
+  achievement_SNIPER_description: "Finish cleanly.",
+  achievement_METRONOME_title: "Metronome",
+  achievement_METRONOME_description: "Hold rhythm.",
+  achievement_STREAK_7_title: "Week streak",
+  achievement_STREAK_7_description: "Practice seven days.",
+  achievement_STREAK_30_title: "Month streak",
+  achievement_STREAK_30_description: "Practice thirty days.",
+  achievement_UNKNOWN_title: "Future achievement",
+  achievement_UNKNOWN_description: "A new achievement.",
 };
 
 describe("GamificationPanel", () => {
@@ -43,7 +56,9 @@ describe("GamificationPanel", () => {
     expect(markup).toContain("League 1");
     expect(markup).toContain("42% to next league");
     expect(markup).toContain("4");
-    expect(markup).toContain("METRONOME");
+    expect(markup).toContain("Metronome");
+    expect(markup).toContain("achievement-badge__art");
+    expect(markup).not.toContain(">METRONOME<");
     expect(markup).not.toContain("New events");
     expect(markup.toLowerCase()).not.toContain("score");
     expect(markup.toLowerCase()).not.toContain("rank");

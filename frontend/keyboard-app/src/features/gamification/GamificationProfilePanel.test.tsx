@@ -18,8 +18,20 @@ const labels: GamificationProfileLabels = {
   noAchievements: "No achievements yet",
   profileTitle: "Keyboard profile",
   profileIntro: "Your league, streak and achievements live here.",
-  masteryTrend: "Mastery trend",
   currentMastery: "Current mastery",
+  lockedAchievement: "Locked achievement",
+  achievement_FIRST_HUNDRED_title: "First hundred",
+  achievement_FIRST_HUNDRED_description: "Reach 100 cpm.",
+  achievement_SNIPER_title: "Sniper",
+  achievement_SNIPER_description: "Finish cleanly.",
+  achievement_METRONOME_title: "Metronome",
+  achievement_METRONOME_description: "Hold rhythm.",
+  achievement_STREAK_7_title: "Week streak",
+  achievement_STREAK_7_description: "Practice seven days.",
+  achievement_STREAK_30_title: "Month streak",
+  achievement_STREAK_30_description: "Practice thirty days.",
+  achievement_UNKNOWN_title: "Future achievement",
+  achievement_UNKNOWN_description: "A new achievement.",
 };
 
 describe("GamificationProfilePanel", () => {
@@ -39,7 +51,7 @@ describe("GamificationProfilePanel", () => {
         bestStreak: 8,
         streakFreezes: 1,
         trend: [188, 196, 212],
-        achievements: ["STEADY_RHYTHM", "FIRST_LEAGUE"],
+        achievements: ["METRONOME", "FIRST_HUNDRED"],
       },
     }));
 
@@ -47,8 +59,11 @@ describe("GamificationProfilePanel", () => {
     expect(markup).toContain("212 cpm");
     expect(markup).toContain("League 2");
     expect(markup).toContain("64% to next league");
-    expect(markup).toContain("STEADY_RHYTHM");
-    expect(markup).toContain("FIRST_LEAGUE");
+    expect(markup).toContain("Metronome");
+    expect(markup).toContain("First hundred");
+    expect(markup).toContain("achievement-badge__art");
+    expect(markup).not.toContain(">METRONOME<");
+    expect(markup).not.toContain(">FIRST_HUNDRED<");
     expect(markup).not.toContain("New events");
   });
 });

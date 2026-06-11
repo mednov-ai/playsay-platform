@@ -1,7 +1,8 @@
 import type { GamificationProfile } from "../../shared/types";
+import { AchievementBadgeCard, achievementInfo, knownAchievementCodes, type AchievementCatalogLabels } from "./achievementCatalog";
 import { format } from "./gamificationEvents";
 
-export interface GamificationPanelLabels {
+export interface GamificationPanelLabels extends AchievementCatalogLabels {
   title: string;
   calibration: string;
   calibrationProgress: string;
@@ -29,7 +30,11 @@ export function GamificationPanel({ labels, gamification, compact = false }: Pro
   );
   const calibrationTotal = gamification?.calibrationTarget ?? 3;
   const leagueLevel = gamification?.leagueLevel ?? 0;
-  const achievements = gamification?.achievements ?? [];
+  const unlockedAchievements = new Set(gamification?.achievements ?? []);
+  const achievementCodes = [
+    ...knownAchievementCodes,
+    ...(gamification?.achievements ?? []).filter((code) => !knownAchievementCodes.includes(code as (typeof knownAchievementCodes)[number])),
+  ];
 
   return (
     <section className={`gamification-panel ${compact ? "gamification-panel--compact" : ""}`} aria-label={labels.title}>
@@ -61,8 +66,26 @@ export function GamificationPanel({ labels, gamification, compact = false }: Pro
 
       <span className="gamification-panel__chips-title">{labels.achievements}</span>
       <div className="gamification-panel__chips" aria-label={labels.achievements}>
-        {achievements.length > 0 ? achievements.slice(0, 4).map((code) => <b key={code}>{code}</b>) : <small>{labels.noAchievements}</small>}
+        {achievementCodes.length > 0 ? (
+          achievementCodes.slice(0, compact ? 3 : achievementCodes.length).map((code) => {
+            const info = achievementInfo(code, labels);
+            return (
+              <span key={code} className={unlockedAchievements.has(code) ? "is-unlocked" : "is-locked"}>
+                {info.title}
+              </span>
+            );
+          })
+        ) : (
+          <small>{labels.noAchievements}</small>
+        )}
       </div>
+      {!compact ? (
+        <div className="achievement-badge-grid" aria-label={labels.achievements}>
+          {achievementCodes.map((code) => (
+            <AchievementBadgeCard key={code} code={code} labels={labels} unlocked={unlockedAchievements.has(code)} />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

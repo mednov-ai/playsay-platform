@@ -179,6 +179,23 @@ class KeyboardApiTest @Autowired constructor(
     }
 
     @Test
+    fun `mastery treats seventy percent rhythm as good when accuracy is high`() {
+        trainingResultRepo.deleteAllInBatch()
+        gamificationProfileRepo.deleteAllInBatch()
+
+        val auth = keyboardAuthentication(subject = "seventy-rhythm-subject")
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        trainingController.submit(auth, calibrationRequest(chordSetId, "seventy-rhythm-1", 180.0))
+        val result = trainingController.submit(
+            auth,
+            calibrationRequest(chordSetId, "seventy-rhythm-2", 240.0).copy(cadence = 0.70),
+        )
+
+        assertTrue(assertNotNull(result.trainingResult.masteryCpm) > 205.0)
+        assertTrue(result.trainingResult.masteryDelta > 20.0)
+    }
+
+    @Test
     fun `calibration completes after three saved standard lessons and emits one completion event`() {
         gamificationEventRepo.deleteAllInBatch()
         trainingResultRepo.deleteAllInBatch()
@@ -206,6 +223,22 @@ class KeyboardApiTest @Autowired constructor(
         assertEquals(third.trainingResult.id, repeatedThird.trainingResult.id)
         assertEquals(emptyList(), repeatedThird.events)
         assertEquals(1, gamificationEventRepo.findByKeycloakSubjectOrderByCreatedAtDesc("calibration-three-subject").count { it.eventType == "CALIBRATION_COMPLETE" })
+    }
+
+    @Test
+    fun `strong calibration starts above beginner league`() {
+        gamificationEventRepo.deleteAllInBatch()
+        trainingResultRepo.deleteAllInBatch()
+        gamificationProfileRepo.deleteAllInBatch()
+
+        val auth = keyboardAuthentication(subject = "strong-calibration-subject")
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+
+        trainingController.submit(auth, calibrationRequest(chordSetId, "strong-calibration-1", 300.0).copy(cadence = 0.70))
+        trainingController.submit(auth, calibrationRequest(chordSetId, "strong-calibration-2", 320.0).copy(cadence = 0.72))
+        val third = trainingController.submit(auth, calibrationRequest(chordSetId, "strong-calibration-3", 340.0).copy(cadence = 0.74))
+
+        assertTrue(assertNotNull(third.gamification.leagueLevel) >= 3)
     }
 
     @Test

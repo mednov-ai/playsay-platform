@@ -19,7 +19,7 @@ export function eventLabel(event: GamificationEvent, labels: GamificationEventLa
     return format(labels.leagueProgressEvent, { level: event.payload.leagueLevel ?? "0" });
   }
   if (event.type === "ACHIEVEMENT_UNLOCKED") {
-    return format(labels.achievementUnlocked, { code: event.payload.code ?? event.type });
+    return format(labels.achievementUnlocked, { code: event.payload.code ?? event.type, title: event.payload.code ?? event.type });
   }
   return labels.prizeHook;
 }

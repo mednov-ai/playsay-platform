@@ -24,6 +24,18 @@ describe("typing mastery", () => {
     expect(mastery.masteryDelta).toBeGreaterThan(0);
   });
 
+  it("treats 70 percent rhythm as good enough to keep mastery close to real tempo", () => {
+    const mastery = estimateSessionMastery({
+      previousMasteryCpm: 180,
+      averageCpm: 240,
+      accuracy: 0.98,
+      cadence: 0.7,
+    });
+
+    expect(mastery.masteryCpm).toBeGreaterThan(205);
+    expect(mastery.masteryDelta).toBeGreaterThan(20);
+  });
+
   it("penalizes mastery when rhythm is unstable even if raw tempo is high", () => {
     const mastery = estimateSessionMastery({
       previousMasteryCpm: 190,

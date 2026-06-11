@@ -146,11 +146,11 @@ class GamificationService(
 
     private fun leagueLevel(masteryCpm: Double, accuracy: Double, cadence: Double): Int =
         when {
-            masteryCpm >= 450 && accuracy >= 0.98 && cadence >= 0.75 -> 5
-            masteryCpm >= 350 && accuracy >= 0.97 && cadence >= 0.68 -> 4
-            masteryCpm >= 250 && accuracy >= 0.96 && cadence >= 0.62 -> 3
-            masteryCpm >= 180 && accuracy >= 0.94 && cadence >= 0.55 -> 2
-            masteryCpm >= 100 && accuracy >= 0.90 -> 1
+            masteryCpm >= 450 && accuracy >= 0.98 && cadence >= 0.70 -> 5
+            masteryCpm >= 350 && accuracy >= 0.97 && cadence >= 0.65 -> 4
+            masteryCpm >= 250 && accuracy >= 0.95 && cadence >= 0.60 -> 3
+            masteryCpm >= 180 && accuracy >= 0.93 && cadence >= 0.50 -> 2
+            masteryCpm >= 100 && accuracy >= 0.88 -> 1
             else -> 0
         }
 

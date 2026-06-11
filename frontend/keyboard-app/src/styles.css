@@ -377,7 +377,7 @@ input {
   padding: 6px 10px;
 }
 
-.dynamics-button {
+.side-panel__actions .secondary-button {
   width: 100%;
   min-height: 28px;
   justify-content: center;
@@ -505,7 +505,7 @@ input {
   min-width: 0;
 }
 
-.gamification-panel__chips b {
+.gamification-panel__chips span {
   min-height: 24px;
   border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line));
   border-radius: 8px;
@@ -515,6 +515,68 @@ input {
   font-size: 12px;
   font-weight: 850;
   overflow-wrap: anywhere;
+}
+
+.gamification-panel__chips span.is-locked {
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--muted);
+}
+
+.achievement-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.achievement-badge-card {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: 8px;
+}
+
+.achievement-badge-card.is-locked {
+  opacity: 0.58;
+}
+
+.achievement-badge__art {
+  display: inline-grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 8px 14px rgb(255 92 0 / 0.18));
+}
+
+.achievement-badge__art.is-locked {
+  filter: grayscale(0.7);
+}
+
+.achievement-badge__art svg {
+  width: 100%;
+  height: 100%;
+}
+
+.achievement-badge-card strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--foreground);
+  font-size: 14px;
+}
+
+.achievement-badge-card p,
+.achievement-badge-card small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.25;
 }
 
 .gamification-panel--compact {
@@ -595,92 +657,6 @@ input {
   font-weight: 800;
 }
 
-.recent-dynamics {
-  min-width: 0;
-  display: grid;
-  gap: 16px;
-}
-
-.recent-dynamics ol {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.recent-dynamics__chart {
-  display: grid;
-  height: 150px;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(34px, 1fr);
-  align-items: end;
-  gap: 10px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, var(--surface)), var(--surface-strong));
-  padding: 16px;
-}
-
-.recent-dynamics__chart span {
-  position: relative;
-  display: flex;
-  min-height: 100%;
-  align-items: end;
-  justify-content: center;
-}
-
-.recent-dynamics__chart span::before {
-  content: "";
-  width: 100%;
-  height: var(--bar-height);
-  min-height: 8px;
-  border-radius: 999px 999px 8px 8px;
-  background: linear-gradient(180deg, var(--primary), color-mix(in srgb, var(--primary) 62%, var(--surface)));
-  box-shadow: 0 8px 18px rgb(255 92 0 / 0.18);
-}
-
-.recent-dynamics__chart b {
-  position: absolute;
-  bottom: calc(var(--bar-height) + 6px);
-  font-size: 11px;
-}
-
-.recent-dynamics li {
-  display: grid;
-  grid-template-columns: 58px repeat(3, minmax(48px, 1fr));
-  gap: 6px;
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 6px;
-  font-size: 12px;
-}
-
-.recent-dynamics li:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.recent-dynamics span {
-  display: grid;
-  min-width: 0;
-  gap: 1px;
-}
-
-.recent-dynamics b {
-  color: var(--foreground);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.recent-dynamics small,
-.recent-dynamics p,
-.recent-dynamics__kind {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-}
-
 .gamification-profile {
   display: grid;
   gap: 14px;
@@ -697,8 +673,7 @@ input {
   padding: 16px;
 }
 
-.gamification-profile__hero span,
-.gamification-profile__trend span {
+.gamification-profile__hero span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
@@ -717,54 +692,6 @@ input {
   font-size: 14px;
   font-weight: 750;
   line-height: 1.38;
-}
-
-.gamification-profile__trend {
-  display: grid;
-  gap: 10px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface-strong);
-  padding: 14px;
-}
-
-.gamification-profile__trend > div:first-child {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.gamification-profile__bars {
-  display: grid;
-  height: 112px;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(24px, 1fr);
-  align-items: end;
-  gap: 8px;
-}
-
-.gamification-profile__bars span {
-  position: relative;
-  display: flex;
-  min-height: 100%;
-  align-items: end;
-  justify-content: center;
-}
-
-.gamification-profile__bars span::before {
-  content: "";
-  width: 100%;
-  height: var(--bar-height);
-  min-height: 8px;
-  border-radius: 999px 999px 8px 8px;
-  background: linear-gradient(180deg, var(--primary), color-mix(in srgb, var(--primary) 58%, var(--surface)));
-}
-
-.gamification-profile__bars b {
-  position: absolute;
-  bottom: calc(var(--bar-height) + 5px);
-  color: var(--foreground);
-  font-size: 11px;
 }
 
 .trainer-surface {
@@ -1018,16 +945,6 @@ input {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-
-.level-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--surface-strong);
-  padding: 0 12px;
 }
 
 .alert {
@@ -1608,56 +1525,95 @@ input {
   padding: 28px;
 }
 
-.dynamics-modal {
-  width: min(760px, calc(100vw - 32px));
-}
-
 .profile-modal {
   width: min(760px, calc(100vw - 32px));
   max-height: calc(100dvh - 36px);
   overflow: auto;
 }
 
-.gamification-event-queue {
+.achievement-celebration {
   position: fixed;
   right: 18px;
   bottom: 18px;
   z-index: 12;
-  width: min(360px, calc(100vw - 36px));
+  width: min(420px, calc(100vw - 36px));
   pointer-events: none;
 }
 
-.gamification-event-queue__item {
+.achievement-celebration__card {
   display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 34px;
   position: relative;
-  gap: 4px;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--line));
-  border-radius: 14px;
+  border-radius: 18px;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--primary) 14%, transparent), transparent 62%),
+    radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 42%),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 12%, transparent), transparent 68%),
     var(--surface);
   box-shadow: var(--shadow);
-  padding: 14px 52px 14px 16px;
+  padding: 14px;
   pointer-events: auto;
-  animation: event-pop 0.32s cubic-bezier(0.18, 1.35, 0.24, 1) both;
+  animation: event-pop 0.38s cubic-bezier(0.18, 1.35, 0.24, 1) both;
 }
 
-.gamification-event-queue__item > span {
+.achievement-celebration__card > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.achievement-celebration__card > div > span {
   color: var(--muted);
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.gamification-event-queue__item strong {
+.achievement-celebration__card strong {
   color: var(--foreground);
-  font-size: 16px;
+  font-size: 18px;
+  line-height: 1.1;
 }
 
-.gamification-event-queue__item .icon-button {
+.achievement-celebration__card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.28;
+}
+
+.achievement-celebration__card .achievement-badge__art {
+  width: 74px;
+  height: 74px;
+  animation: badge-pop 0.62s cubic-bezier(0.18, 1.35, 0.24, 1) both;
+}
+
+.achievement-celebration__shine {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  inset: -40%;
+  background: linear-gradient(120deg, transparent 38%, rgb(255 255 255 / 0.78) 49%, transparent 60%);
+  animation: celebration-shine 1.6s ease-out both;
+  transform: translateX(-62%);
+}
+
+.achievement-celebration__confetti {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 16% 24%, #ff5c00 0 3px, transparent 4px),
+    radial-gradient(circle at 78% 18%, #22c55e 0 3px, transparent 4px),
+    radial-gradient(circle at 86% 72%, #ffc236 0 3px, transparent 4px),
+    radial-gradient(circle at 28% 82%, #111 0 2px, transparent 3px);
+  animation: celebration-confetti 1.1s ease-out both;
+}
+
+.achievement-celebration__card .icon-button {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes play-ring {
@@ -1738,6 +1694,55 @@ input {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes badge-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.56) rotate(-10deg);
+  }
+
+  62% {
+    opacity: 1;
+    transform: scale(1.08) rotate(2deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes celebration-shine {
+  0% {
+    opacity: 0;
+    transform: translateX(-62%);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(62%);
+  }
+}
+
+@keyframes celebration-confetti {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.9);
+  }
+
+  25% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.54;
+    transform: translateY(4px) scale(1);
   }
 }
 
@@ -2061,14 +2066,8 @@ input {
     display: grid;
   }
 
-  .dynamics-button {
+  .progress-profile-button {
     width: 100%;
-  }
-
-  .recent-dynamics__chart {
-    height: 120px;
-    grid-auto-columns: minmax(28px, 1fr);
-    gap: 8px;
   }
 
   .trainer-surface {

@@ -13,14 +13,14 @@ class MasteryService {
         val cleanAverage = cleanPositiveDouble(averageCpm, 0.0)
         val cleanAccuracy = cleanRatio(accuracy)
         val cleanCadence = cleanRatio(cadence)
-        val qualityMultiplier = (0.55 + 0.45 * cleanCadence) * (0.7 + 0.3 * cleanAccuracy)
+        val qualityMultiplier = cadenceTempoFactor(cleanCadence) * accuracyTempoFactor(cleanAccuracy)
         val effectiveTempo = cleanAverage * qualityMultiplier
         val previous = profile.masteryCpm.takeIf { value -> value > 0.0 }
         val alpha = when {
             previous == null -> 1.0
             effectiveTempo < previous && (cleanCadence < 0.55 || cleanAccuracy < 0.93) -> 0.34
-            cleanCadence >= 0.75 && cleanAccuracy >= 0.96 -> 0.42
-            cleanCadence >= 0.65 && cleanAccuracy >= 0.93 -> 0.28
+            cleanCadence >= 0.70 && cleanAccuracy >= 0.96 -> 0.50
+            cleanCadence >= 0.55 && cleanAccuracy >= 0.93 -> 0.28
             else -> 0.18
         }
         val next = previous?.let { value -> value + (effectiveTempo - value) * alpha } ?: effectiveTempo
@@ -50,6 +50,20 @@ class MasteryService {
 
     private fun trendJson(values: List<Double>): String =
         objectMapper.writeValueAsString(values.takeLast(10))
+
+    private fun cadenceTempoFactor(cadence: Double): Double =
+        when {
+            cadence >= 0.70 -> 0.98 + minOf(0.02, (cadence - 0.70) * 0.067)
+            cadence >= 0.55 -> 0.86 + ((cadence - 0.55) / 0.15) * 0.12
+            else -> 0.62 + (cadence / 0.55) * 0.24
+        }
+
+    private fun accuracyTempoFactor(accuracy: Double): Double =
+        when {
+            accuracy >= 0.96 -> 1.0
+            accuracy >= 0.90 -> 0.88 + ((accuracy - 0.90) / 0.06) * 0.12
+            else -> 0.70 + (accuracy / 0.90) * 0.18
+        }
 
     private companion object {
         val objectMapper: ObjectMapper = jacksonObjectMapper()

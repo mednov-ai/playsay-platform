@@ -48,16 +48,16 @@ export function estimateSessionMastery({
   const cleanAverage = Math.max(0, Number.isFinite(averageCpm) ? averageCpm : 0);
   const cleanAccuracy = clamp(Number.isFinite(accuracy) ? accuracy : 0, 0, 1);
   const cleanCadence = clamp(Number.isFinite(cadence) ? cadence : 0, 0, 1);
-  const effectiveTempo = cleanAverage * (0.55 + 0.45 * cleanCadence) * (0.7 + 0.3 * cleanAccuracy);
+  const effectiveTempo = cleanAverage * cadenceTempoFactor(cleanCadence) * accuracyTempoFactor(cleanAccuracy);
   const previous = previousMasteryCpm != null && previousMasteryCpm > 0 ? previousMasteryCpm : null;
   const alpha =
     previous == null
       ? 1
       : effectiveTempo < previous && (cleanCadence < 0.55 || cleanAccuracy < 0.93)
         ? 0.34
-        : cleanCadence >= 0.75 && cleanAccuracy >= 0.96
-          ? 0.42
-          : cleanCadence >= 0.65 && cleanAccuracy >= 0.93
+        : cleanCadence >= 0.7 && cleanAccuracy >= 0.96
+          ? 0.5
+          : cleanCadence >= 0.55 && cleanAccuracy >= 0.93
             ? 0.28
             : 0.18;
   const masteryCpm = roundOne(previous == null ? effectiveTempo : previous + (effectiveTempo - previous) * alpha);
@@ -72,4 +72,24 @@ export function masteryDeltaLabel(value: number): string {
 
 function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+function cadenceTempoFactor(cadence: number): number {
+  if (cadence >= 0.7) {
+    return 0.98 + Math.min(0.02, (cadence - 0.7) * 0.067);
+  }
+  if (cadence >= 0.55) {
+    return 0.86 + ((cadence - 0.55) / 0.15) * 0.12;
+  }
+  return 0.62 + (cadence / 0.55) * 0.24;
+}
+
+function accuracyTempoFactor(accuracy: number): number {
+  if (accuracy >= 0.96) {
+    return 1;
+  }
+  if (accuracy >= 0.9) {
+    return 0.88 + ((accuracy - 0.9) / 0.06) * 0.12;
+  }
+  return 0.7 + (accuracy / 0.9) * 0.18;
 }

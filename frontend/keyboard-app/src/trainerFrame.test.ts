@@ -23,4 +23,21 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).not.toContain(".side-panel .gamification-panel");
     expect(styles).not.toContain("gamification-panel__events");
   });
+
+  it("removes the rough recent dynamics surface from the trainer", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).not.toContain("RecentDynamicsPanel");
+    expect(shell).not.toContain("showDynamicsModal");
+    expect(shell).not.toContain("recentDynamics");
+    expect(styles).not.toContain("dynamics-modal");
+    expect(styles).not.toContain("recent-dynamics");
+  });
+
+  it("does not present chord-set tier as the student level", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).not.toContain("level-pill");
+    expect(shell).not.toContain("level.");
+  });
 });

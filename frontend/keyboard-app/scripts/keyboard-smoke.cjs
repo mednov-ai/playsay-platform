@@ -249,6 +249,7 @@ async function capture(page, name) {
     window.localStorage.setItem("playsay.key.guestDisplayName", "Smoke Guest");
     window.localStorage.setItem("playsay.key.anonymousDeviceId", "smoke-device");
     window.localStorage.setItem("playsay.key.guestSessions", "4");
+    window.localStorage.setItem("playsay.key.layoutMastery", JSON.stringify({ EN: { masteryCpm: 170 } }));
   });
   const page = await context.newPage();
   const mockApi = await installMockApi(page);
@@ -261,7 +262,21 @@ async function capture(page, name) {
   await expectVisibleText(page, "Play&Say");
   await capture(page, "01-intro");
   await page.locator(".intro-play-button").click();
+  if (await page.getByText("Loading field", { exact: false }).isVisible().catch(() => false)) {
+    throw new Error("Old preparation reveal copy became visible after intro.");
+  }
+  await page.locator(".practice-overlay--countdown").waitFor({ state: "visible", timeout: 10_000 });
+  if (await page.locator(".side-panel").isVisible()) {
+    throw new Error("Side controls are visible during focused countdown practice.");
+  }
+  await expectVisibleText(page, "170 cpm · Confident");
+  if (!(await page.locator(".stats-panel--practice .stat__value--animated").first().isVisible())) {
+    throw new Error("Focused practice stats are not rendered with animated numeric values.");
+  }
   await skipCountdown(page);
+  if (await page.locator(".side-panel").isVisible()) {
+    throw new Error("Side controls are visible during running practice.");
+  }
   await completeLesson(page);
   await page.keyboard.press("Escape");
   await page.locator(".practice-overlay--finished").waitFor({ state: "hidden", timeout: 10_000 });
@@ -282,6 +297,20 @@ async function capture(page, name) {
   await dismissCelebration(page);
   await expectVisibleText(page, "Moved to Rhythm");
   await dismissCelebration(page);
+
+  const persistedBeforeReload = await page.evaluate(() => window.localStorage.getItem("playsay.key.practiceState"));
+  if (!persistedBeforeReload || !persistedBeforeReload.includes("\"pendingNext\"")) {
+    throw new Error(`Practice state did not persist the pending next lesson: ${persistedBeforeReload}`);
+  }
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator(".trainer-toolbar").waitFor({ state: "visible", timeout: 10_000 });
+  if (await page.locator(".trainer-intro").isVisible()) {
+    throw new Error("Intro returned after it had been dismissed for this browser profile.");
+  }
+  const restoredSetTitle = await page.locator(".trainer-toolbar h1").innerText();
+  if (restoredSetTitle.includes("home row")) {
+    throw new Error(`Reload fell back to the first two-letter starter set: ${restoredSetTitle}`);
+  }
 
   await page.keyboard.press("Escape");
   await page.locator(".practice-overlay--finished").waitFor({ state: "hidden", timeout: 10_000 });
@@ -349,8 +378,9 @@ async function capture(page, name) {
     displayName: window.localStorage.getItem("playsay.key.guestDisplayName"),
     sessions: window.localStorage.getItem("playsay.key.guestSessions"),
     mastery: window.localStorage.getItem("playsay.key.layoutMastery"),
+    practiceState: window.localStorage.getItem("playsay.key.practiceState"),
   }));
-  if (!resetState.deviceId || resetState.displayName || resetState.sessions || resetState.mastery) {
+  if (!resetState.deviceId || resetState.displayName || resetState.sessions || resetState.mastery || resetState.practiceState) {
     throw new Error(`Anonymous local state was not cleared: ${JSON.stringify(resetState)}`);
   }
   await expectVisibleText(page, "Local practice");

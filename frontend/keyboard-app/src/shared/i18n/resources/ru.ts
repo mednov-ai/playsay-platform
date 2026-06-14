@@ -180,9 +180,6 @@ export const ru = {
     startAria: "Попробовать короткую тренировку",
     shortcut: "Space - начать",
     meta: "5 минут в день · скорость · точность · слабые сочетания",
-    revealAria: "Тренажер открывается",
-    revealKicker: "Готовим поле",
-    revealFight: "Старт",
   },
   trainerSetTitle: {
     letterPairs: "Пары букв",

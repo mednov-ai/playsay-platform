@@ -15,28 +15,30 @@ describe("keyboard trainer intro", () => {
     expect(isTrainerChromeVisible(phase)).toBe(false);
   });
 
-  it("reveals the trainer chrome while the game-style opening animation runs", () => {
-    const phase = trainerIntroReducer(initialTrainerIntroPhase(), { type: "startReveal" });
+  it("can start dismissed when this owner has already opened the trainer", () => {
+    const phase = initialTrainerIntroPhase(true);
 
-    expect(phase).toBe("revealing");
-    expect(isTrainerIntroBlocking(phase)).toBe(true);
+    expect(phase).toBe("dismissed");
+    expect(isTrainerIntroBlocking(phase)).toBe(false);
     expect(isTrainerChromeVisible(phase)).toBe(true);
   });
 
-  it("dismisses the intro after the reveal completes", () => {
-    const revealing = trainerIntroReducer(initialTrainerIntroPhase(), { type: "startReveal" });
-    const dismissed = trainerIntroReducer(revealing, { type: "completeReveal" });
+  it("dismisses the intro without showing a visible preparation overlay", () => {
+    const phase = trainerIntroReducer(initialTrainerIntroPhase(), { type: "startReveal" });
 
-    expect(dismissed).toBe("dismissed");
-    expect(isTrainerIntroBlocking(dismissed)).toBe(false);
-    expect(isTrainerChromeVisible(dismissed)).toBe(true);
+    expect(phase).toBe("dismissed");
+    expect(isTrainerIntroBlocking(phase)).toBe(false);
+    expect(isTrainerChromeVisible(phase)).toBe(true);
+  });
+
+  it("keeps legacy completeReveal as a no-op after the direct dismiss path", () => {
+    const dismissed = trainerIntroReducer(initialTrainerIntroPhase(), { type: "startReveal" });
+
+    expect(trainerIntroReducer(dismissed, { type: "completeReveal" })).toBe("dismissed");
   });
 
   it("does not show the intro again after normal trainer resets", () => {
-    const dismissed = trainerIntroReducer(
-      trainerIntroReducer(initialTrainerIntroPhase(), { type: "startReveal" }),
-      { type: "completeReveal" },
-    );
+    const dismissed = trainerIntroReducer(initialTrainerIntroPhase(), { type: "startReveal" });
 
     expect(trainerIntroReducer(dismissed, { type: "resetTrainer" })).toBe("dismissed");
     expect(trainerIntroReducer(dismissed, { type: "startReveal" })).toBe("dismissed");

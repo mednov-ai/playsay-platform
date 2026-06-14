@@ -26,14 +26,22 @@ import { masteryLevelForCpm, StatsPanel, type MasteryLevelId } from "../../featu
 import { shouldReloadActiveSetForLayout } from "../../features/typing/activeSetSync";
 import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { computeCadence, estimateSessionMastery, masteryDeltaLabel } from "../../features/typing/mastery";
+import {
+  clearPracticeState,
+  markPracticeIntroDismissed,
+  persistActivePracticeSet,
+  persistPendingNextDecision,
+  practiceOwnerKey,
+  readPracticeState,
+  resolvePersistedPracticeSet,
+  updatePracticeState,
+} from "../../features/typing/practiceState";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
 import { chooseTechniqueAdvice } from "../../features/typing/techniqueAdvice";
 import {
   initialTrainerIntroPhase,
-  isTrainerChromeVisible,
   isTrainerIntroBlocking,
   trainerIntroReducer,
-  trainerIntroRevealMs,
 } from "../../features/typing/trainerIntro";
 import { formatChordSetTitle, selectResultWeakness, trainingSetHintKind, type ChordSetTitleLabels } from "../../features/typing/trainerCopy";
 import { buildTrainingSubmitPayload } from "../../features/typing/trainingPayload";
@@ -293,13 +301,14 @@ function measureTypingStripMetrics(element: HTMLElement, stream: StreamItem[]): 
 export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, onLogout, onSignIn }: Props) {
   const { t, i18n } = useTranslation();
   const isAuthenticated = me != null;
-  const [layoutId, setLayoutId] = useState<LayoutId>("EN");
+  const [anonymousDeviceId, setAnonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
+  const ownerKey = practiceOwnerKey({ subject: me?.subject, anonymousDeviceId });
+  const [layoutId, setLayoutId] = useState<LayoutId>(() => readPracticeState(ownerKey)?.layoutId ?? "EN");
   const [sets, setSets] = useState<ChordSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(authError ?? null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [progressImportMessage, setProgressImportMessage] = useState<string | null>(null);
-  const [anonymousDeviceId, setAnonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const [guestSessionCount, setGuestSessionCount] = useState(() => readGuestSessionCount());
   const [guestDisplayName, setGuestDisplayName] = useState<string | null>(() => readGuestDisplayName());
   const [guestLayoutMastery, setGuestLayoutMastery] = useState(() => readGuestLayoutMastery());
@@ -321,7 +330,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [dismissedGamificationEventIds, setDismissedGamificationEventIds] = useState<number[]>([]);
   const [nextDecision, setNextDecision] = useState<AdaptiveDecision | null>(null);
   const [sessionFlow, dispatchSessionFlow] = useReducer(sessionFlowReducer, undefined, initialSessionFlow);
-  const [trainerIntroPhase, dispatchTrainerIntro] = useReducer(trainerIntroReducer, undefined, initialTrainerIntroPhase);
+  const [trainerIntroPhase, dispatchTrainerIntro] = useReducer(trainerIntroReducer, undefined, () =>
+    initialTrainerIntroPhase(readPracticeState(ownerKey)?.introDismissed ?? false),
+  );
   const [typingLineCapacity, setTypingLineCapacity] = useState(typingWindowLineLength);
   const [typingMetrics, setTypingMetrics] = useState<TypingWidthMetrics | null>(null);
   const [restartVariant, setRestartVariant] = useState(0);
@@ -332,7 +343,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const visibleCapacityRef = useRef(visibleCapacity);
   const overlayCloseTimerRef = useRef<number | null>(null);
   const overlayCloseIdRef = useRef(0);
-  const trainerRevealTimerRef = useRef<number | null>(null);
   const profileSeed = me?.subject ?? anonymousDeviceId;
   const keyboardRegistrationUrl = registrationUrlForKeyboard(`${window.location.origin}/`);
 
@@ -364,9 +374,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     () => () => {
       if (overlayCloseTimerRef.current != null) {
         window.clearTimeout(overlayCloseTimerRef.current);
-      }
-      if (trainerRevealTimerRef.current != null) {
-        window.clearTimeout(trainerRevealTimerRef.current);
       }
     },
     [],
@@ -440,6 +447,13 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [stream, themeMode]);
 
   useEffect(() => {
+    const persisted = readPracticeState(ownerKey);
+    if (persisted?.layoutId && persisted.layoutId !== layoutId && sessionFlow.phase === "idle") {
+      setLayoutId(persisted.layoutId);
+    }
+  }, [layoutId, ownerKey, sessionFlow.phase]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
@@ -455,11 +469,16 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     dispatchSessionFlow({ type: "reset" });
 
     const loadedSets = getLocalChordSets(layoutId);
+    const persistedPracticeState = readPracticeState(ownerKey);
+    const restoredSet = resolvePersistedPracticeSet(persistedPracticeState, loadedSets);
     setSets(loadedSets);
-    if (loadedSets.length > 0) {
+    if (restoredSet || loadedSets.length > 0) {
+      const startSet = restoredSet ?? loadedSets[0];
       loadSet(
         layoutId,
-        materializeChordSet(loadedSets[0], profileSeed, isAuthenticated ? 1 : readGuestSessionCount() + 1),
+        startSet.id > 0
+          ? materializeChordSet(startSet, profileSeed, isAuthenticated ? 1 : readGuestSessionCount() + 1)
+          : startSet,
         visibleCapacityRef.current,
       );
     }
@@ -501,7 +520,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     return () => {
       cancelled = true;
     };
-  }, [anonymousDeviceId, isAuthenticated, layoutId, loadSet, profileSeed, t]);
+  }, [anonymousDeviceId, isAuthenticated, layoutId, loadSet, ownerKey, profileSeed, t]);
 
   useEffect(() => {
     if (!shouldReloadActiveSetForLayout({ layoutId, chordSet, phase: sessionFlow.phase })) {
@@ -564,27 +583,39 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         return;
       }
       if (focusLesson) {
-        setNextDecision({ kind: "down", set: focusLessonToChordSet(focusLesson) });
+        const decision = { kind: "down" as const, set: focusLessonToChordSet(focusLesson) };
+        setNextDecision(decision);
+        persistPendingNextDecision({
+          ownerKey,
+          layoutId: sessionResult.layoutId,
+          activeSet: currentSet,
+          pendingNext: decision,
+        });
         return;
       }
       const problemChars = Object.entries(perChar)
         .sort((left, right) => right[1] - left[1])
         .slice(0, 3)
         .map(([char]) => char);
-      setNextDecision(
-        decideNext({
-          layoutId: sessionResult.layoutId,
-          accuracy: sessionResult.accuracy,
-          speedCpm: sessionResult.speedCpm,
-          cadence: sessionResult.cadence,
-          perChar,
-          currentSet,
-          sets: sets.filter((set) => set.layout === sessionResult.layoutId),
-          remedialTitle: t("trainer.remedialTitle", { chars: problemChars.join(" ") }),
-          remedialSeed: `${profileSeed}:${sessionResult.chordSetId}:${sessionResult.durationMs}`,
-          calibrationComplete,
-        }),
-      );
+      const decision = decideNext({
+        layoutId: sessionResult.layoutId,
+        accuracy: sessionResult.accuracy,
+        speedCpm: sessionResult.speedCpm,
+        cadence: sessionResult.cadence,
+        perChar,
+        currentSet,
+        sets: sets.filter((set) => set.layout === sessionResult.layoutId),
+        remedialTitle: t("trainer.remedialTitle", { chars: problemChars.join(" ") }),
+        remedialSeed: `${profileSeed}:${sessionResult.chordSetId}:${sessionResult.durationMs}`,
+        calibrationComplete,
+      });
+      setNextDecision(decision);
+      persistPendingNextDecision({
+        ownerKey,
+        layoutId: sessionResult.layoutId,
+        activeSet: currentSet,
+        pendingNext: decision,
+      });
     };
 
     if (!isAuthenticated) {
@@ -658,7 +689,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         setLoadError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => setSaving(false));
-  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, perChar, profileSeed, resultKey, sessionCalibrationComplete, sessionResult, sessionSavedLayoutMasteryCpm, sets, t]);
+  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, ownerKey, perChar, profileSeed, resultKey, sessionCalibrationComplete, sessionResult, sessionSavedLayoutMasteryCpm, sets, t]);
 
   const liveStats = useMemo(() => {
     const elapsedMs =
@@ -821,7 +852,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   };
   const activeGamificationEvents = latestGamificationEvents.filter((event) => !dismissedGamificationEventIds.includes(event.id));
   const trainerIntroBlocking = isTrainerIntroBlocking(trainerIntroPhase);
-  const trainerChromeVisible = isTrainerChromeVisible(trainerIntroPhase);
+  const practiceFocusMode = sessionFlow.phase === "countdown" || sessionFlow.phase === "running" || sessionFlow.phase === "paused";
   const isSessionLocked =
     trainerIntroBlocking ||
     sessionFlow.phase === "countdown" ||
@@ -869,6 +900,15 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     void changeAppLanguage(language);
   };
 
+  const changeTrainingLayout = (nextLayoutId: LayoutId) => {
+    setLayoutId(nextLayoutId);
+    updatePracticeState(ownerKey, (current) => ({
+      ownerKey,
+      layoutId: nextLayoutId,
+      introDismissed: current?.introDismissed,
+    }));
+  };
+
   const clearSessionResult = useCallback(() => {
     setSaved(false);
     setGuestRecorded(false);
@@ -902,6 +942,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       clearSessionResult();
       setRestartVariant(0);
       dispatchSessionFlow({ type: "reset" });
+      persistActivePracticeSet({
+        ownerKey,
+        layoutId,
+        set: nextSet,
+        introDismissed: trainerIntroPhase === "dismissed",
+      });
       loadSet(layoutId, materializePracticeSet(nextSet, 0), visibleCapacity);
     }
   };
@@ -919,16 +965,29 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
     if (sessionFlow.phase === "finished") {
       setRestartVariant(0);
-      loadSet(layoutId, materializePracticeSet(nextDecision?.set ?? activeSet, 0), visibleCapacity);
+      const nextSet = nextDecision?.set ?? activeSet;
+      persistActivePracticeSet({
+        ownerKey,
+        layoutId: nextSet.layout,
+        set: nextSet,
+        introDismissed: true,
+      });
+      loadSet(layoutId, materializePracticeSet(nextSet, 0), visibleCapacity);
       setNextDecision(null);
     } else if (!chordSet) {
+      persistActivePracticeSet({
+        ownerKey,
+        layoutId: activeSet.layout,
+        set: activeSet,
+        introDismissed: true,
+      });
       loadSet(layoutId, materializePracticeSet(activeSet), visibleCapacity);
     } else {
       reset();
     }
 
     dispatchSessionFlow({ type: "start" });
-  }, [canStartSession, chordSet, clearSessionResult, layoutId, loadSet, materializePracticeSet, nextDecision, reset, sessionFlow.phase, sets, visibleCapacity]);
+  }, [canStartSession, chordSet, clearSessionResult, layoutId, loadSet, materializePracticeSet, nextDecision, ownerKey, reset, sessionFlow.phase, sets, visibleCapacity]);
 
   const revealTrainerAndStart = useCallback(() => {
     if (trainerIntroPhase === "dismissed") {
@@ -941,17 +1000,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
     setLoadError(null);
     clearSessionResult();
+    markPracticeIntroDismissed(ownerKey);
     dispatchTrainerIntro({ type: "startReveal" });
-
-    if (trainerRevealTimerRef.current != null) {
-      window.clearTimeout(trainerRevealTimerRef.current);
-    }
-    trainerRevealTimerRef.current = window.setTimeout(() => {
-      trainerRevealTimerRef.current = null;
-      dispatchTrainerIntro({ type: "completeReveal" });
-      startSession();
-    }, trainerIntroRevealMs);
-  }, [canStartSession, clearSessionResult, startSession, trainerIntroPhase]);
+    window.requestAnimationFrame(() => startSession());
+  }, [canStartSession, clearSessionResult, ownerKey, startSession, trainerIntroPhase]);
 
   const restartSession = useCallback(() => {
     if (!chordSet) {
@@ -1062,6 +1114,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         setShowProfileModal(false);
         setGuestResetConfirm(false);
         setShowNamePrompt(false);
+        clearPracticeState();
         clearSessionResult();
         reset();
         dispatchSessionFlow({ type: "reset" });
@@ -1201,7 +1254,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     finishOverlayVisible: sessionFlow.finishOverlayVisible,
     hasBlockingOverlay: promptBlocked,
   });
-  const trainerLayoutClassName = `trainer-layout ${trainerIntroPhase !== "dismissed" ? "trainer-layout--intro" : ""}`;
+  const trainerLayoutClassName = `trainer-layout ${trainerIntroPhase !== "dismissed" ? "trainer-layout--intro" : ""} ${practiceFocusMode ? "trainer-layout--practice" : ""}`;
   const trainerSurfaceClassName = `trainer-surface trainer-surface--${trainerIntroPhase}`;
 
   useEffect(() => {
@@ -1261,7 +1314,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       </header>
 
       <section className={trainerLayoutClassName}>
-        {trainerIntroPhase === "dismissed" ? (
+        {trainerIntroPhase === "dismissed" && !practiceFocusMode ? (
         <aside className="side-panel">
           <div className="account-strip">
             <span>{accountLabel}</span>
@@ -1283,7 +1336,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
           <label className="field">
             <span>{t("trainer.layout")}</span>
-            <select value={layoutId} onChange={(event) => setLayoutId(event.target.value as LayoutId)} disabled={isSessionLocked}>
+            <select value={layoutId} onChange={(event) => changeTrainingLayout(event.target.value as LayoutId)} disabled={isSessionLocked}>
               {layouts.map((layout) => (
                 <option key={layout} value={layout}>
                   {layout}
@@ -1433,6 +1486,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             cadence={liveStats.cadence}
             errors={liveStats.errors}
             progress={liveStats.progress}
+            variant={practiceFocusMode ? "practice" : "default"}
           />
 
           <div className="typing-stage">
@@ -1612,16 +1666,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                   </button>
                 ) : null}
                 <span>{t("trainer.startShortcut")}</span>
-              </div>
-            </div>
-          ) : null}
-
-          {trainerIntroPhase === "revealing" && trainerChromeVisible ? (
-            <div className="trainer-reveal-overlay" role="presentation">
-              <div className="trainer-reveal-arena" aria-live="assertive" aria-label={t("trainerIntro.revealAria")}>
-                <span className="countdown-kicker">{t("trainerIntro.revealKicker")}</span>
-                <Play size={86} fill="currentColor" aria-hidden="true" />
-                <span className="countdown-fight">{t("trainerIntro.revealFight")}</span>
               </div>
             </div>
           ) : null}

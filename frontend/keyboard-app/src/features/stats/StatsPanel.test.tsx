@@ -64,11 +64,44 @@ describe("StatsPanel", () => {
 
   it("derives named mastery levels from mastery cpm thresholds", () => {
     expect(masteryLevelForCpm(0)).toBe("starter");
-    expect(masteryLevelForCpm(99)).toBe("starter");
-    expect(masteryLevelForCpm(100)).toBe("beginner");
-    expect(masteryLevelForCpm(180)).toBe("confident");
-    expect(masteryLevelForCpm(250)).toBe("middle");
-    expect(masteryLevelForCpm(350)).toBe("strong");
-    expect(masteryLevelForCpm(450)).toBe("pro");
+    expect(masteryLevelForCpm(79)).toBe("starter");
+    expect(masteryLevelForCpm(80)).toBe("beginner");
+    expect(masteryLevelForCpm(159)).toBe("beginner");
+    expect(masteryLevelForCpm(160)).toBe("confident");
+    expect(masteryLevelForCpm(170)).toBe("confident");
+    expect(masteryLevelForCpm(240)).toBe("middle");
+    expect(masteryLevelForCpm(320)).toBe("strong");
+    expect(masteryLevelForCpm(420)).toBe("pro");
+  });
+
+  it("renders a focused practice stats variant with animated numeric values", () => {
+    const markup = renderToStaticMarkup(
+      createElement(StatsPanel, {
+        labels: {
+          mastery: "Мастерство",
+          speed: "Скорость",
+          accuracy: "Точность",
+          cadence: "Ритм",
+          errors: "Ошибки",
+          progress: "Прогресс",
+        },
+        units: {
+          cpm: "зн/мин",
+          percent: "%",
+        },
+        masteryCpm: 170,
+        masteryLevel: "Уверенный",
+        speedCpm: 188,
+        accuracy: 0.97,
+        cadence: 0.72,
+        errors: 2,
+        progress: 0.5,
+        variant: "practice",
+      }),
+    );
+
+    expect(markup).toContain("stats-panel--practice");
+    expect(markup).toContain("stat__value--animated");
+    expect(markup).toContain("170 зн/мин · Уверенный");
   });
 });

@@ -182,9 +182,6 @@ export const fr: TranslationResource = {
     startAria: "Essayer un court entraînement",
     shortcut: "Espace démarre",
     meta: "5 minutes par jour · vitesse · précision · combinaisons faibles",
-    revealAria: "Le clavier s'ouvre",
-    revealKicker: "Chargement du terrain",
-    revealFight: "Départ",
   },
   trainerSetTitle: {
     letterPairs: "Paires de lettres",

@@ -739,6 +739,10 @@ input {
   grid-template-rows: minmax(0, 1fr);
 }
 
+.trainer-layout--practice {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .trainer-surface--visible {
   grid-template-rows: minmax(0, 1fr);
   place-items: center;
@@ -991,6 +995,15 @@ input {
   padding: 6px 10px;
 }
 
+.stats-panel--practice {
+  width: 100%;
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent 42%),
+    var(--surface-strong);
+  padding: 10px 12px;
+}
+
 .stats-panel__grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(104px, 1fr));
@@ -1007,8 +1020,30 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+.stats-panel--practice .stat {
+  min-height: 58px;
+  align-content: center;
+}
+
+.stats-panel--practice .stat strong {
+  font-size: clamp(22px, 2.2vw, 34px);
+  line-height: 1;
+}
+
+.stats-panel--practice .stat:first-child {
+  grid-column: span 2;
+}
+
+.stats-panel--practice .stat:first-child strong {
+  font-size: clamp(24px, 2.4vw, 38px);
+}
+
 .stat__value--accent {
   color: var(--primary);
+}
+
+.stat__value--animated {
+  animation: stat-value-pop 0.28s ease-out both;
 }
 
 .stats-panel__bar {
@@ -1970,6 +2005,18 @@ input {
   }
 }
 
+@keyframes stat-value-pop {
+  from {
+    opacity: 0.72;
+    transform: translateY(3px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .registration-modal__close {
   position: absolute;
   top: 12px;
@@ -2063,6 +2110,10 @@ input {
   .stats-panel__grid {
     grid-template-columns: repeat(3, minmax(104px, 1fr));
   }
+
+  .stats-panel--practice .stats-panel__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1500px) {
@@ -2128,6 +2179,14 @@ input {
   .stats-panel__grid,
   .progress-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-panel--practice .stats-panel__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-panel--practice .stat:first-child {
+    grid-column: 1 / -1;
   }
 
   .gamification-panel__grid,
@@ -2257,6 +2316,10 @@ input {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .stat__value--animated {
+    animation: none;
+  }
+
   *,
   *::before,
   *::after {

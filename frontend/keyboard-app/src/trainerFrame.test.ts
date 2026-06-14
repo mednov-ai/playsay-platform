@@ -40,4 +40,25 @@ describe("keyboard trainer wide frame", () => {
     expect(shell).not.toContain("level-pill");
     expect(shell).not.toContain("level.");
   });
+
+  it("uses a focused practice layout without the side controls while typing", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).toContain('trainerIntroPhase === "dismissed" && !practiceFocusMode');
+    expect(shell).toContain('variant={practiceFocusMode ? "practice" : "default"}');
+    expect(styles).toContain(".trainer-layout--practice");
+    expect(styles).toContain(".stats-panel--practice");
+    expect(styles).toContain(".stat__value--animated");
+  });
+
+  it("does not render the old preparation reveal overlay copy", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+    const ru = readFileSync(resolve(__dirname, "shared/i18n/resources/ru.ts"), "utf8");
+    const en = readFileSync(resolve(__dirname, "shared/i18n/resources/en.ts"), "utf8");
+
+    expect(shell).not.toContain("trainer-reveal-overlay");
+    expect(shell).not.toContain("revealKicker");
+    expect(ru).not.toContain("Готовим поле");
+    expect(en).not.toContain("Loading field");
+  });
 });

@@ -7,14 +7,14 @@ export type TrainerIntroEvent =
 
 export const trainerIntroRevealMs = 680;
 
-export function initialTrainerIntroPhase(): TrainerIntroPhase {
-  return "visible";
+export function initialTrainerIntroPhase(introDismissed = false): TrainerIntroPhase {
+  return introDismissed ? "dismissed" : "visible";
 }
 
 export function trainerIntroReducer(phase: TrainerIntroPhase, event: TrainerIntroEvent): TrainerIntroPhase {
   switch (event.type) {
     case "startReveal":
-      return phase === "visible" ? "revealing" : phase;
+      return phase === "visible" ? "dismissed" : phase;
     case "completeReveal":
       return phase === "revealing" ? "dismissed" : phase;
     case "resetTrainer":

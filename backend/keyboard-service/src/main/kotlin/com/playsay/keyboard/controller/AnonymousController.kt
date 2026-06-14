@@ -2,6 +2,7 @@ package com.playsay.keyboard.controller
 
 import com.playsay.keyboard.dto.AnonymousProfileResponse
 import com.playsay.keyboard.dto.ResolveAnonymousProfileRequest
+import com.playsay.keyboard.dto.ResetAnonymousProfileRequest
 import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitTrainingResultResponse
 import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
@@ -34,6 +35,12 @@ class AnonymousController(
         servletRequest: HttpServletRequest,
     ): AnonymousProfileResponse =
         trainingService.updateAnonymousProfile(request, servletRequest)
+
+    @PostMapping("/profile/reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun reset(@RequestBody request: ResetAnonymousProfileRequest) {
+        trainingService.resetAnonymousProfile(request)
+    }
 
     @PostMapping("/training/results")
     @ResponseStatus(HttpStatus.CREATED)

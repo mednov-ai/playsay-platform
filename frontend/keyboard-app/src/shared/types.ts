@@ -199,6 +199,10 @@ export interface ResolveAnonymousProfileRequest {
   deviceId: string;
 }
 
+export interface ResetAnonymousProfileRequest {
+  deviceId: string;
+}
+
 export interface UpdateAnonymousProfileRequest {
   deviceId: string;
   displayName: string;

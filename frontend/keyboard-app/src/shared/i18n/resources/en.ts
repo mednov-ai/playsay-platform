@@ -112,6 +112,13 @@ export const en: TranslationResource = {
     guestNameLabel: "Name",
     guestNamePlaceholder: "For example, Masha",
     guestNameSave: "Save",
+    guestResetProgress: "Reset progress",
+    guestResetTitle: "Reset guest progress?",
+    guestResetBody: "This removes anonymous lessons, mastery, leagues and the name from this device and the server. It cannot be undone.",
+    guestResetConfirm: "Reset",
+    guestResetCancel: "Cancel",
+    guestResetting: "Resetting...",
+    guestResetError: "Could not reset progress. Check the connection and try again.",
     editGuestName: "Change name",
   },
   gamification: {

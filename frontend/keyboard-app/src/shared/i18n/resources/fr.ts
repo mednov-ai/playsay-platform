@@ -112,6 +112,13 @@ export const fr: TranslationResource = {
     guestNameLabel: "Prénom",
     guestNamePlaceholder: "Par exemple, Masha",
     guestNameSave: "Enregistrer",
+    guestResetProgress: "Réinitialiser la progression",
+    guestResetTitle: "Réinitialiser l'invité ?",
+    guestResetBody: "Les leçons anonymes, la maîtrise, les ligues et le prénom seront supprimés de cet appareil et du serveur. Action irréversible.",
+    guestResetConfirm: "Réinitialiser",
+    guestResetCancel: "Annuler",
+    guestResetting: "Réinitialisation...",
+    guestResetError: "Impossible de réinitialiser la progression. Vérifiez la connexion et réessayez.",
     editGuestName: "Modifier le prénom",
   },
   gamification: {

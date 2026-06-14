@@ -7,6 +7,7 @@ import { AchievementCelebrationQueue, type AchievementCelebrationLabels } from "
 import { GamificationProfilePanel, type GamificationProfileLabels } from "../../features/gamification/GamificationProfilePanel";
 import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/VirtualKeyboard";
 import {
+  clearGuestProgress,
   dismissRegistrationPrompt,
   getOrCreateAnonymousDeviceId,
   readGuestLayoutMastery,
@@ -48,12 +49,13 @@ import {
 } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
 import { computeActiveDurationMs, useTypingStore, type StreamItem } from "../../features/typing/typingStore";
-import { claimAnonymousProgress, fetchProgress, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
+import { claimAnonymousProgress, fetchProgress, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
 import type { ChordSet, FocusLesson, GamificationEvent, GamificationProfile, LayoutId, Me, Progress, TrainingResult } from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
+import { escapeActionForTrainerState } from "./keyboardShortcuts";
 import { shouldBlockDeferredPrompts, shouldShowDeferredPrompt } from "./promptFlow";
 import { registrationUrlForKeyboard } from "./registrationLink";
 
@@ -297,7 +299,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [loadError, setLoadError] = useState<string | null>(authError ?? null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [progressImportMessage, setProgressImportMessage] = useState<string | null>(null);
-  const [anonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
+  const [anonymousDeviceId, setAnonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const [guestSessionCount, setGuestSessionCount] = useState(() => readGuestSessionCount());
   const [guestDisplayName, setGuestDisplayName] = useState<string | null>(() => readGuestDisplayName());
   const [guestLayoutMastery, setGuestLayoutMastery] = useState(() => readGuestLayoutMastery());
@@ -307,6 +309,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [pendingNamePrompt, setPendingNamePrompt] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [guestNameDraft, setGuestNameDraft] = useState("");
+  const [guestResetConfirm, setGuestResetConfirm] = useState(false);
+  const [guestResetting, setGuestResetting] = useState(false);
+  const [guestResetError, setGuestResetError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [guestRecorded, setGuestRecorded] = useState(false);
@@ -995,11 +1000,15 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [guestSessionCount]);
 
   const dismissNamePrompt = useCallback(() => {
+    setGuestResetConfirm(false);
+    setGuestResetError(null);
     setPendingNamePrompt(false);
     setShowNamePrompt(false);
   }, []);
 
   const openGuestNamePrompt = useCallback(() => {
+    setGuestResetConfirm(false);
+    setGuestResetError(null);
     setGuestNameDraft(guestDisplayName ?? "");
     if (sessionFlow.phase === "paused" || sessionFlow.phase === "countdown" || sessionFlow.phase === "running") {
       setPendingNamePrompt(true);
@@ -1009,6 +1018,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [guestDisplayName, sessionFlow.phase]);
 
   const saveGuestName = useCallback(() => {
+    if (guestResetting) {
+      return;
+    }
     const displayName = writeGuestDisplayName(guestNameDraft);
     if (!displayName) {
       return;
@@ -1025,7 +1037,42 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         setGuestSessionCount((current) => Math.max(current, profile.sessions));
       })
       .catch(() => undefined);
-  }, [anonymousDeviceId, guestNameDraft]);
+  }, [anonymousDeviceId, guestNameDraft, guestResetting]);
+
+  const resetGuestProgress = useCallback(() => {
+    setGuestResetting(true);
+    setGuestResetError(null);
+    void resetAnonymousProfile({ deviceId: anonymousDeviceId })
+      .then(() => {
+        clearGuestProgress();
+        const nextAnonymousDeviceId = getOrCreateAnonymousDeviceId();
+        setAnonymousDeviceId(nextAnonymousDeviceId);
+        setGuestSessionCount(0);
+        setGuestDisplayName(null);
+        setGuestLayoutMastery({});
+        setGuestNameDraft("");
+        setProgress(null);
+        setProgressImportMessage(null);
+        setLatestGamificationEvents([]);
+        setDismissedGamificationEventIds([]);
+        setNextDecision(null);
+        setPendingNamePrompt(false);
+        setPendingRegistrationPrompt(false);
+        setShowRegistrationPrompt(false);
+        setShowProfileModal(false);
+        setGuestResetConfirm(false);
+        setShowNamePrompt(false);
+        clearSessionResult();
+        reset();
+        dispatchSessionFlow({ type: "reset" });
+      })
+      .catch(() => {
+        setGuestResetError(t("trainer.guestResetError"));
+      })
+      .finally(() => {
+        setGuestResetting(false);
+      });
+  }, [anonymousDeviceId, clearSessionResult, reset, t]);
 
   useEffect(() => {
     if (sessionFlow.phase !== "running" || sessionResult) {
@@ -1041,40 +1088,42 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey || shouldIgnoreShortcutTarget(event.target)) {
+      if (event.code === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        const action = escapeActionForTrainerState({
+          showNamePrompt,
+          showProfileModal,
+          showRegistrationPrompt,
+          sessionPhase: sessionFlow.phase,
+          finishOverlayVisible: sessionFlow.finishOverlayVisible,
+        });
+        switch (action) {
+          case "closeNamePrompt":
+            dismissNamePrompt();
+            break;
+          case "closeProfileModal":
+            setShowProfileModal(false);
+            break;
+          case "closeRegistrationPrompt":
+            dismissPrompt();
+            break;
+          case "cancelCountdown":
+            cancelCountdown();
+            break;
+          case "closePausedOverlay":
+            restartSession();
+            break;
+          case "dismissFinishedOverlay":
+            dismissFinishOverlay();
+            break;
+          case "none":
+            break;
+        }
         return;
       }
 
-      if (event.code === "Escape") {
-        if (showNamePrompt) {
-          event.preventDefault();
-          dismissNamePrompt();
-          return;
-        }
-        if (showProfileModal) {
-          event.preventDefault();
-          setShowProfileModal(false);
-          return;
-        }
-        if (showRegistrationPrompt) {
-          event.preventDefault();
-          dismissPrompt();
-          return;
-        }
-        if (sessionFlow.phase === "paused") {
-          event.preventDefault();
-          restartSession();
-          return;
-        }
-        if (sessionFlow.phase === "finished" && sessionFlow.finishOverlayVisible) {
-          event.preventDefault();
-          dismissFinishOverlay();
-          return;
-        }
-        if (sessionFlow.phase === "countdown") {
-          event.preventDefault();
-          cancelCountdown();
-        }
+      if (event.metaKey || event.ctrlKey || event.altKey || shouldIgnoreShortcutTarget(event.target)) {
         return;
       }
 
@@ -1102,8 +1151,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [
     canResumeSession,
     canStartSession,
@@ -1602,6 +1651,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 value={guestNameDraft}
                 maxLength={64}
                 autoFocus
+                disabled={guestResetting}
                 placeholder={t("trainer.guestNamePlaceholder")}
                 onChange={(event) => setGuestNameDraft(event.target.value)}
                 onKeyDown={(event) => {
@@ -1613,13 +1663,52 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               />
             </label>
             <div className="registration-modal__actions">
-              <button type="button" className="primary-button" onClick={saveGuestName}>
+              <button type="button" className="primary-button" onClick={saveGuestName} disabled={guestResetting}>
                 <Save size={18} aria-hidden="true" />
                 <span>{t("trainer.guestNameSave")}</span>
               </button>
-              <button type="button" className="secondary-button" onClick={dismissNamePrompt}>
+              <button type="button" className="secondary-button" onClick={dismissNamePrompt} disabled={guestResetting}>
                 <span>{t("trainer.continueGuest")}</span>
               </button>
+            </div>
+            <div className="guest-reset-panel" aria-live="polite">
+              {guestResetConfirm ? (
+                <div className="guest-reset-panel__confirm">
+                  <strong>{t("trainer.guestResetTitle")}</strong>
+                  <p>{t("trainer.guestResetBody")}</p>
+                  <div className="registration-modal__actions">
+                    <button type="button" className="danger-button danger-button--solid" onClick={resetGuestProgress} disabled={guestResetting}>
+                      <RotateCcw size={18} aria-hidden="true" />
+                      <span>{guestResetting ? t("trainer.guestResetting") : t("trainer.guestResetConfirm")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setGuestResetConfirm(false);
+                        setGuestResetError(null);
+                      }}
+                      disabled={guestResetting}
+                    >
+                      <span>{t("trainer.guestResetCancel")}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="danger-button"
+                  onClick={() => {
+                    setGuestResetConfirm(true);
+                    setGuestResetError(null);
+                  }}
+                  disabled={guestResetting}
+                >
+                  <RotateCcw size={18} aria-hidden="true" />
+                  <span>{t("trainer.guestResetProgress")}</span>
+                </button>
+              )}
+              {guestResetError ? <p className="guest-reset-panel__error">{guestResetError}</p> : null}
             </div>
           </section>
         </div>

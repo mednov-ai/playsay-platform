@@ -147,6 +147,7 @@ input {
 .icon-text-button,
 .primary-button,
 .secondary-button,
+.danger-button,
 .session-play-button,
 .play-button {
   min-height: 40px;
@@ -168,10 +169,21 @@ input {
 }
 
 .icon-text-button,
-.secondary-button {
+.secondary-button,
+.danger-button {
   padding: 0 12px;
   background: var(--surface);
   color: var(--foreground);
+}
+
+.danger-button {
+  border-color: color-mix(in srgb, var(--danger) 48%, var(--line));
+  color: var(--danger);
+}
+
+.danger-button--solid {
+  background: color-mix(in srgb, var(--danger) 94%, #111111);
+  color: white;
 }
 
 .primary-button {
@@ -257,11 +269,25 @@ input {
 .secondary-button:hover,
 .icon-text-button:hover,
 .icon-button:hover,
+.danger-button:hover,
 .secondary-button:focus-visible,
 .icon-text-button:focus-visible,
-.icon-button:focus-visible {
+.icon-button:focus-visible,
+.danger-button:focus-visible {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.danger-button:hover,
+.danger-button:focus-visible {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.danger-button--solid:hover,
+.danger-button--solid:focus-visible {
+  background: color-mix(in srgb, var(--danger) 82%, #111111);
+  color: white;
 }
 
 .auth-page,
@@ -1987,6 +2013,41 @@ input {
 
 .guest-name-field {
   margin: 0 0 18px;
+}
+
+.guest-reset-panel {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 0;
+  border-top: 1px solid var(--line);
+  padding: 18px 0 0;
+}
+
+.guest-reset-panel__confirm {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--danger) 42%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  padding: 14px;
+}
+
+.guest-reset-panel__confirm strong {
+  color: var(--foreground);
+  font-size: 15px;
+}
+
+.guest-reset-panel__confirm p,
+.guest-reset-panel__error {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.guest-reset-panel__error {
+  color: var(--danger);
 }
 
 @media (max-width: 1100px) {

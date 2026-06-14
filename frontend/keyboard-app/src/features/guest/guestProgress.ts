@@ -6,7 +6,7 @@ export const anonymousDeviceIdStorageKey = "playsay.key.anonymousDeviceId";
 export const guestDisplayNameStorageKey = "playsay.key.guestDisplayName";
 export const guestLayoutMasteryStorageKey = "playsay.key.layoutMastery";
 
-type GuestStorage = Pick<Storage, "getItem" | "setItem">;
+type GuestStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 export type GuestLayoutMastery = Partial<Record<LayoutId, { masteryCpm: number }>>;
 
 export function browserStorage(): GuestStorage | null {
@@ -80,6 +80,16 @@ export function writeGuestLayoutMastery(
 
 export function dismissRegistrationPrompt(count: number, storage: GuestStorage | null = browserStorage()): void {
   storage?.setItem(guestPromptDismissedStorageKey, String(Math.max(0, Math.floor(count))));
+}
+
+export function clearGuestProgress(storage: GuestStorage | null = browserStorage()): void {
+  [
+    guestSessionStorageKey,
+    guestPromptDismissedStorageKey,
+    anonymousDeviceIdStorageKey,
+    guestDisplayNameStorageKey,
+    guestLayoutMasteryStorageKey,
+  ].forEach((key) => storage?.removeItem(key));
 }
 
 export function shouldShowRegistrationPrompt(sessionCount: number, dismissedCount: number): boolean {

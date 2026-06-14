@@ -112,6 +112,13 @@ export const de: TranslationResource = {
     guestNameLabel: "Name",
     guestNamePlaceholder: "Zum Beispiel Masha",
     guestNameSave: "Speichern",
+    guestResetProgress: "Fortschritt zurücksetzen",
+    guestResetTitle: "Gastfortschritt zurücksetzen?",
+    guestResetBody: "Anonyme Lektionen, Meisterschaft, Ligen und Name werden auf diesem Gerät und dem Server gelöscht. Das kann nicht rückgängig gemacht werden.",
+    guestResetConfirm: "Zurücksetzen",
+    guestResetCancel: "Abbrechen",
+    guestResetting: "Zurücksetzen...",
+    guestResetError: "Fortschritt konnte nicht zurückgesetzt werden. Prüfe die Verbindung und versuche es erneut.",
     editGuestName: "Name ändern",
   },
   gamification: {

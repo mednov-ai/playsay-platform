@@ -6,6 +6,7 @@ import com.playsay.keyboard.controller.MeController
 import com.playsay.keyboard.controller.TrainingController
 import com.playsay.keyboard.dto.ClaimAnonymousProgressRequest
 import com.playsay.keyboard.dto.ResolveAnonymousProfileRequest
+import com.playsay.keyboard.dto.ResetAnonymousProfileRequest
 import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitResultRequest
 import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
@@ -27,6 +28,7 @@ import javax.sql.DataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @SpringBootTest(
@@ -471,6 +473,55 @@ class KeyboardApiTest @Autowired constructor(
 
         assertEquals("MODERATE", third.focusLesson?.reason)
         assertTrue(third.focusLesson?.problemKeys.orEmpty().contains("th"))
+    }
+
+    @Test
+    fun `anonymous profile reset deletes anonymous progress and is idempotent`() {
+        gamificationEventRepo.deleteAllInBatch()
+        trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
+        gamificationProfileRepo.deleteAllInBatch()
+        anonymousProfileRepo.deleteAllInBatch()
+
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val request = anonymousRequest()
+        (1..3).forEach { index ->
+            anonymousController.submit(
+                SubmitAnonymousResultRequest(
+                    deviceId = "device-reset",
+                    clientResultId = "anonymous-reset-$index",
+                    chordSetId = chordSetId,
+                    lessonKind = "STANDARD",
+                    speedCpm = 180.0 + index,
+                    averageCpm = 180.0 + index,
+                    cadence = 0.82,
+                    accuracy = 0.98,
+                    errors = 0,
+                    characterCount = 180 + index,
+                    correctCount = 180 + index,
+                    durationMs = 60_000,
+                    clientTimezone = "Europe/Moscow",
+                    localTrainingDate = "2026-06-${index.toString().padStart(2, '0')}",
+                ),
+                request,
+            )
+        }
+        val profile = anonymousProfileRepo.findByDeviceId("device-reset") ?: error("anonymous profile was not created")
+
+        assertEquals(3, trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id).size)
+        assertTrue(layoutMasteryProfileRepo.findByAnonymousProfileIdOrderByLayoutAsc(profile.id).isNotEmpty())
+        assertNotNull(gamificationProfileRepo.findByAnonymousProfileId(profile.id))
+        assertTrue(gamificationEventRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id).isNotEmpty())
+
+        anonymousController.reset(ResetAnonymousProfileRequest(deviceId = "device-reset"))
+        anonymousController.reset(ResetAnonymousProfileRequest(deviceId = "device-reset"))
+        anonymousController.reset(ResetAnonymousProfileRequest(deviceId = "unknown-device"))
+
+        assertNull(anonymousProfileRepo.findByDeviceId("device-reset"))
+        assertTrue(trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id).isEmpty())
+        assertTrue(layoutMasteryProfileRepo.findByAnonymousProfileIdOrderByLayoutAsc(profile.id).isEmpty())
+        assertNull(gamificationProfileRepo.findByAnonymousProfileId(profile.id))
+        assertTrue(gamificationEventRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id).isEmpty())
     }
 
     @Test

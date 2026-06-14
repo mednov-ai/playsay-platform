@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   anonymousDeviceIdStorageKey,
+  clearGuestProgress,
   guestDisplayNameStorageKey,
   guestLayoutMasteryStorageKey,
   guestPromptDismissedStorageKey,
@@ -17,7 +18,7 @@ import {
   writeGuestLayoutMastery,
 } from "./guestProgress";
 
-class MemoryStorage implements Pick<Storage, "getItem" | "setItem"> {
+class MemoryStorage implements Pick<Storage, "getItem" | "setItem" | "removeItem"> {
   private readonly values = new Map<string, string>();
 
   getItem(key: string): string | null {
@@ -26,6 +27,10 @@ class MemoryStorage implements Pick<Storage, "getItem" | "setItem"> {
 
   setItem(key: string, value: string): void {
     this.values.set(key, value);
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key);
   }
 }
 
@@ -108,5 +113,27 @@ describe("guest keyboard progress", () => {
 
     expect(readGuestSessionCount(storage)).toBe(0);
     expect(readDismissedPromptCount(storage)).toBe(0);
+  });
+
+  it("clears all anonymous local progress and lets the next visit create a fresh device id", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(guestSessionStorageKey, "7");
+    storage.setItem(guestPromptDismissedStorageKey, "5");
+    storage.setItem(anonymousDeviceIdStorageKey, "device-old");
+    storage.setItem(guestDisplayNameStorageKey, "Masha");
+    storage.setItem(guestLayoutMasteryStorageKey, JSON.stringify({ EN: { masteryCpm: 212.3 } }));
+
+    clearGuestProgress(storage);
+
+    expect(storage.getItem(guestSessionStorageKey)).toBeNull();
+    expect(storage.getItem(guestPromptDismissedStorageKey)).toBeNull();
+    expect(storage.getItem(anonymousDeviceIdStorageKey)).toBeNull();
+    expect(storage.getItem(guestDisplayNameStorageKey)).toBeNull();
+    expect(storage.getItem(guestLayoutMasteryStorageKey)).toBeNull();
+    expect(readGuestSessionCount(storage)).toBe(0);
+    expect(readDismissedPromptCount(storage)).toBe(0);
+    expect(readGuestDisplayName(storage)).toBeNull();
+    expect(readGuestLayoutMastery(storage)).toEqual({});
+    expect(getOrCreateAnonymousDeviceId(storage, () => "device-new")).toBe("device-new");
   });
 });

@@ -24,6 +24,13 @@ function submitResponseJson(value) {
   };
 }
 
+function noContent() {
+  return {
+    status: 204,
+    body: "",
+  };
+}
+
 function gamificationProfile(sessionCount) {
   const calibrated = sessionCount >= 3;
   const masteryCpm = calibrated ? 236 : sessionCount === 2 ? 188 : 142;
@@ -127,18 +134,36 @@ function submitTrainingResult(body, sessionCount) {
 }
 
 async function installMockApi(page) {
-  let submitCount = 0;
+  const state = {
+    submitCount: 0,
+    resetCount: 0,
+    resetDevices: [],
+  };
   await page.route("**/api/anonymous/profile/resolve", async (route) => {
-    await route.fulfill(responseJson({ id: 1, deviceId: "smoke-device", displayName: "Smoke Guest", sessions: 0 }));
+    const body = route.request().postDataJSON();
+    await route.fulfill(responseJson({
+      id: state.resetCount > 0 ? 2 : 1,
+      deviceId: body.deviceId,
+      displayName: state.resetCount > 0 ? undefined : "Smoke Guest",
+      sessions: state.resetCount > 0 ? 0 : 0,
+    }));
+  });
+  await page.route("**/api/anonymous/profile/reset", async (route) => {
+    const body = route.request().postDataJSON();
+    state.resetCount += 1;
+    state.resetDevices.push(body.deviceId);
+    state.submitCount = 0;
+    await route.fulfill(noContent());
   });
   await page.route("**/api/anonymous/profile", async (route) => {
-    await route.fulfill(responseJson({ id: 1, deviceId: "smoke-device", displayName: "Smoke Guest", sessions: submitCount }));
+    await route.fulfill(responseJson({ id: 1, deviceId: "smoke-device", displayName: "Smoke Guest", sessions: state.submitCount }));
   });
   await page.route("**/api/anonymous/training/results", async (route) => {
     const body = route.request().postDataJSON();
-    submitCount += 1;
-    await route.fulfill(submitResponseJson(submitTrainingResult(body, submitCount)));
+    state.submitCount += 1;
+    await route.fulfill(submitResponseJson(submitTrainingResult(body, state.submitCount)));
   });
+  return state;
 }
 
 async function pressCurrentCharacter(page) {
@@ -182,6 +207,11 @@ async function startNextLesson(page) {
   await skipCountdown(page);
 }
 
+async function startInlineLesson(page) {
+  await page.locator(".session-play-button").click();
+  await skipCountdown(page);
+}
+
 async function expectVisibleText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({ state: "visible", timeout: 10_000 });
 }
@@ -218,9 +248,10 @@ async function capture(page, name) {
     window.localStorage.setItem("playsay.language", "en");
     window.localStorage.setItem("playsay.key.guestDisplayName", "Smoke Guest");
     window.localStorage.setItem("playsay.key.anonymousDeviceId", "smoke-device");
+    window.localStorage.setItem("playsay.key.guestSessions", "4");
   });
   const page = await context.newPage();
-  await installMockApi(page);
+  const mockApi = await installMockApi(page);
 
   const response = await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
   if (!response || response.status() >= 500) {
@@ -232,7 +263,12 @@ async function capture(page, name) {
   await page.locator(".intro-play-button").click();
   await skipCountdown(page);
   await completeLesson(page);
-  await startNextLesson(page);
+  await page.keyboard.press("Escape");
+  await page.locator(".practice-overlay--finished").waitFor({ state: "hidden", timeout: 10_000 });
+  await expectVisibleText(page, "Save your progress?");
+  await page.keyboard.press("Escape");
+  await page.locator("#registration-prompt-title").waitFor({ state: "hidden", timeout: 10_000 });
+  await startInlineLesson(page);
   await completeLesson(page);
   await startNextLesson(page);
   await completeLesson(page);
@@ -249,9 +285,14 @@ async function capture(page, name) {
 
   await page.keyboard.press("Escape");
   await page.locator(".practice-overlay--finished").waitFor({ state: "hidden", timeout: 10_000 });
+  await page.locator(".account-strip__edit").click();
+  await expectVisibleText(page, "What should we call you?");
+  await page.keyboard.press("Escape");
+  await page.locator("#guest-name-prompt-title").waitFor({ state: "hidden", timeout: 10_000 });
   await page.locator(".progress-profile-button").click();
   await expectVisibleText(page, "Rhythm");
-  await page.locator(".profile-modal .registration-modal__close").click();
+  await page.keyboard.press("Escape");
+  await page.locator("#profile-modal-title").waitFor({ state: "hidden", timeout: 10_000 });
 
   await page.locator(".side-panel .field select").first().selectOption("RU");
   await page.locator(".progress-profile-button").click();
@@ -261,7 +302,62 @@ async function capture(page, name) {
   if (profileText.includes("Rhythm") || profileText.includes("236 cpm")) {
     throw new Error("RU profile copied EN mastery or league.");
   }
-  await page.locator(".profile-modal .registration-modal__close").click();
+  await page.keyboard.press("Escape");
+  await page.locator("#profile-modal-title").waitFor({ state: "hidden", timeout: 10_000 });
+
+  const beforeNoOverlayEscape = await page.evaluate(() => ({
+    layout: document.querySelector(".side-panel .field select")?.value,
+    deviceId: window.localStorage.getItem("playsay.key.anonymousDeviceId"),
+  }));
+  await page.evaluate(() => {
+    window.__playsayKeyboardSmokeEscapeBubbled = false;
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.code === "Escape") {
+          window.__playsayKeyboardSmokeEscapeBubbled = true;
+        }
+      },
+      { once: true },
+    );
+  });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(100);
+  const afterNoOverlayEscape = await page.evaluate(() => ({
+    bubbled: window.__playsayKeyboardSmokeEscapeBubbled,
+    layout: document.querySelector(".side-panel .field select")?.value,
+    deviceId: window.localStorage.getItem("playsay.key.anonymousDeviceId"),
+  }));
+  if (afterNoOverlayEscape.bubbled) {
+    throw new Error("Escape bubbled when no trainer overlay was open.");
+  }
+  if (afterNoOverlayEscape.layout !== beforeNoOverlayEscape.layout || afterNoOverlayEscape.deviceId !== beforeNoOverlayEscape.deviceId) {
+    throw new Error("Escape without overlays changed trainer state.");
+  }
+
+  await page.locator(".account-strip__edit").click();
+  await page.getByRole("button", { name: "Reset progress" }).click();
+  await expectVisibleText(page, "Reset guest progress?");
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
+  await page.locator("#guest-name-prompt-title").waitFor({ state: "hidden", timeout: 10_000 });
+  if (mockApi.resetCount !== 1 || mockApi.resetDevices[0] !== "smoke-device") {
+    throw new Error(`Anonymous reset was not called for the original device id: ${JSON.stringify(mockApi)}`);
+  }
+  await page.waitForFunction(() => window.localStorage.getItem("playsay.key.anonymousDeviceId") !== "smoke-device");
+  const resetState = await page.evaluate(() => ({
+    deviceId: window.localStorage.getItem("playsay.key.anonymousDeviceId"),
+    displayName: window.localStorage.getItem("playsay.key.guestDisplayName"),
+    sessions: window.localStorage.getItem("playsay.key.guestSessions"),
+    mastery: window.localStorage.getItem("playsay.key.layoutMastery"),
+  }));
+  if (!resetState.deviceId || resetState.displayName || resetState.sessions || resetState.mastery) {
+    throw new Error(`Anonymous local state was not cleared: ${JSON.stringify(resetState)}`);
+  }
+  await expectVisibleText(page, "Local practice");
+  const sessionMetric = (await page.locator(".progress-summary .metric").first().innerText()).replace(/\s+/g, " ");
+  if (!sessionMetric.includes("Sessions") || !sessionMetric.includes("0")) {
+    throw new Error(`Guest sessions did not reset in the UI: ${sessionMetric}`);
+  }
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator(".virtual-keyboard").waitFor({ state: "visible", timeout: 10_000 });

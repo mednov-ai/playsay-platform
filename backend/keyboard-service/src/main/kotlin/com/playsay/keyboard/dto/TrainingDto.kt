@@ -188,6 +188,10 @@ data class ResolveAnonymousProfileRequest(
     val deviceId: String,
 )
 
+data class ResetAnonymousProfileRequest(
+    val deviceId: String,
+)
+
 data class UpdateAnonymousProfileRequest(
     val deviceId: String,
     val displayName: String,

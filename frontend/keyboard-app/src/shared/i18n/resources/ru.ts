@@ -110,6 +110,13 @@ export const ru = {
     guestNameLabel: "Имя",
     guestNamePlaceholder: "Например, Маша",
     guestNameSave: "Сохранить",
+    guestResetProgress: "Сбросить прогресс",
+    guestResetTitle: "Сбросить гостевой прогресс?",
+    guestResetBody: "Удалим анонимные уроки, мастерство, лиги и имя с этого устройства и сервера. Действие нельзя отменить.",
+    guestResetConfirm: "Сбросить",
+    guestResetCancel: "Отмена",
+    guestResetting: "Сбрасываем...",
+    guestResetError: "Не удалось сбросить прогресс. Проверьте соединение и попробуйте еще раз.",
     editGuestName: "Сменить имя",
   },
   gamification: {

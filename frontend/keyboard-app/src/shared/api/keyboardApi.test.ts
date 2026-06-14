@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { claimAnonymousProgress, keyboardApiPath, resolveAnonymousProfile, submitAnonymousResult } from "./keyboardApi";
+import { claimAnonymousProgress, keyboardApiPath, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult } from "./keyboardApi";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -73,6 +73,23 @@ describe("keyboard API paths", () => {
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({ Authorization: "Bearer token-1" }),
+      }),
+    );
+  });
+
+  it("resets anonymous profiles without auth and accepts no-content responses", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 204 }),
+    );
+
+    await expect(resetAnonymousProfile({ deviceId: "device-1" })).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/anonymous/profile/reset",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.not.objectContaining({ Authorization: expect.any(String) }),
+        body: JSON.stringify({ deviceId: "device-1" }),
       }),
     );
   });

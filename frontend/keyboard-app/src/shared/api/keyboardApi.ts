@@ -15,6 +15,7 @@ import type {
   Me,
   Progress,
   ResolveAnonymousProfileRequest,
+  ResetAnonymousProfileRequest,
   SubmitAnonymousResult,
   SubmitResult,
   SubmitTrainingResultResponse,
@@ -129,6 +130,14 @@ export function updateAnonymousProfile(body: UpdateAnonymousProfileRequest): Pro
   return publicApiJson<AnonymousProfile>(
     keyboardApiPath("/anonymous/profile"),
     { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
+export function resetAnonymousProfile(body: ResetAnonymousProfileRequest): Promise<void> {
+  return publicApiJson<void>(
+    keyboardApiPath("/anonymous/profile/reset"),
+    { method: "POST", body: JSON.stringify(body) },
+    204,
   );
 }
 

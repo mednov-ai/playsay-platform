@@ -11,6 +11,7 @@ import com.playsay.keyboard.dto.GamificationEventResponse
 import com.playsay.keyboard.dto.GamificationProfileResponse
 import com.playsay.keyboard.dto.ProgressResponse
 import com.playsay.keyboard.dto.ResolveAnonymousProfileRequest
+import com.playsay.keyboard.dto.ResetAnonymousProfileRequest
 import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitResultRequest
 import com.playsay.keyboard.dto.SubmitTrainingResultResponse
@@ -26,6 +27,7 @@ import com.playsay.keyboard.entity.TrainingResultEntity
 import com.playsay.keyboard.mapper.toResponse
 import com.playsay.keyboard.repo.AnonymousProfileRepo
 import com.playsay.keyboard.repo.ChordSetRepo
+import com.playsay.keyboard.repo.GamificationEventRepo
 import com.playsay.keyboard.repo.GamificationProfileRepo
 import com.playsay.keyboard.repo.LayoutMasteryProfileRepo
 import com.playsay.keyboard.repo.TrainingResultRepo
@@ -44,6 +46,7 @@ import kotlin.math.round
 class TrainingService(
     private val chordSetRepo: ChordSetRepo,
     private val trainingResultRepo: TrainingResultRepo,
+    private val gamificationEventRepo: GamificationEventRepo,
     private val gamificationProfileRepo: GamificationProfileRepo,
     private val layoutMasteryProfileRepo: LayoutMasteryProfileRepo,
     private val anonymousProfileRepo: AnonymousProfileRepo,
@@ -107,6 +110,25 @@ class TrainingService(
     fun updateAnonymousProfile(request: UpdateAnonymousProfileRequest, servletRequest: HttpServletRequest): AnonymousProfileResponse {
         val profile = upsertAnonymousProfile(request.deviceId, servletRequest, cleanDisplayName(request.displayName))
         return profile.toResponse()
+    }
+
+    @Transactional
+    fun resetAnonymousProfile(request: ResetAnonymousProfileRequest) {
+        val deviceId = normalizeDeviceId(request.deviceId)
+        val profile = anonymousProfileRepo.findByDeviceId(deviceId) ?: return
+
+        val events = gamificationEventRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id)
+        val layoutProfiles = layoutMasteryProfileRepo.findByAnonymousProfileIdOrderByLayoutAsc(profile.id)
+        val gamificationProfile = gamificationProfileRepo.findByAnonymousProfileId(profile.id)
+        val results = trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id)
+
+        gamificationEventRepo.deleteAll(events)
+        layoutMasteryProfileRepo.deleteAll(layoutProfiles)
+        if (gamificationProfile != null) {
+            gamificationProfileRepo.delete(gamificationProfile)
+        }
+        trainingResultRepo.deleteAll(results)
+        anonymousProfileRepo.delete(profile)
     }
 
     @Transactional

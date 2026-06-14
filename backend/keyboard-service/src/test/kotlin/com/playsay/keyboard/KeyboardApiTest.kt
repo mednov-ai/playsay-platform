@@ -92,6 +92,7 @@ class KeyboardApiTest @Autowired constructor(
             ),
         )
         assertEquals(chordSetId, saved.trainingResult.chordSetId)
+        assertEquals("EN", saved.trainingResult.layout)
         assertEquals(180.5, saved.trainingResult.speedCpm)
 
         val progress = trainingController.progress(keyboardAuthentication())
@@ -419,6 +420,7 @@ class KeyboardApiTest @Autowired constructor(
             anonymousRequest(),
         )
 
+        assertEquals("EN", saved.trainingResult.layout)
         assertEquals("SEVERE", saved.focusLesson?.reason)
         assertTrue(saved.focusLesson?.problemKeys.orEmpty().contains("th"))
     }

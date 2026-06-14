@@ -90,6 +90,7 @@ export interface TrainingResult {
   id: number;
   clientResultId?: string;
   chordSetId: number;
+  layout: LayoutId;
   lessonKind?: TrainingLessonKind;
   speedCpm: number;
   averageCpm: number;

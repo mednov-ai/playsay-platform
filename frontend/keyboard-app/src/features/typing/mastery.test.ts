@@ -52,6 +52,6 @@ describe("typing mastery", () => {
   it("formats mastery deltas without score or rank language", () => {
     expect(masteryDeltaLabel(12)).toBe("+12");
     expect(masteryDeltaLabel(-8)).toBe("-8");
-    expect(masteryDeltaLabel(0)).toBe("0");
+    expect(masteryDeltaLabel(0)).toBe("");
   });
 });

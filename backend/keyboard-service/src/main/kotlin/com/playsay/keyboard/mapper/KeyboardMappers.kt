@@ -21,11 +21,12 @@ fun ChordSetEntity.toResponse(): ChordSetResponse =
         chords = chords.toList(),
     )
 
-fun TrainingResultEntity.toResponse(): TrainingResultResponse =
+fun TrainingResultEntity.toResponse(layout: String): TrainingResultResponse =
     TrainingResultResponse(
         id = id,
         clientResultId = clientResultId,
         chordSetId = chordSetId,
+        layout = layout,
         lessonKind = lessonKind,
         speedCpm = speedCpm,
         averageCpm = averageCpm,

@@ -74,8 +74,10 @@ export function decideNext(params: {
   sets: ChordSet[];
   remedialTitle: string;
   remedialSeed?: string;
+  calibrationComplete?: boolean;
 }): AdaptiveDecision {
   const { layoutId, accuracy, speedCpm, cadence, perChar, currentSet, sets, remedialTitle, remedialSeed } = params;
+  const calibrationComplete = params.calibrationComplete ?? true;
 
   if (accuracy < downThreshold) {
     const problems = topProblemChars(perChar);
@@ -90,7 +92,7 @@ export function decideNext(params: {
   const cadenceIsStable = cadence > stableCadenceThreshold;
   const harder = nextHarderSet(currentSet, sets);
 
-  if (cadenceIsStable && speedCpm > expertSpeedCpm) {
+  if (calibrationComplete && cadenceIsStable && speedCpm > expertSpeedCpm) {
     const hardest = hardestSet(sets);
     if (hardest && hardest.id !== currentSet.id) {
       return { kind: "up", set: hardest };

@@ -6,6 +6,7 @@ import { buildTrainingSubmitPayload } from "./trainingPayload";
 const baseResult: SessionResult = {
   clientResultId: "keyboard-test-result",
   chordSetId: -1,
+  layoutId: "EN",
   speedCpm: 168.4,
   averageCpm: 168.4,
   accuracy: 0.91,

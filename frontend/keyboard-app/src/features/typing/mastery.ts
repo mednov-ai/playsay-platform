@@ -67,7 +67,13 @@ export function estimateSessionMastery({
 
 export function masteryDeltaLabel(value: number): string {
   const rounded = Math.round(value);
-  return rounded > 0 ? `+${rounded}` : String(rounded);
+  if (rounded > 0) {
+    return `+${rounded}`;
+  }
+  if (rounded < 0) {
+    return String(rounded);
+  }
+  return "";
 }
 
 function roundOne(value: number): number {

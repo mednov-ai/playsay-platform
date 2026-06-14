@@ -1,14 +1,15 @@
 import type { GamificationProfile } from "../../shared/types";
 import { AchievementBadgeCard, achievementInfo, knownAchievementCodes, type AchievementCatalogLabels } from "./achievementCatalog";
 import { format } from "./gamificationEvents";
+import { leagueLabelsForLevel, type LeagueCatalogLabels } from "./leagueCatalog";
 
-export interface GamificationPanelLabels extends AchievementCatalogLabels {
+export interface GamificationPanelLabels extends AchievementCatalogLabels, LeagueCatalogLabels {
   title: string;
   calibration: string;
   calibrationProgress: string;
   calibrated: string;
   league: string;
-  leagueFallback: string;
+  leagueUnavailable: string;
   leagueProgress: string;
   streak: string;
   bestStreak: string;
@@ -29,7 +30,8 @@ export function GamificationPanel({ labels, gamification, compact = false }: Pro
     gamification?.calibrationTarget ?? 3,
   );
   const calibrationTotal = gamification?.calibrationTarget ?? 3;
-  const leagueLevel = gamification?.leagueLevel ?? 0;
+  const leagueLevel = gamification?.leagueLevel;
+  const league = leagueLabelsForLevel(leagueLevel, labels);
   const unlockedAchievements = new Set(gamification?.achievements ?? []);
   const achievementCodes = [
     ...knownAchievementCodes,
@@ -50,8 +52,9 @@ export function GamificationPanel({ labels, gamification, compact = false }: Pro
         </span>
         <span>
           <small>{labels.league}</small>
-          <b>{format(labels.leagueFallback, { level: leagueLevel })}</b>
-          <small>{format(labels.leagueProgress, { value: gamification?.leagueProgress ?? 0 })}</small>
+          <b>{leagueLevel == null ? labels.leagueUnavailable : league.name}</b>
+          <small>{league.description}</small>
+          {leagueLevel == null ? null : <small>{format(labels.leagueProgress, { value: gamification?.leagueProgress ?? 0 })}</small>}
         </span>
         <span>
           <small>{labels.streak}</small>
@@ -64,21 +67,25 @@ export function GamificationPanel({ labels, gamification, compact = false }: Pro
         </span>
       </div>
 
-      <span className="gamification-panel__chips-title">{labels.achievements}</span>
-      <div className="gamification-panel__chips" aria-label={labels.achievements}>
-        {achievementCodes.length > 0 ? (
-          achievementCodes.slice(0, compact ? 3 : achievementCodes.length).map((code) => {
-            const info = achievementInfo(code, labels);
-            return (
-              <span key={code} className={unlockedAchievements.has(code) ? "is-unlocked" : "is-locked"}>
-                {info.title}
-              </span>
-            );
-          })
-        ) : (
-          <small>{labels.noAchievements}</small>
-        )}
-      </div>
+      {compact ? (
+        <>
+          <span className="gamification-panel__chips-title">{labels.achievements}</span>
+          <div className="gamification-panel__chips" aria-label={labels.achievements}>
+            {achievementCodes.length > 0 ? (
+              achievementCodes.slice(0, 3).map((code) => {
+                const info = achievementInfo(code, labels);
+                return (
+                  <span key={code} className={unlockedAchievements.has(code) ? "is-unlocked" : "is-locked"}>
+                    {info.title}
+                  </span>
+                );
+              })
+            ) : (
+              <small>{labels.noAchievements}</small>
+            )}
+          </div>
+        </>
+      ) : null}
       {!compact ? (
         <div className="achievement-badge-grid" aria-label={labels.achievements}>
           {achievementCodes.map((code) => (

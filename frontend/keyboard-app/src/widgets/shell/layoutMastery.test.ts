@@ -49,6 +49,32 @@ describe("layout mastery display", () => {
     expect(activeLayoutGamification(gamification, "RU")?.leagueLevel).toBe(0);
   });
 
+  it("does not copy calibrated mastery or league from another layout", () => {
+    const enOnly: GamificationProfile = {
+      ...gamification,
+      layoutMastery: {
+        EN: gamification.layoutMastery?.EN,
+      },
+    };
+
+    const ruProfile = activeLayoutGamification(enOnly, "RU");
+
+    expect(ruProfile?.masteryCpm).toBe(0);
+    expect(ruProfile?.calibrated).toBe(false);
+    expect(ruProfile?.calibrationSessions).toBe(0);
+    expect(ruProfile?.calibrationTarget).toBe(3);
+    expect(ruProfile?.leagueLevel).toBeUndefined();
+    expect(ruProfile?.leagueProgress).toBe(0);
+    expect(ruProfile?.currentStreak).toBe(4);
+    expect(ruProfile?.achievements).toEqual(["METRONOME"]);
+    expect(ruProfile?.activeLayoutMastery).toMatchObject({
+      layout: "RU",
+      masteryCpm: 0,
+      calibrated: false,
+      calibrationSessions: 0,
+    });
+  });
+
   it("prefers backend layout mastery over local guest fallback", () => {
     const progress: Progress = {
       sessions: 2,

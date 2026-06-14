@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { claimAnonymousProgress, keyboardApiPath, resolveAnonymousProfile } from "./keyboardApi";
+import { claimAnonymousProgress, keyboardApiPath, resolveAnonymousProfile, submitAnonymousResult } from "./keyboardApi";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -75,6 +75,89 @@ describe("keyboard API paths", () => {
         headers: expect.objectContaining({ Authorization: "Bearer token-1" }),
       }),
     );
+  });
+
+  it("accepts created anonymous training results and keeps the response layout", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          trainingResult: {
+            id: 21,
+            clientResultId: "client-1",
+            chordSetId: 1,
+            layout: "EN",
+            lessonKind: "STANDARD",
+            speedCpm: 180,
+            averageCpm: 180,
+            cadence: 0.8,
+            masteryCpm: 172,
+            masteryDelta: 0,
+            accuracy: 1,
+            errors: 0,
+            characterCount: 180,
+            correctCount: 180,
+            durationMs: 60_000,
+            perChar: {},
+            perChord: {},
+            focusProblemKeys: [],
+            clientTimezone: "UTC",
+            localTrainingDate: "2026-06-14",
+            createdAt: "2026-06-14T12:00:00Z",
+          },
+          progress: {
+            sessions: 1,
+            bestSpeedCpm: 180,
+            avgSpeedCpm: 180,
+            avgAccuracy: 1,
+            weakFingers: [],
+            recent: [],
+          },
+          gamification: {
+            calibrated: false,
+            calibrationSessions: 1,
+            calibrationTarget: 3,
+            masteryCpm: 172,
+            leagueLevel: 1,
+            leagueProgress: 72,
+            currentStreak: 1,
+            bestStreak: 1,
+            streakFreezes: 0,
+            trend: [172],
+            achievements: [],
+          },
+          events: [],
+          techniqueAdvice: {
+            primaryAdvice: "Keep going.",
+            drillSuggestion: "Repeat.",
+            tone: "STEADY",
+            source: "RULES",
+          },
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(
+      submitAnonymousResult({
+        deviceId: "device-1",
+        clientResultId: "client-1",
+        chordSetId: 1,
+        lessonKind: "STANDARD",
+        speedCpm: 180,
+        averageCpm: 180,
+        cadence: 0.8,
+        accuracy: 1,
+        errors: 0,
+        characterCount: 180,
+        correctCount: 180,
+        durationMs: 60_000,
+        perFinger: {},
+      }),
+    ).resolves.toMatchObject({
+      trainingResult: {
+        layout: "EN",
+      },
+    });
   });
 });
 

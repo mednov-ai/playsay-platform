@@ -230,29 +230,7 @@ EOF
 JSON
               npm --prefix "$SMOKE_NODE_DIR" install --cache /cache/npm --prefer-offline --ignore-scripts --no-audit --no-fund
             fi
-            node <<'NODE'
-const { chromium } = require("/tmp/playsay-keyboard-smoke/node_modules/playwright");
-
-(async () => {
-  const baseUrl = process.env.PLAY_SAY_KEYBOARD_SMOKE_URL || "https://key.play-and-say.ru";
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
-  const page = await context.newPage();
-  const response = await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-  if (!response || response.status() >= 500) {
-    throw new Error(`Keyboard app returned HTTP ${response ? response.status() : "no response"}`);
-  }
-  await page.waitForSelector("text=Play&Say", { timeout: 15000 });
-  const loginButtons = await page.locator("button").filter({ hasText: /Войти|Sign in|Anmelden|Se connecter/ }).count();
-  if (loginButtons < 1) {
-    throw new Error("Keyboard app did not show the authenticated entry flow");
-  }
-  await browser.close();
-})().catch(async (error) => {
-  console.error(error);
-  process.exit(1);
-});
-NODE
+            PLAYWRIGHT_MODULE="$SMOKE_NODE_DIR/node_modules/playwright" node frontend/keyboard-app/scripts/keyboard-smoke.cjs
           '''
         }
       }

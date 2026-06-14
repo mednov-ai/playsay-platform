@@ -43,6 +43,18 @@ describe("keyboard adaptive level selection", () => {
     expect(decision.set.id).toBe(4);
   });
 
+  it("limits calibration promotion to the next level even after a very fast first lesson", () => {
+    const decision = decideNext({
+      ...baseParams,
+      speedCpm: 320,
+      cadence: 0.9,
+      calibrationComplete: false,
+    });
+
+    expect(decision.kind).toBe("up");
+    expect(decision.set.id).toBe(2);
+  });
+
   it("does not speed-promote when cadence is unstable", () => {
     const decision = decideNext({
       ...baseParams,

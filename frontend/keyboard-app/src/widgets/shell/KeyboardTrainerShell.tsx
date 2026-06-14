@@ -90,8 +90,34 @@ export function layoutMasteryCpm(progress: Progress | null, guestLayoutMastery: 
 
 export function activeLayoutGamification(gamification: GamificationProfile | undefined, layoutId: LayoutId): GamificationProfile | undefined {
   const layoutMastery = gamification?.layoutMastery?.[layoutId];
-  if (!gamification || !layoutMastery) {
+  if (!gamification) {
     return gamification;
+  }
+
+  if (!layoutMastery) {
+    const emptyLayoutMastery = {
+      layout: layoutId,
+      calibrated: false,
+      calibrationSessions: 0,
+      calibrationTarget: gamification.calibrationTarget,
+      masteryCpm: 0,
+      baselineMasteryCpm: undefined,
+      leagueLevel: undefined,
+      leagueProgress: 0,
+      trend: [],
+    };
+
+    return {
+      ...gamification,
+      calibrated: false,
+      calibrationSessions: 0,
+      masteryCpm: 0,
+      baselineMasteryCpm: undefined,
+      leagueLevel: undefined,
+      leagueProgress: 0,
+      trend: [],
+      activeLayoutMastery: emptyLayoutMastery,
+    };
   }
 
   return {
@@ -415,6 +441,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     setNextDecision(null);
     setSaved(false);
     setGuestRecorded(false);
+    setSavedTrainingResult(null);
+    setSavedTechniqueAdvice(null);
     setLatestGamificationEvents([]);
     setDismissedGamificationEventIds([]);
     setRestartVariant(0);
@@ -498,8 +526,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [sessionFlow.countdownValue, sessionFlow.phase]);
 
   const sessionResult = result();
-  const resultKey = sessionResult ? `${sessionResult.chordSetId}:${sessionResult.durationMs}:${sessionResult.errors}` : null;
+  const resultKey = sessionResult ? `${sessionResult.layoutId}:${sessionResult.chordSetId}:${sessionResult.durationMs}:${sessionResult.errors}` : null;
   const savedLayoutMasteryCpm = layoutMasteryCpm(progress, isAuthenticated ? {} : guestLayoutMastery, layoutId);
+  const sessionSavedLayoutMasteryCpm = sessionResult
+    ? layoutMasteryCpm(progress, isAuthenticated ? {} : guestLayoutMastery, sessionResult.layoutId)
+    : savedLayoutMasteryCpm;
+  const sessionCalibrationComplete = sessionResult
+    ? activeLayoutGamification(progress?.gamification, sessionResult.layoutId)?.calibrated ?? false
+    : false;
 
   useEffect(() => {
     if (sessionResult && sessionFlow.phase === "running") {
@@ -520,7 +554,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     const currentSet = chordSet;
     const submitPayload = buildTrainingSubmitPayload(sessionResult, currentSet);
 
-    const updateNextDecision = (focusLesson?: FocusLesson) => {
+    const updateNextDecision = (focusLesson?: FocusLesson, calibrationComplete = sessionCalibrationComplete) => {
       if (!currentSet) {
         return;
       }
@@ -534,15 +568,16 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         .map(([char]) => char);
       setNextDecision(
         decideNext({
-          layoutId,
+          layoutId: sessionResult.layoutId,
           accuracy: sessionResult.accuracy,
           speedCpm: sessionResult.speedCpm,
           cadence: sessionResult.cadence,
           perChar,
           currentSet,
-          sets,
+          sets: sets.filter((set) => set.layout === sessionResult.layoutId),
           remedialTitle: t("trainer.remedialTitle", { chars: problemChars.join(" ") }),
           remedialSeed: `${profileSeed}:${sessionResult.chordSetId}:${sessionResult.durationMs}`,
+          calibrationComplete,
         }),
       );
     };
@@ -551,13 +586,13 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       const nextCount = recordGuestSession();
       const dismissedCount = readDismissedPromptCount();
       const localMastery = estimateSessionMastery({
-        previousMasteryCpm: savedLayoutMasteryCpm,
+        previousMasteryCpm: sessionSavedLayoutMasteryCpm,
         averageCpm: sessionResult.averageCpm,
         accuracy: sessionResult.accuracy,
         cadence: sessionResult.cadence,
       });
       setGuestSessionCount(nextCount);
-      setGuestLayoutMastery(writeGuestLayoutMastery(layoutId, localMastery.masteryCpm));
+      setGuestLayoutMastery(writeGuestLayoutMastery(sessionResult.layoutId, localMastery.masteryCpm));
       setGuestRecorded(true);
       updateNextDecision();
       if (!submitPayload) {
@@ -573,7 +608,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           setSavedTechniqueAdvice(savedResult.techniqueAdvice.primaryAdvice);
           setLatestGamificationEvents(savedResult.events);
           setProgress(savedResult.progress);
-          updateNextDecision(savedResult.focusLesson);
+          updateNextDecision(
+            savedResult.focusLesson,
+            activeLayoutGamification(savedResult.progress.gamification, sessionResult.layoutId)?.calibrated ?? sessionCalibrationComplete,
+          );
         })
         .catch(() => undefined);
       if (shouldShowNamePrompt(nextCount, guestDisplayName)) {
@@ -595,11 +633,17 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         setSavedTechniqueAdvice(savedResult.techniqueAdvice.primaryAdvice);
         setLatestGamificationEvents(savedResult.events);
         setProgress(savedResult.progress);
-        updateNextDecision(savedResult.focusLesson);
+        updateNextDecision(
+          savedResult.focusLesson,
+          activeLayoutGamification(savedResult.progress.gamification, sessionResult.layoutId)?.calibrated ?? sessionCalibrationComplete,
+        );
       } else {
         const loadedProgress = await fetchProgress();
         setProgress(loadedProgress);
-        updateNextDecision();
+        updateNextDecision(
+          undefined,
+          activeLayoutGamification(loadedProgress.gamification, sessionResult.layoutId)?.calibrated ?? sessionCalibrationComplete,
+        );
       }
       setSaved(true);
     };
@@ -609,7 +653,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         setLoadError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => setSaving(false));
-  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, layoutId, perChar, profileSeed, resultKey, savedLayoutMasteryCpm, sessionResult, sets, t]);
+  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, perChar, profileSeed, resultKey, sessionCalibrationComplete, sessionResult, sessionSavedLayoutMasteryCpm, sets, t]);
 
   const liveStats = useMemo(() => {
     const elapsedMs =
@@ -642,13 +686,13 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   );
 
   const effectiveMastery = sessionResult
-    ? savedTrainingResult?.masteryCpm != null
+    ? savedTrainingResult?.layout === sessionResult.layoutId && savedTrainingResult.masteryCpm != null
       ? {
           masteryCpm: savedTrainingResult.masteryCpm,
           masteryDelta: savedTrainingResult.masteryDelta,
         }
       : estimateSessionMastery({
-          previousMasteryCpm: savedLayoutMasteryCpm,
+          previousMasteryCpm: sessionSavedLayoutMasteryCpm,
           averageCpm: sessionResult.averageCpm,
           accuracy: sessionResult.accuracy,
           cadence: sessionResult.cadence,
@@ -683,8 +727,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
   const effectiveGamification = activeLayoutGamification(progress?.gamification, layoutId);
+  const displayedSessionMasteryCpm = sessionResult?.layoutId === layoutId ? effectiveMastery?.masteryCpm : null;
   const displayedMastery = displayedMasteryCpm({
-    effectiveMasteryCpm: effectiveMastery?.masteryCpm,
+    effectiveMasteryCpm: displayedSessionMasteryCpm,
     savedLayoutMasteryCpm,
     liveSpeedCpm: liveStats.speedCpm,
     liveAccuracy: liveStats.accuracy,
@@ -699,7 +744,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     calibrationProgress: t("gamification.calibrationProgress"),
     calibrated: t("gamification.calibrated"),
     league: t("gamification.league"),
-    leagueFallback: t("gamification.leagueFallback"),
+    leagueUnavailable: t("gamification.leagueUnavailable"),
     leagueProgress: t("gamification.leagueProgress"),
     streak: t("gamification.streak"),
     bestStreak: t("gamification.bestStreak"),
@@ -719,6 +764,18 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     achievement_STREAK_30_description: t("gamification.achievement_STREAK_30_description"),
     achievement_UNKNOWN_title: t("gamification.achievement_UNKNOWN_title"),
     achievement_UNKNOWN_description: t("gamification.achievement_UNKNOWN_description"),
+    leagueName_calibration: t("gamification.leagueName_calibration"),
+    leagueDescription_calibration: t("gamification.leagueDescription_calibration"),
+    leagueName_spark: t("gamification.leagueName_spark"),
+    leagueDescription_spark: t("gamification.leagueDescription_spark"),
+    leagueName_rhythm: t("gamification.leagueName_rhythm"),
+    leagueDescription_rhythm: t("gamification.leagueDescription_rhythm"),
+    leagueName_flow: t("gamification.leagueName_flow"),
+    leagueDescription_flow: t("gamification.leagueDescription_flow"),
+    leagueName_sprint: t("gamification.leagueName_sprint"),
+    leagueDescription_sprint: t("gamification.leagueDescription_sprint"),
+    leagueName_master: t("gamification.leagueName_master"),
+    leagueDescription_master: t("gamification.leagueDescription_master"),
     profileTitle: t("gamification.profileTitle"),
     profileIntro: t("gamification.profileIntro"),
     currentMastery: t("gamification.currentMastery"),
@@ -744,6 +801,18 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     achievement_STREAK_30_description: t("gamification.achievement_STREAK_30_description"),
     achievement_UNKNOWN_title: t("gamification.achievement_UNKNOWN_title"),
     achievement_UNKNOWN_description: t("gamification.achievement_UNKNOWN_description"),
+    leagueName_calibration: t("gamification.leagueName_calibration"),
+    leagueDescription_calibration: t("gamification.leagueDescription_calibration"),
+    leagueName_spark: t("gamification.leagueName_spark"),
+    leagueDescription_spark: t("gamification.leagueDescription_spark"),
+    leagueName_rhythm: t("gamification.leagueName_rhythm"),
+    leagueDescription_rhythm: t("gamification.leagueDescription_rhythm"),
+    leagueName_flow: t("gamification.leagueName_flow"),
+    leagueDescription_flow: t("gamification.leagueDescription_flow"),
+    leagueName_sprint: t("gamification.leagueName_sprint"),
+    leagueDescription_sprint: t("gamification.leagueDescription_sprint"),
+    leagueName_master: t("gamification.leagueName_master"),
+    leagueDescription_master: t("gamification.leagueDescription_master"),
   };
   const activeGamificationEvents = latestGamificationEvents.filter((event) => !dismissedGamificationEventIds.includes(event.id));
   const trainerIntroBlocking = isTrainerIntroBlocking(trainerIntroPhase);

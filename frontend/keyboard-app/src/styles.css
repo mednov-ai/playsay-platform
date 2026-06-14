@@ -1356,7 +1356,7 @@ input {
 }
 
 .virtual-keyboard {
-  --key-unit: clamp(54px, calc((100vw - 80px) / 16), 84px);
+  --key-unit: clamp(46px, calc((100vw - 80px) / 16), 84px);
   --key-gap: clamp(4px, 0.3vw, 6px);
   --key-height: 50px;
   width: 100%;
@@ -1365,7 +1365,11 @@ input {
   justify-self: center;
   overflow-x: auto;
   overflow-y: visible;
-  padding: 2px 0 4px;
+  border-radius: 12px;
+  scrollbar-color: color-mix(in srgb, var(--primary) 66%, var(--line)) transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 0 8px;
 }
 
 .trainer-toolbar,
@@ -1535,7 +1539,7 @@ input {
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 12;
+  z-index: 100;
   width: min(420px, calc(100vw - 36px));
   pointer-events: none;
 }
@@ -1550,16 +1554,21 @@ input {
   border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--line));
   border-radius: 18px;
   background:
-    radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 42%),
-    linear-gradient(90deg, color-mix(in srgb, var(--primary) 12%, transparent), transparent 68%),
-    var(--surface);
-  box-shadow: var(--shadow);
+    radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--primary) 24%, transparent), transparent 42%),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 16%, transparent), transparent 68%),
+    var(--surface-strong);
+  box-shadow:
+    0 26px 70px rgb(17 17 17 / 0.24),
+    0 0 0 1px rgb(255 255 255 / 0.72);
+  isolation: isolate;
   padding: 14px;
   pointer-events: auto;
   animation: event-pop 0.38s cubic-bezier(0.18, 1.35, 0.24, 1) both;
 }
 
 .achievement-celebration__card > div {
+  position: relative;
+  z-index: 2;
   display: grid;
   gap: 3px;
   min-width: 0;
@@ -1587,6 +1596,8 @@ input {
 }
 
 .achievement-celebration__card .achievement-badge__art {
+  position: relative;
+  z-index: 2;
   width: 74px;
   height: 74px;
   animation: badge-pop 0.62s cubic-bezier(0.18, 1.35, 0.24, 1) both;
@@ -1595,6 +1606,7 @@ input {
 .achievement-celebration__shine {
   position: absolute;
   inset: -40%;
+  z-index: 1;
   background: linear-gradient(120deg, transparent 38%, rgb(255 255 255 / 0.78) 49%, transparent 60%);
   animation: celebration-shine 1.6s ease-out both;
   transform: translateX(-62%);
@@ -1603,6 +1615,7 @@ input {
 .achievement-celebration__confetti {
   position: absolute;
   inset: 0;
+  z-index: 1;
   background:
     radial-gradient(circle at 16% 24%, #ff5c00 0 3px, transparent 4px),
     radial-gradient(circle at 78% 18%, #22c55e 0 3px, transparent 4px),
@@ -1613,7 +1626,7 @@ input {
 
 .achievement-celebration__card .icon-button {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 @keyframes play-ring {
@@ -2167,9 +2180,10 @@ input {
   }
 
   .virtual-keyboard {
-    --key-unit: 50px;
+    --key-unit: clamp(38px, 10.4vw, 50px);
     --key-gap: 5px;
     --key-height: 48px;
+    padding-inline: 8px;
   }
 
   .virtual-keyboard__row {

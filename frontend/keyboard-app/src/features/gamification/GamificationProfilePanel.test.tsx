@@ -9,7 +9,7 @@ const labels: GamificationProfileLabels = {
   calibrationProgress: "{{done}}/{{total}} lessons",
   calibrated: "Calibrated",
   league: "League",
-  leagueFallback: "League {{level}}",
+  leagueUnavailable: "Finish calibration",
   leagueProgress: "{{value}}% to next league",
   streak: "Streak",
   bestStreak: "Best {{value}}",
@@ -20,6 +20,18 @@ const labels: GamificationProfileLabels = {
   profileIntro: "Your league, streak and achievements live here.",
   currentMastery: "Current mastery",
   lockedAchievement: "Locked achievement",
+  leagueName_calibration: "Calibration",
+  leagueDescription_calibration: "Finish three lessons to place into a league.",
+  leagueName_spark: "Spark",
+  leagueDescription_spark: "A careful start.",
+  leagueName_rhythm: "Rhythm",
+  leagueDescription_rhythm: "Stable rhythm and speed.",
+  leagueName_flow: "Flow",
+  leagueDescription_flow: "Confident typing flow.",
+  leagueName_sprint: "Sprint",
+  leagueDescription_sprint: "Fast and accurate typing.",
+  leagueName_master: "Master",
+  leagueDescription_master: "Elite typing control.",
   achievement_FIRST_HUNDRED_title: "First hundred",
   achievement_FIRST_HUNDRED_description: "Reach 100 cpm.",
   achievement_SNIPER_title: "Sniper",
@@ -57,7 +69,8 @@ describe("GamificationProfilePanel", () => {
 
     expect(markup).toContain("Keyboard profile");
     expect(markup).toContain("212 cpm");
-    expect(markup).toContain("League 2");
+    expect(markup).toContain("Rhythm");
+    expect(markup).toContain("Stable rhythm and speed.");
     expect(markup).toContain("64% to next league");
     expect(markup).toContain("Metronome");
     expect(markup).toContain("First hundred");

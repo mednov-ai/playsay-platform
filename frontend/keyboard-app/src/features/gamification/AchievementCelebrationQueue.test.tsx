@@ -7,11 +7,23 @@ const labels: AchievementCelebrationLabels = {
   events: "New events",
   masteryUp: "Mastery +{{delta}}",
   calibrationComplete: "Calibration complete",
-  leagueProgressEvent: "League {{level}} progress",
+  leagueProgressEvent: "Moved to {{leagueName}}",
   achievementUnlocked: "{{title}} unlocked",
   prizeHook: "Future prize event",
   closeEvent: "Close event",
   lockedAchievement: "Locked achievement",
+  leagueName_calibration: "Calibration",
+  leagueDescription_calibration: "Finish three lessons to place into a league.",
+  leagueName_spark: "Spark",
+  leagueDescription_spark: "A careful start.",
+  leagueName_rhythm: "Rhythm",
+  leagueDescription_rhythm: "Stable rhythm and speed.",
+  leagueName_flow: "Flow",
+  leagueDescription_flow: "Confident typing flow.",
+  leagueName_sprint: "Sprint",
+  leagueDescription_sprint: "Fast and accurate typing.",
+  leagueName_master: "Master",
+  leagueDescription_master: "Elite typing control.",
   achievement_FIRST_HUNDRED_title: "First hundred",
   achievement_FIRST_HUNDRED_description: "Reach 100 cpm.",
   achievement_SNIPER_title: "Sniper",
@@ -65,5 +77,24 @@ describe("AchievementCelebrationQueue", () => {
     }));
 
     expect(markup).toBe("");
+  });
+
+  it("renders league events with a named tier instead of a raw number", () => {
+    const markup = renderToStaticMarkup(createElement(AchievementCelebrationQueue, {
+      labels,
+      events: [
+        {
+          id: 8,
+          type: "LEAGUE_PROGRESS",
+          payload: { leagueLevel: "2" },
+          createdAt: "2026-06-11T12:00:00Z",
+        },
+      ],
+      paused: false,
+      onDismiss: () => undefined,
+    }));
+
+    expect(markup).toContain("Moved to Rhythm");
+    expect(markup).not.toContain("League 2");
   });
 });

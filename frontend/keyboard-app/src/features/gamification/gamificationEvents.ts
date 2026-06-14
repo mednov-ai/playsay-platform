@@ -1,6 +1,7 @@
 import type { GamificationEvent } from "../../shared/types";
+import { leagueLabelsForLevel, type LeagueCatalogLabels } from "./leagueCatalog";
 
-export interface GamificationEventLabels {
+export interface GamificationEventLabels extends LeagueCatalogLabels {
   masteryUp: string;
   calibrationComplete: string;
   leagueProgressEvent: string;
@@ -16,7 +17,9 @@ export function eventLabel(event: GamificationEvent, labels: GamificationEventLa
     return labels.calibrationComplete;
   }
   if (event.type === "LEAGUE_PROGRESS") {
-    return format(labels.leagueProgressEvent, { level: event.payload.leagueLevel ?? "0" });
+    const level = Number(event.payload.leagueLevel ?? 0);
+    const league = leagueLabelsForLevel(level, labels);
+    return format(labels.leagueProgressEvent, { level, leagueName: league.name });
   }
   if (event.type === "ACHIEVEMENT_UNLOCKED") {
     return format(labels.achievementUnlocked, { code: event.payload.code ?? event.type, title: event.payload.code ?? event.type });

@@ -75,6 +75,7 @@ data class TrainingResultResponse(
     val id: Long,
     val clientResultId: String?,
     val chordSetId: Long,
+    val layout: String,
     val lessonKind: String,
     val speedCpm: Double,
     val averageCpm: Double,

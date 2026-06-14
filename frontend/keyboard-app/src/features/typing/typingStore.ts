@@ -18,6 +18,7 @@ export interface StreamItem {
 export interface SessionResult {
   clientResultId: string;
   chordSetId: number;
+  layoutId: LayoutId;
   speedCpm: number;
   averageCpm: number;
   accuracy: number;
@@ -315,6 +316,7 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     return {
       clientResultId: `keyboard-${chordSet.id}-${startedAt}-${finishedAt}-${correctCount}-${errorCount}`,
       chordSetId: chordSet.id,
+      layoutId: chordSet.layout,
       speedCpm: averageCpm,
       averageCpm,
       accuracy: Math.round(accuracy * 1_000) / 1_000,

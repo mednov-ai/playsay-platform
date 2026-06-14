@@ -205,7 +205,7 @@ class TrainingService(
             avgAccuracy = results.map { result -> result.accuracy }.average(),
             masteryCpm = layoutProfiles.firstOrNull()?.masteryCpm ?: gamification?.masteryCpm ?: results.firstOrNull()?.masteryCpm,
             weakFingers = weakFingers,
-            recent = results.take(10).map { result -> result.toResponse() },
+            recent = resultResponses(results.take(10)),
             gamification = gamification?.let { gamificationService.toResponse(it, layoutProfiles) },
         )
     }
@@ -231,7 +231,7 @@ class TrainingService(
         val progress = subject?.let { progress(it) }
             ?: anonymousProgress(anonymousProfileId, recent, profile)
         return SubmitTrainingResultResponse(
-            trainingResult = saved.toResponse().copy(focusLesson = focusLesson),
+            trainingResult = saved.toResponse(chordSet.layout).copy(focusLesson = focusLesson),
             progress = progress,
             gamification = gamificationService.toResponse(profile ?: gamificationService.emptyProfile(), layoutProfiles, chordSet.layout),
             events = events.map { event -> gamificationService.eventToResponse(event) },
@@ -270,10 +270,19 @@ class TrainingService(
                 avgAccuracy = results.map { result -> result.accuracy }.average(),
                 masteryCpm = layoutProfiles.firstOrNull()?.masteryCpm ?: profile?.masteryCpm ?: results.firstOrNull()?.masteryCpm,
                 weakFingers = weakFingers,
-                recent = results.take(10).map { result -> result.toResponse() },
+                recent = resultResponses(results.take(10)),
                 gamification = profile?.let { gamificationService.toResponse(it, layoutProfiles) },
             )
         }
+
+    private fun resultResponses(results: List<TrainingResultEntity>): List<TrainingResultResponse> {
+        if (results.isEmpty()) {
+            return emptyList()
+        }
+        val layouts = chordSetRepo.findAllById(results.map { result -> result.chordSetId }.toSet())
+            .associate { chordSet -> chordSet.id to chordSet.layout }
+        return results.map { result -> result.toResponse(layouts[result.chordSetId] ?: "UNKNOWN") }
+    }
 
     private fun profileForSubject(subject: String): GamificationProfileEntity =
         gamificationProfileRepo.findByKeycloakSubject(subject)

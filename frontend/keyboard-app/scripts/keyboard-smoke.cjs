@@ -212,6 +212,13 @@ async function startInlineLesson(page) {
   await skipCountdown(page);
 }
 
+async function dismissFinishedWithEscape(page) {
+  await page.locator(".practice-overlay--finished").waitFor({ state: "visible", timeout: 10_000 });
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Escape");
+  await page.locator(".practice-overlay--finished").waitFor({ state: "hidden", timeout: 10_000 });
+}
+
 async function expectVisibleText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({ state: "visible", timeout: 10_000 });
 }
@@ -278,8 +285,7 @@ async function capture(page, name) {
     throw new Error("Side controls are visible during running practice.");
   }
   await completeLesson(page);
-  await page.keyboard.press("Escape");
-  await page.locator(".practice-overlay--finished").waitFor({ state: "hidden", timeout: 10_000 });
+  await dismissFinishedWithEscape(page);
   await expectVisibleText(page, "Save your progress?");
   await page.keyboard.press("Escape");
   await page.locator("#registration-prompt-title").waitFor({ state: "hidden", timeout: 10_000 });

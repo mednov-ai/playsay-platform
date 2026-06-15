@@ -1,6 +1,6 @@
 import { publicSiteUrl } from "@playsay/shared-ui";
 import { LogIn, LogOut, Pencil, Play, RotateCcw, Save, Trophy, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
 import { AchievementCelebrationQueue, type AchievementCelebrationLabels } from "../../features/gamification/AchievementCelebrationQueue";
@@ -252,7 +252,19 @@ function sameTypingMetrics(left: TypingWidthMetrics, right: TypingWidthMetrics):
   return leftKeys.every((key) => leftWidths[key] === rightWidths[key]);
 }
 
-function measureTypingStripMetrics(element: HTMLElement, stream: StreamItem[]): { capacity: number; metrics: TypingWidthMetrics } {
+function rowCountForTypingStrip(styles: CSSStyleDeclaration, element: HTMLElement): number {
+  const fontSize = Number.parseFloat(styles.fontSize) || 16;
+  const lineHeight = Number.parseFloat(styles.lineHeight) || fontSize * 1.12;
+  const rowGap = Number.parseFloat(styles.rowGap) || 0;
+  const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+  const contentHeight = Math.max(0, element.clientHeight - paddingTop - paddingBottom);
+  const threeRowHeight = lineHeight * 3 + rowGap * 2;
+
+  return contentHeight >= threeRowHeight - 2 ? 3 : typingWindowRows;
+}
+
+function measureTypingStripMetrics(element: HTMLElement, stream: StreamItem[]): { capacity: number; metrics: TypingWidthMetrics; rowCount: number } {
   const styles = window.getComputedStyle(element);
   const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
   const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
@@ -273,6 +285,7 @@ function measureTypingStripMetrics(element: HTMLElement, stream: StreamItem[]): 
     return {
       capacity: computeTypingLineCapacity({ usableWidth, characterWidth: metrics.defaultCharacterWidth }),
       metrics,
+      rowCount: rowCountForTypingStrip(styles, element),
     };
   }
 
@@ -295,6 +308,7 @@ function measureTypingStripMetrics(element: HTMLElement, stream: StreamItem[]): 
   return {
     capacity: computeTypingLineCapacity({ usableWidth, characterWidth: metrics.defaultCharacterWidth }),
     metrics,
+    rowCount: rowCountForTypingStrip(styles, element),
   };
 }
 
@@ -334,10 +348,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     initialTrainerIntroPhase(readPracticeState(ownerKey)?.introDismissed ?? false),
   );
   const [typingLineCapacity, setTypingLineCapacity] = useState(typingWindowLineLength);
+  const [typingRowCount, setTypingRowCount] = useState(typingWindowRows);
   const [typingMetrics, setTypingMetrics] = useState<TypingWidthMetrics | null>(null);
   const [restartVariant, setRestartVariant] = useState(0);
   const [closingOverlay, setClosingOverlay] = useState<ClosingOverlay | null>(null);
-  const visibleCapacity = typingLineCapacity * typingWindowRows;
+  const visibleCapacity = typingLineCapacity * typingRowCount;
   const submittedResultRef = useRef<string | null>(null);
   const typingStripRef = useRef<HTMLDivElement | null>(null);
   const visibleCapacityRef = useRef(visibleCapacity);
@@ -416,6 +431,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       }
       const measured = measureTypingStripMetrics(element, stream);
       setTypingLineCapacity((current) => (current === measured.capacity ? current : measured.capacity));
+      setTypingRowCount((current) => (current === measured.rowCount ? current : measured.rowCount));
       setTypingMetrics((current) =>
         current && sameTypingMetrics(current, measured.metrics)
           ? current
@@ -716,10 +732,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const typingWindow = useMemo(
     () =>
       typingMetrics
-        ? buildMeasuredTypingWindow(stream, statuses, pos, typingMetrics, typingWindowRows)
-        : buildTypingWindow(stream, statuses, pos, typingLineCapacity, typingWindowRows),
-    [pos, statuses, stream, typingLineCapacity, typingMetrics],
+        ? buildMeasuredTypingWindow(stream, statuses, pos, typingMetrics, typingRowCount)
+        : buildTypingWindow(stream, statuses, pos, typingLineCapacity, typingRowCount),
+    [pos, statuses, stream, typingLineCapacity, typingMetrics, typingRowCount],
   );
+  const typingStripStyle = useMemo(() => ({ "--typing-row-count": typingRowCount }) as CSSProperties, [typingRowCount]);
 
   const effectiveMastery = sessionResult
     ? savedTrainingResult?.layout === sessionResult.layoutId && savedTrainingResult.masteryCpm != null
@@ -1488,7 +1505,13 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
           />
 
           <div className="typing-stage">
-            <div ref={typingStripRef} className="typing-strip" aria-live="polite" aria-label={t("trainer.typingLineAria")}>
+            <div
+              ref={typingStripRef}
+              className="typing-strip"
+              style={typingStripStyle}
+              aria-live="polite"
+              aria-label={t("trainer.typingLineAria")}
+            >
               {typingWindow.rows.map((row, rowIndex) => (
                 <div className="typing-strip__line" key={`${typingWindow.start}-${rowIndex}`}>
                   {row.map(({ item, index, status }) => (

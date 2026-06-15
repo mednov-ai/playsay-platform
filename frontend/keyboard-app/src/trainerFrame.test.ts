@@ -75,11 +75,24 @@ describe("keyboard trainer wide frame", () => {
 
   it("gives focused practice taller keyboard keys so stats cards do not over-expand", () => {
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(176px,\s*1fr\)\s+120px\s+minmax\(264px,\s*auto\)\s+34px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(186px,\s*1fr\)\s+152px\s+minmax\(238px,\s*auto\)\s+34px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*48px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*152px/,
     );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*42px/,
+    );
+  });
+
+  it("lets the focused typing strip expand to a measured third line", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(styles).toMatch(/\.typing-strip[\s\S]*--typing-row-count:\s*2/);
+    expect(styles).toMatch(/\.typing-strip[\s\S]*grid-template-rows:\s*repeat\(var\(--typing-row-count\),\s*minmax\(0,\s*1fr\)\)/);
+    expect(shell).toContain("rowCountForTypingStrip");
+    expect(shell).toContain("setTypingRowCount");
+    expect(shell).toContain('style={typingStripStyle}');
   });
 
   it("uses subtle illuminated cards for the reference-style stats metrics", () => {

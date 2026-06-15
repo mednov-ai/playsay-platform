@@ -788,11 +788,19 @@ input {
 }
 
 .trainer-layout--practice .trainer-surface--dismissed {
-  grid-template-rows: minmax(176px, 1fr) 120px minmax(264px, auto) 34px;
+  grid-template-rows: minmax(186px, 1fr) 152px minmax(238px, auto) 34px;
+}
+
+.trainer-layout--practice .trainer-surface--dismissed .typing-stage {
+  height: 152px;
+}
+
+.trainer-layout--practice .trainer-surface--dismissed .typing-strip {
+  min-height: 148px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .virtual-keyboard {
-  --key-height: 48px;
+  --key-height: 42px;
   min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 8px);
   padding: 2px 0 6px;
 }
@@ -1452,7 +1460,8 @@ input {
 
 .typing-strip {
   display: grid;
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  --typing-row-count: 2;
+  grid-template-rows: repeat(var(--typing-row-count), minmax(0, 1fr));
   gap: 4px;
   align-self: stretch;
   height: 100%;

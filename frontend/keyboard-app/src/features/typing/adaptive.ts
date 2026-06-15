@@ -111,6 +111,17 @@ export function decideNext(params: {
   };
 }
 
+export function candidateSetsForCurrentPractice(currentSet: Pick<ChordSet, "layout" | "practiceKind">, sets: ChordSet[]): ChordSet[] {
+  const currentIsCode = currentSet.practiceKind === "CODE" || currentSet.practiceKind === "CODE_COMBO";
+  return sets.filter((set) => {
+    if (set.layout !== currentSet.layout) {
+      return false;
+    }
+    const candidateIsCode = set.practiceKind === "CODE" || set.practiceKind === "CODE_COMBO";
+    return currentIsCode ? candidateIsCode : !candidateIsCode;
+  });
+}
+
 function nextHarderSet(currentSet: ChordSet, sets: ChordSet[]): ChordSet | undefined {
   return sets
     .filter((set) => set.difficulty > currentSet.difficulty)

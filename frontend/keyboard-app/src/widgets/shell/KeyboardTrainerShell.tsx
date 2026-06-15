@@ -32,7 +32,7 @@ import { Metronome } from "../../features/metronome/Metronome";
 import { suggestMetronomeBpm } from "../../features/metronome/metronomeTempo";
 import { masteryLevelForCpm, StatsPanel, type MasteryLevelId } from "../../features/stats/StatsPanel";
 import { shouldReloadActiveSetForLayout } from "../../features/typing/activeSetSync";
-import { decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
+import { candidateSetsForCurrentPractice, decideNext, type AdaptiveDecision } from "../../features/typing/adaptive";
 import { computeCadence, estimateSessionMastery, masteryDeltaLabel } from "../../features/typing/mastery";
 import {
   clearPracticeState,
@@ -648,7 +648,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         cadence: sessionResult.cadence,
         perChar,
         currentSet,
-        sets: sets.filter((set) => set.layout === sessionResult.layoutId),
+        sets: candidateSetsForCurrentPractice(currentSet, sets),
         remedialTitle: t("trainer.remedialTitle", { chars: problemChars.join(" ") }),
         remedialSeed: `${profileSeed}:${sessionResult.chordSetId}:${sessionResult.durationMs}`,
         calibrationComplete,

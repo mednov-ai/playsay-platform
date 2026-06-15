@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChordSet } from "../../shared/types";
-import { buildRemedialSet, decideNext, remedialId } from "./adaptive";
+import { buildRemedialSet, candidateSetsForCurrentPractice, decideNext, remedialId } from "./adaptive";
 
 const sets: ChordSet[] = [
   { id: 1, layout: "EN", title: "Level 1", difficulty: 1, tier: "beginner", chords: ["th"] },
@@ -107,5 +107,36 @@ describe("keyboard adaptive level selection", () => {
 
     expect(decision.set.chords).toHaveLength(32);
     expect(decision.set.chords.some((chord) => ["th", "st", "tr", "ta", "ti"].includes(chord))).toBe(true);
+  });
+
+  it("keeps natural-language lessons out of programming practice sets", () => {
+    const mixedSets: ChordSet[] = [
+      ...sets,
+      { id: 13, layout: "EN", title: "CODE · Python · Trigrams", difficulty: 7, tier: "professional", practiceKind: "CODE", chords: ["def"] },
+      { id: 31, layout: "EN", title: "CODE · Python · Long", difficulty: 9, tier: "professional", practiceKind: "CODE", chords: ["return"] },
+      { id: 5, layout: "RU", title: "RU 1", difficulty: 1, tier: "beginner", chords: ["ст"] },
+    ];
+
+    expect(candidateSetsForCurrentPractice(sets[0], mixedSets).map((set) => set.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("keeps programming combinations inside programming practice sets", () => {
+    const codeCombo: ChordSet = {
+      id: -2,
+      sourceChordSetId: 40,
+      layout: "EN",
+      title: "CODE · TypeScript + Kotlin · Trigrams",
+      difficulty: 7,
+      tier: "professional",
+      practiceKind: "CODE_COMBO",
+      chords: ["fun"],
+    };
+    const mixedSets: ChordSet[] = [
+      ...sets,
+      { id: 13, layout: "EN", title: "CODE · Python · Trigrams", difficulty: 7, tier: "professional", practiceKind: "CODE", chords: ["def"] },
+      { id: 40, layout: "EN", title: "CODE · Mixed · Trigrams", difficulty: 7, tier: "professional", practiceKind: "CODE", chords: ["val"] },
+    ];
+
+    expect(candidateSetsForCurrentPractice(codeCombo, mixedSets).map((set) => set.id)).toEqual([13, 40]);
   });
 });

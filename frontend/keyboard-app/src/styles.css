@@ -788,19 +788,38 @@ input {
 }
 
 .trainer-layout--practice .trainer-surface--dismissed {
-  grid-template-rows: minmax(186px, 1fr) 152px minmax(238px, auto) 34px;
+  grid-template-rows: minmax(172px, 1fr) 180px minmax(242px, auto) 34px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .typing-stage {
-  height: 152px;
+  height: 180px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .typing-strip {
-  min-height: 148px;
+  min-height: 176px;
+  font-size: 32px;
+  line-height: 1.08;
+}
+
+.trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice {
+  gap: 5px;
+  grid-template-rows: minmax(58px, auto) minmax(66px, 1fr) auto;
+  padding: 6px 10px 7px;
+}
+
+.trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice .stat--metric {
+  min-height: 66px;
+  padding: 6px 8px 5px;
+}
+
+.trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice .stat {
+  --stat-number-size: clamp(42px, 6vh, 58px);
+  --stat-suffix-size: clamp(24px, 3.5vh, 34px);
+  --stat-unit-suffix-size: clamp(12px, 1.65vh, 17px);
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .virtual-keyboard {
-  --key-height: 42px;
+  --key-height: 43px;
   min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 8px);
   padding: 2px 0 6px;
 }

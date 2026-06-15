@@ -260,6 +260,11 @@ function rowCountForTypingStrip(styles: CSSStyleDeclaration, element: HTMLElemen
   const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
   const contentHeight = Math.max(0, element.clientHeight - paddingTop - paddingBottom);
   const threeRowHeight = lineHeight * 3 + rowGap * 2;
+  const fourRowHeight = lineHeight * 4 + rowGap * 3;
+
+  if (contentHeight >= fourRowHeight - 2) {
+    return 4;
+  }
 
   return contentHeight >= threeRowHeight - 2 ? 3 : typingWindowRows;
 }

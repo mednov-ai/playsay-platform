@@ -75,22 +75,30 @@ describe("keyboard trainer wide frame", () => {
 
   it("gives focused practice taller keyboard keys so stats cards do not over-expand", () => {
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(186px,\s*1fr\)\s+152px\s+minmax\(238px,\s*auto\)\s+34px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(172px,\s*1fr\)\s+180px\s+minmax\(242px,\s*auto\)\s+34px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*152px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*180px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*42px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*43px/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*66px/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat[\s\S]*--stat-number-size:\s*clamp\(42px,\s*6vh,\s*58px\)/,
     );
   });
 
-  it("lets the focused typing strip expand to a measured third line", () => {
+  it("lets the focused typing strip expand to measured extra lines", () => {
     const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
 
     expect(styles).toMatch(/\.typing-strip[\s\S]*--typing-row-count:\s*2/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*grid-template-rows:\s*repeat\(var\(--typing-row-count\),\s*minmax\(0,\s*1fr\)\)/);
     expect(shell).toContain("rowCountForTypingStrip");
+    expect(shell).toContain("fourRowHeight");
+    expect(shell).toContain("return 4;");
     expect(shell).toContain("setTypingRowCount");
     expect(shell).toContain('style={typingStripStyle}');
   });

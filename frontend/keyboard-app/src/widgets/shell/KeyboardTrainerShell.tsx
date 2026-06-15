@@ -1524,7 +1524,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                       key={index}
                       className={`typing-char typing-char--${status} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""}`}
                     >
-                      {item.isSpace ? "\u00a0" : item.char}
+                      {item.isSpace ? "·" : item.char}
                     </span>
                   ))}
                 </div>

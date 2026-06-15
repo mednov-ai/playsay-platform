@@ -1521,8 +1521,16 @@ input {
 }
 
 .typing-char.is-space {
+  display: inline-grid;
+  place-items: center;
   width: 0.58em;
   min-width: 0.58em;
+  color: color-mix(in srgb, var(--primary) 42%, var(--muted));
+  font-size: 0.72em;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.48;
+  transform: translateY(-0.03em);
 }
 
 .typing-char--correct {
@@ -1531,6 +1539,16 @@ input {
 
 .typing-char--error {
   color: var(--danger);
+}
+
+.typing-char.is-space.typing-char--correct {
+  color: color-mix(in srgb, var(--primary) 58%, var(--muted));
+  opacity: 0.58;
+}
+
+.typing-char.is-space.typing-char--error {
+  color: var(--danger);
+  opacity: 0.8;
 }
 
 .typing-char.is-current::after {
@@ -1547,6 +1565,11 @@ input {
 .typing-char.is-current {
   color: var(--foreground);
   text-shadow: 0 0 0.01px currentColor;
+}
+
+.typing-char.is-space.is-current {
+  color: var(--primary);
+  opacity: 1;
 }
 
 .practice-overlay {

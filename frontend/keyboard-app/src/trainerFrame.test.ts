@@ -109,6 +109,15 @@ describe("keyboard trainer wide frame", () => {
     expect(shell).toContain('style={typingStripStyle}');
   });
 
+  it("renders spaces as subtle dot markers without changing measured space width", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).toContain('item.isSpace ? "·" : item.char');
+    expect(styles).toMatch(/\.typing-char\.is-space[\s\S]*width:\s*0\.58em/);
+    expect(styles).toMatch(/\.typing-char\.is-space[\s\S]*place-items:\s*center/);
+    expect(styles).toMatch(/\.typing-char\.is-space\.is-current[\s\S]*opacity:\s*1/);
+  });
+
   it("uses subtle illuminated cards for the reference-style stats metrics", () => {
     expect(styles).toMatch(/\.stat--metric[\s\S]*position:\s*relative/);
     expect(styles).toContain(".stat--metric::before");

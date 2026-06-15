@@ -223,6 +223,14 @@ async function expectVisibleText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({ state: "visible", timeout: 10_000 });
 }
 
+async function expectMasteryCard(page, value, unit, level) {
+  const card = page.locator(".stats-panel__mastery-card").first();
+  await card.locator(`strong[aria-label="${value} ${unit} · ${level}"]`).waitFor({ state: "visible", timeout: 10_000 });
+  await card.locator(".stats-panel__mastery-number", { hasText: value }).waitFor({ state: "visible", timeout: 10_000 });
+  await card.locator(".stats-panel__mastery-unit", { hasText: unit }).waitFor({ state: "visible", timeout: 10_000 });
+  await card.locator(".stats-panel__mastery-level", { hasText: level }).waitFor({ state: "visible", timeout: 10_000 });
+}
+
 async function dismissCelebration(page) {
   await page.locator(".achievement-celebration .icon-button").click();
 }
@@ -276,7 +284,7 @@ async function capture(page, name) {
   if (await page.locator(".side-panel").isVisible()) {
     throw new Error("Side controls are visible during focused countdown practice.");
   }
-  await expectVisibleText(page, "170 cpm · Confident");
+  await expectMasteryCard(page, "170", "cpm", "Confident");
   if (!(await page.locator(".stats-panel--practice .stat__value--animated").first().isVisible())) {
     throw new Error("Focused practice stats are not rendered with animated numeric values.");
   }
@@ -309,11 +317,11 @@ async function capture(page, name) {
     throw new Error(`Practice state did not persist the pending next lesson: ${persistedBeforeReload}`);
   }
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.locator(".trainer-toolbar").waitFor({ state: "visible", timeout: 10_000 });
+  await page.locator(".stats-panel__set-card").waitFor({ state: "visible", timeout: 10_000 });
   if (await page.locator(".trainer-intro").isVisible()) {
     throw new Error("Intro returned after it had been dismissed for this browser profile.");
   }
-  const restoredSetTitle = await page.locator(".trainer-toolbar h1").innerText();
+  const restoredSetTitle = await page.locator(".stats-panel__set-copy h1").innerText();
   if (restoredSetTitle.includes("home row")) {
     throw new Error(`Reload fell back to the first two-letter starter set: ${restoredSetTitle}`);
   }

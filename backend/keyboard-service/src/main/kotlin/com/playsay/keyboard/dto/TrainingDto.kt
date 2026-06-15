@@ -35,6 +35,7 @@ data class SubmitResultRequest(
     val windowMetrics: Map<String, Double> = emptyMap(),
     val clientTimezone: String = "UTC",
     val localTrainingDate: String? = null,
+    val practiceContext: Map<String, Any?> = emptyMap(),
 )
 
 data class SubmitAnonymousResultRequest(
@@ -69,6 +70,7 @@ data class SubmitAnonymousResultRequest(
     val windowMetrics: Map<String, Double> = emptyMap(),
     val clientTimezone: String = "UTC",
     val localTrainingDate: String? = null,
+    val practiceContext: Map<String, Any?> = emptyMap(),
 )
 
 data class TrainingResultResponse(
@@ -92,6 +94,7 @@ data class TrainingResultResponse(
     val focusProblemKeys: List<String>,
     val clientTimezone: String,
     val localTrainingDate: String?,
+    val practiceContext: Map<String, Any?>,
     val createdAt: String,
     val focusLesson: FocusLessonResponse? = null,
 )

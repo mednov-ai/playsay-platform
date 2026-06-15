@@ -2,7 +2,15 @@ import { publicSiteUrl } from "@playsay/shared-ui";
 import { LogIn, LogOut, Pencil, Play, RotateCcw, Save, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { getLocalChordSets, materializeChordSet } from "../../entities/chordSets";
+import {
+  buildCombinedCodeChordSet,
+  codeDifficultyBands,
+  codeLanguageOptions,
+  getLocalChordSets,
+  materializeChordSet,
+  type CodeDifficultyBand,
+  type CodeLanguageId,
+} from "../../entities/chordSets";
 import { AchievementCelebrationQueue, type AchievementCelebrationLabels } from "../../features/gamification/AchievementCelebrationQueue";
 import { GamificationProfilePanel, type GamificationProfileLabels } from "../../features/gamification/GamificationProfilePanel";
 import { VirtualKeyboard, type KeyboardLabels } from "../../features/keyboard/VirtualKeyboard";
@@ -323,6 +331,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [anonymousDeviceId, setAnonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const ownerKey = practiceOwnerKey({ subject: me?.subject, anonymousDeviceId });
   const [layoutId, setLayoutId] = useState<LayoutId>(() => readPracticeState(ownerKey)?.layoutId ?? "EN");
+  const [codePracticeEnabled, setCodePracticeEnabled] = useState(false);
+  const [selectedCodeLanguages, setSelectedCodeLanguages] = useState<CodeLanguageId[]>(["python"]);
+  const [codeDifficultyBand, setCodeDifficultyBand] = useState<CodeDifficultyBand>("trigrams");
+  const [shiftActive, setShiftActive] = useState(false);
   const [sets, setSets] = useState<ChordSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(authError ?? null);
@@ -474,6 +486,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     }
   }, [layoutId, ownerKey, sessionFlow.phase]);
 
+  const programmingMode = codePracticeEnabled && layoutId === "EN";
+  const codePracticeSet = useMemo(
+    () => buildCombinedCodeChordSet(selectedCodeLanguages, codeDifficultyBand),
+    [codeDifficultyBand, selectedCodeLanguages],
+  );
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -491,12 +509,17 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
     const loadedSets = getLocalChordSets(layoutId);
     const persistedPracticeState = readPracticeState(ownerKey);
-    const restoredSet = resolvePersistedPracticeSet(persistedPracticeState, loadedSets);
+    const persistedSet = resolvePersistedPracticeSet(persistedPracticeState, loadedSets);
+    const restoredSet = programmingMode
+      ? codePracticeSet
+      : persistedSet?.practiceKind === "CODE" || persistedSet?.practiceKind === "CODE_COMBO"
+        ? undefined
+        : persistedSet;
     setSets(loadedSets);
     if (restoredSet || loadedSets.length > 0) {
       const startSet = restoredSet ?? loadedSets[0];
       loadSet(
-        layoutId,
+        startSet.layout,
         startSet.id > 0
           ? materializeChordSet(startSet, profileSeed, isAuthenticated ? 1 : readGuestSessionCount() + 1)
           : startSet,
@@ -541,7 +564,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     return () => {
       cancelled = true;
     };
-  }, [anonymousDeviceId, isAuthenticated, layoutId, loadSet, ownerKey, profileSeed, t]);
+  }, [anonymousDeviceId, codePracticeSet, isAuthenticated, layoutId, loadSet, ownerKey, profileSeed, programmingMode, t]);
 
   useEffect(() => {
     if (!shouldReloadActiveSetForLayout({ layoutId, chordSet, phase: sessionFlow.phase })) {
@@ -782,7 +805,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       })
     : null;
   const suggestedMetronomeBpm = sessionResult ? suggestMetronomeBpm(intervals, sessionResult.cadence) : null;
-  const nextChar = sessionFlow.acceptsTyping ? stream[pos]?.char ?? null : null;
+  const nextItem = sessionFlow.acceptsTyping ? stream[pos] : undefined;
+  const nextChar = nextItem?.char ?? null;
+  const nextRequiresShift = nextItem?.requiresShift === true;
   const effectiveProgress = progress ?? { ...emptyProgress, sessions: guestSessionCount };
   const effectiveGamification = activeLayoutGamification(progress?.gamification, layoutId);
   const displayedSessionMasteryCpm = sessionResult?.layoutId === layoutId ? effectiveMastery?.masteryCpm : null;
@@ -901,10 +926,16 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     longFirst: t("trainerSetTitle.longFirst"),
     longSecond: t("trainerSetTitle.longSecond"),
     homeRow: t("trainerSetTitle.homeRow"),
+    codeTrigrams: t("trainer.codeDifficulty_trigrams"),
+    codeQuadgrams: t("trainer.codeDifficulty_quadgrams"),
+    codeLong: t("trainer.codeDifficulty_long"),
   };
   const formatTrainingSetTitle = useCallback(
     (set: ChordSet) => formatChordSetTitle(set, chordSetTitleLabels),
     [
+      chordSetTitleLabels.codeLong,
+      chordSetTitleLabels.codeQuadgrams,
+      chordSetTitleLabels.codeTrigrams,
       chordSetTitleLabels.homeRow,
       chordSetTitleLabels.letterPairs,
       chordSetTitleLabels.letterQuadgrams,
@@ -915,7 +946,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   );
   const activeSetTitle = chordSet ? formatTrainingSetTitle(chordSet) : loading ? t("auth.loading") : t("trainer.noSet");
   const activeSetHint = chordSet
-    ? t(trainingSetHintKind(chordSet) === "pairs" ? "trainer.setHintPairs" : "trainer.setHintCombinations")
+    ? chordSet.practiceKind === "CODE" || chordSet.practiceKind === "CODE_COMBO"
+      ? t("trainer.setHintCode")
+      : t(trainingSetHintKind(chordSet) === "pairs" ? "trainer.setHintPairs" : "trainer.setHintCombinations")
     : null;
 
   const changeLanguage = (language: SupportedLanguage) => {
@@ -924,11 +957,41 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
   const changeTrainingLayout = (nextLayoutId: LayoutId) => {
     setLayoutId(nextLayoutId);
+    if (nextLayoutId !== "EN") {
+      setCodePracticeEnabled(false);
+    }
     updatePracticeState(ownerKey, (current) => ({
       ownerKey,
       layoutId: nextLayoutId,
       introDismissed: current?.introDismissed,
     }));
+  };
+
+  const changeCodePracticeEnabled = (enabled: boolean) => {
+    setCodePracticeEnabled(enabled);
+    if (enabled && layoutId !== "EN") {
+      setLayoutId("EN");
+      updatePracticeState(ownerKey, (current) => ({
+        ownerKey,
+        layoutId: "EN",
+        introDismissed: current?.introDismissed,
+      }));
+    }
+  };
+
+  const toggleCodeLanguage = (languageId: CodeLanguageId) => {
+    setSelectedCodeLanguages((current) => {
+      if (current.includes(languageId)) {
+        return current.length === 1 ? current : current.filter((language) => language !== languageId);
+      }
+      return codeLanguageOptions
+        .map((language) => language.id)
+        .filter((language) => language === languageId || current.includes(language));
+    });
+  };
+
+  const changeCodeDifficultyBand = (difficultyBand: CodeDifficultyBand) => {
+    setCodeDifficultyBand(difficultyBand);
   };
 
   const clearSessionResult = useCallback(() => {
@@ -1248,6 +1311,29 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     trainerIntroPhase,
   ]);
 
+  useEffect(() => {
+    const activate = (event: KeyboardEvent) => {
+      if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+        setShiftActive(true);
+      }
+    };
+    const deactivate = (event: KeyboardEvent) => {
+      if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+        setShiftActive(false);
+      }
+    };
+    const clear = () => setShiftActive(false);
+
+    window.addEventListener("keydown", activate);
+    window.addEventListener("keyup", deactivate);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", activate);
+      window.removeEventListener("keyup", deactivate);
+      window.removeEventListener("blur", clear);
+    };
+  }, []);
+
   const startLabel = sessionFlow.phase === "finished" ? t("trainer.next") : t("trainer.start");
   const accountLabel = isAuthenticated ? t("auth.signedInAs") : t("auth.guestAccount");
   const accountValue = isAuthenticated ? me.email ?? me.username : guestDisplayName ?? t("auth.guestProgress");
@@ -1367,20 +1453,72 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </select>
           </label>
 
-          <label className="field field--set">
-            <span>{t("trainer.set")}</span>
-            <select
-              value={chordSet && chordSet.id > 0 ? String(chordSet.id) : ""}
-              onChange={(event) => selectSet(event.target.value)}
-              disabled={sets.length === 0 || isSessionLocked}
-            >
-              {sets.map((set) => (
-                <option key={set.id} value={set.id}>
-                  {formatTrainingSetTitle(set)}
-                </option>
-              ))}
-            </select>
+          <label className="code-mode-toggle">
+            <input
+              type="checkbox"
+              checked={codePracticeEnabled}
+              onChange={(event) => changeCodePracticeEnabled(event.target.checked)}
+              disabled={isSessionLocked}
+            />
+            <span>{t("trainer.codePractice")}</span>
           </label>
+
+          {programmingMode ? (
+            <div className="code-practice-panel" aria-label={t("trainer.codePractice")}>
+              <div className="code-practice-panel__header">
+                <span>{t("trainer.codeLanguages")}</span>
+                <strong>{selectedCodeLanguages.length}</strong>
+              </div>
+              <div className="code-language-grid">
+                {codeLanguageOptions.map((language) => {
+                  const active = selectedCodeLanguages.includes(language.id);
+                  return (
+                    <button
+                      key={language.id}
+                      type="button"
+                      className={`code-language-chip ${active ? "is-active" : ""}`}
+                      onClick={() => toggleCodeLanguage(language.id)}
+                      disabled={isSessionLocked}
+                      aria-pressed={active}
+                    >
+                      {language.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <label className="field code-difficulty-field">
+                <span>{t("trainer.codeDifficulty")}</span>
+                <select
+                  value={codeDifficultyBand}
+                  onChange={(event) => changeCodeDifficultyBand(event.target.value as CodeDifficultyBand)}
+                  disabled={isSessionLocked}
+                >
+                  {codeDifficultyBands.map((band) => (
+                    <option key={band.id} value={band.id}>
+                      {t(`trainer.codeDifficulty_${band.id}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : (
+            <label className="field field--set">
+              <span>{t("trainer.set")}</span>
+              <select
+                value={chordSet && chordSet.id > 0 ? String(chordSet.id) : ""}
+                onChange={(event) => selectSet(event.target.value)}
+                disabled={sets.length === 0 || isSessionLocked}
+              >
+                {sets
+                  .filter((set) => set.practiceKind !== "CODE")
+                  .map((set) => (
+                    <option key={set.id} value={set.id}>
+                      {formatTrainingSetTitle(set)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
 
           <div className="side-panel__actions">
             <button
@@ -1541,7 +1679,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </div>
           </div>
 
-          <VirtualKeyboard labels={keyboardLabels} layoutId={layoutId} nextChar={nextChar} />
+          <VirtualKeyboard
+            labels={keyboardLabels}
+            layoutId={layoutId}
+            nextChar={nextChar}
+            nextRequiresShift={nextRequiresShift}
+            programmingMode={programmingMode}
+            shiftActive={shiftActive}
+          />
 
           <div className="trainer-footer">
             <Metronome

@@ -43,6 +43,7 @@ fun TrainingResultEntity.toResponse(layout: String): TrainingResultResponse =
         focusProblemKeys = focusProblemKeys,
         clientTimezone = clientTimezone,
         localTrainingDate = localTrainingDate?.toString(),
+        practiceContext = practiceContextJsonToMap(practiceContextJson),
         createdAt = createdAt.toString(),
     )
 
@@ -90,6 +91,16 @@ class StringListConverter : AttributeConverter<List<String>, String> {
 }
 
 private const val rolePrefix = "ROLE_"
+private val practiceContextType = object : TypeReference<Map<String, Any?>>() {}
+
+private fun practiceContextJsonToMap(value: String?): Map<String, Any?> {
+    if (value.isNullOrBlank()) {
+        return emptyMap()
+    }
+    return runCatching {
+        jacksonObjectMapper().readValue(value, practiceContextType)
+    }.getOrDefault(emptyMap())
+}
 
 private fun levelTierForDifficulty(difficulty: Int): String =
     when {

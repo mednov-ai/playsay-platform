@@ -73,6 +73,101 @@ class KeyboardApiTest @Autowired constructor(
     }
 
     @Test
+    fun `english chord sets include code ngrams for programming languages`() {
+        val codeSets = chordSetController.list(layout = "EN", difficulty = null)
+            .filter { it.title.startsWith("CODE · ") }
+
+        assertEquals(
+            listOf(
+                "CODE · Python · Trigrams",
+                "CODE · JavaScript · Trigrams",
+                "CODE · TypeScript · Trigrams",
+                "CODE · Java · Trigrams",
+                "CODE · Kotlin · Trigrams",
+                "CODE · C# · Trigrams",
+                "CODE · C++ · Trigrams",
+                "CODE · Swift · Trigrams",
+                "CODE · Go · Trigrams",
+                "CODE · Mixed · Trigrams",
+                "CODE · Python · Quadgrams",
+                "CODE · JavaScript · Quadgrams",
+                "CODE · TypeScript · Quadgrams",
+                "CODE · Java · Quadgrams",
+                "CODE · Kotlin · Quadgrams",
+                "CODE · C# · Quadgrams",
+                "CODE · C++ · Quadgrams",
+                "CODE · Swift · Quadgrams",
+                "CODE · Go · Quadgrams",
+                "CODE · Mixed · Quadgrams",
+                "CODE · Python · Long",
+                "CODE · JavaScript · Long",
+                "CODE · TypeScript · Long",
+                "CODE · Java · Long",
+                "CODE · Kotlin · Long",
+                "CODE · C# · Long",
+                "CODE · C++ · Long",
+                "CODE · Swift · Long",
+                "CODE · Go · Long",
+                "CODE · Mixed · Long",
+            ),
+            codeSets.map { it.title },
+        )
+        assertTrue(codeSets.all { set -> set.chords.size >= 48 })
+        assertTrue(codeSets.all { set -> set.chords.all { chord -> chord.length in 3..8 } })
+        assertTrue(codeSets.any { set -> set.chords.any { chord -> Regex("[{}()\\[\\]#:?+*=><]").containsMatchIn(chord) } })
+    }
+
+    @Test
+    fun `combined code practice context is stored with training result`() {
+        trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
+
+        val saved = trainingController.submit(
+            keyboardAuthentication(subject = "code-combo-subject"),
+            SubmitResultRequest(
+                clientResultId = "code-combo-1",
+                chordSetId = 40,
+                speedCpm = 180.0,
+                averageCpm = 180.0,
+                cadence = 0.82,
+                accuracy = 0.97,
+                errors = 1,
+                characterCount = 180,
+                correctCount = 179,
+                durationMs = 60_000,
+                perChar = mapOf("{" to 1),
+                perChord = mapOf("fun" to 1),
+                practiceContext = mapOf(
+                    "practiceKind" to "CODE_COMBO",
+                    "codeLanguages" to listOf("typescript", "kotlin"),
+                    "difficultyBand" to "trigrams",
+                    "title" to "CODE · TypeScript + Kotlin · Trigrams",
+                ),
+            ),
+        )
+        val repeated = trainingController.submit(
+            keyboardAuthentication(subject = "code-combo-subject"),
+            SubmitResultRequest(
+                clientResultId = "code-combo-1",
+                chordSetId = 40,
+                speedCpm = 180.0,
+                averageCpm = 180.0,
+                cadence = 0.82,
+                accuracy = 0.97,
+                errors = 1,
+                characterCount = 180,
+                correctCount = 179,
+                durationMs = 60_000,
+                practiceContext = mapOf("practiceKind" to "CODE_COMBO"),
+            ),
+        )
+
+        assertEquals("CODE_COMBO", saved.trainingResult.practiceContext["practiceKind"])
+        assertEquals(listOf("typescript", "kotlin"), saved.trainingResult.practiceContext["codeLanguages"])
+        assertEquals(saved.trainingResult.practiceContext, repeated.trainingResult.practiceContext)
+    }
+
+    @Test
     fun `authenticated user can train and see progress`() {
         trainingResultRepo.deleteAllInBatch()
         layoutMasteryProfileRepo.deleteAllInBatch()
@@ -330,7 +425,7 @@ class KeyboardApiTest @Autowired constructor(
         val chordSets = chordSetController.list(layout = "EN", difficulty = null) +
             chordSetController.list(layout = "RU", difficulty = null)
 
-        assertEquals((1L..12L).toList(), chordSets.map { it.id }.sorted())
+        assertEquals((1L..42L).toList(), chordSets.map { it.id }.sorted())
         chordSets.forEach { chordSet ->
             assertTrue(chordSet.chords.size >= 48, "set ${chordSet.id} should have a corpus-sized pool")
             assertEquals(chordSet.chords.size, chordSet.chords.toSet().size, "set ${chordSet.id} should not contain duplicate chords")

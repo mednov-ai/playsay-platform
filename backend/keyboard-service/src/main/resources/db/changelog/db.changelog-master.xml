@@ -11,4 +11,5 @@
     <include file="2026-06-11-001-keyboard-mastery-gamification.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-11-002-keyboard-gamification-main.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-11-003-keyboard-layout-mastery.xml" relativeToChangelogFile="true"/>
+    <include file="2026-06-15-001-code-keyboard-chords.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

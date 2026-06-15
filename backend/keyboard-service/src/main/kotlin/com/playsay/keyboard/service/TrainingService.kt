@@ -87,6 +87,7 @@ class TrainingService(
                 correctCount = request.correctCount.coerceAtLeast(0),
                 durationMs = request.durationMs,
                 windowMetricsJson = windowMetricsJson(request.windowMetrics),
+                practiceContextJson = practiceContextJson(request.practiceContext),
                 clientTimezone = cleanTimezone(request.clientTimezone),
                 localTrainingDate = localDate,
                 perFinger = sanitizeErrorMap(request.perFinger),
@@ -164,6 +165,7 @@ class TrainingService(
                 correctCount = request.correctCount.coerceAtLeast(0),
                 durationMs = request.durationMs,
                 windowMetricsJson = windowMetricsJson(request.windowMetrics),
+                practiceContextJson = practiceContextJson(request.practiceContext),
                 clientTimezone = cleanTimezone(request.clientTimezone),
                 localTrainingDate = localDate,
                 perFinger = sanitizeErrorMap(request.perFinger),
@@ -610,6 +612,28 @@ class TrainingService(
                 .take(64)
                 .associate { (key, value) -> key to roundOne(value) },
         ).take(4000)
+
+    private fun practiceContextJson(values: Map<String, Any?>): String =
+        objectMapper.writeValueAsString(sanitizePracticeContext(values)).take(2048)
+
+    private fun sanitizePracticeContext(values: Map<String, Any?>): Map<String, Any?> =
+        values.entries
+            .asSequence()
+            .filter { (key) -> key.length in 1..64 }
+            .take(16)
+            .associate { (key, value) -> key to sanitizePracticeContextValue(value) }
+            .filterValues { value -> value != null }
+
+    private fun sanitizePracticeContextValue(value: Any?): Any? =
+        when (value) {
+            is String -> value.trim().take(160).ifBlank { null }
+            is Number -> value
+            is Boolean -> value
+            is List<*> -> value
+                .mapNotNull { item -> sanitizePracticeContextValue(item) }
+                .take(16)
+            else -> null
+        }
 
     private fun roundOne(value: Double): Double = round(value * 10.0) / 10.0
 

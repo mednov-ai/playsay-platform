@@ -202,7 +202,7 @@ function sanitizeFocusSet(value: unknown, layoutId: LayoutId): ChordSet | undefi
   }
 
   const candidate = value as Partial<ChordSet>;
-  if (candidate.id !== -1 || candidate.layout !== layoutId || !Array.isArray(candidate.chords)) {
+  if (typeof candidate.id !== "number" || candidate.id >= 0 || candidate.layout !== layoutId || !Array.isArray(candidate.chords)) {
     return undefined;
   }
 
@@ -212,15 +212,45 @@ function sanitizeFocusSet(value: unknown, layoutId: LayoutId): ChordSet | undefi
   }
 
   return {
-    id: -1,
+    id: candidate.id,
     sourceChordSetId: typeof candidate.sourceChordSetId === "number" ? candidate.sourceChordSetId : undefined,
     focusProblemKeys: Array.isArray(candidate.focusProblemKeys)
       ? candidate.focusProblemKeys.filter((key): key is string => typeof key === "string" && key.length > 0)
       : undefined,
     layout: layoutId,
     title: typeof candidate.title === "string" && candidate.title.length > 0 ? candidate.title : "Focus",
-    difficulty: 0,
-    tier: "beginner",
+    difficulty: typeof candidate.difficulty === "number" ? candidate.difficulty : 0,
+    tier: candidate.tier === "professional" || candidate.tier === "middle" || candidate.tier === "confident" ? candidate.tier : "beginner",
+    practiceKind: candidate.practiceKind === "CODE_COMBO" || candidate.practiceKind === "CODE" ? candidate.practiceKind : undefined,
+    codeLanguages: Array.isArray(candidate.codeLanguages)
+      ? candidate.codeLanguages.filter((language): language is string => typeof language === "string" && language.length > 0)
+      : undefined,
+    practiceContext: sanitizePracticeContext(candidate.practiceContext),
     chords,
+  };
+}
+
+function sanitizePracticeContext(value: unknown): ChordSet["practiceContext"] | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const candidate = value as Partial<NonNullable<ChordSet["practiceContext"]>>;
+  if (candidate.practiceKind !== "CODE" && candidate.practiceKind !== "CODE_COMBO") {
+    return undefined;
+  }
+  if (candidate.difficultyBand !== "trigrams" && candidate.difficultyBand !== "quadgrams" && candidate.difficultyBand !== "long") {
+    return undefined;
+  }
+  const codeLanguages = Array.isArray(candidate.codeLanguages)
+    ? candidate.codeLanguages.filter((language): language is string => typeof language === "string" && language.length > 0)
+    : [];
+  if (codeLanguages.length === 0 || typeof candidate.title !== "string" || candidate.title.length === 0) {
+    return undefined;
+  }
+  return {
+    practiceKind: candidate.practiceKind,
+    codeLanguages,
+    difficultyBand: candidate.difficultyBand,
+    title: candidate.title,
   };
 }

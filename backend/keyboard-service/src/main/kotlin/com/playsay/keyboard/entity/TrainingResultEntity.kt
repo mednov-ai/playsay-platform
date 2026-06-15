@@ -63,6 +63,9 @@ class TrainingResultEntity(
     @Column(name = "window_metrics_json", nullable = false, length = 4000)
     var windowMetricsJson: String = "{}",
 
+    @Column(name = "practice_context_json", nullable = false, length = 2048)
+    var practiceContextJson: String = "{}",
+
     @Column(name = "client_timezone", nullable = false, length = 64)
     var clientTimezone: String = "UTC",
 

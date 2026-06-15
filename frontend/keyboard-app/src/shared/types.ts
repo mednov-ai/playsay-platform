@@ -15,6 +15,8 @@ export type Finger =
 export interface KeyDef {
   code: string;
   char: string;
+  shiftedChar?: string;
+  requiresShift?: boolean;
   finger: Finger;
   row: number;
   col: number;
@@ -51,6 +53,16 @@ export interface ChordSet {
   difficulty: number;
   tier: LevelTier;
   chords: string[];
+  practiceKind?: "LETTER" | "CODE" | "CODE_COMBO";
+  codeLanguages?: string[];
+  practiceContext?: PracticeContext;
+}
+
+export interface PracticeContext {
+  practiceKind: "CODE" | "CODE_COMBO";
+  codeLanguages: string[];
+  difficultyBand: "trigrams" | "quadgrams" | "long";
+  title: string;
 }
 
 export type TrainingLessonKind = "CALIBRATION" | "STANDARD" | "FOCUS";
@@ -84,6 +96,7 @@ export interface SubmitResult {
   windowMetrics?: Record<string, number>;
   clientTimezone?: string;
   localTrainingDate?: string;
+  practiceContext?: PracticeContext;
 }
 
 export interface TrainingResult {
@@ -108,6 +121,7 @@ export interface TrainingResult {
   focusProblemKeys?: string[];
   clientTimezone?: string;
   localTrainingDate?: string;
+  practiceContext?: PracticeContext;
   createdAt: string;
   focusLesson?: FocusLesson;
 }

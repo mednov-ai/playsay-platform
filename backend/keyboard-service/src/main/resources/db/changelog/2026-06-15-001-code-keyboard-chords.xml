@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-15-001-add-practice-context" author="codex">
+        <addColumn tableName="keyboard_training_results">
+            <column name="practice_context_json" type="varchar(2048)" defaultValue="{}">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="2026-06-15-001-seed-code-chord-sets" author="codex">
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="13"/><column name="layout" value="EN"/><column name="title" value="CODE · Python · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="14"/><column name="layout" value="EN"/><column name="title" value="CODE · JavaScript · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="15"/><column name="layout" value="EN"/><column name="title" value="CODE · TypeScript · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="16"/><column name="layout" value="EN"/><column name="title" value="CODE · Java · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="17"/><column name="layout" value="EN"/><column name="title" value="CODE · Kotlin · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="18"/><column name="layout" value="EN"/><column name="title" value="CODE · C# · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="19"/><column name="layout" value="EN"/><column name="title" value="CODE · C++ · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="20"/><column name="layout" value="EN"/><column name="title" value="CODE · Swift · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="21"/><column name="layout" value="EN"/><column name="title" value="CODE · Go · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="22"/><column name="layout" value="EN"/><column name="title" value="CODE · Python · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="23"/><column name="layout" value="EN"/><column name="title" value="CODE · JavaScript · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="24"/><column name="layout" value="EN"/><column name="title" value="CODE · TypeScript · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="25"/><column name="layout" value="EN"/><column name="title" value="CODE · Java · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="26"/><column name="layout" value="EN"/><column name="title" value="CODE · Kotlin · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="27"/><column name="layout" value="EN"/><column name="title" value="CODE · C# · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="28"/><column name="layout" value="EN"/><column name="title" value="CODE · C++ · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="29"/><column name="layout" value="EN"/><column name="title" value="CODE · Swift · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="30"/><column name="layout" value="EN"/><column name="title" value="CODE · Go · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="31"/><column name="layout" value="EN"/><column name="title" value="CODE · Python · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="32"/><column name="layout" value="EN"/><column name="title" value="CODE · JavaScript · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="33"/><column name="layout" value="EN"/><column name="title" value="CODE · TypeScript · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="34"/><column name="layout" value="EN"/><column name="title" value="CODE · Java · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="35"/><column name="layout" value="EN"/><column name="title" value="CODE · Kotlin · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="36"/><column name="layout" value="EN"/><column name="title" value="CODE · C# · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="37"/><column name="layout" value="EN"/><column name="title" value="CODE · C++ · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="38"/><column name="layout" value="EN"/><column name="title" value="CODE · Swift · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="39"/><column name="layout" value="EN"/><column name="title" value="CODE · Go · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="40"/><column name="layout" value="EN"/><column name="title" value="CODE · Mixed · Trigrams"/><column name="difficulty" valueNumeric="7"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="41"/><column name="layout" value="EN"/><column name="title" value="CODE · Mixed · Quadgrams"/><column name="difficulty" valueNumeric="8"/></insert>
+        <insert tableName="keyboard_chord_sets"><column name="id" valueNumeric="42"/><column name="layout" value="EN"/><column name="title" value="CODE · Mixed · Long"/><column name="difficulty" valueNumeric="9"/></insert>
+    </changeSet>
+
+    <changeSet id="2026-06-15-001-load-code-keyboard-chords" author="codex">
+        <loadData
+            tableName="keyboard_chords"
+            file="data/keyboard-code-chords.csv"
+            relativeToChangelogFile="true"
+            separator="|"
+            encoding="UTF-8">
+            <column name="chord_set_id" type="NUMERIC"/>
+            <column name="position" type="NUMERIC"/>
+            <column name="chord_value" type="STRING"/>
+        </loadData>
+    </changeSet>
+</databaseChangeLog>

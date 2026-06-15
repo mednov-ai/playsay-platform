@@ -54,6 +54,24 @@ const focusSet: ChordSet = {
   chords: ["ee", "er"],
 };
 
+const combinedCodeSet: ChordSet = {
+  id: -2,
+  sourceChordSetId: 40,
+  layout: "EN",
+  title: "CODE · TypeScript + Kotlin · Trigrams",
+  difficulty: 7,
+  tier: "professional",
+  practiceKind: "CODE_COMBO",
+  codeLanguages: ["typescript", "kotlin"],
+  practiceContext: {
+    practiceKind: "CODE_COMBO",
+    codeLanguages: ["typescript", "kotlin"],
+    difficultyBand: "trigrams",
+    title: "CODE · TypeScript + Kotlin · Trigrams",
+  },
+  chords: ["fun", "ype", "():", "val"],
+};
+
 describe("persisted keyboard practice state", () => {
   it("stores active set, pending focus decision and intro state for one owner", () => {
     const storage = new MemoryStorage();
@@ -123,5 +141,28 @@ describe("persisted keyboard practice state", () => {
 
     clearPracticeState(storage);
     expect(storage.getItem(practiceStateStorageKey)).toBeNull();
+  });
+
+  it("persists synthetic combined programming sets with their context", () => {
+    const storage = new MemoryStorage();
+
+    writePracticeState(
+      {
+        ownerKey: "guest:device-a",
+        layoutId: "EN",
+        activeFocusSet: combinedCodeSet,
+      },
+      storage,
+    );
+
+    expect(resolvePersistedPracticeSet(readPracticeState("guest:device-a", storage), sets)).toMatchObject({
+      id: -2,
+      sourceChordSetId: 40,
+      practiceKind: "CODE_COMBO",
+      codeLanguages: ["typescript", "kotlin"],
+      practiceContext: {
+        difficultyBand: "trigrams",
+      },
+    });
   });
 });

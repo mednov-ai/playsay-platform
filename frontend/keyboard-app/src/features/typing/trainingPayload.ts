@@ -2,7 +2,7 @@ import type { ChordSet, SubmitResult } from "../../shared/types";
 import type { SessionResult } from "./typingStore";
 
 export function buildTrainingSubmitPayload(result: SessionResult, activeSet: ChordSet | null): SubmitResult | null {
-  const sourceChordSetId = activeSet?.id === -1 ? activeSet.sourceChordSetId : undefined;
+  const sourceChordSetId = activeSet && activeSet.id < 0 ? activeSet.sourceChordSetId : undefined;
   const chordSetId = sourceChordSetId ?? result.chordSetId;
   if (chordSetId <= 0) {
     return null;
@@ -28,6 +28,7 @@ export function buildTrainingSubmitPayload(result: SessionResult, activeSet: Cho
     windowMetrics: {},
     clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     localTrainingDate: localTrainingDate(),
+    practiceContext: activeSet?.practiceContext,
   };
 }
 

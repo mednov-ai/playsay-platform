@@ -7,6 +7,9 @@ export interface ChordSetTitleLabels {
   longFirst: string;
   longSecond: string;
   homeRow: string;
+  codeTrigrams: string;
+  codeQuadgrams: string;
+  codeLong: string;
 }
 
 export type TrainingSetHintKind = "pairs" | "combinations";
@@ -18,6 +21,17 @@ export type ResultWeakness =
 
 export function formatChordSetTitle(set: Pick<ChordSet, "id" | "layout" | "title" | "difficulty">, labels: ChordSetTitleLabels): string {
   const layout = set.layout;
+
+  if (set.title.startsWith("CODE · ")) {
+    const [, language = "", band = ""] = set.title.split(" · ");
+    const bandLabel =
+      band === "Trigrams"
+        ? labels.codeTrigrams
+        : band === "Quadgrams"
+          ? labels.codeQuadgrams
+          : labels.codeLong;
+    return `Code · ${language} · ${bandLabel}`;
+  }
 
   if (set.id === 1 || set.id === 5) {
     return `${layout} · ${labels.letterPairs} · ${labels.homeRow}`;

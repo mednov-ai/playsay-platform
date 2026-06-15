@@ -16,6 +16,11 @@ function pressAt(ms: number, code: string) {
   useTypingStore.getState().handleKey(code);
 }
 
+function pressShiftedAt(ms: number, code: string) {
+  vi.setSystemTime(ms);
+  useTypingStore.getState().handleKey(code, true);
+}
+
 afterEach(() => {
   vi.useRealTimers();
   useTypingStore.getState().loadSet("EN", timedChordSet, 5);
@@ -52,6 +57,26 @@ describe("typing stream", () => {
     const stream = buildStream("EN", chordSet, 12);
 
     expect(stream.length).toBe(17);
+  });
+
+  it("marks programming symbols that require the Shift layer", () => {
+    const chordSet: ChordSet = {
+      id: 13,
+      layout: "EN",
+      title: "CODE · Python · Trigrams",
+      difficulty: 7,
+      tier: "professional",
+      practiceKind: "CODE",
+      codeLanguages: ["python"],
+      chords: ["fn()", "{ok}"],
+    };
+
+    const stream = buildStream("EN", chordSet, 8);
+
+    expect(stream.find((item) => item.char === "(")).toMatchObject({ code: "Digit9", requiresShift: true });
+    expect(stream.find((item) => item.char === ")")).toMatchObject({ code: "Digit0", requiresShift: true });
+    expect(stream.find((item) => item.char === "{")).toMatchObject({ code: "BracketLeft", requiresShift: true });
+    expect(stream.find((item) => item.char === "o")).toMatchObject({ code: "KeyO", requiresShift: false });
   });
 });
 
@@ -93,5 +118,30 @@ describe("typing session timing", () => {
 
     expect(result?.durationMs).toBe(2_000);
     expect(result?.speedCpm).toBe(150);
+  });
+
+  it("accepts shifted symbols only while Shift is held", () => {
+    vi.useFakeTimers();
+    const symbolSet: ChordSet = {
+      id: 13,
+      layout: "EN",
+      title: "Symbols",
+      difficulty: 7,
+      tier: "professional",
+      practiceKind: "CODE",
+      codeLanguages: ["javascript"],
+      chords: ["()"],
+    };
+    useTypingStore.getState().loadSet("EN", symbolSet, 2);
+
+    pressAt(0, "Digit9");
+    expect(useTypingStore.getState().pos).toBe(0);
+    expect(useTypingStore.getState().errorCount).toBe(1);
+
+    pressShiftedAt(500, "Digit9");
+    pressShiftedAt(1_000, "Digit0");
+
+    expect(useTypingStore.getState().pos).toBe(2);
+    expect(useTypingStore.getState().result()?.perChar).toMatchObject({ "(": 1 });
   });
 });

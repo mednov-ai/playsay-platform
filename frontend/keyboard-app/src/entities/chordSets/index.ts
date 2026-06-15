@@ -1,5 +1,14 @@
 import { seededShuffle } from "../../shared/deterministic";
 import type { ChordSet, LayoutId, LevelTier } from "../../shared/types";
+import {
+  buildCombinedCodeChordSet,
+  codeChordSets,
+  codeDifficultyBandForSet,
+  codeDifficultyBands,
+  codeLanguageOptions,
+  type CodeDifficultyBand,
+  type CodeLanguageId,
+} from "./codeChordSets";
 import { corpusChordSets } from "./corpusChordSets";
 
 export const localChordSets: ChordSet[] = corpusChordSets.map((set) =>
@@ -10,7 +19,7 @@ export const localChordSets: ChordSet[] = corpusChordSets.map((set) =>
     difficulty: set.difficulty,
     chords: [...set.chords],
   }),
-);
+).concat(codeChordSets);
 
 export function getLocalChordSets(layout: LayoutId, difficulty?: number): ChordSet[] {
   return localChordSets.filter((set) => set.layout === layout && (difficulty == null || set.difficulty === difficulty));
@@ -53,6 +62,16 @@ export function materializeChordSet(
 function chordSet(input: Omit<ChordSet, "tier">): ChordSet {
   return {
     ...input,
+    practiceKind: input.practiceKind ?? "LETTER",
     tier: levelTierForDifficulty(input.difficulty),
   };
 }
+
+export {
+  buildCombinedCodeChordSet,
+  codeDifficultyBandForSet,
+  codeDifficultyBands,
+  codeLanguageOptions,
+  type CodeDifficultyBand,
+  type CodeLanguageId,
+};

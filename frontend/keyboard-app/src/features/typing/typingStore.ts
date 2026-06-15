@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { LAYOUTS } from "../../entities/layouts";
+import { LAYOUTS, resolveKeyInput } from "../../entities/layouts";
 import type { ChordSet, Finger, LayoutId } from "../../shared/types";
 import { computeAverageTempo, computeCadence } from "./mastery";
 import { typingWindowLineLength, typingWindowRows } from "./typingWindow";
@@ -8,11 +8,13 @@ export type CharStatus = "pending" | "correct" | "error";
 
 export interface StreamItem {
   char: string;
+  code?: string;
   finger: Finger;
   chordIndex: number;
   chord: string;
   isChordStart: boolean;
   isSpace?: boolean;
+  requiresShift?: boolean;
 }
 
 export interface SessionResult {
@@ -55,7 +57,7 @@ interface TypingState {
   reset: () => void;
   pauseTiming: () => void;
   resumeTiming: () => void;
-  handleKey: (code: string) => void;
+  handleKey: (code: string, shiftKey?: boolean) => void;
   result: () => SessionResult | null;
 }
 
@@ -102,10 +104,12 @@ export function buildStream(layoutId: LayoutId, chordSet: ChordSet, visibleCapac
       const key = layout.byChar[char];
       baseStream.push({
         char,
+        code: key?.code,
         finger: key?.finger ?? "rightIndex",
         chordIndex,
         chord,
         isChordStart: charIndex === 0,
+        requiresShift: key?.requiresShift === true,
       });
     });
   });
@@ -231,14 +235,14 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     });
   },
 
-  handleKey: (code) => {
+  handleKey: (code, shiftKey = false) => {
     const state = get();
     const { layoutId, stream, pos, finishedAt } = state;
     if (finishedAt != null || pos >= stream.length) {
       return;
     }
 
-    const pressedChar = code === "Space" ? " " : LAYOUTS[layoutId].byCode[code]?.char;
+    const pressedChar = code === "Space" ? " " : resolveKeyInput(layoutId, code, shiftKey)?.char;
     if (pressedChar == null) {
       return;
     }

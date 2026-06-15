@@ -64,4 +64,35 @@ describe("training submit payload", () => {
       focusProblemKeys: [],
     });
   });
+
+  it("submits synthetic combined code lessons through their mixed anchor with practice context", () => {
+    const comboSet: ChordSet = {
+      id: -2,
+      sourceChordSetId: 40,
+      layout: "EN",
+      title: "CODE · TypeScript + Kotlin · Trigrams",
+      difficulty: 7,
+      tier: "professional",
+      practiceKind: "CODE_COMBO",
+      codeLanguages: ["typescript", "kotlin"],
+      practiceContext: {
+        practiceKind: "CODE_COMBO",
+        codeLanguages: ["typescript", "kotlin"],
+        difficultyBand: "trigrams",
+        title: "CODE · TypeScript + Kotlin · Trigrams",
+      },
+      chords: ["fun", "ype", "():", "val"],
+    };
+
+    expect(buildTrainingSubmitPayload(baseResult, comboSet)).toMatchObject({
+      chordSetId: 40,
+      lessonKind: "STANDARD",
+      practiceContext: {
+        practiceKind: "CODE_COMBO",
+        codeLanguages: ["typescript", "kotlin"],
+        difficultyBand: "trigrams",
+        title: "CODE · TypeScript + Kotlin · Trigrams",
+      },
+    });
+  });
 });

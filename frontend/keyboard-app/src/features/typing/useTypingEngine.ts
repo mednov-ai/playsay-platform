@@ -30,7 +30,7 @@ export function useTypingEngine(enabled: boolean) {
 
       if (event.code === "Space" || LAYOUTS[layoutId].byCode[event.code]) {
         event.preventDefault();
-        handleKey(event.code);
+        handleKey(event.code, event.shiftKey);
       }
     };
 

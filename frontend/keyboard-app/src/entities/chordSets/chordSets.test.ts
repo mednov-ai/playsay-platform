@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCombinedCodeChordSet,
+  codeLanguageOptions,
   getLocalChordSets,
   levelTierForDifficulty,
   localChordSets,
@@ -8,12 +10,93 @@ import {
 
 describe("local keyboard chord sets", () => {
   it("mirrors the Liquibase seed ids for anonymous training", () => {
-    expect(localChordSets.map((set) => set.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(localChordSets.map((set) => set.id)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+      13, 14, 15, 16, 17, 18, 19, 20, 21,
+      22, 23, 24, 25, 26, 27, 28, 29, 30,
+      31, 32, 33, 34, 35, 36, 37, 38, 39,
+      40, 41, 42,
+    ]);
   });
 
   it("returns layout-specific sets in difficulty order", () => {
-    expect(getLocalChordSets("EN").map((set) => set.id)).toEqual([1, 2, 3, 4, 9, 10]);
+    expect(getLocalChordSets("EN").map((set) => set.id)).toEqual([
+      1, 2, 3, 4, 9, 10,
+      13, 14, 15, 16, 17, 18, 19, 20, 21,
+      22, 23, 24, 25, 26, 27, 28, 29, 30,
+      31, 32, 33, 34, 35, 36, 37, 38, 39,
+      40, 41, 42,
+    ]);
     expect(getLocalChordSets("RU").map((set) => set.id)).toEqual([5, 6, 7, 8, 11, 12]);
+  });
+
+  it("adds programming language ngram lessons that start from trigrams", () => {
+    const codeSets = getLocalChordSets("EN").filter((set) => set.title.startsWith("CODE · "));
+
+    expect(codeLanguageOptions.map((language) => language.label)).toEqual([
+      "Python",
+      "JavaScript",
+      "TypeScript",
+      "Java",
+      "Kotlin",
+      "C#",
+      "C++",
+      "Swift",
+      "Go",
+    ]);
+    expect(codeSets.map((set) => set.title)).toEqual([
+      "CODE · Python · Trigrams",
+      "CODE · JavaScript · Trigrams",
+      "CODE · TypeScript · Trigrams",
+      "CODE · Java · Trigrams",
+      "CODE · Kotlin · Trigrams",
+      "CODE · C# · Trigrams",
+      "CODE · C++ · Trigrams",
+      "CODE · Swift · Trigrams",
+      "CODE · Go · Trigrams",
+      "CODE · Python · Quadgrams",
+      "CODE · JavaScript · Quadgrams",
+      "CODE · TypeScript · Quadgrams",
+      "CODE · Java · Quadgrams",
+      "CODE · Kotlin · Quadgrams",
+      "CODE · C# · Quadgrams",
+      "CODE · C++ · Quadgrams",
+      "CODE · Swift · Quadgrams",
+      "CODE · Go · Quadgrams",
+      "CODE · Python · Long",
+      "CODE · JavaScript · Long",
+      "CODE · TypeScript · Long",
+      "CODE · Java · Long",
+      "CODE · Kotlin · Long",
+      "CODE · C# · Long",
+      "CODE · C++ · Long",
+      "CODE · Swift · Long",
+      "CODE · Go · Long",
+      "CODE · Mixed · Trigrams",
+      "CODE · Mixed · Quadgrams",
+      "CODE · Mixed · Long",
+    ]);
+    expect(codeSets.every((set) => set.chords.length >= 48)).toBe(true);
+    expect(codeSets.every((set) => set.chords.every((chord) => chord.length >= 3 && chord.length <= 8))).toBe(true);
+    expect(codeSets.some((set) => set.chords.some((chord) => /[{}()[\]#:?+*=><]/.test(chord)))).toBe(true);
+  });
+
+  it("builds deterministic combined programming sets from selected languages", () => {
+    const first = buildCombinedCodeChordSet(["typescript", "kotlin"], "trigrams");
+    const second = buildCombinedCodeChordSet(["kotlin", "typescript"], "trigrams");
+    const typescriptOnly = buildCombinedCodeChordSet(["typescript"], "trigrams");
+
+    expect(first).toMatchObject({
+      id: -2,
+      sourceChordSetId: 40,
+      layout: "EN",
+      title: "CODE · TypeScript + Kotlin · Trigrams",
+      practiceKind: "CODE_COMBO",
+      codeLanguages: ["typescript", "kotlin"],
+    });
+    expect(first.chords).toEqual(second.chords);
+    expect(first.chords).not.toEqual(typescriptOnly.chords);
+    expect(first.chords.some((chord) => /[{}()[\]#:?+*=><]/.test(chord))).toBe(true);
   });
 
   it("maps existing numeric difficulty into four visible level tiers", () => {

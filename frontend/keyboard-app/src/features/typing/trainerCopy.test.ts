@@ -9,6 +9,9 @@ const labels = {
   longFirst: "Длинные сочетания I",
   longSecond: "Длинные сочетания II",
   homeRow: "домашний ряд",
+  codeTrigrams: "Тройки",
+  codeQuadgrams: "Четверки",
+  codeLong: "Длинные",
 };
 
 function set(input: Partial<ChordSet>): ChordSet {
@@ -30,6 +33,18 @@ describe("trainer copy helpers", () => {
     expect(formatChordSetTitle(set({ id: 7, layout: "RU", difficulty: 3, title: "RU · Триграммы" }), labels)).toBe("RU · Тройки букв");
     expect(formatChordSetTitle(set({ id: 10, layout: "EN", difficulty: 6, title: "EN · Длинные II" }), labels)).toBe(
       "EN · Длинные сочетания II",
+    );
+  });
+
+  it("keeps programming language names visible for code ngram lessons", () => {
+    expect(formatChordSetTitle(set({ id: 13, layout: "EN", difficulty: 3, title: "CODE · Python · Trigrams" }), labels)).toBe(
+      "Code · Python · Тройки",
+    );
+    expect(formatChordSetTitle(set({ id: 24, layout: "EN", difficulty: 8, title: "CODE · TypeScript · Quadgrams" }), labels)).toBe(
+      "Code · TypeScript · Четверки",
+    );
+    expect(formatChordSetTitle(set({ id: 36, layout: "EN", difficulty: 9, title: "CODE · C# · Long" }), labels)).toBe(
+      "Code · C# · Длинные",
     );
   });
 

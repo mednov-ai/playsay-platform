@@ -73,6 +73,15 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.result-box[\s\S]*min-height:\s*32px/);
   });
 
+  it("gives focused practice taller keyboard keys so stats cards do not over-expand", () => {
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(176px,\s*1fr\)\s+120px\s+minmax\(264px,\s*auto\)\s+34px/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*48px/,
+    );
+  });
+
   it("uses subtle illuminated cards for the reference-style stats metrics", () => {
     expect(styles).toMatch(/\.stat--metric[\s\S]*position:\s*relative/);
     expect(styles).toContain(".stat--metric::before");

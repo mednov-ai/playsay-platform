@@ -787,6 +787,16 @@ input {
   padding: 1px 0 4px;
 }
 
+.trainer-layout--practice .trainer-surface--dismissed {
+  grid-template-rows: minmax(176px, 1fr) 120px minmax(264px, auto) 34px;
+}
+
+.trainer-layout--practice .trainer-surface--dismissed .virtual-keyboard {
+  --key-height: 48px;
+  min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 8px);
+  padding: 2px 0 6px;
+}
+
 .trainer-surface--dismissed .trainer-footer {
   min-height: 34px;
   align-items: center;

@@ -419,7 +419,7 @@ input {
   min-width: 0;
 }
 
-.code-mode-toggle {
+.advanced-mode-toggle {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -428,26 +428,49 @@ input {
   font-weight: 800;
 }
 
-.code-mode-toggle input {
+.advanced-mode-toggle input {
   accent-color: var(--primary);
 }
 
-.code-practice-panel {
+.advanced-summary-card {
   display: grid;
-  gap: 10px;
-}
-
-.code-practice-panel__header {
-  display: flex;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  padding: 6px 8px;
 }
 
-.code-practice-panel__header strong {
-  color: var(--primary);
+.advanced-summary-card > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.advanced-summary-card span,
+.advanced-summary-card small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.advanced-summary-card strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-summary-card__button {
+  width: auto;
+  min-height: 32px;
+  padding: 0 10px;
 }
 
 .code-language-grid {
@@ -1987,14 +2010,8 @@ input {
   opacity: 0.52;
 }
 
-.virtual-keyboard--programming .virtual-keyboard__shifted {
+.virtual-keyboard--advanced .virtual-keyboard__shifted {
   opacity: 0.72;
-}
-
-.virtual-keyboard--shift-active .virtual-keyboard__base {
-  color: color-mix(in srgb, var(--foreground) 42%, transparent);
-  opacity: 0.58;
-  transform: translateY(5px) scale(0.86);
 }
 
 .virtual-keyboard--shift-active .virtual-keyboard__shifted,
@@ -2003,6 +2020,12 @@ input {
   font-size: 17px;
   opacity: 1;
   transform: translate(-13px, 9px);
+}
+
+.virtual-keyboard--number-row-focus .virtual-keyboard__row:first-child .virtual-keyboard__key:not(.virtual-keyboard__key--special) {
+  border-color: color-mix(in srgb, var(--primary) 44%, var(--key-border));
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .virtual-keyboard__home-pad {
@@ -2135,6 +2158,127 @@ input {
   width: min(760px, calc(100vw - 32px));
   max-height: calc(100dvh - 36px);
   overflow: auto;
+}
+
+.advanced-settings-backdrop {
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 34%),
+    rgb(17 17 17 / 0.36);
+}
+
+.advanced-settings-modal {
+  width: min(620px, 100%);
+  display: grid;
+  gap: 14px;
+  overflow: hidden;
+  animation: advanced-settings-in 0.24s cubic-bezier(0.18, 1.22, 0.28, 1) both;
+}
+
+.advanced-settings-modal__header {
+  display: grid;
+  gap: 5px;
+  padding-right: 30px;
+}
+
+.advanced-settings-modal__header span,
+.advanced-settings-section__header span,
+.number-row-toggle span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.advanced-settings-modal__header h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: clamp(24px, 4vw, 34px);
+  line-height: 1;
+}
+
+.advanced-settings-modal__header strong {
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.advanced-settings-section {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--muted-bg, var(--surface)) 60%, white);
+  padding: 14px;
+}
+
+.advanced-settings-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.advanced-settings-section__header strong {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 14%, white);
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.number-row-card {
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.number-row-card.is-active {
+  border-color: color-mix(in srgb, var(--primary) 44%, var(--line));
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  box-shadow: 0 14px 34px rgb(255 92 0 / 0.12);
+}
+
+.number-row-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+}
+
+.number-row-toggle input {
+  accent-color: var(--primary);
+}
+
+.number-row-preview {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.number-row-preview span {
+  display: inline-grid;
+  place-items: center;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.number-row-preview--shift span {
+  color: color-mix(in srgb, var(--foreground) 44%, transparent);
+  font-size: 12px;
+}
+
+.number-row-card.is-active .number-row-preview--shift span {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--line));
+  color: var(--primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .achievement-celebration {
@@ -2431,6 +2575,18 @@ input {
   }
 }
 
+@keyframes advanced-settings-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes intro-play-pulse {
   0%,
   100% {
@@ -2640,7 +2796,7 @@ input {
 
 @media (max-width: 1100px) {
   .side-panel {
-    grid-template-columns: minmax(150px, 1fr) 116px minmax(210px, 1.4fr) minmax(124px, 0.65fr);
+    grid-template-columns: minmax(130px, 0.9fr) 86px minmax(146px, 0.9fr) minmax(220px, 1.35fr) minmax(118px, 0.7fr);
   }
 
   .progress-summary,
@@ -2655,7 +2811,7 @@ input {
 
 @media (max-width: 1500px) {
   .side-panel {
-    grid-template-columns: minmax(150px, 1fr) 116px minmax(260px, 1.6fr) minmax(124px, 0.65fr);
+    grid-template-columns: minmax(150px, 0.9fr) 96px minmax(154px, 0.9fr) minmax(260px, 1.45fr) minmax(124px, 0.65fr);
   }
 
   .progress-summary,
@@ -2792,7 +2948,7 @@ input {
 
   .progress-summary,
   .weak-fingers {
-    display: grid;
+    display: none;
   }
 
   .progress-profile-button {
@@ -2929,6 +3085,7 @@ input {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .advanced-settings-modal,
   .stat__value--animated {
     animation: none;
   }

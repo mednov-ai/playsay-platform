@@ -193,4 +193,39 @@ describe("keyboard trainer wide frame", () => {
     expect(ru).not.toContain("Готовим поле");
     expect(en).not.toContain("Loading field");
   });
+
+  it("keeps advanced code settings in a modal so the side panel stays compact", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).toContain("showAdvancedSettingsModal");
+    expect(shell).toContain("advanced-settings-modal");
+    expect(shell).toContain("numberRowEnabled");
+    expect(shell).toContain("openAdvancedSettings");
+    expect(shell).not.toContain("code-practice-panel");
+    expect(styles).toContain(".advanced-settings-modal");
+    expect(styles).toContain(".advanced-summary-card");
+    expect(styles).not.toContain(".code-practice-panel");
+  });
+
+  it("locks advanced settings for the whole exercise result flow", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).toContain('sessionFlow.phase === "finished"');
+    expect(shell).toContain("advancedSettingsLocked");
+    expect(shell).toContain("disabled={advancedSettingsLocked}");
+  });
+
+  it("renames the visible programming toggle to the advanced mode in all locales", () => {
+    const ru = readFileSync(resolve(__dirname, "shared/i18n/resources/ru.ts"), "utf8");
+    const en = readFileSync(resolve(__dirname, "shared/i18n/resources/en.ts"), "utf8");
+    const de = readFileSync(resolve(__dirname, "shared/i18n/resources/de.ts"), "utf8");
+    const fr = readFileSync(resolve(__dirname, "shared/i18n/resources/fr.ts"), "utf8");
+
+    expect(ru).toContain('advancedPractice: "Продвинутый режим"');
+    expect(en).toContain('advancedPractice: "Advanced mode"');
+    expect(de).toContain('advancedPractice: "Erweiterter Modus"');
+    expect(fr).toContain('advancedPractice: "Mode avancé"');
+    expect(ru).not.toContain('codePractice: "Программирование"');
+    expect(en).not.toContain('codePractice: "Programming"');
+  });
 });

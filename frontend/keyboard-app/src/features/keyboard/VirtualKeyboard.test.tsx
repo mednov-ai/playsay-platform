@@ -31,13 +31,13 @@ describe("VirtualKeyboard", () => {
     expect(markup).not.toContain('data-home-char="h"');
   });
 
-  it("renders a subdued programming symbol layer and brightens it while Shift is held", () => {
+  it("renders a subdued advanced symbol layer and brightens it while Shift is held", () => {
     const idleMarkup = renderToStaticMarkup(createElement(VirtualKeyboard, {
       labels,
       layoutId: "EN",
       nextChar: "{",
       nextRequiresShift: true,
-      programmingMode: true,
+      advancedMode: true,
       shiftActive: false,
     }));
     const shiftedMarkup = renderToStaticMarkup(createElement(VirtualKeyboard, {
@@ -45,15 +45,29 @@ describe("VirtualKeyboard", () => {
       layoutId: "EN",
       nextChar: "{",
       nextRequiresShift: true,
-      programmingMode: true,
+      advancedMode: true,
       shiftActive: true,
     }));
 
-    expect(idleMarkup).toContain("virtual-keyboard--programming");
+    expect(idleMarkup).toContain("virtual-keyboard--advanced");
     expect(idleMarkup).toContain("virtual-keyboard__shifted");
     expect(idleMarkup).toContain("{");
     expect(idleMarkup).toContain("is-shift-target");
     expect(shiftedMarkup).toContain("virtual-keyboard--shift-active");
     expect(shiftedMarkup).toContain("virtual-keyboard__key--shift");
+  });
+
+  it("keeps letter keys readable instead of duplicating uppercase letters in the advanced Shift layer", () => {
+    const markup = renderToStaticMarkup(createElement(VirtualKeyboard, {
+      labels,
+      layoutId: "EN",
+      nextChar: "{",
+      nextRequiresShift: true,
+      advancedMode: true,
+      shiftActive: true,
+    }));
+
+    expect(markup).toContain('<span class="virtual-keyboard__shifted">{</span>');
+    expect(markup).not.toMatch(/<span class="virtual-keyboard__shifted">[A-Z]<\/span>/);
   });
 });

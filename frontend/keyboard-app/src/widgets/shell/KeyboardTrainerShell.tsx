@@ -331,7 +331,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [anonymousDeviceId, setAnonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const ownerKey = practiceOwnerKey({ subject: me?.subject, anonymousDeviceId });
   const [layoutId, setLayoutId] = useState<LayoutId>(() => readPracticeState(ownerKey)?.layoutId ?? "EN");
-  const [codePracticeEnabled, setCodePracticeEnabled] = useState(false);
+  const [advancedPracticeEnabled, setAdvancedPracticeEnabled] = useState(false);
+  const [showAdvancedSettingsModal, setShowAdvancedSettingsModal] = useState(false);
+  const [numberRowEnabled, setNumberRowEnabled] = useState(false);
   const [selectedCodeLanguages, setSelectedCodeLanguages] = useState<CodeLanguageId[]>(["python"]);
   const [codeDifficultyBand, setCodeDifficultyBand] = useState<CodeDifficultyBand>("trigrams");
   const [shiftActive, setShiftActive] = useState(false);
@@ -486,7 +488,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     }
   }, [layoutId, ownerKey, sessionFlow.phase]);
 
-  const programmingMode = codePracticeEnabled && layoutId === "EN";
+  const advancedMode = advancedPracticeEnabled && layoutId === "EN";
   const codePracticeSet = useMemo(
     () => buildCombinedCodeChordSet(selectedCodeLanguages, codeDifficultyBand),
     [codeDifficultyBand, selectedCodeLanguages],
@@ -510,7 +512,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     const loadedSets = getLocalChordSets(layoutId);
     const persistedPracticeState = readPracticeState(ownerKey);
     const persistedSet = resolvePersistedPracticeSet(persistedPracticeState, loadedSets);
-    const restoredSet = programmingMode
+    const restoredSet = advancedMode
       ? codePracticeSet
       : persistedSet?.practiceKind === "CODE" || persistedSet?.practiceKind === "CODE_COMBO"
         ? undefined
@@ -564,7 +566,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     return () => {
       cancelled = true;
     };
-  }, [anonymousDeviceId, codePracticeSet, isAuthenticated, layoutId, loadSet, ownerKey, profileSeed, programmingMode, t]);
+  }, [advancedMode, anonymousDeviceId, codePracticeSet, isAuthenticated, layoutId, loadSet, ownerKey, profileSeed, t]);
 
   useEffect(() => {
     if (!shouldReloadActiveSetForLayout({ layoutId, chordSet, phase: sessionFlow.phase })) {
@@ -905,7 +907,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     sessionFlow.phase === "countdown" ||
     sessionFlow.phase === "running" ||
     sessionFlow.phase === "paused" ||
+    sessionFlow.phase === "finished" ||
     sessionFlow.finishOverlayVisible;
+  const advancedSettingsLocked = isSessionLocked;
   const canStartSession = Boolean((chordSet ?? sets[0]) && (sessionFlow.phase === "idle" || sessionFlow.phase === "finished"));
   const canResumeSession = sessionFlow.phase === "paused";
 
@@ -956,9 +960,13 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   };
 
   const changeTrainingLayout = (nextLayoutId: LayoutId) => {
+    if (advancedSettingsLocked) {
+      return;
+    }
     setLayoutId(nextLayoutId);
     if (nextLayoutId !== "EN") {
-      setCodePracticeEnabled(false);
+      setAdvancedPracticeEnabled(false);
+      setShowAdvancedSettingsModal(false);
     }
     updatePracticeState(ownerKey, (current) => ({
       ownerKey,
@@ -967,8 +975,19 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     }));
   };
 
-  const changeCodePracticeEnabled = (enabled: boolean) => {
-    setCodePracticeEnabled(enabled);
+  const openAdvancedSettings = () => {
+    if (!advancedPracticeEnabled || advancedSettingsLocked) {
+      return;
+    }
+    setShowAdvancedSettingsModal(true);
+  };
+
+  const changeAdvancedPracticeEnabled = (enabled: boolean) => {
+    if (advancedSettingsLocked) {
+      return;
+    }
+    setAdvancedPracticeEnabled(enabled);
+    setShowAdvancedSettingsModal(enabled);
     if (enabled && layoutId !== "EN") {
       setLayoutId("EN");
       updatePracticeState(ownerKey, (current) => ({
@@ -980,6 +999,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   };
 
   const toggleCodeLanguage = (languageId: CodeLanguageId) => {
+    if (advancedSettingsLocked) {
+      return;
+    }
     setSelectedCodeLanguages((current) => {
       if (current.includes(languageId)) {
         return current.length === 1 ? current : current.filter((language) => language !== languageId);
@@ -991,7 +1013,17 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   };
 
   const changeCodeDifficultyBand = (difficultyBand: CodeDifficultyBand) => {
+    if (advancedSettingsLocked) {
+      return;
+    }
     setCodeDifficultyBand(difficultyBand);
+  };
+
+  const changeNumberRowEnabled = (enabled: boolean) => {
+    if (advancedSettingsLocked) {
+      return;
+    }
+    setNumberRowEnabled(enabled);
   };
 
   const clearSessionResult = useCallback(() => {
@@ -1021,6 +1053,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, []);
 
   const selectSet = (setId: string) => {
+    if (advancedSettingsLocked) {
+      return;
+    }
     const nextSet = sets.find((set) => set.id === Number(setId));
     if (nextSet) {
       setNextDecision(null);
@@ -1047,6 +1082,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     clearSessionResult();
     setShowNamePrompt(false);
     setShowRegistrationPrompt(false);
+    setShowAdvancedSettingsModal(false);
 
     if (sessionFlow.phase === "finished") {
       setRestartVariant(0);
@@ -1229,6 +1265,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       if (event.code === "Escape") {
         event.preventDefault();
         event.stopPropagation();
+        if (showAdvancedSettingsModal && !advancedSettingsLocked) {
+          setShowAdvancedSettingsModal(false);
+          return;
+        }
         const action = escapeActionForTrainerState({
           showNamePrompt,
           showProfileModal,
@@ -1292,6 +1332,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [
+    advancedSettingsLocked,
     canResumeSession,
     canStartSession,
     cancelCountdown,
@@ -1303,6 +1344,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     resumeSession,
     sessionFlow.finishOverlayVisible,
     sessionFlow.phase,
+    showAdvancedSettingsModal,
     showNamePrompt,
     showProfileModal,
     showRegistrationPrompt,
@@ -1347,6 +1389,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     renderCountdownOverlay ||
     renderPausedOverlay ||
     sessionFlow.phase === "running" ||
+    showAdvancedSettingsModal ||
     showNamePrompt ||
     showRegistrationPrompt ||
     showProfileModal;
@@ -1355,7 +1398,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     hasNamePrompt: showNamePrompt,
     hasRegistrationPrompt: showRegistrationPrompt,
     hasCelebration: activeGamificationEvents.length > 0 && !celebrationPaused,
-    profileOpen: showProfileModal,
+    profileOpen: showProfileModal || showAdvancedSettingsModal,
   });
   const canShowDeferredPrompt = shouldShowDeferredPrompt({
     sessionPhase: sessionFlow.phase,
@@ -1364,6 +1407,18 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   });
   const trainerLayoutClassName = `trainer-layout ${trainerIntroPhase !== "dismissed" ? "trainer-layout--intro" : ""} ${practiceFocusMode ? "trainer-layout--practice" : ""}`;
   const trainerSurfaceClassName = `trainer-surface trainer-surface--${trainerIntroPhase}`;
+  const selectedCodeLanguageLabels = codeLanguageOptions
+    .filter((language) => selectedCodeLanguages.includes(language.id))
+    .map((language) => language.label);
+  const advancedLanguageSummary = selectedCodeLanguageLabels.join(" + ");
+  const advancedDifficultyLabel = t(`trainer.codeDifficulty_${codeDifficultyBand}`);
+  const advancedSummary = `${advancedLanguageSummary} · ${advancedDifficultyLabel}`;
+
+  useEffect(() => {
+    if (advancedSettingsLocked && showAdvancedSettingsModal) {
+      setShowAdvancedSettingsModal(false);
+    }
+  }, [advancedSettingsLocked, showAdvancedSettingsModal]);
 
   useEffect(() => {
     if (!canShowDeferredPrompt) {
@@ -1444,7 +1499,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
           <label className="field">
             <span>{t("trainer.layout")}</span>
-            <select value={layoutId} onChange={(event) => changeTrainingLayout(event.target.value as LayoutId)} disabled={isSessionLocked}>
+            <select value={layoutId} onChange={(event) => changeTrainingLayout(event.target.value as LayoutId)} disabled={advancedSettingsLocked}>
               {layouts.map((layout) => (
                 <option key={layout} value={layout}>
                   {layout}
@@ -1453,53 +1508,34 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </select>
           </label>
 
-          <label className="code-mode-toggle">
+          <label className="advanced-mode-toggle">
             <input
               type="checkbox"
-              checked={codePracticeEnabled}
-              onChange={(event) => changeCodePracticeEnabled(event.target.checked)}
-              disabled={isSessionLocked}
+              checked={advancedPracticeEnabled}
+              onChange={(event) => changeAdvancedPracticeEnabled(event.target.checked)}
+              disabled={advancedSettingsLocked}
             />
-            <span>{t("trainer.codePractice")}</span>
+            <span>{t("trainer.advancedPractice")}</span>
           </label>
 
-          {programmingMode ? (
-            <div className="code-practice-panel" aria-label={t("trainer.codePractice")}>
-              <div className="code-practice-panel__header">
-                <span>{t("trainer.codeLanguages")}</span>
-                <strong>{selectedCodeLanguages.length}</strong>
+          {advancedMode ? (
+            <div className="advanced-summary-card" aria-label={t("trainer.advancedSummary")}>
+              <div>
+                <span>{t("trainer.codePractice")}</span>
+                <strong>{advancedSummary}</strong>
+                {numberRowEnabled ? <small>{t("trainer.numberRowEnabled")}</small> : null}
               </div>
-              <div className="code-language-grid">
-                {codeLanguageOptions.map((language) => {
-                  const active = selectedCodeLanguages.includes(language.id);
-                  return (
-                    <button
-                      key={language.id}
-                      type="button"
-                      className={`code-language-chip ${active ? "is-active" : ""}`}
-                      onClick={() => toggleCodeLanguage(language.id)}
-                      disabled={isSessionLocked}
-                      aria-pressed={active}
-                    >
-                      {language.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <label className="field code-difficulty-field">
-                <span>{t("trainer.codeDifficulty")}</span>
-                <select
-                  value={codeDifficultyBand}
-                  onChange={(event) => changeCodeDifficultyBand(event.target.value as CodeDifficultyBand)}
-                  disabled={isSessionLocked}
-                >
-                  {codeDifficultyBands.map((band) => (
-                    <option key={band.id} value={band.id}>
-                      {t(`trainer.codeDifficulty_${band.id}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <button
+                type="button"
+                className="secondary-button advanced-summary-card__button"
+                onClick={openAdvancedSettings}
+                disabled={advancedSettingsLocked}
+                aria-label={t("trainer.advancedConfigure")}
+                title={t("trainer.advancedConfigure")}
+              >
+                <Pencil size={16} aria-hidden="true" />
+                <span>{t("trainer.advancedConfigure")}</span>
+              </button>
             </div>
           ) : (
             <label className="field field--set">
@@ -1507,10 +1543,10 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               <select
                 value={chordSet && chordSet.id > 0 ? String(chordSet.id) : ""}
                 onChange={(event) => selectSet(event.target.value)}
-                disabled={sets.length === 0 || isSessionLocked}
+                disabled={sets.length === 0 || advancedSettingsLocked}
               >
                 {sets
-                  .filter((set) => set.practiceKind !== "CODE")
+                  .filter((set) => set.practiceKind !== "CODE" && set.practiceKind !== "CODE_COMBO")
                   .map((set) => (
                     <option key={set.id} value={set.id}>
                       {formatTrainingSetTitle(set)}
@@ -1684,7 +1720,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             layoutId={layoutId}
             nextChar={nextChar}
             nextRequiresShift={nextRequiresShift}
-            programmingMode={programmingMode}
+            advancedMode={advancedMode}
+            numberRowActive={advancedMode && numberRowEnabled}
             shiftActive={shiftActive}
           />
 
@@ -1860,6 +1897,86 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         paused={celebrationPaused}
         onDismiss={(eventId) => setDismissedGamificationEventIds((current) => [...current, eventId])}
       />
+
+      {showAdvancedSettingsModal ? (
+        <div className="modal-backdrop advanced-settings-backdrop" role="presentation">
+          <section className="registration-modal advanced-settings-modal" role="dialog" aria-modal="true" aria-labelledby="advanced-settings-title">
+            <button
+              type="button"
+              className="icon-button registration-modal__close"
+              onClick={() => setShowAdvancedSettingsModal(false)}
+              aria-label={t("trainer.advancedClose")}
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+            <div className="advanced-settings-modal__header">
+              <span>{t("trainer.advancedPractice")}</span>
+              <h2 id="advanced-settings-title">{t("trainer.advancedSettings")}</h2>
+              <strong>{advancedSummary}</strong>
+            </div>
+
+            <section className="advanced-settings-section" aria-label={t("trainer.codePractice")}>
+              <div className="advanced-settings-section__header">
+                <span>{t("trainer.codePractice")}</span>
+                <strong>{selectedCodeLanguages.length}</strong>
+              </div>
+              <div className="code-language-grid">
+                {codeLanguageOptions.map((language) => {
+                  const active = selectedCodeLanguages.includes(language.id);
+                  return (
+                    <button
+                      key={language.id}
+                      type="button"
+                      className={`code-language-chip ${active ? "is-active" : ""}`}
+                      onClick={() => toggleCodeLanguage(language.id)}
+                      disabled={advancedSettingsLocked}
+                      aria-pressed={active}
+                    >
+                      {language.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <label className="field code-difficulty-field">
+                <span>{t("trainer.codeDifficulty")}</span>
+                <select
+                  value={codeDifficultyBand}
+                  onChange={(event) => changeCodeDifficultyBand(event.target.value as CodeDifficultyBand)}
+                  disabled={advancedSettingsLocked}
+                >
+                  {codeDifficultyBands.map((band) => (
+                    <option key={band.id} value={band.id}>
+                      {t(`trainer.codeDifficulty_${band.id}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+
+            <section className={`advanced-settings-section number-row-card ${numberRowEnabled ? "is-active" : ""}`} aria-label={t("trainer.numberRow")}>
+              <label className="number-row-toggle">
+                <input
+                  type="checkbox"
+                  checked={numberRowEnabled}
+                  onChange={(event) => changeNumberRowEnabled(event.target.checked)}
+                  disabled={advancedSettingsLocked}
+                />
+                <span>{t("trainer.numberRow")}</span>
+              </label>
+              <div className="number-row-preview" aria-hidden="true">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
+                  <span key={digit}>{digit}</span>
+                ))}
+              </div>
+              <div className="number-row-preview number-row-preview--shift" aria-hidden="true">
+                {["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"].map((symbol) => (
+                  <span key={symbol}>{symbol}</span>
+                ))}
+              </div>
+            </section>
+          </section>
+        </div>
+      ) : null}
 
       {showNamePrompt ? (
         <div className="modal-backdrop" role="presentation">

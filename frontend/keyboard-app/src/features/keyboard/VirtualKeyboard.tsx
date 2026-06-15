@@ -112,7 +112,8 @@ interface Props {
   layoutId: LayoutId;
   nextChar: string | null;
   nextRequiresShift?: boolean;
-  programmingMode?: boolean;
+  advancedMode?: boolean;
+  numberRowActive?: boolean;
   shiftActive?: boolean;
 }
 
@@ -121,13 +122,14 @@ export function VirtualKeyboard({
   layoutId,
   nextChar,
   nextRequiresShift = false,
-  programmingMode = false,
+  advancedMode = false,
+  numberRowActive = false,
   shiftActive = false,
 }: Props) {
-  const showShiftLayer = programmingMode || shiftActive || nextRequiresShift;
+  const showShiftLayer = advancedMode || shiftActive || nextRequiresShift;
   return (
     <div
-      className={`virtual-keyboard ${programmingMode ? "virtual-keyboard--programming" : ""} ${shiftActive ? "virtual-keyboard--shift-active" : ""} ${nextRequiresShift ? "virtual-keyboard--shift-target" : ""}`}
+      className={`virtual-keyboard ${advancedMode ? "virtual-keyboard--advanced" : ""} ${numberRowActive ? "virtual-keyboard--number-row-focus" : ""} ${shiftActive ? "virtual-keyboard--shift-active" : ""} ${nextRequiresShift ? "virtual-keyboard--shift-target" : ""}`}
       aria-hidden="true"
     >
       {rows.map((row, rowIndex) => (
@@ -158,6 +160,7 @@ export function VirtualKeyboard({
             const active = nextChar != null && (char === nextChar || shiftedChar === nextChar);
             const shiftTarget = nextRequiresShift && shiftedChar === nextChar;
             const homeKey = homeKeyChars.has(key.en);
+            const renderShiftedLabel = showShiftLayer && shiftedChar && shouldRenderShiftedLabel(shiftedChar);
             return (
               <div
                 key={`${rowIndex}-${keyIndex}`}
@@ -167,7 +170,7 @@ export function VirtualKeyboard({
                 style={style}
               >
                 <span className="virtual-keyboard__base">{formatKeyLabel(char)}</span>
-                {showShiftLayer && shiftedChar ? (
+                {renderShiftedLabel ? (
                   <span className="virtual-keyboard__shifted">{formatKeyLabel(shiftedChar)}</span>
                 ) : null}
                 {homeKey ? <span className="virtual-keyboard__home-pad" aria-hidden="true" /> : null}
@@ -182,4 +185,8 @@ export function VirtualKeyboard({
 
 function formatKeyLabel(char: string): string {
   return /\p{L}/u.test(char) ? char.toUpperCase() : char;
+}
+
+function shouldRenderShiftedLabel(shiftedChar: string): boolean {
+  return !/\p{L}/u.test(shiftedChar);
 }

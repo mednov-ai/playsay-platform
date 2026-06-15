@@ -73,7 +73,7 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.result-box[\s\S]*min-height:\s*32px/);
   });
 
-  it("gives focused practice taller keyboard keys so stats cards do not over-expand", () => {
+  it("gives focused practice taller keyboard keys and keeps metric digits height-linked", () => {
     expect(styles).toMatch(
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(172px,\s*1fr\)\s+180px\s+minmax\(242px,\s*auto\)\s+34px/,
     );
@@ -87,10 +87,13 @@ describe("keyboard trainer wide frame", () => {
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*70px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat[\s\S]*--stat-number-size:\s*clamp\(44px,\s*6\.4vh,\s*60px\)/,
+      /\.stat--metric[\s\S]*container-type:\s*size/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat[\s\S]*--stat-value-scale-y:\s*1\.14/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat[\s\S]*--stat-number-size:\s*clamp\(42px,\s*57cqh,\s*86px\)/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat[\s\S]*--stat-value-scale-y:\s*1\.28/,
     );
     expect(styles).toMatch(
       /\.stat__value-line[\s\S]*transform:\s*scale\(var\(--stat-value-scale-x\),\s*var\(--stat-value-scale-y\)\)/,

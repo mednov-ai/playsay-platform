@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Roboto+Flex:GRAD,opsz,wdth,wght@-200..150,8..144,25..151,100..1000&display=swap");
 
 :root {
   font-family: "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -435,7 +435,9 @@ input {
 .account-strip span,
 .trainer-toolbar span,
 .metric span,
-.stat span {
+.stats-panel__set-copy > span,
+.stats-panel__mastery-copy > span,
+.stat > span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -724,10 +726,10 @@ input {
   display: grid;
   position: relative;
   width: min(100%, var(--trainer-frame-width));
-  grid-template-rows: auto auto 128px auto auto;
+  grid-template-rows: auto minmax(132px, 1fr) auto auto;
   justify-items: center;
   justify-self: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -741,6 +743,88 @@ input {
 
 .trainer-layout--practice {
   grid-template-rows: minmax(0, 1fr);
+}
+
+.trainer-surface--dismissed {
+  grid-template-rows: minmax(188px, 1fr) 120px minmax(198px, auto) 34px;
+}
+
+.trainer-surface--dismissed .stats-panel {
+  gap: 5px;
+  padding: 6px 10px;
+}
+
+.trainer-surface--dismissed .stats-panel__set-card,
+.trainer-surface--dismissed .stats-panel__mastery-card,
+.trainer-surface--dismissed .stats-panel__actions-card {
+  min-height: 58px;
+}
+
+.trainer-surface--dismissed .stat--metric {
+  min-height: 72px;
+  padding: 7px 8px 6px;
+}
+
+.trainer-surface--dismissed .stats-panel--practice .stat {
+  --stat-number-size: clamp(58px, 8.8vh, 84px);
+  --stat-suffix-size: clamp(34px, 5vh, 50px);
+  --stat-unit-suffix-size: clamp(15px, 2vh, 20px);
+}
+
+.trainer-surface--dismissed .typing-stage {
+  height: 120px;
+}
+
+.trainer-surface--dismissed .typing-strip {
+  min-height: 112px;
+  padding: 8px 18px;
+  font-size: 32px;
+}
+
+.trainer-surface--dismissed .virtual-keyboard {
+  --key-height: 39px;
+  min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 4px);
+  padding: 1px 0 4px;
+}
+
+.trainer-surface--dismissed .trainer-footer {
+  min-height: 34px;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 2px;
+  font-size: 13px;
+}
+
+.trainer-surface--dismissed .metronome {
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.trainer-surface--dismissed .metronome .icon-text-button {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.trainer-surface--dismissed .metronome__slider {
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.trainer-surface--dismissed .metronome__slider input {
+  width: 126px;
+  min-height: 0;
+  padding: 0;
+}
+
+.trainer-surface--dismissed .metronome__slider strong {
+  min-width: 66px;
+}
+
+.trainer-surface--dismissed .result-box {
+  min-height: 32px;
+  font-size: 13px;
 }
 
 .trainer-surface--visible {
@@ -988,54 +1072,322 @@ input {
 
 .stats-panel {
   display: grid;
-  gap: 5px;
-  border: 1px solid var(--line);
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--line));
   border-radius: 12px;
-  background: var(--surface-strong);
-  padding: 6px 10px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface-strong) 90%, transparent)),
+    var(--surface);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.74),
+    0 12px 26px rgb(17 17 17 / 0.04);
+  padding: 8px 10px 9px;
 }
 
 .stats-panel--practice {
   width: 100%;
   border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent 42%),
-    var(--surface-strong);
-  padding: 10px 12px;
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 7%, transparent), transparent 36%),
+    var(--surface);
+  grid-template-rows: minmax(62px, auto) minmax(112px, 1fr) auto;
+  height: 100%;
+  padding: 8px 10px 9px;
 }
 
-.stats-panel__grid {
+.stats-panel__top {
   display: grid;
-  grid-template-columns: repeat(5, minmax(104px, 1fr));
-  gap: 6px;
+  grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.38fr) minmax(150px, auto);
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stats-panel__top .stats-panel__mastery-card {
+  width: 100%;
+}
+
+.stats-panel__set-card,
+.stats-panel__mastery-card,
+.stats-panel__actions-card {
+  min-height: 64px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--line));
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.96), color-mix(in srgb, var(--surface) 94%, var(--line))),
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.86),
+    0 8px 18px rgb(17 17 17 / 0.025);
+}
+
+.stats-panel__set-card,
+.stats-panel__mastery-card {
+  display: grid;
+  --stat-number-size: clamp(30px, 2.8vw, 40px);
+  --stat-unit-suffix-size: clamp(13px, 1.05vw, 16px);
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 6px 8px;
+}
+
+.stats-panel__set-icon,
+.stats-panel__mastery-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--line));
+  border-radius: 10px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--primary) 8%, var(--surface-strong))),
+    var(--surface);
+  color: var(--primary);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.74),
+    0 10px 20px rgb(255 92 0 / 0.08);
+}
+
+.stats-panel__set-copy {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  min-width: 0;
+}
+
+.stats-panel__set-copy h1 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 20px;
+  line-height: 1.08;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-panel__actions-card {
+  display: grid;
+  place-items: center;
+  padding: 6px 8px;
+}
+
+.stats-panel__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stats-panel__mastery-copy {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stats-panel__mastery-copy strong {
+  display: flex;
+  align-items: baseline;
+  gap: 0.34em;
+  line-height: 1;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-panel__mastery-value-line {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: "Roboto Flex", "Arial Narrow", "Manrope", system-ui, sans-serif;
+  font-stretch: 62%;
+  font-variation-settings: "wdth" 45, "opsz" 96, "GRAD" -80;
+  transform: scaleX(0.86);
+  transform-origin: left bottom;
+  white-space: nowrap;
+}
+
+.stats-panel__mastery-number {
+  background: linear-gradient(180deg, #ff9a70 0%, #ef5a19 48%, #dd4808 100%);
+  color: var(--primary);
+  font-size: clamp(28px, 2.9vw, 42px);
+  font-weight: 640;
+  line-height: 0.9;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.stats-panel__mastery-unit {
+  padding-bottom: 0.18em;
+}
+
+.stats-panel__mastery-divider {
+  color: var(--primary);
+  font-size: clamp(20px, 1.9vw, 28px);
+  font-weight: 760;
+}
+
+.stats-panel__mastery-level {
+  color: var(--primary);
+  font-size: clamp(22px, 2.05vw, 30px);
+  font-weight: 850;
+}
+
+.stats-panel__metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(108px, 1fr));
+  gap: 8px;
+  align-items: stretch;
 }
 
 .stat {
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .stat strong {
-  font-size: 17px;
   font-variant-numeric: tabular-nums;
 }
 
-.stats-panel--practice .stat {
-  min-height: 58px;
-  align-content: center;
+.stat--metric {
+  position: relative;
+  isolation: isolate;
+  --stat-number-size: clamp(36px, 3.45vw, 54px);
+  --stat-suffix-size: clamp(22px, 2.1vw, 32px);
+  --stat-unit-suffix-size: clamp(12px, 1vw, 15px);
+  --stat-value-scale-x: 0.78;
+  --stat-value-slot: 8.2ch;
+  min-height: 84px;
+  align-content: stretch;
+  justify-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line));
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.98), color-mix(in srgb, var(--surface) 94%, var(--line))),
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.92),
+    inset 0 -22px 34px rgb(255 92 0 / 0.018),
+    0 1px 2px rgb(17 17 17 / 0.025),
+    0 10px 22px rgb(17 17 17 / 0.025);
+  padding: 9px 9px 8px;
+  text-align: center;
 }
 
-.stats-panel--practice .stat strong {
-  font-size: clamp(22px, 2.2vw, 34px);
+.stat--metric::before {
+  position: absolute;
+  inset: 22% 12% 10%;
+  z-index: -1;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgb(255 92 0 / 0.11), rgb(255 92 0 / 0.035) 36%, transparent 70%);
+  content: "";
+  filter: blur(8px);
+  opacity: 0.82;
+}
+
+.stat--metric::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.72), transparent 38%),
+    linear-gradient(90deg, transparent, rgb(255 92 0 / 0.035), transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.stat--metric > span,
+.stat--metric strong {
+  position: relative;
+  z-index: 1;
+}
+
+.stat--metric strong {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  align-self: stretch;
+  gap: 3px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
   line-height: 1;
 }
 
-.stats-panel--practice .stat:first-child {
-  grid-column: span 2;
+.stat__value-line {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  align-self: center;
+  width: var(--stat-value-slot);
+  min-width: 0;
+  font-family: "Roboto Flex", "Arial Narrow", "Manrope", system-ui, sans-serif;
+  font-stretch: 62%;
+  font-variation-settings: "wdth" 45, "opsz" 96, "GRAD" -80;
+  transform: scaleX(var(--stat-value-scale-x));
+  transform-origin: center bottom;
+  white-space: nowrap;
 }
 
-.stats-panel--practice .stat:first-child strong {
-  font-size: clamp(24px, 2.4vw, 38px);
+.stat__number {
+  display: inline-block;
+  background: linear-gradient(180deg, #ff9a70 0%, #ef5a19 48%, #dd4808 100%);
+  color: var(--primary);
+  font-size: var(--stat-number-size);
+  font-weight: 640;
+  letter-spacing: 0;
+  line-height: 0.88;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter:
+    drop-shadow(0 1px 0 rgb(255 255 255 / 0.76))
+    drop-shadow(0 6px 12px rgb(255 92 0 / 0.1));
+}
+
+.stat__suffix {
+  display: inline-block;
+  margin-left: 0.08em;
+  background: linear-gradient(180deg, #ff9a70 0%, #ef5a19 50%, #dd4808 100%);
+  color: var(--primary);
+  font-size: var(--stat-suffix-size);
+  font-weight: 640;
+  line-height: 0.92;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 3px 6px rgb(255 92 0 / 0.08));
+}
+
+.stat__suffix--unit {
+  margin-left: 0.28em;
+  padding-bottom: 0.14em;
+  font-size: var(--stat-unit-suffix-size);
+  font-weight: 720;
+  line-height: 1.05;
+}
+
+.stats-panel--practice .stat {
+  --stat-number-size: clamp(74px, 10.8vh, 104px);
+  --stat-suffix-size: clamp(40px, 5.8vh, 58px);
+  --stat-unit-suffix-size: clamp(17px, 2.25vh, 23px);
+  --stat-value-scale-x: 0.72;
+  min-height: 84px;
+}
+
+.stats-panel--practice .stat__number {
+  font-size: var(--stat-number-size);
+}
+
+.stats-panel--practice .stat__suffix {
+  font-size: var(--stat-suffix-size);
+}
+
+.stats-panel--practice .stat__suffix--unit {
+  font-size: var(--stat-unit-suffix-size);
 }
 
 .stat__value--accent {
@@ -1046,8 +1398,15 @@ input {
   animation: stat-value-pop 0.28s ease-out both;
 }
 
+.stats-panel__progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
 .stats-panel__bar {
-  height: 8px;
+  height: 7px;
   overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--line) 70%, var(--surface));
@@ -1059,6 +1418,13 @@ input {
   border-radius: inherit;
   background: var(--primary);
   transition: width 0.15s ease;
+}
+
+.stats-panel__bar-value {
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
 }
 
 .typing-stage {
@@ -1433,7 +1799,6 @@ input {
   padding: 2px 0 8px;
 }
 
-.trainer-toolbar,
 .stats-panel,
 .typing-stage,
 .virtual-keyboard,
@@ -2107,11 +2472,7 @@ input {
     display: none;
   }
 
-  .stats-panel__grid {
-    grid-template-columns: repeat(3, minmax(104px, 1fr));
-  }
-
-  .stats-panel--practice .stats-panel__grid {
+  .stats-panel__metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
@@ -2176,17 +2537,43 @@ input {
     width: 100%;
   }
 
-  .stats-panel__grid,
+  .stats-panel__metrics,
   .progress-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .stats-panel--practice .stats-panel__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .stats-panel__top {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
-  .stats-panel--practice .stat:first-child {
-    grid-column: 1 / -1;
+  .stats-panel__set-copy h1 {
+    white-space: normal;
+  }
+
+  .stats-panel__actions {
+    justify-content: stretch;
+  }
+
+  .stats-panel__actions .session-play-button,
+  .stats-panel__actions .secondary-button {
+    flex: 1 1 120px;
+  }
+
+  .stats-panel__set-card,
+  .stats-panel__mastery-card {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    justify-items: start;
+    min-height: 0;
+  }
+
+  .stats-panel__actions-card {
+    min-height: 0;
+  }
+
+  .stats-panel__mastery-copy strong {
+    text-align: left;
   }
 
   .gamification-panel__grid,

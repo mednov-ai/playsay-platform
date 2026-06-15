@@ -18,6 +18,7 @@ describe("StatsPanel", () => {
         units: {
           cpm: "зн/мин",
           percent: "%",
+          errors: "раз",
         },
         masteryCpm: 252,
         masteryLevel: "Средний",
@@ -30,7 +31,70 @@ describe("StatsPanel", () => {
     );
 
     expect(markup.indexOf("Мастерство")).toBeLessThan(markup.indexOf("Скорость"));
-    expect(markup).toContain("252 зн/мин · Средний");
+    expect(markup).toContain('class="stats-panel__mastery-card');
+    expect(markup).toContain('class="stats-panel__mastery-icon');
+    expect(markup).toContain('class="stats-panel__mastery-value-line');
+    expect(markup).toContain('class="stats-panel__mastery-level"');
+    expect(markup).toContain('class="stats-panel__metrics');
+    expect(markup).toContain('class="stat__number');
+    expect(markup).toContain('class="stat__suffix');
+    expect(markup).not.toContain('class="stat__unit-line');
+    expect(markup).toContain('class="stats-panel__bar-value"');
+    expect(markup.match(/<span class="stat__number/g)?.length).toBe(6);
+    expect(markup.match(/<span class="stat__suffix/g)?.length).toBe(6);
+    expect(markup.match(/stat__suffix--unit/g)?.length).toBe(3);
+    expect(markup).toContain(">зн/мин</span>");
+    expect(markup).toContain(">раз</span>");
+    expect(markup).toContain('<span class="stats-panel__bar-value">42%</span>');
+    expect(markup).toContain('aria-label="252 зн/мин · Средний"');
+    expect(markup).toContain('aria-label="210 зн/мин"');
+    expect(markup).toContain('aria-label="96%"');
+    expect(markup).toContain('aria-label="1 раз"');
+    expect(markup).toContain('aria-label="42%"');
+  });
+
+  it("can merge the current set header into the stats module", () => {
+    const markup = renderToStaticMarkup(
+      createElement(StatsPanel, {
+        labels: {
+          mastery: "Мастерство",
+          speed: "Скорость",
+          accuracy: "Точность",
+          cadence: "Ритм",
+          errors: "Ошибки",
+          progress: "Прогресс",
+        },
+        units: {
+          cpm: "зн/мин",
+          percent: "%",
+          errors: "раз",
+        },
+        currentLabel: "Текущий набор",
+        currentTitle: "EN · Пары букв · домашний ряд",
+        currentHint: "Тренируем частые пары букв.",
+        actions: createElement("button", { type: "button" }, "Старт"),
+        masteryCpm: 155,
+        masteryLevel: "Начинающий",
+        speedCpm: 0,
+        accuracy: 1,
+        cadence: 1,
+        errors: 0,
+        progress: 0,
+      }),
+    );
+
+    expect(markup).toContain('class="stats-panel__top"');
+    expect(markup).toContain('class="stats-panel__mastery-card"');
+    expect(markup).toContain('class="stats-panel__set-card"');
+    expect(markup).not.toContain('class="stats-panel__mastery-rail"');
+    expect(markup).not.toContain('class="stats-panel__set-rail"');
+    expect(markup).toContain('class="stats-panel__set-icon"');
+    expect(markup).toContain('class="stats-panel__set-copy"');
+    expect(markup).toContain('class="stats-panel__actions-card"');
+    expect(markup).toContain('class="stats-panel__actions"');
+    expect(markup.indexOf("Мастерство")).toBeLessThan(markup.indexOf("EN · Пары букв · домашний ряд"));
+    expect(markup).not.toContain("Тренируем частые пары букв.");
+    expect(markup).toContain(">Старт</button>");
   });
 
   it("renders an empty mastery placeholder before live bootstrap has enough chords", () => {
@@ -47,6 +111,7 @@ describe("StatsPanel", () => {
         units: {
           cpm: "зн/мин",
           percent: "%",
+          errors: "раз",
         },
         masteryCpm: null,
         masteryLevel: "Стартовый",
@@ -58,7 +123,7 @@ describe("StatsPanel", () => {
       }),
     );
 
-    expect(markup).toContain("— зн/мин · Стартовый");
+    expect(markup).toContain('aria-label="— зн/мин · Стартовый"');
     expect(markup).not.toContain("0 зн/мин · Стартовый");
   });
 
@@ -88,6 +153,7 @@ describe("StatsPanel", () => {
         units: {
           cpm: "зн/мин",
           percent: "%",
+          errors: "раз",
         },
         masteryCpm: 170,
         masteryLevel: "Уверенный",
@@ -102,6 +168,6 @@ describe("StatsPanel", () => {
 
     expect(markup).toContain("stats-panel--practice");
     expect(markup).toContain("stat__value--animated");
-    expect(markup).toContain("170 зн/мин · Уверенный");
+    expect(markup).toContain('aria-label="170 зн/мин · Уверенный"');
   });
 });

@@ -1433,37 +1433,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </div>
           ) : (
             <>
-          <div className="trainer-toolbar">
-            <div>
-              <span>{t("trainer.current")}</span>
-              <h1>{activeSetTitle}</h1>
-              {activeSetHint ? <p className="trainer-toolbar__hint">{activeSetHint}</p> : null}
-            </div>
-            <div className="trainer-toolbar__actions">
-              <button
-                type="button"
-                className="session-play-button"
-                onClick={startSession}
-                disabled={!canStartSession || trainerIntroPhase === "revealing"}
-                aria-label={t("trainer.playAria")}
-                title={t("trainer.playAria")}
-              >
-                <Play size={24} fill="currentColor" aria-hidden="true" />
-                <span>{startLabel}</span>
-              </button>
-              <button type="button" className="secondary-button" onClick={restartSession} disabled={!chordSet || sessionFlow.phase === "running"}>
-                <RotateCcw size={18} aria-hidden="true" />
-                <span>{t("trainer.restart")}</span>
-              </button>
-              {sessionFlow.phase === "countdown" ? (
-                <button type="button" className="secondary-button" onClick={cancelCountdown}>
-                  <X size={18} aria-hidden="true" />
-                  <span>{t("trainer.cancel")}</span>
-                </button>
-              ) : null}
-            </div>
-          </div>
-
           {loadError ? <div className="alert">{`${t("trainer.loadError")}: ${loadError}`}</div> : null}
 
           <StatsPanel
@@ -1478,7 +1447,36 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             units={{
               cpm: t("units.cpm"),
               percent: t("units.percent"),
+              errors: t("units.errors"),
             }}
+            currentLabel={t("trainer.current")}
+            currentTitle={activeSetTitle}
+            currentHint={activeSetHint}
+            actions={(
+              <>
+                <button
+                  type="button"
+                  className="session-play-button"
+                  onClick={startSession}
+                  disabled={!canStartSession || trainerIntroPhase === "revealing"}
+                  aria-label={t("trainer.playAria")}
+                  title={t("trainer.playAria")}
+                >
+                  <Play size={24} fill="currentColor" aria-hidden="true" />
+                  <span>{startLabel}</span>
+                </button>
+                <button type="button" className="secondary-button" onClick={restartSession} disabled={!chordSet || sessionFlow.phase === "running"}>
+                  <RotateCcw size={18} aria-hidden="true" />
+                  <span>{t("trainer.restart")}</span>
+                </button>
+                {sessionFlow.phase === "countdown" ? (
+                  <button type="button" className="secondary-button" onClick={cancelCountdown}>
+                    <X size={18} aria-hidden="true" />
+                    <span>{t("trainer.cancel")}</span>
+                  </button>
+                ) : null}
+              </>
+            )}
             masteryCpm={displayedMastery}
             masteryLevel={displayedMasteryLevel}
             speedCpm={liveStats.speedCpm}

@@ -211,6 +211,7 @@ export const ru = {
     cpm: "зн/мин",
     bpm: "BPM",
     percent: "%",
+    errors: "раз",
   },
   metronome: {
     label: "Метроном",

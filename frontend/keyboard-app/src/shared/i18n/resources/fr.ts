@@ -213,6 +213,7 @@ export const fr: TranslationResource = {
     cpm: "car/min",
     bpm: "BPM",
     percent: "%",
+    errors: "fois",
   },
   metronome: {
     label: "Métronome",

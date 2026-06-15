@@ -84,10 +84,16 @@ describe("keyboard trainer wide frame", () => {
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*43px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*66px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*70px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat[\s\S]*--stat-number-size:\s*clamp\(42px,\s*6vh,\s*58px\)/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat[\s\S]*--stat-number-size:\s*clamp\(44px,\s*6\.4vh,\s*60px\)/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat[\s\S]*--stat-value-scale-y:\s*1\.14/,
+    );
+    expect(styles).toMatch(
+      /\.stat__value-line[\s\S]*transform:\s*scale\(var\(--stat-value-scale-x\),\s*var\(--stat-value-scale-y\)\)/,
     );
   });
 
@@ -126,6 +132,7 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toContain("family=Manrope");
     expect(styles).toContain("family=Roboto+Flex");
     expect(styles).toMatch(/\.stat--metric[\s\S]*--stat-value-scale-x:\s*0\.78/);
+    expect(styles).toMatch(/\.stat--metric[\s\S]*--stat-value-scale-y:\s*1/);
     expect(styles).toMatch(/\.stat--metric[\s\S]*--stat-value-slot:\s*8\.2ch/);
     expect(styles).toMatch(/\.stats-panel__mastery-card[\s\S]*--stat-number-size:\s*clamp\(30px,\s*2\.8vw,\s*40px\)/);
     expect(styles).toMatch(/\.stat__value-line[\s\S]*font-family:\s*"Roboto Flex"/);
@@ -147,13 +154,16 @@ describe("keyboard trainer wide frame", () => {
       /\.stats-panel--practice\s+\.stat[\s\S]*--stat-value-scale-x:\s*0\.72/,
     );
     expect(styles).toMatch(
+      /\.stats-panel--practice\s+\.stat[\s\S]*--stat-value-scale-y:\s*1\.18/,
+    );
+    expect(styles).toMatch(
       /\.stats-panel--practice\s+\.stat[\s\S]*--stat-suffix-size:\s*clamp\(40px,\s*5\.8vh,\s*58px\)/,
     );
     expect(styles).toMatch(
       /\.stats-panel--practice\s+\.stat__suffix--unit[\s\S]*font-size:\s*var\(--stat-unit-suffix-size\)/,
     );
     expect(styles).toMatch(
-      /\.stat__value-line[\s\S]*transform:\s*scaleX\(var\(--stat-value-scale-x\)\)/,
+      /\.stat__value-line[\s\S]*transform:\s*scale\(var\(--stat-value-scale-x\),\s*var\(--stat-value-scale-y\)\)/,
     );
   });
 

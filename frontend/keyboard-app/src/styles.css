@@ -803,19 +803,24 @@ input {
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice {
   gap: 5px;
-  grid-template-rows: minmax(58px, auto) minmax(66px, 1fr) auto;
+  grid-template-rows: minmax(58px, auto) minmax(70px, 1fr) auto;
   padding: 6px 10px 7px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice .stat--metric {
-  min-height: 66px;
+  min-height: 70px;
   padding: 6px 8px 5px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice .stat {
-  --stat-number-size: clamp(42px, 6vh, 58px);
+  --stat-number-size: clamp(44px, 6.4vh, 60px);
   --stat-suffix-size: clamp(24px, 3.5vh, 34px);
   --stat-unit-suffix-size: clamp(12px, 1.65vh, 17px);
+  --stat-value-scale-y: 1.14;
+}
+
+.trainer-layout--practice .trainer-surface--dismissed .stats-panel__mastery-value-line {
+  --mastery-value-scale-y: 1.08;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .virtual-keyboard {
@@ -1240,7 +1245,7 @@ input {
   font-family: "Roboto Flex", "Arial Narrow", "Manrope", system-ui, sans-serif;
   font-stretch: 62%;
   font-variation-settings: "wdth" 45, "opsz" 96, "GRAD" -80;
-  transform: scaleX(0.86);
+  transform: scale(0.86, var(--mastery-value-scale-y, 1));
   transform-origin: left bottom;
   white-space: nowrap;
 }
@@ -1295,6 +1300,7 @@ input {
   --stat-suffix-size: clamp(22px, 2.1vw, 32px);
   --stat-unit-suffix-size: clamp(12px, 1vw, 15px);
   --stat-value-scale-x: 0.78;
+  --stat-value-scale-y: 1;
   --stat-value-slot: 8.2ch;
   min-height: 84px;
   align-content: stretch;
@@ -1364,8 +1370,8 @@ input {
   font-family: "Roboto Flex", "Arial Narrow", "Manrope", system-ui, sans-serif;
   font-stretch: 62%;
   font-variation-settings: "wdth" 45, "opsz" 96, "GRAD" -80;
-  transform: scaleX(var(--stat-value-scale-x));
-  transform-origin: center bottom;
+  transform: scale(var(--stat-value-scale-x), var(--stat-value-scale-y));
+  transform-origin: center center;
   white-space: nowrap;
 }
 
@@ -1412,6 +1418,7 @@ input {
   --stat-suffix-size: clamp(40px, 5.8vh, 58px);
   --stat-unit-suffix-size: clamp(17px, 2.25vh, 23px);
   --stat-value-scale-x: 0.72;
+  --stat-value-scale-y: 1.18;
   min-height: 84px;
 }
 

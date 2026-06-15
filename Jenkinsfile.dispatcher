@@ -37,6 +37,7 @@ spec:
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA.', trim: true)
     string(name: 'FORCE_TARGETS', defaultValue: '', description: 'Optional manual override: all or comma-separated deploy targets.', trim: true)
+    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '2', description: 'Maximum downstream module jobs to run at once. Use 1 for conservative recovery on the dev VPS.', trim: true)
   }
 
   environment {
@@ -115,6 +116,11 @@ spec:
             }
           }
           def jobs = (detection.AFFECTED_JOBS ?: '').split(',').collect { it.trim() }.findAll { it }
+          def maxParallelText = params.MAX_PARALLEL_MODULE_JOBS?.trim() ?: '2'
+          if (!(maxParallelText ==~ /[1-9]/)) {
+            error "MAX_PARALLEL_MODULE_JOBS must be an integer from 1 to 9; got '${maxParallelText}'"
+          }
+          def maxParallelModuleJobs = maxParallelText.toInteger()
           echo "Affected targets: ${detection.AFFECTED_TARGETS ?: '(none)'}"
           echo "Detection reason: ${detection.AFFECTED_REASON ?: '(unknown)'}"
           if (jobs.isEmpty()) {
@@ -122,14 +128,76 @@ spec:
             return
           }
 
-          jobs.each { jobName ->
-            def downstreamParams = [
-              string(name: 'BRANCH_NAME', value: env.CI_BRANCH),
-              string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
-              string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
-            ]
-            echo "Triggering ${jobName}"
-            build job: jobName, parameters: downstreamParams, wait: false, propagate: false
+          dir('downstream-results') {
+            deleteDir()
+            writeFile file: '.initialized', text: ''
+          }
+
+          def indexedJobs = []
+          jobs.eachWithIndex { jobName, index ->
+            indexedJobs << [name: jobName, index: index]
+          }
+          def batches = indexedJobs.collate(maxParallelModuleJobs)
+          echo "Dispatching ${jobs.size()} downstream job(s) with max parallelism ${maxParallelModuleJobs}"
+
+          batches.eachWithIndex { batch, batchIndex ->
+            echo "Starting downstream batch ${batchIndex + 1}/${batches.size()}: ${batch.collect { it.name }.join(', ')}"
+            def branches = [:]
+            batch.each { job ->
+              def branchJobName = job.name
+              def branchResultFile = "downstream-results/${job.index}-${branchJobName.replaceAll(/[^A-Za-z0-9_.-]/, '_')}.properties"
+              branches[branchJobName] = {
+                def downstreamParams = [
+                  string(name: 'BRANCH_NAME', value: env.CI_BRANCH),
+                  string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
+                  string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
+                ]
+                try {
+                  echo "Triggering ${branchJobName}"
+                  def downstreamBuild = build job: branchJobName, parameters: downstreamParams, wait: true, propagate: false
+                  def downstreamResult = downstreamBuild?.result ?: 'UNKNOWN'
+                  def downstreamNumber = downstreamBuild?.number ?: ''
+                  def downstreamUrl = downstreamBuild?.absoluteUrl ?: ''
+                  echo "${branchJobName} completed with ${downstreamResult}"
+                  writeFile file: branchResultFile, text: "job=${branchJobName}\nresult=${downstreamResult}\nnumber=${downstreamNumber}\nurl=${downstreamUrl}\n"
+                } catch (err) {
+                  def sanitizedError = err.toString().replace('\n', ' ')
+                  echo "${branchJobName} dispatch failed: ${sanitizedError}"
+                  writeFile file: branchResultFile, text: "job=${branchJobName}\nresult=FAILURE\nnumber=\nurl=\nerror=${sanitizedError}\n"
+                }
+              }
+            }
+            parallel branches
+          }
+
+          def downstreamResults = indexedJobs.collect { job ->
+            def resultFile = "downstream-results/${job.index}-${job.name.replaceAll(/[^A-Za-z0-9_.-]/, '_')}.properties"
+            if (!fileExists(resultFile)) {
+              [job: job.name, result: 'FAILURE', number: '', url: '', error: 'missing result file']
+            } else {
+              def values = [:]
+              readFile(resultFile).split('\\n').each { line ->
+                def separator = line.indexOf('=')
+                if (separator > 0) {
+                  values[line.substring(0, separator)] = line.substring(separator + 1)
+                }
+              }
+              values
+            }
+          }
+          def resultSummary = downstreamResults.collect { result ->
+            def buildRef = result.number ? " #${result.number}" : ''
+            "${result.job}=${result.result}${buildRef}"
+          }.join(', ')
+          echo "Downstream module job results: ${resultSummary}"
+
+          def failures = downstreamResults.findAll { result -> result.result != 'SUCCESS' }
+          if (!failures.isEmpty()) {
+            def failureSummary = failures.collect { result ->
+              def buildRef = result.number ? " #${result.number}" : ''
+              "${result.job}=${result.result}${buildRef}"
+            }.join(', ')
+            error "Downstream module job failures: ${failureSummary}"
           }
         }
       }

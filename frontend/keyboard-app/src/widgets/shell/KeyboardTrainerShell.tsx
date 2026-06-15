@@ -1519,14 +1519,23 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             >
               {typingWindow.rows.map((row, rowIndex) => (
                 <div className="typing-strip__line" key={`${typingWindow.start}-${rowIndex}`}>
-                  {row.map(({ item, index, status }) => (
-                    <span
-                      key={index}
-                      className={`typing-char typing-char--${status} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""}`}
-                    >
-                      {item.isSpace ? "·" : item.char}
-                    </span>
-                  ))}
+                  {row.map(({ item, index, status }, itemIndex) => {
+                    const showSpaceMarker =
+                      item.isSpace &&
+                      itemIndex > 0 &&
+                      itemIndex < row.length - 1 &&
+                      !row[itemIndex - 1]?.item.isSpace &&
+                      !row[itemIndex + 1]?.item.isSpace;
+
+                    return (
+                      <span
+                        key={index}
+                        className={`typing-char typing-char--${status} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""} ${item.isSpace && !showSpaceMarker ? "is-space-edge" : ""}`}
+                      >
+                        {item.isSpace ? (showSpaceMarker ? "·" : "\u00a0") : item.char}
+                      </span>
+                    );
+                  })}
                 </div>
               ))}
             </div>

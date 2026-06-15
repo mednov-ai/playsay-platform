@@ -1526,11 +1526,12 @@ input {
   width: 0.58em;
   min-width: 0.58em;
   color: color-mix(in srgb, var(--primary) 42%, var(--muted));
-  font-size: 0.72em;
+  font-size: 1em;
   font-weight: 900;
   line-height: 1;
   opacity: 0.48;
-  transform: translateY(-0.03em);
+  transform: translateY(-0.03em) scale(0.72);
+  transform-origin: center;
 }
 
 .typing-char--correct {
@@ -1549,6 +1550,10 @@ input {
 .typing-char.is-space.typing-char--error {
   color: var(--danger);
   opacity: 0.8;
+}
+
+.typing-char.is-space-edge {
+  opacity: 0;
 }
 
 .typing-char.is-current::after {

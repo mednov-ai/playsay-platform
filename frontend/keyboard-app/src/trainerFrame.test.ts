@@ -112,9 +112,13 @@ describe("keyboard trainer wide frame", () => {
   it("renders spaces as subtle dot markers without changing measured space width", () => {
     const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
 
-    expect(shell).toContain('item.isSpace ? "·" : item.char');
+    expect(shell).toContain("showSpaceMarker");
+    expect(shell).toContain('item.isSpace ? (showSpaceMarker ? "·" : "\\u00a0") : item.char');
     expect(styles).toMatch(/\.typing-char\.is-space[\s\S]*width:\s*0\.58em/);
+    expect(styles).toMatch(/\.typing-char\.is-space[\s\S]*font-size:\s*1em/);
     expect(styles).toMatch(/\.typing-char\.is-space[\s\S]*place-items:\s*center/);
+    expect(styles).toMatch(/\.typing-char\.is-space[\s\S]*transform:\s*translateY\(-0\.03em\)\s+scale\(0\.72\)/);
+    expect(styles).toMatch(/\.typing-char\.is-space-edge[\s\S]*opacity:\s*0/);
     expect(styles).toMatch(/\.typing-char\.is-space\.is-current[\s\S]*opacity:\s*1/);
   });
 

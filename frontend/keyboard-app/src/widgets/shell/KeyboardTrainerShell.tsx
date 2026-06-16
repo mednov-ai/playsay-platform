@@ -1681,45 +1681,49 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             variant={practiceFocusMode ? "practice" : "default"}
           />
 
-          <div className="typing-stage">
-            <div
-              ref={typingStripRef}
-              className="typing-strip"
-              aria-live="polite"
-              aria-label={t("trainer.typingLineAria")}
-            >
-              {typingWindow.rows.map((row, rowIndex) => (
-                <div className="typing-strip__line" key={`${typingWindow.start}-${rowIndex}`}>
-                  {row.map(({ item, index, status }, itemIndex) => {
-                    const hasPreviousVisibleCharacter = itemIndex > 0 && !row[itemIndex - 1]?.item.isSpace;
-                    const hasNextVisibleCharacter = itemIndex < row.length - 1 && !row[itemIndex + 1]?.item.isSpace;
-                    const showSpaceMarker =
-                      item.isSpace &&
-                      hasPreviousVisibleCharacter &&
-                      (hasNextVisibleCharacter || itemIndex === row.length - 1);
+          <div className="practice-workspace">
+            <div className="practice-cluster">
+              <div className="typing-stage">
+                <div
+                  ref={typingStripRef}
+                  className="typing-strip"
+                  aria-live="polite"
+                  aria-label={t("trainer.typingLineAria")}
+                >
+                  {typingWindow.rows.map((row, rowIndex) => (
+                    <div className="typing-strip__line" key={`${typingWindow.start}-${rowIndex}`}>
+                      {row.map(({ item, index, status }, itemIndex) => {
+                        const hasPreviousVisibleCharacter = itemIndex > 0 && !row[itemIndex - 1]?.item.isSpace;
+                        const hasNextVisibleCharacter = itemIndex < row.length - 1 && !row[itemIndex + 1]?.item.isSpace;
+                        const showSpaceMarker =
+                          item.isSpace &&
+                          hasPreviousVisibleCharacter &&
+                          (hasNextVisibleCharacter || itemIndex === row.length - 1);
 
-                    return (
-                      <span
-                        key={index}
-                        className={`typing-char typing-char--${status} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""} ${item.isSpace && !showSpaceMarker ? "is-space-edge" : ""}`}
-                      >
-                        {item.isSpace ? (showSpaceMarker ? "·" : "\u00a0") : item.char}
-                      </span>
-                    );
-                  })}
+                        return (
+                          <span
+                            key={index}
+                            className={`typing-char typing-char--${status} ${index === pos ? "is-current" : ""} ${item.isChordStart ? "is-chord-start" : ""} ${item.isSpace ? "is-space" : ""} ${item.isSpace && !showSpaceMarker ? "is-space-edge" : ""}`}
+                          >
+                            {item.isSpace ? (showSpaceMarker ? "·" : "\u00a0") : item.char}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <VirtualKeyboard
+                labels={keyboardLabels}
+                layoutId={layoutId}
+                nextChar={nextChar}
+                nextRequiresShift={nextRequiresShift}
+                advancedMode={advancedMode}
+                shiftActive={shiftActive}
+              />
             </div>
           </div>
-
-          <VirtualKeyboard
-            labels={keyboardLabels}
-            layoutId={layoutId}
-            nextChar={nextChar}
-            nextRequiresShift={nextRequiresShift}
-            advancedMode={advancedMode}
-            shiftActive={shiftActive}
-          />
 
           <div className="trainer-footer">
             <Metronome

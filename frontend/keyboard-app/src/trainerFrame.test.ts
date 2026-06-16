@@ -56,10 +56,28 @@ describe("keyboard trainer wide frame", () => {
 
   it("keeps the trainer typing strip compact and leaves room for taller keys", () => {
     expect(styles).toMatch(
-      /\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(176px,\s*1fr\)\s+78px\s+minmax\(286px,\s*auto\)\s+40px/,
+      /\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+40px/,
+    );
+    expect(styles).toMatch(
+      /\.practice-workspace[\s\S]*place-items:\s*center/,
+    );
+    expect(styles).toMatch(
+      /\.practice-workspace[\s\S]*min-height:\s*0/,
+    );
+    expect(styles).toMatch(
+      /\.practice-cluster[\s\S]*grid-template-rows:\s*auto\s+auto/,
+    );
+    expect(styles).toMatch(
+      /\.practice-cluster[\s\S]*gap:\s*var\(--practice-cluster-gap\)/,
     );
     expect(styles).toMatch(
       /\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*78px/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-surface--dismissed\s+\.stat--metric\s*\{[^}]*min-height:\s*62px/,
+    );
+    expect(styles).not.toMatch(
+      /\.trainer-surface--dismissed\s+\.practice-workspace\s*\{[^}]*min-height:\s*calc/,
     );
     expect(styles).toMatch(
       /\.stats-panel--practice[\s\S]*grid-template-rows:\s*minmax\(62px,\s*auto\)\s+minmax\(112px,\s*1fr\)\s+auto/,
@@ -67,7 +85,7 @@ describe("keyboard trainer wide frame", () => {
   });
 
   it("keeps the metronome footer inside the MacBook-class trainer viewport", () => {
-    expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*52px/);
+    expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*clamp\(42px,\s*6vh,\s*52px\)/);
     expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.trainer-footer[\s\S]*min-height:\s*34px/);
     expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.metronome__slider\s+input[\s\S]*width:\s*126px/);
     expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.result-box[\s\S]*min-height:\s*32px/);
@@ -81,16 +99,28 @@ describe("keyboard trainer wide frame", () => {
 
   it("gives focused practice taller keyboard keys and keeps metric digits height-linked", () => {
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(168px,\s*1fr\)\s+82px\s+minmax\(318px,\s*auto\)\s+42px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+42px/,
+    );
+    expect(styles).not.toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.practice-workspace\s*\{[^}]*min-height:\s*calc/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice[\s\S]*grid-template-rows:\s*minmax\(58px,\s*auto\)\s+minmax\(70px,\s*auto\)\s+auto/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.practice-cluster[\s\S]*--practice-cluster-gap:\s*8px/,
     );
     expect(styles).toMatch(
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*82px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*58px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*clamp\(53px,\s*7\.4vh,\s*58px\)/,
     );
     expect(styles).toMatch(
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*70px/,
+    );
+    expect(styles).toMatch(
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat\s*\{[\s\S]*min-height:\s*70px/,
     );
     expect(styles).toMatch(
       /\.stat--metric[\s\S]*container-type:\s*size/,
@@ -109,6 +139,10 @@ describe("keyboard trainer wide frame", () => {
   it("keeps the focused typing strip as a single measured line", () => {
     const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
 
+    expect(shell).toContain('className="practice-workspace"');
+    expect(shell).toContain('className="practice-cluster"');
+    expect(shell).toMatch(/<div className="practice-cluster">[\s\S]*<div className="typing-stage">[\s\S]*<VirtualKeyboard/);
+    expect(shell).toMatch(/<div className="trainer-footer">/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*--typing-row-count:\s*1/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*grid-template-rows:\s*minmax\(0,\s*1fr\)/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*font-family:\s*"Roboto Flex"/);

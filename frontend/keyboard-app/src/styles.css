@@ -901,8 +901,9 @@ input {
 }
 
 .trainer-surface--dismissed {
-  grid-template-rows: minmax(176px, 1fr) 78px minmax(286px, auto) 40px;
-  gap: clamp(10px, 1.6vh, 20px);
+  --practice-cluster-gap: 8px;
+  grid-template-rows: auto minmax(0, 1fr) 40px;
+  gap: clamp(8px, 1.2vh, 14px);
 }
 
 .trainer-surface--dismissed .stats-panel {
@@ -917,7 +918,7 @@ input {
 }
 
 .trainer-surface--dismissed .stat--metric {
-  min-height: 72px;
+  min-height: 62px;
   padding: 7px 8px 6px;
 }
 
@@ -938,13 +939,14 @@ input {
 }
 
 .trainer-surface--dismissed .virtual-keyboard {
-  --key-height: 52px;
+  --key-height: clamp(42px, 6vh, 52px);
   min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 4px);
   padding: 1px 0 4px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed {
-  grid-template-rows: minmax(168px, 1fr) 82px minmax(318px, auto) 42px;
+  --practice-cluster-gap: 8px;
+  grid-template-rows: auto minmax(0, 1fr) 42px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .typing-stage {
@@ -959,8 +961,12 @@ input {
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice {
   gap: 5px;
-  grid-template-rows: minmax(58px, auto) minmax(70px, 1fr) auto;
+  grid-template-rows: minmax(58px, auto) minmax(70px, auto) auto;
   padding: 6px 10px 7px;
+}
+
+.trainer-layout--practice .trainer-surface--dismissed .practice-cluster {
+  --practice-cluster-gap: 8px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice .stat--metric {
@@ -974,6 +980,7 @@ input {
   --stat-unit-suffix-size: clamp(11px, 14cqh, 18px);
   --stat-value-scale-x: 0.68;
   --stat-value-scale-y: 1.28;
+  min-height: 70px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel__mastery-value-line {
@@ -981,7 +988,7 @@ input {
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .virtual-keyboard {
-  --key-height: 58px;
+  --key-height: clamp(53px, 7.4vh, 58px);
   min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 8px);
   padding: 2px 0 6px;
 }
@@ -1680,6 +1687,22 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+.practice-workspace {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+}
+
+.practice-cluster {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: var(--practice-cluster-gap);
+  width: 100%;
+  min-width: 0;
+}
+
 .typing-stage {
   position: relative;
   min-height: 0;
@@ -2090,6 +2113,8 @@ input {
 }
 
 .stats-panel,
+.practice-workspace,
+.practice-cluster,
 .typing-stage,
 .virtual-keyboard,
 .trainer-footer {
@@ -3110,6 +3135,24 @@ input {
 
   .trainer-surface {
     overflow: visible;
+  }
+
+  .trainer-surface--dismissed,
+  .trainer-layout--practice .trainer-surface--dismissed {
+    grid-template-rows: auto auto auto;
+  }
+
+  .trainer-surface--dismissed .practice-workspace,
+  .trainer-layout--practice .trainer-surface--dismissed .practice-workspace {
+    min-height: 0;
+  }
+
+  .practice-workspace {
+    place-items: start center;
+  }
+
+  .practice-cluster {
+    --practice-cluster-gap: 6px;
   }
 
   .trainer-surface--visible {

@@ -52,6 +52,8 @@ export const en: TranslationResource = {
     layout: "Practice",
     set: "Set",
     advancedPractice: "Advanced mode",
+    advancedModeOptionNormal: "Normal",
+    advancedModeOptionAdvanced: "Advanced",
     advancedSettings: "Mode settings",
     advancedSummary: "Advanced mode summary",
     advancedConfigure: "Configure",

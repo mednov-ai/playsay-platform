@@ -50,6 +50,8 @@ export const ru = {
     layout: "Тренировка",
     set: "Набор",
     advancedPractice: "Продвинутый режим",
+    advancedModeOptionNormal: "Обычный",
+    advancedModeOptionAdvanced: "Продвинутый",
     advancedSettings: "Настройки режима",
     advancedSummary: "Сводка продвинутого режима",
     advancedConfigure: "Настроить",

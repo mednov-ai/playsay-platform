@@ -63,6 +63,7 @@ export interface PracticeContext {
   codeLanguages: string[];
   difficultyBand: "trigrams" | "quadgrams" | "long";
   title: string;
+  numberRowEnabled?: boolean;
 }
 
 export type TrainingLessonKind = "CALIBRATION" | "STANDARD" | "FOCUS";

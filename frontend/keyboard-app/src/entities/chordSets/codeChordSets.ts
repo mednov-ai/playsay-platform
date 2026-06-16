@@ -19,6 +19,10 @@ export interface CodeLanguageOption {
   label: string;
 }
 
+export interface BuildCodeChordSetOptions {
+  includeNumberRow?: boolean;
+}
+
 interface CodeBandConfig {
   id: CodeDifficultyBand;
   title: string;
@@ -46,7 +50,9 @@ export const codeDifficultyBands: CodeBandConfig[] = [
 ];
 
 const setSize = 64;
+const numberRowChordQuota = 16;
 const codePattern = /^[a-z0-9_+\-*/%=!<>{}()[\].,:;'"#?|&^~]+$/;
+const digitPattern = /[0-9]/;
 
 const codeSources: Record<CodeLanguageId, string[]> = {
   python: [
@@ -96,6 +102,18 @@ const codeSources: Record<CodeLanguageId, string[]> = {
   ],
 };
 
+const numberRowSources = [
+  "0123456789",
+  "9876543210",
+  "00112233445566778899",
+  "102030405060708090",
+  "1234567890",
+  "9081726354",
+  "31415926",
+  "27182818",
+  "10111213",
+];
+
 export const codeChordSets: ChordSet[] = [
   ...codeDifficultyBands.flatMap((band, bandIndex) =>
     codeLanguageOptions.map((language, languageIndex) =>
@@ -105,7 +123,7 @@ export const codeChordSets: ChordSet[] = [
         languageIds: [language.id],
         difficultyBand: band.id,
         difficulty: band.difficulty,
-        chords: languageChords(language.id, band.id),
+        chords: prepareCodeChords(languageChords(language.id, band.id), band.id, `${language.id}:${band.id}`, false),
       }),
     ),
   ),
@@ -116,28 +134,41 @@ export const codeChordSets: ChordSet[] = [
       languageIds: codeLanguageOptions.map((language) => language.id),
       difficultyBand: band.id,
       difficulty: band.difficulty,
-      chords: buildMixedChords(codeLanguageOptions.map((language) => language.id), band.id, `anchor:${band.id}`),
+      chords: prepareCodeChords(
+        buildMixedChords(codeLanguageOptions.map((language) => language.id), band.id, `anchor:${band.id}`),
+        band.id,
+        `anchor:${band.id}`,
+        false,
+      ),
     }),
   ),
 ];
 
-export function buildCombinedCodeChordSet(languageIds: CodeLanguageId[], difficultyBand: CodeDifficultyBand): ChordSet {
+export function buildCombinedCodeChordSet(
+  languageIds: CodeLanguageId[],
+  difficultyBand: CodeDifficultyBand,
+  options: BuildCodeChordSetOptions = {},
+): ChordSet {
   const languages = normalizeLanguageIds(languageIds);
   const band = bandConfig(difficultyBand);
+  const includeNumberRow = options.includeNumberRow === true;
   if (languages.length === 1) {
     const language = languageOption(languages[0]);
+    const seed = `${language.id}:${difficultyBand}`;
     return codeChordSet({
       id: 13 + codeDifficultyBands.findIndex((candidate) => candidate.id === difficultyBand) * codeLanguageOptions.length + codeLanguageOptions.findIndex((candidate) => candidate.id === language.id),
       title: `CODE · ${language.label} · ${band.title}`,
       languageIds: [language.id],
       difficultyBand,
       difficulty: band.difficulty,
-      chords: languageChords(language.id, difficultyBand),
+      includeNumberRow,
+      chords: prepareCodeChords(languageChords(language.id, difficultyBand), difficultyBand, seed, includeNumberRow),
     });
   }
 
   const labels = languages.map((language) => languageOption(language).label);
   const title = `CODE · ${labels.join(" + ")} · ${band.title}`;
+  const seed = `${difficultyBand}:${languages.join("+")}`;
   return codeChordSet({
     id: -2,
     sourceChordSetId: band.anchorId,
@@ -145,8 +176,9 @@ export function buildCombinedCodeChordSet(languageIds: CodeLanguageId[], difficu
     languageIds: languages,
     difficultyBand,
     difficulty: band.difficulty,
+    includeNumberRow,
     practiceKind: "CODE_COMBO",
-    chords: buildMixedChords(languages, difficultyBand, `${difficultyBand}:${languages.join("+")}`),
+    chords: prepareCodeChords(buildMixedChords(languages, difficultyBand, seed), difficultyBand, seed, includeNumberRow),
   });
 }
 
@@ -171,6 +203,7 @@ function codeChordSet(input: {
   difficultyBand: CodeDifficultyBand;
   difficulty: number;
   chords: string[];
+  includeNumberRow?: boolean;
   practiceKind?: "CODE" | "CODE_COMBO";
 }): ChordSet {
   const practiceContext: PracticeContext = {
@@ -178,6 +211,7 @@ function codeChordSet(input: {
     codeLanguages: input.languageIds,
     difficultyBand: input.difficultyBand,
     title: input.title,
+    numberRowEnabled: input.includeNumberRow === true,
   };
   return {
     id: input.id,
@@ -212,6 +246,33 @@ function buildMixedChords(languageIds: CodeLanguageId[], difficultyBand: CodeDif
     index += 1;
   }
   return seededShuffle(mixed, seed).slice(0, setSize);
+}
+
+function prepareCodeChords(
+  chords: string[],
+  difficultyBand: CodeDifficultyBand,
+  seed: string,
+  includeNumberRow: boolean,
+): string[] {
+  const codeChords = chords.filter(withoutDigits);
+  if (!includeNumberRow) {
+    return codeChords.slice(0, setSize);
+  }
+
+  const digitChords = seededShuffle(numberRowChords(difficultyBand), `${seed}:number-row`)
+    .filter((chord) => /^[0-9]+$/.test(chord))
+    .slice(0, numberRowChordQuota);
+  const codeQuota = Math.max(0, setSize - digitChords.length);
+  return seededShuffle(unique([...codeChords.slice(0, codeQuota), ...digitChords]), `${seed}:number-row-enabled`).slice(0, setSize);
+}
+
+function numberRowChords(difficultyBand: CodeDifficultyBand): string[] {
+  const band = bandConfig(difficultyBand);
+  return buildCodeNgrams(numberRowSources, band.lengths, `number-row:${difficultyBand}`);
+}
+
+function withoutDigits(chord: string): boolean {
+  return !digitPattern.test(chord);
 }
 
 function buildCodeNgrams(source: string[], lengths: number[], seed: string): string[] {

@@ -52,6 +52,8 @@ export const de: TranslationResource = {
     layout: "Training",
     set: "Satz",
     advancedPractice: "Erweiterter Modus",
+    advancedModeOptionNormal: "Normal",
+    advancedModeOptionAdvanced: "Erweitert",
     advancedSettings: "Modus-Einstellungen",
     advancedSummary: "Zusammenfassung des erweiterten Modus",
     advancedConfigure: "Einstellen",

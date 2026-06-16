@@ -52,6 +52,8 @@ export const fr: TranslationResource = {
     layout: "Entraînement",
     set: "Série",
     advancedPractice: "Mode avancé",
+    advancedModeOptionNormal: "Normal",
+    advancedModeOptionAdvanced: "Avancé",
     advancedSettings: "Réglages du mode",
     advancedSummary: "Résumé du mode avancé",
     advancedConfigure: "Régler",

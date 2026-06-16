@@ -113,7 +113,6 @@ interface Props {
   nextChar: string | null;
   nextRequiresShift?: boolean;
   advancedMode?: boolean;
-  numberRowActive?: boolean;
   shiftActive?: boolean;
 }
 
@@ -123,13 +122,12 @@ export function VirtualKeyboard({
   nextChar,
   nextRequiresShift = false,
   advancedMode = false,
-  numberRowActive = false,
   shiftActive = false,
 }: Props) {
   const showShiftLayer = advancedMode || shiftActive || nextRequiresShift;
   return (
     <div
-      className={`virtual-keyboard ${advancedMode ? "virtual-keyboard--advanced" : ""} ${numberRowActive ? "virtual-keyboard--number-row-focus" : ""} ${shiftActive ? "virtual-keyboard--shift-active" : ""} ${nextRequiresShift ? "virtual-keyboard--shift-target" : ""}`}
+      className={`virtual-keyboard ${advancedMode ? "virtual-keyboard--advanced" : ""} ${shiftActive ? "virtual-keyboard--shift-active" : ""} ${nextRequiresShift ? "virtual-keyboard--shift-target" : ""}`}
       aria-hidden="true"
     >
       {rows.map((row, rowIndex) => (

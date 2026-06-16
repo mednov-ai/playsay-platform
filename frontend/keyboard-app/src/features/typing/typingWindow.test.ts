@@ -96,6 +96,16 @@ describe("typing window", () => {
     expect(computeTypingLineCapacity({ usableWidth: 720, characterWidth: 12 })).toBe(53);
   });
 
+  it("uses one visible row by default for the trainer typing strip", () => {
+    const stream = Array.from({ length: 200 }, (_, index) => makeItem(index));
+    const statuses = stream.map(() => "pending" as const);
+    const window = buildTypingWindow(stream, statuses, 0);
+
+    expect(typingWindowRows).toBe(1);
+    expect(window.rows).toHaveLength(1);
+    expect(window.rows[0]).toHaveLength(typingWindowLineLength);
+  });
+
   it("packs measured rows so the rendered line width never exceeds the strip", () => {
     const stream: StreamItem[] = [
       { ...makeItem(0), char: "w" },
@@ -181,16 +191,15 @@ describe("typing window", () => {
     expect(measureTypingWindowRowWidth(window.rows[1], metrics)).toBeGreaterThan(metrics.maxLineWidth * 0.85);
   });
 
-  it("renders exactly two filled rows when enough stream items are available", () => {
+  it("renders exactly one filled row by default when enough stream items are available", () => {
     const stream = Array.from({ length: 200 }, (_, index) => makeItem(index));
     const statuses = stream.map(() => "pending" as const);
     const window = buildTypingWindow(stream, statuses, 0);
 
     expect(window.rows).toHaveLength(typingWindowRows);
     expect(window.rows[0]).toHaveLength(typingWindowLineLength);
-    expect(window.rows[1]).toHaveLength(typingWindowLineLength);
     expect(window.start).toBe(0);
-    expect(window.end).toBe(typingWindowLineLength * typingWindowRows);
+    expect(window.end).toBe(typingWindowLineLength);
   });
 
   it("keeps the first two rows anchored while the current position still fits", () => {

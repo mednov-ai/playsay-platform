@@ -99,6 +99,17 @@ describe("local keyboard chord sets", () => {
     expect(first.chords.some((chord) => /[{}()[\]#:?+*=><]/.test(chord))).toBe(true);
   });
 
+  it("keeps number-row digits out of code practice until the number row is enabled", () => {
+    const defaultSet = buildCombinedCodeChordSet(["javascript", "java", "go"], "trigrams");
+    const numberRowSet = buildCombinedCodeChordSet(["javascript", "java", "go"], "trigrams", {
+      includeNumberRow: true,
+    });
+
+    expect(defaultSet.chords.every((chord) => !/[0-9]/.test(chord))).toBe(true);
+    expect(numberRowSet.chords.some((chord) => /[0-9]/.test(chord))).toBe(true);
+    expect(numberRowSet.practiceContext).toMatchObject({ numberRowEnabled: true });
+  });
+
   it("maps existing numeric difficulty into four visible level tiers", () => {
     expect(levelTierForDifficulty(1)).toBe("beginner");
     expect(levelTierForDifficulty(2)).toBe("beginner");

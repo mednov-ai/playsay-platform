@@ -252,5 +252,6 @@ function sanitizePracticeContext(value: unknown): ChordSet["practiceContext"] | 
     codeLanguages,
     difficultyBand: candidate.difficultyBand,
     title: candidate.title,
+    numberRowEnabled: candidate.numberRowEnabled === true,
   };
 }

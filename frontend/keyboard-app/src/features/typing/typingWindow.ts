@@ -37,7 +37,7 @@ export interface BuildTypingWidthMetricsInput {
 }
 
 export const typingWindowLineLength = 48;
-export const typingWindowRows = 2;
+export const typingWindowRows = 1;
 export const typingSpaceEm = 0.58;
 
 const sampleWideCharacters = ["w", "m", "ш", "щ", "W"];

@@ -54,12 +54,12 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toContain(".stat__value--animated");
   });
 
-  it("gives focused practice spare vertical space to stats instead of the typing strip", () => {
+  it("keeps the trainer typing strip compact and leaves room for taller keys", () => {
     expect(styles).toMatch(
-      /\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(188px,\s*1fr\)\s+120px\s+minmax\(198px,\s*auto\)\s+34px/,
+      /\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(176px,\s*1fr\)\s+78px\s+minmax\(286px,\s*auto\)\s+40px/,
     );
     expect(styles).toMatch(
-      /\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*120px/,
+      /\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*78px/,
     );
     expect(styles).toMatch(
       /\.stats-panel--practice[\s\S]*grid-template-rows:\s*minmax\(62px,\s*auto\)\s+minmax\(112px,\s*1fr\)\s+auto/,
@@ -67,21 +67,27 @@ describe("keyboard trainer wide frame", () => {
   });
 
   it("keeps the metronome footer inside the MacBook-class trainer viewport", () => {
-    expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*39px/);
+    expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*52px/);
     expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.trainer-footer[\s\S]*min-height:\s*34px/);
     expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.metronome__slider\s+input[\s\S]*width:\s*126px/);
     expect(styles).toMatch(/\.trainer-surface--dismissed\s+\.result-box[\s\S]*min-height:\s*32px/);
   });
 
+  it("caps the taller keyboard keys again on phone-sized viewports", () => {
+    expect(styles).toMatch(
+      /@media \(max-width:\s*720px\)[\s\S]*\.trainer-surface--dismissed\s+\.virtual-keyboard,[\s\S]*\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*clamp\(40px,\s*11\.8vw,\s*48px\)/,
+    );
+  });
+
   it("gives focused practice taller keyboard keys and keeps metric digits height-linked", () => {
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(172px,\s*1fr\)\s+180px\s+minmax\(242px,\s*auto\)\s+34px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed[\s\S]*grid-template-rows:\s*minmax\(168px,\s*1fr\)\s+82px\s+minmax\(318px,\s*auto\)\s+42px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*180px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*82px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*43px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*58px/,
     );
     expect(styles).toMatch(
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*70px/,
@@ -100,16 +106,17 @@ describe("keyboard trainer wide frame", () => {
     );
   });
 
-  it("lets the focused typing strip expand to measured extra lines", () => {
+  it("keeps the focused typing strip as a single measured line", () => {
     const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
 
-    expect(styles).toMatch(/\.typing-strip[\s\S]*--typing-row-count:\s*2/);
-    expect(styles).toMatch(/\.typing-strip[\s\S]*grid-template-rows:\s*repeat\(var\(--typing-row-count\),\s*minmax\(0,\s*1fr\)\)/);
-    expect(shell).toContain("rowCountForTypingStrip");
-    expect(shell).toContain("fourRowHeight");
-    expect(shell).toContain("return 4;");
-    expect(shell).toContain("setTypingRowCount");
-    expect(shell).toContain('style={typingStripStyle}');
+    expect(styles).toMatch(/\.typing-strip[\s\S]*--typing-row-count:\s*1/);
+    expect(styles).toMatch(/\.typing-strip[\s\S]*grid-template-rows:\s*minmax\(0,\s*1fr\)/);
+    expect(styles).toMatch(/\.typing-strip[\s\S]*font-family:\s*"Roboto Flex"/);
+    expect(styles).toMatch(/\.typing-strip[\s\S]*font-variation-settings:\s*"wdth"\s+54,\s*"opsz"\s+96,\s*"GRAD"\s+-35/);
+    expect(shell).not.toContain("rowCountForTypingStrip");
+    expect(shell).not.toContain("fourRowHeight");
+    expect(shell).not.toContain("setTypingRowCount");
+    expect(shell).not.toContain("typingStripStyle");
   });
 
   it("renders spaces as subtle dot markers without changing measured space width", () => {
@@ -129,6 +136,26 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toMatch(/\.stat--metric[\s\S]*position:\s*relative/);
     expect(styles).toContain(".stat--metric::before");
     expect(styles).toContain("radial-gradient(ellipse at center");
+  });
+
+  it("keeps dark stats tiles matte instead of using white plastic highlights", () => {
+    expect(styles).toContain(".dark .stats-panel");
+    expect(styles).toContain(".dark .stats-panel__set-card");
+    expect(styles).toContain(".dark .stat--metric");
+    expect(styles).toMatch(
+      /\.dark\s+\.stats-panel__set-card,[\s\S]*linear-gradient\(180deg,\s*color-mix\(in srgb,\s*var\(--surface-strong\)\s*86%,\s*var\(--surface\)\)/,
+    );
+    expect(styles).toMatch(
+      /\.dark\s+\.stat--metric[\s\S]*box-shadow:\s*inset 0 1px 0 rgb\(255 122 47 \/ 0\.08\)/,
+    );
+
+    const darkTileStart = styles.indexOf(".dark .stats-panel");
+    const darkTileEnd = styles.indexOf(".stat--metric > span", darkTileStart);
+    const darkTileStyles = styles.slice(darkTileStart, darkTileEnd);
+
+    expect(darkTileEnd).toBeGreaterThan(darkTileStart);
+    expect(darkTileStyles).not.toContain("rgb(255 255 255 / 0.9");
+    expect(darkTileStyles).not.toContain("rgb(255 255 255 / 0.8");
   });
 
   it("uses one tile language for the merged stats header", () => {
@@ -205,6 +232,25 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toContain(".advanced-settings-modal");
     expect(styles).toContain(".advanced-summary-card");
     expect(styles).not.toContain(".code-practice-panel");
+  });
+
+  it("uses a compact advanced mode segmented control instead of the old checkbox label", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).toContain("advanced-mode-control");
+    expect(shell).toContain("advancedModeOptionNormal");
+    expect(shell).toContain("advancedModeOptionAdvanced");
+    expect(shell).not.toContain('className="advanced-mode-toggle"');
+    expect(styles).toContain(".advanced-mode-control");
+    expect(styles).not.toContain(".advanced-mode-toggle");
+  });
+
+  it("does not paint the entire top number row when the number row is enabled", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).not.toContain("numberRowActive=");
+    expect(styles).not.toContain(".virtual-keyboard--number-row-focus .virtual-keyboard__row:first-child");
+    expect(styles).not.toContain("virtual-keyboard--number-row-focus");
   });
 
   it("locks advanced settings for the whole exercise result flow", () => {

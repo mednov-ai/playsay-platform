@@ -419,17 +419,66 @@ input {
   min-width: 0;
 }
 
-.advanced-mode-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--foreground);
-  font-size: 13px;
-  font-weight: 800;
+.advanced-mode-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-self: end;
+  gap: 2px;
+  min-width: 0;
+  max-width: 220px;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--muted-bg, var(--surface)) 74%, white);
+  padding: 3px;
 }
 
-.advanced-mode-toggle input {
-  accent-color: var(--primary);
+.advanced-mode-control__option {
+  min-width: 0;
+  min-height: 32px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.1;
+  cursor: pointer;
+  transition:
+    background-color 0.14s ease,
+    box-shadow 0.14s ease,
+    color 0.14s ease;
+}
+
+.advanced-mode-control__option.is-active {
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.8) inset,
+    0 8px 18px rgb(17 17 17 / 0.08);
+}
+
+.dark .advanced-mode-control {
+  border-color: color-mix(in srgb, var(--primary) 24%, var(--line));
+  background: color-mix(in srgb, var(--surface) 86%, #000 14%);
+}
+
+.dark .advanced-mode-control__option.is-active {
+  background: color-mix(in srgb, var(--surface-strong) 82%, var(--surface));
+  color: var(--foreground);
+  box-shadow:
+    0 1px 0 rgb(255 122 47 / 0.06) inset,
+    0 8px 18px rgb(0 0 0 / 0.2);
+}
+
+.advanced-mode-control__option:not(:disabled):hover {
+  color: var(--primary);
+}
+
+.advanced-mode-control__option:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .advanced-summary-card {
@@ -438,10 +487,21 @@ input {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  max-width: 360px;
   border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line));
   border-radius: 12px;
   background: color-mix(in srgb, var(--primary) 6%, var(--surface));
   padding: 6px 8px;
+}
+
+.dark .advanced-summary-card {
+  border-color: color-mix(in srgb, var(--primary) 24%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 74%, var(--surface)), color-mix(in srgb, var(--surface) 92%, #000 8%)),
+    var(--surface);
+  box-shadow:
+    0 1px 0 rgb(255 122 47 / 0.05) inset,
+    0 10px 22px rgb(0 0 0 / 0.16);
 }
 
 .advanced-summary-card > div {
@@ -490,11 +550,24 @@ input {
   cursor: pointer;
 }
 
+.dark .code-language-chip {
+  background: color-mix(in srgb, var(--surface) 88%, #000 12%);
+  color: var(--muted);
+}
+
 .code-language-chip.is-active {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 13%, white);
   color: var(--foreground);
   box-shadow: 0 6px 14px rgb(255 92 0 / 0.12);
+}
+
+.dark .code-language-chip.is-active {
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface-strong));
+  color: var(--foreground);
+  box-shadow:
+    0 1px 0 rgb(255 122 47 / 0.06) inset,
+    0 8px 18px rgb(0 0 0 / 0.18);
 }
 
 .code-difficulty-field {
@@ -828,7 +901,8 @@ input {
 }
 
 .trainer-surface--dismissed {
-  grid-template-rows: minmax(188px, 1fr) 120px minmax(198px, auto) 34px;
+  grid-template-rows: minmax(176px, 1fr) 78px minmax(286px, auto) 40px;
+  gap: clamp(10px, 1.6vh, 20px);
 }
 
 .trainer-surface--dismissed .stats-panel {
@@ -854,33 +928,33 @@ input {
 }
 
 .trainer-surface--dismissed .typing-stage {
-  height: 120px;
+  height: 78px;
 }
 
 .trainer-surface--dismissed .typing-strip {
-  min-height: 112px;
+  min-height: 0;
   padding: 8px 18px;
-  font-size: 32px;
+  font-size: 34px;
 }
 
 .trainer-surface--dismissed .virtual-keyboard {
-  --key-height: 39px;
+  --key-height: 52px;
   min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 4px);
   padding: 1px 0 4px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed {
-  grid-template-rows: minmax(172px, 1fr) 180px minmax(242px, auto) 34px;
+  grid-template-rows: minmax(168px, 1fr) 82px minmax(318px, auto) 42px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .typing-stage {
-  height: 180px;
+  height: 82px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .typing-strip {
-  min-height: 176px;
-  font-size: 32px;
-  line-height: 1.08;
+  min-height: 0;
+  font-size: 36px;
+  line-height: 1;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice {
@@ -907,7 +981,7 @@ input {
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .virtual-keyboard {
-  --key-height: 43px;
+  --key-height: 58px;
   min-height: calc(5 * var(--key-height) + 4 * var(--key-gap) + 8px);
   padding: 2px 0 6px;
 }
@@ -1426,6 +1500,57 @@ input {
   pointer-events: none;
 }
 
+.dark .stats-panel {
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 72%, var(--surface)), color-mix(in srgb, var(--surface) 96%, #000 4%)),
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 122 47 / 0.045),
+    0 18px 40px rgb(0 0 0 / 0.22);
+}
+
+.dark .stats-panel__set-card,
+.dark .stats-panel__mastery-card,
+.dark .stats-panel__actions-card {
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 86%, var(--surface)), color-mix(in srgb, var(--surface) 92%, #000 8%)),
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 122 47 / 0.07),
+    0 10px 22px rgb(0 0 0 / 0.2);
+}
+
+.dark .stats-panel__set-icon,
+.dark .stats-panel__mastery-icon {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-strong) 82%, var(--surface)), color-mix(in srgb, var(--primary) 10%, var(--surface))),
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 122 47 / 0.08),
+    0 10px 22px rgb(0 0 0 / 0.2);
+}
+
+.dark .stat--metric {
+  border-color: color-mix(in srgb, var(--primary) 20%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 84%, var(--surface)), color-mix(in srgb, var(--surface) 90%, #000 10%)),
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 122 47 / 0.08),
+    inset 0 -24px 42px rgb(255 122 47 / 0.025),
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 12px 26px rgb(0 0 0 / 0.2);
+}
+
+.dark .stat--metric::after {
+  background:
+    linear-gradient(180deg, rgb(255 122 47 / 0.055), transparent 34%),
+    linear-gradient(90deg, transparent, rgb(255 122 47 / 0.07), transparent);
+  opacity: 0.58;
+}
+
 .stat--metric > span,
 .stat--metric strong {
   position: relative;
@@ -1570,24 +1695,29 @@ input {
 
 .typing-strip {
   display: grid;
-  --typing-row-count: 2;
-  grid-template-rows: repeat(var(--typing-row-count), minmax(0, 1fr));
-  gap: 4px;
+  --typing-row-count: 1;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  gap: 0;
   align-self: stretch;
   height: 100%;
-  min-height: 124px;
+  min-height: 78px;
   border-radius: 14px;
   padding: 10px 18px;
   overflow: hidden;
-  font-size: 34px;
-  font-weight: 800;
+  font-family: "Roboto Flex", "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: clamp(32px, 3.1vw, 40px);
+  font-weight: 760;
+  font-stretch: 75%;
+  font-variation-settings: "wdth" 54, "opsz" 96, "GRAD" -35;
   font-variant-ligatures: none;
   letter-spacing: 0;
   word-spacing: 0;
-  line-height: 1.12;
+  line-height: 1;
 }
 
 .typing-strip__line {
+  align-self: center;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -1942,7 +2072,7 @@ input {
 .virtual-keyboard {
   --key-unit: clamp(46px, calc((100vw - 80px) / 16), 84px);
   --key-gap: clamp(4px, 0.3vw, 6px);
-  --key-height: 50px;
+  --key-height: 58px;
   container-type: inline-size;
   width: 100%;
   max-width: var(--trainer-frame-width);
@@ -2020,12 +2150,6 @@ input {
   font-size: 17px;
   opacity: 1;
   transform: translate(-13px, 9px);
-}
-
-.virtual-keyboard--number-row-focus .virtual-keyboard__row:first-child .virtual-keyboard__key:not(.virtual-keyboard__key--special) {
-  border-color: color-mix(in srgb, var(--primary) 44%, var(--key-border));
-  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .virtual-keyboard__home-pad {
@@ -2210,6 +2334,16 @@ input {
   padding: 14px;
 }
 
+.dark .advanced-settings-section {
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 72%, var(--surface)), color-mix(in srgb, var(--surface) 94%, #000 6%)),
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 122 47 / 0.045),
+    0 14px 30px rgb(0 0 0 / 0.18);
+}
+
 .advanced-settings-section__header {
   display: flex;
   align-items: center;
@@ -2228,6 +2362,10 @@ input {
   font-size: 13px;
 }
 
+.dark .advanced-settings-section__header strong {
+  background: color-mix(in srgb, var(--primary) 15%, var(--surface-strong));
+}
+
 .number-row-card {
   transition:
     border-color 0.16s ease,
@@ -2239,6 +2377,15 @@ input {
   border-color: color-mix(in srgb, var(--primary) 44%, var(--line));
   background: color-mix(in srgb, var(--primary) 8%, var(--surface));
   box-shadow: 0 14px 34px rgb(255 92 0 / 0.12);
+}
+
+.dark .number-row-card.is-active {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 9%, var(--surface-strong)), color-mix(in srgb, var(--surface) 92%, #000 8%)),
+    var(--surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 122 47 / 0.06),
+    0 16px 34px rgb(0 0 0 / 0.2);
 }
 
 .number-row-toggle {
@@ -2268,6 +2415,10 @@ input {
   color: var(--foreground);
   font-size: 13px;
   font-weight: 800;
+}
+
+.dark .number-row-preview span {
+  background: color-mix(in srgb, var(--surface) 88%, #000 12%);
 }
 
 .number-row-preview--shift span {
@@ -2993,9 +3144,9 @@ input {
   }
 
   .typing-strip {
-    min-height: 118px;
-    padding: 16px;
-    font-size: 30px;
+    min-height: 66px;
+    padding: 10px 12px;
+    font-size: clamp(24px, 7vw, 30px);
   }
 
   .play-button {
@@ -3054,9 +3205,14 @@ input {
   .virtual-keyboard {
     --key-gap: clamp(2px, 0.75cqw, 4px);
     --key-unit: clamp(20px, calc((100cqw - 42px) / 15), 38px);
-    --key-height: clamp(36px, 10.8vw, 44px);
+    --key-height: clamp(40px, 11.8vw, 48px);
     overflow-x: hidden;
     padding-inline: 0;
+  }
+
+  .trainer-surface--dismissed .virtual-keyboard,
+  .trainer-layout--practice .trainer-surface--dismissed .virtual-keyboard {
+    --key-height: clamp(40px, 11.8vw, 48px);
   }
 
   .virtual-keyboard__row {

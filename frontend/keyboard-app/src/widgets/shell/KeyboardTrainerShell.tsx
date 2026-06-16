@@ -54,7 +54,6 @@ import {
 import { formatChordSetTitle, selectResultWeakness, trainingSetHintKind, type ChordSetTitleLabels } from "../../features/typing/trainerCopy";
 import { buildTrainingSubmitPayload } from "../../features/typing/trainingPayload";
 import {
-  buildCanvasFont,
   buildMeasuredTypingWindow,
   buildTypingWindow,
   buildTypingWidthMetrics,
@@ -238,7 +237,7 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
   return ["A", "BUTTON", "INPUT", "SELECT", "TEXTAREA"].includes(element.tagName);
 }
 
-let typingMeasureCanvas: HTMLCanvasElement | null = null;
+let typingMeasureElement: HTMLSpanElement | null = null;
 
 function sameTypingMetrics(left: TypingWidthMetrics, right: TypingWidthMetrics): boolean {
   if (
@@ -264,46 +263,56 @@ function measureTypingStripMetrics(element: HTMLElement, stream: StreamItem[]): 
   const styles = window.getComputedStyle(element);
   const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
   const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
-  const usableWidth = Math.max(1, element.clientWidth - paddingLeft - paddingRight - 4);
-  typingMeasureCanvas ??= document.createElement("canvas");
-  const context = typingMeasureCanvas.getContext("2d");
+  const usableWidth = Math.max(1, element.clientWidth - paddingLeft - paddingRight - 2);
   const fontSize = Number.parseFloat(styles.fontSize) || 16;
   const characters = stream.map((item) => item.char);
 
-  if (!context) {
-    const fallbackCharacterWidth = fontSize * 0.82;
-    const metrics = buildTypingWidthMetrics({
-      maxLineWidth: usableWidth,
-      fontSize,
-      characters,
-      measureText: (text) => Array.from(text).reduce((sum) => sum + fallbackCharacterWidth, 0),
-    });
-    return {
-      capacity: computeTypingLineCapacity({ usableWidth, characterWidth: metrics.defaultCharacterWidth }),
-      metrics,
-    };
-  }
-
-  context.font = buildCanvasFont({
-    font: styles.font,
-    fontStyle: styles.fontStyle,
-    fontVariant: styles.fontVariant,
-    fontWeight: styles.fontWeight,
-    fontSize: styles.fontSize,
-    lineHeight: styles.lineHeight,
-    fontFamily: styles.fontFamily,
-  });
   const metrics = buildTypingWidthMetrics({
     maxLineWidth: usableWidth,
     fontSize,
     characters,
-    measureText: (text) => context.measureText(text).width,
+    measureText: (text) => measureTypingTextWithElement(styles, text),
   });
 
   return {
     capacity: computeTypingLineCapacity({ usableWidth, characterWidth: metrics.defaultCharacterWidth }),
     metrics,
   };
+}
+
+function measureTypingTextWithElement(styles: CSSStyleDeclaration, text: string): number {
+  if (!document.body) {
+    const fontSize = Number.parseFloat(styles.fontSize) || 16;
+    return Array.from(text).reduce((sum) => sum + fontSize * 0.82, 0);
+  }
+
+  typingMeasureElement ??= document.createElement("span");
+  if (!typingMeasureElement.isConnected) {
+    document.body.appendChild(typingMeasureElement);
+  }
+
+  Object.assign(typingMeasureElement.style, {
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
+    visibility: "hidden",
+    pointerEvents: "none",
+    whiteSpace: "pre",
+    contain: "layout style paint",
+    fontFamily: styles.fontFamily,
+    fontSize: styles.fontSize,
+    fontStretch: styles.fontStretch,
+    fontStyle: styles.fontStyle,
+    fontVariantLigatures: "none",
+    fontVariationSettings: styles.fontVariationSettings,
+    fontWeight: styles.fontWeight,
+    letterSpacing: styles.letterSpacing,
+    lineHeight: styles.lineHeight,
+    wordSpacing: styles.wordSpacing,
+  });
+  typingMeasureElement.textContent = text;
+
+  return typingMeasureElement.getBoundingClientRect().width;
 }
 
 export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, onLogout, onSignIn }: Props) {
@@ -1682,12 +1691,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               {typingWindow.rows.map((row, rowIndex) => (
                 <div className="typing-strip__line" key={`${typingWindow.start}-${rowIndex}`}>
                   {row.map(({ item, index, status }, itemIndex) => {
+                    const hasPreviousVisibleCharacter = itemIndex > 0 && !row[itemIndex - 1]?.item.isSpace;
+                    const hasNextVisibleCharacter = itemIndex < row.length - 1 && !row[itemIndex + 1]?.item.isSpace;
                     const showSpaceMarker =
                       item.isSpace &&
-                      itemIndex > 0 &&
-                      itemIndex < row.length - 1 &&
-                      !row[itemIndex - 1]?.item.isSpace &&
-                      !row[itemIndex + 1]?.item.isSpace;
+                      hasPreviousVisibleCharacter &&
+                      (hasNextVisibleCharacter || itemIndex === row.length - 1);
 
                     return (
                       <span

@@ -112,7 +112,10 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toMatch(/\.typing-strip[\s\S]*--typing-row-count:\s*1/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*grid-template-rows:\s*minmax\(0,\s*1fr\)/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*font-family:\s*"Roboto Flex"/);
-    expect(styles).toMatch(/\.typing-strip[\s\S]*font-variation-settings:\s*"wdth"\s+54,\s*"opsz"\s+96,\s*"GRAD"\s+-35/);
+    expect(styles).toMatch(/\.typing-strip[\s\S]*font-variation-settings:\s*"wdth"\s+48,\s*"opsz"\s+96,\s*"GRAD"\s+-35/);
+    expect(styles).toMatch(/\.typing-strip[\s\S]*line-height:\s*1\.18/);
+    expect(styles).toMatch(/\.typing-strip__line[\s\S]*overflow:\s*visible/);
+    expect(shell).toContain("measureTypingTextWithElement");
     expect(shell).not.toContain("rowCountForTypingStrip");
     expect(shell).not.toContain("fourRowHeight");
     expect(shell).not.toContain("setTypingRowCount");
@@ -123,6 +126,7 @@ describe("keyboard trainer wide frame", () => {
     const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
 
     expect(shell).toContain("showSpaceMarker");
+    expect(shell).toContain("hasPreviousVisibleCharacter");
     expect(shell).toContain('item.isSpace ? (showSpaceMarker ? "·" : "\\u00a0") : item.char');
     expect(styles).toMatch(/\.typing-char\.is-space[\s\S]*width:\s*0\.58em/);
     expect(styles).toMatch(/\.typing-char\.is-space[\s\S]*font-size:\s*1em/);

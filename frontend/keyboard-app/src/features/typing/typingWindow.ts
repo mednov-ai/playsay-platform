@@ -199,6 +199,22 @@ function splitMeasuredLines(
     let nextWidth = unit.width;
 
     if (currentLine.length > 0 && currentWidth + nextWidth > maxLineWidth) {
+      const trailingSpaces = takeTrailingSpaces(nextItems);
+      const tokenItemsBeforeTrailingSpace = nextItems.slice(0, nextItems.length - trailingSpaces.length);
+      const tokenWidthBeforeTrailingSpace = measureTypingWindowRowWidth(tokenItemsBeforeTrailingSpace, metrics);
+
+      if (
+        trailingSpaces.length > 0 &&
+        tokenItemsBeforeTrailingSpace.length > 0 &&
+        currentWidth + tokenWidthBeforeTrailingSpace <= maxLineWidth
+      ) {
+        currentLine.push(...tokenItemsBeforeTrailingSpace);
+        lines.push(currentLine);
+        currentLine = trailingSpaces;
+        currentWidth = measureTypingWindowRowWidth(currentLine, metrics);
+        return;
+      }
+
       const leadingSpaces = takeLeadingSpaces(nextItems);
       const tokenItems = nextItems.slice(leadingSpaces.length);
       const leadingSpaceWidth = measureTypingWindowRowWidth(leadingSpaces, metrics);
@@ -243,14 +259,21 @@ function buildMeasuredUnits(
   while (index < stream.length) {
     const items: TypingWindowItem[] = [];
 
-    while (index < stream.length && stream[index].isSpace) {
-      items.push(toWindowItem(stream[index], statuses, index));
-      index += 1;
-    }
+    if (stream[index].isSpace) {
+      while (index < stream.length && stream[index].isSpace) {
+        items.push(toWindowItem(stream[index], statuses, index));
+        index += 1;
+      }
+    } else {
+      while (index < stream.length && !stream[index].isSpace) {
+        items.push(toWindowItem(stream[index], statuses, index));
+        index += 1;
+      }
 
-    while (index < stream.length && !stream[index].isSpace) {
-      items.push(toWindowItem(stream[index], statuses, index));
-      index += 1;
+      while (index < stream.length && stream[index].isSpace) {
+        items.push(toWindowItem(stream[index], statuses, index));
+        index += 1;
+      }
     }
 
     if (items.length === 0) {
@@ -273,6 +296,17 @@ function takeLeadingSpaces(items: TypingWindowItem[]): TypingWindowItem[] {
       break;
     }
     spaces.push(item);
+  }
+  return spaces;
+}
+
+function takeTrailingSpaces(items: TypingWindowItem[]): TypingWindowItem[] {
+  const spaces: TypingWindowItem[] = [];
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (!items[index].item.isSpace) {
+      break;
+    }
+    spaces.unshift(items[index]);
   }
   return spaces;
 }

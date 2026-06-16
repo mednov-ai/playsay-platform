@@ -204,6 +204,26 @@ describe("typing window", () => {
     expect(measureTypingWindowRowWidth(window.rows[0], metrics)).toBeLessThanOrEqual(metrics.maxLineWidth);
   });
 
+  it("keeps separator spaces at the end of the previous measured line", () => {
+    const stream = streamFromText("aa bb cc dd");
+    const statuses = stream.map(() => "pending" as const);
+    const metrics = {
+      maxLineWidth: 25,
+      defaultCharacterWidth: 10,
+      spaceWidth: 5,
+      characterWidths: { a: 10, b: 10, c: 10, d: 10 },
+    };
+
+    const window = buildMeasuredTypingWindow(stream, statuses, 0, metrics, 2);
+
+    expect(rowText(window.rows[0])).toBe("aa ");
+    expect(rowText(window.rows[1])).toBe("bb ");
+    window.rows.forEach((row) => {
+      expect(row[0]?.item.isSpace).not.toBe(true);
+      expect(measureTypingWindowRowWidth(row, metrics)).toBeLessThanOrEqual(metrics.maxLineWidth);
+    });
+  });
+
   it("keeps measured non-final rows close to the available width when tokens remain", () => {
     const stream = streamFromText("ation ition ement ently ssion through sider ntial iness struct tinue ction fulness ability practice");
     const statuses = stream.map(() => "pending" as const);

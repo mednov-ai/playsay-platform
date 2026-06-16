@@ -954,7 +954,7 @@ input {
 .trainer-layout--practice .trainer-surface--dismissed .typing-strip {
   min-height: 0;
   font-size: 36px;
-  line-height: 1;
+  line-height: 1.18;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice {
@@ -1708,25 +1708,27 @@ input {
   font-family: "Roboto Flex", "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: clamp(32px, 3.1vw, 40px);
   font-weight: 760;
-  font-stretch: 75%;
-  font-variation-settings: "wdth" 54, "opsz" 96, "GRAD" -35;
+  font-stretch: 70%;
+  font-variation-settings: "wdth" 48, "opsz" 96, "GRAD" -35;
   font-variant-ligatures: none;
   letter-spacing: 0;
   word-spacing: 0;
-  line-height: 1;
+  line-height: 1.18;
 }
 
 .typing-strip__line {
   align-self: center;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   white-space: nowrap;
+  line-height: inherit;
 }
 
 .typing-char {
   position: relative;
   display: inline-block;
   min-width: 0;
+  line-height: inherit;
   color: color-mix(in srgb, var(--foreground) 62%, var(--muted));
 }
 

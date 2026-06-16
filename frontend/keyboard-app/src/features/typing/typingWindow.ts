@@ -164,7 +164,8 @@ export function buildMeasuredTypingWindow(
     0,
     lines.findIndex((line) => line.some((item) => item.index === clampedPosition)),
   );
-  const startLineIndex = Math.max(0, Math.min(currentLineIndex - 1, Math.max(0, lines.length - cleanRowCount)));
+  const contextLineCount = Math.max(0, cleanRowCount - 1);
+  const startLineIndex = Math.max(0, Math.min(currentLineIndex - contextLineCount, Math.max(0, lines.length - cleanRowCount)));
   const rows = lines.slice(startLineIndex, startLineIndex + cleanRowCount);
   while (rows.length < cleanRowCount) {
     rows.push([]);

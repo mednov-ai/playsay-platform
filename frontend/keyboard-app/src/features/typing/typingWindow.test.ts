@@ -139,6 +139,35 @@ describe("typing window", () => {
     });
   });
 
+  it("keeps the current measured line visible when the typing strip has one row", () => {
+    const stream = streamFromText("la co er ur ri ho ol un nd ly om ic wh nc ge th pr de");
+    const statuses: CharStatus[] = stream.map((_, index) => (index < 18 ? "correct" : "pending"));
+    const metrics = {
+      maxLineWidth: 150,
+      defaultCharacterWidth: 10,
+      spaceWidth: 5,
+      characterWidths: {
+        a: 10,
+        c: 10,
+        e: 10,
+        h: 10,
+        i: 10,
+        l: 10,
+        n: 10,
+        o: 10,
+        r: 10,
+        u: 10,
+      },
+    };
+
+    const window = buildMeasuredTypingWindow(stream, statuses, 18, metrics, 1);
+    const visibleCurrent = window.rows.flat().find((item) => item.index === 18);
+
+    expect(window.rows).toHaveLength(1);
+    expect(visibleCurrent).toBeDefined();
+    expect(visibleCurrent?.status).toBe("pending");
+  });
+
   it("wraps only between chord tokens, never inside an ngram token", () => {
     const stream = streamFromText("ation ition ement practice");
     const statuses = stream.map(() => "pending" as const);

@@ -105,7 +105,7 @@ describe("keyboard trainer wide frame", () => {
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.practice-workspace\s*\{[^}]*min-height:\s*calc/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice[\s\S]*grid-template-rows:\s*minmax\(58px,\s*auto\)\s+minmax\(70px,\s*auto\)\s+auto/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice[\s\S]*grid-template-rows:\s*minmax\(58px,\s*auto\)\s+minmax\(76px,\s*auto\)\s+auto/,
     );
     expect(styles).toMatch(
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.practice-cluster[\s\S]*--practice-cluster-gap:\s*8px/,
@@ -117,10 +117,10 @@ describe("keyboard trainer wide frame", () => {
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*clamp\(53px,\s*7\.4vh,\s*58px\)/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*70px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*76px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat\s*\{[\s\S]*min-height:\s*70px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat\s*\{[\s\S]*min-height:\s*76px/,
     );
     expect(styles).toMatch(
       /\.stat--metric[\s\S]*container-type:\s*size/,
@@ -134,6 +134,8 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toMatch(
       /\.stat__value-line[\s\S]*transform:\s*scale\(var\(--stat-value-scale-x\),\s*var\(--stat-value-scale-y\)\)/,
     );
+    expect(styles).toMatch(/\.stats-panel--practice\s+\.stat__value-line[\s\S]*align-self:\s*start/);
+    expect(styles).toMatch(/\.stats-panel--practice\s+\.stat__value-line[\s\S]*transform-origin:\s*center top/);
   });
 
   it("keeps the focused typing strip as a single measured line", () => {

@@ -961,7 +961,7 @@ input {
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice {
   gap: 5px;
-  grid-template-rows: minmax(58px, auto) minmax(70px, auto) auto;
+  grid-template-rows: minmax(58px, auto) minmax(76px, auto) auto;
   padding: 6px 10px 7px;
 }
 
@@ -970,7 +970,7 @@ input {
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice .stat--metric {
-  min-height: 70px;
+  min-height: 76px;
   padding: 6px 8px 5px;
 }
 
@@ -980,7 +980,7 @@ input {
   --stat-unit-suffix-size: clamp(11px, 14cqh, 18px);
   --stat-value-scale-x: 0.68;
   --stat-value-scale-y: 1.28;
-  min-height: 70px;
+  min-height: 76px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel__mastery-value-line {
@@ -1648,6 +1648,11 @@ input {
 
 .stats-panel--practice .stat__suffix--unit {
   font-size: var(--stat-unit-suffix-size);
+}
+
+.stats-panel--practice .stat__value-line {
+  align-self: start;
+  transform-origin: center top;
 }
 
 .stat__value--accent {

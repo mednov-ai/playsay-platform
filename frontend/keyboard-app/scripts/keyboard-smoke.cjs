@@ -245,6 +245,32 @@ async function assertNoDocumentHorizontalOverflow(page) {
   }
 }
 
+async function assertFocusedMetricValuesDoNotClip(page) {
+  await page.evaluate(() => document.fonts?.ready ?? Promise.resolve());
+  const metrics = await page.locator(".stats-panel--practice .stat--metric").evaluateAll((cards) => cards.map((card) => {
+    const cardBox = card.getBoundingClientRect();
+    const labelBox = card.querySelector(":scope > span")?.getBoundingClientRect();
+    const valueBox = card.querySelector(".stat__value-line")?.getBoundingClientRect();
+    return {
+      text: card.textContent?.replace(/\s+/g, " ").trim(),
+      labelValueGap: labelBox && valueBox ? valueBox.top - labelBox.bottom : null,
+      valueTopInset: valueBox ? valueBox.top - cardBox.top : null,
+      valueBottomInset: valueBox ? cardBox.bottom - valueBox.bottom : null,
+    };
+  }));
+  const clipped = metrics.find((metric) => (
+    metric.labelValueGap == null
+    || metric.valueTopInset == null
+    || metric.valueBottomInset == null
+    || metric.labelValueGap < 0
+    || metric.valueTopInset < 0
+    || metric.valueBottomInset < 0
+  ));
+  if (clipped) {
+    throw new Error(`Focused metric value is clipped or overlaps its label: ${JSON.stringify(clipped)}`);
+  }
+}
+
 async function capture(page, name) {
   if (!screenshotDir) {
     return;
@@ -288,6 +314,7 @@ async function capture(page, name) {
   if (!(await page.locator(".stats-panel--practice .stat__value--animated").first().isVisible())) {
     throw new Error("Focused practice stats are not rendered with animated numeric values.");
   }
+  await assertFocusedMetricValuesDoNotClip(page);
   await skipCountdown(page);
   if (await page.locator(".side-panel").isVisible()) {
     throw new Error("Side controls are visible during running practice.");

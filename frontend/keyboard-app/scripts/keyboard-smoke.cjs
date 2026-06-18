@@ -245,9 +245,9 @@ async function assertNoDocumentHorizontalOverflow(page) {
   }
 }
 
-async function assertFocusedMetricValuesDoNotClip(page) {
+async function assertMetricValuesDoNotClip(page, selector = ".stats-panel--practice .stat--metric") {
   await page.evaluate(() => document.fonts?.ready ?? Promise.resolve());
-  const metrics = await page.locator(".stats-panel--practice .stat--metric").evaluateAll((cards) => cards.map((card) => {
+  const metrics = await page.locator(selector).evaluateAll((cards) => cards.map((card) => {
     const cardBox = card.getBoundingClientRect();
     const labelBox = card.querySelector(":scope > span")?.getBoundingClientRect();
     const valueBox = card.querySelector(".stat__value-line")?.getBoundingClientRect();
@@ -267,7 +267,7 @@ async function assertFocusedMetricValuesDoNotClip(page) {
     || metric.valueBottomInset < 0
   ));
   if (clipped) {
-    throw new Error(`Focused metric value is clipped or overlaps its label: ${JSON.stringify(clipped)}`);
+    throw new Error(`Metric value is clipped or overlaps its label: ${JSON.stringify(clipped)}`);
   }
 }
 
@@ -314,7 +314,7 @@ async function capture(page, name) {
   if (!(await page.locator(".stats-panel--practice .stat__value--animated").first().isVisible())) {
     throw new Error("Focused practice stats are not rendered with animated numeric values.");
   }
-  await assertFocusedMetricValuesDoNotClip(page);
+  await assertMetricValuesDoNotClip(page);
   await skipCountdown(page);
   if (await page.locator(".side-panel").isVisible()) {
     throw new Error("Side controls are visible during running practice.");
@@ -348,6 +348,7 @@ async function capture(page, name) {
   if (await page.locator(".trainer-intro").isVisible()) {
     throw new Error("Intro returned after it had been dismissed for this browser profile.");
   }
+  await assertMetricValuesDoNotClip(page, ".stats-panel--default .stat--metric");
   const restoredSetTitle = await page.locator(".stats-panel__set-copy h1").innerText();
   if (restoredSetTitle.includes("home row")) {
     throw new Error(`Reload fell back to the first two-letter starter set: ${restoredSetTitle}`);

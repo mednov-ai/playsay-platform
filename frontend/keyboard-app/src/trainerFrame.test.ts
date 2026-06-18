@@ -74,7 +74,7 @@ describe("keyboard trainer wide frame", () => {
       /\.trainer-surface--dismissed\s+\.typing-stage[\s\S]*height:\s*78px/,
     );
     expect(styles).toMatch(
-      /\.trainer-surface--dismissed\s+\.stat--metric\s*\{[^}]*min-height:\s*62px/,
+      /\.trainer-surface--dismissed\s+\.stat--metric\s*\{[^}]*min-height:\s*72px/,
     );
     expect(styles).not.toMatch(
       /\.trainer-surface--dismissed\s+\.practice-workspace\s*\{[^}]*min-height:\s*calc/,

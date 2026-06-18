@@ -918,7 +918,7 @@ input {
 }
 
 .trainer-surface--dismissed .stat--metric {
-  min-height: 62px;
+  min-height: 72px;
   padding: 7px 8px 6px;
 }
 

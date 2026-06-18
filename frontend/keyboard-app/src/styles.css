@@ -393,7 +393,7 @@ input {
 .side-panel {
   display: grid;
   width: min(100%, var(--trainer-frame-width));
-  grid-template-columns: minmax(130px, 0.9fr) 96px 112px minmax(240px, 1.35fr) minmax(124px, 0.58fr) minmax(280px, 1.25fr) minmax(150px, 0.68fr);
+  grid-template-columns: minmax(150px, 0.9fr) 96px minmax(154px, 0.9fr) minmax(260px, 1.45fr) minmax(124px, 0.65fr);
   justify-self: center;
   align-items: end;
   gap: 8px;
@@ -623,12 +623,6 @@ input {
   color: var(--primary);
 }
 
-.progress-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(76px, 1fr));
-  gap: 8px;
-}
-
 .gamification-panel {
   display: grid;
   gap: 8px;
@@ -784,51 +778,6 @@ input {
   font-size: 16px;
 }
 
-.weak-fingers {
-  align-self: stretch;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-strong);
-  padding: 8px 10px;
-  overflow: auto;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.weak-fingers summary {
-  cursor: pointer;
-  color: var(--foreground);
-  font-weight: 800;
-}
-
-.weak-fingers h2 {
-  margin: 0;
-  font-size: 17px;
-}
-
-.weak-fingers ul {
-  display: grid;
-  gap: 6px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.weak-fingers li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 8px;
-}
-
-.weak-fingers p {
-  margin: 8px 0 0;
-  color: var(--muted);
-}
-
 .progress-import-status {
   align-self: stretch;
   border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--line));
@@ -875,6 +824,65 @@ input {
   font-size: 14px;
   font-weight: 750;
   line-height: 1.38;
+}
+
+.profile-progress-snapshot {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-strong) 86%, transparent);
+  padding: 12px;
+}
+
+.profile-progress-snapshot__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.profile-progress-snapshot__weak-fingers {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.profile-progress-snapshot__weak-fingers h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 15px;
+}
+
+.profile-progress-snapshot__weak-fingers ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-progress-snapshot__weak-fingers li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+
+.profile-progress-snapshot__weak-fingers li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.profile-progress-snapshot__weak-fingers p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .trainer-surface {
@@ -2982,11 +2990,6 @@ input {
     grid-template-columns: minmax(130px, 0.9fr) 86px minmax(146px, 0.9fr) minmax(220px, 1.35fr) minmax(118px, 0.7fr);
   }
 
-  .progress-summary,
-  .weak-fingers {
-    display: none;
-  }
-
   .stats-panel__metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -2995,11 +2998,6 @@ input {
 @media (max-width: 1500px) {
   .side-panel {
     grid-template-columns: minmax(150px, 0.9fr) 96px minmax(154px, 0.9fr) minmax(260px, 1.45fr) minmax(124px, 0.65fr);
-  }
-
-  .progress-summary,
-  .weak-fingers {
-    display: none;
   }
 }
 
@@ -3086,7 +3084,7 @@ input {
   }
 
   .stats-panel__metrics,
-  .progress-summary {
+  .profile-progress-snapshot__metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -3127,11 +3125,6 @@ input {
   .gamification-panel__grid,
   .gamification-panel--compact .gamification-panel__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .progress-summary,
-  .weak-fingers {
-    display: none;
   }
 
   .progress-profile-button {

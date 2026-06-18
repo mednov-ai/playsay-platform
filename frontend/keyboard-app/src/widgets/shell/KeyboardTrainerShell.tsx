@@ -1568,29 +1568,6 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </button>
           </div>
 
-          <div className="progress-summary">
-            <Metric label={t("trainer.sessions")} value={String(effectiveProgress.sessions)} />
-            <Metric label={t("trainer.best")} value={`${Math.round(effectiveProgress.bestSpeedCpm)} ${t("units.cpm")}`} />
-            <Metric label={t("trainer.avgSpeed")} value={`${Math.round(effectiveProgress.avgSpeedCpm)} ${t("units.cpm")}`} />
-            <Metric label={t("trainer.avgAccuracy")} value={`${Math.round(effectiveProgress.avgAccuracy * 100)}${t("units.percent")}`} />
-          </div>
-
-          <details className="weak-fingers">
-            <summary>{t("trainer.weakFingers")}</summary>
-            {effectiveProgress.weakFingers.length > 0 ? (
-              <ul>
-                {effectiveProgress.weakFingers.map((finger) => (
-                  <li key={finger.finger}>
-                    <span>{t(`finger.${finger.finger as (typeof FINGER_ORDER)[number]}`)}</span>
-                    <strong>{finger.errors}</strong>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>{isAuthenticated ? t("trainer.noWeakFingers") : t("trainer.signInForProgress")}</p>
-            )}
-          </details>
-
           {progressImportMessage ? <div className="progress-import-status">{progressImportMessage}</div> : null}
 
         </aside>
@@ -2062,6 +2039,24 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               <X size={18} aria-hidden="true" />
             </button>
             <h2 id="profile-modal-title">{t("trainer.progressProfile")}</h2>
+            <ProfileProgressSnapshot
+              progress={effectiveProgress}
+              labels={{
+                sessions: t("trainer.sessions"),
+                best: t("trainer.best"),
+                avgSpeed: t("trainer.avgSpeed"),
+                avgAccuracy: t("trainer.avgAccuracy"),
+                weakFingers: t("trainer.weakFingers"),
+                noWeakFingers: t("trainer.noWeakFingers"),
+                signInForProgress: t("trainer.signInForProgress"),
+              }}
+              units={{
+                cpm: t("units.cpm"),
+                percent: t("units.percent"),
+              }}
+              isAuthenticated={isAuthenticated}
+              fingerLabel={(finger) => t(`finger.${finger as (typeof FINGER_ORDER)[number]}`)}
+            />
             <GamificationProfilePanel
               labels={gamificationLabels}
               units={{ cpm: t("units.cpm") }}
@@ -2104,5 +2099,56 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function ProfileProgressSnapshot({
+  progress,
+  labels,
+  units,
+  isAuthenticated,
+  fingerLabel,
+}: {
+  progress: Progress;
+  labels: {
+    sessions: string;
+    best: string;
+    avgSpeed: string;
+    avgAccuracy: string;
+    weakFingers: string;
+    noWeakFingers: string;
+    signInForProgress: string;
+  };
+  units: {
+    cpm: string;
+    percent: string;
+  };
+  isAuthenticated: boolean;
+  fingerLabel: (finger: string) => string;
+}) {
+  return (
+    <section className="profile-progress-snapshot" aria-label={labels.weakFingers}>
+      <div className="profile-progress-snapshot__metrics">
+        <Metric label={labels.sessions} value={String(progress.sessions)} />
+        <Metric label={labels.best} value={`${Math.round(progress.bestSpeedCpm)} ${units.cpm}`} />
+        <Metric label={labels.avgSpeed} value={`${Math.round(progress.avgSpeedCpm)} ${units.cpm}`} />
+        <Metric label={labels.avgAccuracy} value={`${Math.round(progress.avgAccuracy * 100)}${units.percent}`} />
+      </div>
+      <div className="profile-progress-snapshot__weak-fingers">
+        <h3>{labels.weakFingers}</h3>
+        {progress.weakFingers.length > 0 ? (
+          <ul>
+            {progress.weakFingers.map((finger) => (
+              <li key={finger.finger}>
+                <span>{fingerLabel(finger.finger)}</span>
+                <strong>{finger.errors}</strong>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>{isAuthenticated ? labels.noWeakFingers : labels.signInForProgress}</p>
+        )}
+      </div>
+    </section>
   );
 }

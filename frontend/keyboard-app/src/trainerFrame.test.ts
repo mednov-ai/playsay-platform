@@ -24,6 +24,18 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).not.toContain("gamification-panel__events");
   });
 
+  it("keeps progress details in the profile modal instead of the trainer chrome", () => {
+    const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
+
+    expect(shell).not.toContain('className="progress-summary"');
+    expect(shell).not.toContain('className="weak-fingers"');
+    expect(shell).toContain("<ProfileProgressSnapshot");
+    expect(shell).toContain('className="profile-progress-snapshot"');
+    expect(styles).not.toContain(".progress-summary");
+    expect(styles).not.toContain(".weak-fingers");
+    expect(styles).toContain(".profile-progress-snapshot");
+  });
+
   it("removes the rough recent dynamics surface from the trainer", () => {
     const shell = readFileSync(resolve(__dirname, "widgets/shell/KeyboardTrainerShell.tsx"), "utf8");
 

@@ -271,6 +271,42 @@ async function assertMetricValuesDoNotClip(page, selector = ".stats-panel--pract
   }
 }
 
+async function assertCompactTrainerChromeAtWideLowViewport(page) {
+  await page.setViewportSize({ width: 1501, height: 405 });
+  await page.locator(".trainer-surface--dismissed").waitFor({ state: "visible", timeout: 10_000 });
+  const layout = await page.evaluate(() => {
+    const rect = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) {
+        return null;
+      }
+      const box = element.getBoundingClientRect();
+      return {
+        display: getComputedStyle(element).display,
+        top: box.top,
+        bottom: box.bottom,
+        height: box.height,
+      };
+    };
+    return {
+      progressSummary: rect(".progress-summary"),
+      weakFingers: rect(".weak-fingers"),
+      trainerSurface: rect(".trainer-surface--dismissed"),
+      trainerFooter: rect(".trainer-footer"),
+      viewportHeight: window.innerHeight,
+    };
+  });
+  if (layout.progressSummary || layout.weakFingers) {
+    throw new Error(`Persistent progress blocks are still mounted in the trainer chrome: ${JSON.stringify(layout)}`);
+  }
+  if (!layout.trainerSurface || layout.trainerSurface.top > 145) {
+    throw new Error(`Trainer surface shifted too far down at 1501x405: ${JSON.stringify(layout)}`);
+  }
+  if (!layout.trainerFooter || layout.trainerFooter.bottom > layout.viewportHeight + 1) {
+    throw new Error(`Trainer footer leaves the low desktop viewport: ${JSON.stringify(layout)}`);
+  }
+}
+
 async function capture(page, name) {
   if (!screenshotDir) {
     return;
@@ -426,10 +462,15 @@ async function capture(page, name) {
     throw new Error(`Anonymous local state was not cleared: ${JSON.stringify(resetState)}`);
   }
   await expectVisibleText(page, "Local practice");
-  const sessionMetric = (await page.locator(".progress-summary .metric").first().innerText()).replace(/\s+/g, " ");
-  if (!sessionMetric.includes("Sessions") || !sessionMetric.includes("0")) {
+  await page.locator(".progress-profile-button").click();
+  const sessionMetric = (await page.locator(".profile-progress-snapshot .metric").first().innerText()).replace(/\s+/g, " ");
+  const normalizedSessionMetric = sessionMetric.toLowerCase();
+  if (!normalizedSessionMetric.includes("sessions") || !sessionMetric.includes("0")) {
     throw new Error(`Guest sessions did not reset in the UI: ${sessionMetric}`);
   }
+  await page.keyboard.press("Escape");
+  await page.locator("#profile-modal-title").waitFor({ state: "hidden", timeout: 10_000 });
+  await assertCompactTrainerChromeAtWideLowViewport(page);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator(".virtual-keyboard").waitFor({ state: "visible", timeout: 10_000 });

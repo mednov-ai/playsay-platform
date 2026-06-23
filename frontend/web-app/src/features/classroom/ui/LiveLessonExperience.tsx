@@ -233,13 +233,13 @@ export function classroomViewportMode(): ClassroomViewportMode {
 
 export function effectiveClassroomViewportMode(
   viewportMode: ClassroomViewportMode,
-  canManageLesson: boolean,
+  _canManageLesson: boolean,
 ): ClassroomViewportMode {
-  return canManageLesson ? "desktop" : viewportMode;
+  return viewportMode;
 }
 
 export function shouldShowLessonWorkspace({
-  canManageLesson,
+  canManageLesson: _canManageLesson,
   videoOnly,
   viewportMode,
 }: {
@@ -247,15 +247,11 @@ export function shouldShowLessonWorkspace({
   videoOnly: boolean;
   viewportMode: ClassroomViewportMode;
 }): boolean {
-  if (videoOnly) {
+  if (videoOnly || viewportMode !== "desktop") {
     return false;
   }
 
-  if (canManageLesson) {
-    return true;
-  }
-
-  return viewportMode === "desktop";
+  return true;
 }
 
 export function classroomFullscreenActive(shell?: HTMLElement | null): boolean {

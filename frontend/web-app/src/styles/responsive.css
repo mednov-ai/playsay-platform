@@ -433,8 +433,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .playsay-match-picture img,
-  .playsay-match-generated-thumb {
+  .playsay-match-target[data-kind="image"] img,
+  .playsay-match-target[data-kind="image"] .playsay-match-generated-thumb {
     width: 2.55rem;
   }
 

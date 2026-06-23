@@ -27,6 +27,24 @@ const block = {
   pairs,
 } as MaterialEditorBlock;
 
+const imagePairs: MaterialMatchingPair[] = [
+  {
+    id: "pair-image",
+    imageAlt: "A small orange house",
+    imageUrl: "material-asset:house",
+    left: "house",
+    right: "house",
+    targetKind: "IMAGE",
+  },
+];
+
+const imageBlock = {
+  id: "block-image-matching",
+  type: "matchingPairs",
+  title: "Match the pictures",
+  pairs: imagePairs,
+} as MaterialEditorBlock;
+
 describe("RenderedMatchingPairsExercise card flow", () => {
   it("moves solved pairs to the solved area in the order the student finds them", () => {
     const firstAnswer = materialMatchingAnswerAfterSelection(undefined, pairs, "pair-b", "pair-b");
@@ -79,6 +97,25 @@ describe("RenderedMatchingPairsExercise card flow", () => {
     }));
 
     expect(markup).not.toContain("playsay-answer-attempt-bar");
+  });
+
+  it("renders image targets with a shared sizing hook in unresolved and solved cards", () => {
+    const markup = renderToStaticMarkup(createElement(RenderedMatchingPairsExercise, {
+      answer: {
+        type: "matchingPairs",
+        matches: { "pair-image": "pair-image" },
+        matchOrder: ["pair-image"],
+      },
+      assetUrls: {
+        house: "/api/materials/material-1/assets/house/content",
+      },
+      block: imageBlock,
+      mode: "classroom",
+    }));
+
+    expect(markup).toContain("playsay-match-target");
+    expect(markup).toContain("data-kind=\"image\"");
+    expect(markup).toContain("src=\"/api/materials/material-1/assets/house/content\"");
   });
 
   it("locks unresolved cards after the global error budget is used", () => {

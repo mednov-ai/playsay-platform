@@ -224,7 +224,7 @@ function MatchingPairTarget({
 
   if (pairTargetKind === "IMAGE") {
     return (
-      <>
+      <span className="playsay-match-target" data-kind="image">
         {imageUrl ? (
           <img alt={pair.imageAlt || pair.right} src={imageUrl} />
         ) : (
@@ -235,15 +235,17 @@ function MatchingPairTarget({
         {!imageUrl ? (
           <small>{hasPendingAsset ? t("materials.renderer.loadingImage") : pair.imagePrompt || pair.imageAlt || pair.right}</small>
         ) : null}
-      </>
+      </span>
     );
   }
 
   return (
-    <MarkdownInline
-      className="playsay-match-text-target playsay-match-markdown"
-      value={pair.right || t("materials.renderer.pictureAria", { index: optionIndex + 1 })}
-    />
+    <span className="playsay-match-target" data-kind="text">
+      <MarkdownInline
+        className="playsay-match-text-target playsay-match-markdown"
+        value={pair.right || t("materials.renderer.pictureAria", { index: optionIndex + 1 })}
+      />
+    </span>
   );
 }
 

@@ -979,8 +979,24 @@
   text-align: center;
 }
 
-.playsay-match-picture img,
-.playsay-match-generated-thumb {
+.playsay-match-target {
+  min-width: 0;
+}
+
+.playsay-match-target[data-kind="image"] {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+
+.playsay-match-target[data-kind="text"] {
+  display: block;
+}
+
+.playsay-match-target[data-kind="image"] img,
+.playsay-match-target[data-kind="image"] .playsay-match-generated-thumb {
   width: 3.2rem;
   aspect-ratio: 1;
   border-radius: 0.75rem;
@@ -1004,7 +1020,8 @@
   color: hsl(var(--primary));
 }
 
-.playsay-match-picture span:not(.playsay-match-generated-thumb) {
+.playsay-match-picture span:not(.playsay-match-generated-thumb),
+.playsay-match-solved-card span:not(.playsay-match-generated-thumb) {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -1067,7 +1084,9 @@
 }
 
 .playsay-match-solved-card[data-side="right"] {
+  justify-content: center;
   color: hsl(var(--foreground));
+  text-align: center;
 }
 
 .playsay-match-empty {

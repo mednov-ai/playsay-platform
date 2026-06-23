@@ -37,12 +37,13 @@ describe("classroomViewportMode", () => {
     })).toBe("desktop");
   });
 
-  it("keeps teachers in desktop classroom layout even on narrow touch viewports", () => {
-    expect(effectiveClassroomViewportMode("mobilePortrait", true)).toBe("desktop");
-    expect(effectiveClassroomViewportMode("mobileLandscape", true)).toBe("desktop");
+  it("keeps the detected mobile classroom mode for teachers too", () => {
+    expect(effectiveClassroomViewportMode("mobilePortrait", true)).toBe("mobilePortrait");
+    expect(effectiveClassroomViewportMode("mobileLandscape", true)).toBe("mobileLandscape");
+    expect(effectiveClassroomViewportMode("desktop", true)).toBe("desktop");
   });
 
-  it("hides lesson workspace from mobile students while keeping desktop student work visible", () => {
+  it("hides lesson workspace on mobile while keeping desktop work visible", () => {
     expect(shouldShowLessonWorkspace({
       canManageLesson: false,
       videoOnly: false,
@@ -55,6 +56,21 @@ describe("classroomViewportMode", () => {
     })).toBe(false);
     expect(shouldShowLessonWorkspace({
       canManageLesson: false,
+      videoOnly: false,
+      viewportMode: "desktop",
+    })).toBe(true);
+    expect(shouldShowLessonWorkspace({
+      canManageLesson: true,
+      videoOnly: false,
+      viewportMode: "mobilePortrait",
+    })).toBe(false);
+    expect(shouldShowLessonWorkspace({
+      canManageLesson: true,
+      videoOnly: false,
+      viewportMode: "mobileLandscape",
+    })).toBe(false);
+    expect(shouldShowLessonWorkspace({
+      canManageLesson: true,
       videoOnly: false,
       viewportMode: "desktop",
     })).toBe(true);

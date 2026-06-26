@@ -98,14 +98,16 @@ class LiveKitRoomStore(
         return if (authentication.canJoinAnyLiveKitLesson()) {
             lessonRepo.findJoinableForManager(
                 lessonId = lessonId,
-                now = now,
+                accessStartsBy = lessonAccessStartsBy(now),
+                accessEndsAfter = lessonAccessEndsAfter(now),
                 excludedStatuses = expiredLiveKitStatuses,
             )
         } else {
             lessonRepo.findJoinableForStudent(
                 lessonId = lessonId,
                 subject = authentication.token.subject,
-                now = now,
+                accessStartsBy = lessonAccessStartsBy(now),
+                accessEndsAfter = lessonAccessEndsAfter(now),
                 excludedStatuses = expiredLiveKitStatuses,
             )
         }

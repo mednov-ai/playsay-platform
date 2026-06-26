@@ -6,6 +6,7 @@ import {
 import { participantAssignmentsFromLesson } from "../../entities/schedule/model";
 import {
   editScheduledLesson,
+  completeScheduledLesson as completeScheduledLessonRequest,
   enterScheduledLessonRoom,
   fetchScheduledLessons,
   fetchStudentProfiles,
@@ -154,6 +155,25 @@ export function useScheduleActions({
     }
   }
 
+  async function completeScheduledLesson(lessonId: string) {
+    setScheduleLoading(true);
+    setRoomMessage(null);
+    setScheduleMessage(null);
+    try {
+      const updated = await completeScheduledLessonRequest(lessonId);
+      setScheduledLessons((current) => current.map((item) => (item.id === lessonId ? updated : item)));
+      setRoomSession((current) => (current?.lessonId === lessonId ? null : current));
+      setScheduleMessage(t("schedule.messages.completed"));
+      if (classroomLessonIdFromPath(window.location.pathname)) {
+        navigateToPath("/");
+      }
+    } catch (caught) {
+      setScheduleMessage(applySessionError(caught, t("schedule.messages.completeFailed")));
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+
   async function deleteScheduledLesson(lessonId: string) {
     setScheduleLoading(true);
     setScheduleMessage(null);
@@ -218,6 +238,7 @@ export function useScheduleActions({
   return {
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
+    completeScheduledLesson,
     closeClassroom,
     createScheduledLesson,
     deleteScheduledLesson,

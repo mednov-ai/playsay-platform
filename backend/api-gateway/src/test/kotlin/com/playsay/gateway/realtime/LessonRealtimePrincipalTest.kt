@@ -35,7 +35,7 @@ class LessonRealtimePrincipalTest {
         assertFalse(
             principal.canSee(
                 lesson(
-                    scheduledEnd = Instant.parse("2026-05-25T09:59:59Z"),
+                    scheduledEnd = Instant.parse("2026-05-25T09:49:59Z"),
                     participantSubjects = listOf("student-1"),
                 ),
                 now,

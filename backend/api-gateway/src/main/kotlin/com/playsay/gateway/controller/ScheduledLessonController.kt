@@ -145,4 +145,25 @@ class ScheduledLessonController(
         store.delete(authentication, lessonId)
         return ResponseEntity.noContent().build()
     }
+
+    @PostMapping("/schedule/lessons/{lessonId}/complete", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "completeScheduledLesson",
+        summary = "Complete scheduled lesson",
+        description = "Completes a calendar lesson and closes live access. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Scheduled lesson completed"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot manage schedule", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson not found", content = [Content()]),
+        ],
+    )
+    fun complete(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+    ): ScheduledLessonResponse =
+        store.complete(authentication, lessonId)
 }

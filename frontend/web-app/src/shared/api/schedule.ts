@@ -1,6 +1,7 @@
 import {
   createScheduledLesson,
   createScheduledLessonRoomToken,
+  completeScheduledLesson as completeScheduledLessonGenerated,
   deleteScheduledLesson,
   getScheduledLesson,
   listScheduledLessons,
@@ -88,6 +89,20 @@ export async function removeScheduledLesson(lessonId: string, config = authConfi
   if (response.status !== 204) {
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson delete failed with HTTP ${response.status}.`);
   }
+}
+
+export async function completeScheduledLesson(lessonId: string, config = authConfig): Promise<ScheduledLesson> {
+  const response = await completeScheduledLessonGenerated(lessonId, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson complete failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
 }
 
 export async function enterScheduledLessonRoom(lessonId: string, config = authConfig): Promise<LiveKitRoomToken> {

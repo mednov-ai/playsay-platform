@@ -37,6 +37,33 @@ describe("schedule model", () => {
     expect(scheduleStateLabel(lesson({ scheduledEnd: "2026-05-28T09:00:00.000Z" }), nowMs, t)).toBe("schedule.state.expired");
     expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T09:30:00.000Z", scheduledEnd: "2026-05-28T10:30:00.000Z" }), nowMs, t)).toBe("schedule.state.live");
     expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T11:00:00.000Z" }), nowMs, t)).toBe("schedule.state.planned");
+    expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T10:08:00.000Z", scheduledEnd: "2026-05-28T10:53:00.000Z" }), nowMs, t)).toBe("schedule.state.opensSoon");
+    expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T09:07:00.000Z", scheduledEnd: "2026-05-28T09:52:00.000Z" }), nowMs, t)).toBe("schedule.state.closingSoon");
+  });
+
+  it("opens live lesson access only from ten minutes before start until ten minutes after end", () => {
+    const nowMs = Date.parse("2026-05-28T10:00:00.000Z");
+
+    expect(isJoinableScheduledLesson(lesson({
+      scheduledStart: "2026-05-28T10:11:00.000Z",
+      scheduledEnd: "2026-05-28T10:56:00.000Z",
+    }), nowMs)).toBe(false);
+    expect(isJoinableScheduledLesson(lesson({
+      scheduledStart: "2026-05-28T10:10:00.000Z",
+      scheduledEnd: "2026-05-28T10:55:00.000Z",
+    }), nowMs)).toBe(true);
+    expect(isJoinableScheduledLesson(lesson({
+      scheduledStart: "2026-05-28T09:05:00.000Z",
+      scheduledEnd: "2026-05-28T09:50:00.000Z",
+    }), nowMs)).toBe(true);
+    expect(isJoinableScheduledLesson(lesson({
+      scheduledStart: "2026-05-28T09:04:00.000Z",
+      scheduledEnd: "2026-05-28T09:49:00.000Z",
+    }), nowMs)).toBe(false);
+    expect(isJoinableScheduledLesson(lesson({
+      scheduledStart: null,
+      scheduledEnd: "2026-05-28T10:45:00.000Z",
+    }), nowMs)).toBe(false);
   });
 
   it("sorts current and upcoming lessons before archived lessons", () => {

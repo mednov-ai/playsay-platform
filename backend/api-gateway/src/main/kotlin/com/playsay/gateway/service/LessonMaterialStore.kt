@@ -301,12 +301,19 @@ class LessonMaterialStore(
         lessonRepo.countActiveMaterialParticipant(
             materialId = materialId,
             subject = subject,
-            now = now,
+            accessStartsBy = lessonAccessStartsBy(now),
+            accessEndsAfter = lessonAccessEndsAfter(now),
             excludedStatuses = expiredMaterialParticipantStatuses,
         ) > 0
 }
 
 private fun ScheduledMaterialLookup.isVisibleToParticipant(now: Instant): Boolean =
-    status !in expiredMaterialParticipantStatuses && scheduledEnd?.isAfter(now) != false
+    isLessonInsideAccessWindow(
+        status = status,
+        scheduledStart = scheduledStart,
+        scheduledEnd = scheduledEnd,
+        now = now,
+        closedStatuses = expiredMaterialParticipantStatuses,
+    )
 
 private val expiredMaterialParticipantStatuses = setOf(MetaData.LessonStatuses.COMPLETED, MetaData.LessonStatuses.CANCELLED)

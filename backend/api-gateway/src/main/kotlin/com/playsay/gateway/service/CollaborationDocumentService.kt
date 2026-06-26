@@ -435,7 +435,13 @@ private fun JwtAuthenticationToken.canManageCollaboration(): Boolean =
     authorities.any { authority -> authority.authority == MetaData.Authorities.TEACHER || authority.authority == MetaData.Authorities.ADMIN }
 
 private fun ScheduledMaterialLookupRow.isVisibleToParticipant(now: Instant): Boolean =
-    status !in expiredCollaborationLessonStatuses && scheduledEnd?.isAfter(now) != false
+    isLessonInsideAccessWindow(
+        status = status,
+        scheduledStart = scheduledStart,
+        scheduledEnd = scheduledEnd,
+        now = now,
+        closedStatuses = expiredCollaborationLessonStatuses,
+    )
 
 private val collaborationScopes = setOf(MetaData.CollaborationScopes.INDIVIDUAL, MetaData.CollaborationScopes.GROUP)
 private val expiredCollaborationLessonStatuses = setOf(MetaData.LessonStatuses.COMPLETED, MetaData.LessonStatuses.CANCELLED)

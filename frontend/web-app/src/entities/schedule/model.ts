@@ -12,15 +12,18 @@ export type ScheduleTranslate = (key: string, options?: Record<string, unknown>)
 
 export type ScheduleFormState = {
   defaultParallelMaterialId: string;
+  durationMinutes: string;
   lessonTemplateId: string;
   materialId: string;
   participantMaterialIds: Record<string, string>;
-  scheduledStart: string;
-  scheduledEnd: string;
+  scheduledDate: string;
+  scheduledTime: string;
   type: "INDIVIDUAL" | "GROUP";
   workMode: "SHARED" | "PARALLEL";
   participantSubjects: string;
 };
+
+export const LESSON_ACCESS_GRACE_MS = 10 * 60 * 1000;
 
 export function formatDuration(value: number | null | undefined, t: ScheduleTranslate): string {
   return value ? t("schedule.duration.minutes", { count: value }) : t("schedule.duration.pending");
@@ -51,17 +54,16 @@ export function defaultScheduleForm(lessonTemplateId: string): ScheduleFormState
   const start = new Date();
   start.setDate(start.getDate() + 1);
   start.setHours(10, 0, 0, 0);
-  const end = new Date(start);
-  end.setMinutes(end.getMinutes() + 45);
 
   return {
     defaultParallelMaterialId: "",
+    durationMinutes: "45",
     lessonTemplateId,
     materialId: "",
     participantMaterialIds: {},
-    scheduledStart: toDateTimeLocalValue(start),
-    scheduledEnd: toDateTimeLocalValue(end),
-    type: "GROUP",
+    scheduledDate: toLocalDateValue(start),
+    scheduledTime: toLocalTimeValue(start),
+    type: "INDIVIDUAL",
     workMode: "SHARED",
     participantSubjects: "",
   };
@@ -72,8 +74,31 @@ function toDateTimeLocalValue(date: Date): string {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
+function toLocalDateValue(date: Date): string {
+  return toDateTimeLocalValue(date).slice(0, 10);
+}
+
+function toLocalTimeValue(date: Date): string {
+  return toDateTimeLocalValue(date).slice(11, 16);
+}
+
 export function localDateTimeToIso(value: string): string | null {
   return value ? new Date(value).toISOString() : null;
+}
+
+export function localScheduleDateTimeToIso(date: string, time: string): string | null {
+  return date && time ? localDateTimeToIso(`${date}T${time}`) : null;
+}
+
+export function localScheduleEndIso(date: string, time: string, durationMinutes: string): string | null {
+  const startIso = localScheduleDateTimeToIso(date, time);
+  if (!startIso) {
+    return null;
+  }
+
+  const parsedDuration = Number.parseInt(durationMinutes, 10);
+  const safeDuration = Number.isFinite(parsedDuration) ? Math.max(1, parsedDuration) : 45;
+  return new Date(new Date(startIso).getTime() + safeDuration * 60_000).toISOString();
 }
 
 export function formatDateTime(value: string | null | undefined, t: ScheduleTranslate): string {
@@ -95,7 +120,7 @@ export function dateValueMs(value: string | null | undefined): number | null {
 
 export function isScheduleExpired(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
   const endMs = dateValueMs(lesson.scheduledEnd);
-  return endMs !== null && endMs <= nowMs;
+  return endMs !== null && endMs + LESSON_ACCESS_GRACE_MS < nowMs;
 }
 
 export function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean {
@@ -105,7 +130,13 @@ export function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean
 }
 
 export function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
-  return !isClosedScheduleStatus(lesson.status) && !isScheduleExpired(lesson, nowMs);
+  const startMs = dateValueMs(lesson.scheduledStart);
+  const endMs = dateValueMs(lesson.scheduledEnd);
+  return !isClosedScheduleStatus(lesson.status) &&
+    startMs !== null &&
+    endMs !== null &&
+    startMs - LESSON_ACCESS_GRACE_MS <= nowMs &&
+    endMs + LESSON_ACCESS_GRACE_MS >= nowMs;
 }
 
 export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number, t: ScheduleTranslate): string {
@@ -115,6 +146,17 @@ export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number, t: Sc
 
   if (lesson.status === "COMPLETED" || isScheduleExpired(lesson, nowMs)) {
     return t("schedule.state.expired");
+  }
+
+  if (isJoinableScheduledLesson(lesson, nowMs)) {
+    const startMs = dateValueMs(lesson.scheduledStart);
+    const endMs = dateValueMs(lesson.scheduledEnd);
+    if (startMs !== null && nowMs < startMs) {
+      return t("schedule.state.opensSoon");
+    }
+    if (endMs !== null && nowMs > endMs) {
+      return t("schedule.state.closingSoon");
+    }
   }
 
   if (lesson.status === "IN_PROGRESS" || isLessonCurrent(lesson, nowMs)) {

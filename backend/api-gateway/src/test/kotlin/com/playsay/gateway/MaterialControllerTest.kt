@@ -66,6 +66,10 @@ class MaterialControllerTest @Autowired constructor(
 ) {
     private val objectMapper = jacksonObjectMapper()
 
+    private fun activeLessonStart(): Instant = Instant.now().minusSeconds(300)
+
+    private fun activeLessonEnd(): Instant = Instant.now().plusSeconds(2_400)
+
     @BeforeAll
     fun migrateDatabase() {
         SpringLiquibase().apply {
@@ -292,8 +296,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 lessonTemplateId = lessonTemplate.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -408,8 +412,8 @@ class MaterialControllerTest @Autowired constructor(
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 type = "GROUP",
                 workMode = "PARALLEL",
                 participantSubjects = listOf("student-1", "student-2"),
@@ -487,8 +491,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 materialId = material.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 type = "GROUP",
                 workMode = "SHARED",
                 participantSubjects = listOf("student-1", "student-2"),
@@ -560,8 +564,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 materialId = material.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -609,8 +613,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 materialId = material.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -725,8 +729,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 lessonTemplateId = lessonTemplate.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -835,8 +839,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 materialId = material.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -937,8 +941,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 lessonTemplateId = lessonTemplate.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -1030,8 +1034,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 materialId = material.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -1123,8 +1127,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 materialId = material.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -1245,8 +1249,8 @@ class MaterialControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 materialId = material.id,
-                scheduledStart = Instant.now().plusSeconds(3600),
-                scheduledEnd = Instant.now().plusSeconds(7200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -1284,8 +1288,8 @@ class MaterialControllerTest @Autowired constructor(
                 otherTeacher,
                 ScheduledLessonRequest(
                     materialId = privateScheduleMaterial.id,
-                    scheduledStart = Instant.now().plusSeconds(3600),
-                    scheduledEnd = Instant.now().plusSeconds(7200),
+                    scheduledStart = activeLessonStart(),
+                    scheduledEnd = activeLessonEnd(),
                 ),
             )
         }

@@ -1,5 +1,5 @@
 import { LiveKitRoom } from "@livekit/components-react";
-import { Maximize2, Minimize2, PhoneOff, Radio } from "lucide-react";
+import { CheckCircle2, Maximize2, Minimize2, PhoneOff, Radio } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import {
@@ -48,12 +48,14 @@ const mobileLandscapeQuery = `(max-width: ${mobileLandscapeMaxWidth}px) and (ori
 export function LiveLessonExperience({
   materials,
   onAssignMaterial,
+  onComplete,
   onLeave,
   profile,
   session,
 }: {
   materials: LessonMaterial[];
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
+  onComplete: () => void;
   onLeave: () => void;
   profile: MeProfile | null;
   session: LessonRoomSession;
@@ -166,6 +168,12 @@ export function LiveLessonExperience({
               <PhoneOff className="h-4 w-4" />
               {t("classroom.actions.leave")}
             </Button>
+            {canManageLesson ? (
+              <Button className="playsay-lesson-complete" onClick={onComplete} type="button" variant="outline">
+                <CheckCircle2 className="h-4 w-4" />
+                {t("classroom.actions.complete")}
+              </Button>
+            ) : null}
           </div>
         </div>
 

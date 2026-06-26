@@ -263,6 +263,7 @@ export function useAppController(): AppShellProps {
   const {
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
+    completeScheduledLesson,
     closeClassroom,
     createScheduledLesson,
     deleteScheduledLesson,
@@ -387,6 +388,7 @@ export function useAppController(): AppShellProps {
     appProfile,
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
+    completeScheduledLesson,
     courseLessons,
     courseLoading,
     courseMessage,

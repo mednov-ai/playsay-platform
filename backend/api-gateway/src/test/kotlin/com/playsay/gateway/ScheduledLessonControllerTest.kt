@@ -269,6 +269,29 @@ class ScheduledLessonControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher completes scheduled lesson and records actual end`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.now().minusSeconds(10 * 60),
+                scheduledEnd = Instant.now().plusSeconds(35 * 60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val completed = scheduleController.complete(teacher, lesson.id)
+
+        assertEquals("COMPLETED", completed.status)
+        assertNotNull(lessonRepo.findById(lesson.id).orElseThrow().actualEnd)
+        assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(student, lesson.id)
+        }.also { error -> assertEquals(HttpStatus.NOT_FOUND, error.statusCode) }
+    }
+
+    @Test
     fun `scheduled lesson uses direct material before template material and inherits template material when direct is absent`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
@@ -367,15 +390,16 @@ class ScheduledLessonControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `teacher and participant receive LiveKit room token`() {
+    fun `teacher and participant receive LiveKit room token inside access window`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
+        val now = Instant.now()
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
-                scheduledStart = futureStart(60),
-                scheduledEnd = futureEnd(60),
+                scheduledStart = now.plusSeconds(5 * 60),
+                scheduledEnd = now.plusSeconds(50 * 60),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -395,6 +419,55 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(true, videoGrant["roomJoin"])
         assertEquals(true, videoGrant["canPublish"])
         assertEquals(true, videoGrant["canSubscribe"])
+    }
+
+    @Test
+    fun `LiveKit room token opens ten minutes before start and closes ten minutes after end`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val now = Instant.now()
+        val tooEarly = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = now.plusSeconds(11 * 60),
+                scheduledEnd = now.plusSeconds(56 * 60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        val justOpen = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = now.plusSeconds(9 * 60),
+                scheduledEnd = now.plusSeconds(54 * 60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        val stillOpenAfterEnd = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = now.minusSeconds(54 * 60),
+                scheduledEnd = now.minusSeconds(9 * 60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        val tooLate = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = now.minusSeconds(56 * 60),
+                scheduledEnd = now.minusSeconds(11 * 60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(teacher, tooEarly.id)
+        }.also { error -> assertEquals(HttpStatus.NOT_FOUND, error.statusCode) }
+        assertEquals("lesson-${justOpen.id}", liveKitRoomController.createToken(student, justOpen.id).roomName)
+        assertEquals("lesson-${stillOpenAfterEnd.id}", liveKitRoomController.createToken(student, stillOpenAfterEnd.id).roomName)
+        assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(student, tooLate.id)
+        }.also { error -> assertEquals(HttpStatus.NOT_FOUND, error.statusCode) }
     }
 
     @Test

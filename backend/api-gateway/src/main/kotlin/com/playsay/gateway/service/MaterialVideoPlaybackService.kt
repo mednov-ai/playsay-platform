@@ -140,8 +140,9 @@ class MaterialVideoPlaybackService(
         material: LessonMaterialRow,
         currentUserId: UUID,
         subject: String,
-    ): Boolean =
-        materialCatalogService.canRead(material, authentication, currentUserId) ||
+    ): Boolean {
+        val now = clock.instant()
+        return materialCatalogService.canRead(material, authentication, currentUserId) ||
             assignmentRecipientRepo.countActiveMaterialRecipients(
                 materialId = material.id,
                 studentUserId = currentUserId,
@@ -151,9 +152,11 @@ class MaterialVideoPlaybackService(
             lessonRepo.countActiveMaterialParticipant(
                 materialId = material.id,
                 subject = subject,
-                now = clock.instant(),
+                accessStartsBy = lessonAccessStartsBy(now),
+                accessEndsAfter = lessonAccessEndsAfter(now),
                 excludedStatuses = listOf(MetaData.LessonStatuses.CANCELLED, MetaData.LessonStatuses.COMPLETED),
             ) > 0
+    }
 
     private fun resolveIpCountry(request: HttpServletRequest): String? {
         val headerName = geoCountryHeader.trim().takeIf { it.isNotEmpty() } ?: return null

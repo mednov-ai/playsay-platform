@@ -187,7 +187,7 @@ class RepositoryQueryCoverageTest @Autowired constructor(
         )
         assertEquals(
             listOf(directLesson.id, templateMaterialLesson.id),
-            lessonRepo.findScheduleRowsForStudent("student-1", now, excludedStatuses).map { row -> row.id },
+            lessonRepo.findScheduleRowsForStudent("student-1", now.minusSeconds(600), excludedStatuses).map { row -> row.id },
         )
         val directRow = assertNotNull(lessonRepo.findScheduleRowById(directLesson.id))
         assertEquals("Speaking course", directRow.courseTitle)
@@ -195,15 +195,21 @@ class RepositoryQueryCoverageTest @Autowired constructor(
         assertEquals("Direct material", directRow.materialTitle)
         assertEquals(directMaterial.id, lessonRepo.findScheduledMaterialLookup(directLesson.id)?.materialId)
         assertEquals(templateMaterial.id, lessonRepo.findScheduledMaterialLookup(templateMaterialLesson.id)?.materialId)
-        assertEquals(directLesson.id, lessonRepo.findJoinableForManager(directLesson.id, now, excludedStatuses)?.id)
-        assertEquals(directLesson.id, lessonRepo.findJoinableForStudent(directLesson.id, "student-1", now, excludedStatuses)?.id)
-        assertNull(lessonRepo.findJoinableForStudent(directLesson.id, "student-2", now, excludedStatuses))
-        assertNull(lessonRepo.findJoinableForManager(cancelledLesson.id, now, excludedStatuses))
-        assertNull(lessonRepo.findJoinableForManager(expiredLesson.id, now, excludedStatuses))
+        assertEquals(
+            directLesson.id,
+            lessonRepo.findJoinableForManager(directLesson.id, now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses)?.id,
+        )
+        assertEquals(
+            directLesson.id,
+            lessonRepo.findJoinableForStudent(directLesson.id, "student-1", now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses)?.id,
+        )
+        assertNull(lessonRepo.findJoinableForStudent(directLesson.id, "student-2", now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses))
+        assertNull(lessonRepo.findJoinableForManager(cancelledLesson.id, now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses))
+        assertNull(lessonRepo.findJoinableForManager(expiredLesson.id, now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses))
         assertEquals(directLesson.id, lessonRepo.findByLivekitRoomName("lesson-${directLesson.id}")?.id)
-        assertEquals(1L, lessonRepo.countActiveMaterialParticipant(directMaterial.id, "student-1", now, excludedStatuses))
-        assertEquals(1L, lessonRepo.countActiveMaterialParticipant(directMaterial.id, "student-2", now, excludedStatuses))
-        assertEquals(0L, lessonRepo.countActiveMaterialParticipant(directMaterial.id, "student-missing", now, excludedStatuses))
+        assertEquals(1L, lessonRepo.countActiveMaterialParticipant(directMaterial.id, "student-1", now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses))
+        assertEquals(1L, lessonRepo.countActiveMaterialParticipant(directMaterial.id, "student-2", now.plusSeconds(21_600), now.minusSeconds(600), excludedStatuses))
+        assertEquals(0L, lessonRepo.countActiveMaterialParticipant(directMaterial.id, "student-missing", now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses))
 
         assertEquals(
             listOf("student-1"),
@@ -312,7 +318,13 @@ class RepositoryQueryCoverageTest @Autowired constructor(
         val otherPrivate = material(otherTeacher, title = "Other private", visibility = "PRIVATE", status = "PUBLISHED", updatedAt = now.plusSeconds(30))
         val publicPublished = material(owner, title = "Public published", visibility = "PUBLIC", status = "PUBLISHED", updatedAt = now.plusSeconds(40))
         val archived = material(owner, title = "Archived", visibility = "PUBLIC", status = "ARCHIVED", updatedAt = now.plusSeconds(50))
-        val activeLesson = lesson(teacher = owner, material = ownerPrivate, status = "SCHEDULED", scheduledEnd = now.plusSeconds(3_600))
+        val activeLesson = lesson(
+            teacher = owner,
+            material = ownerPrivate,
+            status = "SCHEDULED",
+            scheduledStart = now.minusSeconds(600),
+            scheduledEnd = now.plusSeconds(3_600),
+        )
         participant(activeLesson, student)
 
         assertTrue(lessonMaterialRepo.existsByIdAndStatusNot(publicPublished.id, "ARCHIVED"))
@@ -331,7 +343,7 @@ class RepositoryQueryCoverageTest @Autowired constructor(
         val row = assertNotNull(lessonMaterialRepo.findRowById(ownerPrivate.id))
         assertEquals("teacher-1", row.ownerTeacherSubject)
         assertEquals("Teacher One", row.ownerTeacherName)
-        assertEquals(1L, lessonRepo.countActiveMaterialParticipant(ownerPrivate.id, "student-1", now, excludedStatuses))
+        assertEquals(1L, lessonRepo.countActiveMaterialParticipant(ownerPrivate.id, "student-1", now.plusSeconds(600), now.minusSeconds(600), excludedStatuses))
     }
 
     @Test

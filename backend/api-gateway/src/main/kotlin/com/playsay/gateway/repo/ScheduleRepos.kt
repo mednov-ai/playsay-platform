@@ -43,6 +43,7 @@ data class LessonParticipantRow(
 data class ScheduledMaterialLookupRow(
     val id: UUID,
     val status: String,
+    val scheduledStart: Instant?,
     val scheduledEnd: Instant?,
     val workMode: String,
     val materialId: UUID?,
@@ -125,7 +126,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
          where currentStudent.keycloakSubject = :subject
            and l.status not in :excludedStatuses
-           and (l.scheduledEnd is null or l.scheduledEnd > :now)
+           and (l.scheduledEnd is null or l.scheduledEnd >= :visibleUntil)
          order by case when l.scheduledStart is null then 1 else 0 end,
                   l.scheduledStart,
                   l.createdAt
@@ -133,7 +134,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
     )
     fun findScheduleRowsForStudent(
         subject: String,
-        now: Instant,
+        visibleUntil: Instant,
         excludedStatuses: Collection<String>,
     ): List<ScheduledLessonRow>
 
@@ -211,12 +212,16 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           from LessonEntity l
          where l.id = :lessonId
            and l.status not in :excludedStatuses
-           and (l.scheduledEnd is null or l.scheduledEnd > :now)
+           and l.scheduledStart is not null
+           and l.scheduledStart <= :accessStartsBy
+           and l.scheduledEnd is not null
+           and l.scheduledEnd >= :accessEndsAfter
         """,
     )
     fun findJoinableForManager(
         lessonId: UUID,
-        now: Instant,
+        accessStartsBy: Instant,
+        accessEndsAfter: Instant,
         excludedStatuses: Collection<String>,
     ): LessonEntity?
 
@@ -226,7 +231,10 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           from LessonEntity l
          where l.id = :lessonId
            and l.status not in :excludedStatuses
-           and (l.scheduledEnd is null or l.scheduledEnd > :now)
+           and l.scheduledStart is not null
+           and l.scheduledStart <= :accessStartsBy
+           and l.scheduledEnd is not null
+           and l.scheduledEnd >= :accessEndsAfter
            and exists (
                select 1
                  from LessonParticipantEntity lp
@@ -239,7 +247,8 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
     fun findJoinableForStudent(
         lessonId: UUID,
         subject: String,
-        now: Instant,
+        accessStartsBy: Instant,
+        accessEndsAfter: Instant,
         excludedStatuses: Collection<String>,
     ): LessonEntity?
 
@@ -257,6 +266,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
         select new com.playsay.gateway.repo.ScheduledMaterialLookupRow(
             l.id,
             l.status,
+            l.scheduledStart,
             l.scheduledEnd,
             l.workMode,
             case
@@ -276,6 +286,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
         select new com.playsay.gateway.repo.ScheduledMaterialLookupRow(
             l.id,
             l.status,
+            l.scheduledStart,
             l.scheduledEnd,
             l.workMode,
             coalesce(lpCurrent.materialId, l.materialId, lt.materialId)
@@ -300,13 +311,17 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
          where coalesce(lp.materialId, l.materialId, lt.materialId) = :materialId
            and student.keycloakSubject = :subject
            and l.status not in :excludedStatuses
-           and (l.scheduledEnd is null or l.scheduledEnd > :now)
+           and l.scheduledStart is not null
+           and l.scheduledStart <= :accessStartsBy
+           and l.scheduledEnd is not null
+           and l.scheduledEnd >= :accessEndsAfter
         """,
     )
     fun countActiveMaterialParticipant(
         materialId: UUID,
         subject: String,
-        now: Instant,
+        accessStartsBy: Instant,
+        accessEndsAfter: Instant,
         excludedStatuses: Collection<String>,
     ): Long
 }

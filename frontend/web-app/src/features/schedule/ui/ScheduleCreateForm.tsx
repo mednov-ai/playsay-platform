@@ -4,7 +4,8 @@ import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
   defaultScheduleForm,
-  localDateTimeToIso,
+  localScheduleDateTimeToIso,
+  localScheduleEndIso,
   selectedParticipantSubjects,
   type CourseLessonOption,
   type ScheduleFormState,
@@ -104,8 +105,8 @@ export function ScheduleCreateForm({
           ? form.defaultParallelMaterialId || null
           : null
         : form.materialId || null,
-      scheduledStart: localDateTimeToIso(form.scheduledStart),
-      scheduledEnd: localDateTimeToIso(form.scheduledEnd),
+      scheduledStart: localScheduleDateTimeToIso(form.scheduledDate, form.scheduledTime),
+      scheduledEnd: localScheduleEndIso(form.scheduledDate, form.scheduledTime, form.durationMinutes),
       status: "SCHEDULED",
       type: form.type,
       workMode: showParallelAssignments ? "PARALLEL" : "SHARED",
@@ -115,132 +116,27 @@ export function ScheduleCreateForm({
   }
 
   return (
-    <form className="grid gap-3 rounded-2xl border border-border bg-muted/50 p-3" onSubmit={submit}>
-      <FormField label={t("schedule.form.lessonTemplate")}>
-        <select
-          className="playsay-input"
-          disabled={disabled}
-          onChange={(event) => selectLessonTemplate(event.target.value)}
-          value={form.lessonTemplateId}
-        >
-          <option value="">{t("schedule.form.noTemplate")}</option>
-          {lessonOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label={t("schedule.form.workMode")}>
-          <select
-            className="playsay-input"
-            disabled={disabled}
-            onChange={(event) => updateField("workMode", event.target.value as ScheduleFormState["workMode"])}
-            value={form.workMode}
-          >
-            <option value="SHARED">{t("schedule.workMode.shared")}</option>
-            <option value="PARALLEL">{t("schedule.workMode.parallel")}</option>
-          </select>
-        </FormField>
-        <FormField label={showParallelAssignments ? t("schedule.form.parallelDefaultMaterial") : t("schedule.form.directMaterial")}>
-          <select
-            className="playsay-input"
-            disabled={disabled || materialOptions.length === 0}
-            onChange={(event) => (
-              showParallelAssignments
-                ? updateField("defaultParallelMaterialId", event.target.value)
-                : updateField("materialId", event.target.value)
-            )}
-            value={showParallelAssignments ? form.defaultParallelMaterialId : form.materialId}
-          >
-            <option value="">{t("schedule.form.noMaterial")}</option>
-            {materialOptions.map((material) => (
-              <option key={material.id} value={material.id}>
-                {material.title}
-              </option>
-            ))}
-          </select>
-        </FormField>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label={t("schedule.form.start")}>
-          <input
-            className="playsay-input"
-            disabled={disabled}
-            onChange={(event) => updateField("scheduledStart", event.target.value)}
-            required
-            type="datetime-local"
-            value={form.scheduledStart}
-          />
-        </FormField>
-        <FormField label={t("schedule.form.end")}>
-          <input
-            className="playsay-input"
-            disabled={disabled}
-            onChange={(event) => updateField("scheduledEnd", event.target.value)}
-            required
-            type="datetime-local"
-            value={form.scheduledEnd}
-          />
-        </FormField>
-      </div>
-
-      {showParallelAssignments ? (
-        <div className="grid gap-2 rounded-2xl border border-border bg-background p-3">
-          <div className="text-xs font-extrabold uppercase text-muted-foreground">
-            {t("schedule.form.studentMaterials")}
-          </div>
-          {selectedSubjects.map((subject) => {
-            const student = studentUsers.find((item) => item.subject === subject);
-            const label = student?.displayName ?? student?.name ?? student?.username ?? subject;
-            return (
-              <label className="grid gap-1 text-sm font-extrabold sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center" key={subject}>
-                <span className="min-w-0 truncate">{label}</span>
-                <select
-                  className="playsay-input"
-                  disabled={disabled || materialOptions.length === 0}
-                  onChange={(event) => updateParticipantMaterial(subject, event.target.value)}
-                  value={form.participantMaterialIds[subject] ?? ""}
-                >
-                  <option value="">{t("schedule.form.useDefaultMaterial")}</option>
-                  {materialOptions.map((material) => (
-                    <option key={material.id} value={material.id}>
-                      {material.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            );
-          })}
+    <form className="grid gap-3 rounded-2xl border border-border bg-muted/50 p-3" data-schedule-quick-create="true" onSubmit={submit}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-base font-extrabold">{t("schedule.form.quickTitle")}</h3>
+          <p className="text-sm font-semibold text-muted-foreground">{t("schedule.form.quickSubtitle")}</p>
         </div>
-      ) : null}
+      </div>
 
-      <div className="grid gap-3 sm:grid-cols-[9rem_1fr]">
-        <FormField label={t("schedule.form.format")}>
-          <select
-            className="playsay-input"
-            disabled={disabled}
-            onChange={(event) => updateField("type", event.target.value as ScheduleFormState["type"])}
-            value={form.type}
-          >
-            <option value="GROUP">{t("schedule.lessonType.group")}</option>
-            <option value="INDIVIDUAL">{t("schedule.lessonType.individual")}</option>
-          </select>
-        </FormField>
-        <FormField label={t("schedule.form.students")}>
+      <div className="grid gap-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(0,2fr)]">
+        <FormField label={t("schedule.form.student")}>
           {studentUsers.length === 0 ? (
             <input
               className="playsay-input"
               disabled={disabled}
+              name="studentSubjects"
               onChange={(event) => updateField("participantSubjects", event.target.value)}
               placeholder={t("schedule.form.studentsPlaceholder")}
               value={form.participantSubjects}
             />
           ) : (
-            <div className="grid gap-2 rounded-2xl border border-border bg-background p-3">
+            <div className="grid max-h-52 gap-2 overflow-auto rounded-2xl border border-border bg-background p-3">
               {studentUsers.map((student) => {
                 const selected = selectedParticipantSubjects(form.participantSubjects).includes(student.subject);
                 return (
@@ -251,8 +147,10 @@ export function ScheduleCreateForm({
                     <input
                       checked={selected}
                       disabled={disabled}
+                      name="studentSubjects"
                       onChange={() => toggleParticipant(student.subject)}
                       type="checkbox"
+                      value={student.subject}
                     />
                   </label>
                 );
@@ -260,12 +158,152 @@ export function ScheduleCreateForm({
             </div>
           )}
         </FormField>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <FormField label={t("schedule.form.date")}>
+            <input
+              className="playsay-input"
+              disabled={disabled}
+              name="scheduledDate"
+              onChange={(event) => updateField("scheduledDate", event.target.value)}
+              required
+              type="date"
+              value={form.scheduledDate}
+            />
+          </FormField>
+          <FormField label={t("schedule.form.time")}>
+            <input
+              className="playsay-input"
+              disabled={disabled}
+              name="scheduledTime"
+              onChange={(event) => updateField("scheduledTime", event.target.value)}
+              required
+              type="time"
+              value={form.scheduledTime}
+            />
+          </FormField>
+          <FormField label={t("schedule.form.duration")}>
+            <input
+              className="playsay-input"
+              disabled={disabled}
+              min={1}
+              name="durationMinutes"
+              onChange={(event) => updateField("durationMinutes", event.target.value)}
+              required
+              step={5}
+              type="number"
+              value={form.durationMinutes}
+            />
+          </FormField>
+        </div>
       </div>
 
+      <FormField label={showParallelAssignments ? t("schedule.form.parallelDefaultMaterial") : t("schedule.form.directMaterial")}>
+        <select
+          className="playsay-input"
+          disabled={disabled || materialOptions.length === 0}
+          name={showParallelAssignments ? "defaultParallelMaterialId" : "materialId"}
+          onChange={(event) => (
+            showParallelAssignments
+              ? updateField("defaultParallelMaterialId", event.target.value)
+              : updateField("materialId", event.target.value)
+          )}
+          value={showParallelAssignments ? form.defaultParallelMaterialId : form.materialId}
+        >
+          <option value="">{t("schedule.form.noMaterial")}</option>
+          {materialOptions.map((material) => (
+            <option key={material.id} value={material.id}>
+              {material.title}
+            </option>
+          ))}
+        </select>
+      </FormField>
+
+      <details className="rounded-2xl border border-border bg-background/70" data-schedule-advanced="true">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-extrabold text-muted-foreground">
+          {t("schedule.form.advanced")}
+        </summary>
+        <div className="grid gap-3 border-t border-border p-3">
+          <FormField label={t("schedule.form.lessonTemplate")}>
+            <select
+              className="playsay-input"
+              disabled={disabled}
+              name="lessonTemplateId"
+              onChange={(event) => selectLessonTemplate(event.target.value)}
+              value={form.lessonTemplateId}
+            >
+              <option value="">{t("schedule.form.noTemplate")}</option>
+              {lessonOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField label={t("schedule.form.format")}>
+              <select
+                className="playsay-input"
+                disabled={disabled}
+                name="type"
+                onChange={(event) => updateField("type", event.target.value as ScheduleFormState["type"])}
+                value={form.type}
+              >
+                <option value="INDIVIDUAL">{t("schedule.lessonType.individual")}</option>
+                <option value="GROUP">{t("schedule.lessonType.group")}</option>
+              </select>
+            </FormField>
+            <FormField label={t("schedule.form.workMode")}>
+              <select
+                className="playsay-input"
+                disabled={disabled}
+                name="workMode"
+                onChange={(event) => updateField("workMode", event.target.value as ScheduleFormState["workMode"])}
+                value={form.workMode}
+              >
+                <option value="SHARED">{t("schedule.workMode.shared")}</option>
+                <option value="PARALLEL">{t("schedule.workMode.parallel")}</option>
+              </select>
+            </FormField>
+          </div>
+
+          {showParallelAssignments ? (
+            <div className="grid gap-2 rounded-2xl border border-border bg-background p-3">
+              <div className="text-xs font-extrabold uppercase text-muted-foreground">
+                {t("schedule.form.studentMaterials")}
+              </div>
+              {selectedSubjects.map((subject) => {
+                const student = studentUsers.find((item) => item.subject === subject);
+                const label = student?.displayName ?? student?.name ?? student?.username ?? subject;
+                return (
+                  <label className="grid gap-1 text-sm font-extrabold sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center" key={subject}>
+                    <span className="min-w-0 truncate">{label}</span>
+                    <select
+                      className="playsay-input"
+                      disabled={disabled || materialOptions.length === 0}
+                      onChange={(event) => updateParticipantMaterial(subject, event.target.value)}
+                      value={form.participantMaterialIds[subject] ?? ""}
+                    >
+                      <option value="">{t("schedule.form.useDefaultMaterial")}</option>
+                      {materialOptions.map((material) => (
+                        <option key={material.id} value={material.id}>
+                          {material.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      </details>
+
       <div className="flex justify-end">
-        <Button disabled={disabled} type="submit">
+        <Button disabled={disabled || (studentUsers.length > 0 && selectedSubjects.length === 0)} type="submit">
           <Plus className="h-4 w-4" />
-          {t("schedule.form.addLesson")}
+          {t("schedule.form.createLesson")}
         </Button>
       </div>
     </form>

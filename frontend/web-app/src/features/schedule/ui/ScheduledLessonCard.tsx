@@ -1,4 +1,4 @@
-import { BookOpen, Copy, Loader2, RotateCcw, Trash2, Video } from "lucide-react";
+import { BookOpen, CheckCircle2, Copy, Loader2, RotateCcw, Trash2, Video } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { formatDateTime, formatLessonType, isJoinableScheduledLesson, scheduleStateLabel } from "../../../entities/schedule/model";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
@@ -11,6 +11,7 @@ export function ScheduledLessonCard({
   linkCopied,
   nowMs,
   onCancel,
+  onComplete,
   onCopyLink,
   onDelete,
   onJoin,
@@ -22,6 +23,7 @@ export function ScheduledLessonCard({
   linkCopied: boolean;
   nowMs: number;
   onCancel: () => void;
+  onComplete: () => void;
   onCopyLink: () => void;
   onDelete: () => void;
   onJoin: () => void;
@@ -80,6 +82,7 @@ export function ScheduledLessonCard({
           <Button
             disabled={disabled || roomLoading || !joinable}
             onClick={onJoin}
+            title={!joinable ? t("schedule.actions.joinUnavailable") : undefined}
             type="button"
           >
             {roomLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
@@ -91,6 +94,10 @@ export function ScheduledLessonCard({
           </Button>
           {canManage ? (
             <>
+              <Button disabled={disabled || lesson.status === "COMPLETED" || lesson.status === "CANCELLED"} onClick={onComplete} type="button" variant="outline">
+                <CheckCircle2 className="h-4 w-4" />
+                {t("schedule.actions.complete")}
+              </Button>
               <Button disabled={disabled || lesson.status === "CANCELLED"} onClick={onCancel} type="button" variant="outline">
                 <RotateCcw className="h-4 w-4" />
                 {t("schedule.actions.cancel")}

@@ -838,6 +838,36 @@ paths:
           description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/complete:
+    post:
+      tags:
+      - Schedule
+      summary: Complete scheduled lesson
+      description: Completes a calendar lesson and closes live access. Requires TEACHER
+        or ADMIN role.
+      operationId: completeScheduledLesson
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Scheduled lesson completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledLessonResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage schedule
+        "404":
+          description: Scheduled lesson not found
+      security:
+      - bearerAuth: []
   /schedule/lessons/{lessonId}/collaboration-documents/{documentId}/token:
     post:
       tags:

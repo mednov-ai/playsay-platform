@@ -2,6 +2,7 @@ package com.playsay.gateway.realtime
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.playsay.gateway.dto.ScheduledLessonResponse
+import com.playsay.gateway.service.lessonAccessEndsAfter
 import java.time.Instant
 import java.util.UUID
 import com.playsay.gateway.utils.MetaData
@@ -29,7 +30,8 @@ data class LessonRealtimePrincipal(
         }
 
         val isParticipant = lesson.participants.any { participant -> participant.subject == subject }
-        val isStillAvailable = lesson.status !in expiredParticipantStatuses && lesson.scheduledEnd?.isAfter(now) != false
+        val isStillAvailable = lesson.status !in expiredParticipantStatuses &&
+            (lesson.scheduledEnd == null || !lesson.scheduledEnd.isBefore(lessonAccessEndsAfter(now)))
         return isParticipant && isStillAvailable
     }
 }

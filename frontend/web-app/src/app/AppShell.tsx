@@ -67,6 +67,7 @@ export type AppShellProps = {
   appProfile: AppUserProfile | null;
   assignMaterialToScheduledLesson: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   cancelScheduledLesson: (lesson: ScheduledLesson) => Promise<void>;
+  completeScheduledLesson: (lessonId: string) => Promise<void>;
   courseLessons: CourseLessonMap;
   courseLoading: boolean;
   courseMessage: string | null;
@@ -143,6 +144,7 @@ export function AppShell(props: AppShellProps) {
     appProfile,
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
+    completeScheduledLesson,
     courseLessons,
     courseLoading,
     courseMessage,
@@ -257,6 +259,7 @@ export function AppShell(props: AppShellProps) {
             <LiveLessonExperience
               materials={materials}
               onAssignMaterial={(lessonId, materialId) => assignMaterialToScheduledLesson(lessonId, materialId)}
+              onComplete={() => void completeScheduledLesson(roomSession.lessonId)}
               onLeave={leaveScheduledLessonRoom}
               profile={profile}
               session={roomSession}
@@ -300,6 +303,7 @@ export function AppShell(props: AppShellProps) {
                   message={scheduleMessage}
                   nowMs={nowMs}
                   onCancel={(lesson) => void cancelScheduledLesson(lesson)}
+                  onComplete={(lesson) => void completeScheduledLesson(lesson.id)}
                   onCreate={(input) => void createScheduledLesson(input)}
                   onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
                   onJoin={(lesson) => void joinScheduledLesson(lesson)}

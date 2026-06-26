@@ -31,6 +31,7 @@ export function SchedulePanel({
   message,
   nowMs,
   onCancel,
+  onComplete,
   onCreate,
   onDelete,
   onJoin,
@@ -49,6 +50,7 @@ export function SchedulePanel({
   message: string | null;
   nowMs: number;
   onCancel: (lesson: ScheduledLesson) => void;
+  onComplete: (lesson: ScheduledLesson) => void;
   onCreate: (input: ScheduledLessonInput) => void;
   onDelete: (lessonId: string) => void;
   onJoin: (lesson: ScheduledLesson) => void;
@@ -92,6 +94,7 @@ export function SchedulePanel({
       linkCopied={copiedLessonId === lesson.id}
       nowMs={nowMs}
       onCancel={() => onCancel(lesson)}
+      onComplete={() => onComplete(lesson)}
       onCopyLink={() => void copyLessonLink(lesson.id)}
       onDelete={() => onDelete(lesson.id)}
       onJoin={() => onJoin(lesson)}

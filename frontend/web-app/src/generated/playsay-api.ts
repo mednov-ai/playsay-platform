@@ -2655,6 +2655,67 @@ export const createHomeworkFromScheduledLesson = async (lessonId: string,
 
 
 
+export type completeScheduledLessonResponse200 = {
+  data: ScheduledLessonResponse
+  status: 200
+}
+
+export type completeScheduledLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type completeScheduledLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type completeScheduledLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type completeScheduledLessonResponseSuccess = (completeScheduledLessonResponse200) & {
+  headers: Headers;
+};
+export type completeScheduledLessonResponseError = (completeScheduledLessonResponse401 | completeScheduledLessonResponse403 | completeScheduledLessonResponse404) & {
+  headers: Headers;
+};
+
+export type completeScheduledLessonResponse = (completeScheduledLessonResponseSuccess | completeScheduledLessonResponseError)
+
+export const getCompleteScheduledLessonUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/complete`
+}
+
+/**
+ * Completes a calendar lesson and closes live access. Requires TEACHER or ADMIN role.
+ * @summary Complete scheduled lesson
+ */
+export const completeScheduledLesson = async (lessonId: string, options?: RequestInit): Promise<completeScheduledLessonResponse> => {
+
+  const res = await fetch(getCompleteScheduledLessonUrl(lessonId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: completeScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as completeScheduledLessonResponse
+}
+
+
+
 export type createCollaborationDocumentTokenResponse200 = {
   data: CollaborationTokenResponse
   status: 200

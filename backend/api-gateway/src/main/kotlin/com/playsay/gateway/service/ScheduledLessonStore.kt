@@ -39,9 +39,10 @@ class ScheduledLessonStore(
         val rows = if (authentication.canManageSchedule()) {
             lessonRepo.findScheduleRowsForManager()
         } else {
+            val now = Instant.now()
             lessonRepo.findScheduleRowsForStudent(
                 subject = authentication.token.subject,
-                now = Instant.now(),
+                visibleUntil = lessonAccessEndsAfter(now),
                 excludedStatuses = expiredParticipantStatuses,
             )
         }
@@ -131,6 +132,23 @@ class ScheduledLessonStore(
 
         lessonRepo.deleteById(lessonId)
         eventPublisher.publishEvent(LessonDeletedEvent(lessonId))
+    }
+
+    @Transactional
+    fun complete(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse {
+        authentication.requireScheduleManager()
+        val lesson = lessonRepo.findById(lessonId).orElse(null)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        val now = Instant.now()
+
+        lesson.status = MetaData.LessonStatuses.COMPLETED
+        lesson.actualEnd = now
+        lesson.updatedAt = now
+        lessonRepo.save(lesson)
+
+        val completed = requireNotNull(find(lessonId)).withParticipants()
+        eventPublisher.publishEvent(LessonChangedEvent(completed))
+        return completed
     }
 
     private fun findVisible(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonRow? {
@@ -390,7 +408,7 @@ private fun ScheduledLessonRow.toResponse(participants: List<LessonParticipantRo
     )
 
 private fun ScheduledLessonRow.isVisibleToParticipant(now: Instant): Boolean =
-    status !in expiredParticipantStatuses && scheduledEnd?.isAfter(now) != false
+    status !in expiredParticipantStatuses && (scheduledEnd == null || !scheduledEnd.isBefore(lessonAccessEndsAfter(now)))
 
 private fun LessonParticipantRow.toResponse(): ScheduledLessonParticipantResponse =
     ScheduledLessonParticipantResponse(

@@ -1,4 +1,4 @@
-import { dateValueMs, isClosedScheduleStatus } from "../../../entities/schedule/model";
+import { LESSON_ACCESS_GRACE_MS, dateValueMs, isClosedScheduleStatus } from "../../../entities/schedule/model";
 import type { LiveKitRoomToken, ScheduledLesson } from "../../../shared/api/playsay";
 
 export type LessonRoomSession = LiveKitRoomToken & {
@@ -55,5 +55,5 @@ export function isRoomSessionExpired(session: LessonRoomSession, nowMs = Date.no
   }
 
   const endMs = dateValueMs(session.lessonEndsAt);
-  return endMs !== null && endMs <= nowMs;
+  return endMs !== null && endMs + LESSON_ACCESS_GRACE_MS < nowMs;
 }

@@ -79,6 +79,10 @@ class CollaborationDocumentControllerTest @Autowired constructor(
 ) {
     private val objectMapper = jacksonObjectMapper()
 
+    private fun activeLessonStart(): Instant = Instant.now().minusSeconds(300)
+
+    private fun activeLessonEnd(): Instant = Instant.now().plusSeconds(2_400)
+
     @BeforeAll
     fun migrateDatabase() {
         SpringLiquibase().apply {
@@ -334,8 +338,8 @@ class CollaborationDocumentControllerTest @Autowired constructor(
             teacher,
             ScheduledLessonRequest(
                 materialId = material.id,
-                scheduledStart = Instant.now().plusSeconds(3_600),
-                scheduledEnd = Instant.now().plusSeconds(7_200),
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
                 type = "GROUP",
                 participantSubjects = participantSubjects,
             ),

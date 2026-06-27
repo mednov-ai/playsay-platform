@@ -1,6 +1,12 @@
 import { BookOpen, CheckCircle2, Copy, Loader2, RotateCcw, Trash2, Video } from "lucide-react";
 import { Button } from "../../../components/ui/button";
-import { formatDateTime, formatLessonType, isJoinableScheduledLesson, scheduleStateLabel } from "../../../entities/schedule/model";
+import {
+  formatDateTime,
+  formatLessonType,
+  isArchivedScheduleLesson,
+  isJoinableScheduledLesson,
+  scheduleStateLabel,
+} from "../../../entities/schedule/model";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 
@@ -32,10 +38,11 @@ export function ScheduledLessonCard({
   const { t } = useAppTranslation();
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
   const joinable = isJoinableScheduledLesson(lesson, nowMs);
+  const archived = isArchivedScheduleLesson(lesson, nowMs);
   const stateLabel = scheduleStateLabel(lesson, nowMs, translate);
 
   return (
-    <article className="rounded-2xl border border-border bg-white p-4">
+    <article className="playsay-schedule-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -79,20 +86,25 @@ export function ScheduledLessonCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            disabled={disabled || roomLoading || !joinable}
-            onClick={onJoin}
-            title={!joinable ? t("schedule.actions.joinUnavailable") : undefined}
-            type="button"
-          >
-            {roomLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-            {t("schedule.actions.join")}
-          </Button>
+          {joinable ? (
+            <Button
+              disabled={disabled || roomLoading}
+              onClick={onJoin}
+              type="button"
+            >
+              {roomLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+              {t("schedule.actions.join")}
+            </Button>
+          ) : (
+            <span className="playsay-schedule-join-note" data-schedule-join-status="closed">
+              {archived ? stateLabel : t("schedule.actions.joinWindowHint")}
+            </span>
+          )}
           <Button disabled={disabled} onClick={onCopyLink} type="button" variant="outline">
             <Copy className="h-4 w-4" />
             {linkCopied ? t("schedule.clipboard.copied") : t("schedule.clipboard.link")}
           </Button>
-          {canManage ? (
+          {canManage && !archived ? (
             <>
               <Button disabled={disabled || lesson.status === "COMPLETED" || lesson.status === "CANCELLED"} onClick={onComplete} type="button" variant="outline">
                 <CheckCircle2 className="h-4 w-4" />
@@ -102,11 +114,13 @@ export function ScheduledLessonCard({
                 <RotateCcw className="h-4 w-4" />
                 {t("schedule.actions.cancel")}
               </Button>
-              <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
-                <Trash2 className="h-4 w-4" />
-                {t("schedule.actions.delete")}
-              </Button>
             </>
+          ) : null}
+          {canManage ? (
+            <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
+              <Trash2 className="h-4 w-4" />
+              {t("schedule.actions.delete")}
+            </Button>
           ) : null}
         </div>
       </div>

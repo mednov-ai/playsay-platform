@@ -207,8 +207,16 @@ export const en = {
   schedule: {
     title: "Schedule",
     lessonFallbackTitle: "Lesson",
+    dashboard: {
+      teacherTitle: "Teacher desk",
+      teacherSubtitle: "Create lessons and keep only upcoming classes in view.",
+      studentTitle: "My lessons",
+      studentSubtitle: "Upcoming lessons and online classroom entry.",
+      upcomingTitle: "Upcoming lessons",
+      upcomingSubtitle: "Past lessons are kept in the archive.",
+    },
     archive: {
-      old: "Past lessons",
+      old: "Lesson archive",
       more: "More lessons",
       hiddenCount_one: "{{count}} hidden",
       hiddenCount_other: "{{count}} hidden",
@@ -216,6 +224,8 @@ export const en = {
     empty: {
       manager: "There are no scheduled lessons yet.",
       student: "You do not have planned lessons yet.",
+      noUpcomingManager: "There are no upcoming lessons. You can create a new one.",
+      noUpcomingStudent: "There are no upcoming lessons.",
     },
     loginRequired: "Sign in to see the schedule.",
     clipboard: {
@@ -279,11 +289,19 @@ export const en = {
       student: "Student",
       students: "Students",
       studentsPlaceholder: "Students will appear after their first sign-in",
+      noStudentsSelected: "no students selected",
+      selectedStudents_one: "{{count}} student selected",
+      selectedStudents_other: "{{count}} students selected",
+      stepStudents: "Who",
+      stepTime: "When",
+      stepMaterial: "Material",
       repeat: "Repeat",
       recurrenceCount: "Lessons",
       advanced: "Advanced",
       addLesson: "Add lesson",
       createLesson: "Create lesson",
+      createRequiresStudent: "Select a student first.",
+      createRequiresRecurrence: "Check the lesson count and weekdays.",
     },
     recurrence: {
       none: "No repeat",
@@ -301,6 +319,7 @@ export const en = {
     actions: {
       join: "Join lesson",
       joinUnavailable: "Entry opens 10 minutes before the lesson and closes 10 minutes after.",
+      joinWindowHint: "Opens 10 minutes before",
       complete: "Complete",
       cancel: "Cancel",
       delete: "Delete",

@@ -35,9 +35,20 @@ export function ScheduleCreateForm({
   const materialOptions = materials.filter((material) => material.status !== "ARCHIVED");
   const selectedSubjects = selectedParticipantSubjects(form.participantSubjects);
   const showParallelAssignments = form.workMode === "PARALLEL" && selectedSubjects.length > 1;
-  const createDisabled = disabled ||
-    (studentUsers.length > 0 && selectedSubjects.length === 0) ||
-    !isWeeklyRecurrenceValid(form);
+  const needsStudent = studentUsers.length > 0 && selectedSubjects.length === 0;
+  const recurrenceInvalid = !isWeeklyRecurrenceValid(form);
+  const createDisabledReason = needsStudent ? "student" : recurrenceInvalid ? "recurrence" : disabled ? "busy" : null;
+  const createDisabled = Boolean(createDisabledReason);
+  const selectedMaterialId = showParallelAssignments ? form.defaultParallelMaterialId : form.materialId;
+  const selectedMaterialTitle = materialOptions.find((material) => material.id === selectedMaterialId)?.title ?? t("schedule.form.noMaterial");
+  const selectedStudentSummary = selectedSubjects.length === 0
+    ? t("schedule.form.noStudentsSelected")
+    : t("schedule.form.selectedStudents", { count: selectedSubjects.length });
+  const createHint = createDisabledReason === "student"
+    ? t("schedule.form.createRequiresStudent")
+    : createDisabledReason === "recurrence"
+      ? t("schedule.form.createRequiresRecurrence")
+      : null;
 
   useEffect(() => {
     setForm((current) => {
@@ -156,16 +167,39 @@ export function ScheduleCreateForm({
   }
 
   return (
-    <form className="grid gap-3 rounded-2xl border border-border bg-muted/50 p-3" data-schedule-quick-create="true" onSubmit={submit}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <form
+      className="playsay-schedule-create-form"
+      data-schedule-create-reason={createDisabledReason ?? "ready"}
+      data-schedule-quick-create="true"
+      onSubmit={submit}
+    >
+      <div className="playsay-schedule-create-head">
         <div>
-          <h3 className="text-base font-extrabold">{t("schedule.form.quickTitle")}</h3>
-          <p className="text-sm font-semibold text-muted-foreground">{t("schedule.form.quickSubtitle")}</p>
+          <h3>{t("schedule.form.quickTitle")}</h3>
+          <p>{t("schedule.form.quickSubtitle")}</p>
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(0,2fr)]">
-        <FormField label={t("schedule.form.student")}>
+      <div className="playsay-schedule-step-row" aria-hidden="true">
+        <div className="playsay-schedule-step">
+          <span>1</span>
+          <strong>{t("schedule.form.stepStudents")}</strong>
+          <small>{selectedStudentSummary}</small>
+        </div>
+        <div className="playsay-schedule-step">
+          <span>2</span>
+          <strong>{t("schedule.form.stepTime")}</strong>
+          <small>{form.scheduledDate} · {form.scheduledTime}</small>
+        </div>
+        <div className="playsay-schedule-step">
+          <span>3</span>
+          <strong>{t("schedule.form.stepMaterial")}</strong>
+          <small>{selectedMaterialTitle}</small>
+        </div>
+      </div>
+
+      <div className="playsay-schedule-create-main">
+        <FormField label={t("schedule.form.students")}>
           {studentUsers.length === 0 ? (
             <input
               className="playsay-input"
@@ -199,7 +233,7 @@ export function ScheduleCreateForm({
           )}
         </FormField>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="playsay-schedule-time-grid">
           <FormField label={t("schedule.form.date")}>
             <input
               className="playsay-input"
@@ -238,8 +272,8 @@ export function ScheduleCreateForm({
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-border bg-background/70 p-3" data-schedule-recurrence="true">
-        <div className="grid gap-3 sm:grid-cols-[minmax(12rem,1fr)_minmax(8rem,12rem)]">
+      <div className="playsay-schedule-recurrence" data-schedule-recurrence="true">
+        <div className="playsay-schedule-recurrence-grid">
           <FormField label={t("schedule.form.repeat")}>
             <select
               className="playsay-input"
@@ -308,8 +342,8 @@ export function ScheduleCreateForm({
         </select>
       </FormField>
 
-      <details className="rounded-2xl border border-border bg-background/70" data-schedule-advanced="true">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-extrabold text-muted-foreground">
+      <details className="playsay-schedule-advanced" data-schedule-advanced="true">
+        <summary>
           {t("schedule.form.advanced")}
         </summary>
         <div className="grid gap-3 border-t border-border p-3">
@@ -389,8 +423,13 @@ export function ScheduleCreateForm({
         </div>
       </details>
 
-      <div className="flex justify-end">
-        <Button disabled={createDisabled} type="submit">
+      <div className="playsay-schedule-create-footer">
+        {createHint ? (
+          <p className="playsay-schedule-create-hint">
+            {createHint}
+          </p>
+        ) : null}
+        <Button disabled={createDisabled} title={createHint ?? undefined} type="submit">
           <Plus className="h-4 w-4" />
           {t("schedule.form.createLesson")}
         </Button>

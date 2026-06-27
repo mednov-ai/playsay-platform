@@ -1,0 +1,363 @@
+.playsay-schedule-shell {
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: hsl(var(--surface) / 0.88);
+  padding: clamp(0.875rem, 2vw, 1.25rem);
+}
+
+.playsay-schedule-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 1rem;
+}
+
+.playsay-schedule-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: hsl(var(--primary));
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.playsay-schedule-header h2,
+.playsay-schedule-list-head h3,
+.playsay-schedule-create-head h3 {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.playsay-schedule-header h2 {
+  margin-top: 0.35rem;
+  font-size: clamp(1.3rem, 2.6vw, 2rem);
+}
+
+.playsay-schedule-header p,
+.playsay-schedule-list-head p,
+.playsay-schedule-create-head p {
+  margin: 0.25rem 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.playsay-schedule-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.9fr) minmax(0, 1.35fr);
+  align-items: start;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.playsay-schedule-dashboard-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.playsay-schedule-list-panel,
+.playsay-schedule-create-form {
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: hsl(var(--surface-muted) / 0.64);
+}
+
+.playsay-schedule-list-panel {
+  padding: 0.75rem;
+}
+
+.playsay-schedule-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.25rem 0.25rem 0.75rem;
+}
+
+.playsay-schedule-list-head h3 {
+  font-size: 1rem;
+}
+
+.playsay-schedule-list-head > span {
+  display: inline-grid;
+  min-width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 999px;
+  background: hsl(var(--surface));
+  color: hsl(var(--primary));
+  font-size: 0.84rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-message,
+.playsay-schedule-empty {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface) / 0.86);
+  color: hsl(var(--muted-foreground));
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 0.8rem;
+}
+
+.playsay-schedule-message {
+  margin-bottom: 0.65rem;
+}
+
+.playsay-schedule-timeline {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.playsay-schedule-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface));
+  padding: 0.9rem;
+}
+
+.playsay-schedule-join-note {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 0 0.75rem;
+}
+
+.playsay-schedule-archive {
+  overflow: hidden;
+  margin-top: 0.85rem;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface) / 0.58);
+}
+
+.playsay-schedule-archive summary {
+  display: flex;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: hsl(var(--foreground));
+  font-size: 0.84rem;
+  font-weight: 950;
+  padding: 0.8rem;
+}
+
+.playsay-schedule-archive summary::-webkit-details-marker {
+  display: none;
+}
+
+.playsay-schedule-archive[open] summary svg:last-child {
+  transform: rotate(180deg);
+}
+
+.playsay-schedule-archive > div {
+  display: grid;
+  gap: 0.75rem;
+  border-top: 1px solid hsl(var(--border));
+  padding: 0.75rem;
+}
+
+.playsay-schedule-create-form {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.9rem;
+}
+
+.playsay-schedule-create-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.playsay-schedule-create-head h3 {
+  font-size: 1.05rem;
+}
+
+.playsay-schedule-step-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.playsay-schedule-step {
+  min-width: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface) / 0.82);
+  padding: 0.65rem;
+}
+
+.playsay-schedule-step span {
+  display: inline-grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-step strong,
+.playsay-schedule-step small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-schedule-step strong {
+  margin-top: 0.4rem;
+  color: hsl(var(--foreground));
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-step small {
+  margin-top: 0.15rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.playsay-schedule-create-main {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.95fr) minmax(0, 1.35fr);
+  align-items: start;
+  gap: 0.8rem;
+}
+
+.playsay-schedule-time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  align-content: start;
+  gap: 0.7rem;
+}
+
+.playsay-schedule-recurrence {
+  display: grid;
+  gap: 0.7rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface) / 0.74);
+  padding: 0.75rem;
+}
+
+.playsay-schedule-recurrence-grid {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(7rem, 11rem);
+  gap: 0.7rem;
+}
+
+.playsay-schedule-advanced {
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface) / 0.74);
+}
+
+.playsay-schedule-advanced summary {
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.84rem;
+  font-weight: 950;
+  list-style: none;
+  padding: 0.65rem 0.75rem;
+}
+
+.playsay-schedule-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.playsay-schedule-create-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.playsay-schedule-create-hint {
+  flex: 1 1 16rem;
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.dark .playsay-schedule-shell,
+.dark .playsay-schedule-list-panel,
+.dark .playsay-schedule-create-form,
+.dark .playsay-schedule-card,
+.dark .playsay-schedule-message,
+.dark .playsay-schedule-empty,
+.dark .playsay-schedule-step,
+.dark .playsay-schedule-recurrence,
+.dark .playsay-schedule-advanced,
+.dark .playsay-schedule-archive {
+  background: hsl(var(--surface) / 0.82);
+}
+
+.dark .playsay-schedule-list-head > span,
+.dark .playsay-schedule-join-note {
+  background: hsl(var(--surface-strong));
+}
+
+@media (max-width: 980px) {
+  .playsay-schedule-dashboard-grid,
+  .playsay-schedule-create-main {
+    grid-template-columns: 1fr;
+  }
+
+  .playsay-schedule-create-panel {
+    order: -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .playsay-schedule-header,
+  .playsay-schedule-create-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .playsay-schedule-header button,
+  .playsay-schedule-create-footer button {
+    width: 100%;
+  }
+
+  .playsay-schedule-create-hint {
+    flex: 0 1 auto;
+  }
+
+  .playsay-schedule-step-row,
+  .playsay-schedule-time-grid,
+  .playsay-schedule-recurrence-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .playsay-schedule-card .flex:last-child {
+    width: 100%;
+  }
+
+  .playsay-schedule-card .flex:last-child > * {
+    flex: 1 1 9rem;
+  }
+}

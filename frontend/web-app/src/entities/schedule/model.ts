@@ -166,6 +166,10 @@ export function isScheduleExpired(lesson: ScheduledLesson, nowMs = Date.now()): 
   return endMs !== null && endMs + LESSON_ACCESS_GRACE_MS < nowMs;
 }
 
+export function isArchivedScheduleLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+  return isClosedScheduleStatus(lesson.status) || isScheduleExpired(lesson, nowMs);
+}
+
 export function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean {
   const startMs = dateValueMs(lesson.scheduledStart);
   const endMs = dateValueMs(lesson.scheduledEnd);
@@ -246,6 +250,17 @@ export function compareScheduleLessons(left: ScheduledLesson, right: ScheduledLe
 
 export function compareJoinableLessons(left: ScheduledLesson, right: ScheduledLesson, nowMs: number): number {
   return compareScheduleLessons(left, right, nowMs);
+}
+
+export function splitScheduleLessonsForDashboard(
+  lessons: ScheduledLesson[],
+  nowMs: number,
+): { archivedLessons: ScheduledLesson[]; mainLessons: ScheduledLesson[] } {
+  const orderedLessons = [...lessons].sort((left, right) => compareScheduleLessons(left, right, nowMs));
+  return {
+    mainLessons: orderedLessons.filter((lesson) => !isArchivedScheduleLesson(lesson, nowMs)),
+    archivedLessons: orderedLessons.filter((lesson) => isArchivedScheduleLesson(lesson, nowMs)),
+  };
 }
 
 export function formatLessonRange(

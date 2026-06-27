@@ -207,8 +207,16 @@ export const de = {
   schedule: {
     title: "Stundenplan",
     lessonFallbackTitle: "Stunde",
+    dashboard: {
+      teacherTitle: "Lehrkraft-Desk",
+      teacherSubtitle: "Stunden erstellen und nur die nächsten Termine im Blick behalten.",
+      studentTitle: "Meine Stunden",
+      studentSubtitle: "Nächste Termine und Zugang zum Online-Klassenzimmer.",
+      upcomingTitle: "Nächste Stunden",
+      upcomingSubtitle: "Frühere Stunden liegen im Archiv.",
+    },
     archive: {
-      old: "Frühere Stunden",
+      old: "Stundenarchiv",
       more: "Weitere Stunden",
       hiddenCount_one: "{{count}} ausgeblendet",
       hiddenCount_other: "{{count}} ausgeblendet",
@@ -216,6 +224,8 @@ export const de = {
     empty: {
       manager: "Es sind noch keine Stunden geplant.",
       student: "Sie haben noch keine geplanten Stunden.",
+      noUpcomingManager: "Es gibt keine nächsten Stunden. Sie können eine neue erstellen.",
+      noUpcomingStudent: "Es gibt keine nächsten Stunden.",
     },
     loginRequired: "Melden Sie sich an, um den Stundenplan zu sehen.",
     clipboard: {
@@ -279,11 +289,19 @@ export const de = {
       student: "Schüler",
       students: "Schüler",
       studentsPlaceholder: "Schüler erscheinen nach der ersten Anmeldung",
+      noStudentsSelected: "keine Schüler gewählt",
+      selectedStudents_one: "{{count}} Schüler gewählt",
+      selectedStudents_other: "{{count}} Schüler gewählt",
+      stepStudents: "Wer",
+      stepTime: "Wann",
+      stepMaterial: "Material",
       repeat: "Wiederholen",
       recurrenceCount: "Stunden",
       advanced: "Erweitert",
       addLesson: "Stunde hinzufügen",
       createLesson: "Stunde erstellen",
+      createRequiresStudent: "Wählen Sie zuerst einen Schüler.",
+      createRequiresRecurrence: "Prüfen Sie Anzahl und Wochentage.",
     },
     recurrence: {
       none: "Keine Wiederholung",
@@ -301,6 +319,7 @@ export const de = {
     actions: {
       join: "Stunde betreten",
       joinUnavailable: "Der Zutritt öffnet 10 Minuten vorher und schließt 10 Minuten danach.",
+      joinWindowHint: "Öffnet 10 Minuten vorher",
       complete: "Beenden",
       cancel: "Absagen",
       delete: "Löschen",

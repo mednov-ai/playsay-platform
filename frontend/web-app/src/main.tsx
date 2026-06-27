@@ -6,6 +6,7 @@ import "@livekit/components-styles";
 import "./shared/i18n/config";
 import "./styles.css";
 import "./styles/workspace.css";
+import "./styles/schedule.css";
 import "./styles/classroom.css";
 import "./styles/materials.css";
 import "./styles/responsive.css";

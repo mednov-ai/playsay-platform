@@ -207,8 +207,16 @@ export const fr = {
   schedule: {
     title: "Planning",
     lessonFallbackTitle: "Cours",
+    dashboard: {
+      teacherTitle: "Espace professeur",
+      teacherSubtitle: "Créez des cours et gardez seulement les prochains en vue.",
+      studentTitle: "Mes cours",
+      studentSubtitle: "Prochains cours et entrée dans la classe en ligne.",
+      upcomingTitle: "Prochains cours",
+      upcomingSubtitle: "Les cours passés sont dans l'archive.",
+    },
     archive: {
-      old: "Cours passés",
+      old: "Archive des cours",
       more: "Autres cours",
       hiddenCount_one: "{{count}} masqué",
       hiddenCount_other: "{{count}} masqués",
@@ -216,6 +224,8 @@ export const fr = {
     empty: {
       manager: "Aucun cours n'est encore planifié.",
       student: "Vous n'avez pas encore de cours planifiés.",
+      noUpcomingManager: "Aucun cours à venir. Vous pouvez en créer un.",
+      noUpcomingStudent: "Aucun cours à venir.",
     },
     loginRequired: "Connectez-vous pour voir le planning.",
     clipboard: {
@@ -279,11 +289,19 @@ export const fr = {
       student: "Élève",
       students: "Élèves",
       studentsPlaceholder: "Les élèves apparaîtront après leur première connexion",
+      noStudentsSelected: "aucun élève choisi",
+      selectedStudents_one: "{{count}} élève choisi",
+      selectedStudents_other: "{{count}} élèves choisis",
+      stepStudents: "Qui",
+      stepTime: "Quand",
+      stepMaterial: "Support",
       repeat: "Répéter",
       recurrenceCount: "Cours",
       advanced: "Avancé",
       addLesson: "Ajouter un cours",
       createLesson: "Créer le cours",
+      createRequiresStudent: "Choisissez d'abord un élève.",
+      createRequiresRecurrence: "Vérifiez le nombre de cours et les jours.",
     },
     recurrence: {
       none: "Sans répétition",
@@ -301,6 +319,7 @@ export const fr = {
     actions: {
       join: "Entrer en cours",
       joinUnavailable: "L'accès ouvre 10 minutes avant et ferme 10 minutes après.",
+      joinWindowHint: "Ouvre 10 minutes avant",
       complete: "Terminer",
       cancel: "Annuler",
       delete: "Supprimer",

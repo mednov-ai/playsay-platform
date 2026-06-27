@@ -207,8 +207,16 @@ export const ru = {
   schedule: {
     title: "Расписание",
     lessonFallbackTitle: "Занятие",
+    dashboard: {
+      teacherTitle: "Рабочий стол учителя",
+      teacherSubtitle: "Создайте занятие и держите рядом только ближайшие уроки.",
+      studentTitle: "Мои уроки",
+      studentSubtitle: "Ближайшие занятия и вход в online-класс.",
+      upcomingTitle: "Ближайшие занятия",
+      upcomingSubtitle: "Прошедшие занятия убраны в архив.",
+    },
     archive: {
-      old: "Старые занятия",
+      old: "Архив занятий",
       more: "Ещё занятия",
       hiddenCount_one: "скрыто {{count}}",
       hiddenCount_few: "скрыто {{count}}",
@@ -218,6 +226,8 @@ export const ru = {
     empty: {
       manager: "В расписании пока нет занятий.",
       student: "У вас пока нет запланированных занятий.",
+      noUpcomingManager: "Ближайших занятий нет. Можно создать новый урок.",
+      noUpcomingStudent: "Ближайших занятий нет.",
     },
     loginRequired: "Войдите, чтобы увидеть расписание.",
     clipboard: {
@@ -285,11 +295,21 @@ export const ru = {
       student: "Ученик",
       students: "Ученики",
       studentsPlaceholder: "Ученики появятся после первого входа",
+      noStudentsSelected: "ученики не выбраны",
+      selectedStudents_one: "выбран {{count}} ученик",
+      selectedStudents_few: "выбрано {{count}} ученика",
+      selectedStudents_many: "выбрано {{count}} учеников",
+      selectedStudents_other: "выбрано {{count}} учеников",
+      stepStudents: "Кого учим",
+      stepTime: "Когда",
+      stepMaterial: "Материал",
       repeat: "Повтор",
       recurrenceCount: "Занятий",
       advanced: "Дополнительно",
       addLesson: "Добавить занятие",
       createLesson: "Создать урок",
+      createRequiresStudent: "Сначала выберите ученика.",
+      createRequiresRecurrence: "Проверьте количество занятий и дни недели.",
     },
     recurrence: {
       none: "Без повтора",
@@ -307,6 +327,7 @@ export const ru = {
     actions: {
       join: "Войти в урок",
       joinUnavailable: "Вход откроется за 10 минут до урока и закроется через 10 минут после.",
+      joinWindowHint: "Откроется за 10 минут",
       complete: "Завершить",
       cancel: "Отменить",
       delete: "Удалить",

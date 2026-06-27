@@ -6,6 +6,7 @@ import {
   formatParticipantCount,
   isJoinableScheduledLesson,
   isWeeklyRecurrenceValid,
+  splitScheduleLessonsForDashboard,
   scheduleStateLabel,
   scheduleRecurrenceInput,
   selectedParticipantSubjects,
@@ -78,6 +79,21 @@ describe("schedule model", () => {
 
     expect(sorted.map((item) => item.id)).toEqual(["live", "future", "old"]);
     expect(isJoinableScheduledLesson(sorted[0], nowMs)).toBe(true);
+  });
+
+  it("keeps expired and closed lessons out of the teacher dashboard main list", () => {
+    const nowMs = Date.parse("2026-05-28T10:00:00.000Z");
+    const split = splitScheduleLessonsForDashboard([
+      lesson({ id: "expired", scheduledEnd: "2026-05-28T09:00:00.000Z" }),
+      lesson({ id: "completed", status: "COMPLETED", scheduledStart: "2026-05-29T10:00:00.000Z", scheduledEnd: "2026-05-29T10:45:00.000Z" }),
+      lesson({ id: "cancelled", status: "CANCELLED", scheduledStart: "2026-05-29T12:00:00.000Z", scheduledEnd: "2026-05-29T12:45:00.000Z" }),
+      lesson({ id: "future", scheduledStart: "2026-05-30T10:00:00.000Z", scheduledEnd: "2026-05-30T10:45:00.000Z" }),
+      lesson({ id: "live", scheduledStart: "2026-05-28T09:55:00.000Z", scheduledEnd: "2026-05-28T10:45:00.000Z" }),
+    ], nowMs);
+
+    expect(split.mainLessons.map((item) => item.id)).toEqual(["live", "future"]);
+    expect(split.archivedLessons.map((item) => item.id)).toEqual(expect.arrayContaining(["completed", "cancelled", "expired"]));
+    expect(split.archivedLessons).toHaveLength(3);
   });
 
   it("formats compact schedule values for UI", () => {

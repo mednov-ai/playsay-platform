@@ -1,6 +1,6 @@
 import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import { publicSiteUrl } from "@playsay/shared-ui";
-import { Loader2, LogIn, LogOut, User, UserPlus, Video } from "lucide-react";
+import { CalendarPlus, Loader2, LogIn, LogOut, User, UserPlus, Video } from "lucide-react";
 import { type WorkspaceTab, type WorkspaceTabDefinition } from "../entities/workspace/model";
 import type { CourseLessonMap } from "../entities/schedule/model";
 import {
@@ -209,6 +209,17 @@ export function AppShell(props: AppShellProps) {
     workspaceTab,
     workspaceTabs,
   } = props;
+  const canManageSchedule = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+
+  function focusScheduleCreateForm() {
+    setWorkspaceTab("schedule");
+    window.requestAnimationFrame(() => {
+      document.querySelector("[data-schedule-quick-create='true']")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
 
   return (
     <main className={`${isClassroomOpen ? "h-dvh overflow-hidden" : "min-h-screen overflow-hidden"} bg-background text-foreground`}>
@@ -224,19 +235,28 @@ export function AppShell(props: AppShellProps) {
             <BrandMark />
             <div className="flex flex-wrap items-center justify-end gap-2">
               <ThemeToggle mode={theme.mode} onModeChange={theme.setMode} resolvedTheme={theme.resolvedTheme} />
-              <Button
-                className="min-w-40"
-                disabled={!nextJoinableLesson || anyLessonLoading}
-                onClick={() => {
-                  if (nextJoinableLesson) {
+              {nextJoinableLesson ? (
+                <Button
+                  className="min-w-40"
+                  disabled={anyLessonLoading}
+                  onClick={() => {
                     void joinScheduledLesson(nextJoinableLesson);
-                  }
-                }}
-                type="button"
-              >
-                {nextLessonLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-                {t("shell.actions.joinLesson")}
-              </Button>
+                  }}
+                  type="button"
+                >
+                  {nextLessonLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                  {t("shell.actions.joinLesson")}
+                </Button>
+              ) : canManageSchedule ? (
+                <Button
+                  className="min-w-40"
+                  onClick={focusScheduleCreateForm}
+                  type="button"
+                >
+                  <CalendarPlus className="h-4 w-4" />
+                  {t("schedule.form.createLesson")}
+                </Button>
+              ) : null}
               <Button
                 aria-expanded={profileOpen}
                 onClick={() => setProfileOpen((current) => !current)}

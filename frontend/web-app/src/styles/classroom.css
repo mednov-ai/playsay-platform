@@ -394,9 +394,14 @@
 
 .playsay-lesson-material-picker {
   display: grid;
-  width: min(100%, 27rem);
-  grid-template-columns: minmax(10rem, 1fr) auto;
+  width: min(100%, 38rem);
+  grid-template-columns: minmax(10rem, 1fr) auto auto;
   gap: 0.5rem;
+}
+
+.playsay-live-image-upload[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 .playsay-assignment-strip {

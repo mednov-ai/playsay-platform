@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanMaterialBlock,
+  editorDocumentFromJson,
   FILL_GAP_MARKER,
   materialAcceptedAnswersWithCandidate,
   materialAnswerOptionIds,
@@ -21,6 +22,42 @@ import {
 import type { MaterialEditorBlock } from "./types";
 
 describe("material document accepted answers", () => {
+  it("keeps uploaded static image page layout and contain metadata through serde", () => {
+    const document = editorDocumentFromJson({
+      schemaVersion: 1,
+      pages: [
+        {
+          id: "page-1",
+          title: "Warm-up",
+          layout: "FLOW",
+          blocks: [{ id: "text-1", type: "text", title: "Warm-up", body: "First page" }],
+        },
+        {
+          id: "page-static",
+          title: "Worksheet scan",
+          layout: "STATIC_IMAGE",
+          blocks: [
+            {
+              id: "image-1",
+              type: "image",
+              title: "Worksheet scan",
+              url: "material-asset:asset-1",
+              alt: "Worksheet scan",
+              objectFit: "contain",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(document.pages[1].layout).toBe("STATIC_IMAGE");
+    expect(document.pages[1].blocks[0]).toMatchObject({
+      alt: "Worksheet scan",
+      objectFit: "contain",
+      url: "material-asset:asset-1",
+    });
+  });
+
   it("keeps a selected video clip through serde and removes invalid bounds", () => {
     const block = materialBlockFromJson({
       id: "video-1",

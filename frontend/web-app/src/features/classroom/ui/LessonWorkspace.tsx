@@ -1,5 +1,5 @@
-import { BookOpen, Clock3, Eye, Loader2, Plus, Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { BookOpen, Clock3, Eye, ImagePlus, Loader2, Plus, Users } from "lucide-react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Button } from "../../../components/ui/button";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import { formatLessonRange, formatParticipantCount } from "../../../entities/schedule/model";
@@ -55,6 +55,8 @@ export function LessonWorkspace({
     materialLoading,
     selectedMaterialId,
     setSelectedMaterialId,
+    uploadImagePage,
+    uploadingImagePage,
   } = useLessonMaterial({ onAssignMaterial, session });
   const canMonitorSubmissions = canAssignLessons(profile);
   const assignedParticipants = session.participants.filter((participant) => Boolean(participant.materialId));
@@ -158,6 +160,14 @@ export function LessonWorkspace({
     setStudentHealthState((current) => acknowledgeStudentHealth(current, subject));
   }
 
+  function handleImagePageSelect(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (file) {
+      void uploadImagePage(file);
+    }
+  }
+
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
@@ -209,6 +219,19 @@ export function LessonWorkspace({
               >
                 {assigningMaterial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {t("classroom.actions.assign")}
+              </Button>
+              <Button asChild variant="outline">
+                <label aria-disabled={uploadingImagePage ? "true" : "false"} className="playsay-live-image-upload">
+                  <input
+                    accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                    className="sr-only"
+                    disabled={uploadingImagePage}
+                    onChange={handleImagePageSelect}
+                    type="file"
+                  />
+                  {uploadingImagePage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                  {uploadingImagePage ? t("classroom.actions.uploadingImagePage") : t("classroom.actions.addImagePage")}
+                </label>
               </Button>
             </div>
           ) : null}
@@ -270,6 +293,7 @@ export function LessonWorkspace({
           canMonitorSubmissions ? (
             teacherTaskVisible ? (
               <LessonTaskCanvas
+                canControlPages={!isParallelWork}
                 collaborationControls={null}
                 lessonId={session.lessonId}
                 material={visibleMaterial}

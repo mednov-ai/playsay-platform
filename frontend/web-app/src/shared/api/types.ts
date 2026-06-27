@@ -87,6 +87,13 @@ export type LessonMaterialAsset = {
   metadata: LessonMaterialJson;
   createdAt: string;
 };
+export type MaterialImagePageResult = {
+  material: LessonMaterial;
+  activePageId: string;
+};
+export type LiveLessonImagePageResult = MaterialImagePageResult & {
+  lesson: ScheduledLesson;
+};
 export type LessonMaterialInput = {
   title: string;
   description?: string | null;

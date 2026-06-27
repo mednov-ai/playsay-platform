@@ -756,6 +756,8 @@ export const ru = {
         VIDEO_PLAYBACK_DECISION_FAILED: "Не удалось получить решение playback от сервера.",
         UNKNOWN: "Причина пока не определена.",
       },
+      pagePicker: "Страницы материала",
+      selectPage: "Открыть страницу {{number}}: {{title}}",
       imageFallback: "Изображение",
       studentAnswerPlaceholder: "Ответ ученика",
       resizeImage: "Изменить размер картинки",
@@ -853,12 +855,14 @@ export const ru = {
     participantFallback: "Участник",
     actions: {
       assign: "Назначить",
+      addImagePage: "Добавить картинку",
       complete: "Завершить",
       enterFullscreen: "На весь экран",
       exitFullscreen: "Выйти из полноэкранного режима",
       leave: "Выйти",
       submit: "Отправить",
       submitting: "Отправляем",
+      uploadingImagePage: "Загружаем",
     },
     controls: {
       microphone: "Микрофон",
@@ -900,6 +904,8 @@ export const ru = {
     },
     messages: {
       materialAssigned: "Материал назначен",
+      imagePageAdded: "Страница с картинкой добавлена",
+      imagePageUploadFailed: "Не удалось добавить картинку",
       materialUnassigned: "Материал снят",
       materialAssignFailed: "Не удалось назначить материал",
       materialLoadFailed: "Не удалось загрузить материал",

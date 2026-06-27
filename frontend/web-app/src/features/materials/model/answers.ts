@@ -1,5 +1,5 @@
 import type { LessonMaterialJson, LessonMaterialSubmission } from "../../../shared/api/playsay";
-import type { MaterialAnswerBlock, MaterialAnswerState, MaterialAttemptEntry, MaterialHintEntry } from "./types";
+import type { MaterialAnswerBlock, MaterialAnswerState, MaterialAttemptEntry, MaterialEditorBlock, MaterialEditorPage, MaterialHintEntry } from "./types";
 import { asJsonObject, asNumber, asString } from "./formatters";
 
 export function materialAnswersFromSubmission(submission: Pick<LessonMaterialSubmission, "content"> | { content?: LessonMaterialJson | null } | null): MaterialAnswerState {
@@ -12,6 +12,17 @@ export function materialAnswersFromSubmission(submission: Pick<LessonMaterialSub
     }
     return result;
   }, {});
+}
+
+export function materialBlockAcceptsAnswers(block: Pick<MaterialEditorBlock, "type">): boolean {
+  return block.type === "fillGaps" ||
+    block.type === "multipleChoice" ||
+    block.type === "matchingPairs" ||
+    block.type === "freeWriting";
+}
+
+export function materialPageAcceptsAnswers(page: Pick<MaterialEditorPage, "blocks"> | null | undefined): boolean {
+  return page?.blocks.some(materialBlockAcceptsAnswers) ?? false;
 }
 
 export function materialAnswerItems(answer: MaterialAnswerBlock | undefined): Record<string, string> {

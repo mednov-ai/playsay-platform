@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   annotationContentFromJson,
   annotationContentFromStrokes,
+  annotationStrokesForPage,
   pointsToSvgPath,
   type AnnotationStroke,
 } from "./annotation";
@@ -20,7 +21,8 @@ describe("annotation model", () => {
       },
     ];
 
-    expect(annotationContentFromStrokes(strokes)).toEqual({
+    expect(annotationContentFromStrokes(strokes, "page-2")).toEqual({
+      activePageId: "page-2",
       coordinateSpace: "material-page",
       schemaVersion: 2,
       strokes: [
@@ -55,6 +57,31 @@ describe("annotation model", () => {
       pageId: "material",
       points: [{ pageId: "material", x: 10, y: 20 }],
     });
+    expect(content.activePageId).toBe("material");
+  });
+
+  it("keeps active page id and filters strokes by page", () => {
+    const content = annotationContentFromJson({
+      activePageId: "page-static",
+      schemaVersion: 2,
+      strokes: [
+        {
+          color: "#ff5c00",
+          id: "first",
+          pageId: "page-1",
+          points: [{ pageId: "page-1", x: 10, y: 20 }],
+        },
+        {
+          color: "#2574ff",
+          id: "static",
+          pageId: "page-static",
+          points: [{ pageId: "page-static", x: 30, y: 40 }],
+        },
+      ],
+    });
+
+    expect(content.activePageId).toBe("page-static");
+    expect(annotationStrokesForPage(content.strokes, "page-static").map((stroke) => stroke.id)).toEqual(["static"]);
   });
 
   it("renders svg paths from normalized points", () => {

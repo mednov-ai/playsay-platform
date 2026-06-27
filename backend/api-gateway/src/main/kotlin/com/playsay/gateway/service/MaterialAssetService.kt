@@ -92,6 +92,97 @@ class MaterialAssetService(
     fun findAssets(materialId: UUID): List<MaterialAssetEntity> =
         materialAssetRepo.findByMaterialId(materialId)
 
+    fun insertUploadedImageAsset(
+        materialId: UUID,
+        originalFileName: String?,
+        contentType: String,
+        bytes: ByteArray,
+    ): UUID {
+        val id = UUID.randomUUID()
+        val storageKey = "material-assets/$materialId/$id.${contentType.materialImageExtension()}"
+        try {
+            materialObjectStorage.putObject(storageKey, bytes, contentType)
+            materialAssetRepo.saveAndFlush(
+                MaterialAssetEntity(
+                    id = id,
+                    materialId = materialId,
+                    kind = "UPLOADED_IMAGE",
+                    storageKey = storageKey,
+                    externalUrl = null,
+                    provider = "USER",
+                    metadata = objectMapper.writeValueAsString(
+                        uploadedImageMetadata(
+                            originalFileName = originalFileName,
+                            contentType = contentType,
+                            byteSize = bytes.size,
+                            storageKey = storageKey,
+                        ),
+                    ),
+                    createdAt = Instant.now(),
+                ),
+            )
+        } catch (exception: MaterialObjectStorageException) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
+        } catch (exception: RuntimeException) {
+            runCatching { materialObjectStorage.deleteObject(storageKey) }
+            throw exception
+        }
+        return id
+    }
+
+    fun copyAssets(sourceMaterialId: UUID, targetMaterialId: UUID, assetIds: Set<UUID>): Map<UUID, UUID> {
+        if (assetIds.isEmpty()) {
+            return emptyMap()
+        }
+
+        return assetIds.mapNotNull { assetId ->
+            val sourceAsset = findAsset(assetId)
+                ?.takeIf { asset -> asset.materialId == sourceMaterialId }
+                ?: return@mapNotNull null
+            val copiedAssetId = UUID.randomUUID()
+            val storageContent = sourceAsset.storageKey
+                ?.trim()
+                ?.takeIf { key -> key.isNotEmpty() }
+                ?.let { key ->
+                    try {
+                        materialObjectStorage.getObject(key)
+                    } catch (exception: MaterialObjectNotFoundException) {
+                        throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
+                    } catch (exception: MaterialObjectStorageException) {
+                        throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
+                    }
+                }
+            val copiedStorageKey = storageContent?.let { content ->
+                "material-assets/$targetMaterialId/$copiedAssetId.${copiedAssetExtension(sourceAsset, content.contentType)}"
+            }
+
+            try {
+                if (storageContent != null && copiedStorageKey != null) {
+                    materialObjectStorage.putObject(copiedStorageKey, storageContent.bytes, storageContent.contentType)
+                }
+                materialAssetRepo.saveAndFlush(
+                    MaterialAssetEntity(
+                        id = copiedAssetId,
+                        materialId = targetMaterialId,
+                        kind = sourceAsset.kind,
+                        storageKey = copiedStorageKey,
+                        externalUrl = sourceAsset.externalUrl,
+                        provider = sourceAsset.provider,
+                        metadata = objectMapper.writeValueAsString(copiedAssetMetadata(sourceAsset, copiedStorageKey)),
+                        createdAt = Instant.now(),
+                    ),
+                )
+            } catch (exception: MaterialObjectStorageException) {
+                throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
+            } catch (exception: RuntimeException) {
+                copiedStorageKey?.let { key -> runCatching { materialObjectStorage.deleteObject(key) } }
+                throw exception
+            }
+
+            assetId to copiedAssetId
+        }.toMap()
+    }
+
     fun findYoutubeThumbnailAsset(
         materialId: UUID,
         blockId: String,
@@ -241,6 +332,37 @@ class MaterialAssetService(
             replace("tags", generatedImageTags(target, generated, existingTags))
             generated.revisedPrompt?.let { value -> put("revisedPrompt", value) }
         }
+
+    private fun uploadedImageMetadata(
+        originalFileName: String?,
+        contentType: String,
+        byteSize: Int,
+        storageKey: String,
+    ): ObjectNode =
+        objectMapper.createObjectNode().apply {
+            originalFileName?.takeIf { fileName -> fileName.isNotBlank() }?.let { fileName -> put("fileName", fileName.take(240)) }
+            put("mimeType", contentType)
+            put("byteSize", byteSize)
+            put("storageKey", storageKey)
+            put("safeSvg", contentType == "image/svg+xml")
+            replace("tags", objectMapper.createArrayNode())
+        }
+
+    private fun copiedAssetMetadata(asset: StoredMaterialAsset, storageKey: String?): ObjectNode =
+        runCatching { objectMapper.readTree(asset.metadata).deepCopy<ObjectNode>() }
+            .getOrElse { objectMapper.createObjectNode() }
+            .apply {
+                put("copiedFromAssetId", asset.id.toString())
+                put("sourceMaterialId", asset.materialId.toString())
+                storageKey?.let { key -> put("storageKey", key) }
+            }
+
+    private fun copiedAssetExtension(asset: StoredMaterialAsset, contentType: String): String =
+        contentType.materialImageExtension().takeIf { extension -> extension != "bin" }
+            ?: asset.storageKey
+                ?.substringAfterLast('.', "")
+                ?.takeIf { extension -> extension.matches(Regex("[a-zA-Z0-9]{1,12}")) }
+            ?: "bin"
 
     private fun generatedImageTags(
         target: MaterialImageTarget,

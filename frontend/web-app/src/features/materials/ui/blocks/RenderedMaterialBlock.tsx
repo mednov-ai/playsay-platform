@@ -10,6 +10,7 @@ import {
   resolveMaterialImageUrl,
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
+  type MaterialEditorPage,
   type MaterialRenderMode,
 } from "../../model/materialDocument";
 import { RenderedMarkdown, MarkdownInline } from "../markdown/RenderedMarkdown";
@@ -34,6 +35,7 @@ export function RenderedMaterialBlock({
   onAssetTagsChange,
   onBlockPatchCommit,
   onBlockPatch,
+  pageLayout,
   materialId,
 }: {
   allowVideoFullscreen?: boolean;
@@ -47,6 +49,7 @@ export function RenderedMaterialBlock({
   onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
+  pageLayout?: MaterialEditorPage["layout"];
 }) {
   const { t } = useAppTranslation();
   const [videoPlayback, setVideoPlayback] = useState<MaterialVideoPlayback | null>(null);
@@ -95,7 +98,7 @@ export function RenderedMaterialBlock({
 
   const blockSection = (children: ReactNode, className = "playsay-render-block") => (
     <section
-      className={className}
+      className={`${className}${pageLayout === "STATIC_IMAGE" ? " playsay-render-block-static-image" : ""}`}
       data-playsay-block-id={block.id}
       data-playsay-block-type={block.type}
       data-playsay-context-label={contextLabel}
@@ -239,16 +242,17 @@ export function RenderedMaterialBlock({
         const assetId = materialAssetIdFromUrl(block.url);
         const imageUrl = resolveMaterialImageUrl(block.url, assetUrls);
         const imageHeight = block.height ? `${block.height}px` : undefined;
+        const objectFit = block.objectFit ?? (pageLayout === "STATIC_IMAGE" ? "contain" : undefined);
         return blockSection(
           <>
             <h4>{block.title}</h4>
             {imageUrl ? (
               <figure
-                className="playsay-rendered-image"
+                className={`playsay-rendered-image${pageLayout === "STATIC_IMAGE" ? " playsay-rendered-image-static" : ""}`}
                 data-editable={mode === "teacherPreview" && Boolean(onBlockPatch) ? "true" : "false"}
-                style={{ "--playsay-image-height": imageHeight } as CSSProperties}
+                style={{ "--playsay-image-height": imageHeight, "--playsay-image-fit": objectFit } as CSSProperties}
               >
-                <img alt={block.caption || block.prompt || block.title} src={imageUrl} />
+                <img alt={block.alt || block.caption || block.prompt || block.title} src={imageUrl} />
                 {mode === "teacherPreview" ? (
                   <MaterialImageInlineTools
                     assetId={assetId}

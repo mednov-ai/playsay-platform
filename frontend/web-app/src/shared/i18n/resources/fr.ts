@@ -734,6 +734,8 @@ export const fr = {
         VIDEO_PLAYBACK_DECISION_FAILED: "Impossible d'obtenir la décision de lecture du serveur.",
         UNKNOWN: "La raison n'est pas encore disponible.",
       },
+      pagePicker: "Pages du support",
+      selectPage: "Ouvrir la page {{number}} : {{title}}",
       imageFallback: "Image",
       studentAnswerPlaceholder: "Réponse de l'élève",
       resizeImage: "Redimensionner l'image",
@@ -829,12 +831,14 @@ export const fr = {
     participantFallback: "Participant",
     actions: {
       assign: "Attribuer",
+      addImagePage: "Ajouter image",
       complete: "Terminer",
       enterFullscreen: "Plein écran",
       exitFullscreen: "Quitter le plein écran",
       leave: "Quitter",
       submit: "Envoyer",
       submitting: "Envoi",
+      uploadingImagePage: "Import",
     },
     controls: {
       microphone: "Micro",
@@ -876,6 +880,8 @@ export const fr = {
     },
     messages: {
       materialAssigned: "Support attribué",
+      imagePageAdded: "Page image ajoutée",
+      imagePageUploadFailed: "Impossible d'ajouter l'image",
       materialUnassigned: "Support retiré",
       materialAssignFailed: "Impossible d'attribuer le support",
       materialLoadFailed: "Impossible de charger le support",

@@ -11,12 +11,15 @@ import {
   AnnotationToolButton,
   FallbackLessonDocument,
   LessonMaterialDocumentView,
+  editorDocumentFromJson,
   materialAnswersFromSubmission,
+  materialPageAcceptsAnswers,
   materialLiveScore,
   type MaterialAnswerBlock,
   type MaterialAnswerState,
 } from "../../materials";
 import {
+  annotationStrokesForPage,
   pointsToSvgPath,
   type AnnotationStroke,
 } from "../model/annotation";
@@ -43,8 +46,10 @@ export function LessonTaskCanvas({
   submissionMessage,
   submissionSaving,
   teacherName,
+  canControlPages = false,
 }: {
   annotationSync?: LiveAnnotationSync | null;
+  canControlPages?: boolean;
   collaborationControls?: ReactNode;
   lessonId: string;
   material?: LessonMaterial | null;
@@ -56,7 +61,10 @@ export function LessonTaskCanvas({
   teacherName: string;
 }) {
   const { t } = useAppTranslation();
+  const document = material ? editorDocumentFromJson(material.document, material.title) : null;
+  const firstPageId = document?.pages[0]?.id ?? null;
   const {
+    activePageId,
     annotationColor,
     annotationStrokes,
     annotationTool,
@@ -64,10 +72,14 @@ export function LessonTaskCanvas({
     endAnnotation,
     extendAnnotation,
     setAnnotationColor,
+    setActivePageId,
     setAnnotationStrokes,
     setAnnotationTool,
-  } = useLessonAnnotation({ lessonId, liveAnnotation: annotationSync, materialId: material?.id });
+  } = useLessonAnnotation({ initialPageId: firstPageId, lessonId, liveAnnotation: annotationSync, materialId: material?.id });
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
+  const activePage = document?.pages.find((page) => page.id === activePageId) ?? document?.pages[0] ?? null;
+  const visibleAnnotationStrokes = annotationStrokesForPage(annotationStrokes, activePage?.id ?? activePageId);
+  const activePageAcceptsAnswers = materialPageAcceptsAnswers(activePage);
 
   useEffect(() => {
     setAnswers(materialAnswersFromSubmission(submission));
@@ -98,13 +110,15 @@ export function LessonTaskCanvas({
     ? liveScore
     : score ?? liveScore;
   const footerControls = collaborationControls === undefined ? (
-    <>
+    activePageAcceptsAnswers ? (
+      <>
       <Button disabled={!material || submissionSaving} onClick={submitAnswers} type="button">
         {submissionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         {submissionSaving ? t("classroom.actions.submitting") : t("classroom.actions.submit")}
       </Button>
       {submissionMessage ? <span className="playsay-task-submit-status">{submissionMessage}</span> : null}
-    </>
+      </>
+    ) : null
   ) : collaborationControls;
 
   function updateMaterialCursor(event: PointerEvent<HTMLDivElement>) {
@@ -141,9 +155,9 @@ export function LessonTaskCanvas({
         </AnnotationToolButton>
         <AnnotationToolButton
           active={false}
-          disabled={annotationStrokes.length === 0}
+          disabled={visibleAnnotationStrokes.length === 0}
           label={t("classroom.annotation.undo")}
-          onClick={() => setAnnotationStrokes((current) => current.slice(0, -1))}
+          onClick={() => setAnnotationStrokes((current) => removeLatestStrokeForPage(current, activePage?.id ?? activePageId))}
           testId="annotation-tool-undo"
         >
           <Undo2 className="h-4 w-4" />
@@ -175,9 +189,12 @@ export function LessonTaskCanvas({
           >
             {material ? (
               <LessonMaterialDocumentView
+                activePageId={activePageId}
                 answers={answers}
+                canControlPages={canControlPages}
                 material={material}
                 mode="classroom"
+                onActivePageIdChange={setActivePageId}
                 onAnswerChange={updateAnswer}
                 score={displayScore}
               />
@@ -195,7 +212,7 @@ export function LessonTaskCanvas({
               preserveAspectRatio="none"
               viewBox="0 0 1000 1000"
             >
-              {annotationStrokes.map((stroke) => (
+              {visibleAnnotationStrokes.map((stroke) => (
                 <path
                   d={pointsToSvgPath(stroke.points)}
                   fill="none"
@@ -222,4 +239,18 @@ export function LessonTaskCanvas({
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function removeLatestStrokeForPage(strokes: AnnotationStroke[], pageId: string): AnnotationStroke[] {
+  let latestIndex = -1;
+  for (let index = strokes.length - 1; index >= 0; index -= 1) {
+    if (strokes[index].pageId === pageId) {
+      latestIndex = index;
+      break;
+    }
+  }
+  if (latestIndex < 0) {
+    return strokes;
+  }
+  return strokes.filter((_, index) => index !== latestIndex);
 }

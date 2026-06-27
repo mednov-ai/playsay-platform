@@ -481,6 +481,12 @@ export interface LiveKitRoomTokenResponse {
   expiresAt: string;
 }
 
+export interface LiveLessonImagePageResponse {
+  lesson: ScheduledLessonResponse;
+  material: LessonMaterialResponse;
+  activePageId: string;
+}
+
 export interface LessonHomeworkRequest {
   /**
      * @maxItems 100
@@ -705,6 +711,11 @@ export interface MaterialVideoPlaybackResponse {
   thumbnailUrl?: string | null;
   /** @nullable */
   thumbnailAssetId?: string | null;
+}
+
+export interface MaterialImagePageResponse {
+  material: LessonMaterialResponse;
+  activePageId: string;
 }
 
 export interface MaterialGenerateImagesRequest {
@@ -1048,6 +1059,14 @@ export interface HelloResponse {
   timestamp: string;
 }
 
+export type AppendScheduledLessonImagePageParams = {
+title?: string;
+};
+
+export type AppendScheduledLessonImagePageBody = {
+  file: Blob;
+};
+
 export type GetCurrentCollaborationDocumentParams = {
 materialId: string;
 documentKind?: string;
@@ -1055,6 +1074,14 @@ scope?: string;
 };
 
 export type YookassaWebhookBody = { [key: string]: unknown };
+
+export type AppendMaterialImagePageParams = {
+title?: string;
+};
+
+export type AppendMaterialImagePageBody = {
+  file: Blob;
+};
 
 export type ListCollaborationDocumentsParams = {
 materialId: string;
@@ -2609,6 +2636,91 @@ export const createScheduledLessonRoomToken = async (lessonId: string, options?:
 
 
 
+export type appendScheduledLessonImagePageResponse201 = {
+  data: LiveLessonImagePageResponse
+  status: 201
+}
+
+export type appendScheduledLessonImagePageResponse400 = {
+  data: void
+  status: 400
+}
+
+export type appendScheduledLessonImagePageResponse401 = {
+  data: void
+  status: 401
+}
+
+export type appendScheduledLessonImagePageResponse403 = {
+  data: void
+  status: 403
+}
+
+export type appendScheduledLessonImagePageResponse404 = {
+  data: void
+  status: 404
+}
+
+export type appendScheduledLessonImagePageResponse502 = {
+  data: void
+  status: 502
+}
+
+export type appendScheduledLessonImagePageResponseSuccess = (appendScheduledLessonImagePageResponse201) & {
+  headers: Headers;
+};
+export type appendScheduledLessonImagePageResponseError = (appendScheduledLessonImagePageResponse400 | appendScheduledLessonImagePageResponse401 | appendScheduledLessonImagePageResponse403 | appendScheduledLessonImagePageResponse404 | appendScheduledLessonImagePageResponse502) & {
+  headers: Headers;
+};
+
+export type appendScheduledLessonImagePageResponse = (appendScheduledLessonImagePageResponseSuccess | appendScheduledLessonImagePageResponseError)
+
+export const getAppendScheduledLessonImagePageUrl = (lessonId: string,
+    params?: AppendScheduledLessonImagePageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/image-page?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/image-page`
+}
+
+/**
+ * Uploads a JPEG, PNG, WebP, or safe SVG image for the current scheduled lesson. The first upload creates a lesson-specific material copy and assigns it to the lesson. Requires TEACHER or ADMIN role.
+ * @summary Append a static image page during a live scheduled lesson
+ */
+export const appendScheduledLessonImagePage = async (lessonId: string,
+    appendScheduledLessonImagePageBody?: AppendScheduledLessonImagePageBody,
+    params?: AppendScheduledLessonImagePageParams, options?: RequestInit): Promise<appendScheduledLessonImagePageResponse> => {
+    const formData = new FormData();
+if(appendScheduledLessonImagePageBody?.file !== undefined) {
+ formData.append(`file`, appendScheduledLessonImagePageBody.file);
+ }
+
+  const res = await fetch(getAppendScheduledLessonImagePageUrl(lessonId,params),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: appendScheduledLessonImagePageResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as appendScheduledLessonImagePageResponse
+}
+
+
+
 export type createHomeworkFromScheduledLessonResponse201 = {
   data: TeacherAssignmentDetailResponse
   status: 201
@@ -3371,6 +3483,91 @@ export const createMaterialVideoPlayback = async (materialId: string,
 
   const data: createMaterialVideoPlaybackResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createMaterialVideoPlaybackResponse
+}
+
+
+
+export type appendMaterialImagePageResponse201 = {
+  data: MaterialImagePageResponse
+  status: 201
+}
+
+export type appendMaterialImagePageResponse400 = {
+  data: void
+  status: 400
+}
+
+export type appendMaterialImagePageResponse401 = {
+  data: void
+  status: 401
+}
+
+export type appendMaterialImagePageResponse403 = {
+  data: void
+  status: 403
+}
+
+export type appendMaterialImagePageResponse404 = {
+  data: void
+  status: 404
+}
+
+export type appendMaterialImagePageResponse502 = {
+  data: void
+  status: 502
+}
+
+export type appendMaterialImagePageResponseSuccess = (appendMaterialImagePageResponse201) & {
+  headers: Headers;
+};
+export type appendMaterialImagePageResponseError = (appendMaterialImagePageResponse400 | appendMaterialImagePageResponse401 | appendMaterialImagePageResponse403 | appendMaterialImagePageResponse404 | appendMaterialImagePageResponse502) & {
+  headers: Headers;
+};
+
+export type appendMaterialImagePageResponse = (appendMaterialImagePageResponseSuccess | appendMaterialImagePageResponseError)
+
+export const getAppendMaterialImagePageUrl = (materialId: string,
+    params?: AppendMaterialImagePageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/materials/${materialId}/image-page?${stringifiedParams}` : `/api/materials/${materialId}/image-page`
+}
+
+/**
+ * Uploads a JPEG, PNG, WebP, or safe SVG image and appends it as a static image page. Requires material owner or ADMIN role.
+ * @summary Append a static image page to a reusable material
+ */
+export const appendMaterialImagePage = async (materialId: string,
+    appendMaterialImagePageBody?: AppendMaterialImagePageBody,
+    params?: AppendMaterialImagePageParams, options?: RequestInit): Promise<appendMaterialImagePageResponse> => {
+    const formData = new FormData();
+if(appendMaterialImagePageBody?.file !== undefined) {
+ formData.append(`file`, appendMaterialImagePageBody.file);
+ }
+
+  const res = await fetch(getAppendMaterialImagePageUrl(materialId,params),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: appendMaterialImagePageResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as appendMaterialImagePageResponse
 }
 
 

@@ -115,6 +115,8 @@ export type MaterialEditorBlock = {
   provider?: string;
   videoClip?: MaterialVideoClip;
   caption?: string;
+  alt?: string;
+  objectFit?: "contain" | "cover";
   cards?: Array<{ id: string; front: string; back: string; example?: string }>;
   items?: Array<{
     id?: string;
@@ -149,7 +151,7 @@ export type MaterialExerciseItem = NonNullable<MaterialEditorBlock["items"]>[num
 export type MaterialEditorPage = {
   id: string;
   title: string;
-  layout: "FLOW" | "WORKSHEET";
+  layout: "FLOW" | "WORKSHEET" | "STATIC_IMAGE";
   blocks: MaterialEditorBlock[];
 };
 

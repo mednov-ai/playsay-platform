@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import {
+  appendScheduledLessonImagePage,
   fetchScheduledLessonMaterial,
   type LessonMaterial,
+  type LiveLessonImagePageResult,
   type ScheduledLesson,
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -20,6 +22,7 @@ export function useLessonMaterial({
   const [materialError, setMaterialError] = useState<string | null>(null);
   const [selectedMaterialId, setSelectedMaterialId] = useState(session.materialId ?? "");
   const [assigningMaterial, setAssigningMaterial] = useState(false);
+  const [uploadingImagePage, setUploadingImagePage] = useState(false);
   const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,6 +32,7 @@ export function useLessonMaterial({
   useEffect(() => {
     if (
       assignmentMessage !== t("classroom.messages.materialAssigned") &&
+      assignmentMessage !== t("classroom.messages.imagePageAdded") &&
       assignmentMessage !== t("classroom.messages.materialUnassigned")
     ) {
       return undefined;
@@ -102,6 +106,24 @@ export function useLessonMaterial({
     }
   }
 
+  async function uploadImagePage(file: File): Promise<LiveLessonImagePageResult | null> {
+    setUploadingImagePage(true);
+    setAssignmentMessage(null);
+    try {
+      const result = await appendScheduledLessonImagePage(session.lessonId, file, file.name);
+      setMaterial(result.material);
+      setSelectedMaterialId(result.lesson.materialId ?? result.material.id);
+      setMaterialError(null);
+      setAssignmentMessage(t("classroom.messages.imagePageAdded"));
+      return result;
+    } catch (caught) {
+      setAssignmentMessage(caught instanceof Error ? caught.message : t("classroom.messages.imagePageUploadFailed"));
+      return null;
+    } finally {
+      setUploadingImagePage(false);
+    }
+  }
+
   return {
     assigningMaterial,
     assignmentMessage,
@@ -111,5 +133,7 @@ export function useLessonMaterial({
     materialLoading,
     selectedMaterialId,
     setSelectedMaterialId,
+    uploadImagePage,
+    uploadingImagePage,
   };
 }

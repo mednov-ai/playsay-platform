@@ -31,6 +31,27 @@ const material = {
   updatedAt: "2026-06-03T00:00:00.000Z",
 } satisfies LessonMaterial;
 
+const staticImageMaterial = {
+  ...material,
+  id: "material-static",
+  document: {
+    schemaVersion: 1,
+    pages: [{
+      id: "page-static",
+      title: "Static worksheet",
+      layout: "STATIC_IMAGE",
+      blocks: [{
+        id: "image-1",
+        type: "image",
+        title: "Static worksheet",
+        url: "https://example.com/static.png",
+        objectFit: "contain",
+      }],
+    }],
+  },
+  blockCount: 1,
+} satisfies LessonMaterial;
+
 describe("LessonTaskCanvas", () => {
   it("lets teacher monitor mode hide fake pagination and submit controls", () => {
     const markup = renderToStaticMarkup(createElement(LessonTaskCanvas, {
@@ -65,5 +86,22 @@ describe("LessonTaskCanvas", () => {
 
     expect(markup).not.toContain("playsay-material-score-badge");
     expect(markup).not.toContain("нет оценки");
+  });
+
+  it("does not show answer submit controls for a non-answer static image page", () => {
+    const markup = renderToStaticMarkup(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: staticImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+
+    expect(markup).toContain("Static worksheet");
+    expect(markup).not.toContain("Отправить");
+    expect(markup).not.toContain("Submit");
   });
 });

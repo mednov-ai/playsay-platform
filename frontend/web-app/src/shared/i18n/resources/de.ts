@@ -734,6 +734,8 @@ export const de = {
         VIDEO_PLAYBACK_DECISION_FAILED: "Die Playback-Entscheidung konnte nicht geladen werden.",
         UNKNOWN: "Der Grund ist noch nicht verfügbar.",
       },
+      pagePicker: "Materialseiten",
+      selectPage: "Seite {{number}} öffnen: {{title}}",
       imageFallback: "Bild",
       studentAnswerPlaceholder: "Schülerantwort",
       resizeImage: "Bildgröße ändern",
@@ -829,12 +831,14 @@ export const de = {
     participantFallback: "Teilnehmer",
     actions: {
       assign: "Zuweisen",
+      addImagePage: "Bild hinzufügen",
       complete: "Beenden",
       enterFullscreen: "Vollbild öffnen",
       exitFullscreen: "Vollbild beenden",
       leave: "Verlassen",
       submit: "Senden",
       submitting: "Wird gesendet",
+      uploadingImagePage: "Wird hochgeladen",
     },
     controls: {
       microphone: "Mikrofon",
@@ -876,6 +880,8 @@ export const de = {
     },
     messages: {
       materialAssigned: "Material zugewiesen",
+      imagePageAdded: "Bildseite hinzugefügt",
+      imagePageUploadFailed: "Bildseite konnte nicht hinzugefügt werden",
       materialUnassigned: "Material entfernt",
       materialAssignFailed: "Material konnte nicht zugewiesen werden",
       materialLoadFailed: "Material konnte nicht geladen werden",

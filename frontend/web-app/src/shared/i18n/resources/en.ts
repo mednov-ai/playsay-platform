@@ -734,6 +734,8 @@ export const en = {
         VIDEO_PLAYBACK_DECISION_FAILED: "Could not get a playback decision from the server.",
         UNKNOWN: "The reason is not available yet.",
       },
+      pagePicker: "Material pages",
+      selectPage: "Open page {{number}}: {{title}}",
       imageFallback: "Image",
       studentAnswerPlaceholder: "Student answer",
       resizeImage: "Resize image",
@@ -829,12 +831,14 @@ export const en = {
     participantFallback: "Participant",
     actions: {
       assign: "Assign",
+      addImagePage: "Add image",
       complete: "Complete",
       enterFullscreen: "Enter fullscreen",
       exitFullscreen: "Exit fullscreen",
       leave: "Leave",
       submit: "Send",
       submitting: "Sending",
+      uploadingImagePage: "Uploading",
     },
     controls: {
       microphone: "Microphone",
@@ -876,6 +880,8 @@ export const en = {
     },
     messages: {
       materialAssigned: "Material assigned",
+      imagePageAdded: "Image page added",
+      imagePageUploadFailed: "Could not add image page",
       materialUnassigned: "Material removed",
       materialAssignFailed: "Could not assign material",
       materialLoadFailed: "Could not load material",

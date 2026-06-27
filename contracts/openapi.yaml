@@ -800,6 +800,57 @@ paths:
           description: LiveKit is not configured
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/image-page:
+    post:
+      tags:
+      - Materials
+      summary: Append a static image page during a live scheduled lesson
+      description: "Uploads a JPEG, PNG, WebP, or safe SVG image for the current scheduled\
+        \ lesson. The first upload creates a lesson-specific material copy and assigns\
+        \ it to the lesson. Requires TEACHER or ADMIN role."
+      operationId: appendScheduledLessonImagePage
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: title
+        in: query
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "201":
+          description: Live lesson image page appended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveLessonImagePageResponse"
+        "400":
+          description: Invalid image upload or unsupported lesson mode
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage live lesson materials
+        "404":
+          description: Scheduled lesson or material not found
+        "502":
+          description: Object storage failed
+      security:
+      - bearerAuth: []
   /schedule/lessons/{lessonId}/homework:
     post:
       tags:
@@ -1198,6 +1249,56 @@ paths:
           description: Missing or invalid bearer token
         "404":
           description: Material or block not found
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/image-page:
+    post:
+      tags:
+      - Materials
+      summary: Append a static image page to a reusable material
+      description: "Uploads a JPEG, PNG, WebP, or safe SVG image and appends it as\
+        \ a static image page. Requires material owner or ADMIN role."
+      operationId: appendMaterialImagePage
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: title
+        in: query
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "201":
+          description: Image page appended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialImagePageResponse"
+        "400":
+          description: Invalid image upload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot edit material
+        "404":
+          description: Material not found
+        "502":
+          description: Object storage failed
       security:
       - bearerAuth: []
   /materials/{materialId}/generate-images:
@@ -3126,6 +3227,19 @@ components:
       - roomName
       - serverUrl
       - token
+    LiveLessonImagePageResponse:
+      type: object
+      properties:
+        lesson:
+          $ref: "#/components/schemas/ScheduledLessonResponse"
+        material:
+          $ref: "#/components/schemas/LessonMaterialResponse"
+        activePageId:
+          type: string
+      required:
+      - activePageId
+      - lesson
+      - material
     LessonHomeworkRequest:
       type: object
       properties:
@@ -3594,6 +3708,16 @@ components:
       - blockId
       - materialId
       - mode
+    MaterialImagePageResponse:
+      type: object
+      properties:
+        material:
+          $ref: "#/components/schemas/LessonMaterialResponse"
+        activePageId:
+          type: string
+      required:
+      - activePageId
+      - material
     MaterialGenerateImagesRequest:
       type: object
       properties:

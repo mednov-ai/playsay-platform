@@ -13,12 +13,16 @@ import {
   materialDocumentAssetIds,
 } from "../model/materialDocument";
 import { RenderedMaterialBlock } from "./blocks/RenderedMaterialBlock";
+import { useAppTranslation } from "../../../shared/i18n";
 
 export function LessonMaterialDocumentView({
+  activePageId,
   allowVideoFullscreen,
   answers = {},
+  canControlPages = false,
   material,
   mode = "classroom",
+  onActivePageIdChange,
   onAnswerChange,
   onAssetTagsChange,
   onBlockPatchCommit,
@@ -26,10 +30,13 @@ export function LessonMaterialDocumentView({
   score,
   showScoreBadge = true,
 }: {
+  activePageId?: string | null;
   allowVideoFullscreen?: boolean;
   answers?: MaterialAnswerState;
+  canControlPages?: boolean;
   material: LessonMaterial;
   mode?: MaterialRenderMode;
+  onActivePageIdChange?: (pageId: string) => void;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
   onAssetTagsChange?: (assetId: string, tags: string[]) => Promise<LessonMaterialAsset | null>;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
@@ -37,14 +44,24 @@ export function LessonMaterialDocumentView({
   score?: number | null;
   showScoreBadge?: boolean;
 }) {
+  const { t } = useAppTranslation();
   const document = editorDocumentFromJson(material.document);
-  const page = document.pages[0] ?? defaultMaterialPage(material.title);
+  const [internalActivePageId, setInternalActivePageId] = useState<string | null>(null);
+  const selectedPageId = activePageId ?? internalActivePageId;
+  const page = document.pages.find((item) => item.id === selectedPageId) ?? document.pages[0] ?? defaultMaterialPage(material.title);
   const assetIds = materialDocumentAssetIds(document);
   const assetKey = assetIds.join("|");
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
   const videoFullscreenAllowed = allowVideoFullscreen ?? mode === "teacherPreview";
+  const pagePickerVisible = document.pages.length > 1;
+  const pagePickerEnabled = canControlPages || activePageId === undefined;
+  const isStaticImagePage = page.layout === "STATIC_IMAGE";
+
+  useEffect(() => {
+    setInternalActivePageId(null);
+  }, [material.id]);
 
   useEffect(() => {
     let active = true;
@@ -101,7 +118,11 @@ export function LessonMaterialDocumentView({
   }, [assetKey, material.id, material.updatedAt]);
 
   return (
-    <div className="playsay-rendered-material">
+    <div
+      className={`playsay-rendered-material${isStaticImagePage ? " playsay-static-image-page" : ""}`}
+      data-playsay-layout={page.layout}
+      data-playsay-page-id={page.id}
+    >
       {showScoreBadge && numericScore !== null ? (
         <div className="playsay-material-score-badge">
           <span>{material.cefrLevel}</span>
@@ -112,9 +133,33 @@ export function LessonMaterialDocumentView({
         <FileText className="h-4 w-4 text-primary" />
         {material.title}
       </div>
+      {pagePickerVisible ? (
+        <nav className="playsay-page-picker" aria-label={t("materials.renderer.pagePicker")}>
+          {document.pages.map((item, index) => (
+            <button
+              aria-label={t("materials.renderer.selectPage", { number: index + 1, title: item.title })}
+              className="playsay-page-picker-button"
+              data-active={item.id === page.id ? "true" : "false"}
+              disabled={!pagePickerEnabled}
+              key={item.id}
+              onClick={() => {
+                if (onActivePageIdChange) {
+                  onActivePageIdChange(item.id);
+                } else {
+                  setInternalActivePageId(item.id);
+                }
+              }}
+              type="button"
+            >
+              <span>{index + 1}</span>
+              <strong>{item.title}</strong>
+            </button>
+          ))}
+        </nav>
+      ) : null}
       <h3>{page.title}</h3>
       {material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
-      <div className="playsay-material-blocks">
+      <div className={`playsay-material-blocks${isStaticImagePage ? " playsay-material-blocks-static-image" : ""}`}>
         {page.blocks.map((block) => (
           <RenderedMaterialBlock
             allowVideoFullscreen={videoFullscreenAllowed}
@@ -132,6 +177,7 @@ export function LessonMaterialDocumentView({
             }}
             onBlockPatchCommit={onBlockPatchCommit}
             onBlockPatch={onBlockPatch}
+            pageLayout={page.layout}
           />
         ))}
       </div>

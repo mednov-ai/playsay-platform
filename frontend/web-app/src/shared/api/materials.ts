@@ -16,6 +16,8 @@ import type {
   LessonMaterialSubmission,
   LessonMaterialSubmissionInput,
   LessonMaterialUrlDraftInput,
+  LiveLessonImagePageResult,
+  MaterialImagePageResult,
   MaterialVideoPlayback,
   MaterialVideoPlaybackInput,
 } from "./types";
@@ -164,6 +166,24 @@ export async function updateMaterialAsset(
   );
 }
 
+export async function appendMaterialImagePage(
+  materialId: string,
+  file: File,
+  title?: string | null,
+  config = authConfig,
+): Promise<MaterialImagePageResult> {
+  return uploadImagePage<MaterialImagePageResult>(`/api/materials/${materialId}/image-page`, file, title, config);
+}
+
+export async function appendScheduledLessonImagePage(
+  lessonId: string,
+  file: File,
+  title?: string | null,
+  config = authConfig,
+): Promise<LiveLessonImagePageResult> {
+  return uploadImagePage<LiveLessonImagePageResult>(`/api/schedule/lessons/${lessonId}/image-page`, file, title, config);
+}
+
 export async function fetchScheduledLessonMaterial(
   lessonId: string,
   config = authConfig,
@@ -176,6 +196,36 @@ export async function fetchScheduledLessonMaterial(
     }
     throw caught;
   }
+}
+
+async function uploadImagePage<T>(
+  path: string,
+  file: File,
+  title: string | null | undefined,
+  config = authConfig,
+): Promise<T> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (title?.trim()) {
+    formData.append("title", title.trim());
+  }
+
+  const authorized = await authorizedOptions(config);
+  const response = await fetch(path, {
+    body: formData,
+    headers: authorized.headers,
+    method: "POST",
+  });
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 201) {
+    throw await apiErrorFromResponse(response, `Image page upload failed with HTTP ${response.status}.`);
+  }
+
+  return (await response.json()) as T;
 }
 
 export async function fetchScheduledLessonMaterialSubmission(

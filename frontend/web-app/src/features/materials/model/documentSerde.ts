@@ -158,7 +158,7 @@ export function materialPageFromJson(value: unknown, index: number, fallbackTitl
   return {
     id: asString(page.id) || createClientId("page"),
     title: asString(page.title) || (index === 0 ? fallbackTitle : i18n.t("materials.defaults.pageTitleNumber", { number: index + 1 })),
-    layout: page.layout === "WORKSHEET" ? "WORKSHEET" : "FLOW",
+    layout: normalizeMaterialPageLayout(asString(page.layout)),
     blocks,
   };
 }
@@ -191,6 +191,8 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   const url = asString(block.url);
   const provider = asString(block.provider);
   const caption = asString(block.caption);
+  const alt = asString(block.alt);
+  const objectFit = normalizeMaterialObjectFit(asString(block.objectFit));
   const height = asNumber(block.height);
   const videoClip = normalizeMaterialVideoClip(block.videoClip);
 
@@ -211,6 +213,12 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   }
   if (caption) {
     result.caption = caption;
+  }
+  if (alt) {
+    result.alt = alt;
+  }
+  if (objectFit) {
+    result.objectFit = objectFit;
   }
   if (height !== null) {
     result.height = Math.min(800, Math.max(120, height));
@@ -276,6 +284,12 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   }
   if (block.caption?.trim()) {
     clean.caption = block.caption.trim();
+  }
+  if (block.alt?.trim()) {
+    clean.alt = block.alt.trim();
+  }
+  if (block.objectFit === "contain" || block.objectFit === "cover") {
+    clean.objectFit = block.objectFit;
   }
   if (block.height) {
     clean.height = Math.min(800, Math.max(120, block.height));
@@ -417,6 +431,19 @@ export function materialMatchingPairFromJson(value: unknown): MaterialMatchingPa
 
 export function materialMatchingPairTargetKind(pair: MaterialMatchingPair): MaterialMatchingTargetKind {
   return pair.targetKind ?? (pair.imagePrompt?.trim() || pair.imageAlt?.trim() || pair.imageUrl?.trim() ? "IMAGE" : "TEXT");
+}
+
+function normalizeMaterialPageLayout(value: string): MaterialEditorPage["layout"] {
+  const layout = value.trim().toUpperCase();
+  if (layout === "WORKSHEET" || layout === "STATIC_IMAGE") {
+    return layout;
+  }
+  return "FLOW";
+}
+
+function normalizeMaterialObjectFit(value: string): MaterialEditorBlock["objectFit"] {
+  const fit = value.trim().toLowerCase();
+  return fit === "contain" || fit === "cover" ? fit : undefined;
 }
 
 export function normalizeMatchingTargetKind(value: string): MaterialMatchingTargetKind | null {

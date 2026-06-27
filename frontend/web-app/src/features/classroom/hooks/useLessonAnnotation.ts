@@ -20,16 +20,19 @@ type LiveAnnotationSync = {
 };
 
 export function useLessonAnnotation({
+  initialPageId,
   liveAnnotation,
   lessonId,
   materialId,
 }: {
+  initialPageId?: string | null;
   liveAnnotation?: LiveAnnotationSync | null;
   lessonId: string;
   materialId?: string | null;
 }) {
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pointer");
   const [annotationColor, setAnnotationColor] = useState("#ff5c00");
+  const [activePageId, setActivePageId] = useState(initialPageId?.trim() || defaultAnnotationPageId);
   const [localAnnotationStrokes, setLocalAnnotationStrokes] = useState<AnnotationStroke[]>([]);
   const [annotationReady, setAnnotationReady] = useState(false);
   const activeStrokeId = useRef<string | null>(null);
@@ -38,7 +41,7 @@ export function useLessonAnnotation({
   const liveStrokeCountRef = useRef(0);
   const annotationStrokes = liveAnnotation?.strokes ?? localAnnotationStrokes;
   const setAnnotationStrokes = liveAnnotation?.setStrokes ?? setLocalAnnotationStrokes;
-  const liveAnnotationEnabled = Boolean(liveAnnotation);
+  const normalizedInitialPageId = initialPageId?.trim() || defaultAnnotationPageId;
 
   useEffect(() => {
     liveAnnotationRef.current = liveAnnotation ?? null;
@@ -51,6 +54,7 @@ export function useLessonAnnotation({
   useEffect(() => {
     if (!materialId) {
       setAnnotationReady(false);
+      setActivePageId(normalizedInitialPageId);
       setLocalAnnotationStrokes([]);
       lastSyncedAnnotationRef.current = "";
       return undefined;
@@ -61,10 +65,11 @@ export function useLessonAnnotation({
     async function loadAnnotation() {
       try {
         const annotation = await fetchScheduledLessonMaterialAnnotation(lessonId);
-        const content = annotationContentFromJson(annotation?.content);
+        const content = annotationContentFromJson(annotation?.content, normalizedInitialPageId);
         const serialized = JSON.stringify(content);
         if (!cancelled && serialized !== lastSyncedAnnotationRef.current) {
           lastSyncedAnnotationRef.current = serialized;
+          setActivePageId(content.activePageId);
           const currentLiveAnnotation = liveAnnotationRef.current;
           if (currentLiveAnnotation) {
             if (liveStrokeCountRef.current === 0 && content.strokes.length > 0) {
@@ -75,7 +80,7 @@ export function useLessonAnnotation({
           }
         }
       } catch {
-        const content = emptyAnnotationContent();
+        const content = emptyAnnotationContent(normalizedInitialPageId);
         const serialized = JSON.stringify(content);
         if (!liveAnnotationRef.current && !cancelled && serialized !== lastSyncedAnnotationRef.current) {
           lastSyncedAnnotationRef.current = serialized;
@@ -89,14 +94,10 @@ export function useLessonAnnotation({
     }
 
     setAnnotationReady(false);
+    setActivePageId(normalizedInitialPageId);
     lastSyncedAnnotationRef.current = "";
     setLocalAnnotationStrokes([]);
     void loadAnnotation();
-    if (liveAnnotationEnabled) {
-      return () => {
-        cancelled = true;
-      };
-    }
 
     const intervalId = window.setInterval(() => {
       void loadAnnotation();
@@ -106,14 +107,14 @@ export function useLessonAnnotation({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [lessonId, liveAnnotationEnabled, materialId]);
+  }, [lessonId, materialId, normalizedInitialPageId]);
 
   useEffect(() => {
     if (!materialId || !annotationReady) {
       return undefined;
     }
 
-    const content = annotationContentFromStrokes(annotationStrokes);
+    const content = annotationContentFromStrokes(annotationStrokes, activePageId);
     const serialized = JSON.stringify(content);
     if (serialized === lastSyncedAnnotationRef.current) {
       return undefined;
@@ -130,7 +131,7 @@ export function useLessonAnnotation({
     }, 500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [annotationReady, annotationStrokes, lessonId, materialId]);
+  }, [activePageId, annotationReady, annotationStrokes, lessonId, materialId]);
 
   function beginAnnotation(event: PointerEvent<SVGSVGElement>) {
     if (annotationTool === "pointer") {
@@ -139,7 +140,7 @@ export function useLessonAnnotation({
 
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    const point = svgPointFromEvent(event);
+    const point = svgPointFromEvent(event, activePageId);
     if (annotationTool === "eraser") {
       eraseAnnotationAt(point, setAnnotationStrokes);
       return;
@@ -156,7 +157,7 @@ export function useLessonAnnotation({
     }
 
     event.preventDefault();
-    const point = svgPointFromEvent(event);
+    const point = svgPointFromEvent(event, activePageId);
     if (annotationTool === "eraser") {
       eraseAnnotationAt(point, setAnnotationStrokes);
       return;
@@ -184,6 +185,7 @@ export function useLessonAnnotation({
   }
 
   return {
+    activePageId,
     annotationColor,
     annotationStrokes,
     annotationTool,
@@ -191,7 +193,10 @@ export function useLessonAnnotation({
     endAnnotation,
     extendAnnotation,
     setAnnotationColor,
+    setActivePageId,
     setAnnotationStrokes,
     setAnnotationTool,
   };
 }
+
+const defaultAnnotationPageId = "material";

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Search, Users, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -32,6 +32,9 @@ export function ScheduleCreateForm({
 }) {
   const { t } = useAppTranslation();
   const [form, setForm] = useState<ScheduleFormState>(() => defaultScheduleForm(lessonOptions[0]?.id ?? ""));
+  const [studentPickerOpen, setStudentPickerOpen] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const [draftStudentSubjects, setDraftStudentSubjects] = useState<string[]>([]);
   const materialOptions = materials.filter((material) => material.status !== "ARCHIVED");
   const selectedSubjects = selectedParticipantSubjects(form.participantSubjects);
   const showParallelAssignments = form.workMode === "PARALLEL" && selectedSubjects.length > 1;
@@ -44,6 +47,9 @@ export function ScheduleCreateForm({
   const selectedStudentSummary = selectedSubjects.length === 0
     ? t("schedule.form.noStudentsSelected")
     : t("schedule.form.selectedStudents", { count: selectedSubjects.length });
+  const selectedStudentLabels = selectedSubjects
+    .map((subject) => studentLabel(studentUsers.find((student) => student.subject === subject)) ?? subject)
+    .filter(Boolean);
   const createHint = createDisabledReason === "student"
     ? t("schedule.form.createRequiresStudent")
     : createDisabledReason === "recurrence"
@@ -112,18 +118,28 @@ export function ScheduleCreateForm({
     }));
   }
 
-  function toggleParticipant(subject: string) {
+  function openStudentPicker() {
+    setDraftStudentSubjects(selectedSubjects);
+    setStudentSearchQuery("");
+    setStudentPickerOpen(true);
+  }
+
+  function applyStudentPicker() {
     setForm((current) => {
-      const selected = selectedParticipantSubjects(current.participantSubjects);
-      const next = selected.includes(subject)
-        ? selected.filter((item) => item !== subject)
-        : [...selected, subject];
       const nextMaterialIds = { ...current.participantMaterialIds };
-      if (!next.includes(subject)) {
-        delete nextMaterialIds[subject];
-      }
-      return { ...current, participantMaterialIds: nextMaterialIds, participantSubjects: next.join(", ") };
+      Object.keys(nextMaterialIds).forEach((subject) => {
+        if (!draftStudentSubjects.includes(subject)) {
+          delete nextMaterialIds[subject];
+        }
+      });
+      return {
+        ...current,
+        participantMaterialIds: nextMaterialIds,
+        participantSubjects: draftStudentSubjects.join(", "),
+      };
     });
+    setStudentPickerOpen(false);
+    setStudentSearchQuery("");
   }
 
   function updateParticipantMaterial(subject: string, materialId: string) {
@@ -210,30 +226,31 @@ export function ScheduleCreateForm({
               value={form.participantSubjects}
             />
           ) : (
-            <div className="grid max-h-52 gap-2 overflow-auto rounded-2xl border border-border bg-background p-3">
-              {studentUsers.map((student) => {
-                const selected = selectedParticipantSubjects(form.participantSubjects).includes(student.subject);
-                return (
-                  <label className="flex items-center justify-between gap-3 text-sm font-extrabold" key={student.subject}>
-                    <span className="min-w-0 truncate">
-                      {student.displayName ?? student.name ?? student.username ?? student.subject}
-                    </span>
-                    <input
-                      checked={selected}
-                      disabled={disabled}
-                      name="studentSubjects"
-                      onChange={() => toggleParticipant(student.subject)}
-                      type="checkbox"
-                      value={student.subject}
-                    />
-                  </label>
-                );
-              })}
+            <div className="playsay-schedule-student-picker" data-schedule-student-picker="summary">
+              <input name="studentSubjects" readOnly type="hidden" value={form.participantSubjects} />
+              <div className="playsay-schedule-student-summary">
+                <span>{selectedStudentSummary}</span>
+                <small>
+                  {selectedStudentLabels.length > 0
+                    ? selectedStudentLabels.join(", ")
+                    : t("schedule.form.studentsPickerHint")}
+                </small>
+              </div>
+              <Button
+                data-schedule-student-picker-open="true"
+                disabled={disabled}
+                onClick={openStudentPicker}
+                type="button"
+                variant="outline"
+              >
+                <Users className="h-4 w-4" />
+                {t("schedule.form.chooseStudents")}
+              </Button>
             </div>
           )}
         </FormField>
 
-        <div className="playsay-schedule-time-grid">
+        <div className="playsay-schedule-time-grid" data-schedule-time-grid="true">
           <FormField label={t("schedule.form.date")}>
             <input
               className="playsay-input"
@@ -256,21 +273,35 @@ export function ScheduleCreateForm({
               value={form.scheduledTime}
             />
           </FormField>
-          <FormField label={t("schedule.form.duration")}>
-            <input
-              className="playsay-input"
-              disabled={disabled}
-              min={1}
-              name="durationMinutes"
-              onChange={(event) => updateField("durationMinutes", event.target.value)}
-              required
-              step={5}
-              type="number"
-              value={form.durationMinutes}
-            />
-          </FormField>
+          <div data-schedule-duration-field="true">
+            <FormField label={t("schedule.form.duration")}>
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                min={1}
+                name="durationMinutes"
+                onChange={(event) => updateField("durationMinutes", event.target.value)}
+                required
+                step={5}
+                type="number"
+                value={form.durationMinutes}
+              />
+            </FormField>
+          </div>
         </div>
       </div>
+
+      <ScheduleStudentPickerDialog
+        disabled={disabled}
+        draftSubjects={draftStudentSubjects}
+        onApply={applyStudentPicker}
+        onClose={() => setStudentPickerOpen(false)}
+        onDraftSubjectsChange={setDraftStudentSubjects}
+        onSearchQueryChange={setStudentSearchQuery}
+        open={studentPickerOpen}
+        searchQuery={studentSearchQuery}
+        studentUsers={studentUsers}
+      />
 
       <div className="playsay-schedule-recurrence" data-schedule-recurrence="true">
         <div className="playsay-schedule-recurrence-grid">
@@ -436,6 +467,144 @@ export function ScheduleCreateForm({
       </div>
     </form>
   );
+}
+
+export function ScheduleStudentPickerDialog({
+  disabled,
+  draftSubjects,
+  onApply,
+  onClose,
+  onDraftSubjectsChange,
+  onSearchQueryChange,
+  open,
+  searchQuery,
+  studentUsers,
+}: {
+  disabled: boolean;
+  draftSubjects: string[];
+  onApply: () => void;
+  onClose: () => void;
+  onDraftSubjectsChange: (subjects: string[]) => void;
+  onSearchQueryChange: (query: string) => void;
+  open: boolean;
+  searchQuery: string;
+  studentUsers: AdminUserProfile[];
+}) {
+  const { t } = useAppTranslation();
+  const visibleStudents = filterScheduleStudents(studentUsers, searchQuery);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
+  if (!open) {
+    return null;
+  }
+
+  function toggleDraftSubject(subject: string) {
+    const nextSubjects = draftSubjects.includes(subject)
+      ? draftSubjects.filter((item) => item !== subject)
+      : [...draftSubjects, subject];
+    onDraftSubjectsChange(nextSubjects);
+  }
+
+  return (
+    <div className="playsay-schedule-student-dialog-backdrop">
+      <div
+        aria-labelledby="schedule-student-picker-title"
+        aria-modal="true"
+        className="playsay-schedule-student-dialog"
+        role="dialog"
+      >
+        <div className="playsay-schedule-student-dialog-head">
+          <div className="min-w-0">
+            <h3 id="schedule-student-picker-title">{t("schedule.form.studentsPickerTitle")}</h3>
+            <p>{t("schedule.form.studentsPickerSubtitle")}</p>
+          </div>
+          <Button
+            aria-label={t("schedule.form.closeStudentsPicker")}
+            onClick={onClose}
+            type="button"
+            variant="outline"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <label className="playsay-schedule-student-search">
+          <Search className="h-4 w-4" />
+          <input
+            disabled={disabled}
+            name="studentSearch"
+            onChange={(event) => onSearchQueryChange(event.target.value)}
+            placeholder={t("schedule.form.studentSearchPlaceholder")}
+            type="search"
+            value={searchQuery}
+          />
+        </label>
+
+        <div className="playsay-schedule-student-dialog-list">
+          {visibleStudents.length === 0 ? (
+            <div className="playsay-schedule-student-empty">
+              {t("schedule.form.noStudentsFound")}
+            </div>
+          ) : visibleStudents.map((student) => {
+            const label = studentLabel(student) ?? student.subject;
+            return (
+              <label className="playsay-schedule-student-option" key={student.subject}>
+                <span className="min-w-0 truncate">{label}</span>
+                <input
+                  checked={draftSubjects.includes(student.subject)}
+                  disabled={disabled}
+                  name="studentPickerSubjects"
+                  onChange={() => toggleDraftSubject(student.subject)}
+                  type="checkbox"
+                  value={student.subject}
+                />
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="playsay-schedule-student-dialog-actions">
+          <Button onClick={onClose} type="button" variant="outline">
+            {t("schedule.form.cancelStudentsPicker")}
+          </Button>
+          <Button disabled={disabled} onClick={onApply} type="button">
+            {t("schedule.form.applyStudentsPicker")}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function filterScheduleStudents(students: AdminUserProfile[], query: string): AdminUserProfile[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) {
+    return students;
+  }
+
+  return students.filter((student) => (
+    [student.displayName, student.name, student.username, student.subject]
+      .filter(Boolean)
+      .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery))
+  ));
+}
+
+function studentLabel(student: AdminUserProfile | undefined): string | null {
+  return student?.displayName ?? student?.name ?? student?.username ?? student?.subject ?? null;
 }
 
 function buildParticipantAssignments(

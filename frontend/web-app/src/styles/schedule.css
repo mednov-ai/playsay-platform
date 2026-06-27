@@ -1,4 +1,8 @@
 .playsay-schedule-shell {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid hsl(var(--border));
   border-radius: 1rem;
   background: hsl(var(--surface) / 0.88);
@@ -7,11 +11,16 @@
 
 .playsay-schedule-header {
   display: flex;
+  min-width: 0;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   border-bottom: 1px solid hsl(var(--border));
   padding-bottom: 1rem;
+}
+
+.playsay-schedule-header > div {
+  min-width: 0;
 }
 
 .playsay-schedule-eyebrow {
@@ -27,10 +36,12 @@
 .playsay-schedule-header h2,
 .playsay-schedule-list-head h3,
 .playsay-schedule-create-head h3 {
+  max-width: 100%;
   margin: 0;
   color: hsl(var(--foreground));
   font-weight: 950;
   line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .playsay-schedule-header h2 {
@@ -41,14 +52,17 @@
 .playsay-schedule-header p,
 .playsay-schedule-list-head p,
 .playsay-schedule-create-head p {
+  max-width: 100%;
   margin: 0.25rem 0 0;
   color: hsl(var(--muted-foreground));
   font-size: 0.86rem;
   font-weight: 750;
+  overflow-wrap: anywhere;
 }
 
 .playsay-schedule-dashboard-grid {
   display: grid;
+  min-width: 0;
   grid-template-columns: minmax(18rem, 0.9fr) minmax(0, 1.35fr);
   align-items: start;
   gap: 1rem;
@@ -61,6 +75,10 @@
 
 .playsay-schedule-list-panel,
 .playsay-schedule-create-form {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid hsl(var(--border));
   border-radius: 1rem;
   background: hsl(var(--surface-muted) / 0.64);
@@ -238,17 +256,67 @@
 
 .playsay-schedule-create-main {
   display: grid;
+  min-width: 0;
   grid-template-columns: minmax(13rem, 0.95fr) minmax(0, 1.35fr);
   align-items: start;
   gap: 0.8rem;
 }
 
+.playsay-schedule-student-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface) / 0.78);
+  padding: 0.65rem;
+}
+
+.playsay-schedule-student-summary {
+  min-width: 0;
+}
+
+.playsay-schedule-student-summary span,
+.playsay-schedule-student-summary small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-schedule-student-summary span {
+  color: hsl(var(--foreground));
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-student-summary small {
+  margin-top: 0.15rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
 .playsay-schedule-time-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+  grid-template-columns: minmax(8.75rem, 1fr) minmax(7.5rem, 0.85fr) minmax(6.5rem, 0.7fr);
   align-items: start;
   align-content: start;
   gap: 0.7rem;
+}
+
+.playsay-schedule-time-grid .playsay-input {
+  height: 2.5rem;
+  min-height: 2.5rem;
+  min-width: 0;
+  border-radius: 0.75rem;
+  padding-inline: 0.75rem;
+}
+
+.playsay-schedule-time-grid [data-schedule-duration-field="true"] .playsay-input {
+  max-width: 8rem;
 }
 
 .playsay-schedule-recurrence {
@@ -302,6 +370,118 @@
   font-weight: 850;
 }
 
+.playsay-schedule-student-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgb(17 17 17 / 0.42);
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+.playsay-schedule-student-dialog {
+  display: grid;
+  width: min(100%, 34rem);
+  max-height: min(42rem, calc(100dvh - 2rem));
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: hsl(var(--background));
+  box-shadow: 0 1.5rem 4rem rgb(17 17 17 / 0.22);
+  overflow: hidden;
+  padding: 0.9rem;
+}
+
+.playsay-schedule-student-dialog-head,
+.playsay-schedule-student-dialog-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.playsay-schedule-student-dialog-head button {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  padding-inline: 0;
+}
+
+.playsay-schedule-student-dialog-head h3 {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: 1.08rem;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.playsay-schedule-student-dialog-head p {
+  margin: 0.25rem 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.playsay-schedule-student-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface));
+  color: hsl(var(--muted-foreground));
+  padding: 0 0.75rem;
+}
+
+.playsay-schedule-student-search input {
+  min-height: 2.6rem;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  outline: none;
+}
+
+.playsay-schedule-student-dialog-list {
+  display: grid;
+  min-height: 0;
+  gap: 0.5rem;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.playsay-schedule-student-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--surface) / 0.7);
+  color: hsl(var(--foreground));
+  font-size: 0.9rem;
+  font-weight: 900;
+  padding: 0.75rem;
+}
+
+.playsay-schedule-student-empty {
+  border: 1px dashed hsl(var(--border));
+  border-radius: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.86rem;
+  font-weight: 850;
+  padding: 0.8rem;
+}
+
+.playsay-schedule-student-dialog-actions {
+  justify-content: flex-end;
+}
+
 .dark .playsay-schedule-shell,
 .dark .playsay-schedule-list-panel,
 .dark .playsay-schedule-create-form,
@@ -309,14 +489,18 @@
 .dark .playsay-schedule-message,
 .dark .playsay-schedule-empty,
 .dark .playsay-schedule-step,
+.dark .playsay-schedule-student-picker,
 .dark .playsay-schedule-recurrence,
 .dark .playsay-schedule-advanced,
-.dark .playsay-schedule-archive {
+.dark .playsay-schedule-archive,
+.dark .playsay-schedule-student-dialog {
   background: hsl(var(--surface) / 0.82);
 }
 
 .dark .playsay-schedule-list-head > span,
-.dark .playsay-schedule-join-note {
+.dark .playsay-schedule-join-note,
+.dark .playsay-schedule-student-search,
+.dark .playsay-schedule-student-option {
   background: hsl(var(--surface-strong));
 }
 
@@ -351,6 +535,22 @@
   .playsay-schedule-time-grid,
   .playsay-schedule-recurrence-grid {
     grid-template-columns: 1fr;
+  }
+
+  .playsay-schedule-student-picker,
+  .playsay-schedule-student-dialog-actions {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .playsay-schedule-student-picker button,
+  .playsay-schedule-student-dialog-actions button {
+    width: 100%;
+  }
+
+  .playsay-schedule-time-grid [data-schedule-duration-field="true"] .playsay-input {
+    max-width: none;
   }
 
   .playsay-schedule-card .flex:last-child {

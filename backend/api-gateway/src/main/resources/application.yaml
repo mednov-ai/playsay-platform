@@ -64,6 +64,12 @@ playsay:
     service-token: ${PLAYSAY_PAYMENT_SERVICE_TOKEN:}
   registration-service:
     base-url: ${PLAYSAY_REGISTRATION_SERVICE_BASE_URL:http://registration-service.playsay-dev.svc.cluster.local}
+  email-service:
+    base-url: ${PLAYSAY_EMAIL_SERVICE_BASE_URL:http://email-service.playsay-dev.svc.cluster.local}
+    service-token: ${PLAYSAY_EMAIL_SERVICE_TOKEN:}
+  public-app-url: ${PLAYSAY_PUBLIC_APP_URL:https://online.play-and-say.ru}
+  lesson-reminders:
+    poll-delay-ms: ${PLAYSAY_LESSON_REMINDERS_POLL_DELAY_MS:60000}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
     s3:

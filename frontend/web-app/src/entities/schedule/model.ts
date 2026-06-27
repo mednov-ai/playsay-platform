@@ -1,4 +1,4 @@
-import type { Course, CourseLesson, ScheduledLesson, ScheduledLessonMaterialAssignmentInput } from "../../shared/api/playsay";
+import type { Course, CourseLesson, ScheduledLesson, ScheduledLessonInput, ScheduledLessonMaterialAssignmentInput } from "../../shared/api/playsay";
 
 export type CourseLessonMap = Record<string, CourseLesson[]>;
 
@@ -21,9 +21,13 @@ export type ScheduleFormState = {
   type: "INDIVIDUAL" | "GROUP";
   workMode: "SHARED" | "PARALLEL";
   participantSubjects: string;
+  recurrenceMode: "NONE" | "WEEKLY";
+  recurrenceCount: string;
+  recurrenceWeekdays: string[];
 };
 
 export const LESSON_ACCESS_GRACE_MS = 10 * 60 * 1000;
+export const scheduleWeekdays = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
 
 export function formatDuration(value: number | null | undefined, t: ScheduleTranslate): string {
   return value ? t("schedule.duration.minutes", { count: value }) : t("schedule.duration.pending");
@@ -66,6 +70,9 @@ export function defaultScheduleForm(lessonTemplateId: string): ScheduleFormState
     type: "INDIVIDUAL",
     workMode: "SHARED",
     participantSubjects: "",
+    recurrenceMode: "NONE",
+    recurrenceCount: "4",
+    recurrenceWeekdays: [],
   };
 }
 
@@ -99,6 +106,42 @@ export function localScheduleEndIso(date: string, time: string, durationMinutes:
   const parsedDuration = Number.parseInt(durationMinutes, 10);
   const safeDuration = Number.isFinite(parsedDuration) ? Math.max(1, parsedDuration) : 45;
   return new Date(new Date(startIso).getTime() + safeDuration * 60_000).toISOString();
+}
+
+export function weekdayFromLocalDate(date: string): string {
+  const dayIndex = date ? new Date(`${date}T00:00:00`).getDay() : 1;
+  const normalizedIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+  return scheduleWeekdays[normalizedIndex];
+}
+
+export function isWeeklyRecurrenceValid(form: ScheduleFormState): boolean {
+  if (form.recurrenceMode !== "WEEKLY") {
+    return true;
+  }
+
+  const count = Number.parseInt(form.recurrenceCount, 10);
+  return Number.isInteger(count) && count >= 2 && count <= 52 && form.recurrenceWeekdays.length > 0;
+}
+
+export function scheduleRecurrenceInput(
+  form: ScheduleFormState,
+  timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+): ScheduledLessonInput["recurrence"] | undefined {
+  if (form.recurrenceMode !== "WEEKLY") {
+    return undefined;
+  }
+
+  const count = Number.parseInt(form.recurrenceCount, 10);
+  const weekdays = form.recurrenceWeekdays.length > 0
+    ? form.recurrenceWeekdays
+    : [weekdayFromLocalDate(form.scheduledDate)];
+
+  return {
+    mode: "WEEKLY_COUNT",
+    count,
+    weekdays,
+    timeZone,
+  };
 }
 
 export function formatDateTime(value: string | null | undefined, t: ScheduleTranslate): string {

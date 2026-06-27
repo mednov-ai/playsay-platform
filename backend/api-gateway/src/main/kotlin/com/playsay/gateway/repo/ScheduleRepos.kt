@@ -1,6 +1,7 @@
 package com.playsay.gateway.repo
 
 import com.playsay.gateway.entity.LessonEntity
+import com.playsay.gateway.entity.LessonEmailReminderEntity
 import com.playsay.gateway.entity.LessonParticipantEntity
 import jakarta.persistence.LockModeType
 import java.time.Instant
@@ -24,6 +25,9 @@ data class ScheduledLessonRow(
     val status: String,
     val type: String,
     val workMode: String,
+    val recurrenceSeriesId: UUID?,
+    val recurrenceIndex: Int?,
+    val recurrenceTotal: Int?,
     val livekitRoomName: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
@@ -77,6 +81,9 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.status,
             l.type,
             l.workMode,
+            l.recurrenceSeriesId,
+            l.recurrenceIndex,
+            l.recurrenceTotal,
             l.livekitRoomName,
             l.createdAt,
             l.updatedAt
@@ -113,6 +120,9 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.status,
             l.type,
             l.workMode,
+            l.recurrenceSeriesId,
+            l.recurrenceIndex,
+            l.recurrenceTotal,
             l.livekitRoomName,
             l.createdAt,
             l.updatedAt
@@ -155,6 +165,9 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.status,
             l.type,
             l.workMode,
+            l.recurrenceSeriesId,
+            l.recurrenceIndex,
+            l.recurrenceTotal,
             l.livekitRoomName,
             l.createdAt,
             l.updatedAt
@@ -189,6 +202,9 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.status,
             l.type,
             l.workMode,
+            l.recurrenceSeriesId,
+            l.recurrenceIndex,
+            l.recurrenceTotal,
             l.livekitRoomName,
             l.createdAt,
             l.updatedAt
@@ -415,4 +431,24 @@ interface LessonParticipantRepo : JpaRepository<LessonParticipantEntity, UUID> {
         """,
     )
     fun findByRoomNameAndStudentSubject(roomName: String, subject: String): LessonParticipantEntity?
+}
+
+interface LessonEmailReminderRepo : JpaRepository<LessonEmailReminderEntity, UUID> {
+    fun deleteByLessonIdAndStatusIn(lessonId: UUID, statuses: Collection<String>): Long
+
+    fun existsByIdempotencyKey(idempotencyKey: String): Boolean
+
+    fun findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lessonId: UUID): List<LessonEmailReminderEntity>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        select r
+          from LessonEmailReminderEntity r
+         where r.status = :status
+           and r.dueAt <= :now
+         order by r.dueAt, r.createdAt
+        """,
+    )
+    fun findDue(status: String, now: Instant): List<LessonEmailReminderEntity>
 }

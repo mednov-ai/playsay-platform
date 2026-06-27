@@ -23,9 +23,12 @@ describe("ScheduleCreateForm", () => {
     expect(markup).toContain('name="scheduledDate"');
     expect(markup).toContain('name="scheduledTime"');
     expect(markup).toContain('name="durationMinutes"');
+    expect(markup).toContain('data-schedule-recurrence="true"');
+    expect(markup).toContain('name="recurrenceMode"');
     expect(markup).toContain('data-schedule-advanced="true"');
     expect(markup.indexOf('name="studentSubjects"')).toBeLessThan(markup.indexOf('data-schedule-advanced="true"'));
     expect(markup.indexOf('name="durationMinutes"')).toBeLessThan(markup.indexOf('data-schedule-advanced="true"'));
+    expect(markup.indexOf('name="recurrenceMode"')).toBeLessThan(markup.indexOf('data-schedule-advanced="true"'));
     expect(markup.indexOf('name="workMode"')).toBeGreaterThan(markup.indexOf('data-schedule-advanced="true"'));
   });
 });

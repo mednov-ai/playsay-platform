@@ -31,6 +31,27 @@ object MetaData {
         const val PARALLEL = "PARALLEL"
     }
 
+    object LessonRecurrenceModes {
+        const val WEEKLY_COUNT = "WEEKLY_COUNT"
+    }
+
+    object LessonReminderTypes {
+        const val LESSON_START_30M = "LESSON_START_30M"
+    }
+
+    object LessonReminderRecipientRoles {
+        const val TEACHER = "TEACHER"
+        const val STUDENT = "STUDENT"
+    }
+
+    object LessonReminderStatuses {
+        const val PENDING = "PENDING"
+        const val SENT = "SENT"
+        const val FAILED = "FAILED"
+        const val SKIPPED = "SKIPPED"
+        const val CANCELLED = "CANCELLED"
+    }
+
     object AttendanceStatuses {
         const val PLANNED = "PLANNED"
         const val PRESENT = "PRESENT"
@@ -91,6 +112,10 @@ object MetaData {
         const val UNSUPPORTED_LESSON_STATUS = "UNSUPPORTED_LESSON_STATUS"
         const val UNSUPPORTED_LESSON_TYPE = "UNSUPPORTED_LESSON_TYPE"
         const val UNSUPPORTED_LESSON_WORK_MODE = "UNSUPPORTED_LESSON_WORK_MODE"
+        const val UNSUPPORTED_LESSON_RECURRENCE = "UNSUPPORTED_LESSON_RECURRENCE"
+        const val LESSON_RECURRENCE_COUNT_OUT_OF_RANGE = "LESSON_RECURRENCE_COUNT_OUT_OF_RANGE"
+        const val LESSON_RECURRENCE_WEEKDAY_INVALID = "LESSON_RECURRENCE_WEEKDAY_INVALID"
+        const val LESSON_RECURRENCE_TIME_ZONE_INVALID = "LESSON_RECURRENCE_TIME_ZONE_INVALID"
         const val ORDER_INDEX_NEGATIVE = "ORDER_INDEX_NEGATIVE"
         const val PLANNED_DURATION_OUT_OF_RANGE = "PLANNED_DURATION_OUT_OF_RANGE"
         const val MATERIAL_NOT_FOUND = "MATERIAL_NOT_FOUND"
@@ -119,6 +144,7 @@ object MetaData {
         const val PAYMENT_INVOICE_NOT_FOUND = "PAYMENT_INVOICE_NOT_FOUND"
         const val PAYMENT_SERVICE_UNAVAILABLE = "PAYMENT_SERVICE_UNAVAILABLE"
         const val REGISTRATION_SERVICE_UNAVAILABLE = "REGISTRATION_SERVICE_UNAVAILABLE"
+        const val EMAIL_SERVICE_UNAVAILABLE = "EMAIL_SERVICE_UNAVAILABLE"
         const val LIVEKIT_NOT_CONFIGURED = "LIVEKIT_NOT_CONFIGURED"
         const val LIVEKIT_WEBHOOK_SIGNATURE_MISSING = "LIVEKIT_WEBHOOK_SIGNATURE_MISSING"
         const val LIVEKIT_WEBHOOK_SIGNATURE_INVALID = "LIVEKIT_WEBHOOK_SIGNATURE_INVALID"

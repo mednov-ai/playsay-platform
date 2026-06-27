@@ -2227,6 +2227,27 @@ components:
       required:
       - materialId
       - participantSubjects
+    ScheduledLessonRecurrenceRequest:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - WEEKLY_COUNT
+        count:
+          type: integer
+          format: int32
+        weekdays:
+          type: array
+          items:
+            type: string
+        timeZone:
+          type: string
+      required:
+      - count
+      - mode
+      - timeZone
+      - weekdays
     ScheduledLessonRequest:
       type: object
       properties:
@@ -2275,6 +2296,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ScheduledLessonMaterialAssignmentRequest"
+        recurrence:
+          oneOf:
+          - $ref: "#/components/schemas/ScheduledLessonRecurrenceRequest"
+          - type: "null"
       required:
       - participantAssignments
       - participantSubjects
@@ -2366,6 +2391,21 @@ components:
           type: string
         workMode:
           type: string
+        recurrenceSeriesId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        recurrenceIndex:
+          type:
+          - integer
+          - "null"
+          format: int32
+        recurrenceTotal:
+          type:
+          - integer
+          - "null"
+          format: int32
         livekitRoomName:
           type:
           - string

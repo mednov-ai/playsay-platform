@@ -17,11 +17,20 @@ data class ScheduledLessonRequest(
     val workMode: String = "SHARED",
     val participantSubjects: List<String> = emptyList(),
     val participantAssignments: List<ScheduledLessonMaterialAssignmentRequest> = emptyList(),
+    val recurrence: ScheduledLessonRecurrenceRequest? = null,
 )
 
 data class ScheduledLessonMaterialAssignmentRequest(
     val materialId: UUID,
     val participantSubjects: List<String> = emptyList(),
+)
+
+data class ScheduledLessonRecurrenceRequest(
+    @field:Schema(allowableValues = ["WEEKLY_COUNT"])
+    val mode: String = "WEEKLY_COUNT",
+    val count: Int = 2,
+    val weekdays: List<String> = emptyList(),
+    val timeZone: String = "UTC",
 )
 
 data class ScheduledLessonParticipantResponse(
@@ -48,6 +57,9 @@ data class ScheduledLessonResponse(
     val status: String,
     val type: String,
     val workMode: String = "SHARED",
+    val recurrenceSeriesId: UUID? = null,
+    val recurrenceIndex: Int? = null,
+    val recurrenceTotal: Int? = null,
     val livekitRoomName: String?,
     val participants: List<ScheduledLessonParticipantResponse>,
     val createdAt: Instant,

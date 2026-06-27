@@ -11,6 +11,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 import java.util.Date
@@ -20,11 +21,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
@@ -56,12 +61,21 @@ class ScheduledLessonControllerTest @Autowired constructor(
     private val userProfileStore: UserProfileStore,
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val lessonRepo: LessonRepo,
+    private val lessonEmailReminderRepo: LessonEmailReminderRepo,
+    private val lessonReminderScheduler: LessonReminderScheduler,
     private val lessonTemplateRepo: LessonTemplateRepo,
     private val courseRepo: CourseRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val appUserRepo: AppUserRepo,
     private val dataSource: DataSource,
 ) {
+    @TestConfiguration
+    class LessonReminderTestConfig {
+        @Bean
+        @Primary
+        fun lessonReminderEmailClient(): LessonReminderEmailClient = RecordingLessonReminderEmailClient
+    }
+
     @BeforeAll
     fun migrateDatabase() {
         SpringLiquibase().apply {
@@ -72,6 +86,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
+        RecordingLessonReminderEmailClient.sent.clear()
+        lessonEmailReminderRepo.deleteAllInBatch()
         lessonParticipantRepo.deleteAllInBatch()
         lessonRepo.deleteAllInBatch()
         lessonTemplateRepo.deleteAllInBatch()
@@ -104,6 +120,159 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals("lesson-${created.id}", created.livekitRoomName)
         assertEquals(listOf("student-1"), created.participants.map { participant -> participant.subject })
         assertEquals(2, scheduleController.list(teacher).size)
+    }
+
+    @Test
+    fun `teacher schedules weekly recurrence as separate lessons`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lessonTemplateId = courseLessonId(teacher)
+        val firstStart = Instant.parse("2026-06-29T10:00:00Z")
+        val firstEnd = Instant.parse("2026-06-29T10:45:00Z")
+
+        val created = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = firstStart,
+                scheduledEnd = firstEnd,
+                type = "GROUP",
+                participantSubjects = listOf("student-1"),
+                recurrence = ScheduledLessonRecurrenceRequest(
+                    mode = "WEEKLY_COUNT",
+                    count = 4,
+                    weekdays = listOf("MONDAY"),
+                    timeZone = "UTC",
+                ),
+            ),
+        ).body!!
+
+        val lessons = scheduleController.list(teacher)
+
+        assertEquals(4, lessons.size)
+        assertNotNull(created.recurrenceSeriesId)
+        assertEquals(listOf(1, 2, 3, 4), lessons.map { lesson -> lesson.recurrenceIndex })
+        assertEquals(listOf(4, 4, 4, 4), lessons.map { lesson -> lesson.recurrenceTotal })
+        assertEquals(1, lessons.map { lesson -> lesson.recurrenceSeriesId }.distinct().size)
+        assertEquals(
+            listOf(
+                firstStart,
+                firstStart.plus(Duration.ofDays(7)),
+                firstStart.plus(Duration.ofDays(14)),
+                firstStart.plus(Duration.ofDays(21)),
+            ),
+            lessons.map { lesson -> lesson.scheduledStart },
+        )
+        assertEquals(8, lessonEmailReminderRepo.count())
+        assertTrue(lessons.all { lesson -> lesson.participants.map { participant -> participant.subject } == listOf("student-1") })
+    }
+
+    @Test
+    fun `teacher cannot create recurrence with invalid count or update lesson with recurrence`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+
+        val invalidCount = assertFailsWith<ResponseStatusException> {
+            scheduleController.create(
+                teacher,
+                ScheduledLessonRequest(
+                    scheduledStart = Instant.parse("2026-06-29T10:00:00Z"),
+                    scheduledEnd = Instant.parse("2026-06-29T10:45:00Z"),
+                    recurrence = ScheduledLessonRecurrenceRequest(
+                        mode = "WEEKLY_COUNT",
+                        count = 1,
+                        weekdays = listOf("MONDAY"),
+                        timeZone = "UTC",
+                    ),
+                ),
+            )
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, invalidCount.statusCode)
+
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.parse("2026-06-29T10:00:00Z"),
+                scheduledEnd = Instant.parse("2026-06-29T10:45:00Z"),
+            ),
+        ).body!!
+
+        val updateWithRecurrence = assertFailsWith<ResponseStatusException> {
+            scheduleController.update(
+                teacher,
+                lesson.id,
+                ScheduledLessonRequest(
+                    scheduledStart = Instant.parse("2026-06-29T12:00:00Z"),
+                    scheduledEnd = Instant.parse("2026-06-29T12:45:00Z"),
+                    recurrence = ScheduledLessonRecurrenceRequest(
+                        mode = "WEEKLY_COUNT",
+                        count = 2,
+                        weekdays = listOf("MONDAY"),
+                        timeZone = "UTC",
+                    ),
+                ),
+            )
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, updateWithRecurrence.statusCode)
+    }
+
+    @Test
+    fun `lesson creation enqueues reminder for teacher and participants`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val start = Instant.parse("2026-06-29T10:00:00Z")
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = start,
+                scheduledEnd = Instant.parse("2026-06-29T10:45:00Z"),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val reminders = lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
+
+        assertEquals(2, reminders.size)
+        assertEquals(listOf("STUDENT", "TEACHER"), reminders.map { reminder -> reminder.recipientRole }.sorted())
+        assertEquals(listOf(start.minus(Duration.ofMinutes(30)), start.minus(Duration.ofMinutes(30))), reminders.map { reminder -> reminder.dueAt })
+        assertEquals(listOf("PENDING", "PENDING"), reminders.map { reminder -> reminder.status })
+    }
+
+    @Test
+    fun `lesson reminder scheduler sends due reminders once and skips recipients without email`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(studentOne)
+        val studentTwoId = userProfileStore.currentUserId(studentTwo)
+        appUserRepo.findById(studentTwoId).orElseThrow().apply {
+            email = null
+            appUserRepo.save(this)
+        }
+        val start = Instant.now().plus(Duration.ofMinutes(10))
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = start,
+                scheduledEnd = start.plus(Duration.ofMinutes(45)),
+                type = "GROUP",
+                participantSubjects = listOf("student-1", "student-2"),
+            ),
+        ).body!!
+
+        lessonReminderScheduler.dispatchDueReminders(Instant.now().plus(Duration.ofSeconds(5)))
+        lessonReminderScheduler.dispatchDueReminders(Instant.now().plus(Duration.ofSeconds(10)))
+
+        val sent = RecordingLessonReminderEmailClient.sent
+        val reminders = lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
+
+        assertEquals(2, sent.size)
+        assertEquals(listOf("student.one@example.com", "teacher.one@example.com"), sent.map { email -> email.to }.sorted())
+        assertTrue(sent.all { email -> email.templateKey == "lesson-reminder-30m" })
+        assertTrue(sent.all { email -> email.model["lessonUrl"] == "https://online.play-and-say.ru/lessons/${lesson.id}/classroom" })
+        assertEquals(2, reminders.count { reminder -> reminder.status == "SENT" })
+        assertEquals(1, reminders.count { reminder -> reminder.status == "SKIPPED" })
     }
 
     @Test
@@ -627,4 +796,12 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val leftAt: Instant?,
         val attendanceStatus: String?,
     )
+}
+
+private object RecordingLessonReminderEmailClient : LessonReminderEmailClient {
+    val sent = mutableListOf<LessonReminderEmailCommand>()
+
+    override fun send(command: LessonReminderEmailCommand) {
+        sent += command
+    }
 }

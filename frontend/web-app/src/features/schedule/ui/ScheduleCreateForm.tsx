@@ -4,11 +4,15 @@ import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
   defaultScheduleForm,
+  isWeeklyRecurrenceValid,
   localScheduleDateTimeToIso,
   localScheduleEndIso,
+  scheduleRecurrenceInput,
+  scheduleWeekdays,
   selectedParticipantSubjects,
   type CourseLessonOption,
   type ScheduleFormState,
+  weekdayFromLocalDate,
 } from "../../../entities/schedule/model";
 import type { AdminUserProfile, LessonMaterial, ScheduledLessonInput } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -31,6 +35,9 @@ export function ScheduleCreateForm({
   const materialOptions = materials.filter((material) => material.status !== "ARCHIVED");
   const selectedSubjects = selectedParticipantSubjects(form.participantSubjects);
   const showParallelAssignments = form.workMode === "PARALLEL" && selectedSubjects.length > 1;
+  const createDisabled = disabled ||
+    (studentUsers.length > 0 && selectedSubjects.length === 0) ||
+    !isWeeklyRecurrenceValid(form);
 
   useEffect(() => {
     setForm((current) => {
@@ -49,6 +56,38 @@ export function ScheduleCreateForm({
 
   function updateField<Key extends keyof ScheduleFormState>(field: Key, value: ScheduleFormState[Key]) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateScheduledDate(value: string) {
+    setForm((current) => ({
+      ...current,
+      scheduledDate: value,
+      recurrenceWeekdays: current.recurrenceMode === "WEEKLY" && current.recurrenceWeekdays.length === 0
+        ? [weekdayFromLocalDate(value)]
+        : current.recurrenceWeekdays,
+    }));
+  }
+
+  function updateRecurrenceMode(value: ScheduleFormState["recurrenceMode"]) {
+    setForm((current) => ({
+      ...current,
+      recurrenceMode: value,
+      recurrenceWeekdays: value === "WEEKLY" && current.recurrenceWeekdays.length === 0
+        ? [weekdayFromLocalDate(current.scheduledDate)]
+        : current.recurrenceWeekdays,
+    }));
+  }
+
+  function toggleRecurrenceWeekday(weekday: string) {
+    setForm((current) => {
+      const selected = current.recurrenceWeekdays.includes(weekday);
+      return {
+        ...current,
+        recurrenceWeekdays: selected
+          ? current.recurrenceWeekdays.filter((item) => item !== weekday)
+          : [...current.recurrenceWeekdays, weekday],
+      };
+    });
   }
 
   function selectLessonTemplate(lessonTemplateId: string) {
@@ -112,6 +151,7 @@ export function ScheduleCreateForm({
       workMode: showParallelAssignments ? "PARALLEL" : "SHARED",
       participantSubjects,
       participantAssignments: showParallelAssignments ? participantAssignments : [],
+      recurrence: scheduleRecurrenceInput(form),
     });
   }
 
@@ -165,7 +205,7 @@ export function ScheduleCreateForm({
               className="playsay-input"
               disabled={disabled}
               name="scheduledDate"
-              onChange={(event) => updateField("scheduledDate", event.target.value)}
+              onChange={(event) => updateScheduledDate(event.target.value)}
               required
               type="date"
               value={form.scheduledDate}
@@ -196,6 +236,55 @@ export function ScheduleCreateForm({
             />
           </FormField>
         </div>
+      </div>
+
+      <div className="grid gap-3 rounded-2xl border border-border bg-background/70 p-3" data-schedule-recurrence="true">
+        <div className="grid gap-3 sm:grid-cols-[minmax(12rem,1fr)_minmax(8rem,12rem)]">
+          <FormField label={t("schedule.form.repeat")}>
+            <select
+              className="playsay-input"
+              disabled={disabled}
+              name="recurrenceMode"
+              onChange={(event) => updateRecurrenceMode(event.target.value as ScheduleFormState["recurrenceMode"])}
+              value={form.recurrenceMode}
+            >
+              <option value="NONE">{t("schedule.recurrence.none")}</option>
+              <option value="WEEKLY">{t("schedule.recurrence.weekly")}</option>
+            </select>
+          </FormField>
+          {form.recurrenceMode === "WEEKLY" ? (
+            <FormField label={t("schedule.form.recurrenceCount")}>
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                max={52}
+                min={2}
+                name="recurrenceCount"
+                onChange={(event) => updateField("recurrenceCount", event.target.value)}
+                required
+                type="number"
+                value={form.recurrenceCount}
+              />
+            </FormField>
+          ) : null}
+        </div>
+        {form.recurrenceMode === "WEEKLY" ? (
+          <div className="flex flex-wrap gap-2" data-schedule-recurrence-weekdays="true">
+            {scheduleWeekdays.map((weekday) => (
+              <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-extrabold" key={weekday}>
+                <input
+                  checked={form.recurrenceWeekdays.includes(weekday)}
+                  disabled={disabled}
+                  name="recurrenceWeekdays"
+                  onChange={() => toggleRecurrenceWeekday(weekday)}
+                  type="checkbox"
+                  value={weekday}
+                />
+                <span>{t(`schedule.weekdaysShort.${weekday}`)}</span>
+              </label>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <FormField label={showParallelAssignments ? t("schedule.form.parallelDefaultMaterial") : t("schedule.form.directMaterial")}>
@@ -301,7 +390,7 @@ export function ScheduleCreateForm({
       </details>
 
       <div className="flex justify-end">
-        <Button disabled={disabled || (studentUsers.length > 0 && selectedSubjects.length === 0)} type="submit">
+        <Button disabled={createDisabled} type="submit">
           <Plus className="h-4 w-4" />
           {t("schedule.form.createLesson")}
         </Button>

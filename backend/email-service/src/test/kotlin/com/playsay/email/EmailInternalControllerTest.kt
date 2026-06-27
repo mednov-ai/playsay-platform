@@ -99,6 +99,20 @@ class EmailInternalControllerTest @Autowired constructor(
         assertTrue(sent.htmlBody.contains("123456"))
     }
 
+    @Test
+    fun `sends lesson reminder email from database template`() {
+        val response = sendTransactionalEmail(lessonReminderEmailBody())
+
+        assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+        val sent = RecordingOutboundEmailSender.sent.last()
+        assertEquals("student@example.com", sent.to)
+        assertTrue(sent.subject.contains("Play&Say"))
+        assertTrue(sent.textBody.contains("Lesson demo"))
+        assertTrue(sent.textBody.contains("https://online.play-and-say.ru/lessons/lesson-1/classroom"))
+        assertTrue(sent.htmlBody.contains("Lesson demo"))
+        assertTrue(sent.htmlBody.contains("https://online.play-and-say.ru/lessons/lesson-1/classroom"))
+    }
+
     private fun sendTransactionalEmail(body: String = transactionalEmailBody()): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/internal/emails/transactional"))
@@ -134,6 +148,24 @@ class EmailInternalControllerTest @Autowired constructor(
             "displayName": "Student",
             "code": "123456",
             "expiresMinutes": "15"
+          }
+        }
+        """.trimIndent()
+
+    private fun lessonReminderEmailBody(): String =
+        """
+        {
+          "to": "student@example.com",
+          "templateKey": "lesson-reminder-30m",
+          "locale": "en",
+          "idempotencyKey": "lesson-reminder-30m:lesson-1:student-1:2026-06-29T10:00:00Z",
+          "model": {
+            "displayName": "Student",
+            "lessonTitle": "Lesson demo",
+            "startsAt": "29 Jun 2026, 10:00",
+            "teacherName": "Teacher",
+            "studentNames": "Student",
+            "lessonUrl": "https://online.play-and-say.ru/lessons/lesson-1/classroom"
           }
         }
         """.trimIndent()

@@ -45,6 +45,12 @@ class LessonEntity(
     var type: String = "",
     @Column(name = "work_mode", nullable = false, length = 32)
     var workMode: String = "SHARED",
+    @Column(name = "recurrence_series_id")
+    var recurrenceSeriesId: UUID? = null,
+    @Column(name = "recurrence_index")
+    var recurrenceIndex: Int? = null,
+    @Column(name = "recurrence_total")
+    var recurrenceTotal: Int? = null,
     @Column(name = "livekit_room_name", length = 255)
     var livekitRoomName: String? = null,
     @Column(name = "created_at", nullable = false)

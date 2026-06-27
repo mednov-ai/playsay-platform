@@ -61,6 +61,20 @@ export interface ScheduledLessonMaterialAssignmentRequest {
   participantSubjects: string[];
 }
 
+export type ScheduledLessonRecurrenceRequestMode = typeof ScheduledLessonRecurrenceRequestMode[keyof typeof ScheduledLessonRecurrenceRequestMode];
+
+
+export const ScheduledLessonRecurrenceRequestMode = {
+  WEEKLY_COUNT: 'WEEKLY_COUNT',
+} as const;
+
+export interface ScheduledLessonRecurrenceRequest {
+  mode: ScheduledLessonRecurrenceRequestMode;
+  count: number;
+  weekdays: string[];
+  timeZone: string;
+}
+
 export type ScheduledLessonRequestStatus = typeof ScheduledLessonRequestStatus[keyof typeof ScheduledLessonRequestStatus];
 
 
@@ -101,6 +115,7 @@ export interface ScheduledLessonRequest {
   workMode: ScheduledLessonRequestWorkMode;
   participantSubjects: string[];
   participantAssignments: ScheduledLessonMaterialAssignmentRequest[];
+  recurrence?: ScheduledLessonRecurrenceRequest | null;
 }
 
 export interface ScheduledLessonParticipantResponse {
@@ -142,6 +157,12 @@ export interface ScheduledLessonResponse {
   status: string;
   type: string;
   workMode: string;
+  /** @nullable */
+  recurrenceSeriesId?: string | null;
+  /** @nullable */
+  recurrenceIndex?: number | null;
+  /** @nullable */
+  recurrenceTotal?: number | null;
   /** @nullable */
   livekitRoomName?: string | null;
   participants: ScheduledLessonParticipantResponse[];

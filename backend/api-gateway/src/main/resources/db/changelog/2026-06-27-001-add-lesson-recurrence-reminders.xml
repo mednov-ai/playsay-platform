@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-27-001-add-lesson-recurrence-reminders" author="codex">
+        <addColumn tableName="lesson">
+            <column name="recurrence_series_id" type="UUID"/>
+            <column name="recurrence_index" type="INT"/>
+            <column name="recurrence_total" type="INT"/>
+        </addColumn>
+        <createIndex tableName="lesson" indexName="idx_lesson_recurrence_series">
+            <column name="recurrence_series_id"/>
+            <column name="recurrence_index"/>
+        </createIndex>
+
+        <createTable tableName="lesson_email_reminder">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_lesson_email_reminder"/>
+            </column>
+            <column name="lesson_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="recipient_user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="recipient_role" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reminder_type" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="due_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="attempts" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="idempotency_key" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_lesson_email_reminder_idempotency"/>
+            </column>
+            <column name="last_error" type="TEXT"/>
+            <column name="sent_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="lesson_email_reminder"
+            baseColumnNames="lesson_id"
+            constraintName="fk_lesson_email_reminder_lesson"
+            referencedTableName="lesson"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="lesson_email_reminder"
+            baseColumnNames="recipient_user_id"
+            constraintName="fk_lesson_email_reminder_recipient"
+            referencedTableName="app_user"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <createIndex tableName="lesson_email_reminder" indexName="idx_lesson_email_reminder_due">
+            <column name="status"/>
+            <column name="due_at"/>
+        </createIndex>
+        <createIndex tableName="lesson_email_reminder" indexName="idx_lesson_email_reminder_lesson">
+            <column name="lesson_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

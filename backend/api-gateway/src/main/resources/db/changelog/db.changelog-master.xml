@@ -14,4 +14,5 @@
     <include file="2026-06-03-002-add-app-user-country.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-03-003-backfill-app-user-country.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-04-004-create-curriculum-board.xml" relativeToChangelogFile="true"/>
+    <include file="2026-06-27-001-add-lesson-recurrence-reminders.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -32,6 +32,7 @@ class ScheduledLessonStore(
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val appUserRepo: AppUserRepo,
     private val userProfileStore: UserProfileStore,
+    private val lessonReminderService: LessonReminderService,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional(readOnly = true)
@@ -65,30 +66,47 @@ class ScheduledLessonStore(
         values.participantAssignments.forEach { assignment -> validateMaterialId(authentication, assignment.materialId) }
         val participants = participants(values.participantSubjects)
         val materialAssignments = participantMaterialAssignments(values, participants)
-        val id = UUID.randomUUID()
         val now = Instant.now()
+        val occurrences = values.occurrences()
+        val recurrenceSeriesId = values.recurrence?.let { UUID.randomUUID() }
+        val recurrenceTotal = values.recurrence?.count
 
-        lessonRepo.saveAndFlush(
-            LessonEntity(
-                id = id,
-                lessonTemplateId = values.lessonTemplateId,
-                materialId = values.sharedMaterialId(),
+        val createdLessons = occurrences.mapIndexed { index, occurrence ->
+            val id = UUID.randomUUID()
+            lessonRepo.saveAndFlush(
+                LessonEntity(
+                    id = id,
+                    lessonTemplateId = values.lessonTemplateId,
+                    materialId = values.sharedMaterialId(),
+                    teacherUserId = teacherUserId,
+                    scheduledStart = occurrence.scheduledStart,
+                    scheduledEnd = occurrence.scheduledEnd,
+                    status = values.status,
+                    type = values.type,
+                    workMode = values.workMode,
+                    recurrenceSeriesId = recurrenceSeriesId,
+                    recurrenceIndex = recurrenceSeriesId?.let { index + 1 },
+                    recurrenceTotal = recurrenceTotal,
+                    livekitRoomName = "lesson-$id",
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+
+            replaceParticipants(id, participants, materialAssignments)
+            lessonReminderService.rebuildPendingReminders(
+                lessonId = id,
                 teacherUserId = teacherUserId,
-                scheduledStart = values.scheduledStart,
-                scheduledEnd = values.scheduledEnd,
+                participantUserIds = participants.map { participant -> participant.userId },
+                scheduledStart = occurrence.scheduledStart,
                 status = values.status,
-                type = values.type,
-                workMode = values.workMode,
-                livekitRoomName = "lesson-$id",
-                createdAt = now,
-                updatedAt = now,
-            ),
-        )
+                now = now,
+            )
+            requireNotNull(find(id)).withParticipants()
+        }
 
-        replaceParticipants(id, participants, materialAssignments)
-        val created = requireNotNull(find(id)).withParticipants()
-        eventPublisher.publishEvent(LessonChangedEvent(created))
-        return created
+        createdLessons.forEach { created -> eventPublisher.publishEvent(LessonChangedEvent(created)) }
+        return createdLessons.first()
     }
 
     @Transactional
@@ -100,7 +118,7 @@ class ScheduledLessonStore(
         authentication.requireScheduleManager()
         val lesson = lessonRepo.findById(lessonId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        val values = request.validated()
+        val values = request.validated(allowRecurrence = false)
         validateLessonTemplate(values.lessonTemplateId)
         validateMaterialId(authentication, values.materialId)
         values.participantAssignments.forEach { assignment -> validateMaterialId(authentication, assignment.materialId) }
@@ -118,6 +136,13 @@ class ScheduledLessonStore(
         lessonRepo.save(lesson)
 
         replaceParticipants(lessonId, participants, materialAssignments)
+        lessonReminderService.rebuildPendingReminders(
+            lessonId = lessonId,
+            teacherUserId = lesson.teacherUserId,
+            participantUserIds = participants.map { participant -> participant.userId },
+            scheduledStart = lesson.scheduledStart,
+            status = lesson.status,
+        )
         val updated = requireNotNull(find(lessonId)).withParticipants()
         eventPublisher.publishEvent(LessonChangedEvent(updated))
         return updated
@@ -130,6 +155,7 @@ class ScheduledLessonStore(
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
+        lessonReminderService.cancelPendingReminders(lessonId)
         lessonRepo.deleteById(lessonId)
         eventPublisher.publishEvent(LessonDeletedEvent(lessonId))
     }
@@ -145,6 +171,7 @@ class ScheduledLessonStore(
         lesson.actualEnd = now
         lesson.updatedAt = now
         lessonRepo.save(lesson)
+        lessonReminderService.cancelPendingReminders(lessonId)
 
         val completed = requireNotNull(find(lessonId)).withParticipants()
         eventPublisher.publishEvent(LessonChangedEvent(completed))
@@ -308,67 +335,10 @@ class ScheduledLessonStore(
     }
 }
 
-private data class ValidatedScheduledLessonRequest(
-    val lessonTemplateId: UUID?,
-    val materialId: UUID?,
-    val scheduledStart: Instant?,
-    val scheduledEnd: Instant?,
-    val status: String,
-    val type: String,
-    val workMode: String,
-    val participantSubjects: List<String>,
-    val participantAssignments: List<ValidatedScheduledLessonMaterialAssignment>,
-)
-
-private data class ValidatedScheduledLessonMaterialAssignment(
-    val materialId: UUID,
-    val participantSubjects: List<String>,
-)
-
 private data class ScheduledParticipant(
     val subject: String,
     val userId: UUID,
 )
-
-private fun ScheduledLessonRequest.validated(): ValidatedScheduledLessonRequest {
-    if (scheduledStart != null && scheduledEnd != null && !scheduledEnd.isAfter(scheduledStart)) {
-        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.SCHEDULED_END_BEFORE_START)
-    }
-
-    val cleanedStatus = status.trim().uppercase()
-    if (cleanedStatus !in scheduleStatuses) {
-        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_LESSON_STATUS)
-    }
-
-    val cleanedType = type.trim().uppercase()
-    if (cleanedType !in scheduleTypes) {
-        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_LESSON_TYPE)
-    }
-
-    val cleanedWorkMode = workMode.trim().uppercase()
-    if (cleanedWorkMode !in scheduleWorkModes) {
-        throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_LESSON_WORK_MODE)
-    }
-
-    return ValidatedScheduledLessonRequest(
-        lessonTemplateId = lessonTemplateId,
-        materialId = materialId,
-        scheduledStart = scheduledStart,
-        scheduledEnd = scheduledEnd,
-        status = cleanedStatus,
-        type = cleanedType,
-        workMode = cleanedWorkMode,
-        participantSubjects = participantSubjects.mapNotNull { subject -> subject.trim().takeIf { it.isNotEmpty() } }.distinct(),
-        participantAssignments = participantAssignments.map { assignment ->
-            ValidatedScheduledLessonMaterialAssignment(
-                materialId = assignment.materialId,
-                participantSubjects = assignment.participantSubjects
-                    .mapNotNull { subject -> subject.trim().takeIf { it.isNotEmpty() } }
-                    .distinct(),
-            )
-        },
-    )
-}
 
 private fun ValidatedScheduledLessonRequest.sharedMaterialId(): UUID? =
     if (workMode == MetaData.LessonWorkModes.SHARED) materialId else null
@@ -401,6 +371,9 @@ private fun ScheduledLessonRow.toResponse(participants: List<LessonParticipantRo
         status = status,
         type = type,
         workMode = workMode,
+        recurrenceSeriesId = recurrenceSeriesId,
+        recurrenceIndex = recurrenceIndex,
+        recurrenceTotal = recurrenceTotal,
         livekitRoomName = livekitRoomName,
         participants = participants.map { participant -> participant.toResponse() },
         createdAt = createdAt,
@@ -420,12 +393,4 @@ private fun LessonParticipantRow.toResponse(): ScheduledLessonParticipantRespons
         materialTitle = materialTitle,
     )
 
-private val scheduleStatuses = setOf(
-    MetaData.LessonStatuses.SCHEDULED,
-    MetaData.LessonStatuses.IN_PROGRESS,
-    MetaData.LessonStatuses.COMPLETED,
-    MetaData.LessonStatuses.CANCELLED,
-)
-private val scheduleTypes = setOf(MetaData.LessonTypes.INDIVIDUAL, MetaData.LessonTypes.GROUP)
-private val scheduleWorkModes = setOf(MetaData.LessonWorkModes.SHARED, MetaData.LessonWorkModes.PARALLEL)
 private val expiredParticipantStatuses = setOf(MetaData.LessonStatuses.COMPLETED, MetaData.LessonStatuses.CANCELLED)

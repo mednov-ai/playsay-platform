@@ -5,7 +5,9 @@ import {
   formatLessonType,
   formatParticipantCount,
   isJoinableScheduledLesson,
+  isWeeklyRecurrenceValid,
   scheduleStateLabel,
+  scheduleRecurrenceInput,
   selectedParticipantSubjects,
 } from "./model";
 import type { ScheduledLesson } from "../../shared/api/playsay";
@@ -88,5 +90,31 @@ describe("schedule model", () => {
     expect(formatParticipantCount(3, t)).toBe("schedule.participants.count:3");
     expect(formatParticipantCount(8, t)).toBe("schedule.participants.count:8");
     expect(selectedParticipantSubjects(" one, two ,, three ")).toEqual(["one", "two", "three"]);
+  });
+
+  it("builds weekly recurrence payload for scheduled lesson create", () => {
+    const form = {
+      defaultParallelMaterialId: "",
+      durationMinutes: "45",
+      lessonTemplateId: "lesson-template-1",
+      materialId: "material-1",
+      participantMaterialIds: {},
+      participantSubjects: "student-1",
+      scheduledDate: "2026-06-29",
+      scheduledTime: "10:00",
+      type: "GROUP" as const,
+      workMode: "SHARED" as const,
+      recurrenceMode: "WEEKLY" as const,
+      recurrenceCount: "6",
+      recurrenceWeekdays: ["MONDAY", "WEDNESDAY"],
+    };
+
+    expect(isWeeklyRecurrenceValid(form)).toBe(true);
+    expect(scheduleRecurrenceInput(form, "Europe/Moscow")).toEqual({
+      mode: "WEEKLY_COUNT",
+      count: 6,
+      weekdays: ["MONDAY", "WEDNESDAY"],
+      timeZone: "Europe/Moscow",
+    });
   });
 });

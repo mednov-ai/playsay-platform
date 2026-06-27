@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-06-27-001-add-lesson-reminder-template" author="codex">
+        <sql><![CDATA[
+INSERT INTO email_templates (id, template_key, locale, subject_template, text_template, html_template, version, enabled, created_at, updated_at) VALUES
+('10000000-0000-0000-0000-000000000301', 'lesson-reminder-30m', 'ru', 'Урок Play&Say начнётся через 30 минут',
+'Здравствуйте, ${displayName!"участник Play&Say"}!
+
+Напоминаем: урок "${lessonTitle!"Play&Say"}" начнётся ${startsAt!"скоро"}.
+Преподаватель: ${teacherName!"Play&Say"}
+Ученики: ${studentNames!""}
+
+Войти в урок:
+${lessonUrl}
+
+До встречи на занятии!',
+'<p>Здравствуйте, ${displayName!"участник Play&Say"}!</p><p>Напоминаем: урок <strong>${lessonTitle!"Play&Say"}</strong> начнётся ${startsAt!"скоро"}.</p><p>Преподаватель: ${teacherName!"Play&Say"}<br/>Ученики: ${studentNames!""}</p><p><a href="${lessonUrl}">Войти в урок</a></p><p>До встречи на занятии!</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000302', 'lesson-reminder-30m', 'en', 'Your Play&Say lesson starts in 30 minutes',
+'Hello, ${displayName!"Play&Say learner"}!
+
+Reminder: "${lessonTitle!"Play&Say lesson"}" starts at ${startsAt!"soon"}.
+Teacher: ${teacherName!"Play&Say"}
+Students: ${studentNames!""}
+
+Join the lesson:
+${lessonUrl}
+
+See you in class!',
+'<p>Hello, ${displayName!"Play&Say learner"}!</p><p>Reminder: <strong>${lessonTitle!"Play&Say lesson"}</strong> starts at ${startsAt!"soon"}.</p><p>Teacher: ${teacherName!"Play&Say"}<br/>Students: ${studentNames!""}</p><p><a href="${lessonUrl}">Join the lesson</a></p><p>See you in class!</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000303', 'lesson-reminder-30m', 'de', 'Ihre Play&Say Stunde beginnt in 30 Minuten',
+'Hallo, ${displayName!"Play&Say Lernende/r"}!
+
+Erinnerung: "${lessonTitle!"Play&Say Stunde"}" beginnt um ${startsAt!"bald"}.
+Lehrkraft: ${teacherName!"Play&Say"}
+Schüler: ${studentNames!""}
+
+Zur Stunde:
+${lessonUrl}
+
+Bis gleich im Unterricht!',
+'<p>Hallo, ${displayName!"Play&Say Lernende/r"}!</p><p>Erinnerung: <strong>${lessonTitle!"Play&Say Stunde"}</strong> beginnt um ${startsAt!"bald"}.</p><p>Lehrkraft: ${teacherName!"Play&Say"}<br/>Schüler: ${studentNames!""}</p><p><a href="${lessonUrl}">Zur Stunde</a></p><p>Bis gleich im Unterricht!</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000304', 'lesson-reminder-30m', 'fr', 'Votre cours Play&Say commence dans 30 minutes',
+'Bonjour, ${displayName!"apprenant Play&Say"} !
+
+Rappel : "${lessonTitle!"cours Play&Say"}" commence à ${startsAt!"bientôt"}.
+Enseignant : ${teacherName!"Play&Say"}
+Élèves : ${studentNames!""}
+
+Rejoindre le cours :
+${lessonUrl}
+
+À tout de suite en cours !',
+'<p>Bonjour, ${displayName!"apprenant Play&Say"} !</p><p>Rappel : <strong>${lessonTitle!"cours Play&Say"}</strong> commence à ${startsAt!"bientôt"}.</p><p>Enseignant : ${teacherName!"Play&Say"}<br/>Élèves : ${studentNames!""}</p><p><a href="${lessonUrl}">Rejoindre le cours</a></p><p>À tout de suite en cours !</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

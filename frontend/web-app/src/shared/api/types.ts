@@ -42,8 +42,15 @@ export type ScheduledLesson = ScheduledLessonResponse & {
   materialTitle?: string | null;
 };
 export type ScheduledLessonMaterialAssignmentInput = ScheduledLessonMaterialAssignmentRequest;
+export type ScheduledLessonRecurrenceInput = {
+  mode: "WEEKLY_COUNT";
+  count: number;
+  weekdays: string[];
+  timeZone: string;
+};
 export type ScheduledLessonInput = ScheduledLessonRequest & {
   materialId?: string | null;
+  recurrence?: ScheduledLessonRecurrenceInput | null;
 };
 export type LiveKitRoomToken = LiveKitRoomTokenResponse;
 export type LessonMaterialJson = Record<string, unknown>;

@@ -1,15 +1,20 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Search, Users, X } from "lucide-react";
+import { Minus, Plus, Search, Users, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
+  DURATION_PRESET_MINUTES,
+  MAX_SCHEDULE_DURATION_MINUTES,
+  MIN_SCHEDULE_DURATION_MINUTES,
   defaultScheduleForm,
   isWeeklyRecurrenceValid,
   localScheduleDateTimeToIso,
   localScheduleEndIso,
+  normalizedDurationMinutes,
   scheduleRecurrenceInput,
   scheduleWeekdays,
   selectedParticipantSubjects,
+  stepDurationMinutes,
   type CourseLessonOption,
   type ScheduleFormState,
   weekdayFromLocalDate,
@@ -38,6 +43,7 @@ export function ScheduleCreateForm({
   const materialOptions = materials.filter((material) => material.status !== "ARCHIVED");
   const selectedSubjects = selectedParticipantSubjects(form.participantSubjects);
   const showParallelAssignments = form.workMode === "PARALLEL" && selectedSubjects.length > 1;
+  const selectedRecurrenceWeekdays = scheduleWeekdays.filter((weekday) => form.recurrenceWeekdays.includes(weekday));
   const needsStudent = studentUsers.length > 0 && selectedSubjects.length === 0;
   const recurrenceInvalid = !isWeeklyRecurrenceValid(form);
   const createDisabledReason = needsStudent ? "student" : recurrenceInvalid ? "recurrence" : disabled ? "busy" : null;
@@ -76,35 +82,92 @@ export function ScheduleCreateForm({
   }
 
   function updateScheduledDate(value: string) {
+    setForm((current) => {
+      if (current.recurrenceMode !== "WEEKLY" || current.recurrenceWeekdays.length > 0) {
+        return { ...current, scheduledDate: value };
+      }
+
+      const weekday = weekdayFromLocalDate(value);
+      return {
+        ...current,
+        scheduledDate: value,
+        recurrenceWeekdays: [weekday],
+        recurrenceWeekdayTimes: {
+          ...current.recurrenceWeekdayTimes,
+          [weekday]: current.scheduledTime,
+        },
+      };
+    });
+  }
+
+  function updateScheduledTime(value: string) {
+    updateField("scheduledTime", value);
+  }
+
+  function updateDurationMinutes(value: string | number) {
+    updateField("durationMinutes", String(value));
+  }
+
+  function clampDurationMinutes() {
     setForm((current) => ({
       ...current,
-      scheduledDate: value,
-      recurrenceWeekdays: current.recurrenceMode === "WEEKLY" && current.recurrenceWeekdays.length === 0
-        ? [weekdayFromLocalDate(value)]
-        : current.recurrenceWeekdays,
+      durationMinutes: String(normalizedDurationMinutes(current.durationMinutes)),
+    }));
+  }
+
+  function stepDurationMinutesBy(step: number) {
+    setForm((current) => ({
+      ...current,
+      durationMinutes: stepDurationMinutes(current.durationMinutes, step),
     }));
   }
 
   function updateRecurrenceMode(value: ScheduleFormState["recurrenceMode"]) {
-    setForm((current) => ({
-      ...current,
-      recurrenceMode: value,
-      recurrenceWeekdays: value === "WEEKLY" && current.recurrenceWeekdays.length === 0
-        ? [weekdayFromLocalDate(current.scheduledDate)]
-        : current.recurrenceWeekdays,
-    }));
+    setForm((current) => {
+      if (value !== "WEEKLY" || current.recurrenceWeekdays.length > 0) {
+        return { ...current, recurrenceMode: value };
+      }
+
+      const weekday = weekdayFromLocalDate(current.scheduledDate);
+      return {
+        ...current,
+        recurrenceMode: value,
+        recurrenceWeekdays: [weekday],
+        recurrenceWeekdayTimes: {
+          ...current.recurrenceWeekdayTimes,
+          [weekday]: current.scheduledTime,
+        },
+      };
+    });
   }
 
   function toggleRecurrenceWeekday(weekday: string) {
     setForm((current) => {
       const selected = current.recurrenceWeekdays.includes(weekday);
+      const recurrenceWeekdayTimes = { ...current.recurrenceWeekdayTimes };
+      if (selected) {
+        delete recurrenceWeekdayTimes[weekday];
+      } else {
+        recurrenceWeekdayTimes[weekday] = recurrenceWeekdayTimes[weekday] || current.scheduledTime;
+      }
       return {
         ...current,
         recurrenceWeekdays: selected
           ? current.recurrenceWeekdays.filter((item) => item !== weekday)
           : [...current.recurrenceWeekdays, weekday],
+        recurrenceWeekdayTimes,
       };
     });
+  }
+
+  function updateRecurrenceWeekdayTime(weekday: string, time: string) {
+    setForm((current) => ({
+      ...current,
+      recurrenceWeekdayTimes: {
+        ...current.recurrenceWeekdayTimes,
+        [weekday]: time,
+      },
+    }));
   }
 
   function selectLessonTemplate(lessonTemplateId: string) {
@@ -267,7 +330,7 @@ export function ScheduleCreateForm({
               className="playsay-input"
               disabled={disabled}
               name="scheduledTime"
-              onChange={(event) => updateField("scheduledTime", event.target.value)}
+              onChange={(event) => updateScheduledTime(event.target.value)}
               required
               type="time"
               value={form.scheduledTime}
@@ -275,17 +338,60 @@ export function ScheduleCreateForm({
           </FormField>
           <div data-schedule-duration-field="true">
             <FormField label={t("schedule.form.duration")}>
-              <input
-                className="playsay-input"
-                disabled={disabled}
-                min={1}
-                name="durationMinutes"
-                onChange={(event) => updateField("durationMinutes", event.target.value)}
-                required
-                step={5}
-                type="number"
-                value={form.durationMinutes}
-              />
+              <div className="playsay-schedule-duration-control">
+                <div className="playsay-schedule-duration-presets" data-schedule-duration-presets="true">
+                  {DURATION_PRESET_MINUTES.map((duration) => {
+                    const selected = Number.parseInt(form.durationMinutes, 10) === duration;
+                    return (
+                      <button
+                        aria-pressed={selected}
+                        className="playsay-schedule-duration-preset"
+                        data-selected={selected ? "true" : "false"}
+                        disabled={disabled}
+                        key={duration}
+                        onClick={() => updateDurationMinutes(duration)}
+                        type="button"
+                      >
+                        {duration}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="playsay-schedule-duration-stepper" data-schedule-duration-stepper="true">
+                  <button
+                    aria-label={t("schedule.form.durationDecrease")}
+                    disabled={disabled}
+                    onClick={() => stepDurationMinutesBy(-10)}
+                    type="button"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <div className="playsay-schedule-duration-value">
+                    <input
+                      className="playsay-input"
+                      disabled={disabled}
+                      max={MAX_SCHEDULE_DURATION_MINUTES}
+                      min={MIN_SCHEDULE_DURATION_MINUTES}
+                      name="durationMinutes"
+                      onBlur={clampDurationMinutes}
+                      onChange={(event) => updateDurationMinutes(event.target.value)}
+                      required
+                      step={10}
+                      type="number"
+                      value={form.durationMinutes}
+                    />
+                    <span>{t("schedule.form.durationUnit")}</span>
+                  </div>
+                  <button
+                    aria-label={t("schedule.form.durationIncrease")}
+                    disabled={disabled}
+                    onClick={() => stepDurationMinutesBy(10)}
+                    type="button"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             </FormField>
           </div>
         </div>
@@ -304,26 +410,41 @@ export function ScheduleCreateForm({
       />
 
       <div className="playsay-schedule-recurrence" data-schedule-recurrence="true">
+        <input name="recurrenceMode" type="hidden" value={form.recurrenceMode} />
         <div className="playsay-schedule-recurrence-grid">
-          <FormField label={t("schedule.form.repeat")}>
-            <select
-              className="playsay-input"
+          <div
+            aria-label={t("schedule.form.recurrenceMode")}
+            className="playsay-schedule-recurrence-mode"
+            role="group"
+          >
+            <button
+              aria-pressed={form.recurrenceMode === "NONE"}
+              data-schedule-recurrence-mode="single"
+              data-selected={form.recurrenceMode === "NONE" ? "true" : "false"}
               disabled={disabled}
-              name="recurrenceMode"
-              onChange={(event) => updateRecurrenceMode(event.target.value as ScheduleFormState["recurrenceMode"])}
-              value={form.recurrenceMode}
+              onClick={() => updateRecurrenceMode("NONE")}
+              type="button"
             >
-              <option value="NONE">{t("schedule.recurrence.none")}</option>
-              <option value="WEEKLY">{t("schedule.recurrence.weekly")}</option>
-            </select>
-          </FormField>
+              {t("schedule.recurrence.none")}
+            </button>
+            <button
+              aria-pressed={form.recurrenceMode === "WEEKLY"}
+              data-schedule-recurrence-mode="weekly"
+              data-selected={form.recurrenceMode === "WEEKLY" ? "true" : "false"}
+              disabled={disabled}
+              onClick={() => updateRecurrenceMode("WEEKLY")}
+              type="button"
+            >
+              {t("schedule.recurrence.weekly")}
+            </button>
+          </div>
           {form.recurrenceMode === "WEEKLY" ? (
-            <FormField label={t("schedule.form.recurrenceCount")}>
+            <FormField label={t("schedule.form.recurrenceWeeks")}>
               <input
                 className="playsay-input"
                 disabled={disabled}
                 max={52}
-                min={2}
+                min={1}
                 name="recurrenceCount"
                 onChange={(event) => updateField("recurrenceCount", event.target.value)}
                 required
@@ -334,20 +455,43 @@ export function ScheduleCreateForm({
           ) : null}
         </div>
         {form.recurrenceMode === "WEEKLY" ? (
-          <div className="flex flex-wrap gap-2" data-schedule-recurrence-weekdays="true">
-            {scheduleWeekdays.map((weekday) => (
-              <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-extrabold" key={weekday}>
-                <input
-                  checked={form.recurrenceWeekdays.includes(weekday)}
-                  disabled={disabled}
-                  name="recurrenceWeekdays"
-                  onChange={() => toggleRecurrenceWeekday(weekday)}
-                  type="checkbox"
-                  value={weekday}
-                />
-                <span>{t(`schedule.weekdaysShort.${weekday}`)}</span>
-              </label>
-            ))}
+          <div className="playsay-schedule-weekly-grid">
+            <div className="playsay-schedule-weekdays" data-schedule-recurrence-weekdays="true">
+              {scheduleWeekdays.map((weekday) => {
+                const selected = form.recurrenceWeekdays.includes(weekday);
+                return (
+                  <button
+                    aria-pressed={selected}
+                    data-selected={selected ? "true" : "false"}
+                    disabled={disabled}
+                    key={weekday}
+                    onClick={() => toggleRecurrenceWeekday(weekday)}
+                    type="button"
+                  >
+                    {t(`schedule.weekdaysShort.${weekday}`)}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedRecurrenceWeekdays.length > 0 ? (
+              <div className="playsay-schedule-weekday-times" data-schedule-recurrence-weekday-times="true">
+                <div>{t("schedule.form.weekdayTimes")}</div>
+                {selectedRecurrenceWeekdays.map((weekday) => (
+                  <label key={weekday}>
+                    <span>{t(`schedule.weekdaysShort.${weekday}`)}</span>
+                    <input
+                      className="playsay-input"
+                      disabled={disabled}
+                      name={`recurrenceWeekdayTimes.${weekday}`}
+                      onChange={(event) => updateRecurrenceWeekdayTime(weekday, event.target.value)}
+                      required
+                      type="time"
+                      value={form.recurrenceWeekdayTimes[weekday] ?? form.scheduledTime}
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

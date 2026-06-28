@@ -2,9 +2,12 @@ package com.playsay.gateway
 
 import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
+import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.service.*
+import com.playsay.gateway.utils.MetaData
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class MaterialAiDraftServiceTest {
@@ -36,6 +39,7 @@ class MaterialAiDraftServiceTest {
         assertEquals("text", draft.document["pages"][0]["blocks"][0]["type"].asText())
         assertTrue(transport.requestBody.contains("\"text\""))
         assertTrue(transport.requestBody.contains("\"json_schema\""))
+        assertTrue(transport.requestBody.contains("\"strict\":true"))
     }
 
     @Test
@@ -107,6 +111,58 @@ class MaterialAiDraftServiceTest {
         assertEquals("-", items[4]["correct"].asText())
     }
 
+    @Test
+    fun `openai provider rejects text block without body`() {
+        val invalidDraftJson = openAiDraftJson()
+            .replace("\"body\": \"Talk about your favourite food when you travel.\"", "\"body\": null")
+        val transport = RecordingOpenAiTransport(openAiResponse(invalidDraftJson))
+        val provider = OpenAiMaterialAiDraftProvider(
+            transport = transport,
+            apiKey = "test-key",
+            model = "gpt-5.4-mini",
+            baseUrl = "https://api.openai.com/v1",
+        )
+
+        val exception = assertFailsWith<ProjectResponseException> {
+            provider.draft(
+                MaterialAiDraftInput(
+                    title = "Travel food",
+                    prompt = "B1 travel food speaking lesson",
+                    language = "en",
+                    cefrLevel = "B1",
+                ),
+            )
+        }
+
+        assertEquals(MetaData.ErrorCodes.AI_MATERIAL_SCHEMA_INVALID, exception.errorCode)
+    }
+
+    @Test
+    fun `openai provider rejects matching pairs block without pairs`() {
+        val invalidDraftJson = openAiMatchingPairsDraftJson()
+            .replace(Regex(""""pairs": \[\s*\{[\s\S]*?}\s*],"""), "\"pairs\": [],")
+        val transport = RecordingOpenAiTransport(openAiResponse(invalidDraftJson))
+        val provider = OpenAiMaterialAiDraftProvider(
+            transport = transport,
+            apiKey = "test-key",
+            model = "gpt-5.4-mini",
+            baseUrl = "https://api.openai.com/v1",
+        )
+
+        val exception = assertFailsWith<ProjectResponseException> {
+            provider.draft(
+                MaterialAiDraftInput(
+                    title = "Food pairs",
+                    prompt = "Create a matching pairs activity",
+                    language = "en",
+                    cefrLevel = "A1",
+                ),
+            )
+        }
+
+        assertEquals(MetaData.ErrorCodes.AI_MATERIAL_SCHEMA_INVALID, exception.errorCode)
+    }
+
     private class RecordingOpenAiTransport(
         private val responseBody: String,
     ) : OpenAiResponsesTransport {
@@ -173,6 +229,7 @@ class MaterialAiDraftServiceTest {
                     "minWords": null,
                     "cards": [],
                     "items": [],
+                    "pairs": [],
                     "options": []
                   }
                 ]
@@ -240,6 +297,7 @@ class MaterialAiDraftServiceTest {
                       { "prompt": "It is ___ red pencil.", "answer": "-", "correct": "-", "choices": ["a", "an", "-"] },
                       { "prompt": "___ children", "answer": "a", "correct": "a", "choices": ["a", "an", "-"] }
                     ],
+                    "pairs": [],
                     "options": []
                   }
                 ]
@@ -252,6 +310,78 @@ class MaterialAiDraftServiceTest {
             "sourceType": "scan",
             "inputSummary": "A1 article worksheet",
             "notes": "Scan converted to article choices."
+          },
+          "scoringRubric": {
+            "maxScore": 10,
+            "criteria": [
+              { "key": "taskCompletion", "label": "Task completion", "weight": 4 },
+              { "key": "grammar", "label": "Grammar", "weight": 2 },
+              { "key": "vocabulary", "label": "Vocabulary", "weight": 2 },
+              { "key": "fluency", "label": "Fluency", "weight": 2 }
+            ],
+            "analysisFlags": ["taskCompletion", "grammar", "vocabulary", "fluency"]
+          }
+        }
+        """.trimIndent()
+
+    private fun openAiMatchingPairsDraftJson(): String =
+        """
+        {
+          "title": "Food pairs",
+          "description": "Match food words to categories.",
+          "language": "en",
+          "cefrLevel": "A1",
+          "visibility": "PRIVATE",
+          "status": "DRAFT",
+          "document": {
+            "schemaVersion": 1,
+            "pages": [
+              {
+                "id": "page-1",
+                "title": "Food pairs",
+                "layout": "FLOW",
+                "blocks": [
+                  {
+                    "id": "block-1",
+                    "type": "matchingPairs",
+                    "title": "Match the words",
+                    "body": null,
+                    "instruction": "Match each food word to the category.",
+                    "prompt": null,
+                    "level": null,
+                    "language": null,
+                    "url": null,
+                    "provider": null,
+                    "caption": null,
+                    "imageUrl": null,
+                    "alt": null,
+                    "height": null,
+                    "minWords": null,
+                    "cards": [],
+                    "items": [],
+                    "pairs": [
+                      {
+                        "id": "pair-1",
+                        "left": "apple",
+                        "right": "fruit",
+                        "targetKind": "TEXT",
+                        "imagePrompt": "",
+                        "imageAlt": "",
+                        "imageUrl": null
+                      }
+                    ],
+                    "options": []
+                  }
+                ]
+              }
+            ]
+          },
+          "sourceMeta": {
+            "kind": "AI_GENERATED",
+            "provider": "openai",
+            "sourceType": "teacher_prompt",
+            "inputSummary": "Create a matching pairs activity",
+            "notes": "Matching pair draft."
           },
           "scoringRubric": {
             "maxScore": 10,

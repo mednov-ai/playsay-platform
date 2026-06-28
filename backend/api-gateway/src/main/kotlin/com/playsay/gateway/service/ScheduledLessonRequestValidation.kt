@@ -8,6 +8,7 @@ import java.time.DateTimeException
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -34,6 +35,7 @@ internal data class ValidatedScheduledLessonRecurrence(
     val mode: String,
     val count: Int,
     val weekdays: Set<DayOfWeek>,
+    val weekdayTimes: Map<DayOfWeek, LocalTime>,
     val timeZone: ZoneId,
 )
 
@@ -99,10 +101,11 @@ private fun ScheduledLessonRecurrenceRequest.validated(
     }
 
     val cleanedMode = mode.trim().uppercase()
-    if (cleanedMode != MetaData.LessonRecurrenceModes.WEEKLY_COUNT) {
+    if (cleanedMode !in lessonRecurrenceModes) {
         throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_LESSON_RECURRENCE)
     }
-    if (count !in 2..52) {
+    val validCountRange = if (cleanedMode == MetaData.LessonRecurrenceModes.WEEKLY_BY_WEEK) 1..52 else 2..52
+    if (count !in validCountRange) {
         throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.LESSON_RECURRENCE_COUNT_OUT_OF_RANGE)
     }
 
@@ -115,6 +118,17 @@ private fun ScheduledLessonRecurrenceRequest.validated(
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.LESSON_RECURRENCE_WEEKDAY_INVALID)
         }
     }.toSet()
+    val parsedWeekdayTimes = if (cleanedMode == MetaData.LessonRecurrenceModes.WEEKLY_BY_WEEK) {
+        parsedWeekdays.associateWith { weekday ->
+            val rawTime = weekdayTimes[weekday.name]?.trim()
+                ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.LESSON_RECURRENCE_WEEKDAY_INVALID)
+            runCatching { LocalTime.parse(rawTime) }.getOrElse {
+                throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.LESSON_RECURRENCE_WEEKDAY_INVALID)
+            }
+        }
+    } else {
+        emptyMap()
+    }
 
     val zoneId = runCatching { ZoneId.of(timeZone.trim()) }.getOrElse { error ->
         if (error is DateTimeException) {
@@ -127,6 +141,7 @@ private fun ScheduledLessonRecurrenceRequest.validated(
         mode = cleanedMode,
         count = count,
         weekdays = parsedWeekdays,
+        weekdayTimes = parsedWeekdayTimes,
         timeZone = zoneId,
     )
 }
@@ -140,10 +155,15 @@ internal fun ValidatedScheduledLessonRequest.occurrences(): List<ScheduledLesson
     val localStartTime = firstLocalStart.toLocalTime()
     var date = firstLocalStart.toLocalDate()
     val occurrences = mutableListOf<ScheduledLessonOccurrence>()
+    val targetCount = if (recurrence.mode == MetaData.LessonRecurrenceModes.WEEKLY_BY_WEEK) {
+        recurrence.count * recurrence.weekdays.size
+    } else {
+        recurrence.count
+    }
 
-    while (occurrences.size < recurrence.count) {
+    while (occurrences.size < targetCount) {
         if (date.dayOfWeek in recurrence.weekdays) {
-            val candidateStart = date.atTime(localStartTime).atZone(recurrence.timeZone).toInstant()
+            val candidateStart = date.atTime(recurrence.weekdayTimes[date.dayOfWeek] ?: localStartTime).atZone(recurrence.timeZone).toInstant()
             if (!candidateStart.isBefore(start)) {
                 occurrences += ScheduledLessonOccurrence(
                     scheduledStart = candidateStart,
@@ -165,3 +185,7 @@ private val scheduleStatuses = setOf(
 )
 private val scheduleTypes = setOf(MetaData.LessonTypes.INDIVIDUAL, MetaData.LessonTypes.GROUP)
 private val scheduleWorkModes = setOf(MetaData.LessonWorkModes.SHARED, MetaData.LessonWorkModes.PARALLEL)
+private val lessonRecurrenceModes = setOf(
+    MetaData.LessonRecurrenceModes.WEEKLY_COUNT,
+    MetaData.LessonRecurrenceModes.WEEKLY_BY_WEEK,
+)

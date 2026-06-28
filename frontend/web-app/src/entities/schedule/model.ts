@@ -24,9 +24,13 @@ export type ScheduleFormState = {
   recurrenceMode: "NONE" | "WEEKLY";
   recurrenceCount: string;
   recurrenceWeekdays: string[];
+  recurrenceWeekdayTimes: Record<string, string>;
 };
 
 export const LESSON_ACCESS_GRACE_MS = 10 * 60 * 1000;
+export const DURATION_PRESET_MINUTES = [30, 45, 60, 90] as const;
+export const MIN_SCHEDULE_DURATION_MINUTES = 10;
+export const MAX_SCHEDULE_DURATION_MINUTES = 180;
 export const scheduleWeekdays = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
 
 export function formatDuration(value: number | null | undefined, t: ScheduleTranslate): string {
@@ -73,6 +77,7 @@ export function defaultScheduleForm(lessonTemplateId: string): ScheduleFormState
     recurrenceMode: "NONE",
     recurrenceCount: "4",
     recurrenceWeekdays: [],
+    recurrenceWeekdayTimes: {},
   };
 }
 
@@ -103,9 +108,18 @@ export function localScheduleEndIso(date: string, time: string, durationMinutes:
     return null;
   }
 
-  const parsedDuration = Number.parseInt(durationMinutes, 10);
-  const safeDuration = Number.isFinite(parsedDuration) ? Math.max(1, parsedDuration) : 45;
+  const safeDuration = normalizedDurationMinutes(durationMinutes);
   return new Date(new Date(startIso).getTime() + safeDuration * 60_000).toISOString();
+}
+
+export function normalizedDurationMinutes(value: string | number, fallback = 45): number {
+  const parsedDuration = typeof value === "number" ? value : Number.parseInt(value, 10);
+  const safeDuration = Number.isFinite(parsedDuration) ? parsedDuration : fallback;
+  return Math.min(MAX_SCHEDULE_DURATION_MINUTES, Math.max(MIN_SCHEDULE_DURATION_MINUTES, safeDuration));
+}
+
+export function stepDurationMinutes(value: string, step: number): string {
+  return String(normalizedDurationMinutes(normalizedDurationMinutes(value) + step));
 }
 
 export function weekdayFromLocalDate(date: string): string {
@@ -120,7 +134,11 @@ export function isWeeklyRecurrenceValid(form: ScheduleFormState): boolean {
   }
 
   const count = Number.parseInt(form.recurrenceCount, 10);
-  return Number.isInteger(count) && count >= 2 && count <= 52 && form.recurrenceWeekdays.length > 0;
+  return Number.isInteger(count) &&
+    count >= 1 &&
+    count <= 52 &&
+    form.recurrenceWeekdays.length > 0 &&
+    form.recurrenceWeekdays.every((weekday) => Boolean(form.recurrenceWeekdayTimes[weekday]));
 }
 
 export function scheduleRecurrenceInput(
@@ -135,11 +153,15 @@ export function scheduleRecurrenceInput(
   const weekdays = form.recurrenceWeekdays.length > 0
     ? form.recurrenceWeekdays
     : [weekdayFromLocalDate(form.scheduledDate)];
+  const weekdayTimes = Object.fromEntries(
+    weekdays.map((weekday) => [weekday, form.recurrenceWeekdayTimes[weekday] || form.scheduledTime]),
+  );
 
   return {
-    mode: "WEEKLY_COUNT",
+    mode: "WEEKLY_BY_WEEK",
     count,
     weekdays,
+    weekdayTimes,
     timeZone,
   };
 }
@@ -169,6 +191,8 @@ export function isScheduleExpired(lesson: ScheduledLesson, nowMs = Date.now()): 
 export function isArchivedScheduleLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
   return isClosedScheduleStatus(lesson.status) || isScheduleExpired(lesson, nowMs);
 }
+
+export const isArchivedScheduledLesson = isArchivedScheduleLesson;
 
 export function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean {
   const startMs = dateValueMs(lesson.scheduledStart);
@@ -214,7 +238,7 @@ export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number, t: Sc
 }
 
 export function scheduleSortRank(lesson: ScheduledLesson, nowMs: number): number {
-  if (!isJoinableScheduledLesson(lesson, nowMs)) {
+  if (isArchivedScheduleLesson(lesson, nowMs)) {
     return 3;
   }
 

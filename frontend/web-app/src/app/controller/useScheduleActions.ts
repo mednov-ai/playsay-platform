@@ -76,7 +76,11 @@ export function useScheduleActions({
     try {
       await saveScheduledLesson(input);
       setScheduledLessons(await fetchScheduledLessons());
-      const createdCount = input.recurrence?.mode === "WEEKLY_COUNT" ? input.recurrence.count : null;
+      const createdCount = input.recurrence?.mode === "WEEKLY_COUNT"
+        ? input.recurrence.count
+        : input.recurrence?.mode === "WEEKLY_BY_WEEK"
+          ? input.recurrence.count * input.recurrence.weekdays.length
+          : null;
       setScheduleMessage(createdCount ? t("schedule.messages.createdRecurring", { count: createdCount }) : t("schedule.messages.created"));
     } catch (caught) {
       setScheduleMessage(applySessionError(caught, t("schedule.messages.createFailed")));

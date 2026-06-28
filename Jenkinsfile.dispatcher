@@ -37,7 +37,7 @@ spec:
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA.', trim: true)
     string(name: 'FORCE_TARGETS', defaultValue: '', description: 'Optional manual override: all or comma-separated deploy targets.', trim: true)
-    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '2', description: 'Maximum downstream module jobs to run at once. Use 1 for conservative recovery on the dev VPS.', trim: true)
+    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1', description: 'Maximum downstream module jobs to run at once. Dev default is 1 for single-node VPS stability; use 2 only after checking node memory and swap.', trim: true)
   }
 
   environment {
@@ -116,7 +116,7 @@ spec:
             }
           }
           def jobs = (detection.AFFECTED_JOBS ?: '').split(',').collect { it.trim() }.findAll { it }
-          def maxParallelText = params.MAX_PARALLEL_MODULE_JOBS?.trim() ?: '2'
+          def maxParallelText = params.MAX_PARALLEL_MODULE_JOBS?.trim() ?: '1'
           if (!(maxParallelText ==~ /[1-9]/)) {
             error "MAX_PARALLEL_MODULE_JOBS must be an integer from 1 to 9; got '${maxParallelText}'"
           }

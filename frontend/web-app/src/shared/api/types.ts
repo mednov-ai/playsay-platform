@@ -43,9 +43,10 @@ export type ScheduledLesson = ScheduledLessonResponse & {
 };
 export type ScheduledLessonMaterialAssignmentInput = ScheduledLessonMaterialAssignmentRequest;
 export type ScheduledLessonRecurrenceInput = {
-  mode: "WEEKLY_COUNT";
+  mode: "WEEKLY_COUNT" | "WEEKLY_BY_WEEK";
   count: number;
   weekdays: string[];
+  weekdayTimes?: Record<string, string>;
   timeZone: string;
 };
 export type ScheduledLessonInput = ScheduledLessonRequest & {

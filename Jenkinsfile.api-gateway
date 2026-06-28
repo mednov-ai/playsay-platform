@@ -170,7 +170,7 @@ spec:
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :api-gateway:test :api-gateway:bootJar --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :api-gateway:test :api-gateway:bootJar --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
       }
@@ -180,7 +180,7 @@ spec:
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
         sh '''

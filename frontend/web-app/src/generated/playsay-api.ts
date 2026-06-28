@@ -66,12 +66,16 @@ export type ScheduledLessonRecurrenceRequestMode = typeof ScheduledLessonRecurre
 
 export const ScheduledLessonRecurrenceRequestMode = {
   WEEKLY_COUNT: 'WEEKLY_COUNT',
+  WEEKLY_BY_WEEK: 'WEEKLY_BY_WEEK',
 } as const;
+
+export type ScheduledLessonRecurrenceRequestWeekdayTimes = {[key: string]: string};
 
 export interface ScheduledLessonRecurrenceRequest {
   mode: ScheduledLessonRecurrenceRequestMode;
   count: number;
   weekdays: string[];
+  weekdayTimes: ScheduledLessonRecurrenceRequestWeekdayTimes;
   timeZone: string;
 }
 

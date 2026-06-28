@@ -140,19 +140,19 @@ export function SchedulePanel({
             ) : null}
 
             {mainLessons.length === 0 ? (
-              <div className="playsay-schedule-empty">
+              <div className="playsay-schedule-empty" data-schedule-primary-list="true">
                 {scheduledLessons.length === 0
                   ? canManage ? t("schedule.empty.manager") : t("schedule.empty.student")
                   : emptyMainMessage}
               </div>
             ) : (
-              <div className="playsay-schedule-timeline">
+              <div className="playsay-schedule-timeline" data-schedule-primary-list="true">
                 {mainLessons.map(renderLessonCard)}
               </div>
             )}
 
             {archivedLessons.length > 0 ? (
-              <details className="playsay-schedule-archive">
+              <details className="playsay-schedule-archive" data-schedule-archive="true">
                 <summary>
                   <span className="inline-flex items-center gap-2">
                     <Archive className="h-4 w-4" />

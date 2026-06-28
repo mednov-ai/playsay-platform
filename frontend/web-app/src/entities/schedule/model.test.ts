@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   compareScheduleLessons,
+  DURATION_PRESET_MINUTES,
   formatDuration,
   formatLessonType,
   formatParticipantCount,
@@ -10,6 +11,7 @@ import {
   scheduleStateLabel,
   scheduleRecurrenceInput,
   selectedParticipantSubjects,
+  stepDurationMinutes,
 } from "./model";
 import type { ScheduledLesson } from "../../shared/api/playsay";
 
@@ -73,11 +75,12 @@ describe("schedule model", () => {
     const nowMs = Date.parse("2026-05-28T10:00:00.000Z");
     const sorted = [
       lesson({ id: "old", scheduledEnd: "2026-05-28T09:00:00.000Z" }),
-      lesson({ id: "future", scheduledStart: "2026-05-28T12:00:00.000Z" }),
+      lesson({ id: "future-later", scheduledStart: "2026-05-28T14:00:00.000Z" }),
+      lesson({ id: "future-soon", scheduledStart: "2026-05-28T12:00:00.000Z" }),
       lesson({ id: "live", scheduledStart: "2026-05-28T09:55:00.000Z", scheduledEnd: "2026-05-28T10:45:00.000Z" }),
     ].sort((left, right) => compareScheduleLessons(left, right, nowMs));
 
-    expect(sorted.map((item) => item.id)).toEqual(["live", "future", "old"]);
+    expect(sorted.map((item) => item.id)).toEqual(["live", "future-soon", "future-later", "old"]);
     expect(isJoinableScheduledLesson(sorted[0], nowMs)).toBe(true);
   });
 
@@ -123,14 +126,31 @@ describe("schedule model", () => {
       recurrenceMode: "WEEKLY" as const,
       recurrenceCount: "6",
       recurrenceWeekdays: ["MONDAY", "WEDNESDAY"],
+      recurrenceWeekdayTimes: {
+        MONDAY: "10:00",
+        WEDNESDAY: "16:00",
+      },
     };
 
     expect(isWeeklyRecurrenceValid(form)).toBe(true);
     expect(scheduleRecurrenceInput(form, "Europe/Moscow")).toEqual({
-      mode: "WEEKLY_COUNT",
+      mode: "WEEKLY_BY_WEEK",
       count: 6,
       weekdays: ["MONDAY", "WEDNESDAY"],
+      weekdayTimes: {
+        MONDAY: "10:00",
+        WEDNESDAY: "16:00",
+      },
       timeZone: "Europe/Moscow",
     });
+  });
+
+  it("steps duration by ten minutes and keeps preset durations explicit", () => {
+    expect(DURATION_PRESET_MINUTES).toEqual([30, 45, 60, 90]);
+    expect(stepDurationMinutes("45", 10)).toBe("55");
+    expect(stepDurationMinutes("45", -10)).toBe("35");
+    expect(stepDurationMinutes("5", -10)).toBe("10");
+    expect(stepDurationMinutes("190", 10)).toBe("180");
+    expect(stepDurationMinutes("", 10)).toBe("55");
   });
 });

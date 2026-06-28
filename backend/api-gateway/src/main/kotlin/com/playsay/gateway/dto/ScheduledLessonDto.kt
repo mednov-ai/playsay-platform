@@ -26,10 +26,11 @@ data class ScheduledLessonMaterialAssignmentRequest(
 )
 
 data class ScheduledLessonRecurrenceRequest(
-    @field:Schema(allowableValues = ["WEEKLY_COUNT"])
+    @field:Schema(allowableValues = ["WEEKLY_COUNT", "WEEKLY_BY_WEEK"])
     val mode: String = "WEEKLY_COUNT",
     val count: Int = 2,
     val weekdays: List<String> = emptyList(),
+    val weekdayTimes: Map<String, String> = emptyMap(),
     val timeZone: String = "UTC",
 )
 

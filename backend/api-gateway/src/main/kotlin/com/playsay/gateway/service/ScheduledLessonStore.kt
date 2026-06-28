@@ -69,7 +69,7 @@ class ScheduledLessonStore(
         val now = Instant.now()
         val occurrences = values.occurrences()
         val recurrenceSeriesId = values.recurrence?.let { UUID.randomUUID() }
-        val recurrenceTotal = values.recurrence?.count
+        val recurrenceTotal = values.recurrence?.let { occurrences.size }
 
         val createdLessons = occurrences.mapIndexed { index, occurrence ->
             val id = UUID.randomUUID()

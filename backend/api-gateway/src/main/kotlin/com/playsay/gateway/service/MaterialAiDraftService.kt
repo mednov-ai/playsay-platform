@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.networknt.schema.JsonSchema
+import com.networknt.schema.JsonSchemaFactory
+import com.networknt.schema.SpecVersion
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -127,6 +130,7 @@ class OpenAiMaterialAiDraftProvider(
                 MetaData.ErrorCodes.AI_MATERIAL_RESPONSE_MISSING,
             )
         val draftNode = parseJson(outputText)
+        validateMaterialDraftSchema(draftNode)
         val draft = runCatching { objectMapper.treeToValue(draftNode, LessonMaterialDraftResponse::class.java) }
             .getOrElse {
                 throw ProjectResponseException.localized(
@@ -277,6 +281,22 @@ private fun LessonMaterialDraftResponse.withOpenAiSourceMeta(
 
 private fun LessonMaterialDraftResponse.withNormalizedArticleAnswers(): LessonMaterialDraftResponse =
     copy(document = normalizeArticleExerciseAnswers(document))
+
+private val materialDraftJsonSchema: JsonSchema by lazy {
+    JsonSchemaFactory
+        .getInstance(SpecVersion.VersionFlag.V202012)
+        .getSchema(materialDraftJsonSchemaJson)
+}
+
+private fun validateMaterialDraftSchema(draftNode: JsonNode) {
+    val validationMessages = materialDraftJsonSchema.validate(draftNode)
+    if (validationMessages.isNotEmpty()) {
+        throw ProjectResponseException.localized(
+            HttpStatus.BAD_GATEWAY,
+            MetaData.ErrorCodes.AI_MATERIAL_SCHEMA_INVALID,
+        )
+    }
+}
 
 private fun normalizeArticleExerciseAnswers(document: JsonNode): JsonNode {
     val normalized = document.deepCopy<JsonNode>()
@@ -715,6 +735,64 @@ private val materialDraftJsonSchemaJson = """
         }
       },
       "required": ["id", "type", "title", "body", "instruction", "prompt", "level", "language", "url", "provider", "caption", "imageUrl", "alt", "height", "minWords", "cards", "items", "pairs", "options"],
+      "anyOf": [
+        {
+          "properties": {
+            "type": { "type": "string", "enum": ["text"] },
+            "body": { "type": "string", "maxLength": 4000 }
+          }
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "enum": ["videoEmbed", "image", "generatedImage"] }
+          }
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "enum": ["flashcards"] },
+            "cards": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 12,
+              "items": { "${'$'}ref": "#/${'$'}defs/flashcard" }
+            }
+          }
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "enum": ["fillGaps", "multipleChoice"] },
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "items": { "${'$'}ref": "#/${'$'}defs/exerciseItem" }
+            }
+          }
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "enum": ["matchingPairs"] },
+            "pairs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "items": { "${'$'}ref": "#/${'$'}defs/matchingPair" }
+            }
+          }
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "enum": ["freeWriting", "speakingPrompt"] },
+            "prompt": { "type": "string", "maxLength": 2000 }
+          }
+        },
+        {
+          "properties": {
+            "type": { "type": "string", "enum": ["drawingArea"] },
+            "height": { "type": "integer", "minimum": 120, "maximum": 800 }
+          }
+        }
+      ],
       "additionalProperties": false
     },
     "flashcard": {

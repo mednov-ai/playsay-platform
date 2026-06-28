@@ -2335,6 +2335,7 @@ components:
           type: string
           enum:
           - WEEKLY_COUNT
+          - WEEKLY_BY_WEEK
         count:
           type: integer
           format: int32
@@ -2342,12 +2343,17 @@ components:
           type: array
           items:
             type: string
+        weekdayTimes:
+          type: object
+          additionalProperties:
+            type: string
         timeZone:
           type: string
       required:
       - count
       - mode
       - timeZone
+      - weekdayTimes
       - weekdays
     ScheduledLessonRequest:
       type: object

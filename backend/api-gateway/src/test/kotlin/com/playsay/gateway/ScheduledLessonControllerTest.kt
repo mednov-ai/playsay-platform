@@ -169,6 +169,60 @@ class ScheduledLessonControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher schedules weekly recurrence by weeks with per weekday times`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lessonTemplateId = courseLessonId(teacher)
+
+        val created = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = Instant.parse("2026-06-29T10:00:00Z"),
+                scheduledEnd = Instant.parse("2026-06-29T10:45:00Z"),
+                type = "GROUP",
+                participantSubjects = listOf("student-1"),
+                recurrence = ScheduledLessonRecurrenceRequest(
+                    mode = "WEEKLY_BY_WEEK",
+                    count = 4,
+                    weekdays = listOf("MONDAY", "WEDNESDAY"),
+                    weekdayTimes = mapOf(
+                        "MONDAY" to "10:00",
+                        "WEDNESDAY" to "16:00",
+                    ),
+                    timeZone = "UTC",
+                ),
+            ),
+        ).body!!
+
+        val lessons = scheduleController.list(teacher)
+
+        assertEquals(8, lessons.size)
+        assertNotNull(created.recurrenceSeriesId)
+        assertEquals((1..8).toList(), lessons.map { lesson -> lesson.recurrenceIndex })
+        assertEquals(List(8) { 8 }, lessons.map { lesson -> lesson.recurrenceTotal })
+        assertEquals(
+            listOf(
+                Instant.parse("2026-06-29T10:00:00Z"),
+                Instant.parse("2026-07-01T16:00:00Z"),
+                Instant.parse("2026-07-06T10:00:00Z"),
+                Instant.parse("2026-07-08T16:00:00Z"),
+                Instant.parse("2026-07-13T10:00:00Z"),
+                Instant.parse("2026-07-15T16:00:00Z"),
+                Instant.parse("2026-07-20T10:00:00Z"),
+                Instant.parse("2026-07-22T16:00:00Z"),
+            ),
+            lessons.map { lesson -> lesson.scheduledStart },
+        )
+        assertTrue(
+            lessons.all { lesson ->
+                Duration.between(lesson.scheduledStart, lesson.scheduledEnd) == Duration.ofMinutes(45)
+            },
+        )
+    }
+
+    @Test
     fun `teacher cannot create recurrence with invalid count or update lesson with recurrence`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
 
@@ -188,6 +242,60 @@ class ScheduledLessonControllerTest @Autowired constructor(
             )
         }
         assertEquals(HttpStatus.BAD_REQUEST, invalidCount.statusCode)
+
+        val invalidWeekCount = assertFailsWith<ResponseStatusException> {
+            scheduleController.create(
+                teacher,
+                ScheduledLessonRequest(
+                    scheduledStart = Instant.parse("2026-06-29T10:00:00Z"),
+                    scheduledEnd = Instant.parse("2026-06-29T10:45:00Z"),
+                    recurrence = ScheduledLessonRecurrenceRequest(
+                        mode = "WEEKLY_BY_WEEK",
+                        count = 0,
+                        weekdays = listOf("MONDAY"),
+                        weekdayTimes = mapOf("MONDAY" to "10:00"),
+                        timeZone = "UTC",
+                    ),
+                ),
+            )
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, invalidWeekCount.statusCode)
+
+        val missingWeekdayTime = assertFailsWith<ResponseStatusException> {
+            scheduleController.create(
+                teacher,
+                ScheduledLessonRequest(
+                    scheduledStart = Instant.parse("2026-06-29T10:00:00Z"),
+                    scheduledEnd = Instant.parse("2026-06-29T10:45:00Z"),
+                    recurrence = ScheduledLessonRecurrenceRequest(
+                        mode = "WEEKLY_BY_WEEK",
+                        count = 4,
+                        weekdays = listOf("MONDAY", "WEDNESDAY"),
+                        weekdayTimes = mapOf("MONDAY" to "10:00"),
+                        timeZone = "UTC",
+                    ),
+                ),
+            )
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, missingWeekdayTime.statusCode)
+
+        val invalidWeekdayTime = assertFailsWith<ResponseStatusException> {
+            scheduleController.create(
+                teacher,
+                ScheduledLessonRequest(
+                    scheduledStart = Instant.parse("2026-06-29T10:00:00Z"),
+                    scheduledEnd = Instant.parse("2026-06-29T10:45:00Z"),
+                    recurrence = ScheduledLessonRecurrenceRequest(
+                        mode = "WEEKLY_BY_WEEK",
+                        count = 4,
+                        weekdays = listOf("MONDAY"),
+                        weekdayTimes = mapOf("MONDAY" to "25:00"),
+                        timeZone = "UTC",
+                    ),
+                ),
+            )
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, invalidWeekdayTime.statusCode)
 
         val lesson = scheduleController.create(
             teacher,

@@ -301,7 +301,7 @@
 .playsay-schedule-time-grid {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(8.75rem, 1fr) minmax(7.5rem, 0.85fr) minmax(6.5rem, 0.7fr);
+  grid-template-columns: minmax(8.75rem, 1fr) minmax(7.5rem, 0.85fr);
   align-items: start;
   align-content: start;
   gap: 0.7rem;
@@ -316,7 +316,88 @@
 }
 
 .playsay-schedule-time-grid [data-schedule-duration-field="true"] .playsay-input {
-  max-width: 8rem;
+  max-width: none;
+}
+
+.playsay-schedule-time-grid [data-schedule-duration-field="true"] {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+
+.playsay-schedule-duration-control {
+  display: grid;
+  min-width: 0;
+  gap: 0.55rem;
+}
+
+.playsay-schedule-duration-presets {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.playsay-schedule-duration-preset,
+.playsay-schedule-duration-stepper button,
+.playsay-schedule-weekdays button,
+.playsay-schedule-recurrence-mode button {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.playsay-schedule-duration-preset {
+  min-width: 0;
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-duration-preset[data-selected="true"],
+.playsay-schedule-weekdays button[data-selected="true"],
+.playsay-schedule-recurrence-mode button[data-selected="true"] {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.playsay-schedule-duration-stepper {
+  display: grid;
+  grid-template-columns: 2.35rem minmax(6.5rem, 8rem) 2.35rem;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.playsay-schedule-duration-stepper button {
+  display: grid;
+  width: 2.35rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 0.65rem;
+}
+
+.playsay-schedule-duration-value {
+  position: relative;
+  min-width: 0;
+}
+
+.playsay-schedule-duration-value .playsay-input {
+  padding-right: 2.75rem;
+  text-align: center;
+  font-weight: 950;
+}
+
+.playsay-schedule-duration-value span {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  transform: translateY(-50%);
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  font-weight: 950;
+  pointer-events: none;
 }
 
 .playsay-schedule-recurrence {
@@ -330,8 +411,88 @@
 
 .playsay-schedule-recurrence-grid {
   display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(7rem, 11rem);
+  grid-template-columns: minmax(12rem, 1fr) minmax(6.5rem, 9rem);
   gap: 0.7rem;
+}
+
+.playsay-schedule-recurrence-mode {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--background));
+  padding: 0.25rem;
+}
+
+.playsay-schedule-recurrence-mode button {
+  min-width: 0;
+  border-color: transparent;
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-weekly-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 18rem);
+  gap: 0.75rem;
+}
+
+.playsay-schedule-weekdays {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.playsay-schedule-weekdays button {
+  min-width: 2.65rem;
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-weekday-times {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.playsay-schedule-weekday-times > div {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-weekday-times label {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--background));
+  padding: 0.4rem;
+}
+
+.playsay-schedule-weekday-times label > span {
+  color: hsl(var(--foreground));
+  text-align: center;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-weekday-times .playsay-input {
+  height: 2.35rem;
+  min-height: 2.35rem;
+  border-radius: 0.65rem;
 }
 
 .playsay-schedule-advanced {
@@ -533,7 +694,8 @@
 
   .playsay-schedule-step-row,
   .playsay-schedule-time-grid,
-  .playsay-schedule-recurrence-grid {
+  .playsay-schedule-recurrence-grid,
+  .playsay-schedule-weekly-grid {
     grid-template-columns: 1fr;
   }
 

@@ -33,6 +33,7 @@ object MetaData {
 
     object LessonRecurrenceModes {
         const val WEEKLY_COUNT = "WEEKLY_COUNT"
+        const val WEEKLY_BY_WEEK = "WEEKLY_BY_WEEK"
     }
 
     object LessonReminderTypes {

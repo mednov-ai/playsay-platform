@@ -52,7 +52,7 @@ export const en = {
       retry: "Check again",
       success: "Access is ready. Redirecting to the lesson.",
       failed: "Could not open the lesson link. Ask the teacher to send a new link.",
-      missingToken: "The access link has no token.",
+      missingToken: "The access link has no code.",
     },
     form: {
       email: "Email",

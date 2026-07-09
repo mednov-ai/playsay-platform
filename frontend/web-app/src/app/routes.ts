@@ -17,7 +17,7 @@ export function paymentTokenFromPath(pathname: string): string | null {
 }
 
 export function isStudentInvitePath(pathname: string): boolean {
-  return /^\/student-invite\/?$/.test(pathname);
+  return /^\/join\/?$/.test(pathname);
 }
 
 export type RegistrationRoute =

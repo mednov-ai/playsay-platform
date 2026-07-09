@@ -68,7 +68,7 @@ class ScheduledLessonParticipantLinkService(
         "${publicAppUrl.trimEnd('/')}/lessons/$lessonId/classroom"
 
     private fun inviteUrl(token: String): String =
-        "${publicAppUrl.trimEnd('/')}/student-invite#$token"
+        "${publicAppUrl.trimEnd('/')}/join#$token"
 
     private companion object {
         const val participantLinkModeMagic = "MAGIC_LINK"

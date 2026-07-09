@@ -6,8 +6,8 @@ describe("student invite token location parsing", () => {
     expect(studentInviteTokenFromLocation({ hash: "#A7K2Q9", search: "?token=legacy" })).toBe("A7K2Q9");
   });
 
-  it("falls back to legacy query token links", () => {
-    expect(studentInviteTokenFromLocation({ hash: "", search: "?token=legacy-token" })).toBe("legacy-token");
+  it("ignores legacy query token links", () => {
+    expect(studentInviteTokenFromLocation({ hash: "", search: "?token=legacy-token" })).toBe("");
   });
 
   it("returns an empty token when the location has no invite secret", () => {

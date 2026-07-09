@@ -171,7 +171,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(1, links.links.size)
         assertEquals("managed-student-1", links.links.single().subject)
         assertEquals("MAGIC_LINK", links.links.single().mode)
-        assertTrue(links.links.single().url.endsWith("/student-invite#A7K2Q9"))
+        assertTrue(links.links.single().url.endsWith("/join#A7K2Q9"))
         assertFalse(links.links.single().url.contains("?token="))
         assertEquals(lesson.id, RecordingScheduledLessonRegistrationGateway.invites.single().lessonId)
         assertEquals("managed-student-1", RecordingScheduledLessonRegistrationGateway.invites.single().subject)

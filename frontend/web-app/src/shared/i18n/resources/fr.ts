@@ -52,7 +52,7 @@ export const fr = {
       retry: "Vérifier encore",
       success: "Accès prêt. Redirection vers le cours.",
       failed: "Impossible d'ouvrir le lien du cours. Demandez un nouveau lien au professeur.",
-      missingToken: "Le lien d'accès n'a pas de jeton.",
+      missingToken: "Le lien d'accès n'a pas de code.",
     },
     form: {
       email: "Email",

@@ -52,7 +52,7 @@ export const de = {
       retry: "Erneut prüfen",
       success: "Zugang ist bereit. Weiterleitung zur Stunde.",
       failed: "Der Stundenlink konnte nicht geöffnet werden. Bitten Sie die Lehrkraft um einen neuen Link.",
-      missingToken: "Der Zugangslink enthält keinen Token.",
+      missingToken: "Der Zugangslink enthält keinen Zugangscode.",
     },
     form: {
       email: "E-Mail",

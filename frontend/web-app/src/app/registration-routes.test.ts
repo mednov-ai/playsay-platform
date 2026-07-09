@@ -11,8 +11,10 @@ describe("registration routes", () => {
   });
 
   it("recognizes managed student invite pages", () => {
-    expect(isStudentInvitePath("/student-invite")).toBe(true);
-    expect(isStudentInvitePath("/student-invite/")).toBe(true);
+    expect(isStudentInvitePath("/join")).toBe(true);
+    expect(isStudentInvitePath("/join/")).toBe(true);
+    expect(isStudentInvitePath("/student-invite")).toBe(false);
+    expect(isStudentInvitePath("/student-invite/")).toBe(false);
     expect(isStudentInvitePath("/register")).toBe(false);
   });
 });

@@ -16,6 +16,10 @@ export function paymentTokenFromPath(pathname: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+export function isStudentInvitePath(pathname: string): boolean {
+  return /^\/student-invite\/?$/.test(pathname);
+}
+
 export type RegistrationRoute =
   | { kind: "start" }
   | { kind: "check-email" }

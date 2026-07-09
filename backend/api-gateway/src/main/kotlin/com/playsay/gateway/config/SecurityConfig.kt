@@ -41,11 +41,13 @@ class SecurityConfig {
                         pathPattern(HttpMethod.POST, "/api/registration/confirm"),
                         pathPattern(HttpMethod.POST, "/api/registration/forgot-password"),
                         pathPattern(HttpMethod.POST, "/api/registration/reset-password"),
+                        pathPattern(HttpMethod.POST, "/api/student-invites/consume"),
                         pathPattern(HttpMethod.POST, "/registration/start"),
                         pathPattern(HttpMethod.POST, "/registration/resend"),
                         pathPattern(HttpMethod.POST, "/registration/confirm"),
                         pathPattern(HttpMethod.POST, "/registration/forgot-password"),
                         pathPattern(HttpMethod.POST, "/registration/reset-password"),
+                        pathPattern(HttpMethod.POST, "/student-invites/consume"),
                     ).permitAll()
                     .anyRequest().authenticated()
             }

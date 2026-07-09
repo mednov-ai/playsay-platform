@@ -18,7 +18,9 @@ describe("SchedulePanel", () => {
           nowMs={Date.parse("2026-06-27T10:00:00.000Z")}
           onCancel={() => undefined}
           onComplete={() => undefined}
+          onCopyLinks={() => Promise.resolve(true)}
           onCreate={() => undefined}
+          onCreateManagedStudent={() => Promise.resolve(null)}
           onDelete={() => undefined}
           onJoin={() => undefined}
           onRefresh={() => undefined}

@@ -54,6 +54,7 @@ export interface UserProfileResponse {
   /** @nullable */
   learningGoal?: string | null;
   updatedAt: string;
+  managedByTeacher: boolean;
 }
 
 export interface ScheduledLessonMaterialAssignmentRequest {
@@ -477,12 +478,50 @@ export interface LessonTemplateCardsRequest {
   cards: LessonTemplateCardRequest[];
 }
 
+export interface ManagedStudentRequest {
+  /**
+     * @minLength 0
+     * @maxLength 320
+     */
+  email: string;
+  /**
+     * @minLength 0
+     * @maxLength 120
+     */
+  displayName: string;
+}
+
 export interface LiveKitRoomTokenResponse {
   serverUrl: string;
   token: string;
   roomName: string;
   identity: string;
   expiresAt: string;
+}
+
+export type ScheduledLessonParticipantLinkResponseMode = typeof ScheduledLessonParticipantLinkResponseMode[keyof typeof ScheduledLessonParticipantLinkResponseMode];
+
+
+export const ScheduledLessonParticipantLinkResponseMode = {
+  MAGIC_LINK: 'MAGIC_LINK',
+  AUTHENTICATED_LINK: 'AUTHENTICATED_LINK',
+} as const;
+
+export interface ScheduledLessonParticipantLinkResponse {
+  subject: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  email?: string | null;
+  url: string;
+  /** @nullable */
+  expiresAt?: string | null;
+  mode: ScheduledLessonParticipantLinkResponseMode;
+}
+
+export interface ScheduledLessonParticipantLinksResponse {
+  lessonId: string;
+  links: ScheduledLessonParticipantLinkResponse[];
 }
 
 export interface LiveLessonImagePageResponse {
@@ -875,6 +914,24 @@ export interface HomeworkAssignmentRequest {
   instructions?: string | null;
   /** @nullable */
   dueAt?: string | null;
+}
+
+export interface StudentInviteConsumeRequest {
+  /**
+     * @minLength 0
+     * @maxLength 255
+     */
+  token: string;
+}
+
+export interface StudentInviteConsumeResponse {
+  accessToken: string;
+  /** @nullable */
+  refreshToken?: string | null;
+  /** @nullable */
+  idToken?: string | null;
+  expiresIn: number;
+  continueUrl: string;
 }
 
 export interface StartRegistrationRequest {
@@ -2467,6 +2524,67 @@ export const replaceCourseLessonCards = async (courseId: string,
 
 
 
+export type createManagedStudentResponse200 = {
+  data: UserProfileResponse
+  status: 200
+}
+
+export type createManagedStudentResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createManagedStudentResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createManagedStudentResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createManagedStudentResponseSuccess = (createManagedStudentResponse200) & {
+  headers: Headers;
+};
+export type createManagedStudentResponseError = (createManagedStudentResponse400 | createManagedStudentResponse401 | createManagedStudentResponse403) & {
+  headers: Headers;
+};
+
+export type createManagedStudentResponse = (createManagedStudentResponseSuccess | createManagedStudentResponseError)
+
+export const getCreateManagedStudentUrl = () => {
+
+
+
+
+  return `/api/students/managed`
+}
+
+/**
+ * Creates or returns a teacher-managed Keycloak student account and app-level profile. Requires TEACHER or ADMIN role.
+ * @summary Create managed student account
+ */
+export const createManagedStudent = async (managedStudentRequest: ManagedStudentRequest, options?: RequestInit): Promise<createManagedStudentResponse> => {
+
+  const res = await fetch(getCreateManagedStudentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(managedStudentRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createManagedStudentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createManagedStudentResponse
+}
+
+
+
 export type listScheduledLessonsResponse200 = {
   data: ScheduledLessonResponse[]
   status: 200
@@ -2636,6 +2754,67 @@ export const createScheduledLessonRoomToken = async (lessonId: string, options?:
 
   const data: createScheduledLessonRoomTokenResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createScheduledLessonRoomTokenResponse
+}
+
+
+
+export type createScheduledLessonParticipantLinksResponse200 = {
+  data: ScheduledLessonParticipantLinksResponse
+  status: 200
+}
+
+export type createScheduledLessonParticipantLinksResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createScheduledLessonParticipantLinksResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createScheduledLessonParticipantLinksResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createScheduledLessonParticipantLinksResponseSuccess = (createScheduledLessonParticipantLinksResponse200) & {
+  headers: Headers;
+};
+export type createScheduledLessonParticipantLinksResponseError = (createScheduledLessonParticipantLinksResponse401 | createScheduledLessonParticipantLinksResponse403 | createScheduledLessonParticipantLinksResponse404) & {
+  headers: Headers;
+};
+
+export type createScheduledLessonParticipantLinksResponse = (createScheduledLessonParticipantLinksResponseSuccess | createScheduledLessonParticipantLinksResponseError)
+
+export const getCreateScheduledLessonParticipantLinksUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/participant-links`
+}
+
+/**
+ * Returns per-participant lesson links. Teacher-managed students receive one-time magic links. Requires TEACHER or ADMIN role.
+ * @summary Create scheduled lesson participant links
+ */
+export const createScheduledLessonParticipantLinks = async (lessonId: string, options?: RequestInit): Promise<createScheduledLessonParticipantLinksResponse> => {
+
+  const res = await fetch(getCreateScheduledLessonParticipantLinksUrl(lessonId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createScheduledLessonParticipantLinksResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createScheduledLessonParticipantLinksResponse
 }
 
 
@@ -4257,6 +4436,86 @@ export const createHomeworkAssignment = async (homeworkAssignmentRequest: Homewo
 
   const data: createHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createHomeworkAssignmentResponse
+}
+
+
+
+export type consumeResponse200 = {
+  data: StudentInviteConsumeResponse
+  status: 200
+}
+
+export type consumeResponseSuccess = (consumeResponse200) & {
+  headers: Headers;
+};
+;
+
+export type consumeResponse = (consumeResponseSuccess)
+
+export const getConsumeUrl = () => {
+
+
+
+
+  return `/api/student-invites/consume`
+}
+
+export const consume = async (studentInviteConsumeRequest: StudentInviteConsumeRequest, options?: RequestInit): Promise<consumeResponse> => {
+
+  const res = await fetch(getConsumeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(studentInviteConsumeRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: consumeResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as consumeResponse
+}
+
+
+
+export type consume1Response200 = {
+  data: StudentInviteConsumeResponse
+  status: 200
+}
+
+export type consume1ResponseSuccess = (consume1Response200) & {
+  headers: Headers;
+};
+;
+
+export type consume1Response = (consume1ResponseSuccess)
+
+export const getConsume1Url = () => {
+
+
+
+
+  return `/api/api/student-invites/consume`
+}
+
+export const consume1 = async (studentInviteConsumeRequest: StudentInviteConsumeRequest, options?: RequestInit): Promise<consume1Response> => {
+
+  const res = await fetch(getConsume1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(studentInviteConsumeRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: consume1Response['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as consume1Response
 }
 
 

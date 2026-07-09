@@ -85,6 +85,24 @@ export interface RegistrationResponse {
   continueUrl?: string | null;
 }
 
+export interface StudentInviteConsumeRequest {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  token: string;
+}
+
+export interface StudentInviteConsumeResponse {
+  accessToken: string;
+  /** @nullable */
+  refreshToken?: string | null;
+  /** @nullable */
+  idToken?: string | null;
+  expiresIn: number;
+  continueUrl: string;
+}
+
 export type startRegistrationResponse202 = {
   data: RegistrationResponse
   status: 202
@@ -351,4 +369,55 @@ export const resetPassword = async (resetPasswordRequest: ResetPasswordRequest, 
 
   const data: resetPasswordResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as resetPasswordResponse
+}
+
+
+
+export type consumeStudentInviteResponse200 = {
+  data: StudentInviteConsumeResponse
+  status: 200
+}
+
+export type consumeStudentInviteResponse400 = {
+  data: void
+  status: 400
+}
+
+export type consumeStudentInviteResponseSuccess = (consumeStudentInviteResponse200) & {
+  headers: Headers;
+};
+export type consumeStudentInviteResponseError = (consumeStudentInviteResponse400) & {
+  headers: Headers;
+};
+
+export type consumeStudentInviteResponse = (consumeStudentInviteResponseSuccess | consumeStudentInviteResponseError)
+
+export const getConsumeStudentInviteUrl = () => {
+
+
+
+
+  return `/api/student-invites/consume`
+}
+
+/**
+ * Exchanges a one-time managed-student invite token for a Keycloak token set and the lesson continue URL.
+ * @summary Consume managed-student lesson invite
+ */
+export const consumeStudentInvite = async (studentInviteConsumeRequest: StudentInviteConsumeRequest, options?: RequestInit): Promise<consumeStudentInviteResponse> => {
+
+  const res = await fetch(getConsumeStudentInviteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(studentInviteConsumeRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: consumeStudentInviteResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as consumeStudentInviteResponse
 }

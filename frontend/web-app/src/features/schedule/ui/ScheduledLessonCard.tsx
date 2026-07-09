@@ -102,7 +102,7 @@ export function ScheduledLessonCard({
           )}
           <Button disabled={disabled} onClick={onCopyLink} type="button" variant="outline">
             <Copy className="h-4 w-4" />
-            {linkCopied ? t("schedule.clipboard.copied") : t("schedule.clipboard.link")}
+            {linkCopied ? t("schedule.clipboard.copied") : canManage ? t("schedule.actions.copyLinks") : t("schedule.clipboard.link")}
           </Button>
           {canManage && !archived ? (
             <>

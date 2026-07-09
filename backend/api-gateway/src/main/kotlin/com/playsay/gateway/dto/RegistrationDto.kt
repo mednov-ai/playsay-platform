@@ -3,6 +3,8 @@ package com.playsay.gateway.dto
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import java.time.Instant
+import java.util.UUID
 
 data class StartRegistrationRequest(
     @field:Email
@@ -64,4 +66,37 @@ data class ResetPasswordRequest(
 data class RegistrationResponse(
     val status: String,
     val continueUrl: String? = null,
+)
+
+data class ManagedStudentProvisionResponse(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+)
+
+data class ManagedStudentInviteRequest(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+    val lessonId: UUID,
+    val continueUrl: String,
+)
+
+data class ManagedStudentInviteResponse(
+    val token: String,
+    val expiresAt: Instant,
+)
+
+data class StudentInviteConsumeRequest(
+    @field:NotBlank
+    @field:Size(max = 255)
+    val token: String,
+)
+
+data class StudentInviteConsumeResponse(
+    val accessToken: String,
+    val refreshToken: String?,
+    val idToken: String?,
+    val expiresIn: Long,
+    val continueUrl: String,
 )

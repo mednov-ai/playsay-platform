@@ -46,6 +46,7 @@ playsay:
       realm: ${PLAYSAY_KEYCLOAK_REALM:playsay}
       client-id: ${PLAYSAY_KEYCLOAK_ADMIN_CLIENT_ID:playsay-registration-service}
       client-secret: ${PLAYSAY_KEYCLOAK_ADMIN_CLIENT_SECRET:}
+      student-token-client-id: ${PLAYSAY_KEYCLOAK_STUDENT_TOKEN_CLIENT_ID:playsay-web}
     email-service:
       base-url: ${PLAYSAY_EMAIL_SERVICE_BASE_URL:http://email-service:8086}
       service-token: ${PLAYSAY_EMAIL_SERVICE_TOKEN:}

@@ -2,15 +2,22 @@ package com.playsay.gateway
 
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
+import com.playsay.gateway.dto.ManagedStudentInviteRequest
+import com.playsay.gateway.dto.ManagedStudentInviteResponse
+import com.playsay.gateway.dto.ManagedStudentProvisionResponse
+import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.RegistrationResponse
 import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
+import com.playsay.gateway.dto.StudentInviteConsumeRequest
+import com.playsay.gateway.dto.StudentInviteConsumeResponse
 import com.playsay.gateway.service.RegistrationGateway
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.springframework.beans.factory.annotation.Autowired
@@ -118,4 +125,19 @@ private class AnonymousRegistrationGateway : RegistrationGateway {
 
     override fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse =
         RegistrationResponse(status = "PASSWORD_RESET")
+
+    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse =
+        ManagedStudentProvisionResponse(subject = "student-subject", email = request.email, displayName = request.displayName)
+
+    override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
+        ManagedStudentInviteResponse(token = "student-invite-token", expiresAt = Instant.parse("2026-07-09T12:00:00Z"))
+
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
+        StudentInviteConsumeResponse(
+            accessToken = "access-token",
+            refreshToken = "refresh-token",
+            idToken = "id-token",
+            expiresIn = 300,
+            continueUrl = "/lessons/lesson-id/classroom",
+        )
 }

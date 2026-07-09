@@ -2,7 +2,9 @@ package com.playsay.gateway.controller
 
 import com.playsay.gateway.dto.UpdateUserProfileRequest
 import com.playsay.gateway.dto.UserProfileResponse
+import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.service.UserProfileStore
+import jakarta.validation.Valid
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -12,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -114,4 +117,29 @@ class UserProfileController(
     )
     fun listStudents(authentication: JwtAuthenticationToken): List<UserProfileResponse> =
         store.listStudents(authentication)
+
+    @PostMapping(
+        "/students/managed",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "createManagedStudent",
+        summary = "Create managed student account",
+        description = "Creates or returns a teacher-managed Keycloak student account and app-level profile. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Managed student profile"),
+            ApiResponse(responseCode = "400", description = "Invalid managed student payload", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user is not a teacher/admin", content = [Content()]),
+        ],
+    )
+    fun createManagedStudent(
+        authentication: JwtAuthenticationToken,
+        @Valid @RequestBody request: ManagedStudentRequest,
+    ): UserProfileResponse =
+        store.createManagedStudent(authentication, request)
 }

@@ -24,6 +24,7 @@ import {
   type LessonMaterialInput,
   type LessonTemplateCardsInput,
   type LessonMaterialUrlDraftInput,
+  type ManagedStudentInput,
   type MeProfile,
   type PaymentInvoice,
   type PaymentInvoiceCreateInput,
@@ -68,6 +69,7 @@ export type AppShellProps = {
   assignMaterialToScheduledLesson: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   cancelScheduledLesson: (lesson: ScheduledLesson) => Promise<void>;
   completeScheduledLesson: (lessonId: string) => Promise<void>;
+  copyScheduledLessonLinks: (lesson: ScheduledLesson) => Promise<boolean>;
   courseLessons: CourseLessonMap;
   courseLoading: boolean;
   courseMessage: string | null;
@@ -77,6 +79,7 @@ export type AppShellProps = {
   createLesson: (courseId: string, input: CourseLessonInput) => Promise<void>;
   createTopic: (courseId: string, input: CurriculumTopicInput) => Promise<void>;
   createScheduledLesson: (input: ScheduledLessonInput) => Promise<void>;
+  createManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   deleteCourse: (courseId: string) => Promise<void>;
   deleteLesson: (courseId: string, lessonId: string) => Promise<void>;
   deleteMaterial: (materialId: string) => Promise<void>;
@@ -145,6 +148,7 @@ export function AppShell(props: AppShellProps) {
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     completeScheduledLesson,
+    copyScheduledLessonLinks,
     courseLessons,
     courseLoading,
     courseMessage,
@@ -154,6 +158,7 @@ export function AppShell(props: AppShellProps) {
     createLesson,
     createTopic,
     createScheduledLesson,
+    createManagedStudent,
     deleteCourse,
     deleteLesson,
     deleteMaterial,
@@ -325,7 +330,9 @@ export function AppShell(props: AppShellProps) {
                   onCancel={(lesson) => void cancelScheduledLesson(lesson)}
                   onComplete={(lesson) => void completeScheduledLesson(lesson.id)}
                   onCreate={(input) => void createScheduledLesson(input)}
+                  onCreateManagedStudent={createManagedStudent}
                   onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
+                  onCopyLinks={(lesson) => copyScheduledLessonLinks(lesson)}
                   onJoin={(lesson) => void joinScheduledLesson(lesson)}
                   onRefresh={() => void refreshSchedule()}
                   profile={profile}

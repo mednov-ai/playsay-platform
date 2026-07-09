@@ -1,6 +1,9 @@
 package com.playsay.gateway.dto
 
 import io.swagger.v3.oas.annotations.media.Schema
+import jakarta.validation.constraints.Email
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import java.time.Instant
 
 data class UserProfileResponse(
@@ -15,6 +18,7 @@ data class UserProfileResponse(
     val timezone: String?,
     val learningGoal: String?,
     val updatedAt: Instant,
+    val managedByTeacher: Boolean = false,
 )
 
 data class UpdateUserProfileRequest(
@@ -28,4 +32,14 @@ data class UpdateUserProfileRequest(
     val timezone: String? = null,
     @field:Schema(maxLength = 500)
     val learningGoal: String? = null,
+)
+
+data class ManagedStudentRequest(
+    @field:Email
+    @field:NotBlank
+    @field:Size(max = 320)
+    val email: String,
+    @field:NotBlank
+    @field:Size(max = 120)
+    val displayName: String,
 )

@@ -13,6 +13,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
@@ -36,6 +39,13 @@ class UserProfileControllerTest @Autowired constructor(
     private val appUserRepo: AppUserRepo,
     private val dataSource: DataSource,
 ) {
+    @TestConfiguration
+    class ManagedStudentTestConfig {
+        @Bean
+        @Primary
+        fun registrationGateway(): RegistrationGateway = RecordingManagedStudentRegistrationGateway
+    }
+
     @BeforeAll
     fun migrateDatabase() {
         SpringLiquibase().apply {
@@ -46,6 +56,7 @@ class UserProfileControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
+        RecordingManagedStudentRegistrationGateway.created.clear()
         appUserRepo.deleteAllInBatch()
     }
 
@@ -126,6 +137,24 @@ class UserProfileControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher creates managed student profile before first student login`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+
+        val created = controller.createManagedStudent(
+            teacher,
+            ManagedStudentRequest(email = "new.student@example.com", displayName = "New Student"),
+        )
+
+        assertEquals("managed-student-1", created.subject)
+        assertEquals("new.student@example.com", created.email)
+        assertEquals("New Student", created.displayName)
+        assertEquals(listOf("STUDENT"), created.roles)
+        assertEquals(true, created.managedByTeacher)
+        assertEquals(listOf("new.student@example.com"), controller.listStudents(teacher).map { student -> student.email })
+        assertEquals(listOf("new.student@example.com"), RecordingManagedStudentRegistrationGateway.created.map { request -> request.email })
+    }
+
+    @Test
     fun `non admin cannot list profiles`() {
         val error = assertFailsWith<ResponseStatusException> {
             controller.list(authentication(role = "ROLE_TEACHER"))
@@ -173,4 +202,38 @@ class UserProfileControllerTest @Autowired constructor(
 
         return JwtAuthenticationToken(jwt, listOf(SimpleGrantedAuthority(role)))
     }
+}
+
+private object RecordingManagedStudentRegistrationGateway : RegistrationGateway {
+    val created = mutableListOf<ManagedStudentRequest>()
+
+    override fun start(request: StartRegistrationRequest, clientAddress: String?): RegistrationResponse =
+        RegistrationResponse(status = "CHECK_EMAIL")
+
+    override fun resend(request: ResendRegistrationRequest, clientAddress: String?): RegistrationResponse =
+        RegistrationResponse(status = "CHECK_EMAIL")
+
+    override fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse =
+        RegistrationResponse(status = "CONFIRMED")
+
+    override fun forgotPassword(request: ForgotPasswordRequest, clientAddress: String?): RegistrationResponse =
+        RegistrationResponse(status = "CHECK_EMAIL")
+
+    override fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse =
+        RegistrationResponse(status = "PASSWORD_RESET")
+
+    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse {
+        created += request
+        return ManagedStudentProvisionResponse(
+            subject = "managed-student-1",
+            email = request.email,
+            displayName = request.displayName,
+        )
+    }
+
+    override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
+        error("Managed student invite creation is not used in this test.")
+
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
+        error("Student invite consume is not used in this test.")
 }

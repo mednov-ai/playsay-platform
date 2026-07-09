@@ -2,6 +2,7 @@ package com.playsay.registration
 
 import com.playsay.registration.service.KeycloakRegistrationClient
 import com.playsay.registration.service.KeycloakRegistrationUser
+import com.playsay.registration.service.KeycloakTokenSet
 import com.playsay.registration.service.KeycloakUserCreateCommand
 import com.playsay.registration.repo.PendingRegistrationRepo
 import com.playsay.registration.service.RegistrationEmailClient
@@ -16,6 +17,7 @@ import javax.sql.DataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import liquibase.integration.spring.SpringLiquibase
 import org.junit.jupiter.api.BeforeAll
@@ -107,6 +109,42 @@ class RegistrationControllerTest @Autowired constructor(
         assertTrue(confirmed.body().contains("CONFIRMED"))
         assertEquals("student@example.com", RecordingKeycloakRegistrationClient.enabledUsers.single())
         assertEquals("STUDENT", RecordingKeycloakRegistrationClient.assignedRoles.single())
+    }
+
+    @Test
+    fun `managed student provisioning creates enabled keycloak student`() {
+        val response = provisionManagedStudent("managed@example.com", "Managed Student")
+
+        assertEquals(HttpStatus.CREATED.value(), response.statusCode(), response.body())
+        assertTrue(response.body().contains("managed-subject-1"))
+        val createdUser = RecordingKeycloakRegistrationClient.createdUsers.single()
+        assertEquals("managed@example.com", createdUser.email)
+        assertTrue(createdUser.enabled)
+        assertTrue(createdUser.emailVerified)
+        assertTrue(createdUser.managedStudent)
+        assertEquals("STUDENT", RecordingKeycloakRegistrationClient.assignedRoles.single())
+    }
+
+    @Test
+    fun `managed student invite is one time and returns keycloak tokens`() {
+        provisionManagedStudent("invitee@example.com", "Invitee")
+        val invite = createManagedStudentInvite(
+            subject = "managed-subject-1",
+            email = "invitee@example.com",
+            displayName = "Invitee",
+            lessonId = "3f20a6e4-a861-49ab-aa70-8300b589f61f",
+            continueUrl = "https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
+        )
+        val token = assertNotNull(invite.token)
+
+        val consumed = consumeManagedStudentInvite(token)
+        val repeated = consumeManagedStudentInvite(token)
+
+        assertEquals(HttpStatus.OK.value(), consumed.statusCode(), consumed.body())
+        assertTrue(consumed.body().contains("access-token-invitee"))
+        assertTrue(consumed.body().contains("https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom"))
+        assertEquals(HttpStatus.BAD_REQUEST.value(), repeated.statusCode(), repeated.body())
+        assertEquals(listOf("invitee@example.com"), RecordingKeycloakRegistrationClient.passwordGrantUsers)
     }
 
     @Test
@@ -411,6 +449,48 @@ class RegistrationControllerTest @Autowired constructor(
             HttpResponse.BodyHandlers.ofString(),
         )
 
+    private fun provisionManagedStudent(email: String, displayName: String): HttpResponse<String> =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/internal/managed-students"))
+                .header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""{"email":"$email","displayName":"$displayName"}"""))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+    private fun createManagedStudentInvite(
+        subject: String,
+        email: String,
+        displayName: String,
+        lessonId: String,
+        continueUrl: String,
+    ): ManagedInviteFixture {
+        val response = httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/internal/managed-student-invites"))
+                .header("content-type", "application/json")
+                .POST(
+                    HttpRequest.BodyPublishers.ofString(
+                        """{"subject":"$subject","email":"$email","displayName":"$displayName","lessonId":"$lessonId","continueUrl":"$continueUrl"}""",
+                    ),
+                )
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+        assertEquals(HttpStatus.CREATED.value(), response.statusCode(), response.body())
+        return ManagedInviteFixture(
+            token = Regex(""""token"\s*:\s*"([^"]+)"""").find(response.body())?.groupValues?.get(1),
+        )
+    }
+
+    private fun consumeManagedStudentInvite(token: String): HttpResponse<String> =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/student-invites/consume"))
+                .header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""{"token":"$token"}"""))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
     private fun lastConfirmationToken(): String =
         URI.create(RecordingRegistrationEmailClient.registrationConfirmations.last().confirmationUrl)
             .query
@@ -437,6 +517,10 @@ class RegistrationControllerTest @Autowired constructor(
         val returnToLine = returnTo?.let { ",\"returnTo\":\"$it\"" } ?: ""
         return """{"email":"$email","password":"$password","displayName":"Student","locale":"en"$returnToLine}"""
     }
+
+    private data class ManagedInviteFixture(
+        val token: String?,
+    )
 }
 
 private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient {
@@ -445,6 +529,7 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
     val enabledUsers = mutableListOf<String>()
     val assignedRoles = mutableListOf<String>()
     val updatedPasswords = mutableMapOf<String, String>()
+    val passwordGrantUsers = mutableListOf<String>()
 
     fun reset() {
         existingUsers.clear()
@@ -452,6 +537,7 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
         enabledUsers.clear()
         assignedRoles.clear()
         updatedPasswords.clear()
+        passwordGrantUsers.clear()
     }
 
     override fun createDisabledUser(command: KeycloakUserCreateCommand): Boolean {
@@ -460,9 +546,11 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
         }
         createdUsers += command
         existingUsers[command.email] = KeycloakRegistrationUser(
+            subject = "managed-subject-${createdUsers.size}",
             email = command.email,
             enabled = command.enabled,
             emailVerified = command.emailVerified,
+            managedStudent = command.managedStudent,
         )
         return true
     }
@@ -473,7 +561,7 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
     override fun enableVerifiedUser(email: String) {
         enabledUsers += email
         existingUsers[email] = existingUsers[email]?.copy(enabled = true, emailVerified = true)
-            ?: KeycloakRegistrationUser(email = email, enabled = true, emailVerified = true)
+            ?: KeycloakRegistrationUser(subject = "managed-subject-1", email = email, enabled = true, emailVerified = true)
     }
 
     override fun assignRealmRole(email: String, role: String) {
@@ -482,6 +570,16 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
 
     override fun updatePassword(email: String, newPassword: String) {
         updatedPasswords[email] = newPassword
+    }
+
+    override fun passwordGrant(email: String, password: String, clientId: String): KeycloakTokenSet {
+        passwordGrantUsers += email
+        return KeycloakTokenSet(
+            accessToken = "access-token-${email.substringBefore("@")}",
+            refreshToken = "refresh-token-${email.substringBefore("@")}",
+            idToken = "id-token-${email.substringBefore("@")}",
+            expiresIn = 300,
+        )
     }
 }
 

@@ -5,6 +5,8 @@ import {
 } from "../../features/classroom";
 import { participantAssignmentsFromLesson } from "../../entities/schedule/model";
 import {
+  createManagedStudentProfile,
+  createScheduledLessonParticipantLinks,
   editScheduledLesson,
   completeScheduledLesson as completeScheduledLessonRequest,
   enterScheduledLessonRoom,
@@ -13,9 +15,11 @@ import {
   removeScheduledLesson,
   saveScheduledLesson,
   type AdminUserProfile,
+  type ManagedStudentInput,
   type MeProfile,
   type ScheduledLesson,
   type ScheduledLessonInput,
+  type ScheduledLessonParticipantLink,
 } from "../../shared/api/playsay";
 import { useAppTranslation } from "../../shared/i18n";
 import type { SessionErrorHandler } from "./types";
@@ -86,6 +90,36 @@ export function useScheduleActions({
       setScheduleMessage(applySessionError(caught, t("schedule.messages.createFailed")));
     } finally {
       setScheduleLoading(false);
+    }
+  }
+
+  async function createManagedStudent(input: ManagedStudentInput): Promise<AdminUserProfile | null> {
+    setScheduleLoading(true);
+    setScheduleMessage(null);
+    try {
+      const created = await createManagedStudentProfile(input);
+      setStudentUsers((current) => upsertUserProfile(current, created));
+      setScheduleMessage(t("schedule.messages.managedStudentCreated"));
+      return created;
+    } catch (caught) {
+      setScheduleMessage(applySessionError(caught, t("schedule.messages.managedStudentCreateFailed")));
+      return null;
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+
+  async function copyScheduledLessonLinks(lesson: ScheduledLesson): Promise<boolean> {
+    setScheduleMessage(null);
+    try {
+      const links = await createScheduledLessonParticipantLinks(lesson.id);
+      const text = formatLessonLinks(lesson, links.links);
+      await copyText(text, t("schedule.messages.linksPromptTitle"));
+      setScheduleMessage(t("schedule.messages.linksCopied"));
+      return true;
+    } catch (caught) {
+      setScheduleMessage(applySessionError(caught, t("schedule.messages.linksCopyFailed")));
+      return false;
     }
   }
 
@@ -245,10 +279,46 @@ export function useScheduleActions({
     cancelScheduledLesson,
     completeScheduledLesson,
     closeClassroom,
+    copyScheduledLessonLinks,
+    createManagedStudent,
     createScheduledLesson,
     deleteScheduledLesson,
     joinScheduledLesson,
     leaveScheduledLessonRoom,
     refreshSchedule,
   };
+}
+
+function upsertUserProfile(users: AdminUserProfile[], user: AdminUserProfile): AdminUserProfile[] {
+  const existing = users.some((item) => item.subject === user.subject);
+  const nextUsers = existing
+    ? users.map((item) => (item.subject === user.subject ? user : item))
+    : [...users, user];
+  return nextUsers.sort((left, right) => userLabel(left).localeCompare(userLabel(right)));
+}
+
+function formatLessonLinks(lesson: ScheduledLesson, links: ScheduledLessonParticipantLink[]): string {
+  if (links.length === 0) {
+    return new URL(classroomPath(lesson.id), window.location.origin).toString();
+  }
+
+  if (links.length === 1) {
+    return links[0].url;
+  }
+
+  return links
+    .map((link) => `${link.displayName ?? link.email ?? link.subject}: ${link.url}`)
+    .join("\n");
+}
+
+async function copyText(text: string, promptTitle: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    window.prompt(promptTitle, text);
+  }
+}
+
+function userLabel(user: AdminUserProfile): string {
+  return user.displayName ?? user.name ?? user.username ?? user.email ?? user.subject;
 }

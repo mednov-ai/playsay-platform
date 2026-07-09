@@ -109,6 +109,26 @@ paths:
                 $ref: "#/components/schemas/RegistrationResponse"
         "400":
           description: Invalid code, expired code, or weak password.
+  /student-invites/consume:
+    post:
+      operationId: consumeStudentInvite
+      summary: Consume managed-student lesson invite
+      description: Exchanges a one-time managed-student invite token for a Keycloak token set and the lesson continue URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentInviteConsumeRequest"
+      responses:
+        "200":
+          description: Invite consumed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentInviteConsumeResponse"
+        "400":
+          description: Invalid, expired, or already consumed invite token.
 components:
   schemas:
     StartRegistrationRequest:
@@ -208,3 +228,32 @@ components:
         continueUrl:
           type: string
           nullable: true
+    StudentInviteConsumeRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 255
+    StudentInviteConsumeResponse:
+      type: object
+      required:
+        - accessToken
+        - expiresIn
+        - continueUrl
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+          nullable: true
+        idToken:
+          type: string
+          nullable: true
+        expiresIn:
+          type: integer
+          format: int64
+        continueUrl:
+          type: string

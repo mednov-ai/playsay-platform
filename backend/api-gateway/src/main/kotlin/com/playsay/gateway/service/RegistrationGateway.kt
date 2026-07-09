@@ -4,10 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
+import com.playsay.gateway.dto.ManagedStudentInviteRequest
+import com.playsay.gateway.dto.ManagedStudentInviteResponse
+import com.playsay.gateway.dto.ManagedStudentProvisionResponse
+import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.RegistrationResponse
 import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
+import com.playsay.gateway.dto.StudentInviteConsumeRequest
+import com.playsay.gateway.dto.StudentInviteConsumeResponse
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData
 import java.net.URI
@@ -27,6 +33,9 @@ interface RegistrationGateway {
     fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse
     fun forgotPassword(request: ForgotPasswordRequest, clientAddress: String?): RegistrationResponse
     fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse
+    fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse
+    fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse
+    fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse
 }
 
 @Component
@@ -54,7 +63,25 @@ class HttpRegistrationGateway(
     override fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse =
         postJson("/api/registration/reset-password", request, HttpStatus.OK, clientAddress)
 
-    private fun postJson(path: String, body: Any, expectedStatus: HttpStatus, clientAddress: String? = null): RegistrationResponse {
+    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse =
+        postJson("/api/internal/managed-students", request, HttpStatus.CREATED, ManagedStudentProvisionResponse::class.java)
+
+    override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
+        postJson("/api/internal/managed-student-invites", request, HttpStatus.CREATED, ManagedStudentInviteResponse::class.java)
+
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
+        postJson("/api/student-invites/consume", request, HttpStatus.OK, StudentInviteConsumeResponse::class.java)
+
+    private fun postJson(path: String, body: Any, expectedStatus: HttpStatus, clientAddress: String? = null): RegistrationResponse =
+        postJson(path, body, expectedStatus, RegistrationResponse::class.java, clientAddress)
+
+    private fun <T : Any> postJson(
+        path: String,
+        body: Any,
+        expectedStatus: HttpStatus,
+        responseType: Class<T>,
+        clientAddress: String? = null,
+    ): T {
         val response = send(path, objectMapper.writeValueAsString(body), clientAddress)
         if (response.statusCode() != expectedStatus.value()) {
             logger.warn("registration-service request failed path={} status={}", path, response.statusCode())
@@ -65,7 +92,7 @@ class HttpRegistrationGateway(
                     ?: MetaData.ErrorCodes.REGISTRATION_SERVICE_UNAVAILABLE,
             )
         }
-        return runCatching { objectMapper.readValue(response.body(), RegistrationResponse::class.java) }.getOrElse {
+        return runCatching { objectMapper.readValue(response.body(), responseType) }.getOrElse {
             logger.warn("registration-service response could not be parsed path={}", path, it)
             throw registrationUnavailable()
         }

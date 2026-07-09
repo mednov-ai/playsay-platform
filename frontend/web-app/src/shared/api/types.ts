@@ -19,11 +19,18 @@ import type {
 export type MeProfile = MeResponse;
 export type AppUserProfile = UserProfileResponse & {
   countryCode?: string | null;
+  managedByTeacher?: boolean;
 };
 export type UpdateUserProfileInput = UpdateUserProfileRequest & {
   countryCode?: string | null;
 };
-export type AdminUserProfile = UserProfileResponse;
+export type AdminUserProfile = UserProfileResponse & {
+  managedByTeacher?: boolean;
+};
+export type ManagedStudentInput = {
+  email: string;
+  displayName: string;
+};
 export type Course = CourseResponse;
 export type CourseLesson = CourseLessonResponse & {
   materialId?: string | null;
@@ -41,6 +48,18 @@ export type ScheduledLesson = ScheduledLessonResponse & {
   materialId?: string | null;
   materialTitle?: string | null;
 };
+export type ScheduledLessonParticipantLink = {
+  subject: string;
+  displayName?: string | null;
+  email?: string | null;
+  url: string;
+  expiresAt?: string | null;
+  mode: "MAGIC_LINK" | "AUTHENTICATED_LINK" | string;
+};
+export type ScheduledLessonParticipantLinks = {
+  lessonId: string;
+  links: ScheduledLessonParticipantLink[];
+};
 export type ScheduledLessonMaterialAssignmentInput = ScheduledLessonMaterialAssignmentRequest;
 export type ScheduledLessonRecurrenceInput = {
   mode: "WEEKLY_COUNT" | "WEEKLY_BY_WEEK";
@@ -54,6 +73,13 @@ export type ScheduledLessonInput = ScheduledLessonRequest & {
   recurrence?: ScheduledLessonRecurrenceInput | null;
 };
 export type LiveKitRoomToken = LiveKitRoomTokenResponse;
+export type StudentInviteConsumeResult = {
+  accessToken: string;
+  refreshToken?: string | null;
+  idToken?: string | null;
+  expiresIn: number;
+  continueUrl: string;
+};
 export type LessonMaterialJson = Record<string, unknown>;
 export type LessonMaterial = {
   id: string;

@@ -5,6 +5,8 @@ import {
   completeLogin,
   isSilentLoginUnavailable,
   mapTokenResponse,
+  readTokens,
+  storeTokens,
   type AuthConfig,
 } from "./shared/auth/oidc";
 
@@ -94,6 +96,25 @@ describe("auth helpers", () => {
       accessToken: "access",
       refreshToken: "refresh",
       idToken: "id",
+      expiresAt: 61_000,
+    });
+  });
+
+  it("stores token sets issued by the managed student invite exchange", () => {
+    const storage = new MemoryStorage();
+    vi.stubGlobal("window", { sessionStorage: storage });
+
+    storeTokens({
+      accessToken: "invite-access",
+      refreshToken: "invite-refresh",
+      idToken: "invite-id",
+      expiresAt: 61_000,
+    });
+
+    expect(readTokens()).toEqual({
+      accessToken: "invite-access",
+      refreshToken: "invite-refresh",
+      idToken: "invite-id",
       expiresAt: 61_000,
     });
   });

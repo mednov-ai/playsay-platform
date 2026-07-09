@@ -66,3 +66,18 @@ data class ScheduledLessonResponse(
     val createdAt: Instant,
     val updatedAt: Instant,
 )
+
+data class ScheduledLessonParticipantLinkResponse(
+    val subject: String,
+    val displayName: String?,
+    val email: String?,
+    val url: String,
+    val expiresAt: Instant? = null,
+    @field:Schema(allowableValues = ["MAGIC_LINK", "AUTHENTICATED_LINK"])
+    val mode: String,
+)
+
+data class ScheduledLessonParticipantLinksResponse(
+    val lessonId: UUID,
+    val links: List<ScheduledLessonParticipantLinkResponse>,
+)

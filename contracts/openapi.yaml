@@ -722,6 +722,35 @@ paths:
                 $ref: "#/components/schemas/CourseLessonResponse"
       security:
       - bearerAuth: []
+  /students/managed:
+    post:
+      tags:
+      - Users
+      summary: Create managed student account
+      description: Creates or returns a teacher-managed Keycloak student account and
+        app-level profile. Requires TEACHER or ADMIN role.
+      operationId: createManagedStudent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManagedStudentRequest"
+        required: true
+      responses:
+        "200":
+          description: Managed student profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "400":
+          description: Invalid managed student payload
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user is not a teacher/admin
+      security:
+      - bearerAuth: []
   /schedule/lessons:
     get:
       tags:
@@ -798,6 +827,36 @@ paths:
           description: Scheduled lesson not found
         "503":
           description: LiveKit is not configured
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/participant-links:
+    post:
+      tags:
+      - Schedule
+      summary: Create scheduled lesson participant links
+      description: Returns per-participant lesson links. Teacher-managed students
+        receive one-time magic links. Requires TEACHER or ADMIN role.
+      operationId: createScheduledLessonParticipantLinks
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Scheduled lesson participant links
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledLessonParticipantLinksResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage schedule
+        "404":
+          description: Scheduled lesson not found
       security:
       - bearerAuth: []
   /schedule/lessons/{lessonId}/image-page:
@@ -1653,6 +1712,42 @@ paths:
           description: Material not found
       security:
       - bearerAuth: []
+  /student-invites/consume:
+    post:
+      tags:
+      - student-invite-controller
+      operationId: consume
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentInviteConsumeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentInviteConsumeResponse"
+  /api/student-invites/consume:
+    post:
+      tags:
+      - student-invite-controller
+      operationId: consume_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentInviteConsumeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentInviteConsumeResponse"
   /api/registration/start:
     post:
       tags:
@@ -2311,7 +2406,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+        managedByTeacher:
+          type: boolean
       required:
+      - managedByTeacher
       - roles
       - subject
       - updatedAt
@@ -3213,6 +3311,21 @@ components:
             $ref: "#/components/schemas/LessonTemplateCardRequest"
       required:
       - cards
+    ManagedStudentRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          minLength: 0
+        displayName:
+          type: string
+          maxLength: 120
+          minLength: 0
+      required:
+      - displayName
+      - email
     LiveKitRoomTokenResponse:
       type: object
       properties:
@@ -3233,6 +3346,48 @@ components:
       - roomName
       - serverUrl
       - token
+    ScheduledLessonParticipantLinkResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        displayName:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+        url:
+          type: string
+        expiresAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        mode:
+          type: string
+          enum:
+          - MAGIC_LINK
+          - AUTHENTICATED_LINK
+      required:
+      - mode
+      - subject
+      - url
+    ScheduledLessonParticipantLinksResponse:
+      type: object
+      properties:
+        lessonId:
+          type: string
+          format: uuid
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduledLessonParticipantLinkResponse"
+      required:
+      - lessonId
+      - links
     LiveLessonImagePageResponse:
       type: object
       properties:
@@ -3942,6 +4097,37 @@ components:
       required:
       - materialId
       - studentSubjects
+    StudentInviteConsumeRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - token
+    StudentInviteConsumeResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type:
+          - string
+          - "null"
+        idToken:
+          type:
+          - string
+          - "null"
+        expiresIn:
+          type: integer
+          format: int64
+        continueUrl:
+          type: string
+      required:
+      - accessToken
+      - continueUrl
+      - expiresIn
     StartRegistrationRequest:
       type: object
       properties:

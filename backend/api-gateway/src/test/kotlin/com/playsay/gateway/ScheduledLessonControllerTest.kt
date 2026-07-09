@@ -2,6 +2,7 @@ package com.playsay.gateway
 
 import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
+import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.repo.*
 import com.playsay.gateway.service.*
 import com.nimbusds.jose.JWSAlgorithm
@@ -11,8 +12,13 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneOffset
+import java.time.temporal.TemporalAdjusters
 import java.util.Base64
 import java.util.Date
 import java.util.UUID
@@ -74,6 +80,10 @@ class ScheduledLessonControllerTest @Autowired constructor(
         @Bean
         @Primary
         fun lessonReminderEmailClient(): LessonReminderEmailClient = RecordingLessonReminderEmailClient
+
+        @Bean
+        @Primary
+        fun registrationGateway(): RegistrationGateway = RecordingScheduledLessonRegistrationGateway
     }
 
     @BeforeAll
@@ -87,6 +97,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
     @BeforeEach
     fun cleanDatabase() {
         RecordingLessonReminderEmailClient.sent.clear()
+        RecordingScheduledLessonRegistrationGateway.reset()
         lessonEmailReminderRepo.deleteAllInBatch()
         lessonParticipantRepo.deleteAllInBatch()
         lessonRepo.deleteAllInBatch()
@@ -123,13 +134,54 @@ class ScheduledLessonControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher creates participant magic link for managed student`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val teacherUserId = userProfileStore.currentUserId(teacher)
+        val now = Instant.parse("2026-05-24T10:00:00Z")
+        appUserRepo.saveAndFlush(
+            AppUserEntity(
+                id = UUID.randomUUID(),
+                keycloakSubject = "managed-student-1",
+                username = "new.student@example.com",
+                email = "new.student@example.com",
+                name = "New Student",
+                roles = "STUDENT",
+                displayName = "New Student",
+                countryCode = "RU",
+                managedByTeacher = true,
+                managedByTeacherUserId = teacherUserId,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
+                scheduledEnd = Instant.parse("2026-05-25T10:45:00Z"),
+                participantSubjects = listOf("managed-student-1"),
+            ),
+        ).body!!
+
+        val links = scheduleController.createParticipantLinks(teacher, lesson.id)
+
+        assertEquals(1, links.links.size)
+        assertEquals("managed-student-1", links.links.single().subject)
+        assertEquals("MAGIC_LINK", links.links.single().mode)
+        assertTrue(links.links.single().url.contains("/student-invite?token=invite-token-1"))
+        assertEquals(lesson.id, RecordingScheduledLessonRegistrationGateway.invites.single().lessonId)
+        assertEquals("managed-student-1", RecordingScheduledLessonRegistrationGateway.invites.single().subject)
+        assertTrue(RecordingScheduledLessonRegistrationGateway.invites.single().continueUrl.endsWith("/lessons/${lesson.id}/classroom"))
+    }
+
+    @Test
     fun `teacher schedules weekly recurrence as separate lessons`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
         val lessonTemplateId = courseLessonId(teacher)
-        val firstStart = Instant.parse("2026-06-29T10:00:00Z")
-        val firstEnd = Instant.parse("2026-06-29T10:45:00Z")
+        val firstStart = futureWeekdayStart(DayOfWeek.MONDAY)
+        val firstEnd = firstStart.plus(Duration.ofMinutes(45))
 
         val created = scheduleController.create(
             teacher,
@@ -329,12 +381,12 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         userProfileStore.currentUserId(student)
-        val start = Instant.parse("2026-06-29T10:00:00Z")
+        val start = futureWeekdayStart(DayOfWeek.MONDAY)
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
                 scheduledStart = start,
-                scheduledEnd = Instant.parse("2026-06-29T10:45:00Z"),
+                scheduledEnd = start.plus(Duration.ofMinutes(45)),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -897,6 +949,13 @@ class ScheduledLessonControllerTest @Autowired constructor(
     private fun futureEnd(minutesFromNow: Long): Instant =
         Instant.now().plusSeconds((minutesFromNow + 45) * 60)
 
+    private fun futureWeekdayStart(dayOfWeek: DayOfWeek, time: LocalTime = LocalTime.of(10, 0)): Instant =
+        LocalDate.now(ZoneOffset.UTC)
+            .plusDays(1)
+            .with(TemporalAdjusters.nextOrSame(dayOfWeek))
+            .atTime(time)
+            .toInstant(ZoneOffset.UTC)
+
     private data class AttendanceRow(
         val status: String,
         val actualStart: Instant?,
@@ -912,4 +971,42 @@ private object RecordingLessonReminderEmailClient : LessonReminderEmailClient {
     override fun send(command: LessonReminderEmailCommand) {
         sent += command
     }
+}
+
+private object RecordingScheduledLessonRegistrationGateway : RegistrationGateway {
+    val invites = mutableListOf<ManagedStudentInviteRequest>()
+
+    fun reset() {
+        invites.clear()
+    }
+
+    override fun start(request: StartRegistrationRequest, clientAddress: String?): RegistrationResponse =
+        RegistrationResponse(status = "CHECK_EMAIL")
+
+    override fun resend(request: ResendRegistrationRequest, clientAddress: String?): RegistrationResponse =
+        RegistrationResponse(status = "CHECK_EMAIL")
+
+    override fun confirm(request: ConfirmRegistrationRequest): RegistrationResponse =
+        RegistrationResponse(status = "CONFIRMED")
+
+    override fun forgotPassword(request: ForgotPasswordRequest, clientAddress: String?): RegistrationResponse =
+        RegistrationResponse(status = "CHECK_EMAIL")
+
+    override fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse =
+        RegistrationResponse(status = "PASSWORD_RESET")
+
+    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse =
+        ManagedStudentProvisionResponse(
+            subject = "managed-student-1",
+            email = request.email,
+            displayName = request.displayName,
+        )
+
+    override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse {
+        invites += request
+        return ManagedStudentInviteResponse(token = "invite-token-1", expiresAt = Instant.parse("2026-05-25T09:55:00Z"))
+    }
+
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
+        error("Student invite consume is not used in this test.")
 }

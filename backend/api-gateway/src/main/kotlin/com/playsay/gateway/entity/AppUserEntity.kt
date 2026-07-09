@@ -35,6 +35,10 @@ class AppUserEntity(
     var timezone: String? = null,
     @Column(name = "learning_goal", length = 500)
     var learningGoal: String? = null,
+    @Column(name = "managed_by_teacher", nullable = false)
+    var managedByTeacher: Boolean = false,
+    @Column(name = "managed_by_teacher_user_id")
+    var managedByTeacherUserId: UUID? = null,
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)

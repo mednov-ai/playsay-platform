@@ -11,6 +11,7 @@ import type {
   AdminUserProfile,
   Course,
   LessonMaterial,
+  ManagedStudentInput,
   MeProfile,
   ScheduledLesson,
   ScheduledLessonInput,
@@ -29,7 +30,9 @@ export function SchedulePanel({
   nowMs,
   onCancel,
   onComplete,
+  onCopyLinks,
   onCreate,
+  onCreateManagedStudent,
   onDelete,
   onJoin,
   onRefresh,
@@ -48,7 +51,9 @@ export function SchedulePanel({
   nowMs: number;
   onCancel: (lesson: ScheduledLesson) => void;
   onComplete: (lesson: ScheduledLesson) => void;
+  onCopyLinks: (lesson: ScheduledLesson) => Promise<boolean>;
   onCreate: (input: ScheduledLessonInput) => void;
+  onCreateManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   onDelete: (lessonId: string) => void;
   onJoin: (lesson: ScheduledLesson) => void;
   onRefresh: () => void;
@@ -64,17 +69,28 @@ export function SchedulePanel({
   const { archivedLessons, mainLessons } = splitScheduleLessonsForDashboard(scheduledLessons, nowMs);
   const [copiedLessonId, setCopiedLessonId] = useState<string | null>(null);
 
-  async function copyLessonLink(lessonId: string) {
-    const url = new URL(classroomPath(lessonId), window.location.origin).toString();
+  async function copyLessonLink(lesson: ScheduledLesson) {
+    if (canManage) {
+      if (await onCopyLinks(lesson)) {
+        markCopied(lesson.id);
+      }
+      return;
+    }
+
+    const url = new URL(classroomPath(lesson.id), window.location.origin).toString();
     try {
       await navigator.clipboard.writeText(url);
-      setCopiedLessonId(lessonId);
-      window.setTimeout(() => {
-        setCopiedLessonId((current) => (current === lessonId ? null : current));
-      }, 1800);
+      markCopied(lesson.id);
     } catch {
       window.prompt(t("schedule.clipboard.promptTitle"), url);
     }
+  }
+
+  function markCopied(lessonId: string) {
+    setCopiedLessonId(lessonId);
+    window.setTimeout(() => {
+      setCopiedLessonId((current) => (current === lessonId ? null : current));
+    }, 1800);
   }
 
   const renderLessonCard = (lesson: ScheduledLesson) => (
@@ -87,7 +103,7 @@ export function SchedulePanel({
       nowMs={nowMs}
       onCancel={() => onCancel(lesson)}
       onComplete={() => onComplete(lesson)}
-      onCopyLink={() => void copyLessonLink(lesson.id)}
+      onCopyLink={() => void copyLessonLink(lesson)}
       onDelete={() => onDelete(lesson.id)}
       onJoin={() => onJoin(lesson)}
       roomLoading={roomLoadingLessonId === lesson.id}
@@ -175,8 +191,11 @@ export function SchedulePanel({
               <ScheduleCreateForm
                 disabled={disabled}
                 lessonOptions={lessonOptions}
+                managedStudentLoading={loading}
+                managedStudentMessage={message}
                 materials={materials}
                 onCreate={onCreate}
+                onCreateManagedStudent={onCreateManagedStudent}
                 studentUsers={studentUsers}
               />
             </div>

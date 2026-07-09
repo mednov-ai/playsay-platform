@@ -89,6 +89,10 @@ export function clearTokens(): void {
   window.sessionStorage.removeItem(completedFlowStorageKey);
 }
 
+export function storeTokens(tokens: TokenSet): void {
+  window.sessionStorage.setItem(tokenStorageKey, JSON.stringify(tokens));
+}
+
 export async function startLogin(config = authConfig): Promise<void> {
   const redirectUri = getRedirectUri(config);
   const codeVerifier = createCodeVerifier();
@@ -214,7 +218,7 @@ export async function getValidAccessToken(config = authConfig): Promise<string |
   }
 
   const refreshed = await parseTokenResponse(response);
-  writeTokens(refreshed);
+  storeTokens(refreshed);
   return refreshed.accessToken;
 }
 
@@ -316,7 +320,7 @@ async function exchangeLoginCode(config: AuthConfig, code: string, state: string
 
   const tokens = await parseTokenResponse(response);
   window.sessionStorage.removeItem(flowStorageKey);
-  writeTokens(tokens);
+  storeTokens(tokens);
   writeCompletedLoginFlow({
     clientId: config.clientId,
     code,
@@ -357,10 +361,6 @@ function isCompletedLoginFlow(
     flow.redirectUri === getRedirectUri(config) &&
     flow.state === state
   );
-}
-
-function writeTokens(tokens: TokenSet): void {
-  window.sessionStorage.setItem(tokenStorageKey, JSON.stringify(tokens));
 }
 
 async function parseTokenResponse(response: Response): Promise<TokenSet> {

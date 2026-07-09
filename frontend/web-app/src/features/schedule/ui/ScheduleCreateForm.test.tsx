@@ -77,6 +77,31 @@ describe("ScheduleCreateForm", () => {
     expect(markup).toContain("Применить");
     expect(markup).toContain("Отмена");
   });
+
+  it("renders managed student creation inside the student picker", () => {
+    const markup = renderToStaticMarkup(
+      <AppProviders>
+        <ScheduleStudentPickerDialog
+          disabled={false}
+          draftSubjects={[]}
+          onApply={() => undefined}
+          onClose={() => undefined}
+          onCreateManagedStudent={() => Promise.resolve(null)}
+          onDraftSubjectsChange={() => undefined}
+          onSearchQueryChange={() => undefined}
+          open
+          searchQuery=""
+          studentUsers={[]}
+        />
+      </AppProviders>,
+    );
+
+    expect(markup).toContain('data-schedule-managed-student-form="true"');
+    expect(markup).toContain("Новый ученик");
+    expect(markup).toContain('type="email"');
+    expect(markup).toContain("Email ученика");
+    expect(markup).toContain("Имя ученика");
+  });
 });
 
 const lessonOptions: CourseLessonOption[] = [

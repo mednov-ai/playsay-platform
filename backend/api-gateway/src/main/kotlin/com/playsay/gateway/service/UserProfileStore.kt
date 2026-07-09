@@ -1,5 +1,6 @@
 package com.playsay.gateway.service
 
+import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.UpdateUserProfileRequest
 import com.playsay.gateway.dto.UserProfileResponse
 import com.playsay.gateway.entity.AppUserEntity
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class UserProfileStore(
     private val userRepo: AppUserRepo,
+    private val registrationGateway: RegistrationGateway,
 ) {
     @Transactional
     fun current(authentication: JwtAuthenticationToken): UserProfileResponse {
@@ -76,6 +78,32 @@ class UserProfileStore(
     fun listStudents(authentication: JwtAuthenticationToken): List<UserProfileResponse> {
         requireTeacherOrAdmin(authentication)
         return listStudentProfiles()
+    }
+
+    @Transactional
+    fun createManagedStudent(authentication: JwtAuthenticationToken, request: ManagedStudentRequest): UserProfileResponse {
+        requireTeacherOrAdmin(authentication)
+        val teacherUserId = currentUserId(authentication)
+        val provisioned = registrationGateway.createManagedStudent(request)
+        val now = Instant.now()
+        val existing = userRepo.findByKeycloakSubject(provisioned.subject)
+        val profile = existing ?: AppUserEntity(
+            id = UUID.randomUUID(),
+            keycloakSubject = provisioned.subject,
+            createdAt = now,
+        )
+
+        profile.username = provisioned.email
+        profile.email = provisioned.email
+        profile.name = provisioned.displayName
+        profile.roles = MetaData.Roles.STUDENT
+        profile.displayName = clean(provisioned.displayName ?: request.displayName, 120)
+        profile.countryCode = profile.countryCode ?: defaultCountryCode
+        profile.managedByTeacher = true
+        profile.managedByTeacherUserId = teacherUserId
+        profile.updatedAt = now
+
+        return saveProfile(profile).toResponse()
     }
 
     private fun listProfiles(): List<UserProfileResponse> =
@@ -203,6 +231,7 @@ private fun AppUserEntity.toResponse(): UserProfileResponse =
         timezone = timezone,
         learningGoal = learningGoal,
         updatedAt = updatedAt,
+        managedByTeacher = managedByTeacher,
     )
 
 private fun CurrentIdentity.defaultDisplayName(): String? =

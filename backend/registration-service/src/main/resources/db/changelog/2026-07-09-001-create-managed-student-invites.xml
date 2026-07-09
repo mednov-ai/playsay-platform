@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-09-001-create-managed-student-invites" author="codex">
+        <createTable tableName="managed_student_invites">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_managed_student_invites"/>
+            </column>
+            <column name="token_hash" type="VARCHAR(64)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_managed_student_invite_token_hash"/>
+            </column>
+            <column name="keycloak_subject" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="email_normalized" type="VARCHAR(320)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_name" type="VARCHAR(120)"/>
+            <column name="lesson_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="continue_url" type="VARCHAR(1024)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="consumed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="managed_student_invites" indexName="idx_managed_student_invite_subject">
+            <column name="keycloak_subject"/>
+            <column name="status"/>
+        </createIndex>
+        <createIndex tableName="managed_student_invites" indexName="idx_managed_student_invite_lesson">
+            <column name="lesson_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

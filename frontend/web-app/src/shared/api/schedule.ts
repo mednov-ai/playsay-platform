@@ -10,8 +10,8 @@ import {
 } from "../../generated/playsay-api";
 import { authConfig, clearTokens } from "./auth";
 import { apiErrorFromData } from "./errors";
-import { authorizedOptions } from "./http";
-import type { LiveKitRoomToken, ScheduledLesson, ScheduledLessonInput } from "./types";
+import { apiJson, authorizedOptions } from "./http";
+import type { LiveKitRoomToken, ScheduledLesson, ScheduledLessonInput, ScheduledLessonParticipantLinks } from "./types";
 
 export async function fetchScheduledLessons(config = authConfig): Promise<ScheduledLesson[]> {
   const response = await listScheduledLessons(await authorizedOptions(config));
@@ -117,4 +117,16 @@ export async function enterScheduledLessonRoom(lessonId: string, config = authCo
   }
 
   return response.data;
+}
+
+export async function createScheduledLessonParticipantLinks(
+  lessonId: string,
+  config = authConfig,
+): Promise<ScheduledLessonParticipantLinks> {
+  return apiJson<ScheduledLessonParticipantLinks>(
+    `/api/schedule/lessons/${encodeURIComponent(lessonId)}/participant-links`,
+    { method: "POST" },
+    config,
+    200,
+  );
 }

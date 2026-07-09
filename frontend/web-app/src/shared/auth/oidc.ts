@@ -13,6 +13,7 @@ export {
   skipSilentLoginOnce,
   startLogin,
   startSilentLogin,
+  storeTokens,
 } from "../api/auth";
 
 export type {

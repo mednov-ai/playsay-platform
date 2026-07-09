@@ -8,8 +8,8 @@ import {
 } from "../../generated/playsay-api";
 import { authConfig, clearTokens } from "./auth";
 import { apiErrorFromData } from "./errors";
-import { authorizedOptions } from "./http";
-import type { AdminUserProfile, AppUserProfile, MeProfile, UpdateUserProfileInput } from "./types";
+import { apiJson, authorizedOptions } from "./http";
+import type { AdminUserProfile, AppUserProfile, ManagedStudentInput, MeProfile, UpdateUserProfileInput } from "./types";
 
 export async function fetchMe(config = authConfig): Promise<MeProfile> {
   const response = await getMe(await authorizedOptions(config));
@@ -65,6 +65,21 @@ export async function fetchStudentProfiles(config = authConfig): Promise<AdminUs
   }
 
   return response.data;
+}
+
+export async function createManagedStudentProfile(
+  input: ManagedStudentInput,
+  config = authConfig,
+): Promise<AdminUserProfile> {
+  return apiJson<AdminUserProfile>(
+    "/api/students/managed",
+    {
+      body: JSON.stringify(input),
+      method: "POST",
+    },
+    config,
+    200,
+  );
 }
 
 export async function saveUserProfile(

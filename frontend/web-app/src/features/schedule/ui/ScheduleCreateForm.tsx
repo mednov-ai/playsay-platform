@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Minus, Plus, Search, Users, X } from "lucide-react";
+import { Loader2, Minus, Plus, Search, UserPlus, Users, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -19,20 +19,26 @@ import {
   type ScheduleFormState,
   weekdayFromLocalDate,
 } from "../../../entities/schedule/model";
-import type { AdminUserProfile, LessonMaterial, ScheduledLessonInput } from "../../../shared/api/playsay";
+import type { AdminUserProfile, LessonMaterial, ManagedStudentInput, ScheduledLessonInput } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function ScheduleCreateForm({
   disabled,
   lessonOptions,
+  managedStudentLoading = false,
+  managedStudentMessage = null,
   materials,
   onCreate,
+  onCreateManagedStudent,
   studentUsers,
 }: {
   disabled: boolean;
   lessonOptions: CourseLessonOption[];
+  managedStudentLoading?: boolean;
+  managedStudentMessage?: string | null;
   materials: LessonMaterial[];
   onCreate: (input: ScheduledLessonInput) => void;
+  onCreateManagedStudent?: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   studentUsers: AdminUserProfile[];
 }) {
   const { t } = useAppTranslation();
@@ -42,9 +48,10 @@ export function ScheduleCreateForm({
   const [draftStudentSubjects, setDraftStudentSubjects] = useState<string[]>([]);
   const materialOptions = materials.filter((material) => material.status !== "ARCHIVED");
   const selectedSubjects = selectedParticipantSubjects(form.participantSubjects);
+  const showStudentPicker = studentUsers.length > 0 || Boolean(onCreateManagedStudent);
   const showParallelAssignments = form.workMode === "PARALLEL" && selectedSubjects.length > 1;
   const selectedRecurrenceWeekdays = scheduleWeekdays.filter((weekday) => form.recurrenceWeekdays.includes(weekday));
-  const needsStudent = studentUsers.length > 0 && selectedSubjects.length === 0;
+  const needsStudent = showStudentPicker && selectedSubjects.length === 0;
   const recurrenceInvalid = !isWeeklyRecurrenceValid(form);
   const createDisabledReason = needsStudent ? "student" : recurrenceInvalid ? "recurrence" : disabled ? "busy" : null;
   const createDisabled = Boolean(createDisabledReason);
@@ -279,7 +286,7 @@ export function ScheduleCreateForm({
 
       <div className="playsay-schedule-create-main">
         <FormField label={t("schedule.form.students")}>
-          {studentUsers.length === 0 ? (
+          {!showStudentPicker ? (
             <input
               className="playsay-input"
               disabled={disabled}
@@ -400,8 +407,11 @@ export function ScheduleCreateForm({
       <ScheduleStudentPickerDialog
         disabled={disabled}
         draftSubjects={draftStudentSubjects}
+        managedStudentLoading={managedStudentLoading}
+        managedStudentMessage={managedStudentMessage}
         onApply={applyStudentPicker}
         onClose={() => setStudentPickerOpen(false)}
+        onCreateManagedStudent={onCreateManagedStudent}
         onDraftSubjectsChange={setDraftStudentSubjects}
         onSearchQueryChange={setStudentSearchQuery}
         open={studentPickerOpen}
@@ -616,8 +626,11 @@ export function ScheduleCreateForm({
 export function ScheduleStudentPickerDialog({
   disabled,
   draftSubjects,
+  managedStudentLoading = false,
+  managedStudentMessage = null,
   onApply,
   onClose,
+  onCreateManagedStudent,
   onDraftSubjectsChange,
   onSearchQueryChange,
   open,
@@ -626,8 +639,11 @@ export function ScheduleStudentPickerDialog({
 }: {
   disabled: boolean;
   draftSubjects: string[];
+  managedStudentLoading?: boolean;
+  managedStudentMessage?: string | null;
   onApply: () => void;
   onClose: () => void;
+  onCreateManagedStudent?: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   onDraftSubjectsChange: (subjects: string[]) => void;
   onSearchQueryChange: (query: string) => void;
   open: boolean;
@@ -636,6 +652,8 @@ export function ScheduleStudentPickerDialog({
 }) {
   const { t } = useAppTranslation();
   const visibleStudents = filterScheduleStudents(studentUsers, searchQuery);
+  const [managedStudentEmail, setManagedStudentEmail] = useState("");
+  const [managedStudentName, setManagedStudentName] = useState("");
 
   useEffect(() => {
     if (!open) {
@@ -661,6 +679,25 @@ export function ScheduleStudentPickerDialog({
       ? draftSubjects.filter((item) => item !== subject)
       : [...draftSubjects, subject];
     onDraftSubjectsChange(nextSubjects);
+  }
+
+  async function submitManagedStudent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!onCreateManagedStudent || managedStudentLoading) {
+      return;
+    }
+    const created = await onCreateManagedStudent({
+      displayName: managedStudentName.trim(),
+      email: managedStudentEmail.trim(),
+    });
+    if (!created) {
+      return;
+    }
+    if (!draftSubjects.includes(created.subject)) {
+      onDraftSubjectsChange([...draftSubjects, created.subject]);
+    }
+    setManagedStudentEmail("");
+    setManagedStudentName("");
   }
 
   return (
@@ -697,6 +734,52 @@ export function ScheduleStudentPickerDialog({
             value={searchQuery}
           />
         </label>
+
+        {onCreateManagedStudent ? (
+          <form
+            className="playsay-schedule-managed-student-form"
+            data-schedule-managed-student-form="true"
+            onSubmit={(event) => void submitManagedStudent(event)}
+          >
+            <h4>{t("schedule.form.createManagedStudentTitle")}</h4>
+            <div>
+              <label>
+                <span>{t("schedule.form.createManagedStudentEmail")}</span>
+                <input
+                  className="playsay-input"
+                  disabled={disabled || managedStudentLoading}
+                  maxLength={320}
+                  onChange={(event) => setManagedStudentEmail(event.target.value)}
+                  required
+                  type="email"
+                  value={managedStudentEmail}
+                />
+              </label>
+              <label>
+                <span>{t("schedule.form.createManagedStudentName")}</span>
+                <input
+                  className="playsay-input"
+                  disabled={disabled || managedStudentLoading}
+                  maxLength={120}
+                  onChange={(event) => setManagedStudentName(event.target.value)}
+                  required
+                  type="text"
+                  value={managedStudentName}
+                />
+              </label>
+            </div>
+            <div className="playsay-schedule-managed-student-actions">
+              {managedStudentMessage ? <p>{managedStudentMessage}</p> : null}
+              <Button
+                disabled={disabled || managedStudentLoading || !managedStudentEmail.trim() || !managedStudentName.trim()}
+                type="submit"
+              >
+                {managedStudentLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                {t("schedule.form.createManagedStudent")}
+              </Button>
+            </div>
+          </form>
+        ) : null}
 
         <div className="playsay-schedule-student-dialog-list">
           {visibleStudents.length === 0 ? (
@@ -741,14 +824,14 @@ function filterScheduleStudents(students: AdminUserProfile[], query: string): Ad
   }
 
   return students.filter((student) => (
-    [student.displayName, student.name, student.username, student.subject]
+    [student.displayName, student.name, student.username, student.email, student.subject]
       .filter(Boolean)
       .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery))
   ));
 }
 
 function studentLabel(student: AdminUserProfile | undefined): string | null {
-  return student?.displayName ?? student?.name ?? student?.username ?? student?.subject ?? null;
+  return student?.displayName ?? student?.name ?? student?.username ?? student?.email ?? student?.subject ?? null;
 }
 
 function buildParticipantAssignments(

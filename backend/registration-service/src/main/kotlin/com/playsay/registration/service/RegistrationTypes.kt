@@ -41,12 +41,54 @@ data class KeycloakUserCreateCommand(
     val displayName: String?,
     val enabled: Boolean,
     val emailVerified: Boolean,
+    val managedStudent: Boolean = false,
 )
 
 data class KeycloakRegistrationUser(
     val email: String,
     val enabled: Boolean,
     val emailVerified: Boolean,
+    val subject: String = email,
+    val managedStudent: Boolean = false,
+)
+
+data class ManagedStudentCommand(
+    val email: String,
+    val displayName: String,
+)
+
+data class ManagedStudentResult(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+)
+
+data class ManagedStudentInviteCommand(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+    val lessonId: java.util.UUID,
+    val continueUrl: String,
+)
+
+data class ManagedStudentInviteResult(
+    val token: String,
+    val expiresAt: java.time.Instant,
+)
+
+data class ConsumeStudentInviteResult(
+    val accessToken: String,
+    val refreshToken: String?,
+    val idToken: String?,
+    val expiresIn: Long,
+    val continueUrl: String,
+)
+
+data class KeycloakTokenSet(
+    val accessToken: String,
+    val refreshToken: String?,
+    val idToken: String?,
+    val expiresIn: Long,
 )
 
 interface KeycloakRegistrationClient {
@@ -59,6 +101,8 @@ interface KeycloakRegistrationClient {
     fun assignRealmRole(email: String, role: String)
 
     fun updatePassword(email: String, newPassword: String)
+
+    fun passwordGrant(email: String, password: String, clientId: String): KeycloakTokenSet
 }
 
 data class RegistrationEmailCommand(

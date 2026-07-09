@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import java.time.Instant
+import java.util.UUID
 
 data class StartRegistrationRequest(
     @field:Email
@@ -66,4 +68,55 @@ data class ResetPasswordRequest(
 data class RegistrationResponse(
     val status: String,
     val continueUrl: String? = null,
+)
+
+data class ManagedStudentRequest(
+    @field:Email
+    @field:NotBlank
+    @field:Size(max = 320)
+    val email: String,
+    @field:NotBlank
+    @field:Size(max = 120)
+    val displayName: String,
+)
+
+data class ManagedStudentResponse(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+)
+
+data class ManagedStudentInviteRequest(
+    @field:NotBlank
+    @field:Size(max = 255)
+    val subject: String,
+    @field:Email
+    @field:NotBlank
+    @field:Size(max = 320)
+    val email: String,
+    @field:Size(max = 120)
+    val displayName: String? = null,
+    val lessonId: UUID,
+    @field:NotBlank
+    @field:Size(max = 1024)
+    val continueUrl: String,
+)
+
+data class ManagedStudentInviteResponse(
+    val token: String,
+    val expiresAt: Instant,
+)
+
+data class ConsumeStudentInviteRequest(
+    @field:NotBlank
+    @field:Size(max = 255)
+    val token: String,
+)
+
+data class ConsumeStudentInviteResponse(
+    val accessToken: String,
+    val refreshToken: String?,
+    val idToken: String?,
+    val expiresIn: Long,
+    val continueUrl: String,
 )

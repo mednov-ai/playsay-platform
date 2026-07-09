@@ -12,6 +12,8 @@ import {
   type StartRegistrationRequest,
 } from "../../generated/registration-api";
 import { ApiError, isApiStatus } from "./errors";
+import { publicApiJson } from "./http";
+import type { StudentInviteConsumeResult } from "./types";
 
 export type RegistrationStartInput = StartRegistrationRequest;
 export type RegistrationResendInput = ResendRegistrationRequest;
@@ -58,6 +60,17 @@ export async function resetPasswordRequest(input: ResetPasswordInput): Promise<R
     throw registrationRequestError(response.status, `Password reset failed with HTTP ${response.status}.`);
   }
   return response.data;
+}
+
+export async function consumeStudentInviteRequest(token: string): Promise<StudentInviteConsumeResult> {
+  return publicApiJson<StudentInviteConsumeResult>(
+    "/api/student-invites/consume",
+    {
+      body: JSON.stringify({ token }),
+      method: "POST",
+    },
+    200,
+  );
 }
 
 export function isRegistrationRateLimitError(caught: unknown): boolean {

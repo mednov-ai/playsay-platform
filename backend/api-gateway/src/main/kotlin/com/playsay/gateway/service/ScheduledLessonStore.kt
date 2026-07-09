@@ -1,6 +1,7 @@
 package com.playsay.gateway.service
 
 import com.playsay.gateway.dto.ScheduledLessonParticipantResponse
+import com.playsay.gateway.dto.ScheduledLessonParticipantLinksResponse
 import com.playsay.gateway.dto.ScheduledLessonRequest
 import com.playsay.gateway.dto.ScheduledLessonResponse
 import com.playsay.gateway.entity.LessonEntity
@@ -33,6 +34,7 @@ class ScheduledLessonStore(
     private val appUserRepo: AppUserRepo,
     private val userProfileStore: UserProfileStore,
     private val lessonReminderService: LessonReminderService,
+    private val participantLinkService: ScheduledLessonParticipantLinkService,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional(readOnly = true)
@@ -204,6 +206,14 @@ class ScheduledLessonStore(
         return completed
     }
 
+    @Transactional
+    fun createParticipantLinks(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonParticipantLinksResponse {
+        authentication.requireScheduleManager()
+        val lesson = find(lessonId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        return participantLinkService.createLinks(lesson, participantsFor(listOf(lessonId)))
+    }
+
     private fun findVisible(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonRow? {
         val lesson = if (authentication.canManageSchedule()) {
             find(lessonId)
@@ -359,6 +369,7 @@ class ScheduledLessonStore(
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_ID_NOT_FOUND)
         }
     }
+
 }
 
 private data class ScheduledParticipant(

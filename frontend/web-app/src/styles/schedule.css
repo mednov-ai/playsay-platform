@@ -545,7 +545,7 @@
   display: grid;
   width: min(100%, 34rem);
   max-height: min(42rem, calc(100dvh - 2rem));
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: 0.8rem;
   border: 1px solid hsl(var(--border));
   border-radius: 1rem;
@@ -608,6 +608,54 @@
   outline: none;
 }
 
+.playsay-schedule-managed-student-form {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  background: hsl(var(--surface) / 0.78);
+  padding: 0.75rem;
+}
+
+.playsay-schedule-managed-student-form h4 {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-managed-student-form > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.6rem;
+}
+
+.playsay-schedule-managed-student-form label {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+  color: hsl(var(--foreground));
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.playsay-schedule-managed-student-form .playsay-input {
+  min-height: 2.35rem;
+}
+
+.playsay-schedule-managed-student-actions {
+  align-items: center;
+}
+
+.playsay-schedule-managed-student-actions p {
+  min-width: 0;
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
 .playsay-schedule-student-dialog-list {
   display: grid;
   min-height: 0;
@@ -661,6 +709,7 @@
 .dark .playsay-schedule-list-head > span,
 .dark .playsay-schedule-join-note,
 .dark .playsay-schedule-student-search,
+.dark .playsay-schedule-managed-student-form,
 .dark .playsay-schedule-student-option {
   background: hsl(var(--surface-strong));
 }
@@ -695,7 +744,8 @@
   .playsay-schedule-step-row,
   .playsay-schedule-time-grid,
   .playsay-schedule-recurrence-grid,
-  .playsay-schedule-weekly-grid {
+  .playsay-schedule-weekly-grid,
+  .playsay-schedule-managed-student-form > div {
     grid-template-columns: 1fr;
   }
 

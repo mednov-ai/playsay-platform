@@ -31,6 +31,28 @@ describe("ScheduledLessonCard", () => {
     expect(markup).not.toContain("Войти в урок");
     expect(markup).toContain("Откроется за 10 минут");
   });
+
+  it("labels the copy action as participant links for teachers", () => {
+    const markup = renderToStaticMarkup(
+      <AppProviders>
+        <ScheduledLessonCard
+          canManage
+          disabled={false}
+          lesson={lesson({})}
+          linkCopied={false}
+          nowMs={Date.parse("2026-05-28T10:00:00.000Z")}
+          onCancel={() => undefined}
+          onComplete={() => undefined}
+          onCopyLink={() => undefined}
+          onDelete={() => undefined}
+          onJoin={() => undefined}
+          roomLoading={false}
+        />
+      </AppProviders>,
+    );
+
+    expect(markup).toContain("Ссылки");
+  });
 });
 
 function lesson(patch: Partial<ScheduledLesson>): ScheduledLesson {

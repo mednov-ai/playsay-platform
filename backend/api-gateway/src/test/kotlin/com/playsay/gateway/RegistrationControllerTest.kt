@@ -3,10 +3,16 @@ package com.playsay.gateway
 import com.playsay.gateway.controller.RegistrationController
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
+import com.playsay.gateway.dto.ManagedStudentInviteRequest
+import com.playsay.gateway.dto.ManagedStudentInviteResponse
+import com.playsay.gateway.dto.ManagedStudentProvisionResponse
+import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.RegistrationResponse
 import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
+import com.playsay.gateway.dto.StudentInviteConsumeRequest
+import com.playsay.gateway.dto.StudentInviteConsumeResponse
 import com.playsay.gateway.service.RegistrationGateway
 import org.springframework.mock.web.MockHttpServletRequest
 import kotlin.test.Test
@@ -118,4 +124,13 @@ private class RecordingRegistrationGateway : RegistrationGateway {
         clientAddresses.add(clientAddress)
         return RegistrationResponse(status = "PASSWORD_RESET")
     }
+
+    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse =
+        error("Managed student creation is not used in this test.")
+
+    override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
+        error("Managed student invite creation is not used in this test.")
+
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
+        error("Student invite consume is not used in this test.")
 }

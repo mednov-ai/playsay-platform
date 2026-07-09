@@ -166,4 +166,25 @@ class ScheduledLessonController(
         @PathVariable lessonId: UUID,
     ): ScheduledLessonResponse =
         store.complete(authentication, lessonId)
+
+    @PostMapping("/schedule/lessons/{lessonId}/participant-links", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "createScheduledLessonParticipantLinks",
+        summary = "Create scheduled lesson participant links",
+        description = "Returns per-participant lesson links. Teacher-managed students receive one-time magic links. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Scheduled lesson participant links"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot manage schedule", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson not found", content = [Content()]),
+        ],
+    )
+    fun createParticipantLinks(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+    ): ScheduledLessonParticipantLinksResponse =
+        store.createParticipantLinks(authentication, lessonId)
 }

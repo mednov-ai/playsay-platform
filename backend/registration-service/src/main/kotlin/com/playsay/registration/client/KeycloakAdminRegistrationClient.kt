@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.playsay.registration.service.KeycloakRegistrationClient
 import com.playsay.registration.service.KeycloakRegistrationUser
+import com.playsay.registration.service.KeycloakTokenSet
 import com.playsay.registration.service.KeycloakUserCreateCommand
 import java.net.URI
 import java.net.URLEncoder
@@ -21,7 +22,7 @@ class KeycloakAdminRegistrationClient(
     private val clientSecret: String,
 ) : KeycloakRegistrationClient {
     override fun createDisabledUser(command: KeycloakUserCreateCommand): Boolean {
-        val payload = mapOf(
+        val payload = linkedMapOf<String, Any?>(
             "username" to command.email,
             "email" to command.email,
             "firstName" to command.displayName,
@@ -31,6 +32,9 @@ class KeycloakAdminRegistrationClient(
                 mapOf("type" to "password", "value" to command.password, "temporary" to false),
             ),
         )
+        if (command.managedStudent) {
+            payload["attributes"] = mapOf(managedStudentAttribute to listOf("true"))
+        }
         val response = sendAdmin(
             path = "/admin/realms/$realm/users",
             method = "POST",
@@ -46,9 +50,11 @@ class KeycloakAdminRegistrationClient(
     override fun findUserByEmail(email: String): KeycloakRegistrationUser? =
         userByEmail(email)?.let { user ->
             KeycloakRegistrationUser(
+                subject = user.requiredText("id"),
                 email = user.get("email")?.asText()?.takeIf { it.isNotBlank() } ?: email,
                 enabled = user.get("enabled")?.asBoolean(false) ?: false,
                 emailVerified = user.get("emailVerified")?.asBoolean(false) ?: false,
+                managedStudent = user.managedStudent(),
             )
         }
 
@@ -86,6 +92,29 @@ class KeycloakAdminRegistrationClient(
         require(response.statusCode() in 200..299) { "Keycloak password reset failed with HTTP ${response.statusCode()}" }
     }
 
+    override fun passwordGrant(email: String, password: String, clientId: String): KeycloakTokenSet {
+        val body = listOf(
+            "grant_type" to "password",
+            "client_id" to clientId,
+            "username" to email,
+            "password" to password,
+            "scope" to "openid profile email",
+        ).joinToString("&") { (key, value) -> "${key.urlEncoded()}=${value.urlEncoded()}" }
+        val request = HttpRequest.newBuilder(URI.create("${keycloakBaseUrl.trimEnd('/')}/realms/$realm/protocol/openid-connect/token"))
+            .header("content-type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        require(response.statusCode() in 200..299) { "Keycloak password grant failed with HTTP ${response.statusCode()}" }
+        val token = objectMapper.readTree(response.body())
+        return KeycloakTokenSet(
+            accessToken = token.requiredText("access_token"),
+            refreshToken = token.get("refresh_token")?.asText()?.takeIf { it.isNotBlank() },
+            idToken = token.get("id_token")?.asText()?.takeIf { it.isNotBlank() },
+            expiresIn = token.get("expires_in")?.asLong() ?: 0,
+        )
+    }
+
     private fun userIdByEmail(email: String): String {
         return userByEmail(email)?.get("id")?.asText()
             ?: error("Keycloak user not found for registration email.")
@@ -93,7 +122,7 @@ class KeycloakAdminRegistrationClient(
 
     private fun userByEmail(email: String): JsonNode? {
         val response = sendAdmin(
-            path = "/admin/realms/$realm/users?email=${email.urlEncoded()}&exact=true",
+            path = "/admin/realms/$realm/users?email=${email.urlEncoded()}&exact=true&briefRepresentation=false",
             method = "GET",
         )
         require(response.statusCode() in 200..299) { "Keycloak user lookup failed with HTTP ${response.statusCode()}" }
@@ -132,6 +161,21 @@ class KeycloakAdminRegistrationClient(
     private fun JsonNode.requiredText(field: String): String =
         get(field)?.asText()?.takeIf { it.isNotBlank() } ?: error("Keycloak response missing $field")
 
+    private fun JsonNode.managedStudent(): Boolean =
+        get("attributes")
+            ?.get(managedStudentAttribute)
+            ?.let { values ->
+                when {
+                    values.isArray -> values.any { value -> value.asText() == "true" }
+                    else -> values.asText() == "true"
+                }
+            }
+            ?: false
+
     private fun String.urlEncoded(): String =
         URLEncoder.encode(this, StandardCharsets.UTF_8)
+
+    private companion object {
+        const val managedStudentAttribute = "playsay_managed_student"
+    }
 }

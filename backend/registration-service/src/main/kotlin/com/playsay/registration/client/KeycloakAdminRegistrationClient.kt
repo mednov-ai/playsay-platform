@@ -22,15 +22,18 @@ class KeycloakAdminRegistrationClient(
     private val clientSecret: String,
 ) : KeycloakRegistrationClient {
     override fun createDisabledUser(command: KeycloakUserCreateCommand): Boolean {
+        val profileName = keycloakProfileName(command.email, command.displayName)
         val payload = linkedMapOf<String, Any?>(
             "username" to command.email,
             "email" to command.email,
-            "firstName" to command.displayName,
+            "firstName" to profileName.firstName,
+            "lastName" to profileName.lastName,
             "enabled" to command.enabled,
             "emailVerified" to command.emailVerified,
             "credentials" to listOf(
                 mapOf("type" to "password", "value" to command.password, "temporary" to false),
             ),
+            "requiredActions" to emptyList<String>(),
         )
         if (command.managedStudent) {
             payload["attributes"] = mapOf(managedStudentAttribute to listOf("true"))
@@ -175,7 +178,27 @@ class KeycloakAdminRegistrationClient(
     private fun String.urlEncoded(): String =
         URLEncoder.encode(this, StandardCharsets.UTF_8)
 
+    private fun keycloakProfileName(email: String, displayName: String?): KeycloakProfileName {
+        val fallbackName = email.substringBefore("@").takeIf { it.isNotBlank() } ?: "student"
+        val normalized = displayName
+            ?.trim()
+            ?.replace(Regex("\\s+"), " ")
+            ?.takeIf { it.isNotBlank() }
+            ?: fallbackName
+        val parts = normalized.split(" ", limit = 2)
+        return KeycloakProfileName(
+            firstName = parts.first().take(keycloakNameMaxLength),
+            lastName = (parts.getOrNull(1)?.takeIf { it.isNotBlank() } ?: "-").take(keycloakNameMaxLength),
+        )
+    }
+
+    private data class KeycloakProfileName(
+        val firstName: String,
+        val lastName: String,
+    )
+
     private companion object {
         const val managedStudentAttribute = "playsay_managed_student"
+        const val keycloakNameMaxLength = 255
     }
 }

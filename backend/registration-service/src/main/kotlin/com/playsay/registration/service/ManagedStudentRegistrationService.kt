@@ -103,7 +103,7 @@ class ManagedStudentRegistrationService(
 
     @Transactional(readOnly = true)
     fun lookupManagedStudentInvite(token: String, remoteAddress: String? = null): ManagedStudentInviteLookupResult {
-        val invite = resolvePendingInvite(token, remoteAddress)
+        val invite = resolvePendingInvite(token, remoteAddress, lockForUpdate = false)
         return ManagedStudentInviteLookupResult(
             subject = invite.keycloakSubject,
             email = invite.emailNormalized,
@@ -116,7 +116,7 @@ class ManagedStudentRegistrationService(
 
     @Transactional
     fun consumeManagedStudentInvite(token: String, remoteAddress: String? = null): ConsumeStudentInviteResult {
-        val invite = resolvePendingInvite(token, remoteAddress)
+        val invite = resolvePendingInvite(token, remoteAddress, lockForUpdate = true)
         val now = Instant.now(clock)
 
         if (invite.createdAt.plusSeconds(inviteRetentionDays.coerceAtLeast(1) * secondsPerDay).isBefore(now)) {
@@ -145,12 +145,16 @@ class ManagedStudentRegistrationService(
         )
     }
 
-    private fun resolvePendingInvite(token: String, remoteAddress: String?): ManagedStudentInviteEntity {
+    private fun resolvePendingInvite(
+        token: String,
+        remoteAddress: String?,
+        lockForUpdate: Boolean,
+    ): ManagedStudentInviteEntity {
         val submittedToken = token.trim()
         val normalizedToken = tokenService.normalizeStudentInviteCode(submittedToken)
         rateLimiter.check("student-invite:$normalizedToken", remoteAddress)
-        return pendingInviteByToken(normalizedToken)
-            ?: submittedToken.takeIf { it != normalizedToken }?.let(::pendingInviteByToken)
+        return pendingInviteByToken(normalizedToken, lockForUpdate)
+            ?: submittedToken.takeIf { it != normalizedToken }?.let { pendingInviteByToken(it, lockForUpdate) }
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid student invite token.")
     }
 
@@ -164,11 +168,14 @@ class ManagedStudentRegistrationService(
         throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not allocate invite code.")
     }
 
-    private fun pendingInviteByToken(token: String): ManagedStudentInviteEntity? =
-        managedStudentInviteRepo.findByTokenHashAndStatus(
-            tokenService.hash(token),
-            managedInviteStatusPending,
-        )
+    private fun pendingInviteByToken(token: String, lockForUpdate: Boolean): ManagedStudentInviteEntity? {
+        val tokenHash = tokenService.hash(token)
+        return if (lockForUpdate) {
+            managedStudentInviteRepo.findByTokenHashAndStatus(tokenHash, managedInviteStatusPending)
+        } else {
+            managedStudentInviteRepo.findPendingLookupByTokenHashAndStatus(tokenHash, managedInviteStatusPending)
+        }
+    }
 
     private fun newManagedStudentPassword(): String =
         "Aa1!${tokenService.newToken()}"

@@ -4,6 +4,7 @@ import com.playsay.registration.service.KeycloakRegistrationClient
 import com.playsay.registration.service.KeycloakRegistrationUser
 import com.playsay.registration.service.KeycloakTokenSet
 import com.playsay.registration.service.KeycloakUserCreateCommand
+import com.playsay.registration.repo.ManagedStudentInviteRepo
 import com.playsay.registration.repo.PendingRegistrationRepo
 import com.playsay.registration.service.RegistrationEmailClient
 import com.playsay.registration.service.RegistrationEmailCommand
@@ -20,6 +21,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import liquibase.integration.spring.SpringLiquibase
+import org.springframework.data.jpa.repository.Lock
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
@@ -186,6 +188,17 @@ class RegistrationControllerTest @Autowired constructor(
         assertTrue(lookup.body().contains(continueUrl))
         assertEquals(HttpStatus.OK.value(), consumed.statusCode(), consumed.body())
         assertTrue(consumed.body().contains("access-token-lookup"))
+    }
+
+    @Test
+    fun `managed student invite lookup repository query does not require a write lock`() {
+        val lookupMethod = ManagedStudentInviteRepo::class.java.getMethod(
+            "findPendingLookupByTokenHashAndStatus",
+            String::class.java,
+            String::class.java,
+        )
+
+        assertEquals(null, lookupMethod.getAnnotation(Lock::class.java))
     }
 
     @Test

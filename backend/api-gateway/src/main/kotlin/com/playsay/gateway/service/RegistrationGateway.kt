@@ -6,6 +6,7 @@ import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
 import com.playsay.gateway.dto.ManagedStudentInviteRequest
 import com.playsay.gateway.dto.ManagedStudentInviteResponse
+import com.playsay.gateway.dto.ManagedStudentInviteLookupResponse
 import com.playsay.gateway.dto.ManagedStudentProvisionResponse
 import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.RegistrationResponse
@@ -35,6 +36,7 @@ interface RegistrationGateway {
     fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse
     fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse
     fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse
+    fun lookupManagedStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): ManagedStudentInviteLookupResponse
     fun consumeStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): StudentInviteConsumeResponse
 }
 
@@ -68,6 +70,18 @@ class HttpRegistrationGateway(
 
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
         postJson("/api/internal/managed-student-invites", request, HttpStatus.CREATED, ManagedStudentInviteResponse::class.java)
+
+    override fun lookupManagedStudentInvite(
+        request: StudentInviteConsumeRequest,
+        clientAddress: String?,
+    ): ManagedStudentInviteLookupResponse =
+        postJson(
+            "/api/internal/managed-student-invites/lookup",
+            request,
+            HttpStatus.OK,
+            ManagedStudentInviteLookupResponse::class.java,
+            clientAddress,
+        )
 
     override fun consumeStudentInvite(
         request: StudentInviteConsumeRequest,

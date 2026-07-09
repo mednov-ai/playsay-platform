@@ -34,6 +34,7 @@ playsay:
   registration:
     public-base-url: ${PLAYSAY_REGISTRATION_PUBLIC_BASE_URL:https://online.play-and-say.ru}
     token-ttl-hours: ${PLAYSAY_REGISTRATION_TOKEN_TTL_HOURS:24}
+    managed-student-invite-retention-days: ${PLAYSAY_REGISTRATION_MANAGED_STUDENT_INVITE_RETENTION_DAYS:30}
     resend-cooldown-seconds: ${PLAYSAY_REGISTRATION_RESEND_COOLDOWN_SECONDS:300}
     password-reset-code-ttl-minutes: ${PLAYSAY_REGISTRATION_PASSWORD_RESET_CODE_TTL_MINUTES:15}
     password-reset-max-attempts: ${PLAYSAY_REGISTRATION_PASSWORD_RESET_MAX_ATTEMPTS:5}

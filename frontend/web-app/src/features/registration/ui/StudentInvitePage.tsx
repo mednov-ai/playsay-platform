@@ -1,4 +1,4 @@
-import { CheckCircle2, KeyRound, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock3, KeyRound, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAppTheme } from "../../../app/AppProviders";
 import { Button } from "../../../components/ui/button";
@@ -17,9 +17,10 @@ export function StudentInvitePage() {
   const { t } = useAppTranslation();
   const theme = useAppTheme();
   const [token] = useState(() => studentInviteTokenFromLocation(window.location));
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "waiting" | "success" | "error">("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [continueUrl, setContinueUrl] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!token) {
@@ -33,6 +34,19 @@ export function StudentInvitePage() {
     void consumeStudentInviteOnce(token)
       .then((result) => {
         if (cancelled) {
+          return;
+        }
+        if (result.status === "WAITING") {
+          const opensAt = new Date(result.opensAt);
+          setStatus("waiting");
+          setMessage(t("registration.studentInvite.waiting", { time: formatLessonTime(opensAt) }));
+          const retryDelay = Math.max(1000, Math.min((result.retryAfterSeconds ?? 60) * 1000, 60_000));
+          window.setTimeout(() => {
+            if (!cancelled) {
+              setStatus("loading");
+              setAttempt((value) => value + 1);
+            }
+          }, retryDelay);
           return;
         }
         storeTokens({
@@ -58,7 +72,7 @@ export function StudentInvitePage() {
     return () => {
       cancelled = true;
     };
-  }, [t, token]);
+  }, [attempt, t, token]);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -75,7 +89,13 @@ export function StudentInvitePage() {
           <div className="rounded-[1.5rem] border border-border bg-background/85 p-5 shadow-sm sm:p-7">
             <div className="flex items-center gap-3 border-b border-border pb-5">
               <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
-                {status === "success" ? <CheckCircle2 className="h-5 w-5" /> : <KeyRound className="h-5 w-5" />}
+                {status === "success" ? (
+                  <CheckCircle2 className="h-5 w-5" />
+                ) : status === "waiting" ? (
+                  <Clock3 className="h-5 w-5" />
+                ) : (
+                  <KeyRound className="h-5 w-5" />
+                )}
               </span>
               <div>
                 <h1 className="text-2xl font-extrabold">{t("registration.studentInvite.title")}</h1>
@@ -92,6 +112,14 @@ export function StudentInvitePage() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   {t("registration.studentInvite.loading")}
                 </div>
+              ) : null}
+              {status === "waiting" ? (
+                <Button onClick={() => {
+                  setStatus("loading");
+                  setAttempt((value) => value + 1);
+                }} type="button" variant="outline">
+                  {t("registration.studentInvite.retry")}
+                </Button>
               ) : null}
               {status === "success" && continueUrl ? (
                 <Button onClick={() => window.location.assign(resolveContinueUrl(continueUrl))} type="button">
@@ -129,4 +157,14 @@ function resolveContinueUrl(value: string): string {
   } catch {
     return "/";
   }
+}
+
+function formatLessonTime(value: Date): string {
+  if (Number.isNaN(value.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(value);
 }

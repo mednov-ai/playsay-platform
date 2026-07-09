@@ -48,6 +48,8 @@ export const de = {
       title: "Zugang zur Stunde",
       subtitle: "Schülerzugang zum Online-Klassenraum wird vorbereitet.",
       loading: "Stunde wird geöffnet...",
+      waiting: "Der Link funktioniert. Der Zugang öffnet um {{time}}.",
+      retry: "Erneut prüfen",
       success: "Zugang ist bereit. Weiterleitung zur Stunde.",
       failed: "Der Stundenlink konnte nicht geöffnet werden. Bitten Sie die Lehrkraft um einen neuen Link.",
       missingToken: "Der Zugangslink enthält keinen Token.",

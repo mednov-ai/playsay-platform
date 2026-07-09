@@ -107,6 +107,15 @@ data class ManagedStudentInviteResponse(
     val expiresAt: Instant,
 )
 
+data class ManagedStudentInviteLookupResponse(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+    val lessonId: UUID,
+    val continueUrl: String,
+    val expiresAt: Instant,
+)
+
 data class ConsumeStudentInviteRequest(
     @field:NotBlank
     @field:Size(max = 255)

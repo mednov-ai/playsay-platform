@@ -4,6 +4,7 @@ import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
 import com.playsay.gateway.dto.ManagedStudentInviteRequest
 import com.playsay.gateway.dto.ManagedStudentInviteResponse
+import com.playsay.gateway.dto.ManagedStudentInviteLookupResponse
 import com.playsay.gateway.dto.ManagedStudentProvisionResponse
 import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.RegistrationResponse
@@ -132,8 +133,15 @@ private class AnonymousRegistrationGateway : RegistrationGateway {
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
         ManagedStudentInviteResponse(token = "student-invite-token", expiresAt = Instant.parse("2026-07-09T12:00:00Z"))
 
+    override fun lookupManagedStudentInvite(
+        request: StudentInviteConsumeRequest,
+        clientAddress: String?,
+    ): ManagedStudentInviteLookupResponse =
+        error("Student invite lookup is not used in this test.")
+
     override fun consumeStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): StudentInviteConsumeResponse =
         StudentInviteConsumeResponse(
+            status = "AUTHENTICATED",
             accessToken = "access-token",
             refreshToken = "refresh-token",
             idToken = "id-token",

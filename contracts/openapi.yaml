@@ -4109,8 +4109,12 @@ components:
     StudentInviteConsumeResponse:
       type: object
       properties:
-        accessToken:
+        status:
           type: string
+        accessToken:
+          type:
+          - string
+          - "null"
         refreshToken:
           type:
           - string
@@ -4120,14 +4124,36 @@ components:
           - string
           - "null"
         expiresIn:
-          type: integer
+          type:
+          - integer
+          - "null"
           format: int64
         continueUrl:
-          type: string
+          type:
+          - string
+          - "null"
+        opensAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        scheduledStart:
+          type:
+          - string
+          - "null"
+          format: date-time
+        scheduledEnd:
+          type:
+          - string
+          - "null"
+          format: date-time
+        retryAfterSeconds:
+          type:
+          - integer
+          - "null"
+          format: int64
       required:
-      - accessToken
-      - continueUrl
-      - expiresIn
+      - status
     StartRegistrationRequest:
       type: object
       properties:

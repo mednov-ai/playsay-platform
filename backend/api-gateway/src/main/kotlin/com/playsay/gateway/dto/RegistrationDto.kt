@@ -87,6 +87,15 @@ data class ManagedStudentInviteResponse(
     val expiresAt: Instant,
 )
 
+data class ManagedStudentInviteLookupResponse(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+    val lessonId: UUID,
+    val continueUrl: String,
+    val expiresAt: Instant? = null,
+)
+
 data class StudentInviteConsumeRequest(
     @field:NotBlank
     @field:Size(max = 255)
@@ -94,9 +103,14 @@ data class StudentInviteConsumeRequest(
 )
 
 data class StudentInviteConsumeResponse(
-    val accessToken: String,
-    val refreshToken: String?,
-    val idToken: String?,
-    val expiresIn: Long,
-    val continueUrl: String,
+    val status: String = "AUTHENTICATED",
+    val accessToken: String? = null,
+    val refreshToken: String? = null,
+    val idToken: String? = null,
+    val expiresIn: Long? = null,
+    val continueUrl: String? = null,
+    val opensAt: Instant? = null,
+    val scheduledStart: Instant? = null,
+    val scheduledEnd: Instant? = null,
+    val retryAfterSeconds: Long? = null,
 )

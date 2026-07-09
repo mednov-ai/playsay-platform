@@ -73,13 +73,23 @@ export type ScheduledLessonInput = ScheduledLessonRequest & {
   recurrence?: ScheduledLessonRecurrenceInput | null;
 };
 export type LiveKitRoomToken = LiveKitRoomTokenResponse;
-export type StudentInviteConsumeResult = {
+export type StudentInviteAuthenticatedResult = {
+  status?: "AUTHENTICATED";
   accessToken: string;
   refreshToken?: string | null;
   idToken?: string | null;
   expiresIn: number;
   continueUrl: string;
 };
+export type StudentInviteWaitingResult = {
+  status: "WAITING";
+  opensAt: string;
+  scheduledStart?: string | null;
+  scheduledEnd?: string | null;
+  retryAfterSeconds?: number | null;
+  continueUrl?: string | null;
+};
+export type StudentInviteConsumeResult = StudentInviteAuthenticatedResult | StudentInviteWaitingResult;
 export type LessonMaterialJson = Record<string, unknown>;
 export type LessonMaterial = {
   id: string;

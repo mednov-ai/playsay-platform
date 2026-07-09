@@ -925,13 +925,25 @@ export interface StudentInviteConsumeRequest {
 }
 
 export interface StudentInviteConsumeResponse {
-  accessToken: string;
+  status: string;
+  /** @nullable */
+  accessToken?: string | null;
   /** @nullable */
   refreshToken?: string | null;
   /** @nullable */
   idToken?: string | null;
-  expiresIn: number;
-  continueUrl: string;
+  /** @nullable */
+  expiresIn?: number | null;
+  /** @nullable */
+  continueUrl?: string | null;
+  /** @nullable */
+  opensAt?: string | null;
+  /** @nullable */
+  scheduledStart?: string | null;
+  /** @nullable */
+  scheduledEnd?: string | null;
+  /** @nullable */
+  retryAfterSeconds?: number | null;
 }
 
 export interface StartRegistrationRequest {

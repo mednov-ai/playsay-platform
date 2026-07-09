@@ -2,6 +2,7 @@ package com.playsay.registration.controller
 
 import com.playsay.registration.dto.ConsumeStudentInviteRequest
 import com.playsay.registration.dto.ConsumeStudentInviteResponse
+import com.playsay.registration.dto.ManagedStudentInviteLookupResponse
 import com.playsay.registration.dto.ManagedStudentInviteRequest
 import com.playsay.registration.dto.ManagedStudentInviteResponse
 import com.playsay.registration.dto.ManagedStudentRequest
@@ -61,6 +62,29 @@ class ManagedStudentController(
             ),
         )
         return ManagedStudentInviteResponse(token = result.token, expiresAt = result.expiresAt)
+    }
+
+    @PostMapping(
+        "/api/internal/managed-student-invites/lookup",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    fun lookupManagedStudentInvite(
+        @Valid @RequestBody request: ConsumeStudentInviteRequest,
+        servletRequest: HttpServletRequest,
+    ): ManagedStudentInviteLookupResponse {
+        val result = registrationService.lookupManagedStudentInvite(
+            request.token,
+            clientIpResolver.resolve(servletRequest),
+        )
+        return ManagedStudentInviteLookupResponse(
+            subject = result.subject,
+            email = result.email,
+            displayName = result.displayName,
+            lessonId = result.lessonId,
+            continueUrl = result.continueUrl,
+            expiresAt = result.expiresAt,
+        )
     }
 
     @PostMapping(

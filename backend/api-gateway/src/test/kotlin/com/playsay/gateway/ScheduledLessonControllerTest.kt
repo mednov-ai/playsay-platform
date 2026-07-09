@@ -61,6 +61,7 @@ import liquibase.integration.spring.SpringLiquibase
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ScheduledLessonControllerTest @Autowired constructor(
     private val scheduleController: ScheduledLessonController,
+    private val studentInviteController: StudentInviteController,
     private val liveKitRoomController: LiveKitRoomController,
     private val liveKitWebhookController: LiveKitWebhookController,
     private val courseController: CourseController,
@@ -174,6 +175,75 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(lesson.id, RecordingScheduledLessonRegistrationGateway.invites.single().lessonId)
         assertEquals("managed-student-1", RecordingScheduledLessonRegistrationGateway.invites.single().subject)
         assertTrue(RecordingScheduledLessonRegistrationGateway.invites.single().continueUrl.endsWith("/lessons/${lesson.id}/classroom"))
+    }
+
+    @Test
+    fun `student invite waits before lesson access window without consuming registration invite`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentSubject = "managed-student-1"
+        userProfileStore.currentUserId(authentication(subject = studentSubject, username = "managed.one", role = "ROLE_STUDENT"))
+        val scheduledStart = Instant.now().plus(Duration.ofMinutes(20))
+        val scheduledEnd = scheduledStart.plus(Duration.ofMinutes(45))
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = scheduledStart,
+                scheduledEnd = scheduledEnd,
+                participantSubjects = listOf(studentSubject),
+            ),
+        ).body!!
+        RecordingScheduledLessonRegistrationGateway.lookupResponse = ManagedStudentInviteLookupResponse(
+            subject = studentSubject,
+            email = "managed@example.com",
+            displayName = "Managed Student",
+            lessonId = lesson.id,
+            continueUrl = "https://online.play-and-say.ru/lessons/${lesson.id}/classroom",
+        )
+
+        val response = studentInviteController.consume(
+            StudentInviteConsumeRequest(token = "A7K2Q9"),
+            jakarta.servlet.http.HttpServletRequestWrapper(org.springframework.mock.web.MockHttpServletRequest()),
+        )
+
+        assertEquals("WAITING", response.status)
+        assertEquals(scheduledStart.minusSeconds(LESSON_ACCESS_GRACE_SECONDS), response.opensAt)
+        assertEquals(scheduledStart, response.scheduledStart)
+        assertEquals(scheduledEnd, response.scheduledEnd)
+        assertTrue((response.retryAfterSeconds ?: 0) > 0)
+        assertEquals(listOf("A7K2Q9"), RecordingScheduledLessonRegistrationGateway.lookups.map { it.token })
+        assertTrue(RecordingScheduledLessonRegistrationGateway.consumes.isEmpty())
+    }
+
+    @Test
+    fun `student invite authenticates inside current lesson access window`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentSubject = "managed-student-1"
+        userProfileStore.currentUserId(authentication(subject = studentSubject, username = "managed.one", role = "ROLE_STUDENT"))
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.now().plus(Duration.ofMinutes(5)),
+                scheduledEnd = Instant.now().plus(Duration.ofMinutes(50)),
+                participantSubjects = listOf(studentSubject),
+            ),
+        ).body!!
+        RecordingScheduledLessonRegistrationGateway.lookupResponse = ManagedStudentInviteLookupResponse(
+            subject = studentSubject,
+            email = "managed@example.com",
+            displayName = "Managed Student",
+            lessonId = lesson.id,
+            continueUrl = "https://online.play-and-say.ru/lessons/${lesson.id}/classroom",
+        )
+
+        val response = studentInviteController.consume(
+            StudentInviteConsumeRequest(token = "A7K2Q9"),
+            jakarta.servlet.http.HttpServletRequestWrapper(org.springframework.mock.web.MockHttpServletRequest()),
+        )
+
+        assertEquals("AUTHENTICATED", response.status)
+        assertEquals("access-token", response.accessToken)
+        assertEquals(listOf("A7K2Q9"), RecordingScheduledLessonRegistrationGateway.lookups.map { it.token })
+        assertEquals(listOf("A7K2Q9"), RecordingScheduledLessonRegistrationGateway.consumes.map { it.token })
     }
 
     @Test
@@ -977,9 +1047,15 @@ private object RecordingLessonReminderEmailClient : LessonReminderEmailClient {
 
 private object RecordingScheduledLessonRegistrationGateway : RegistrationGateway {
     val invites = mutableListOf<ManagedStudentInviteRequest>()
+    val lookups = mutableListOf<StudentInviteConsumeRequest>()
+    val consumes = mutableListOf<StudentInviteConsumeRequest>()
+    var lookupResponse: ManagedStudentInviteLookupResponse? = null
 
     fun reset() {
         invites.clear()
+        lookups.clear()
+        consumes.clear()
+        lookupResponse = null
     }
 
     override fun start(request: StartRegistrationRequest, clientAddress: String?): RegistrationResponse =
@@ -1009,6 +1085,23 @@ private object RecordingScheduledLessonRegistrationGateway : RegistrationGateway
         return ManagedStudentInviteResponse(token = "A7K2Q9", expiresAt = Instant.parse("2026-05-25T09:55:00Z"))
     }
 
-    override fun consumeStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): StudentInviteConsumeResponse =
-        error("Student invite consume is not used in this test.")
+    override fun lookupManagedStudentInvite(
+        request: StudentInviteConsumeRequest,
+        clientAddress: String?,
+    ): ManagedStudentInviteLookupResponse {
+        lookups += request
+        return lookupResponse ?: error("Student invite lookup response was not configured.")
+    }
+
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): StudentInviteConsumeResponse {
+        consumes += request
+        return StudentInviteConsumeResponse(
+            status = "AUTHENTICATED",
+            accessToken = "access-token",
+            refreshToken = "refresh-token",
+            idToken = "id-token",
+            expiresIn = 300,
+            continueUrl = "/lessons/lesson-id/classroom",
+        )
+    }
 }

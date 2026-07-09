@@ -2,7 +2,7 @@ package com.playsay.gateway.controller
 
 import com.playsay.gateway.dto.StudentInviteConsumeRequest
 import com.playsay.gateway.dto.StudentInviteConsumeResponse
-import com.playsay.gateway.service.RegistrationGateway
+import com.playsay.gateway.service.StudentInviteService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.MediaType
@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 class StudentInviteController(
-    private val registrationGateway: RegistrationGateway,
+    private val studentInviteService: StudentInviteService,
 ) {
     @PostMapping(
         path = ["/student-invites/consume", "/api/student-invites/consume"],
@@ -23,7 +23,7 @@ class StudentInviteController(
         @Valid @RequestBody request: StudentInviteConsumeRequest,
         servletRequest: HttpServletRequest,
     ): StudentInviteConsumeResponse =
-        registrationGateway.consumeStudentInvite(request, clientAddress(servletRequest))
+        studentInviteService.consume(request, clientAddress(servletRequest))
 
     private fun clientAddress(request: HttpServletRequest): String? =
         firstForwardedAddress(request.getHeader(xForwardedForHeader))

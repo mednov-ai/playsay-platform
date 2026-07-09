@@ -48,7 +48,7 @@ class ScheduledLessonParticipantLinkService(
                         displayName = displayName,
                         email = user.email,
                         url = inviteUrl(invite.token),
-                        expiresAt = invite.expiresAt,
+                        expiresAt = lesson.scheduledEnd?.plusSeconds(LESSON_ACCESS_GRACE_SECONDS) ?: invite.expiresAt,
                         mode = participantLinkModeMagic,
                     )
                 } else {

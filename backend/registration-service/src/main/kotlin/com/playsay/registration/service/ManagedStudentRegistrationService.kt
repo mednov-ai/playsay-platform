@@ -18,7 +18,7 @@ class ManagedStudentRegistrationService(
     private val tokenService: RegistrationTokenService,
     private val rateLimiter: InMemoryRegistrationRateLimiter,
     private val clock: Clock,
-    @param:Value("\${playsay.registration.token-ttl-hours}") private val tokenTtlHours: Long,
+    @param:Value("\${playsay.registration.managed-student-invite-retention-days:30}") private val inviteRetentionDays: Long,
     @param:Value("\${playsay.registration.keycloak.student-token-client-id:playsay-web}") private val studentTokenClientId: String,
 ) {
     private val returnToPolicy = ReturnToUrlPolicy()
@@ -93,7 +93,7 @@ class ManagedStudentRegistrationService(
             lessonId = command.lessonId,
             continueUrl = continueUrl,
             status = managedInviteStatusPending,
-            expiresAt = now.plusSeconds(tokenTtlHours * 3600),
+            expiresAt = now.plusSeconds(inviteRetentionDays.coerceAtLeast(1) * secondsPerDay),
             createdAt = now,
             updatedAt = now,
         )
@@ -101,16 +101,25 @@ class ManagedStudentRegistrationService(
         return ManagedStudentInviteResult(token = token, expiresAt = invite.expiresAt)
     }
 
+    @Transactional(readOnly = true)
+    fun lookupManagedStudentInvite(token: String, remoteAddress: String? = null): ManagedStudentInviteLookupResult {
+        val invite = resolvePendingInvite(token, remoteAddress)
+        return ManagedStudentInviteLookupResult(
+            subject = invite.keycloakSubject,
+            email = invite.emailNormalized,
+            displayName = invite.displayName,
+            lessonId = invite.lessonId,
+            continueUrl = invite.continueUrl,
+            expiresAt = invite.expiresAt,
+        )
+    }
+
     @Transactional
     fun consumeManagedStudentInvite(token: String, remoteAddress: String? = null): ConsumeStudentInviteResult {
-        val submittedToken = token.trim()
-        val normalizedToken = tokenService.normalizeStudentInviteCode(submittedToken)
-        rateLimiter.check("student-invite:$normalizedToken", remoteAddress)
-        val invite = pendingInviteByToken(normalizedToken)
-            ?: submittedToken.takeIf { it != normalizedToken }?.let(::pendingInviteByToken)
-            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid student invite token.")
+        val invite = resolvePendingInvite(token, remoteAddress)
         val now = Instant.now(clock)
-        if (invite.expiresAt.isBefore(now)) {
+
+        if (invite.createdAt.plusSeconds(inviteRetentionDays.coerceAtLeast(1) * secondsPerDay).isBefore(now)) {
             invite.status = managedInviteStatusExpired
             invite.updatedAt = now
             managedStudentInviteRepo.saveAndFlush(invite)
@@ -134,6 +143,15 @@ class ManagedStudentRegistrationService(
             expiresIn = tokens.expiresIn,
             continueUrl = invite.continueUrl,
         )
+    }
+
+    private fun resolvePendingInvite(token: String, remoteAddress: String?): ManagedStudentInviteEntity {
+        val submittedToken = token.trim()
+        val normalizedToken = tokenService.normalizeStudentInviteCode(submittedToken)
+        rateLimiter.check("student-invite:$normalizedToken", remoteAddress)
+        return pendingInviteByToken(normalizedToken)
+            ?: submittedToken.takeIf { it != normalizedToken }?.let(::pendingInviteByToken)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid student invite token.")
     }
 
     private fun newUniqueStudentInviteCode(): String {
@@ -176,5 +194,6 @@ class ManagedStudentRegistrationService(
         const val managedInviteStatusExpired = "EXPIRED"
         const val studentRole = "STUDENT"
         const val studentInviteCodeGenerationAttempts = 10
+        const val secondsPerDay: Long = 24 * 60 * 60
     }
 }

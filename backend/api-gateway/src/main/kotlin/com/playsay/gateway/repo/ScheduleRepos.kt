@@ -349,6 +349,17 @@ interface LessonParticipantRepo : JpaRepository<LessonParticipantEntity, UUID> {
 
     @Query(
         """
+        select count(lp) > 0
+          from LessonParticipantEntity lp
+          join AppUserEntity student on student.id = lp.studentUserId
+         where lp.lessonId = :lessonId
+           and student.keycloakSubject = :subject
+        """,
+    )
+    fun existsByLessonIdAndSubject(lessonId: UUID, subject: String): Boolean
+
+    @Query(
+        """
         select new com.playsay.gateway.repo.LessonParticipantRow(
             lp.lessonId,
             lp.studentUserId,

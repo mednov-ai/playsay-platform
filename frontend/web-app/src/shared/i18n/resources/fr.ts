@@ -48,6 +48,8 @@ export const fr = {
       title: "Entrée en cours",
       subtitle: "Préparation de l'accès élève à la classe en ligne.",
       loading: "Ouverture du cours...",
+      waiting: "Le lien fonctionne. L'accès ouvre à {{time}}.",
+      retry: "Vérifier encore",
       success: "Accès prêt. Redirection vers le cours.",
       failed: "Impossible d'ouvrir le lien du cours. Demandez un nouveau lien au professeur.",
       missingToken: "Le lien d'accès n'a pas de jeton.",

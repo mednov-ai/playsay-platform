@@ -1,7 +1,7 @@
 package com.playsay.gateway
 
 import com.playsay.gateway.controller.RegistrationController
-import com.playsay.gateway.controller.StudentInviteController
+import com.playsay.gateway.dto.ManagedStudentInviteLookupResponse
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
 import com.playsay.gateway.dto.ManagedStudentInviteRequest
@@ -15,9 +15,9 @@ import com.playsay.gateway.dto.StartRegistrationRequest
 import com.playsay.gateway.dto.StudentInviteConsumeRequest
 import com.playsay.gateway.dto.StudentInviteConsumeResponse
 import com.playsay.gateway.service.RegistrationGateway
-import org.springframework.mock.web.MockHttpServletRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import org.springframework.mock.web.MockHttpServletRequest
 
 class RegistrationControllerTest {
     @Test
@@ -88,22 +88,6 @@ class RegistrationControllerTest {
         assertEquals(listOf<String?>("203.0.113.20", "203.0.113.21"), gateway.clientAddresses)
     }
 
-    @Test
-    fun `student invite consume forwards first public client address`() {
-        val gateway = RecordingRegistrationGateway()
-        val controller = StudentInviteController(gateway)
-
-        val response = controller.consume(
-            StudentInviteConsumeRequest(token = "A7K2Q9"),
-            MockHttpServletRequest().apply {
-                addHeader("X-Forwarded-For", "198.51.100.11, 10.0.0.15")
-            },
-        )
-
-        assertEquals("/lessons/lesson-id/classroom", response.continueUrl)
-        assertEquals("A7K2Q9", gateway.studentInviteConsumes.single().token)
-        assertEquals("198.51.100.11", gateway.clientAddresses.single())
-    }
 }
 
 private class RecordingRegistrationGateway : RegistrationGateway {
@@ -150,6 +134,12 @@ private class RecordingRegistrationGateway : RegistrationGateway {
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
         error("Managed student invite creation is not used in this test.")
 
+    override fun lookupManagedStudentInvite(
+        request: StudentInviteConsumeRequest,
+        clientAddress: String?,
+    ): ManagedStudentInviteLookupResponse =
+        error("Student invite lookup is not used in this test.")
+
     override fun consumeStudentInvite(
         request: StudentInviteConsumeRequest,
         clientAddress: String?,
@@ -157,6 +147,7 @@ private class RecordingRegistrationGateway : RegistrationGateway {
         studentInviteConsumes.add(request)
         clientAddresses.add(clientAddress)
         return StudentInviteConsumeResponse(
+            status = "AUTHENTICATED",
             accessToken = "access-token",
             refreshToken = "refresh-token",
             idToken = "id-token",

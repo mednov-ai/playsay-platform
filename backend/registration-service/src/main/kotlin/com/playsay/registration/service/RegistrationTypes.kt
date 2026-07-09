@@ -76,6 +76,15 @@ data class ManagedStudentInviteResult(
     val expiresAt: java.time.Instant,
 )
 
+data class ManagedStudentInviteLookupResult(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+    val lessonId: java.util.UUID,
+    val continueUrl: String,
+    val expiresAt: java.time.Instant,
+)
+
 data class ConsumeStudentInviteResult(
     val accessToken: String,
     val refreshToken: String?,

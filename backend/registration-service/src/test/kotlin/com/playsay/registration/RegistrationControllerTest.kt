@@ -164,6 +164,31 @@ class RegistrationControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `managed student invite lookup is pending metadata only and does not consume code`() {
+        provisionManagedStudent("lookup@example.com", "Lookup Student")
+        val lessonId = "37a6f61a-434f-483d-9177-f4b2f6fcdca5"
+        val continueUrl = "https://online.play-and-say.ru/lessons/$lessonId/classroom"
+        val invite = createManagedStudentInvite(
+            subject = "managed-subject-1",
+            email = "lookup@example.com",
+            displayName = "Lookup Student",
+            lessonId = lessonId,
+            continueUrl = continueUrl,
+        )
+        val token = assertNotNull(invite.token)
+
+        val lookup = lookupManagedStudentInvite(token)
+        val consumed = consumeManagedStudentInvite(token)
+
+        assertEquals(HttpStatus.OK.value(), lookup.statusCode(), lookup.body())
+        assertTrue(lookup.body().contains("managed-subject-1"))
+        assertTrue(lookup.body().contains(lessonId))
+        assertTrue(lookup.body().contains(continueUrl))
+        assertEquals(HttpStatus.OK.value(), consumed.statusCode(), consumed.body())
+        assertTrue(consumed.body().contains("access-token-lookup"))
+    }
+
+    @Test
     fun `registration start uses generic response for duplicate email`() {
         val first = startRegistration("duplicate@example.com")
         val second = startRegistration("duplicate@example.com")
@@ -501,6 +526,15 @@ class RegistrationControllerTest @Autowired constructor(
     private fun consumeManagedStudentInvite(token: String): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/student-invites/consume"))
+                .header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""{"token":"$token"}"""))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+    private fun lookupManagedStudentInvite(token: String): HttpResponse<String> =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/internal/managed-student-invites/lookup"))
                 .header("content-type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString("""{"token":"$token"}"""))
                 .build(),

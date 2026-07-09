@@ -40,4 +40,23 @@ describe("registration API errors", () => {
       }),
     );
   });
+
+  it("accepts waiting student invite response without auth tokens", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({
+        status: "WAITING",
+        opensAt: "2026-05-25T09:50:00Z",
+        scheduledStart: "2026-05-25T10:00:00Z",
+        scheduledEnd: "2026-05-25T10:45:00Z",
+        retryAfterSeconds: 600,
+      }), { status: 200 })),
+    );
+
+    await expect(consumeStudentInviteRequest("A7K2Q9")).resolves.toMatchObject({
+      status: "WAITING",
+      opensAt: "2026-05-25T09:50:00Z",
+      retryAfterSeconds: 600,
+    });
+  });
 });

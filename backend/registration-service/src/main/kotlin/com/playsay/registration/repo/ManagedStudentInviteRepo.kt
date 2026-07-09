@@ -9,4 +9,6 @@ import org.springframework.data.jpa.repository.Lock
 interface ManagedStudentInviteRepo : JpaRepository<ManagedStudentInviteEntity, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     fun findByTokenHashAndStatus(tokenHash: String, status: String): ManagedStudentInviteEntity?
+
+    fun existsByTokenHash(tokenHash: String): Boolean
 }

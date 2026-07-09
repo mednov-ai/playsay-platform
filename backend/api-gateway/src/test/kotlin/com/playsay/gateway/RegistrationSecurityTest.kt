@@ -132,7 +132,7 @@ private class AnonymousRegistrationGateway : RegistrationGateway {
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
         ManagedStudentInviteResponse(token = "student-invite-token", expiresAt = Instant.parse("2026-07-09T12:00:00Z"))
 
-    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): StudentInviteConsumeResponse =
         StudentInviteConsumeResponse(
             accessToken = "access-token",
             refreshToken = "refresh-token",

@@ -234,6 +234,6 @@ private object RecordingManagedStudentRegistrationGateway : RegistrationGateway 
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
         error("Managed student invite creation is not used in this test.")
 
-    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): StudentInviteConsumeResponse =
         error("Student invite consume is not used in this test.")
 }

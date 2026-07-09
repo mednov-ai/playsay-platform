@@ -87,6 +87,7 @@ export interface RegistrationResponse {
 
 export interface StudentInviteConsumeRequest {
   /**
+     * One-time managed-student invite code. New codes are at most 6 characters; longer legacy pending tokens remain accepted for compatibility.
      * @minLength 1
      * @maxLength 255
      */
@@ -401,7 +402,7 @@ export const getConsumeStudentInviteUrl = () => {
 }
 
 /**
- * Exchanges a one-time managed-student invite token for a Keycloak token set and the lesson continue URL.
+ * Exchanges a one-time managed-student invite code for a Keycloak token set and the lesson continue URL. The public link carries the code in the URL fragment, while this request keeps the legacy `token` field name for client compatibility.
  * @summary Consume managed-student lesson invite
  */
 export const consumeStudentInvite = async (studentInviteConsumeRequest: StudentInviteConsumeRequest, options?: RequestInit): Promise<consumeStudentInviteResponse> => {

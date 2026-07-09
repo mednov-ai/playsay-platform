@@ -113,7 +113,7 @@ paths:
     post:
       operationId: consumeStudentInvite
       summary: Consume managed-student lesson invite
-      description: Exchanges a one-time managed-student invite token for a Keycloak token set and the lesson continue URL.
+      description: Exchanges a one-time managed-student invite code for a Keycloak token set and the lesson continue URL. The public link carries the code in the URL fragment, while this request keeps the legacy `token` field name for client compatibility.
       requestBody:
         required: true
         content:
@@ -128,7 +128,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/StudentInviteConsumeResponse"
         "400":
-          description: Invalid, expired, or already consumed invite token.
+          description: Invalid, expired, or already consumed invite code.
 components:
   schemas:
     StartRegistrationRequest:
@@ -235,6 +235,7 @@ components:
       properties:
         token:
           type: string
+          description: One-time managed-student invite code. New codes are at most 6 characters; longer legacy pending tokens remain accepted for compatibility.
           minLength: 1
           maxLength: 255
     StudentInviteConsumeResponse:

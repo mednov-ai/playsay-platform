@@ -139,12 +139,28 @@ class RegistrationControllerTest @Autowired constructor(
 
         val consumed = consumeManagedStudentInvite(token)
         val repeated = consumeManagedStudentInvite(token)
+        val manualInvite = createManagedStudentInvite(
+            subject = "managed-subject-1",
+            email = "invitee@example.com",
+            displayName = "Invitee",
+            lessonId = "3f20a6e4-a861-49ab-aa70-8300b589f61f",
+            continueUrl = "https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
+        )
+        val manualToken = assertNotNull(manualInvite.token)
+        val manualEntry = "${manualToken.substring(0, 3).lowercase()} ${manualToken.substring(3).lowercase()}"
+        val manualConsumed = consumeManagedStudentInvite(manualEntry)
 
+        assertTrue(Regex("^[A-Z0-9]{6}$").matches(token))
+        assertTrue(Regex("^[A-Z0-9]{6}$").matches(manualToken))
         assertEquals(HttpStatus.OK.value(), consumed.statusCode(), consumed.body())
+        assertEquals(HttpStatus.OK.value(), manualConsumed.statusCode(), manualConsumed.body())
         assertTrue(consumed.body().contains("access-token-invitee"))
         assertTrue(consumed.body().contains("https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom"))
         assertEquals(HttpStatus.BAD_REQUEST.value(), repeated.statusCode(), repeated.body())
-        assertEquals(listOf("invitee@example.com"), RecordingKeycloakRegistrationClient.passwordGrantUsers)
+        assertEquals(
+            listOf("invitee@example.com", "invitee@example.com"),
+            RecordingKeycloakRegistrationClient.passwordGrantUsers,
+        )
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.playsay.gateway
 
 import com.playsay.gateway.controller.RegistrationController
+import com.playsay.gateway.controller.StudentInviteController
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
 import com.playsay.gateway.dto.ManagedStudentInviteRequest
@@ -86,6 +87,23 @@ class RegistrationControllerTest {
         assertEquals("123456", gateway.resetPasswordRequests.single().code)
         assertEquals(listOf<String?>("203.0.113.20", "203.0.113.21"), gateway.clientAddresses)
     }
+
+    @Test
+    fun `student invite consume forwards first public client address`() {
+        val gateway = RecordingRegistrationGateway()
+        val controller = StudentInviteController(gateway)
+
+        val response = controller.consume(
+            StudentInviteConsumeRequest(token = "A7K2Q9"),
+            MockHttpServletRequest().apply {
+                addHeader("X-Forwarded-For", "198.51.100.11, 10.0.0.15")
+            },
+        )
+
+        assertEquals("/lessons/lesson-id/classroom", response.continueUrl)
+        assertEquals("A7K2Q9", gateway.studentInviteConsumes.single().token)
+        assertEquals("198.51.100.11", gateway.clientAddresses.single())
+    }
 }
 
 private class RecordingRegistrationGateway : RegistrationGateway {
@@ -94,6 +112,7 @@ private class RecordingRegistrationGateway : RegistrationGateway {
     val confirmed = mutableListOf<ConfirmRegistrationRequest>()
     val forgotPasswordRequests = mutableListOf<ForgotPasswordRequest>()
     val resetPasswordRequests = mutableListOf<ResetPasswordRequest>()
+    val studentInviteConsumes = mutableListOf<StudentInviteConsumeRequest>()
     val clientAddresses = mutableListOf<String?>()
 
     override fun start(request: StartRegistrationRequest, clientAddress: String?): RegistrationResponse {
@@ -131,6 +150,18 @@ private class RecordingRegistrationGateway : RegistrationGateway {
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
         error("Managed student invite creation is not used in this test.")
 
-    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
-        error("Student invite consume is not used in this test.")
+    override fun consumeStudentInvite(
+        request: StudentInviteConsumeRequest,
+        clientAddress: String?,
+    ): StudentInviteConsumeResponse {
+        studentInviteConsumes.add(request)
+        clientAddresses.add(clientAddress)
+        return StudentInviteConsumeResponse(
+            accessToken = "access-token",
+            refreshToken = "refresh-token",
+            idToken = "id-token",
+            expiresIn = 300,
+            continueUrl = "/lessons/lesson-id/classroom",
+        )
+    }
 }

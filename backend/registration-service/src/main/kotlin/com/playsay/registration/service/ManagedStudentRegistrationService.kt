@@ -16,6 +16,7 @@ class ManagedStudentRegistrationService(
     private val managedStudentInviteRepo: ManagedStudentInviteRepo,
     private val keycloak: KeycloakRegistrationClient,
     private val tokenService: RegistrationTokenService,
+    private val rateLimiter: InMemoryRegistrationRateLimiter,
     private val clock: Clock,
     @param:Value("\${playsay.registration.token-ttl-hours}") private val tokenTtlHours: Long,
     @param:Value("\${playsay.registration.keycloak.student-token-client-id:playsay-web}") private val studentTokenClientId: String,
@@ -81,10 +82,10 @@ class ManagedStudentRegistrationService(
         val continueUrl = allowedReturnTo(command.continueUrl)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Continue URL is not allowed.")
         val now = Instant.now(clock)
-        val token = tokenService.newToken()
+        val token = newUniqueStudentInviteCode()
         val invite = ManagedStudentInviteEntity(
             id = UUID.randomUUID(),
-            tokenHash = tokenService.hash(token),
+            tokenHash = tokenService.hash(tokenService.normalizeStudentInviteCode(token)),
             keycloakSubject = command.subject.trim().takeIf { it.isNotEmpty() }
                 ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Subject is required."),
             emailNormalized = email,
@@ -101,11 +102,13 @@ class ManagedStudentRegistrationService(
     }
 
     @Transactional
-    fun consumeManagedStudentInvite(token: String): ConsumeStudentInviteResult {
-        val invite = managedStudentInviteRepo.findByTokenHashAndStatus(
-            tokenService.hash(token.trim()),
-            managedInviteStatusPending,
-        ) ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid student invite token.")
+    fun consumeManagedStudentInvite(token: String, remoteAddress: String? = null): ConsumeStudentInviteResult {
+        val submittedToken = token.trim()
+        val normalizedToken = tokenService.normalizeStudentInviteCode(submittedToken)
+        rateLimiter.check("student-invite:$normalizedToken", remoteAddress)
+        val invite = pendingInviteByToken(normalizedToken)
+            ?: submittedToken.takeIf { it != normalizedToken }?.let(::pendingInviteByToken)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid student invite token.")
         val now = Instant.now(clock)
         if (invite.expiresAt.isBefore(now)) {
             invite.status = managedInviteStatusExpired
@@ -133,6 +136,22 @@ class ManagedStudentRegistrationService(
         )
     }
 
+    private fun newUniqueStudentInviteCode(): String {
+        repeat(studentInviteCodeGenerationAttempts) {
+            val token = tokenService.newStudentInviteCode()
+            if (!managedStudentInviteRepo.existsByTokenHash(tokenService.hash(tokenService.normalizeStudentInviteCode(token)))) {
+                return token
+            }
+        }
+        throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Could not allocate invite code.")
+    }
+
+    private fun pendingInviteByToken(token: String): ManagedStudentInviteEntity? =
+        managedStudentInviteRepo.findByTokenHashAndStatus(
+            tokenService.hash(token),
+            managedInviteStatusPending,
+        )
+
     private fun newManagedStudentPassword(): String =
         "Aa1!${tokenService.newToken()}"
 
@@ -156,5 +175,6 @@ class ManagedStudentRegistrationService(
         const val managedInviteStatusConsumed = "CONSUMED"
         const val managedInviteStatusExpired = "EXPIRED"
         const val studentRole = "STUDENT"
+        const val studentInviteCodeGenerationAttempts = 10
     }
 }

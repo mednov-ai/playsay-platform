@@ -1,19 +1,22 @@
 import { CheckCircle2, KeyRound, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppTheme } from "../../../app/AppProviders";
 import { Button } from "../../../components/ui/button";
 import { storeTokens } from "../../../shared/api/auth";
 import { consumeStudentInviteRequest } from "../../../shared/api/registration";
+import type { StudentInviteConsumeResult } from "../../../shared/api/types";
 import { useAppTranslation } from "../../../shared/i18n";
 import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
 import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
 import { BrandMark } from "../../../shared/ui/BrandMark";
+import { clearStudentInviteSecretFromAddressBar, studentInviteTokenFromLocation } from "../model/studentInviteToken";
+
+const inviteConsumeRequests = new Map<string, Promise<StudentInviteConsumeResult>>();
 
 export function StudentInvitePage() {
   const { t } = useAppTranslation();
   const theme = useAppTheme();
-  const params = useMemo(() => new URLSearchParams(window.location.search), []);
-  const token = params.get("token") ?? "";
+  const [token] = useState(() => studentInviteTokenFromLocation(window.location));
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [continueUrl, setContinueUrl] = useState<string | null>(null);
@@ -25,8 +28,9 @@ export function StudentInvitePage() {
       return undefined;
     }
 
+    clearStudentInviteSecretFromAddressBar();
     let cancelled = false;
-    void consumeStudentInviteRequest(token)
+    void consumeStudentInviteOnce(token)
       .then((result) => {
         if (cancelled) {
           return;
@@ -100,6 +104,19 @@ export function StudentInvitePage() {
       </section>
     </main>
   );
+}
+
+function consumeStudentInviteOnce(token: string): Promise<StudentInviteConsumeResult> {
+  const existing = inviteConsumeRequests.get(token);
+  if (existing) {
+    return existing;
+  }
+
+  const request = consumeStudentInviteRequest(token).finally(() => {
+    window.setTimeout(() => inviteConsumeRequests.delete(token), 0);
+  });
+  inviteConsumeRequests.set(token, request);
+  return request;
 }
 
 function resolveContinueUrl(value: string): string {

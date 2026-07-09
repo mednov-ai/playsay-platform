@@ -24,6 +24,7 @@ import java.util.Date
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -168,7 +169,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(1, links.links.size)
         assertEquals("managed-student-1", links.links.single().subject)
         assertEquals("MAGIC_LINK", links.links.single().mode)
-        assertTrue(links.links.single().url.contains("/student-invite?token=invite-token-1"))
+        assertTrue(links.links.single().url.endsWith("/student-invite#A7K2Q9"))
+        assertFalse(links.links.single().url.contains("?token="))
         assertEquals(lesson.id, RecordingScheduledLessonRegistrationGateway.invites.single().lessonId)
         assertEquals("managed-student-1", RecordingScheduledLessonRegistrationGateway.invites.single().subject)
         assertTrue(RecordingScheduledLessonRegistrationGateway.invites.single().continueUrl.endsWith("/lessons/${lesson.id}/classroom"))
@@ -1004,9 +1006,9 @@ private object RecordingScheduledLessonRegistrationGateway : RegistrationGateway
 
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse {
         invites += request
-        return ManagedStudentInviteResponse(token = "invite-token-1", expiresAt = Instant.parse("2026-05-25T09:55:00Z"))
+        return ManagedStudentInviteResponse(token = "A7K2Q9", expiresAt = Instant.parse("2026-05-25T09:55:00Z"))
     }
 
-    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
+    override fun consumeStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): StudentInviteConsumeResponse =
         error("Student invite consume is not used in this test.")
 }

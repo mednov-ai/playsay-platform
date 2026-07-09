@@ -35,7 +35,7 @@ interface RegistrationGateway {
     fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse
     fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse
     fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse
-    fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse
+    fun consumeStudentInvite(request: StudentInviteConsumeRequest, clientAddress: String?): StudentInviteConsumeResponse
 }
 
 @Component
@@ -69,8 +69,11 @@ class HttpRegistrationGateway(
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
         postJson("/api/internal/managed-student-invites", request, HttpStatus.CREATED, ManagedStudentInviteResponse::class.java)
 
-    override fun consumeStudentInvite(request: StudentInviteConsumeRequest): StudentInviteConsumeResponse =
-        postJson("/api/student-invites/consume", request, HttpStatus.OK, StudentInviteConsumeResponse::class.java)
+    override fun consumeStudentInvite(
+        request: StudentInviteConsumeRequest,
+        clientAddress: String?,
+    ): StudentInviteConsumeResponse =
+        postJson("/api/student-invites/consume", request, HttpStatus.OK, StudentInviteConsumeResponse::class.java, clientAddress)
 
     private fun postJson(path: String, body: Any, expectedStatus: HttpStatus, clientAddress: String? = null): RegistrationResponse =
         postJson(path, body, expectedStatus, RegistrationResponse::class.java, clientAddress)

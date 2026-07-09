@@ -9,6 +9,8 @@ import com.playsay.registration.dto.ManagedStudentResponse
 import com.playsay.registration.service.ManagedStudentCommand
 import com.playsay.registration.service.ManagedStudentInviteCommand
 import com.playsay.registration.service.ManagedStudentRegistrationService
+import com.playsay.registration.utils.ClientIpResolver
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class ManagedStudentController(
     private val registrationService: ManagedStudentRegistrationService,
+    private val clientIpResolver: ClientIpResolver,
 ) {
     @PostMapping(
         "/api/internal/managed-students",
@@ -65,8 +68,14 @@ class ManagedStudentController(
         consumes = [MediaType.APPLICATION_JSON_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
-    fun consumeStudentInvite(@Valid @RequestBody request: ConsumeStudentInviteRequest): ConsumeStudentInviteResponse {
-        val result = registrationService.consumeManagedStudentInvite(request.token)
+    fun consumeStudentInvite(
+        @Valid @RequestBody request: ConsumeStudentInviteRequest,
+        servletRequest: HttpServletRequest,
+    ): ConsumeStudentInviteResponse {
+        val result = registrationService.consumeManagedStudentInvite(
+            request.token,
+            clientIpResolver.resolve(servletRequest),
+        )
         return ConsumeStudentInviteResponse(
             accessToken = result.accessToken,
             refreshToken = result.refreshToken,

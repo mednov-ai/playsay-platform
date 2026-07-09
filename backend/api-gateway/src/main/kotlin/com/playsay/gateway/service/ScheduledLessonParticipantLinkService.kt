@@ -8,8 +8,6 @@ import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.LessonParticipantRow
 import com.playsay.gateway.repo.ScheduledLessonRow
 import com.playsay.gateway.utils.MetaData
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -70,7 +68,7 @@ class ScheduledLessonParticipantLinkService(
         "${publicAppUrl.trimEnd('/')}/lessons/$lessonId/classroom"
 
     private fun inviteUrl(token: String): String =
-        "${publicAppUrl.trimEnd('/')}/student-invite?token=${URLEncoder.encode(token, StandardCharsets.UTF_8)}"
+        "${publicAppUrl.trimEnd('/')}/student-invite#$token"
 
     private companion object {
         const val participantLinkModeMagic = "MAGIC_LINK"

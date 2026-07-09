@@ -18,6 +18,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Base64
 import java.util.Date
@@ -182,7 +183,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val studentSubject = "managed-student-1"
         userProfileStore.currentUserId(authentication(subject = studentSubject, username = "managed.one", role = "ROLE_STUDENT"))
-        val scheduledStart = Instant.now().plus(Duration.ofMinutes(20))
+        val scheduledStart = Instant.now().plus(Duration.ofMinutes(20)).truncatedTo(ChronoUnit.MICROS)
         val scheduledEnd = scheduledStart.plus(Duration.ofMinutes(45))
         val lesson = scheduleController.create(
             teacher,

@@ -2440,16 +2440,16 @@ components:
           type:
           - string
           - "null"
-        birthDate:
-          type:
-          - string
-          - "null"
-          format: date
         updatedAt:
           type: string
           format: date-time
         managedByTeacher:
           type: boolean
+        birthDate:
+          type:
+          - string
+          - "null"
+          format: date
       required:
       - managedByTeacher
       - roles

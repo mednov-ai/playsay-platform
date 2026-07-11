@@ -55,10 +55,10 @@ export interface UserProfileResponse {
   timezone?: string | null;
   /** @nullable */
   learningGoal?: string | null;
-  /** @nullable */
-  birthDate?: string | null;
   updatedAt: string;
   managedByTeacher: boolean;
+  /** @nullable */
+  birthDate?: string | null;
 }
 
 export interface ScheduledLessonMaterialAssignmentRequest {

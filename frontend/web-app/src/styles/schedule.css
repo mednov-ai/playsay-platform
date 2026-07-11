@@ -133,10 +133,510 @@
 }
 
 .playsay-schedule-card {
+  position: relative;
   border: 1px solid hsl(var(--border));
   border-radius: 0.875rem;
   background: hsl(var(--surface));
   padding: 0.9rem;
+}
+
+.playsay-schedule-card-menu {
+  position: relative;
+}
+
+.playsay-schedule-card-menu summary {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  list-style: none;
+  place-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--background));
+}
+
+.playsay-schedule-card-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.playsay-schedule-card-menu > div {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  display: grid;
+  width: max-content;
+  min-width: 12rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--background));
+  box-shadow: 0 1rem 2.5rem rgb(17 17 17 / 0.16);
+  padding: 0.35rem;
+}
+
+.playsay-schedule-card-menu button {
+  display: flex;
+  min-height: 2.35rem;
+  align-items: center;
+  gap: 0.55rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: 0.82rem;
+  font-weight: 850;
+  padding: 0 0.65rem;
+  text-align: left;
+}
+
+.playsay-schedule-card-menu button:hover {
+  background: hsl(var(--muted));
+}
+
+.playsay-schedule-card-menu button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.playsay-schedule-wizard-backdrop {
+  position: fixed;
+  z-index: 55;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  background: rgb(17 17 17 / 0.48);
+  padding: clamp(0.5rem, 2vw, 1.5rem);
+}
+
+.playsay-schedule-wizard {
+  display: grid;
+  width: min(100%, 58rem);
+  max-height: calc(100dvh - 1rem);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.5rem;
+  background: hsl(var(--background));
+  box-shadow: 0 2rem 6rem rgb(17 17 17 / 0.24);
+}
+
+.playsay-schedule-wizard-head,
+.playsay-schedule-wizard-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 1rem 1.15rem;
+}
+
+.playsay-schedule-wizard-head span,
+.playsay-preparation-header span,
+.playsay-preparation-section-head span {
+  color: hsl(var(--primary));
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.playsay-schedule-wizard-head h2,
+.playsay-preparation-header h1,
+.playsay-preparation-section-head h2 {
+  margin: 0.2rem 0 0;
+  color: hsl(var(--foreground));
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.playsay-schedule-wizard-head h2 {
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.playsay-schedule-wizard-head p,
+.playsay-preparation-header p {
+  margin: 0.3rem 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.playsay-schedule-wizard-head > button {
+  width: 2.5rem;
+  flex: 0 0 auto;
+  padding-inline: 0;
+}
+
+.playsay-schedule-wizard-progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.45);
+  padding: 0.65rem 1.15rem;
+}
+
+.playsay-schedule-wizard-progress button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: left;
+}
+
+.playsay-schedule-wizard-progress button span {
+  display: grid;
+  width: 1.55rem;
+  height: 1.55rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: hsl(var(--border));
+  color: hsl(var(--foreground));
+  font-size: 0.72rem;
+}
+
+.playsay-schedule-wizard-progress button[data-active="true"] {
+  color: hsl(var(--foreground));
+}
+
+.playsay-schedule-wizard-progress button[data-active="true"] span {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.playsay-schedule-wizard-body {
+  min-height: 24rem;
+  overflow: auto;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+.playsay-schedule-wizard-step {
+  display: grid;
+  max-width: 45rem;
+  margin: 0 auto;
+  gap: 0.85rem;
+}
+
+.playsay-schedule-wizard-icon {
+  width: 2.3rem;
+  height: 2.3rem;
+  color: hsl(var(--primary));
+}
+
+.playsay-schedule-wizard-step h3 {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.5vw, 1.65rem);
+  font-weight: 950;
+}
+
+.playsay-schedule-wizard-step > p {
+  margin: -0.45rem 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.playsay-schedule-choice {
+  display: grid;
+  gap: 0.35rem;
+  border: 2px solid hsl(var(--primary) / 0.32);
+  border-radius: 1rem;
+  background: hsl(var(--surface));
+  color: hsl(var(--foreground));
+  padding: 1.2rem;
+  text-align: left;
+}
+
+.playsay-schedule-choice span {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.playsay-schedule-choice strong {
+  color: hsl(var(--primary));
+  font-size: 0.8rem;
+}
+
+.playsay-schedule-wizard-fields,
+.playsay-schedule-wizard-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.playsay-schedule-wizard-advanced-grid {
+  border-top: 1px solid hsl(var(--border));
+  padding: 0.85rem;
+}
+
+.playsay-schedule-material-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.playsay-schedule-material-option {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  background: hsl(var(--surface));
+  color: hsl(var(--foreground));
+  text-align: left;
+}
+
+.playsay-schedule-material-option[data-selected="true"] {
+  border-color: hsl(var(--primary));
+  box-shadow: inset 0 0 0 1px hsl(var(--primary));
+}
+
+.playsay-schedule-material-option > button {
+  display: grid;
+  gap: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0.85rem;
+  text-align: left;
+}
+
+.playsay-schedule-material-option > button:last-child:not(:first-child) {
+  border-top: 1px solid hsl(var(--border));
+  color: hsl(var(--primary));
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.playsay-schedule-material-option strong,
+.playsay-schedule-material-option span {
+  display: block;
+}
+
+.playsay-schedule-material-option span {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.playsay-schedule-wizard-empty,
+.playsay-preparation-empty-material {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 1rem;
+  background: hsl(var(--muted) / 0.45);
+  padding: 1rem;
+}
+
+.playsay-schedule-wizard-review dl,
+.playsay-preparation-sidebar dl {
+  display: grid;
+  margin: 0;
+  gap: 0.55rem;
+}
+
+.playsay-schedule-wizard-review dl > div,
+.playsay-preparation-sidebar dl > div {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.8rem;
+  background: hsl(var(--surface));
+  padding: 0.75rem;
+}
+
+.playsay-schedule-wizard-review dt,
+.playsay-preparation-sidebar dt {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.playsay-schedule-wizard-review dd,
+.playsay-preparation-sidebar dd {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.playsay-schedule-wizard-footer {
+  align-items: center;
+  border-top: 1px solid hsl(var(--border));
+  border-bottom: 0;
+}
+
+.playsay-schedule-wizard-success {
+  display: grid;
+  min-height: 25rem;
+  place-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.playsay-schedule-wizard-success > div:first-child {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto 0.5rem;
+  place-items: center;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.playsay-schedule-wizard-success > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.playsay-preparation-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.playsay-preparation-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.25rem;
+  background: hsl(var(--surface) / 0.9);
+  padding: 1rem;
+}
+
+.playsay-preparation-header h1 {
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.playsay-preparation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(17rem, 0.75fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.playsay-preparation-main,
+.playsay-preparation-sidebar > section,
+.playsay-preparation-sidebar > button {
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.1rem;
+  background: hsl(var(--surface) / 0.9);
+}
+
+.playsay-preparation-main,
+.playsay-preparation-sidebar > section {
+  padding: 1rem;
+}
+
+.playsay-preparation-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.playsay-preparation-section-head h2 {
+  font-size: 1.2rem;
+}
+
+.playsay-preparation-material-picker {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.playsay-preparation-material-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid hsl(var(--primary) / 0.3);
+  border-radius: 1rem;
+  background: #fff8f3;
+  color: hsl(var(--primary));
+  padding: 1rem;
+}
+
+.playsay-preparation-material-card strong,
+.playsay-preparation-material-card span,
+.playsay-preparation-empty-material strong,
+.playsay-preparation-empty-material span {
+  display: block;
+}
+
+.playsay-preparation-material-card span,
+.playsay-preparation-empty-material span {
+  margin-top: 0.2rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.playsay-preparation-sidebar {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.playsay-preparation-sidebar h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 950;
+}
+
+.playsay-preparation-sidebar dt {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.playsay-preparation-checklist {
+  display: grid;
+  margin: 0;
+  gap: 0.45rem;
+  list-style: none;
+  padding: 0;
+}
+
+.playsay-preparation-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.playsay-preparation-checklist li svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: hsl(var(--border));
+  color: hsl(var(--background));
+  padding: 0.15rem;
+}
+
+.playsay-preparation-checklist li[data-ready="true"] {
+  color: hsl(var(--foreground));
+}
+
+.playsay-preparation-checklist li[data-ready="true"] svg {
+  background: #2e9b69;
 }
 
 .playsay-schedule-join-note {
@@ -706,6 +1206,14 @@
   background: hsl(var(--surface) / 0.82);
 }
 
+.dark .playsay-schedule-wizard,
+.dark .playsay-preparation-header,
+.dark .playsay-preparation-main,
+.dark .playsay-preparation-sidebar > section,
+.dark .playsay-preparation-material-card {
+  background: hsl(var(--surface) / 0.92);
+}
+
 .dark .playsay-schedule-list-head > span,
 .dark .playsay-schedule-join-note,
 .dark .playsay-schedule-student-search,
@@ -722,6 +1230,10 @@
 
   .playsay-schedule-create-panel {
     order: -1;
+  }
+
+  .playsay-preparation-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -747,6 +1259,50 @@
   .playsay-schedule-weekly-grid,
   .playsay-schedule-managed-student-form > div {
     grid-template-columns: 1fr;
+  }
+
+  .playsay-schedule-wizard-progress {
+    grid-template-columns: repeat(4, auto);
+    overflow-x: auto;
+  }
+
+  .playsay-schedule-wizard-progress button {
+    font-size: 0;
+  }
+
+  .playsay-schedule-wizard-progress button span {
+    font-size: 0.72rem;
+  }
+
+  .playsay-schedule-wizard-fields,
+  .playsay-schedule-wizard-advanced-grid,
+  .playsay-schedule-material-grid,
+  .playsay-preparation-header {
+    grid-template-columns: 1fr;
+  }
+
+  .playsay-schedule-wizard {
+    max-height: calc(100dvh - 0.5rem);
+    border-radius: 1rem;
+  }
+
+  .playsay-schedule-wizard-footer button,
+  .playsay-preparation-header > button,
+  .playsay-preparation-empty-material button {
+    width: 100%;
+  }
+
+  .playsay-preparation-header > button:first-child {
+    order: 2;
+  }
+
+  .playsay-preparation-header > button:last-child {
+    order: 1;
+  }
+
+  .playsay-preparation-empty-material {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .playsay-schedule-student-picker,

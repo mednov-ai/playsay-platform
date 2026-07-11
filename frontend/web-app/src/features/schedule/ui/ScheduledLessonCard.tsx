@@ -1,4 +1,4 @@
-import { BookOpen, CheckCircle2, Copy, Loader2, RotateCcw, Trash2, Video } from "lucide-react";
+import { BookOpen, CheckCircle2, Copy, EllipsisVertical, Loader2, RotateCcw, Trash2, Video } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   formatDateTime,
@@ -21,6 +21,7 @@ export function ScheduledLessonCard({
   onCopyLink,
   onDelete,
   onJoin,
+  onPrepare = () => undefined,
   roomLoading,
 }: {
   canManage: boolean;
@@ -33,6 +34,7 @@ export function ScheduledLessonCard({
   onCopyLink: () => void;
   onDelete: () => void;
   onJoin: () => void;
+  onPrepare?: () => void;
   roomLoading: boolean;
 }) {
   const { t } = useAppTranslation();
@@ -86,7 +88,12 @@ export function ScheduledLessonCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {joinable ? (
+          {canManage && !archived && lesson.status !== "IN_PROGRESS" ? (
+            <Button disabled={disabled} onClick={onPrepare} type="button">
+              <BookOpen className="h-4 w-4" />
+              {t("schedule.actions.prepare")}
+            </Button>
+          ) : joinable || (canManage && lesson.status === "IN_PROGRESS") ? (
             <Button
               disabled={disabled || roomLoading}
               onClick={onJoin}
@@ -100,28 +107,21 @@ export function ScheduledLessonCard({
               {archived ? stateLabel : t("schedule.actions.joinWindowHint")}
             </span>
           )}
-          <Button disabled={disabled} onClick={onCopyLink} type="button" variant="outline">
-            <Copy className="h-4 w-4" />
-            {linkCopied ? t("schedule.clipboard.copied") : canManage ? t("schedule.actions.copyLinks") : t("schedule.clipboard.link")}
-          </Button>
-          {canManage && !archived ? (
-            <>
-              <Button disabled={disabled || lesson.status === "COMPLETED" || lesson.status === "CANCELLED"} onClick={onComplete} type="button" variant="outline">
-                <CheckCircle2 className="h-4 w-4" />
-                {t("schedule.actions.complete")}
-              </Button>
-              <Button disabled={disabled || lesson.status === "CANCELLED"} onClick={onCancel} type="button" variant="outline">
-                <RotateCcw className="h-4 w-4" />
-                {t("schedule.actions.cancel")}
-              </Button>
-            </>
-          ) : null}
-          {canManage ? (
-            <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
-              <Trash2 className="h-4 w-4" />
-              {t("schedule.actions.delete")}
+          {!canManage ? (
+            <Button disabled={disabled} onClick={onCopyLink} type="button" variant="outline">
+              <Copy className="h-4 w-4" />{linkCopied ? t("schedule.clipboard.copied") : t("schedule.clipboard.link")}
             </Button>
-          ) : null}
+          ) : (
+            <details className="playsay-schedule-card-menu">
+              <summary aria-label={t("schedule.actions.more")}><EllipsisVertical className="h-4 w-4" /></summary>
+              <div>
+                <button disabled={disabled} onClick={onCopyLink} type="button"><Copy />{linkCopied ? t("schedule.clipboard.copied") : t("schedule.actions.copyLinks")}</button>
+                {!archived ? <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.complete")) && onComplete()} type="button"><CheckCircle2 />{t("schedule.actions.complete")}</button> : null}
+                {!archived ? <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.cancel")) && onCancel()} type="button"><RotateCcw />{t("schedule.actions.cancel")}</button> : null}
+                <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.delete")) && onDelete()} type="button"><Trash2 />{t("schedule.actions.delete")}</button>
+              </div>
+            </details>
+          )}
         </div>
       </div>
     </article>

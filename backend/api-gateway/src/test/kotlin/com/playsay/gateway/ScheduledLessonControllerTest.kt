@@ -806,6 +806,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
             ),
         ).body!!
 
+        val started = scheduleController.start(teacher, lesson.id)
+
         val teacherToken = liveKitRoomController.createToken(teacher, lesson.id)
         val studentToken = liveKitRoomController.createToken(student, lesson.id)
         val claims = SignedJWT.parse(teacherToken.token).jwtClaimsSet
@@ -815,6 +817,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals("lesson-${lesson.id}", teacherToken.roomName)
         assertEquals("teacher-1", teacherToken.identity)
         assertEquals("lesson-${lesson.id}", studentToken.roomName)
+        assertEquals("IN_PROGRESS", started.status)
         assertEquals("test-key", claims.issuer)
         assertEquals("teacher-1", claims.subject)
         assertEquals("lesson-${lesson.id}", videoGrant["room"])
@@ -862,8 +865,11 @@ class ScheduledLessonControllerTest @Autowired constructor(
             ),
         ).body!!
 
+        listOf(tooEarly, justOpen, stillOpenAfterEnd, tooLate).forEach { lesson -> scheduleController.start(teacher, lesson.id) }
+
+        assertEquals("lesson-${tooEarly.id}", liveKitRoomController.createToken(teacher, tooEarly.id).roomName)
         assertFailsWith<ResponseStatusException> {
-            liveKitRoomController.createToken(teacher, tooEarly.id)
+            liveKitRoomController.createToken(student, tooEarly.id)
         }.also { error -> assertEquals(HttpStatus.NOT_FOUND, error.statusCode) }
         assertEquals("lesson-${justOpen.id}", liveKitRoomController.createToken(student, justOpen.id).roomName)
         assertEquals("lesson-${stillOpenAfterEnd.id}", liveKitRoomController.createToken(student, stillOpenAfterEnd.id).roomName)
@@ -888,6 +894,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
             ),
         ).body!!
 
+        scheduleController.start(teacher, lesson.id)
+
         val error = assertFailsWith<ResponseStatusException> {
             liveKitRoomController.createToken(otherStudent, lesson.id)
         }
@@ -909,15 +917,37 @@ class ScheduledLessonControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val teacherError = assertFailsWith<ResponseStatusException> {
-            liveKitRoomController.createToken(teacher, lesson.id)
-        }
+        val teacherToken = liveKitRoomController.createToken(teacher, lesson.id)
         val studentError = assertFailsWith<ResponseStatusException> {
             liveKitRoomController.createToken(student, lesson.id)
         }
 
-        assertEquals(HttpStatus.NOT_FOUND, teacherError.statusCode)
+        assertEquals("lesson-${lesson.id}", teacherToken.roomName)
         assertEquals(HttpStatus.NOT_FOUND, studentError.statusCode)
+    }
+
+    @Test
+    fun `teacher starts lesson idempotently and cannot restart a closed lesson`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.now().plusSeconds(24 * 60 * 60),
+                scheduledEnd = Instant.now().plusSeconds(25 * 60 * 60),
+            ),
+        ).body!!
+
+        val firstStart = scheduleController.start(teacher, lesson.id)
+        val secondStart = scheduleController.start(teacher, lesson.id)
+
+        assertEquals("IN_PROGRESS", firstStart.status)
+        assertEquals(firstStart.updatedAt, secondStart.updatedAt)
+
+        scheduleController.complete(teacher, lesson.id)
+        val error = assertFailsWith<ResponseStatusException> {
+            scheduleController.start(teacher, lesson.id)
+        }
+        assertEquals(HttpStatus.CONFLICT, error.statusCode)
     }
 
     @Test

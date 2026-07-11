@@ -22,7 +22,7 @@ describe("AppShell", () => {
       createElement(AppShell, props),
     ));
 
-    expect(markup).toContain("Создать урок");
+    expect(markup).toContain("Назначить урок");
     expect(markup).not.toContain("Войти в урок");
   });
 });

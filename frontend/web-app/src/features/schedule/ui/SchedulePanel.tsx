@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Archive, CalendarDays, ChevronDown, Loader2, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Archive, CalendarDays, CalendarPlus, ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { classroomPath } from "../../../app/routes";
 import {
   flattenCourseLessonOptions,
@@ -16,7 +16,7 @@ import type {
   ScheduledLesson,
   ScheduledLessonInput,
 } from "../../../shared/api/playsay";
-import { ScheduleCreateForm } from "./ScheduleCreateForm";
+import { LessonAssignmentWizard } from "./LessonAssignmentWizard";
 import { ScheduledLessonCard } from "./ScheduledLessonCard";
 import { useAppTranslation } from "../../../shared/i18n";
 
@@ -35,6 +35,8 @@ export function SchedulePanel({
   onCreateManagedStudent,
   onDelete,
   onJoin,
+  onOpenMaterials,
+  onPrepare,
   onRefresh,
   profile,
   roomLoadingLessonId,
@@ -52,10 +54,12 @@ export function SchedulePanel({
   onCancel: (lesson: ScheduledLesson) => void;
   onComplete: (lesson: ScheduledLesson) => void;
   onCopyLinks: (lesson: ScheduledLesson) => Promise<boolean>;
-  onCreate: (input: ScheduledLessonInput) => void;
+  onCreate: (input: ScheduledLessonInput) => Promise<ScheduledLesson | null | void> | void;
   onCreateManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   onDelete: (lessonId: string) => void;
   onJoin: (lesson: ScheduledLesson) => void;
+  onOpenMaterials?: () => void;
+  onPrepare?: (lessonId: string) => void;
   onRefresh: () => void;
   profile: MeProfile | null;
   roomLoadingLessonId: string | null;
@@ -68,6 +72,15 @@ export function SchedulePanel({
   const lessonOptions = flattenCourseLessonOptions(courses, lessons);
   const { archivedLessons, mainLessons } = splitScheduleLessonsForDashboard(scheduledLessons, nowMs);
   const [copiedLessonId, setCopiedLessonId] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  useEffect(() => {
+    function openWizard() {
+      setWizardOpen(true);
+    }
+    window.addEventListener("playsay:assign-lesson", openWizard);
+    return () => window.removeEventListener("playsay:assign-lesson", openWizard);
+  }, []);
 
   async function copyLessonLink(lesson: ScheduledLesson) {
     if (canManage) {
@@ -106,6 +119,7 @@ export function SchedulePanel({
       onCopyLink={() => void copyLessonLink(lesson)}
       onDelete={() => onDelete(lesson.id)}
       onJoin={() => onJoin(lesson)}
+      onPrepare={() => onPrepare?.(lesson.id)}
       roomLoading={roomLoadingLessonId === lesson.id}
     />
   );
@@ -123,17 +137,24 @@ export function SchedulePanel({
           <h2>{canManage ? t("schedule.dashboard.teacherTitle") : t("schedule.dashboard.studentTitle")}</h2>
           <p>{canManage ? t("schedule.dashboard.teacherSubtitle") : t("schedule.dashboard.studentSubtitle")}</p>
         </div>
-        <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {t("common.actions.refresh")}
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {canManage ? (
+            <Button data-schedule-open-create="true" disabled={disabled} onClick={() => setWizardOpen(true)} type="button">
+              <CalendarPlus className="h-4 w-4" />{t("schedule.wizard.assign")}
+            </Button>
+          ) : null}
+          <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {t("common.actions.refresh")}
+          </Button>
+        </div>
       </div>
       {!profile ? (
         <div className="playsay-schedule-empty">
           {t("schedule.loginRequired")}
         </div>
       ) : (
-        <div className={canManage ? "playsay-schedule-dashboard-grid" : "playsay-schedule-dashboard-grid playsay-schedule-dashboard-grid--single"}>
+        <div className="playsay-schedule-dashboard-grid playsay-schedule-dashboard-grid--single">
           <div className="playsay-schedule-list-panel">
             <div className="playsay-schedule-list-head">
               <div>
@@ -185,23 +206,23 @@ export function SchedulePanel({
               </details>
             ) : null}
           </div>
-
-          {canManage ? (
-            <div className="playsay-schedule-create-panel">
-              <ScheduleCreateForm
-                disabled={disabled}
-                lessonOptions={lessonOptions}
-                managedStudentLoading={loading}
-                managedStudentMessage={message}
-                materials={materials}
-                onCreate={onCreate}
-                onCreateManagedStudent={onCreateManagedStudent}
-                studentUsers={studentUsers}
-              />
-            </div>
-          ) : null}
         </div>
       )}
+      {canManage ? (
+        <LessonAssignmentWizard
+          disabled={disabled}
+          lessonOptions={lessonOptions}
+          managedStudentMessage={message}
+          materials={materials}
+          onClose={() => setWizardOpen(false)}
+          onCreate={onCreate}
+          onCreateManagedStudent={onCreateManagedStudent}
+          onOpenMaterials={onOpenMaterials ?? (() => undefined)}
+          onPrepare={onPrepare ?? (() => undefined)}
+          open={wizardOpen}
+          studentUsers={studentUsers}
+        />
+      ) : null}
     </section>
   );
 }

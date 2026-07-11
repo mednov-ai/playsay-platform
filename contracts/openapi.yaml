@@ -978,6 +978,38 @@ paths:
           description: Scheduled lesson not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/start:
+    post:
+      tags:
+      - Schedule
+      summary: Start scheduled lesson
+      description: Starts a calendar lesson and opens live access. Requires TEACHER
+        or ADMIN role.
+      operationId: startScheduledLesson
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Scheduled lesson started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledLessonResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage schedule
+        "404":
+          description: Scheduled lesson not found
+        "409":
+          description: Scheduled lesson cannot be started
+      security:
+      - bearerAuth: []
   /schedule/lessons/{lessonId}/collaboration-documents/{documentId}/token:
     post:
       tags:

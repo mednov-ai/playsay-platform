@@ -139,7 +139,7 @@ class RepositoryQueryCoverageTest @Autowired constructor(
             teacher = teacher,
             template = template,
             material = directMaterial,
-            status = "SCHEDULED",
+            status = "IN_PROGRESS",
             scheduledStart = now.plusSeconds(3_600),
             scheduledEnd = now.plusSeconds(7_200),
         )
@@ -201,9 +201,9 @@ class RepositoryQueryCoverageTest @Autowired constructor(
         )
         assertEquals(
             directLesson.id,
-            lessonRepo.findJoinableForStudent(directLesson.id, "student-1", now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses)?.id,
+            lessonRepo.findJoinableForStudent(directLesson.id, "student-1", now.plusSeconds(3_600), now.minusSeconds(600), "IN_PROGRESS")?.id,
         )
-        assertNull(lessonRepo.findJoinableForStudent(directLesson.id, "student-2", now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses))
+        assertNull(lessonRepo.findJoinableForStudent(directLesson.id, "student-2", now.plusSeconds(3_600), now.minusSeconds(600), "IN_PROGRESS"))
         assertNull(lessonRepo.findJoinableForManager(cancelledLesson.id, now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses))
         assertNull(lessonRepo.findJoinableForManager(expiredLesson.id, now.plusSeconds(3_600), now.minusSeconds(600), excludedStatuses))
         assertEquals(directLesson.id, lessonRepo.findByLivekitRoomName("lesson-${directLesson.id}")?.id)

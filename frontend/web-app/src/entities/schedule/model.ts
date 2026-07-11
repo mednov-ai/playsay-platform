@@ -203,7 +203,7 @@ export function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean
 export function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
   const startMs = dateValueMs(lesson.scheduledStart);
   const endMs = dateValueMs(lesson.scheduledEnd);
-  return !isClosedScheduleStatus(lesson.status) &&
+  return lesson.status === "IN_PROGRESS" &&
     startMs !== null &&
     endMs !== null &&
     startMs - LESSON_ACCESS_GRACE_MS <= nowMs &&
@@ -230,7 +230,7 @@ export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number, t: Sc
     }
   }
 
-  if (lesson.status === "IN_PROGRESS" || isLessonCurrent(lesson, nowMs)) {
+  if (lesson.status === "IN_PROGRESS") {
     return t("schedule.state.live");
   }
 

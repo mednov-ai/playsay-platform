@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AppShellProps } from "./AppShell";
 import { AppShell } from "./AppShell";
 import { AppProviders } from "./AppProviders";
+import { LessonPreparationPanel } from "../features/schedule/ui/LessonPreparationPanel";
 
 describe("AppShell teacher header", () => {
   it("shows create lesson instead of a disabled join CTA when no lesson is joinable", () => {
@@ -13,7 +14,41 @@ describe("AppShell teacher header", () => {
     );
 
     expect(markup).not.toContain("Войти в урок");
-    expect(markup).toContain("Создать урок");
+    expect(markup).toContain("Назначить урок");
+  });
+
+  it("opens the dedicated preparation workspace for a scheduled lesson", () => {
+    const lesson = {
+      createdAt: "2026-05-20T10:00:00.000Z",
+      id: "lesson-prepare",
+      lessonTitle: "Speaking warm-up",
+      participants: [{ subject: "student-1", displayName: "Mila" }],
+      scheduledEnd: "2026-05-28T10:45:00.000Z",
+      scheduledStart: "2026-05-28T10:00:00.000Z",
+      status: "SCHEDULED",
+      type: "INDIVIDUAL",
+      updatedAt: "2026-05-20T10:00:00.000Z",
+      workMode: "SHARED",
+    } as AppShellProps["scheduledLessons"][number];
+    const markup = renderToStaticMarkup(
+      <AppProviders>
+        <LessonPreparationPanel
+          disabled={false}
+          lesson={lesson}
+          materials={[]}
+          message={null}
+          onAssignMaterial={async () => null}
+          onBack={() => undefined}
+          onCopyLinks={async () => true}
+          onOpenMaterials={() => undefined}
+          onStart={async () => undefined}
+        />
+      </AppProviders>,
+    );
+
+    expect(markup).toContain("Подготовка урока");
+    expect(markup).toContain("Начать урок");
+    expect(markup).toContain("Mila");
   });
 });
 

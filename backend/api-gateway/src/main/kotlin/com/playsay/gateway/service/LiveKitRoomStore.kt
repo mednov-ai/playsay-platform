@@ -96,19 +96,14 @@ class LiveKitRoomStore(
     private fun findJoinableLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LessonEntity? {
         val now = Instant.now()
         return if (authentication.canJoinAnyLiveKitLesson()) {
-            lessonRepo.findJoinableForManager(
-                lessonId = lessonId,
-                accessStartsBy = lessonAccessStartsBy(now),
-                accessEndsAfter = lessonAccessEndsAfter(now),
-                excludedStatuses = expiredLiveKitStatuses,
-            )
+            lessonRepo.findById(lessonId).orElse(null)?.takeUnless { lesson -> lesson.status in expiredLiveKitStatuses }
         } else {
             lessonRepo.findJoinableForStudent(
                 lessonId = lessonId,
                 subject = authentication.token.subject,
                 accessStartsBy = lessonAccessStartsBy(now),
                 accessEndsAfter = lessonAccessEndsAfter(now),
-                excludedStatuses = expiredLiveKitStatuses,
+                requiredStatus = MetaData.LessonStatuses.IN_PROGRESS,
             )
         }
     }

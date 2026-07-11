@@ -34,6 +34,7 @@ import com.playsay.gateway.service.*
 @Tag(name = "Schedule")
 class ScheduledLessonController(
     private val store: ScheduledLessonStore,
+    private val lifecycleService: ScheduledLessonLifecycleService,
 ) {
     @GetMapping("/schedule/lessons", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
@@ -166,6 +167,28 @@ class ScheduledLessonController(
         @PathVariable lessonId: UUID,
     ): ScheduledLessonResponse =
         store.complete(authentication, lessonId)
+
+    @PostMapping("/schedule/lessons/{lessonId}/start", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "startScheduledLesson",
+        summary = "Start scheduled lesson",
+        description = "Starts a calendar lesson and opens live access. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Scheduled lesson started"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot manage schedule", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson not found", content = [Content()]),
+            ApiResponse(responseCode = "409", description = "Scheduled lesson cannot be started", content = [Content()]),
+        ],
+    )
+    fun start(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+    ): ScheduledLessonResponse =
+        lifecycleService.start(authentication, lessonId)
 
     @PostMapping("/schedule/lessons/{lessonId}/participant-links", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(

@@ -2,6 +2,15 @@ export function classroomPath(lessonId: string): string {
   return `/lessons/${lessonId}/classroom`;
 }
 
+export function lessonPreparationPath(lessonId: string): string {
+  return `/lessons/${encodeURIComponent(lessonId)}/prepare`;
+}
+
+export function lessonPreparationIdFromPath(pathname: string): string | null {
+  const match = /^\/lessons\/([^/]+)\/prepare\/?$/.exec(pathname);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export function classroomLessonIdFromPath(pathname: string): string | null {
   const match = /^\/lessons\/([^/]+)\/classroom\/?$/.exec(pathname);
   return match ? decodeURIComponent(match[1]) : null;

@@ -5,7 +5,7 @@ import type { ScheduledLesson } from "../../../shared/api/playsay";
 import { ScheduledLessonCard } from "./ScheduledLessonCard";
 
 describe("ScheduledLessonCard", () => {
-  it("does not render a disabled join CTA when lesson access is closed", () => {
+  it("offers lesson preparation before the live access window", () => {
     const markup = renderToStaticMarkup(
       <AppProviders>
         <ScheduledLessonCard
@@ -29,7 +29,7 @@ describe("ScheduledLessonCard", () => {
 
     expect(markup).not.toContain('disabled=""');
     expect(markup).not.toContain("Войти в урок");
-    expect(markup).toContain("Откроется за 10 минут");
+    expect(markup).toContain("Подготовить урок");
   });
 
   it("labels the copy action as participant links for teachers", () => {

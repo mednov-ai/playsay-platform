@@ -14,6 +14,7 @@ import {
   fetchStudentProfiles,
   removeScheduledLesson,
   saveScheduledLesson,
+  startScheduledLesson as startScheduledLessonRequest,
   type AdminUserProfile,
   type ManagedStudentInput,
   type MeProfile,
@@ -74,11 +75,11 @@ export function useScheduleActions({
     }
   }
 
-  async function createScheduledLesson(input: ScheduledLessonInput) {
+  async function createScheduledLesson(input: ScheduledLessonInput): Promise<ScheduledLesson | null> {
     setScheduleLoading(true);
     setScheduleMessage(null);
     try {
-      await saveScheduledLesson(input);
+      const created = await saveScheduledLesson(input);
       setScheduledLessons(await fetchScheduledLessons());
       const createdCount = input.recurrence?.mode === "WEEKLY_COUNT"
         ? input.recurrence.count
@@ -86,10 +87,26 @@ export function useScheduleActions({
           ? input.recurrence.count * input.recurrence.weekdays.length
           : null;
       setScheduleMessage(createdCount ? t("schedule.messages.createdRecurring", { count: createdCount }) : t("schedule.messages.created"));
+      return created;
     } catch (caught) {
       setScheduleMessage(applySessionError(caught, t("schedule.messages.createFailed")));
+      return null;
     } finally {
       setScheduleLoading(false);
+    }
+  }
+
+  async function startScheduledLesson(lesson: ScheduledLesson): Promise<void> {
+    setRoomLoadingLessonId(lesson.id);
+    setRoomMessage(null);
+    try {
+      const started = await startScheduledLessonRequest(lesson.id);
+      setScheduledLessons((current) => current.map((item) => (item.id === lesson.id ? started : item)));
+      await joinScheduledLesson(started);
+    } catch (caught) {
+      setRoomMessage(applySessionError(caught, t("schedule.messages.startFailed")));
+    } finally {
+      setRoomLoadingLessonId(null);
     }
   }
 
@@ -286,6 +303,7 @@ export function useScheduleActions({
     joinScheduledLesson,
     leaveScheduledLessonRoom,
     refreshSchedule,
+    startScheduledLesson,
   };
 }
 

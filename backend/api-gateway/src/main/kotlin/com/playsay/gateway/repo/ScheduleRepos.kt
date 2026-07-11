@@ -246,7 +246,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
         select l
           from LessonEntity l
          where l.id = :lessonId
-           and l.status not in :excludedStatuses
+           and l.status = :requiredStatus
            and l.scheduledStart is not null
            and l.scheduledStart <= :accessStartsBy
            and l.scheduledEnd is not null
@@ -265,7 +265,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
         subject: String,
         accessStartsBy: Instant,
         accessEndsAfter: Instant,
-        excludedStatuses: Collection<String>,
+        requiredStatus: String,
     ): LessonEntity?
 
     @Query(

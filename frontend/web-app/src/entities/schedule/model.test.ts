@@ -40,32 +40,38 @@ describe("schedule model", () => {
 
     expect(scheduleStateLabel(lesson({ status: "CANCELLED" }), nowMs, t)).toBe("schedule.state.cancelled");
     expect(scheduleStateLabel(lesson({ scheduledEnd: "2026-05-28T09:00:00.000Z" }), nowMs, t)).toBe("schedule.state.expired");
-    expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T09:30:00.000Z", scheduledEnd: "2026-05-28T10:30:00.000Z" }), nowMs, t)).toBe("schedule.state.live");
+    expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-28T09:30:00.000Z", scheduledEnd: "2026-05-28T10:30:00.000Z" }), nowMs, t)).toBe("schedule.state.live");
+    expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T09:30:00.000Z", scheduledEnd: "2026-05-28T10:30:00.000Z" }), nowMs, t)).toBe("schedule.state.planned");
     expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T11:00:00.000Z" }), nowMs, t)).toBe("schedule.state.planned");
-    expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T10:08:00.000Z", scheduledEnd: "2026-05-28T10:53:00.000Z" }), nowMs, t)).toBe("schedule.state.opensSoon");
-    expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T09:07:00.000Z", scheduledEnd: "2026-05-28T09:52:00.000Z" }), nowMs, t)).toBe("schedule.state.closingSoon");
+    expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-28T10:08:00.000Z", scheduledEnd: "2026-05-28T10:53:00.000Z" }), nowMs, t)).toBe("schedule.state.opensSoon");
+    expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-28T09:07:00.000Z", scheduledEnd: "2026-05-28T09:52:00.000Z" }), nowMs, t)).toBe("schedule.state.closingSoon");
   });
 
   it("opens live lesson access only from ten minutes before start until ten minutes after end", () => {
     const nowMs = Date.parse("2026-05-28T10:00:00.000Z");
 
     expect(isJoinableScheduledLesson(lesson({
+      status: "IN_PROGRESS",
       scheduledStart: "2026-05-28T10:11:00.000Z",
       scheduledEnd: "2026-05-28T10:56:00.000Z",
     }), nowMs)).toBe(false);
     expect(isJoinableScheduledLesson(lesson({
+      status: "IN_PROGRESS",
       scheduledStart: "2026-05-28T10:10:00.000Z",
       scheduledEnd: "2026-05-28T10:55:00.000Z",
     }), nowMs)).toBe(true);
     expect(isJoinableScheduledLesson(lesson({
+      status: "IN_PROGRESS",
       scheduledStart: "2026-05-28T09:05:00.000Z",
       scheduledEnd: "2026-05-28T09:50:00.000Z",
     }), nowMs)).toBe(true);
     expect(isJoinableScheduledLesson(lesson({
+      status: "IN_PROGRESS",
       scheduledStart: "2026-05-28T09:04:00.000Z",
       scheduledEnd: "2026-05-28T09:49:00.000Z",
     }), nowMs)).toBe(false);
     expect(isJoinableScheduledLesson(lesson({
+      status: "IN_PROGRESS",
       scheduledStart: null,
       scheduledEnd: "2026-05-28T10:45:00.000Z",
     }), nowMs)).toBe(false);
@@ -77,7 +83,7 @@ describe("schedule model", () => {
       lesson({ id: "old", scheduledEnd: "2026-05-28T09:00:00.000Z" }),
       lesson({ id: "future-later", scheduledStart: "2026-05-28T14:00:00.000Z" }),
       lesson({ id: "future-soon", scheduledStart: "2026-05-28T12:00:00.000Z" }),
-      lesson({ id: "live", scheduledStart: "2026-05-28T09:55:00.000Z", scheduledEnd: "2026-05-28T10:45:00.000Z" }),
+      lesson({ id: "live", status: "IN_PROGRESS", scheduledStart: "2026-05-28T09:55:00.000Z", scheduledEnd: "2026-05-28T10:45:00.000Z" }),
     ].sort((left, right) => compareScheduleLessons(left, right, nowMs));
 
     expect(sorted.map((item) => item.id)).toEqual(["live", "future-soon", "future-later", "old"]);

@@ -26,7 +26,7 @@ import {
   type ScheduledLesson,
   type UpdateUserProfileInput,
 } from "../shared/api/playsay";
-import { classroomLessonIdFromPath } from "./routes";
+import { classroomLessonIdFromPath, lessonPreparationIdFromPath, lessonPreparationPath } from "./routes";
 import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
 import { useCourseWorkspaceData } from "../features/courses";
 import { usePaymentInvoicesData } from "../features/payments";
@@ -77,6 +77,7 @@ export function useAppController(): AppShellProps {
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const routeLessonId = classroomLessonIdFromPath(currentPath);
+  const preparationLessonId = lessonPreparationIdFromPath(currentPath);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,6 +273,7 @@ export function useAppController(): AppShellProps {
     joinScheduledLesson,
     leaveScheduledLessonRoom,
     refreshSchedule,
+    startScheduledLesson,
   } = useScheduleActions({
     applySessionError,
     navigateToPath,
@@ -324,13 +326,21 @@ export function useAppController(): AppShellProps {
 
     const routeLesson = scheduledLessons.find((lesson) => lesson.id === routeLessonId);
     if (routeLesson) {
-      if (!isJoinableScheduledLesson(routeLesson, nowMs)) {
+      if (!canManagePeople && !isJoinableScheduledLesson(routeLesson, nowMs)) {
         setRoomMessage(t("schedule.messages.alreadyClosed"));
         return;
       }
       void joinScheduledLesson(routeLesson, { updateRoute: false });
     }
   }, [nowMs, routeLessonId, roomLoadingLessonId, roomSession, scheduledLessons, status]);
+
+  function openLessonPreparation(lessonId: string) {
+    navigateToPath(lessonPreparationPath(lessonId));
+  }
+
+  function closeLessonPreparation() {
+    navigateToPath("/");
+  }
 
   function logout() {
     const logoutUrl = buildLogoutUrl();
@@ -427,6 +437,7 @@ export function useAppController(): AppShellProps {
     paymentInvoices,
     paymentLoading,
     paymentMessage,
+    preparationLessonId,
     profile,
     profileMessage,
     profileOpen,
@@ -447,6 +458,7 @@ export function useAppController(): AppShellProps {
     setProfileOpen,
     setWorkspaceTab,
     status,
+    startScheduledLesson,
     studentUsers,
     replaceLessonCards,
     createPaymentInvoice,
@@ -456,6 +468,8 @@ export function useAppController(): AppShellProps {
     upsertMaterial,
     workspaceTab,
     workspaceTabs,
+    openLessonPreparation,
+    closeLessonPreparation,
   };
 }
 

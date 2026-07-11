@@ -59,6 +59,7 @@ const ProfileAccountPanel = lazy(() => (
   import("../features/profile/ui/ProfileAccountPanel").then((module) => ({ default: module.ProfileAccountPanel }))
 ));
 const SchedulePanel = lazy(() => import("../features/schedule/ui/SchedulePanel").then((module) => ({ default: module.SchedulePanel })));
+const LessonPreparationPanel = lazy(() => import("../features/schedule/ui/LessonPreparationPanel").then((module) => ({ default: module.LessonPreparationPanel })));
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -78,7 +79,7 @@ export type AppShellProps = {
   createCourse: (input: CourseInput) => Promise<void>;
   createLesson: (courseId: string, input: CourseLessonInput) => Promise<void>;
   createTopic: (courseId: string, input: CurriculumTopicInput) => Promise<void>;
-  createScheduledLesson: (input: ScheduledLessonInput) => Promise<void>;
+  createScheduledLesson: (input: ScheduledLessonInput) => Promise<ScheduledLesson | null | void>;
   createManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   deleteCourse: (courseId: string) => Promise<void>;
   deleteLesson: (courseId: string, lessonId: string) => Promise<void>;
@@ -105,6 +106,7 @@ export type AppShellProps = {
   paymentInvoices: PaymentInvoice[];
   paymentLoading: boolean;
   paymentMessage: string | null;
+  preparationLessonId?: string | null;
   profile: MeProfile | null;
   profileMessage: string | null;
   profileOpen: boolean;
@@ -125,6 +127,7 @@ export type AppShellProps = {
   setProfileOpen: Dispatch<SetStateAction<boolean>>;
   setWorkspaceTab: Dispatch<SetStateAction<WorkspaceTab>>;
   status: SessionStatus;
+  startScheduledLesson?: (lesson: ScheduledLesson) => Promise<void>;
   studentUsers: AdminUserProfile[];
   replaceLessonCards: (courseId: string, lessonId: string, input: LessonTemplateCardsInput) => Promise<void>;
   createPaymentInvoice: (input: PaymentInvoiceCreateInput) => Promise<PaymentInvoiceCreated | null>;
@@ -134,6 +137,8 @@ export type AppShellProps = {
   upsertMaterial: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
   workspaceTab: WorkspaceTab;
   workspaceTabs: WorkspaceTabDefinition[];
+  openLessonPreparation?: (lessonId: string) => void;
+  closeLessonPreparation?: () => void;
 };
 
 export function AppShell(props: AppShellProps) {
@@ -184,6 +189,7 @@ export function AppShell(props: AppShellProps) {
     paymentInvoices,
     paymentLoading,
     paymentMessage,
+    preparationLessonId = null,
     profile,
     profileMessage,
     profileOpen,
@@ -204,6 +210,7 @@ export function AppShell(props: AppShellProps) {
     setProfileOpen,
     setWorkspaceTab,
     status,
+    startScheduledLesson = async () => undefined,
     studentUsers,
     replaceLessonCards,
     createPaymentInvoice,
@@ -213,16 +220,18 @@ export function AppShell(props: AppShellProps) {
     upsertMaterial,
     workspaceTab,
     workspaceTabs,
+    openLessonPreparation = () => undefined,
+    closeLessonPreparation = () => undefined,
   } = props;
   const canManageSchedule = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+  const preparationLesson = preparationLessonId
+    ? scheduledLessons.find((lesson) => lesson.id === preparationLessonId) ?? null
+    : null;
 
   function focusScheduleCreateForm() {
     setWorkspaceTab("schedule");
     window.requestAnimationFrame(() => {
-      document.querySelector("[data-schedule-quick-create='true']")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      window.dispatchEvent(new CustomEvent("playsay:assign-lesson"));
     });
   }
 
@@ -240,7 +249,7 @@ export function AppShell(props: AppShellProps) {
             <BrandMark />
             <div className="flex flex-wrap items-center justify-end gap-2">
               <ThemeToggle mode={theme.mode} onModeChange={theme.setMode} resolvedTheme={theme.resolvedTheme} />
-              {nextJoinableLesson ? (
+              {!canManageSchedule && nextJoinableLesson ? (
                 <Button
                   className="min-w-40"
                   disabled={anyLessonLoading}
@@ -259,7 +268,7 @@ export function AppShell(props: AppShellProps) {
                   type="button"
                 >
                   <CalendarPlus className="h-4 w-4" />
-                  {t("schedule.form.createLesson")}
+                  {t("schedule.wizard.assign")}
                 </Button>
               ) : null}
               <Button
@@ -292,6 +301,23 @@ export function AppShell(props: AppShellProps) {
           </Suspense>
         ) : !isAuthenticated ? (
           <WelcomeLanding profileSaving={profileSaving} status={status} />
+        ) : preparationLesson && canManageSchedule ? (
+          <Suspense fallback={<PanelFallback />}>
+            <LessonPreparationPanel
+              disabled={scheduleLoading || roomLoadingLessonId === preparationLesson.id}
+              lesson={preparationLesson}
+              materials={materials}
+              message={roomMessage ?? scheduleMessage}
+              onAssignMaterial={assignMaterialToScheduledLesson}
+              onBack={closeLessonPreparation}
+              onCopyLinks={copyScheduledLessonLinks}
+              onOpenMaterials={() => {
+                closeLessonPreparation();
+                setWorkspaceTab("materials");
+              }}
+              onStart={startScheduledLesson}
+            />
+          </Suspense>
         ) : (
           <div className="grid flex-1 gap-5">
             <Suspense fallback={<PanelFallback />}>
@@ -329,11 +355,13 @@ export function AppShell(props: AppShellProps) {
                   nowMs={nowMs}
                   onCancel={(lesson) => void cancelScheduledLesson(lesson)}
                   onComplete={(lesson) => void completeScheduledLesson(lesson.id)}
-                  onCreate={(input) => void createScheduledLesson(input)}
+                  onCreate={createScheduledLesson}
                   onCreateManagedStudent={createManagedStudent}
                   onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
                   onCopyLinks={(lesson) => copyScheduledLessonLinks(lesson)}
                   onJoin={(lesson) => void joinScheduledLesson(lesson)}
+                  onOpenMaterials={() => setWorkspaceTab("materials")}
+                  onPrepare={openLessonPreparation}
                   onRefresh={() => void refreshSchedule()}
                   profile={profile}
                   roomLoadingLessonId={roomLoadingLessonId}

@@ -105,6 +105,15 @@ export async function completeScheduledLesson(lessonId: string, config = authCon
   return response.data;
 }
 
+export async function startScheduledLesson(lessonId: string, config = authConfig): Promise<ScheduledLesson> {
+  return apiJson<ScheduledLesson>(
+    `/api/schedule/lessons/${encodeURIComponent(lessonId)}/start`,
+    { method: "POST" },
+    config,
+    200,
+  );
+}
+
 export async function enterScheduledLessonRoom(lessonId: string, config = authConfig): Promise<LiveKitRoomToken> {
   const response = await createScheduledLessonRoomToken(lessonId, await authorizedOptions(config));
 

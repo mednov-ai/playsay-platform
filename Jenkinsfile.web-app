@@ -14,6 +14,9 @@ spec:
       image: node:22
       command: ["cat"]
       tty: true
+      env:
+        - name: NODE_OPTIONS
+          value: "--max-old-space-size=768"
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /cache/npm

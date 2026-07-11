@@ -26,6 +26,10 @@ management:
   endpoints.web.exposure.include: health,info,prometheus
   endpoint.health.probes.enabled: true
 
+logging:
+  level:
+    org.hibernate.orm.connections.pooling: WARN
+
 playsay:
   ai-tutor:
     realtime:

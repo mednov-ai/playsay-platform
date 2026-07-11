@@ -36,6 +36,11 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    if (providers.gradleProperty("lowMemoryTests").isPresent) {
+        maxParallelForks = 1
+        forkEvery = 8
+        maxHeapSize = "512m"
+    }
 }
 
 tasks.named("jar") {

@@ -173,7 +173,7 @@ spec:
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :api-gateway:test :api-gateway:bootJar --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :api-gateway:test :api-gateway:bootJar -PlowMemoryTests --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
           }
         }
       }

@@ -1,5 +1,7 @@
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY build/libs/ai-tutor-service-*.jar app.jar
+RUN addgroup --system playsay && adduser --system --ingroup playsay playsay
+COPY ai-tutor-service/build/libs/*.jar /app/app.jar
+USER playsay
 EXPOSE 8087
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

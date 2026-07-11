@@ -14,6 +14,9 @@ spec:
       image: gradle:8-jdk21
       command: ["cat"]
       tty: true
+      env:
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.jvmargs=-Xmx384m -XX:MaxMetaspaceSize=256m"
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /home/gradle/.gradle
@@ -24,7 +27,7 @@ spec:
           memory: 1Gi
         limits:
           cpu: "2"
-          memory: 3Gi
+          memory: 2Gi
     - name: liquibase
       image: liquibase/liquibase:5.0.3
       command: ["cat"]

@@ -30,6 +30,7 @@ import { LessonTaskCanvas } from "./LessonTaskCanvas";
 import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
+import { VocabularyQuickAdd } from "../../vocabulary/ui/VocabularyQuickAdd";
 
 export function LessonWorkspace({
   displayName,
@@ -180,6 +181,7 @@ export function LessonWorkspace({
         </nav>
 
         <div className="playsay-workbench-tools">
+          <VocabularyQuickAdd recipientSubjects={canMonitorSubmissions ? session.participants.map((participant) => participant.subject) : []} source={{ sourceType: "LESSON", lessonId: session.lessonId, materialId: visibleMaterial?.id, ownerSubject: canMonitorSubmissions ? activeParticipant?.subject : undefined }}><span /></VocabularyQuickAdd>
           {canMonitorSubmissions && teacherWorkParticipants.length > 0 ? (
             <label className="playsay-teacher-target-picker">
               <span>{t("classroom.teacherTask.targetLabel")}</span>

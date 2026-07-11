@@ -24,6 +24,7 @@ class ConversationSessionEntity(
     @Column(name = "completed_at") var completedAt: Instant? = null,
     @Column(name = "duration_seconds", nullable = false) var durationSeconds: Long = 0,
     @Column(name = "summary_json", nullable = false, length = 16_000) var summaryJson: String = "{}",
+    @Column(name = "vocabulary_goals_json", nullable = false, length = 8_000) var vocabularyGoalsJson: String = "[]",
 )
 
 enum class StoredSessionStatus { ACTIVE, COMPLETED, FAILED }

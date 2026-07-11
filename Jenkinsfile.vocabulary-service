@@ -1,0 +1,287 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  securityContext:
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+  containers:
+    - name: gradle
+      image: gradle:8-jdk21
+      command: ["cat"]
+      tty: true
+      volumeMounts:
+        - name: jenkins-agent-cache
+          mountPath: /home/gradle/.gradle
+          subPath: gradle-vocabulary-service
+      resources:
+        requests:
+          cpu: 450m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 3Gi
+    - name: liquibase
+      image: liquibase/liquibase:5.0.3
+      command: ["cat"]
+      tty: true
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 0
+      env:
+        - name: PLAYSAY_DB_JDBC_URL
+          valueFrom:
+            secretKeyRef:
+              name: playsay-app-db
+              key: jdbc-uri
+        - name: PLAYSAY_DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: playsay-app-db
+              key: username
+        - name: PLAYSAY_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: playsay-app-db
+              key: password
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:debug
+      command: ["/busybox/cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 150m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1024Mi
+    - name: tools
+      image: alpine:3.20
+      command: ["cat"]
+      tty: true
+  volumes:
+    - name: kaniko-docker-config
+      emptyDir: {}
+    - name: jenkins-agent-cache
+      persistentVolumeClaim:
+        claimName: jenkins-agent-cache
+"""
+    }
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timestamps()
+  }
+
+  parameters {
+    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev.', trim: true)
+    string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
+    string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
+    string(name: 'ARGOCD_REFRESH_MODE', defaultValue: 'webhook', description: 'ArgoCD refresh mode: webhook or annotate.', trim: true)
+  }
+
+  environment {
+    GITHUB_OWNER = 'mednov-ai'
+    VOCABULARY_IMAGE_NAME = 'playsay-vocabulary-service'
+    PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
+    INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
+    INFRA_BRANCH = 'develop'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script {
+          def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
+          def requestedCommit = params.GITHUB_AFTER?.trim()
+          checkout([
+            $class: 'GitSCM',
+            branches: [[name: "*/${requestedBranch}"]],
+            doGenerateSubmoduleConfigurations: false,
+            extensions: [],
+            submoduleCfg: [],
+            userRemoteConfigs: [[url: env.PLATFORM_REPO]]
+          ])
+          if (requestedCommit) {
+            sh "git fetch --no-tags origin +refs/heads/${requestedBranch}:refs/remotes/origin/${requestedBranch}"
+            sh "git checkout --detach ${requestedCommit}"
+          }
+          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
+          env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
+
+          def buildPrefix = env.CI_BRANCH == 'develop' ? 'vocabulary-dev' : "vocabulary-${env.CI_BRANCH}"
+          buildPrefix = buildPrefix.replaceAll(/[^A-Za-z0-9_.-]/, '-')
+          buildPrefix = buildPrefix.replaceAll(/^[^A-Za-z0-9]+/, '').replaceAll(/[^A-Za-z0-9]+$/, '')
+          int maxPrefixLength = 63 - env.BUILD_NUMBER.length() - 1
+          if (buildPrefix.length() > maxPrefixLength) {
+            buildPrefix = buildPrefix.take(maxPrefixLength).replaceAll(/[^A-Za-z0-9]+$/, '')
+          }
+          env.BUILD_LABEL_PREFIX = buildPrefix ?: 'vocabulary'
+          env.BUILD_LABEL = "${env.BUILD_LABEL_PREFIX}-${env.BUILD_NUMBER}"
+          env.DEPLOY_TO_DEV = (
+            env.CI_BRANCH == 'develop' ||
+            env.CI_BRANCH.startsWith('codex/') ||
+            env.CI_BRANCH.startsWith('feature/') ||
+            env.CI_BRANCH.startsWith('release/') ||
+            env.CI_BRANCH.startsWith('hotfix/')
+          ).toString()
+
+          env.RUN_DB_MIGRATE = 'true'
+          def before = params.GITHUB_BEFORE?.trim()
+          if (before ==~ /[0-9a-f]{40}/ && env.GIT_COMMIT ==~ /[0-9a-f]{40}/ && !(before ==~ /0{40}/)) {
+            def beforeExists = sh(script: "git cat-file -e ${before}^{commit}", returnStatus: true) == 0
+            def isAncestor = beforeExists && sh(script: "git merge-base --is-ancestor ${before} ${env.GIT_COMMIT}", returnStatus: true) == 0
+            if (isAncestor) {
+              def changed = sh(script: "git diff --name-only ${before} ${env.GIT_COMMIT} -- backend/vocabulary-service/src/main/resources/db/changelog", returnStdout: true).trim()
+              env.RUN_DB_MIGRATE = changed ? 'true' : 'false'
+            }
+          }
+
+          currentBuild.displayName = env.BUILD_LABEL
+          currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
+          echo "Build label: ${env.BUILD_LABEL}"
+          echo "Source branch: ${env.CI_BRANCH}"
+          echo "Source commit: ${env.GIT_COMMIT}"
+          echo "Deploy to dev: ${env.DEPLOY_TO_DEV}"
+          echo "Run DB migrate: ${env.RUN_DB_MIGRATE}"
+        }
+      }
+    }
+
+    stage('Test and package') {
+      steps {
+        container('gradle') {
+          dir('backend') {
+            sh 'gradle :vocabulary-service:test :vocabulary-service:bootJar --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
+          }
+        }
+      }
+    }
+
+    stage('DB migrate') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' && env.RUN_DB_MIGRATE == 'true' }
+      }
+      steps {
+        container('liquibase') {
+          sh '''
+            set -eu
+            POSTGRES_JDBC_VERSION="42.7.8"
+            POSTGRES_JDBC_JAR="/tmp/postgresql-${POSTGRES_JDBC_VERSION}.jar"
+            if [ ! -f "$POSTGRES_JDBC_JAR" ]; then
+              curl -fsSL "https://repo1.maven.org/maven2/org/postgresql/postgresql/${POSTGRES_JDBC_VERSION}/postgresql-${POSTGRES_JDBC_VERSION}.jar" -o "$POSTGRES_JDBC_JAR"
+            fi
+            CHANGELOG="backend/vocabulary-service/src/main/resources/db/changelog/db.changelog-master.xml"
+            liquibase \
+              --changelog-file="$CHANGELOG" \
+              --classpath="$POSTGRES_JDBC_JAR" \
+              --url="$PLAYSAY_DB_JDBC_URL" \
+              --username="$PLAYSAY_DB_USERNAME" \
+              --password="$PLAYSAY_DB_PASSWORD" \
+              status --verbose
+            liquibase \
+              --changelog-file="$CHANGELOG" \
+              --classpath="$POSTGRES_JDBC_JAR" \
+              --url="$PLAYSAY_DB_JDBC_URL" \
+              --username="$PLAYSAY_DB_USERNAME" \
+              --password="$PLAYSAY_DB_PASSWORD" \
+              update
+          '''
+        }
+      }
+    }
+
+    stage('Build and push image') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('kaniko') {
+          withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+            sh '''
+              set -eu
+              JAR_COUNT="$(find "$WORKSPACE/backend/vocabulary-service/build/libs" -maxdepth 1 -name "*.jar" | wc -l | tr -d " ")"
+              if [ "$JAR_COUNT" != "1" ]; then
+                echo "Expected exactly one vocabulary-service bootJar, found $JAR_COUNT"
+                find "$WORKSPACE/backend/vocabulary-service/build/libs" -maxdepth 1 -type f -print || true
+                exit 1
+              fi
+              mkdir -p /kaniko/.docker
+              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\\n')"
+              cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
+EOF
+              /kaniko/executor \
+                --context "$WORKSPACE/backend" \
+                --dockerfile "$WORKSPACE/backend/vocabulary-service/Dockerfile" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${VOCABULARY_IMAGE_NAME}:${GIT_COMMIT}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${VOCABULARY_IMAGE_NAME}:${BUILD_LABEL}" \
+                --destination "ghcr.io/${GITHUB_OWNER}/${VOCABULARY_IMAGE_NAME}:dev"
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Tag source commit') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('tools') {
+          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+            sh 'apk add --no-cache git && ./scripts/ci/tag-source-commit.sh'
+          }
+        }
+      }
+    }
+
+    stage('Update dev image tag') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('tools') {
+          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+            sh 'apk add --no-cache git yq && CHART_VALUES_FILE=helm-charts/vocabulary-service/values-dev.yaml ./scripts/ci/update-dev-image-tag.sh'
+          }
+        }
+      }
+    }
+
+    stage('Wait for rollout') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('tools') {
+          sh 'apk add --no-cache jq kubectl && APP=vocabulary-service ./scripts/ci/wait-for-argocd-rollout.sh'
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
+    }
+  }
+}

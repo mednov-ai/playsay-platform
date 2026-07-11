@@ -32,3 +32,15 @@ class LearnerStudentProfileEntity(
     @Column(name = "birth_date")
     var birthDate: LocalDate? = null,
 )
+
+/** Read-only projection of active learner vocabulary owned by vocabulary-service. */
+@Entity
+@Table(name = "vocabulary_entries")
+class LearnerVocabularyEntryEntity(
+    @Id var id: UUID = UUID.randomUUID(),
+    @Column(name = "owner_subject", nullable = false) var ownerSubject: String = "",
+    @Column(name = "source_text", nullable = false) var sourceText: String = "",
+    @Column var translation: String? = null,
+    @Column(nullable = false) var status: String = "ACTIVE",
+    @Column(name = "updated_at", nullable = false) var updatedAt: java.time.Instant = java.time.Instant.EPOCH,
+)

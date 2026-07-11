@@ -7,6 +7,7 @@ import com.playsay.aitutor.entity.SessionEventEntity
 import com.playsay.aitutor.entity.StoredSessionStatus
 import com.playsay.aitutor.repo.ConversationSessionRepository
 import com.playsay.aitutor.repo.SessionEventRepository
+import com.playsay.aitutor.repo.LearnerVocabularyEntryRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -21,6 +22,7 @@ class AiTutorSessionService(
     private val realtime: RealtimeCredentialService,
     private val agePolicies: LearnerAgePolicyService,
     private val objectMapper: ObjectMapper,
+    private val vocabularyEntries: LearnerVocabularyEntryRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
@@ -28,6 +30,7 @@ class AiTutorSessionService(
         val agePolicy = agePolicies.resolve(subject)
         val persona = requireNotNull(catalog.persona(request.personaId, agePolicy)) { "Persona is unavailable for this age policy" }
         val scenario = requireNotNull(catalog.scenario(request.scenarioId, agePolicy)) { "Scenario is unavailable for this age policy" }
+        val vocabularyGoals = runCatching { vocabularyEntries.findTop5ByOwnerSubjectAndStatusOrderByUpdatedAtDesc(subject).map { it.sourceText } }.getOrDefault(emptyList())
         require(scenario.freeConversation || request.freeTopic.isNullOrBlank()) { "Free topic is supported only for free conversation" }
         val entity = sessions.save(
             ConversationSessionEntity(
@@ -37,9 +40,10 @@ class AiTutorSessionService(
                 feedbackMode = request.feedbackMode.name,
                 agePolicy = agePolicy.name,
                 freeTopic = request.freeTopic?.trim(),
+                vocabularyGoalsJson = objectMapper.writeValueAsString(vocabularyGoals),
             ),
         )
-        val credentials = realtime.create(persona.voice, instructions(persona, scenario, request))
+        val credentials = realtime.create(persona.voice, instructions(persona, scenario, request, vocabularyGoals))
         return entity.toResponse(credentials)
     }
 
@@ -126,12 +130,13 @@ class AiTutorSessionService(
         )
     }
 
-    private fun instructions(persona: TutorPersonaResponse, scenario: ConversationScenarioResponse, request: CreateSessionRequest): String =
+    private fun instructions(persona: TutorPersonaResponse, scenario: ConversationScenarioResponse, request: CreateSessionRequest, vocabularyGoals: List<String>): String =
         """
         You are ${persona.name}, a supportive English conversation tutor. Stay in English unless the learner asks for brief help.
         Scenario: ${request.freeTopic?.takeIf { it.isNotBlank() } ?: scenario.title}. Target level: ${scenario.cefrLevel}.
         Conversation goal: ${scenario.conversationGoal}. Success criteria: ${scenario.successCriteria.joinToString("; ")}.
         Turn goals in order: ${scenario.turnGoals.joinToString("; ")}.
+        Learner vocabulary goals: ${vocabularyGoals.joinToString("; ").ifBlank { "none" }}. Invite natural use of these words when relevant; never force an unnatural turn.
         Evaluate meaning and task completion, not exact wording. Multiple semantically correct answers are valid.
         Use ACCEPTED when the answer is relevant, understandable, and sufficiently correct even if a native speaker might phrase it differently.
         Use IMPROVE only for a material grammar/vocabulary problem, unclear meaning, or failure to address the current goal.
@@ -153,5 +158,6 @@ class AiTutorSessionService(
         summary = summaryJson.takeUnless { it == "{}" }?.let { json ->
             runCatching { objectMapper.readValue(json, SessionSummaryResponse::class.java) }.getOrNull()
         },
+        vocabularyGoals = runCatching { objectMapper.readValue(vocabularyGoalsJson, Array<String>::class.java).toList() }.getOrDefault(emptyList()),
     )
 }

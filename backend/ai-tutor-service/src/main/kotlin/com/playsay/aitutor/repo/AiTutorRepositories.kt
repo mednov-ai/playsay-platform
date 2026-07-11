@@ -3,6 +3,7 @@ package com.playsay.aitutor.repo
 import com.playsay.aitutor.entity.ConversationSessionEntity
 import com.playsay.aitutor.entity.LearnerAppUserEntity
 import com.playsay.aitutor.entity.LearnerStudentProfileEntity
+import com.playsay.aitutor.entity.LearnerVocabularyEntryEntity
 import com.playsay.aitutor.entity.SessionEventEntity
 import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
@@ -24,4 +25,8 @@ interface LearnerAppUserRepository : JpaRepository<LearnerAppUserEntity, UUID> {
 
 interface LearnerStudentProfileRepository : JpaRepository<LearnerStudentProfileEntity, UUID> {
     fun findByUserId(userId: UUID): LearnerStudentProfileEntity?
+}
+
+interface LearnerVocabularyEntryRepository : JpaRepository<LearnerVocabularyEntryEntity, UUID> {
+    fun findTop5ByOwnerSubjectAndStatusOrderByUpdatedAtDesc(ownerSubject: String, status: String = "ACTIVE"): List<LearnerVocabularyEntryEntity>
 }

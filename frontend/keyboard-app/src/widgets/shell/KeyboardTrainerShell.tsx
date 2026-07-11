@@ -64,7 +64,7 @@ import {
 } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
 import { computeActiveDurationMs, useTypingStore, type StreamItem } from "../../features/typing/typingStore";
-import { claimAnonymousProgress, fetchProgress, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
+import { claimAnonymousProgress, fetchProgress, fetchVocabularyPractice, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
@@ -506,6 +506,22 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         ? undefined
         : persistedSet;
     setSets(loadedSets);
+    if (isAuthenticated && layoutId === "EN" && !advancedMode) {
+      void fetchVocabularyPractice().then(({ entries }) => {
+        if (cancelled || entries.length === 0) return;
+        const vocabularySet: ChordSet = {
+          id: -900,
+          layout: "EN",
+          title: t("trainer.vocabularySet"),
+          difficulty: 1,
+          tier: "beginner",
+          chords: entries.map((entry) => entry.sourceText),
+          practiceKind: "VOCABULARY",
+          practiceContext: { practiceKind: "VOCABULARY", title: t("trainer.vocabularySet"), vocabularyEntryIds: entries.map((entry) => entry.id) },
+        };
+        setSets((current) => [...current.filter((item) => item.practiceKind !== "VOCABULARY"), vocabularySet]);
+      }).catch(() => undefined);
+    }
     if (restoredSet || loadedSets.length > 0) {
       const startSet = restoredSet ?? loadedSets[0];
       loadSet(

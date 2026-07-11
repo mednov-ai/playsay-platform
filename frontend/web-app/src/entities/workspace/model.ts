@@ -1,6 +1,6 @@
 import type { MeProfile } from "../../shared/api/playsay";
 
-export type WorkspaceTab = "schedule" | "homework" | "aiTutor" | "materials" | "courses" | "billing";
+export type WorkspaceTab = "schedule" | "homework" | "vocabulary" | "aiTutor" | "materials" | "courses" | "billing";
 
 export type WorkspaceTabDefinition = {
   id: WorkspaceTab;
@@ -23,6 +23,7 @@ export function workspaceTabsForProfile(profile: MeProfile | null): WorkspaceTab
   if (!canAssign) {
     return [
       scheduleTab,
+      { id: "vocabulary", labelKey: "workspace.tabs.vocabulary.label", descriptionKey: "workspace.tabs.vocabulary.description" },
       { id: "aiTutor", labelKey: "workspace.tabs.aiTutor.label", descriptionKey: "workspace.tabs.aiTutor.description" },
       {
         id: "homework",
@@ -34,6 +35,7 @@ export function workspaceTabsForProfile(profile: MeProfile | null): WorkspaceTab
 
   return [
     scheduleTab,
+    { id: "vocabulary", labelKey: "workspace.tabs.vocabulary.label", descriptionKey: "workspace.tabs.vocabulary.description" },
     { id: "aiTutor", labelKey: "workspace.tabs.aiTutor.label", descriptionKey: "workspace.tabs.aiTutor.description" },
     {
       id: "homework",

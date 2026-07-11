@@ -53,18 +53,22 @@ export interface ChordSet {
   difficulty: number;
   tier: LevelTier;
   chords: string[];
-  practiceKind?: "LETTER" | "CODE" | "CODE_COMBO";
+  practiceKind?: "LETTER" | "CODE" | "CODE_COMBO" | "VOCABULARY";
   codeLanguages?: string[];
   practiceContext?: PracticeContext;
 }
 
 export interface PracticeContext {
-  practiceKind: "CODE" | "CODE_COMBO";
-  codeLanguages: string[];
-  difficultyBand: "trigrams" | "quadgrams" | "long";
+  practiceKind: "CODE" | "CODE_COMBO" | "VOCABULARY";
+  codeLanguages?: string[];
+  difficultyBand?: "trigrams" | "quadgrams" | "long";
   title: string;
   numberRowEnabled?: boolean;
+  vocabularyEntryIds?: string[];
 }
+
+export interface VocabularyPracticeEntry { id: string; sourceText: string; }
+export interface VocabularyPracticeResponse { entries: VocabularyPracticeEntry[]; }
 
 export type TrainingLessonKind = "CALIBRATION" | "STANDARD" | "FOCUS";
 

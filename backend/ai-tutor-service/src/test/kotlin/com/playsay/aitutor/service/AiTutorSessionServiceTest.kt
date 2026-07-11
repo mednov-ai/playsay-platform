@@ -5,6 +5,7 @@ import com.playsay.aitutor.dto.*
 import com.playsay.aitutor.entity.ConversationSessionEntity
 import com.playsay.aitutor.repo.ConversationSessionRepository
 import com.playsay.aitutor.repo.SessionEventRepository
+import com.playsay.aitutor.repo.LearnerVocabularyEntryRepository
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import java.util.UUID
@@ -18,7 +19,8 @@ class AiTutorSessionServiceTest {
     private val agePolicies = Mockito.mock(LearnerAgePolicyService::class.java).also {
         Mockito.`when`(it.resolve("student-1")).thenReturn(AgePolicy.ADULT)
     }
-    private val service = AiTutorSessionService(AiTutorCatalogService(), sessions, events, realtime, agePolicies, jacksonObjectMapper())
+    private val vocabulary = Mockito.mock(LearnerVocabularyEntryRepository::class.java)
+    private val service = AiTutorSessionService(AiTutorCatalogService(), sessions, events, realtime, agePolicies, jacksonObjectMapper(), vocabulary)
 
     @Test
     fun `accepted answer does not require a replacement phrase`() {

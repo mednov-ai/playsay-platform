@@ -200,6 +200,7 @@ export const de = {
         label: "Hausaufgaben",
         description: "Aufgaben und Fortschritt",
       },
+      vocabulary: { label: "Wörterbuch", description: "Wörter zum Üben" },
       aiTutor: { label: "KI-Trainer", description: "Sprechpraxis" },
       materials: {
         label: "Materialien",
@@ -215,6 +216,12 @@ export const de = {
       },
       aria: "Arbeitsbereiche",
     },
+  },
+  vocabulary: {
+    title: "Mein Wörterbuch", description: "Wörter aus Unterricht, Hausaufgaben und eigener Übung.", search: "Wort suchen", empty: "Noch keine Wörter — füge das erste hinzu.", translationMissing: "Übersetzung fehlt noch",
+    quickAdd: { title: "Zum Wörterbuch hinzufügen" }, fields: { word: "Wort oder Ausdruck", translation: "Übersetzung", allParticipants: "Für alle Teilnehmenden hinzufügen" },
+    actions: { add: "Hinzufügen", suggest: "Übersetzung vorschlagen", save: "Speichern", search: "Suchen", archive: "Archivieren" },
+    messages: { saved: "Wort gespeichert.", saveFailed: "Wort konnte nicht gespeichert werden.", translationUnavailable: "Der Übersetzer ist nicht verfügbar — bitte manuell eingeben." },
   },
   aiTutor: {
     eyebrow: "Selbstständiges Üben", title: "Gespräch mit einem KI-Tutor", subtitle: "Wähle Thema, Stimme und Korrekturhäufigkeit.",

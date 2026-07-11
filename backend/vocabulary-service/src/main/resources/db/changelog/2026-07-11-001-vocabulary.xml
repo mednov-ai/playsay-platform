@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+  <changeSet id="2026-07-11-001-vocabulary" author="codex">
+    <createTable tableName="vocabulary_entries">
+      <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column><column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+      <column name="source_text" type="VARCHAR(240)"><constraints nullable="false"/></column><column name="normalized_source" type="VARCHAR(240)"><constraints nullable="false"/></column>
+      <column name="source_language" type="VARCHAR(16)"><constraints nullable="false"/></column><column name="target_language" type="VARCHAR(16)"><constraints nullable="false"/></column>
+      <column name="translation" type="VARCHAR(500)"/><column name="part_of_speech" type="VARCHAR(80)"/><column name="example" type="VARCHAR(1000)"/><column name="example_translation" type="VARCHAR(1000)"/>
+      <column name="translation_state" type="VARCHAR(16)"><constraints nullable="false"/></column><column name="status" type="VARCHAR(16)"><constraints nullable="false"/></column>
+      <column name="created_by_subject" type="VARCHAR(255)"><constraints nullable="false"/></column><column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column><column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+    </createTable>
+    <addUniqueConstraint tableName="vocabulary_entries" columnNames="owner_subject,normalized_source,source_language,target_language" constraintName="uq_vocabulary_owner_word_pair"/>
+    <createIndex tableName="vocabulary_entries" indexName="idx_vocabulary_owner_updated"><column name="owner_subject"/><column name="updated_at"/></createIndex>
+    <createTable tableName="vocabulary_occurrences">
+      <column name="id" type="BIGINT" autoIncrement="true"><constraints primaryKey="true" nullable="false"/></column><column name="entry_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_entries" referencedColumnNames="id" foreignKeyName="fk_vocabulary_occurrence_entry"/></column>
+      <column name="source_type" type="VARCHAR(16)"><constraints nullable="false"/></column><column name="lesson_id" type="UUID"/><column name="assignment_id" type="UUID"/><column name="material_id" type="UUID"/><column name="block_id" type="VARCHAR(120)"/><column name="context" type="VARCHAR(1000)"/>
+      <column name="added_by_subject" type="VARCHAR(255)"><constraints nullable="false"/></column><column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+    </createTable>
+  </changeSet>
+</databaseChangeLog>

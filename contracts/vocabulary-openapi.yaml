@@ -1,0 +1,46 @@
+openapi: 3.1.0
+info: { title: Play&Say Vocabulary API, version: 0.1.0 }
+servers: [{ url: /api/vocabulary }]
+security: [{ bearerAuth: [] }]
+paths:
+  /translation-suggestions:
+    post:
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TranslationSuggestionRequest' } } } }
+      responses: { '200': { description: Editable translation suggestion } }
+  /entries:
+    get: { responses: { '200': { description: Active vocabulary entries } } }
+    post:
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateEntry' } } } }
+      responses: { '201': { description: Created or merged vocabulary entry } }
+  /entries/{entryId}:
+    parameters: [{ in: path, name: entryId, required: true, schema: { type: string, format: uuid } }]
+    patch: { responses: { '200': { description: Updated entry } } }
+    delete: { responses: { '204': { description: Archived entry } } }
+  /practice:
+    get: { responses: { '200': { description: Current learner vocabulary practice set } } }
+components:
+  securitySchemes: { bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT } }
+  schemas:
+    SourceType: { type: string, enum: [LESSON, HOMEWORK, MANUAL] }
+    TranslationState: { type: string, enum: [MISSING, SUGGESTED, CONFIRMED] }
+    TranslationSuggestionRequest:
+      type: object
+      required: [sourceText]
+      properties:
+        sourceText: { type: string, maxLength: 240 }
+        sourceLanguage: { type: string, maxLength: 16 }
+        targetLanguage: { type: string, maxLength: 16 }
+        context: { type: string, maxLength: 1000 }
+    CreateEntry:
+      allOf:
+        - { $ref: '#/components/schemas/TranslationSuggestionRequest' }
+        - type: object
+          required: [sourceType]
+          properties:
+            ownerSubject: { type: string, maxLength: 255 }
+            translation: { type: string, maxLength: 500 }
+            sourceType: { $ref: '#/components/schemas/SourceType' }
+            lessonId: { type: string, format: uuid }
+            assignmentId: { type: string, format: uuid }
+            materialId: { type: string, format: uuid }
+            blockId: { type: string, maxLength: 120 }

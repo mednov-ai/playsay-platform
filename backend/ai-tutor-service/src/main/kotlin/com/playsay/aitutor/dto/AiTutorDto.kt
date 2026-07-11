@@ -61,6 +61,7 @@ data class ConversationSessionResponse(
     val completedAt: Instant?,
     val realtime: RealtimeCredentialsResponse? = null,
     val summary: SessionSummaryResponse? = null,
+    val vocabularyGoals: List<String> = emptyList(),
 )
 
 data class SessionSummaryResponse(

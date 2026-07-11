@@ -47,6 +47,7 @@ export const ru = {
     pro: "Профи",
   },
   trainer: {
+    vocabularySet: "Мой словарик",
     layout: "Тренировка",
     set: "Набор",
     advancedPractice: "Продвинутый режим",

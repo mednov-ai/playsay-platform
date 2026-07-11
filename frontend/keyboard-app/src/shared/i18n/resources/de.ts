@@ -49,6 +49,7 @@ export const de: TranslationResource = {
     pro: "Profi",
   },
   trainer: {
+    vocabularySet: "Mein Wörterbuch",
     layout: "Training",
     set: "Satz",
     advancedPractice: "Erweiterter Modus",

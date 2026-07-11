@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+  <changeSet id="2026-07-11-002-ai-tutor-vocabulary" author="codex">
+    <addColumn tableName="ai_tutor_sessions"><column name="vocabulary_goals_json" type="VARCHAR(8000)" defaultValue="[]"><constraints nullable="false"/></column></addColumn>
+  </changeSet>
+</databaseChangeLog>

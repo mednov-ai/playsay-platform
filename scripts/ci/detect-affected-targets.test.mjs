@@ -99,10 +99,11 @@ test("collaboration-service changes trigger only collaboration-service job", () 
 test("shared backend changes trigger all backend targets including keyboard backend", () => {
   assertDetection(
     ["backend/shared-kotlin/src/main/kotlin/com/playsay/shared/Clock.kt"],
-    ["api-gateway", "ai-tutor-service", "media-service", "payment-service", "registration-service", "email-service", "keyboard-service"],
+    ["api-gateway", "ai-tutor-service", "vocabulary-service", "media-service", "payment-service", "registration-service", "email-service", "keyboard-service"],
     [
       "playsay-api-gateway-develop",
       "playsay-ai-tutor-service-develop",
+      "playsay-vocabulary-service-develop",
       "playsay-media-service-develop",
       "playsay-payment-service-develop",
       "playsay-registration-service-develop",
@@ -132,6 +133,7 @@ test("unknown source paths fail safe to all targets", () => {
   assert.deepEqual(result.targets, [
     "api-gateway",
     "ai-tutor-service",
+    "vocabulary-service",
     "web-app",
     "collaboration-service",
     "media-service",
@@ -146,6 +148,7 @@ test("unknown source paths fail safe to all targets", () => {
     [
       "playsay-api-gateway-develop",
       "playsay-ai-tutor-service-develop",
+      "playsay-vocabulary-service-develop",
       "playsay-web-app-develop",
       "playsay-collaboration-service-develop",
       "playsay-media-service-develop",
@@ -167,6 +170,7 @@ test("invalid diff base fails safe to all targets", () => {
   assert.deepEqual(result.targets, [
     "api-gateway",
     "ai-tutor-service",
+    "vocabulary-service",
     "web-app",
     "collaboration-service",
     "media-service",
@@ -181,6 +185,7 @@ test("invalid diff base fails safe to all targets", () => {
     [
       "playsay-api-gateway-develop",
       "playsay-ai-tutor-service-develop",
+      "playsay-vocabulary-service-develop",
       "playsay-web-app-develop",
       "playsay-collaboration-service-develop",
       "playsay-media-service-develop",

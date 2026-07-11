@@ -200,6 +200,7 @@ export const ru = {
         label: "Домашка",
         description: "задания и прогресс",
       },
+      vocabulary: { label: "Словарик", description: "слова для практики" },
       aiTutor: { label: "AI-тренер", description: "разговорная практика" },
       materials: {
         label: "Материалы",
@@ -215,6 +216,12 @@ export const ru = {
       },
       aria: "Рабочие разделы",
     },
+  },
+  vocabulary: {
+    title: "Мой словарик", description: "Слова из уроков, домашки и самостоятельной практики.", search: "Найти слово", empty: "Слов пока нет — добавьте первое.", translationMissing: "Перевод пока не добавлен",
+    quickAdd: { title: "Добавить в словарик" }, fields: { word: "Слово или фраза", translation: "Перевод", allParticipants: "Добавить всем участникам урока" },
+    actions: { add: "В словарик", suggest: "Предложить перевод", save: "Сохранить", search: "Найти", archive: "Архивировать" },
+    messages: { saved: "Слово сохранено.", saveFailed: "Не удалось сохранить слово.", translationUnavailable: "Переводчик сейчас недоступен — перевод можно ввести вручную." },
   },
   aiTutor: {
     eyebrow: "Самостоятельная практика", title: "Разговор с AI-преподавателем", subtitle: "Выберите тему, голос и частоту исправлений.",

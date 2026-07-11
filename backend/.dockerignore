@@ -7,6 +7,9 @@
 !ai-tutor-service/build/
 !ai-tutor-service/build/libs/
 !ai-tutor-service/build/libs/*.jar
+!vocabulary-service/build/
+!vocabulary-service/build/libs/
+!vocabulary-service/build/libs/*.jar
 !media-service/build/
 !media-service/build/libs/
 !media-service/build/libs/*.jar

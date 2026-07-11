@@ -200,6 +200,7 @@ export const fr = {
         label: "Devoirs",
         description: "tâches et progrès",
       },
+      vocabulary: { label: "Vocabulaire", description: "mots à pratiquer" },
       aiTutor: { label: "Coach IA", description: "pratique orale" },
       materials: {
         label: "Supports",
@@ -215,6 +216,12 @@ export const fr = {
       },
       aria: "Sections de travail",
     },
+  },
+  vocabulary: {
+    title: "Mon vocabulaire", description: "Mots des cours, devoirs et exercices personnels.", search: "Chercher un mot", empty: "Aucun mot — ajoutez le premier.", translationMissing: "Traduction non renseignée",
+    quickAdd: { title: "Ajouter au vocabulaire" }, fields: { word: "Mot ou expression", translation: "Traduction", allParticipants: "Ajouter pour tous les participants" },
+    actions: { add: "Ajouter", suggest: "Proposer une traduction", save: "Enregistrer", search: "Chercher", archive: "Archiver" },
+    messages: { saved: "Mot enregistré.", saveFailed: "Impossible d’enregistrer le mot.", translationUnavailable: "Le traducteur est indisponible — saisissez la traduction manuellement." },
   },
   aiTutor: {
     eyebrow: "Pratique autonome", title: "Conversation avec un professeur IA", subtitle: "Choisissez le sujet, la voix et la fréquence des corrections.",

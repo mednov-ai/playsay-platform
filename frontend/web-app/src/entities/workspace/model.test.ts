@@ -18,8 +18,8 @@ describe("workspace model", () => {
   });
 
   it("adds AI speaking practice to student and teacher workspaces", () => {
-    expect(workspaceTabsForProfile(profileWithRoles(["STUDENT"])).map((tab) => tab.id)).toEqual(["schedule", "aiTutor", "homework"]);
-    expect(workspaceTabsForProfile(profileWithRoles(["TEACHER"])).map((tab) => tab.id)).toEqual(["schedule", "aiTutor", "homework", "materials", "courses", "billing"]);
+    expect(workspaceTabsForProfile(profileWithRoles(["STUDENT"])).map((tab) => tab.id)).toEqual(["schedule", "vocabulary", "aiTutor", "homework"]);
+    expect(workspaceTabsForProfile(profileWithRoles(["TEACHER"])).map((tab) => tab.id)).toEqual(["schedule", "vocabulary", "aiTutor", "homework", "materials", "courses", "billing"]);
     expect(workspaceTabsForProfile(profileWithRoles(["STUDENT"]))[0].labelKey).toBe("workspace.tabs.mySchedule.label");
     expect(workspaceTabsForProfile(profileWithRoles(["TEACHER"]))[0].labelKey).toBe("workspace.tabs.schedule.label");
   });

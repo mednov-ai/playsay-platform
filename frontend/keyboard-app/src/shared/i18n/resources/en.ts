@@ -49,6 +49,7 @@ export const en: TranslationResource = {
     pro: "Pro",
   },
   trainer: {
+    vocabularySet: "My vocabulary",
     layout: "Practice",
     set: "Set",
     advancedPractice: "Advanced mode",

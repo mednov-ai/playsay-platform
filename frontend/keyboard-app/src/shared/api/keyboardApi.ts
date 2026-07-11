@@ -20,6 +20,7 @@ import type {
   SubmitResult,
   SubmitTrainingResultResponse,
   UpdateAnonymousProfileRequest,
+  VocabularyPracticeResponse,
 } from "../types";
 
 const apiBaseUrl = import.meta.env.VITE_KEYBOARD_API_BASE_URL ?? "";
@@ -110,6 +111,10 @@ export function submitResult(body: SubmitResult): Promise<SubmitTrainingResultRe
 
 export function fetchProgress(): Promise<Progress> {
   return apiJson<Progress>(keyboardApiPath("/training/progress"), { method: "GET" });
+}
+
+export function fetchVocabularyPractice(): Promise<VocabularyPracticeResponse> {
+  return apiJson<VocabularyPracticeResponse>(`${apiBaseUrl}/api/vocabulary/practice?limit=32`, { method: "GET" });
 }
 
 export function claimAnonymousProgress(body: ClaimAnonymousProgressRequest): Promise<ClaimAnonymousProgressResponse> {

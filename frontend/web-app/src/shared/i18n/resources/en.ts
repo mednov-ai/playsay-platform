@@ -200,6 +200,7 @@ export const en = {
         label: "Homework",
         description: "tasks and progress",
       },
+      vocabulary: { label: "Vocabulary", description: "words to practise" },
       aiTutor: { label: "AI trainer", description: "speaking practice" },
       materials: {
         label: "Materials",
@@ -215,6 +216,12 @@ export const en = {
       },
       aria: "Workspace sections",
     },
+  },
+  vocabulary: {
+    title: "My vocabulary", description: "Words from lessons, homework, and independent practice.", search: "Find a word", empty: "No words yet — add your first one.", translationMissing: "Translation not added yet",
+    quickAdd: { title: "Add to vocabulary" }, fields: { word: "Word or phrase", translation: "Translation", allParticipants: "Add for all lesson participants" },
+    actions: { add: "Add word", suggest: "Suggest translation", save: "Save", search: "Search", archive: "Archive" },
+    messages: { saved: "Word saved.", saveFailed: "Could not save the word.", translationUnavailable: "Translator is unavailable — enter a translation manually." },
   },
   aiTutor: {
     eyebrow: "Independent practice", title: "Talk with an AI tutor", subtitle: "Choose a topic, voice, and how often you want corrections.",

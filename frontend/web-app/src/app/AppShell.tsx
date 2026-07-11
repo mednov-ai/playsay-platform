@@ -61,6 +61,7 @@ const ProfileAccountPanel = lazy(() => (
 const SchedulePanel = lazy(() => import("../features/schedule/ui/SchedulePanel").then((module) => ({ default: module.SchedulePanel })));
 const LessonPreparationPanel = lazy(() => import("../features/schedule/ui/LessonPreparationPanel").then((module) => ({ default: module.LessonPreparationPanel })));
 const AiTutorPanel = lazy(() => import("../features/ai-tutor/ui/AiTutorPanel").then((module) => ({ default: module.AiTutorPanel })));
+const VocabularyPanel = lazy(() => import("../features/vocabulary/ui/VocabularyPanel").then((module) => ({ default: module.VocabularyPanel })));
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -385,6 +386,8 @@ export function AppShell(props: AppShellProps) {
               {workspaceTab === "aiTutor" ? (
                 <AiTutorPanel appProfile={appProfile} onOpenProfile={() => setProfileOpen(true)} />
               ) : null}
+
+              {workspaceTab === "vocabulary" ? <VocabularyPanel /> : null}
 
               {workspaceTab === "materials" ? (
                 <MaterialLibraryPanel

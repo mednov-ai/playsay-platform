@@ -10,6 +10,7 @@ import {
   type MaterialAnswerState,
 } from "../../materials";
 import { formatHomeworkDate } from "../model/homeworkUtils";
+import { VocabularyQuickAdd } from "../../vocabulary/ui/VocabularyQuickAdd";
 
 export function StudentHomeworkDetailView({
   answers,
@@ -63,14 +64,16 @@ export function StudentHomeworkDetailView({
             {detail.assignment.instructions}
           </div>
         ) : null}
-        <LessonMaterialDocumentView
-          answers={answers}
-          material={detail.material}
-          mode="classroom"
-          onAnswerChange={onAnswerChange}
-          score={score}
-          showScoreBadge={false}
-        />
+        <VocabularyQuickAdd source={{ sourceType: "HOMEWORK", assignmentId: detail.assignment.id, materialId: detail.material.id }}>
+          <LessonMaterialDocumentView
+            answers={answers}
+            material={detail.material}
+            mode="classroom"
+            onAnswerChange={onAnswerChange}
+            score={score}
+            showScoreBadge={false}
+          />
+        </VocabularyQuickAdd>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button disabled={disabled} onClick={onSubmit} type="button">

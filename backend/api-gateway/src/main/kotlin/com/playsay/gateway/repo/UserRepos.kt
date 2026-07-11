@@ -34,6 +34,9 @@ interface AppUserRepo : JpaRepository<AppUserEntity, UUID> {
     fun findByRoleOrdered(role: String): List<AppUserEntity>
 }
 
-interface StudentProfileRepo : JpaRepository<StudentProfileEntity, UUID>
+interface StudentProfileRepo : JpaRepository<StudentProfileEntity, UUID> {
+    fun findByUserId(userId: UUID): StudentProfileEntity?
+    fun findByUserIdIn(userIds: Collection<UUID>): List<StudentProfileEntity>
+}
 
 interface TeacherProfileRepo : JpaRepository<TeacherProfileEntity, UUID>

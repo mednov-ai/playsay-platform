@@ -1,0 +1,19 @@
+package com.playsay.aitutor.service
+
+import com.playsay.aitutor.dto.AgePolicy
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class AiTutorCatalogServiceTest {
+    private val catalog = AiTutorCatalogService()
+
+    @Test
+    fun `child catalog excludes adult work scenario and restricted persona`() {
+        assertFalse(catalog.scenarios(AgePolicy.CHILD).any { it.id == "job-interview" })
+        assertFalse(catalog.personas(AgePolicy.CHILD).any { it.id == "nova" })
+        assertTrue(catalog.scenarios(AgePolicy.CHILD).any { it.id == "free" })
+        assertTrue(catalog.scenarios(AgePolicy.CHILD).all { it.conversationGoal.isNotBlank() })
+        assertTrue(catalog.scenarios(AgePolicy.CHILD).all { it.successCriteria.isNotEmpty() && it.turnGoals.isNotEmpty() })
+    }
+}

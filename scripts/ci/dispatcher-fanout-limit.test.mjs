@@ -11,7 +11,7 @@ const dispatcher = readFileSync(resolve(platformRoot, "Jenkinsfile.dispatcher"),
 const dispatchJobXmlPath = resolve(projectRoot, "playsay-infra/jenkins/jobs/playsay-platform-dispatch-develop.xml");
 
 test("dispatcher exposes a bounded downstream concurrency parameter", () => {
-  assert.match(dispatcher, /string\(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '2'/);
+  assert.match(dispatcher, /string\(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1'/);
   assert.match(dispatcher, /MAX_PARALLEL_MODULE_JOBS must be an integer from 1 to 9/);
   assert.match(dispatcher, /maxParallelModuleJobs = maxParallelText\.toInteger\(\)/);
 });
@@ -28,6 +28,6 @@ test("dispatcher batches downstream jobs and aggregates their results", () => {
 test("dispatcher job XML exposes the same concurrency parameter", { skip: !existsSync(dispatchJobXmlPath) }, () => {
   const dispatchJobXml = readFileSync(dispatchJobXmlPath, "utf8");
   assert.match(dispatchJobXml, /<name>MAX_PARALLEL_MODULE_JOBS<\/name>/);
-  assert.match(dispatchJobXml, /<defaultValue>2<\/defaultValue>/);
+  assert.match(dispatchJobXml, /<defaultValue>1<\/defaultValue>/);
   assert.match(dispatchJobXml, /Maximum downstream module jobs to run at once/);
 });

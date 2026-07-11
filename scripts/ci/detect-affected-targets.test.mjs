@@ -40,6 +40,14 @@ test("api-gateway and contract changes trigger api-gateway and web-app", () => {
   );
 });
 
+test("ai tutor backend and contract changes trigger ai tutor and web-app", () => {
+  assertDetection(
+    ["backend/ai-tutor-service/src/main/kotlin/com/playsay/aitutor/AiTutorServiceApplication.kt", "contracts/ai-tutor-openapi.yaml"],
+    ["ai-tutor-service", "web-app"],
+    ["playsay-ai-tutor-service-develop", "playsay-web-app-develop"],
+  );
+});
+
 test("registration contract changes trigger registration-service and web-app", () => {
   assertDetection(
     ["contracts/registration-openapi.yaml"],
@@ -91,9 +99,10 @@ test("collaboration-service changes trigger only collaboration-service job", () 
 test("shared backend changes trigger all backend targets including keyboard backend", () => {
   assertDetection(
     ["backend/shared-kotlin/src/main/kotlin/com/playsay/shared/Clock.kt"],
-    ["api-gateway", "media-service", "payment-service", "registration-service", "email-service", "keyboard-service"],
+    ["api-gateway", "ai-tutor-service", "media-service", "payment-service", "registration-service", "email-service", "keyboard-service"],
     [
       "playsay-api-gateway-develop",
+      "playsay-ai-tutor-service-develop",
       "playsay-media-service-develop",
       "playsay-payment-service-develop",
       "playsay-registration-service-develop",
@@ -122,6 +131,7 @@ test("unknown source paths fail safe to all targets", () => {
   const result = detectTargetsForPaths(["new-tooling/config.yml"]);
   assert.deepEqual(result.targets, [
     "api-gateway",
+    "ai-tutor-service",
     "web-app",
     "collaboration-service",
     "media-service",
@@ -135,6 +145,7 @@ test("unknown source paths fail safe to all targets", () => {
     result.jobs.map((job) => job.name),
     [
       "playsay-api-gateway-develop",
+      "playsay-ai-tutor-service-develop",
       "playsay-web-app-develop",
       "playsay-collaboration-service-develop",
       "playsay-media-service-develop",
@@ -155,6 +166,7 @@ test("invalid diff base fails safe to all targets", () => {
   });
   assert.deepEqual(result.targets, [
     "api-gateway",
+    "ai-tutor-service",
     "web-app",
     "collaboration-service",
     "media-service",
@@ -168,6 +180,7 @@ test("invalid diff base fails safe to all targets", () => {
     result.jobs.map((job) => job.name),
     [
       "playsay-api-gateway-develop",
+      "playsay-ai-tutor-service-develop",
       "playsay-web-app-develop",
       "playsay-collaboration-service-develop",
       "playsay-media-service-develop",

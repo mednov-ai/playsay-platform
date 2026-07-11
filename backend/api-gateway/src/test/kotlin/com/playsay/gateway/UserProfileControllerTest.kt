@@ -4,6 +4,7 @@ import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.repo.*
 import com.playsay.gateway.service.*
+import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -78,6 +79,7 @@ class UserProfileControllerTest @Autowired constructor(
                 countryCode = " ru ",
                 timezone = "Europe/Moscow",
                 learningGoal = "Practice classroom speaking.",
+                birthDate = LocalDate.parse("2012-04-03"),
             ),
         )
 
@@ -86,6 +88,7 @@ class UserProfileControllerTest @Autowired constructor(
         assertEquals("RU", updated.countryCode)
         assertEquals("Europe/Moscow", updated.timezone)
         assertEquals("Practice classroom speaking.", updated.learningGoal)
+        assertEquals(LocalDate.parse("2012-04-03"), updated.birthDate)
         assertEquals(listOf("STUDENT"), updated.roles)
     }
 
@@ -181,6 +184,18 @@ class UserProfileControllerTest @Autowired constructor(
             controller.update(
                 authentication(role = "ROLE_STUDENT"),
                 UpdateUserProfileRequest(countryCode = "R1"),
+            )
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.statusCode)
+    }
+
+    @Test
+    fun `rejects a future birth date`() {
+        val error = assertFailsWith<ResponseStatusException> {
+            controller.update(
+                authentication(role = "ROLE_STUDENT"),
+                UpdateUserProfileRequest(birthDate = LocalDate.now().plusDays(1)),
             )
         }
 

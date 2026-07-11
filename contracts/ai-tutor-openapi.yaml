@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info: { title: Play&Say AI Tutor API, version: 0.1.0 }
+servers: [{ url: /api/ai-tutor }]
+security: [{ bearerAuth: [] }]
+paths:
+  /personas:
+    get:
+      responses: { '200': { description: Allowed tutor personas } }
+  /scenarios:
+    get:
+      responses: { '200': { description: Allowed scenarios } }
+  /sessions:
+    post:
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateSession' } } } }
+      responses: { '201': { description: Session with optional ephemeral Realtime credentials } }
+  /sessions/{sessionId}/events:
+    post:
+      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SessionEvent' } } } }
+      responses: { '200': { description: Idempotently accepted event } }
+  /sessions/{sessionId}/finish:
+    post:
+      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Completed session } }
+  /progress:
+    get: { responses: { '200': { description: Learner AI tutor progress } } }
+  /assessment:
+    post: { responses: { '200': { description: Non-final CEFR range and confidence } } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    FeedbackMode: { type: string, enum: [EVERY_TURN, SIGNIFICANT, SESSION_END] }
+    TurnVerdict: { type: string, enum: [ACCEPTED, IMPROVE] }
+    GoalResult: { type: string, enum: [MET, PARTIAL, NOT_MET] }
+    LanguageIssueCategory: { type: string, enum: [GRAMMAR, VOCABULARY, RELEVANCE, CLARITY] }
+    CreateSession:
+      type: object
+      required: [personaId, scenarioId, feedbackMode]
+      properties:
+        personaId: { type: string }
+        scenarioId: { type: string }
+        feedbackMode: { $ref: '#/components/schemas/FeedbackMode' }
+        freeTopic: { type: string, maxLength: 240 }
+    TurnEvaluation:
+      type: object
+      required: [clientTurnId, verdict, goalResult, original, improved, explanation, category, encouragement]
+      properties:
+        clientTurnId: { type: string, maxLength: 128 }
+        verdict: { $ref: '#/components/schemas/TurnVerdict' }
+        goalResult: { $ref: '#/components/schemas/GoalResult' }
+        original: { type: string, maxLength: 2000 }
+        improved: { type: string, maxLength: 2000 }
+        explanation: { type: string, maxLength: 1000 }
+        category: { $ref: '#/components/schemas/LanguageIssueCategory' }
+        encouragement: { type: string, maxLength: 500 }
+    SessionEvent:
+      type: object
+      required: [clientEventId, type, turnEvaluation]
+      properties:
+        clientEventId: { type: string, maxLength: 128 }
+        type: { type: string, enum: [TURN_EVALUATION] }
+        turnEvaluation: { $ref: '#/components/schemas/TurnEvaluation' }

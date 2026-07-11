@@ -2394,6 +2394,11 @@ components:
           - string
           - "null"
           maxLength: 500
+        birthDate:
+          type:
+          - string
+          - "null"
+          format: date
     UserProfileResponse:
       type: object
       properties:
@@ -2435,6 +2440,11 @@ components:
           type:
           - string
           - "null"
+        birthDate:
+          type:
+          - string
+          - "null"
+          format: date
         updatedAt:
           type: string
           format: date-time

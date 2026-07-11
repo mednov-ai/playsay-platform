@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const TARGETS = Object.freeze([
   "api-gateway",
+  "ai-tutor-service",
   "web-app",
   "collaboration-service",
   "media-service",
@@ -19,6 +20,7 @@ const KEYBOARD_FRONTEND_TARGETS = new Set(["keyboard-app"]);
 const ALL_TARGETS = new Set(TARGETS);
 const BACKEND_TARGETS = new Set([
   "api-gateway",
+  "ai-tutor-service",
   "media-service",
   "payment-service",
   "registration-service",
@@ -28,6 +30,7 @@ const BACKEND_TARGETS = new Set([
 const FRONTEND_TARGETS = new Set(["web-app", "keyboard-app"]);
 const TARGET_JOBS = Object.freeze({
   "api-gateway": "playsay-api-gateway-develop",
+  "ai-tutor-service": "playsay-ai-tutor-service-develop",
   "web-app": "playsay-web-app-develop",
   "collaboration-service": "playsay-collaboration-service-develop",
   "media-service": "playsay-media-service-develop",
@@ -103,6 +106,12 @@ export function detectTargetsForPaths(paths, options = {}) {
 
     if (path === "contracts/openapi.yaml" || path.startsWith("backend/api-gateway/")) {
       targets.add("api-gateway");
+      targets.add("web-app");
+      continue;
+    }
+
+    if (path === "contracts/ai-tutor-openapi.yaml" || path.startsWith("backend/ai-tutor-service/")) {
+      targets.add("ai-tutor-service");
       targets.add("web-app");
       continue;
     }

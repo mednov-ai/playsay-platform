@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, ClipboardList, CreditCard, Layers3 } from "lucide-react";
+import { BookOpen, CalendarDays, ClipboardList, CreditCard, Layers3, MessagesSquare } from "lucide-react";
 import type { ReactNode } from "react";
 import type { WorkspaceTab, WorkspaceTabDefinition } from "../../entities/workspace/model";
 import { useAppTranslation } from "../../shared/i18n";
@@ -38,6 +38,8 @@ export function WorkspaceTabs({
 
 function workspaceTabIcon(tab: WorkspaceTab): ReactNode {
   switch (tab) {
+    case "aiTutor":
+      return <MessagesSquare className="h-4 w-4" />;
     case "billing":
       return <CreditCard className="h-4 w-4" />;
     case "homework":

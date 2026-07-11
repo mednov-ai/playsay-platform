@@ -1,0 +1,35 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: ai-tutor-service
+  datasource:
+    url: ${PLAYSAY_AI_TUTOR_DB_JDBC_URL:jdbc:postgresql://playsay-postgres-rw.playsay-data.svc.cluster.local:5432/ai_tutor}
+    username: ${PLAYSAY_AI_TUTOR_DB_USERNAME:ai_tutor_app}
+    password: ${PLAYSAY_AI_TUTOR_DB_PASSWORD:}
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: ${PLAYSAY_AI_TUTOR_LIQUIBASE_ENABLED:false}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${PLAYSAY_AUTH_ISSUER_URI:https://ops.play-and-say.ru:18443/keycloak/realms/playsay}
+          jwk-set-uri: ${PLAYSAY_AUTH_JWK_SET_URI:https://ops.play-and-say.ru:18443/keycloak/realms/playsay/protocol/openid-connect/certs}
+
+management:
+  endpoints.web.exposure.include: health,info,prometheus
+  endpoint.health.probes.enabled: true
+
+playsay:
+  ai-tutor:
+    realtime:
+      provider: ${PLAYSAY_AI_TUTOR_REALTIME_PROVIDER:stub}
+      api-key: ${PLAYSAY_AI_TUTOR_OPENAI_API_KEY:}
+      base-url: ${PLAYSAY_AI_TUTOR_OPENAI_BASE_URL:https://api.openai.com/v1}
+      model: ${PLAYSAY_AI_TUTOR_REALTIME_MODEL:gpt-realtime-2.1}

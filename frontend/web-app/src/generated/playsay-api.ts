@@ -32,6 +32,8 @@ export interface UpdateUserProfileRequest {
      * @nullable
      */
   learningGoal?: string | null;
+  /** @nullable */
+  birthDate?: string | null;
 }
 
 export interface UserProfileResponse {
@@ -53,6 +55,8 @@ export interface UserProfileResponse {
   timezone?: string | null;
   /** @nullable */
   learningGoal?: string | null;
+  /** @nullable */
+  birthDate?: string | null;
   updatedAt: string;
   managedByTeacher: boolean;
 }
@@ -2705,6 +2709,72 @@ export const createScheduledLesson = async (scheduledLessonRequest: ScheduledLes
 
   const data: createScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createScheduledLessonResponse
+}
+
+
+
+export type startScheduledLessonResponse200 = {
+  data: ScheduledLessonResponse
+  status: 200
+}
+
+export type startScheduledLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type startScheduledLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type startScheduledLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type startScheduledLessonResponse409 = {
+  data: void
+  status: 409
+}
+
+export type startScheduledLessonResponseSuccess = (startScheduledLessonResponse200) & {
+  headers: Headers;
+};
+export type startScheduledLessonResponseError = (startScheduledLessonResponse401 | startScheduledLessonResponse403 | startScheduledLessonResponse404 | startScheduledLessonResponse409) & {
+  headers: Headers;
+};
+
+export type startScheduledLessonResponse = (startScheduledLessonResponseSuccess | startScheduledLessonResponseError)
+
+export const getStartScheduledLessonUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/start`
+}
+
+/**
+ * Starts a calendar lesson and opens live access. Requires TEACHER or ADMIN role.
+ * @summary Start scheduled lesson
+ */
+export const startScheduledLesson = async (lessonId: string, options?: RequestInit): Promise<startScheduledLessonResponse> => {
+
+  const res = await fetch(getStartScheduledLessonUrl(lessonId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: startScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as startScheduledLessonResponse
 }
 
 

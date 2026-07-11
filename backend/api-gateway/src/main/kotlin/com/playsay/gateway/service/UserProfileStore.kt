@@ -4,10 +4,13 @@ import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.UpdateUserProfileRequest
 import com.playsay.gateway.dto.UserProfileResponse
 import com.playsay.gateway.entity.AppUserEntity
+import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
+import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class UserProfileStore(
     private val userRepo: AppUserRepo,
+    private val studentProfileRepo: StudentProfileRepo,
     private val registrationGateway: RegistrationGateway,
 ) {
     @Transactional
@@ -26,7 +30,7 @@ class UserProfileStore(
             ?.also { existing -> updateIdentity(existing, identity) }
             ?: insertProfile(identity)
 
-        return profile.toResponse()
+        return profile.toResponse(studentProfileRepo.findByUserId(profile.id))
     }
 
     @Transactional
@@ -46,7 +50,9 @@ class UserProfileStore(
         profile.learningGoal = clean(request.learningGoal, 500)
         profile.updatedAt = updatedAt
 
-        return saveProfile(profile).toResponse()
+        val studentProfile = updateBirthDate(profile, request.birthDate, updatedAt)
+
+        return saveProfile(profile).toResponse(studentProfile)
     }
 
     @Transactional
@@ -64,6 +70,12 @@ class UserProfileStore(
         profile.timezone = null
         profile.learningGoal = null
         profile.updatedAt = Instant.now()
+
+        studentProfileRepo.findByUserId(profile.id)?.also { student ->
+            student.birthDate = null
+            student.updatedAt = profile.updatedAt
+            studentProfileRepo.save(student)
+        }
 
         saveProfile(profile)
     }
@@ -107,12 +119,16 @@ class UserProfileStore(
     }
 
     private fun listProfiles(): List<UserProfileResponse> =
-        userRepo.findAllOrdered()
-            .map { profile -> profile.toResponse() }
+        userRepo.findAllOrdered().let { profiles ->
+            val studentsByUserId = studentProfileRepo.findByUserIdIn(profiles.map { it.id }).associateBy { it.userId }
+            profiles.map { profile -> profile.toResponse(studentsByUserId[profile.id]) }
+        }
 
     private fun listStudentProfiles(): List<UserProfileResponse> =
-        userRepo.findByRoleOrdered(MetaData.Roles.STUDENT)
-            .map { profile -> profile.toResponse() }
+        userRepo.findByRoleOrdered(MetaData.Roles.STUDENT).let { profiles ->
+            val studentsByUserId = studentProfileRepo.findByUserIdIn(profiles.map { it.id }).associateBy { it.userId }
+            profiles.map { profile -> profile.toResponse(studentsByUserId[profile.id]) }
+        }
 
     @Transactional
     fun currentUserId(authentication: JwtAuthenticationToken): UUID {
@@ -176,6 +192,24 @@ class UserProfileStore(
         // Other stores still write through legacy SQL during this migration, so FK users must be visible immediately.
         userRepo.saveAndFlush(profile)
 
+    private fun updateBirthDate(profile: AppUserEntity, birthDate: LocalDate?, updatedAt: Instant): StudentProfileEntity? {
+        if (MetaData.Roles.STUDENT !in profile.roles.toApplicationRoles()) {
+            return null
+        }
+        val today = LocalDate.now()
+        if (birthDate != null && (!birthDate.isBefore(today) || birthDate.isBefore(today.minusYears(120)))) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.INVALID_BIRTH_DATE)
+        }
+        val student = studentProfileRepo.findByUserId(profile.id) ?: StudentProfileEntity(
+            id = UUID.randomUUID(),
+            userId = profile.id,
+            createdAt = updatedAt,
+        )
+        student.birthDate = birthDate
+        student.updatedAt = updatedAt
+        return studentProfileRepo.save(student)
+    }
+
     private fun requireAdmin(authentication: JwtAuthenticationToken) {
         if (authentication.authorities.none { authority -> authority.authority == MetaData.Authorities.ADMIN }) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.ADMIN_ROLE_REQUIRED)
@@ -218,7 +252,7 @@ private fun JwtAuthenticationToken.applicationRoles(): List<String> =
         .map { authority -> authority.removePrefix(MetaData.Authorities.PREFIX) }
         .sorted()
 
-private fun AppUserEntity.toResponse(): UserProfileResponse =
+private fun AppUserEntity.toResponse(studentProfile: StudentProfileEntity? = null): UserProfileResponse =
     UserProfileResponse(
         subject = keycloakSubject,
         username = username,
@@ -232,6 +266,7 @@ private fun AppUserEntity.toResponse(): UserProfileResponse =
         learningGoal = learningGoal,
         updatedAt = updatedAt,
         managedByTeacher = managedByTeacher,
+        birthDate = studentProfile?.birthDate,
     )
 
 private fun CurrentIdentity.defaultDisplayName(): String? =

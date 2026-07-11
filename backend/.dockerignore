@@ -4,6 +4,9 @@
 !api-gateway/build/
 !api-gateway/build/libs/
 !api-gateway/build/libs/*.jar
+!ai-tutor-service/build/
+!ai-tutor-service/build/libs/
+!ai-tutor-service/build/libs/*.jar
 !media-service/build/
 !media-service/build/libs/
 !media-service/build/libs/*.jar

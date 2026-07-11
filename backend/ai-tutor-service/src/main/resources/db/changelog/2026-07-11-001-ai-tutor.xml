@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-07-11-001" author="codex">
+        <createTable tableName="ai_tutor_sessions">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="keycloak_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="persona_id" type="VARCHAR(80)"><constraints nullable="false"/></column>
+            <column name="scenario_id" type="VARCHAR(80)"><constraints nullable="false"/></column>
+            <column name="feedback_mode" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="age_policy" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="free_topic" type="VARCHAR(240)"/>
+            <column name="status" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="started_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="completed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="duration_seconds" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="summary_json" type="VARCHAR(16000)" defaultValue="{}"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="ai_tutor_sessions" indexName="idx_ai_tutor_subject_started"><column name="keycloak_subject"/><column name="started_at"/></createIndex>
+        <createTable tableName="ai_tutor_session_events">
+            <column name="id" type="BIGINT" autoIncrement="true"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false" referencedTableName="ai_tutor_sessions" referencedColumnNames="id" foreignKeyName="fk_ai_tutor_event_session"/></column>
+            <column name="client_event_id" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="type" type="VARCHAR(40)"><constraints nullable="false"/></column>
+            <column name="payload_json" type="VARCHAR(16000)"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="ai_tutor_session_events" columnNames="session_id,client_event_id" constraintName="uq_ai_tutor_session_event"/>
+    </changeSet>
+</databaseChangeLog>

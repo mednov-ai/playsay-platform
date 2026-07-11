@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.Instant
+import java.time.LocalDate
 
 data class UserProfileResponse(
     val subject: String,
@@ -19,6 +20,8 @@ data class UserProfileResponse(
     val learningGoal: String?,
     val updatedAt: Instant,
     val managedByTeacher: Boolean = false,
+    @field:Schema(type = "string", format = "date", nullable = true)
+    val birthDate: LocalDate? = null,
 )
 
 data class UpdateUserProfileRequest(
@@ -32,6 +35,8 @@ data class UpdateUserProfileRequest(
     val timezone: String? = null,
     @field:Schema(maxLength = 500)
     val learningGoal: String? = null,
+    @field:Schema(type = "string", format = "date", nullable = true)
+    val birthDate: LocalDate? = null,
 )
 
 data class ManagedStudentRequest(

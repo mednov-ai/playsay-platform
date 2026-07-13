@@ -14,17 +14,20 @@ spec:
       image: gradle:8-jdk21
       command: ["cat"]
       tty: true
+      env:
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.jvmargs=-Xmx384m -XX:MaxMetaspaceSize=192m"
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /home/gradle/.gradle
           subPath: gradle-ai-tutor-service
       resources:
         requests:
-          cpu: 450m
-          memory: 1Gi
+          cpu: 250m
+          memory: 384Mi
         limits:
-          cpu: "2"
-          memory: 3Gi
+          cpu: "1"
+          memory: 1536Mi
     - name: liquibase
       image: liquibase/liquibase:5.0.3
       command: ["cat"]
@@ -170,7 +173,7 @@ spec:
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :ai-tutor-service:test :ai-tutor-service:bootJar --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :ai-tutor-service:test :ai-tutor-service:bootJar --no-daemon --stacktrace --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process'
           }
         }
       }

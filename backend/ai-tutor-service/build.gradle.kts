@@ -27,5 +27,10 @@ dependencies {
     testRuntimeOnly("com.h2database:h2")
 }
 
-tasks.withType<Test> { useJUnitPlatform() }
+tasks.withType<Test> {
+    useJUnitPlatform()
+    maxParallelForks = 1
+    maxHeapSize = "384m"
+    jvmArgs("-XX:MaxMetaspaceSize=192m")
+}
 tasks.named("jar") { enabled = false }

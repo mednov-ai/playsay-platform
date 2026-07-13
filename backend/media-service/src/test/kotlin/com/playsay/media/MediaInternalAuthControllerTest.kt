@@ -35,6 +35,19 @@ class MediaInternalAuthControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `internal video cache endpoint requires service token`() {
+        val response = HttpClient.newHttpClient().send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/internal/youtube/video-cache"))
+                .header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""{"videoId":"5l-fo-d0gt8","requestedQuality":"MEDIUM"}"""))
+                .build(),
+            HttpResponse.BodyHandlers.discarding(),
+        )
+
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.statusCode())
+    }
+
+    @Test
     fun `public stream endpoint does not require bearer token but rejects unknown sessions`() {
         val response = HttpClient.newHttpClient().send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/video-playback-sessions/${UUID.randomUUID()}/stream"))

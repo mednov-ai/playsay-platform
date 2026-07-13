@@ -3922,6 +3922,25 @@ components:
           - string
           - "null"
           format: uuid
+        deliverySource:
+          type:
+          - string
+          - "null"
+          enum:
+          - MINIO_CACHE
+          - YOUTUBE_RELAY
+        cacheStatus:
+          type:
+          - string
+          - "null"
+          enum:
+          - PENDING
+          - IN_PROGRESS
+          - READY
+          - RETRY
+          - REJECTED
+          - MISS
+          - DISABLED
       required:
       - blockId
       - materialId

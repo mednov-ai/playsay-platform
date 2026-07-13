@@ -25,12 +25,15 @@ class MaterialVideoPlaybackService(
     private val lessonRepo: LessonRepo,
     private val youtubeMediaClient: YoutubeMediaClient,
     private val materialAssetService: MaterialAssetService,
+    private val youtubeVideoCacheService: YoutubeVideoCacheService,
     @param:Value("\${playsay.video.youtube.rf-relay.enabled:false}")
     private val rfRelayEnabled: Boolean,
     @param:Value("\${playsay.video.youtube.rf-relay.geo-country-header:}")
     private val geoCountryHeader: String,
     @param:Value("\${playsay.video.youtube.rf-relay.require-geo-country:true}")
     private val requireGeoCountry: Boolean,
+    @param:Value("\${playsay.video.youtube.cache.enabled:false}")
+    private val youtubeCacheEnabled: Boolean,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     fun playback(
@@ -61,8 +64,19 @@ class MaterialVideoPlaybackService(
 
         val storedMeta = YoutubeVideoSupport.metaFromBlock(block)
         val storedMetaComplete = storedMeta?.durationSeconds != null && storedMeta.language != null
-        val resolvedMeta = if (storedMetaComplete) null else diagnostics.videoId?.let { videoId -> youtubeMediaClient.resolveMetadata(videoId) }
-        val meta = storedMeta?.takeIf { storedMetaComplete } ?: resolvedMeta
+        val cachedMeta = diagnostics.videoId
+            ?.let { videoId -> youtubeVideoCacheService.find(videoId) }
+            ?.takeIf { cache -> cache.durationSeconds != null && cache.language != null }
+            ?.let { cache ->
+                YoutubeVideoMeta(
+                    videoId = cache.videoId,
+                    durationSeconds = cache.durationSeconds,
+                    language = cache.language,
+                    thumbnailUrl = cache.thumbnailUrl,
+                )
+            }
+        val resolvedMeta = if (storedMetaComplete || cachedMeta != null) null else diagnostics.videoId?.let { videoId -> youtubeMediaClient.resolveMetadata(videoId) }
+        val meta = storedMeta?.takeIf { storedMetaComplete } ?: cachedMeta ?: resolvedMeta
             ?: return response(
                 materialId,
                 request.blockId,
@@ -77,7 +91,11 @@ class MaterialVideoPlaybackService(
                 metadataSource = "MISSING",
                 effectiveMeta = null,
             )
-        val metadataSource = if (storedMetaComplete) "STORED" else "MEDIA_SERVICE_ON_DEMAND"
+        val metadataSource = when {
+            storedMetaComplete -> "STORED"
+            cachedMeta != null -> "CACHE_RECORD"
+            else -> "MEDIA_SERVICE_ON_DEMAND"
+        }
         val embedUrl = YoutubeVideoSupport.embedUrl(meta.videoId)
         val policy = YoutubeVideoSupport.videoMeetsPolicy(meta)
         if (!policy.approved) {
@@ -106,8 +124,16 @@ class MaterialVideoPlaybackService(
                 videoId = meta.videoId,
                 requestedQuality = requestedQuality.name,
                 thumbnailStorageKey = if (existingThumbnail == null) thumbnailStorageKey else null,
+                thumbnailSourceUrl = meta.thumbnailUrl,
             ),
         )
+        if (
+            youtubeCacheEnabled &&
+            requestedQuality == YoutubePlaybackQuality.MEDIUM &&
+            mediaSession.deliverySource != "MINIO_CACHE"
+        ) {
+            youtubeVideoCacheService.markUnavailable(meta.videoId)
+        }
         val thumbnailAsset = existingThumbnail ?: maybeCreateYoutubeThumbnailAsset(
             materialId = materialId,
             blockId = request.blockId,
@@ -132,6 +158,8 @@ class MaterialVideoPlaybackService(
             selectedHeight = mediaSession.selectedHeight,
             thumbnailUrl = thumbnailAsset?.contentUrl,
             thumbnailAssetId = thumbnailAsset?.id,
+            deliverySource = mediaSession.deliverySource,
+            cacheStatus = cacheStatus(meta.videoId),
         )
     }
 
@@ -203,7 +231,19 @@ class MaterialVideoPlaybackService(
             selectedHeight = null,
             thumbnailUrl = null,
             thumbnailAssetId = null,
+            deliverySource = null,
+            cacheStatus = cacheStatus(videoId),
         )
+    }
+
+    private fun cacheStatus(videoId: String?): String? {
+        if (videoId == null) {
+            return null
+        }
+        if (!youtubeCacheEnabled) {
+            return "DISABLED"
+        }
+        return youtubeVideoCacheService.find(videoId)?.status ?: "MISS"
     }
 
     private fun maybeCreateYoutubeThumbnailAsset(

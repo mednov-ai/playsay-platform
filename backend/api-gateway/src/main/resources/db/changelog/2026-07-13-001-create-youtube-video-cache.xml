@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-13-001-create-youtube-video-cache" author="codex">
+        <createTable tableName="youtube_video_cache">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_youtube_video_cache"/>
+            </column>
+            <column name="video_id" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quality" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(24)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="storage_key" type="VARCHAR(1024)"/>
+            <column name="selected_quality" type="VARCHAR(16)"/>
+            <column name="selected_height" type="INT"/>
+            <column name="content_type" type="VARCHAR(160)"/>
+            <column name="byte_size" type="BIGINT"/>
+            <column name="duration_seconds" type="INT"/>
+            <column name="language" type="VARCHAR(32)"/>
+            <column name="thumbnail_url" type="TEXT"/>
+            <column name="attempts" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="lease_until" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="unreferenced_since" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_error_code" type="VARCHAR(120)"/>
+            <column name="ready_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="youtube_video_cache"
+            columnNames="video_id,quality"
+            constraintName="uk_youtube_video_cache_video_quality"/>
+        <createIndex tableName="youtube_video_cache" indexName="idx_youtube_video_cache_work">
+            <column name="status"/>
+            <column name="next_attempt_at"/>
+            <column name="lease_until"/>
+        </createIndex>
+        <createIndex tableName="youtube_video_cache" indexName="idx_youtube_video_cache_cleanup">
+            <column name="unreferenced_since"/>
+        </createIndex>
+
+        <createTable tableName="youtube_video_cache_reference">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_youtube_video_cache_reference"/>
+            </column>
+            <column name="cache_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="material_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="block_id" type="VARCHAR(120)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="youtube_video_cache_reference"
+            baseColumnNames="cache_id"
+            constraintName="fk_youtube_video_cache_reference_cache"
+            referencedTableName="youtube_video_cache"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableName="youtube_video_cache_reference"
+            baseColumnNames="material_id"
+            constraintName="fk_youtube_video_cache_reference_material"
+            referencedTableName="lesson_material"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        <addUniqueConstraint
+            tableName="youtube_video_cache_reference"
+            columnNames="material_id,block_id"
+            constraintName="uk_youtube_video_cache_reference_block"/>
+        <createIndex tableName="youtube_video_cache_reference" indexName="idx_youtube_video_cache_reference_cache">
+            <column name="cache_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="youtube_video_cache_reference"/>
+            <dropTable tableName="youtube_video_cache"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

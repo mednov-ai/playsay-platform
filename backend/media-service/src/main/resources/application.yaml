@@ -22,6 +22,11 @@ playsay:
     max-upstream-range-bytes: ${PLAYSAY_MEDIA_SERVICE_MAX_UPSTREAM_RANGE_BYTES:1048576}
     max-thumbnail-bytes: ${PLAYSAY_MEDIA_SERVICE_MAX_THUMBNAIL_BYTES:5242880}
     ytdlp-path: ${PLAYSAY_MEDIA_SERVICE_YTDLP_PATH:yt-dlp}
+    ffmpeg-path: ${PLAYSAY_MEDIA_SERVICE_FFMPEG_PATH:/usr/local/bin/ffmpeg}
+    youtube-cache-enabled: ${PLAYSAY_YOUTUBE_CACHE_ENABLED:false}
+    cache-download-timeout-seconds: ${PLAYSAY_MEDIA_SERVICE_CACHE_DOWNLOAD_TIMEOUT_SECONDS:600}
+    cache-max-video-bytes: ${PLAYSAY_MEDIA_SERVICE_CACHE_MAX_VIDEO_BYTES:262144000}
+    cache-temp-directory: ${PLAYSAY_MEDIA_SERVICE_CACHE_TEMP_DIRECTORY:/tmp/playsay-media-cache}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
     s3:

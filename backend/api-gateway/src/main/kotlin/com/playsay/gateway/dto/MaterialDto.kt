@@ -158,6 +158,13 @@ data class MaterialVideoPlaybackResponse(
     val selectedHeight: Int? = null,
     val thumbnailUrl: String? = null,
     val thumbnailAssetId: UUID? = null,
+    @field:Schema(allowableValues = ["MINIO_CACHE", "YOUTUBE_RELAY"], nullable = true)
+    val deliverySource: String? = null,
+    @field:Schema(
+        allowableValues = ["PENDING", "IN_PROGRESS", "READY", "RETRY", "REJECTED", "MISS", "DISABLED"],
+        nullable = true,
+    )
+    val cacheStatus: String? = null,
 )
 
 data class MaterialAnswerSuggestionItem(

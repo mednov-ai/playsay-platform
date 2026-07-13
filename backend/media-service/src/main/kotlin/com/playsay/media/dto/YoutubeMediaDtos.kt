@@ -20,6 +20,7 @@ data class YoutubePlaybackSessionRequest(
     val videoId: String,
     val requestedQuality: String?,
     val thumbnailStorageKey: String?,
+    val thumbnailSourceUrl: String? = null,
 )
 
 data class YoutubePlaybackSessionResponse(
@@ -32,4 +33,24 @@ data class YoutubePlaybackSessionResponse(
     val thumbnailStored: Boolean,
     val thumbnailContentType: String?,
     val thumbnailByteSize: Long?,
+    val deliverySource: String,
+)
+
+data class YoutubeVideoCacheRequest(
+    val videoId: String,
+    val requestedQuality: String?,
+)
+
+data class YoutubeVideoCacheResponse(
+    val videoId: String,
+    val status: String,
+    val storageKey: String,
+    val requestedQuality: String,
+    val selectedQuality: String,
+    val selectedHeight: Int?,
+    val contentType: String,
+    val byteSize: Long,
+    val durationSeconds: Int?,
+    val language: String?,
+    val thumbnailUrl: String?,
 )

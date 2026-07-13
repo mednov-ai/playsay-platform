@@ -1,5 +1,6 @@
 package com.playsay.media.service
 
+import io.micrometer.core.instrument.MeterRegistry
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -18,6 +19,9 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 @Component
 class YoutubeRelayStreamService(
     private val sessionStore: YoutubePlaybackSessionStore,
+    private val objectStorage: MediaObjectStorage,
+    private val metadataResolver: YoutubeMetadataResolver,
+    private val meterRegistry: MeterRegistry,
     @param:Value("\${playsay.media-service.max-upstream-range-bytes:1048576}")
     private val maxUpstreamRangeBytes: Long = DEFAULT_MAX_UPSTREAM_RANGE_BYTES,
     private val httpClient: HttpClient = HttpClient.newBuilder()
@@ -29,7 +33,71 @@ class YoutubeRelayStreamService(
         val session = sessionStore.find(sessionId)
             ?: throw MediaServiceException(HttpStatus.NOT_FOUND, "VIDEO_PLAYBACK_SESSION_NOT_FOUND")
         val upstreamRangeHeader = boundedRangeHeader(rangeHeader)
-        val requestBuilder = HttpRequest.newBuilder(URI.create(session.upstreamUrl))
+        if (session.deliverySource == "MINIO_CACHE" && session.cacheStorageKey != null) {
+            val cached = runCatching { cachedResponse(session, upstreamRangeHeader, rangeHeader) }
+                .onFailure {
+                    logger.warn(
+                        "media-service cache stream failed sessionId={} materialId={} blockId={} videoId={} rangeHeader={}",
+                        session.id,
+                        session.materialId,
+                        session.blockId,
+                        session.videoId,
+                        sanitizedRange(rangeHeader),
+                        it,
+                    )
+                }
+                .getOrNull()
+            if (cached != null) {
+                meterRegistry.counter("playsay.youtube.cache.streams", "result", "hit").increment()
+                return cached
+            }
+            meterRegistry.counter("playsay.youtube.cache.streams", "result", "fallback").increment()
+        }
+        return upstreamResponse(session, upstreamRangeHeader, rangeHeader)
+    }
+
+    private fun cachedResponse(
+        session: YoutubePlaybackSession,
+        boundedRange: String?,
+        rangeHeader: String?,
+    ): ResponseEntity<StreamingResponseBody>? {
+        val key = session.cacheStorageKey ?: return null
+        val content = objectStorage.getObject(key, boundedRange) ?: return null
+        logger.info(
+            "media-service cache stream response sessionId={} materialId={} blockId={} videoId={} rangeHeader={} cacheRangeHeader={} contentType={} contentLength={} contentRange={} selectedQuality={} selectedHeight={}",
+            session.id,
+            session.materialId,
+            session.blockId,
+            session.videoId,
+            sanitizedRange(rangeHeader),
+            boundedRange,
+            content.contentType,
+            content.contentLength,
+            content.contentRange,
+            session.selectedQuality,
+            session.selectedHeight,
+        )
+        val headers = baseHeaders().apply {
+            set(HttpHeaders.CONTENT_TYPE, content.contentType)
+            contentLength = content.contentLength
+            content.contentRange?.let { value -> set(HttpHeaders.CONTENT_RANGE, value) }
+            set(HttpHeaders.ACCEPT_RANGES, content.acceptRanges)
+        }
+        val body = StreamingResponseBody { output ->
+            content.inputStream.use { input -> input.copyTo(output) }
+        }
+        val status = if (content.contentRange != null) HttpStatus.PARTIAL_CONTENT else HttpStatus.OK
+        return ResponseEntity.status(status).headers(headers).body(body)
+    }
+
+    private fun upstreamResponse(
+        session: YoutubePlaybackSession,
+        upstreamRangeHeader: String?,
+        rangeHeader: String?,
+    ): ResponseEntity<StreamingResponseBody> {
+        val upstreamUrl = session.upstreamUrl ?: resolveFallbackUpstream(session)
+            ?: throw MediaServiceException(HttpStatus.SERVICE_UNAVAILABLE, "YOUTUBE_RELAY_UNAVAILABLE")
+        val requestBuilder = HttpRequest.newBuilder(URI.create(upstreamUrl))
             .timeout(Duration.ofSeconds(20))
             .GET()
         upstreamRangeHeader?.let { range -> requestBuilder.header(HttpHeaders.RANGE, range) }
@@ -69,28 +137,29 @@ class YoutubeRelayStreamService(
             session.selectedHeight,
         )
 
-        val headers = HttpHeaders()
-        headers.setCacheControl(CacheControl.noStore())
-        headers["X-Accel-Buffering"] = "no"
+        val headers = baseHeaders()
         copyHeader(upstreamResponse, headers, HttpHeaders.CONTENT_TYPE)
         copyHeader(upstreamResponse, headers, HttpHeaders.CONTENT_LENGTH)
         copyHeader(upstreamResponse, headers, HttpHeaders.CONTENT_RANGE)
         copyHeader(upstreamResponse, headers, HttpHeaders.ACCEPT_RANGES)
-
         val body = StreamingResponseBody { output ->
             upstreamResponse.body().use { input -> input.copyTo(output) }
         }
-
-        return ResponseEntity.status(upstreamResponse.statusCode())
-            .headers(headers)
-            .body(body)
+        return ResponseEntity.status(upstreamResponse.statusCode()).headers(headers).body(body)
     }
 
-    private fun copyHeader(
-        response: HttpResponse<*>,
-        headers: HttpHeaders,
-        headerName: String,
-    ) {
+    private fun resolveFallbackUpstream(session: YoutubePlaybackSession): String? =
+        metadataResolver.resolve(session.videoId)
+            ?.let { metadata -> YoutubeQualitySelector.select(metadata.formats, session.requestedQuality) }
+            ?.upstreamUrl
+
+    private fun baseHeaders(): HttpHeaders =
+        HttpHeaders().apply {
+            setCacheControl(CacheControl.noStore())
+            set("X-Accel-Buffering", "no")
+        }
+
+    private fun copyHeader(response: HttpResponse<*>, headers: HttpHeaders, headerName: String) {
         response.headers().firstValue(headerName).ifPresent { value -> headers[headerName] = value }
     }
 
@@ -103,24 +172,17 @@ class YoutubeRelayStreamService(
         if (cleanRange.isNullOrBlank()) {
             return "bytes=0-${maxBytes - 1}"
         }
-
         val match = singleRangePattern.matchEntire(cleanRange) ?: return cleanRange.take(64)
         val startText = match.groupValues[1]
         if (startText.isBlank()) {
             return cleanRange.take(64)
         }
-
         val start = startText.toLongOrNull() ?: return cleanRange.take(64)
         val requestedEnd = match.groupValues[2].takeIf { value -> value.isNotBlank() }?.toLongOrNull()
         if (requestedEnd != null && requestedEnd < start) {
             return cleanRange.take(64)
         }
-
-        val maxEnd = if (Long.MAX_VALUE - start < maxBytes - 1) {
-            Long.MAX_VALUE
-        } else {
-            start + maxBytes - 1
-        }
+        val maxEnd = if (Long.MAX_VALUE - start < maxBytes - 1) Long.MAX_VALUE else start + maxBytes - 1
         val boundedEnd = requestedEnd?.coerceAtMost(maxEnd) ?: maxEnd
         return "bytes=$start-$boundedEnd"
     }

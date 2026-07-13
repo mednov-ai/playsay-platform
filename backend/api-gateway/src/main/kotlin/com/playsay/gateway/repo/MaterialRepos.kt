@@ -33,6 +33,8 @@ data class LessonMaterialRow(
 interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
     fun existsByIdAndStatusNot(id: UUID, status: String): Boolean
 
+    fun findAllByStatusNot(status: String): List<LessonMaterialEntity>
+
     @Query(
         """
         select count(m)

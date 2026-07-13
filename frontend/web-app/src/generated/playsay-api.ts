@@ -745,6 +745,33 @@ export interface MaterialVideoPlaybackRequest {
   quality?: MaterialVideoPlaybackRequestQuality;
 }
 
+/**
+ * @nullable
+ */
+export type MaterialVideoPlaybackResponseDeliverySource = typeof MaterialVideoPlaybackResponseDeliverySource[keyof typeof MaterialVideoPlaybackResponseDeliverySource] | null;
+
+
+export const MaterialVideoPlaybackResponseDeliverySource = {
+  MINIO_CACHE: 'MINIO_CACHE',
+  YOUTUBE_RELAY: 'YOUTUBE_RELAY',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MaterialVideoPlaybackResponseCacheStatus = typeof MaterialVideoPlaybackResponseCacheStatus[keyof typeof MaterialVideoPlaybackResponseCacheStatus] | null;
+
+
+export const MaterialVideoPlaybackResponseCacheStatus = {
+  PENDING: 'PENDING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  READY: 'READY',
+  RETRY: 'RETRY',
+  REJECTED: 'REJECTED',
+  MISS: 'MISS',
+  DISABLED: 'DISABLED',
+} as const;
+
 export interface MaterialVideoPlaybackResponse {
   materialId: string;
   blockId: string;
@@ -771,6 +798,10 @@ export interface MaterialVideoPlaybackResponse {
   thumbnailUrl?: string | null;
   /** @nullable */
   thumbnailAssetId?: string | null;
+  /** @nullable */
+  deliverySource?: MaterialVideoPlaybackResponseDeliverySource;
+  /** @nullable */
+  cacheStatus?: MaterialVideoPlaybackResponseCacheStatus;
 }
 
 export interface MaterialImagePageResponse {

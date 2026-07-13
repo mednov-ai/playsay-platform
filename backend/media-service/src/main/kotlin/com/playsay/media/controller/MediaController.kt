@@ -4,6 +4,8 @@ import com.playsay.media.dto.YoutubeMetadataRequest
 import com.playsay.media.dto.YoutubeMetadataResponse
 import com.playsay.media.dto.YoutubePlaybackSessionRequest
 import com.playsay.media.dto.YoutubePlaybackSessionResponse
+import com.playsay.media.dto.YoutubeVideoCacheRequest
+import com.playsay.media.dto.YoutubeVideoCacheResponse
 import com.playsay.media.service.MediaInternalAuth
 import com.playsay.media.service.MediaServiceException
 import com.playsay.media.service.YoutubeMetadataResolver
@@ -12,6 +14,7 @@ import com.playsay.media.service.YoutubePlaybackSessionStore
 import com.playsay.media.service.YoutubeQualitySelector
 import com.playsay.media.service.YoutubeRelayStreamService
 import com.playsay.media.service.YoutubeThumbnailService
+import com.playsay.media.service.YoutubeVideoCacheService
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
@@ -19,8 +22,10 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RestController
@@ -32,6 +37,7 @@ class MediaController(
     private val sessionStore: YoutubePlaybackSessionStore,
     private val streamService: YoutubeRelayStreamService,
     private val thumbnailService: YoutubeThumbnailService,
+    private val videoCacheService: YoutubeVideoCacheService,
     private val internalAuth: MediaInternalAuth,
     @param:Value("\${playsay.media-service.session-ttl-seconds:900}")
     private val sessionTtlSeconds: Long,
@@ -67,6 +73,35 @@ class MediaController(
     ): YoutubePlaybackSessionResponse {
         internalAuth.requireValid(serviceToken)
         val requestedQuality = YoutubePlaybackQuality.normalized(request.requestedQuality)
+        val cached = if (requestedQuality == YoutubePlaybackQuality.MEDIUM) videoCacheService.find(request.videoId, requestedQuality) else null
+        if (cached != null) {
+            val thumbnail = thumbnailService.store(request.thumbnailSourceUrl ?: cached.thumbnailUrl, request.thumbnailStorageKey)
+            val session = sessionStore.create(
+                subject = request.subject,
+                materialId = request.materialId,
+                blockId = request.blockId,
+                videoId = request.videoId,
+                upstreamUrl = null,
+                requestedQuality = requestedQuality,
+                selectedQuality = cached.selectedQuality,
+                selectedHeight = cached.selectedHeight,
+                ttlSeconds = sessionTtlSeconds,
+                cacheStorageKey = cached.storageKey,
+                deliverySource = "MINIO_CACHE",
+            )
+            return YoutubePlaybackSessionResponse(
+                sessionId = session.id,
+                expiresAt = session.expiresAt.toString(),
+                requestedQuality = requestedQuality.name,
+                selectedQuality = cached.selectedQuality.name,
+                selectedHeight = cached.selectedHeight,
+                thumbnailSourceUrl = request.thumbnailSourceUrl ?: cached.thumbnailUrl,
+                thumbnailStored = thumbnail != null,
+                thumbnailContentType = thumbnail?.contentType,
+                thumbnailByteSize = thumbnail?.byteSize,
+                deliverySource = "MINIO_CACHE",
+            )
+        }
         val metadata = metadataResolver.resolve(request.videoId)
             ?: throw MediaServiceException(HttpStatus.SERVICE_UNAVAILABLE, "YOUTUBE_RELAY_UNAVAILABLE")
         val selected = YoutubeQualitySelector.select(metadata.formats, requestedQuality)
@@ -93,7 +128,32 @@ class MediaController(
             thumbnailStored = thumbnail != null,
             thumbnailContentType = thumbnail?.contentType,
             thumbnailByteSize = thumbnail?.byteSize,
+            deliverySource = "YOUTUBE_RELAY",
         )
+    }
+
+    @PostMapping(
+        "/internal/youtube/video-cache",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    fun cacheVideo(
+        @RequestHeader("X-PlaySay-Media-Service-Token", required = false) serviceToken: String?,
+        @RequestBody request: YoutubeVideoCacheRequest,
+    ): YoutubeVideoCacheResponse {
+        internalAuth.requireValid(serviceToken)
+        return videoCacheService.cache(request)
+    }
+
+    @DeleteMapping("/internal/youtube/video-cache/{videoId}")
+    fun deleteCachedVideo(
+        @RequestHeader("X-PlaySay-Media-Service-Token", required = false) serviceToken: String?,
+        @PathVariable videoId: String,
+        @RequestParam(defaultValue = "MEDIUM") quality: String,
+    ): ResponseEntity<Void> {
+        internalAuth.requireValid(serviceToken)
+        videoCacheService.delete(videoId, quality)
+        return ResponseEntity.noContent().build()
     }
 
     @GetMapping("/video-playback-sessions/{sessionId}/stream")

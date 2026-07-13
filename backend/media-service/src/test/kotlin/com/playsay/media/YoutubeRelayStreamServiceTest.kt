@@ -1,9 +1,13 @@
 package com.playsay.media
 
 import com.playsay.media.service.MediaServiceException
+import com.playsay.media.service.InMemoryMediaObjectStorage
 import com.playsay.media.service.YoutubePlaybackQuality
 import com.playsay.media.service.YoutubePlaybackSessionStore
+import com.playsay.media.service.YoutubeMetadataResolver
 import com.playsay.media.service.YoutubeRelayStreamService
+import com.playsay.media.service.YoutubeVideoCacheService
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.sun.net.httpserver.HttpServer
 import java.io.ByteArrayOutputStream
 import java.net.InetSocketAddress
@@ -48,7 +52,7 @@ class YoutubeRelayStreamServiceTest {
                 selectedHeight = 720,
                 ttlSeconds = 900,
             )
-            val service = YoutubeRelayStreamService(sessionStore = sessionStore, maxUpstreamRangeBytes = 4)
+            val service = streamService(sessionStore, maxUpstreamRangeBytes = 4)
 
             val response = service.stream(session.id, "bytes=0-")
             val body = ByteArrayOutputStream()
@@ -70,7 +74,7 @@ class YoutubeRelayStreamServiceTest {
         val sessionStore = YoutubePlaybackSessionStore(
             clock = Clock.fixed(Instant.parse("2026-06-04T08:00:00Z"), ZoneOffset.UTC),
         )
-        val service = YoutubeRelayStreamService(sessionStore = sessionStore)
+        val service = streamService(sessionStore)
 
         val error = kotlin.test.assertFailsWith<MediaServiceException> {
             service.stream(UUID.randomUUID(), null)
@@ -78,4 +82,49 @@ class YoutubeRelayStreamServiceTest {
 
         assertEquals(HttpStatus.NOT_FOUND, error.status)
     }
+
+    @Test
+    fun `streams bounded range from minio cache session`() {
+        val objectStorage = InMemoryMediaObjectStorage()
+        val storageKey = YoutubeVideoCacheService.storageKey("5l-fo-d0gt8", YoutubePlaybackQuality.MEDIUM)
+        objectStorage.putObject(storageKey, "video-bytes".encodeToByteArray(), "video/mp4")
+        val sessionStore = YoutubePlaybackSessionStore(
+            clock = Clock.fixed(Instant.parse("2026-06-04T08:00:00Z"), ZoneOffset.UTC),
+        )
+        val session = sessionStore.create(
+            subject = "teacher-1",
+            materialId = UUID.randomUUID(),
+            blockId = "video-1",
+            videoId = "5l-fo-d0gt8",
+            upstreamUrl = null,
+            requestedQuality = YoutubePlaybackQuality.MEDIUM,
+            selectedQuality = YoutubePlaybackQuality.MEDIUM,
+            selectedHeight = 720,
+            ttlSeconds = 900,
+            cacheStorageKey = storageKey,
+            deliverySource = "MINIO_CACHE",
+        )
+        val service = streamService(sessionStore, objectStorage, maxUpstreamRangeBytes = 4)
+
+        val response = service.stream(session.id, "bytes=2-")
+        val body = ByteArrayOutputStream()
+        assertNotNull(response.body).writeTo(body)
+
+        assertEquals(HttpStatus.PARTIAL_CONTENT, response.statusCode)
+        assertEquals("bytes 2-5/11", response.headers.getFirst("Content-Range"))
+        assertEquals("deo-", body.toString(Charsets.UTF_8))
+    }
+
+    private fun streamService(
+        sessionStore: YoutubePlaybackSessionStore,
+        objectStorage: InMemoryMediaObjectStorage = InMemoryMediaObjectStorage(),
+        maxUpstreamRangeBytes: Long = 1_048_576,
+    ): YoutubeRelayStreamService =
+        YoutubeRelayStreamService(
+            sessionStore = sessionStore,
+            objectStorage = objectStorage,
+            metadataResolver = YoutubeMetadataResolver("/path/that/does/not/exist"),
+            meterRegistry = SimpleMeterRegistry(),
+            maxUpstreamRangeBytes = maxUpstreamRangeBytes,
+        )
 }

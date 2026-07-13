@@ -14,13 +14,18 @@ import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.MaterialAssetRepo
+import com.playsay.gateway.repo.YoutubeVideoCacheReferenceRepo
+import com.playsay.gateway.repo.YoutubeVideoCacheRepo
 import com.playsay.gateway.service.MaterialAssetService
 import com.playsay.gateway.service.UserProfileStore
 import com.playsay.gateway.service.YoutubeMediaClient
 import com.playsay.gateway.service.YoutubeMediaPlaybackSessionCommand
 import com.playsay.gateway.service.YoutubeMediaPlaybackSessionResult
 import com.playsay.gateway.service.YoutubeVideoMeta
+import com.playsay.gateway.service.YoutubeVideoCacheService
+import com.playsay.gateway.service.YoutubeVideoCacheStatuses
 import com.playsay.gateway.utils.MetaData
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -66,6 +71,9 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val materialAssetRepo: MaterialAssetRepo,
     private val materialAssetService: MaterialAssetService,
+    private val youtubeVideoCacheRepo: YoutubeVideoCacheRepo,
+    private val youtubeVideoCacheReferenceRepo: YoutubeVideoCacheReferenceRepo,
+    private val youtubeVideoCacheService: YoutubeVideoCacheService,
     private val appUserRepo: AppUserRepo,
     private val dataSource: DataSource,
     private val testYoutubeMediaClient: TestYoutubeMediaClient,
@@ -90,6 +98,8 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
     @BeforeEach
     fun cleanDatabase() {
         testYoutubeMediaClient.reset()
+        youtubeVideoCacheReferenceRepo.deleteAllInBatch()
+        youtubeVideoCacheRepo.deleteAllInBatch()
         materialAssetRepo.deleteAllInBatch()
         assignmentRecipientRepo.deleteAllInBatch()
         assignmentRepo.deleteAllInBatch()
@@ -118,7 +128,61 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
         assertNotNull(response.sessionId)
         assertNotNull(response.relayUrl)
         assertEquals("/api/media/video-playback-sessions/${response.sessionId}/stream", response.relayUrl)
+        assertEquals("YOUTUBE_RELAY", response.deliverySource)
+        assertEquals("DISABLED", response.cacheStatus)
         assertNull(response.reason)
+    }
+
+    @Test
+    fun `shares cache row across materials and reconciles updates and archives`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val first = createYoutubeMaterial(teacher)
+        val second = createYoutubeMaterial(teacher)
+
+        assertEquals(1L, youtubeVideoCacheRepo.count())
+        assertEquals(2L, youtubeVideoCacheReferenceRepo.count())
+        val shared = assertNotNull(youtubeVideoCacheRepo.findByVideoIdAndQuality("5l-fo-d0gt8", "MEDIUM"))
+        assertEquals(2L, youtubeVideoCacheReferenceRepo.countByCacheId(shared.id))
+
+        val updatedDocument = first.document.deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>()
+        (updatedDocument.path("pages").path(0).path("blocks").path(0) as com.fasterxml.jackson.databind.node.ObjectNode)
+            .put("url", "https://youtu.be/abcdefghijk")
+        materialCrudController.update(
+            teacher,
+            first.id,
+            LessonMaterialRequest(title = first.title, status = first.status, document = updatedDocument),
+        )
+
+        val replacement = assertNotNull(youtubeVideoCacheRepo.findByVideoIdAndQuality("abcdefghijk", "MEDIUM"))
+        assertEquals(2L, youtubeVideoCacheRepo.count())
+        assertEquals(1L, youtubeVideoCacheReferenceRepo.countByCacheId(shared.id))
+        assertEquals(1L, youtubeVideoCacheReferenceRepo.countByCacheId(replacement.id))
+        assertNull(youtubeVideoCacheRepo.findById(shared.id).orElseThrow().unreferencedSince)
+
+        materialCrudController.archive(teacher, second.id)
+        assertNotNull(youtubeVideoCacheRepo.findById(shared.id).orElseThrow().unreferencedSince)
+        materialCrudController.archive(teacher, first.id)
+        assertNotNull(youtubeVideoCacheRepo.findById(replacement.id).orElseThrow().unreferencedSince)
+        assertEquals(0L, youtubeVideoCacheReferenceRepo.count())
+    }
+
+    @Test
+    fun `expired worker lease makes cache job claimable again`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        createYoutubeMaterial(teacher)
+
+        val firstClaim = assertNotNull(youtubeVideoCacheService.claimNext(Duration.ofMinutes(15)))
+        assertEquals(YoutubeVideoCacheStatuses.IN_PROGRESS, firstClaim.status)
+        assertEquals(1, firstClaim.attempts)
+        assertNull(youtubeVideoCacheService.claimNext(Duration.ofMinutes(15)))
+
+        val entity = youtubeVideoCacheRepo.findById(firstClaim.id).orElseThrow()
+        entity.leaseUntil = Instant.now().minusSeconds(1)
+        youtubeVideoCacheRepo.saveAndFlush(entity)
+
+        val recovered = assertNotNull(youtubeVideoCacheService.claimNext(Duration.ofMinutes(15)))
+        assertEquals(firstClaim.id, recovered.id)
+        assertEquals(2, recovered.attempts)
     }
 
     @Test

@@ -23,6 +23,7 @@ class LessonMaterialCatalogService(
     private val userProfileStore: UserProfileStore,
     private val materialRequestValidator: MaterialRequestValidator,
     private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
+    private val youtubeVideoCacheService: YoutubeVideoCacheService,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -69,7 +70,7 @@ class LessonMaterialCatalogService(
         val values = materialRequestValidator.validate(request)
         val now = Instant.now()
 
-        val material = lessonMaterialRepo.save(
+        val material = lessonMaterialRepo.saveAndFlush(
             LessonMaterialEntity(
                 id = UUID.randomUUID(),
                 ownerTeacherUserId = ownerTeacherUserId,
@@ -90,6 +91,11 @@ class LessonMaterialCatalogService(
                 updatedAt = now,
             ),
         )
+        if (material.status == MetaData.MaterialStatuses.ARCHIVED) {
+            youtubeVideoCacheService.removeReferences(material.id)
+        } else {
+            youtubeVideoCacheService.reconcileReferences(material.id, values.document)
+        }
 
         return lessonMaterialResponseMapper.toResponse(requireExisting(material.id))
     }
@@ -118,7 +124,12 @@ class LessonMaterialCatalogService(
         entity.ageBand = values.ageBand
         entity.estimatedDurationMin = values.estimatedDurationMin
         entity.updatedAt = Instant.now()
-        lessonMaterialRepo.save(entity)
+        lessonMaterialRepo.saveAndFlush(entity)
+        if (entity.status == MetaData.MaterialStatuses.ARCHIVED) {
+            youtubeVideoCacheService.removeReferences(materialId)
+        } else {
+            youtubeVideoCacheService.reconcileReferences(materialId, values.document)
+        }
 
         return lessonMaterialResponseMapper.toResponse(requireExisting(materialId))
     }
@@ -130,7 +141,8 @@ class LessonMaterialCatalogService(
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         entity.status = MetaData.MaterialStatuses.ARCHIVED
         entity.updatedAt = Instant.now()
-        lessonMaterialRepo.save(entity)
+        lessonMaterialRepo.saveAndFlush(entity)
+        youtubeVideoCacheService.removeReferences(materialId)
     }
 
     @Transactional(readOnly = true)

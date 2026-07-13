@@ -59,6 +59,7 @@ playsay:
   media-service:
     base-url: ${PLAYSAY_MEDIA_SERVICE_BASE_URL:http://media-service.playsay-dev.svc.cluster.local}
     service-token: ${PLAYSAY_MEDIA_SERVICE_TOKEN:}
+    cache-request-timeout-seconds: ${PLAYSAY_MEDIA_SERVICE_CACHE_REQUEST_TIMEOUT_SECONDS:660}
   payment-service:
     base-url: ${PLAYSAY_PAYMENT_SERVICE_BASE_URL:http://payment-service.playsay-dev.svc.cluster.local}
     service-token: ${PLAYSAY_PAYMENT_SERVICE_TOKEN:}
@@ -86,3 +87,11 @@ playsay:
         enabled: ${PLAYSAY_YOUTUBE_RF_RELAY_ENABLED:false}
         geo-country-header: ${PLAYSAY_YOUTUBE_RF_RELAY_GEO_COUNTRY_HEADER:}
         require-geo-country: ${PLAYSAY_YOUTUBE_RF_RELAY_REQUIRE_GEO_COUNTRY:true}
+      cache:
+        enabled: ${PLAYSAY_YOUTUBE_CACHE_ENABLED:false}
+        poll-delay-ms: ${PLAYSAY_YOUTUBE_CACHE_POLL_DELAY_MS:5000}
+        initial-delay-ms: ${PLAYSAY_YOUTUBE_CACHE_INITIAL_DELAY_MS:5000}
+        lease-seconds: ${PLAYSAY_YOUTUBE_CACHE_LEASE_SECONDS:900}
+        retention-days: ${PLAYSAY_YOUTUBE_CACHE_RETENTION_DAYS:30}
+        cleanup-delay-ms: ${PLAYSAY_YOUTUBE_CACHE_CLEANUP_DELAY_MS:86400000}
+        cleanup-initial-delay-ms: ${PLAYSAY_YOUTUBE_CACHE_CLEANUP_INITIAL_DELAY_MS:60000}

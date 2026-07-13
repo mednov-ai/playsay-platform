@@ -550,6 +550,10 @@ export const en = {
   courses: {
     title: "Program",
     loginRequired: "Sign in to see learning programs.",
+    guide: {
+      manager: "Start with a level: add or select a topic, then manage its lessons and cards.",
+      student: "Select a topic in a level to open its lessons and cards.",
+    },
     empty: {
       manager: "There are no level tracks yet. Create the first program track.",
       student: "There are no published level tracks yet.",
@@ -605,6 +609,8 @@ export const en = {
       lessonOrder: "No. {{order}}",
     },
     actions: {
+      addCard: "Add card",
+      closeInspector: "Close topic",
       delete: "Delete",
       deleteTrack: "Delete level",
       deleteTopic: "Delete topic",
@@ -612,9 +618,12 @@ export const en = {
       moveCardUp: "Move card up",
       moveCardDown: "Move card down",
       removeCard: "Remove card",
+      newTrack: "New level",
+      openTopic: "Open topic “{{title}}”",
     },
     inspector: {
       lessons: "Topic lessons",
+      title: "Topic and lessons",
       topicSettings: "Topic settings",
     },
     roles: {

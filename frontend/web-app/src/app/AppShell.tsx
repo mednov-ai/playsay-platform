@@ -81,7 +81,7 @@ export type AppShellProps = {
   courses: Course[];
   createCourse: (input: CourseInput) => Promise<void>;
   createLesson: (courseId: string, input: CourseLessonInput) => Promise<void>;
-  createTopic: (courseId: string, input: CurriculumTopicInput) => Promise<void>;
+  createTopic: (courseId: string, input: CurriculumTopicInput) => Promise<CurriculumTopic | null>;
   createScheduledLesson: (input: ScheduledLessonInput) => Promise<ScheduledLesson | null | void>;
   createManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   deleteCourse: (courseId: string) => Promise<void>;
@@ -442,7 +442,7 @@ export function AppShell(props: AppShellProps) {
                   message={courseMessage}
                   onCreateCourse={(input) => void createCourse(input)}
                   onCreateLesson={(courseId, input) => void createLesson(courseId, input)}
-                  onCreateTopic={(courseId, input) => void createTopic(courseId, input)}
+                  onCreateTopic={createTopic}
                   onDeleteCourse={(courseId) => void deleteCourse(courseId)}
                   onDeleteLesson={(courseId, lessonId) => void deleteLesson(courseId, lessonId)}
                   onDeleteTopic={(courseId, topicId) => void deleteTopic(courseId, topicId)}

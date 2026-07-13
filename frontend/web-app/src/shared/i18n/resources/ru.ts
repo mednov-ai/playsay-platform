@@ -562,6 +562,10 @@ export const ru = {
   courses: {
     title: "Программа",
     loginRequired: "Войдите, чтобы увидеть учебные программы.",
+    guide: {
+      manager: "Начните с уровня: добавьте или выберите тему, затем откройте в ней уроки и карточки.",
+      student: "Выберите тему в нужном уровне, чтобы открыть её уроки и карточки.",
+    },
     empty: {
       manager: "Уровней пока нет. Создайте первый трек программы.",
       student: "Опубликованных уровней пока нет.",
@@ -625,6 +629,8 @@ export const ru = {
       lessonOrder: "№ {{order}}",
     },
     actions: {
+      addCard: "Добавить карточку",
+      closeInspector: "Закрыть тему",
       delete: "Удалить",
       deleteTrack: "Удалить уровень",
       deleteTopic: "Удалить тему",
@@ -632,9 +638,12 @@ export const ru = {
       moveCardUp: "Поднять карточку",
       moveCardDown: "Опустить карточку",
       removeCard: "Убрать карточку",
+      newTrack: "Новый уровень",
+      openTopic: "Открыть тему «{{title}}»",
     },
     inspector: {
       lessons: "Уроки темы",
+      title: "Тема и уроки",
       topicSettings: "Настройки темы",
     },
     roles: {

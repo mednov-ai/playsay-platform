@@ -71,7 +71,7 @@ function props(): AppShellProps {
     createCourse: async () => undefined,
     createLesson: async () => undefined,
     createManagedStudent: async () => null,
-    createTopic: async () => undefined,
+    createTopic: async () => null,
     createScheduledLesson: async () => undefined,
     deleteCourse: async () => undefined,
     deleteLesson: async () => undefined,

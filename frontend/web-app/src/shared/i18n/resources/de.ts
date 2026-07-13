@@ -550,6 +550,10 @@ export const de = {
   courses: {
     title: "Programm",
     loginRequired: "Melden Sie sich an, um Lernprogramme zu sehen.",
+    guide: {
+      manager: "Beginnen Sie mit einem Niveau: Thema hinzufügen oder wählen, dann Lektionen und Karten bearbeiten.",
+      student: "Wählen Sie ein Thema, um seine Lektionen und Karten zu öffnen.",
+    },
     empty: {
       manager: "Es gibt noch keine Niveau-Tracks. Erstellen Sie den ersten Track.",
       student: "Es gibt noch keine veröffentlichten Niveau-Tracks.",
@@ -605,6 +609,8 @@ export const de = {
       lessonOrder: "Nr. {{order}}",
     },
     actions: {
+      addCard: "Karte hinzufügen",
+      closeInspector: "Thema schließen",
       delete: "Löschen",
       deleteTrack: "Niveau löschen",
       deleteTopic: "Thema löschen",
@@ -612,9 +618,12 @@ export const de = {
       moveCardUp: "Karte nach oben",
       moveCardDown: "Karte nach unten",
       removeCard: "Karte entfernen",
+      newTrack: "Neues Niveau",
+      openTopic: "Thema „{{title}}“ öffnen",
     },
     inspector: {
       lessons: "Lektionen des Themas",
+      title: "Thema und Lektionen",
       topicSettings: "Thema-Einstellungen",
     },
     roles: {

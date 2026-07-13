@@ -14,6 +14,7 @@ import {
   type CourseInput,
   type CourseLesson,
   type CourseLessonInput,
+  type CurriculumTopic,
   type CurriculumTopicInput,
   type LessonTemplateCardsInput,
 } from "../../../shared/api/playsay";
@@ -36,6 +37,11 @@ type CourseMutationRequest =
   | { type: "deleteCourse"; courseId: string }
   | { type: "deleteLesson"; courseId: string; lessonId: string }
   | { type: "deleteTopic"; courseId: string; topicId: string };
+
+type CourseMutationResult = {
+  bundle: CourseBundle;
+  createdTopic: CurriculumTopic | null;
+};
 
 export function setCourseBundleQueryData(queryClient: QueryClient, bundle: CourseBundle) {
   queryClient.setQueryData(courseQueryKeys.bundle(), bundle);
@@ -79,8 +85,8 @@ export function useCourseWorkspaceData({
     onMutate: () => {
       setCourseMessage(null);
     },
-    onSuccess: (bundle, request) => {
-      setCourseBundleQueryData(queryClient, bundle);
+    onSuccess: (result, request) => {
+      setCourseBundleQueryData(queryClient, result.bundle);
       setCourseMessage(successMessageForCourseMutation(t, request));
     },
   });
@@ -147,9 +153,11 @@ export function useCourseWorkspaceData({
 
   async function createTopic(courseId: string, input: CurriculumTopicInput) {
     try {
-      await courseMutation.mutateAsync({ courseId, input, type: "createTopic" });
+      const result = await courseMutation.mutateAsync({ courseId, input, type: "createTopic" });
+      return result.createdTopic;
     } catch {
       // Error state is surfaced through courseMessage.
+      return null;
     }
   }
 
@@ -200,49 +208,56 @@ export function useCourseWorkspaceData({
   };
 }
 
-async function applyCourseMutation(request: CourseMutationRequest): Promise<CourseBundle> {
+async function applyCourseMutation(request: CourseMutationRequest): Promise<CourseMutationResult> {
   if (request.type === "createCourse") {
     await saveCourse(request.input);
-    return fetchCourseBundle();
+    return resultWithBundle();
   }
 
   if (request.type === "deleteCourse") {
     await removeCourse(request.courseId);
-    return fetchCourseBundle();
+    return resultWithBundle();
   }
 
   if (request.type === "createLesson") {
     await saveCourseLesson(request.courseId, request.input);
-    return fetchCourseBundle();
+    return resultWithBundle();
   }
 
   if (request.type === "updateLesson") {
     await editCourseLesson(request.courseId, request.lessonId, request.input);
-    return fetchCourseBundle();
+    return resultWithBundle();
   }
 
   if (request.type === "replaceLessonCards") {
     await saveCourseLessonCards(request.courseId, request.lessonId, request.input);
-    return fetchCourseBundle();
+    return resultWithBundle();
   }
 
   if (request.type === "createTopic") {
-    await saveCurriculumTopic(request.courseId, request.input);
-    return fetchCourseBundle();
+    const createdTopic = await saveCurriculumTopic(request.courseId, request.input);
+    return resultWithBundle(createdTopic);
   }
 
   if (request.type === "updateTopic") {
     await editCurriculumTopic(request.courseId, request.topicId, request.input);
-    return fetchCourseBundle();
+    return resultWithBundle();
   }
 
   if (request.type === "deleteLesson") {
     await removeCourseLesson(request.courseId, request.lessonId);
-    return fetchCourseBundle();
+    return resultWithBundle();
   }
 
   await removeCurriculumTopic(request.courseId, request.topicId);
-  return fetchCourseBundle();
+  return resultWithBundle();
+}
+
+async function resultWithBundle(createdTopic: CurriculumTopic | null = null): Promise<CourseMutationResult> {
+  return {
+    bundle: await fetchCourseBundle(),
+    createdTopic,
+  };
 }
 
 function successMessageForCourseMutation(t: ReturnType<typeof useAppTranslation>["t"], request: CourseMutationRequest) {

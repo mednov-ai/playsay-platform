@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type Ref } from "react";
 import {
   ArrowDown,
   ArrowUp,
   BookMarked,
+  ChevronDown,
   Layers3,
   ListChecks,
   Loader2,
   Plus,
   RefreshCw,
   Save,
+  Settings2,
   Tags,
   Trash2,
+  X,
 } from "lucide-react";
 import { formatDuration, type CourseLessonMap } from "../../../entities/schedule/model";
 import { Button } from "../../../components/ui/button";
@@ -90,7 +93,7 @@ export function CourseWorkspacePanel({
   message: string | null;
   onCreateCourse: (input: CourseInput) => void;
   onCreateLesson: (courseId: string, input: CourseLessonInput) => void;
-  onCreateTopic: (courseId: string, input: CurriculumTopicInput) => void;
+  onCreateTopic: (courseId: string, input: CurriculumTopicInput) => Promise<CurriculumTopic | null>;
   onDeleteCourse: (courseId: string) => void;
   onDeleteLesson: (courseId: string, lessonId: string) => void;
   onDeleteTopic: (courseId: string, topicId: string) => void;
@@ -103,20 +106,38 @@ export function CourseWorkspacePanel({
   const { t } = useAppTranslation();
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const board = useMemo(() => buildCurriculumBoard({ courses, lessons, topics }), [courses, lessons, topics]);
-  const [selectedTopicId, setSelectedTopicId] = useState<string>(
-    () => board.flatMap((track) => track.topics)[0]?.topic.id ?? "",
-  );
+  const [selectedTopicId, setSelectedTopicId] = useState("");
+  const [courseCreateOpen, setCourseCreateOpen] = useState(false);
+  const [creatingTopicCourseId, setCreatingTopicCourseId] = useState("");
+  const topicButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const inspectorRef = useRef<HTMLElement>(null);
   const selectedTopic = findTopicCard(board, selectedTopicId);
   const selectedTrack = selectedTopic ? board.find((track) => track.course.id === selectedTopic.topic.courseId) ?? null : null;
-  const activeMaterials = materials.filter((material) => material.status !== "ARCHIVED");
+  const activeMaterials = useMemo(
+    () => materials.filter((material) => material.status !== "ARCHIVED"),
+    [materials],
+  );
 
   useEffect(() => {
-    if (selectedTopic && board.some((track) => track.topics.some((topic) => topic.topic.id === selectedTopic.topic.id))) {
+    if (selectedTopicId && !selectedTopic) {
+      setSelectedTopicId("");
+    }
+  }, [selectedTopic, selectedTopicId]);
+
+  useEffect(() => {
+    if (!selectedTopicId || typeof window === "undefined" || typeof window.matchMedia !== "function") {
       return;
     }
-    const firstTopic = board.flatMap((track) => track.topics)[0];
-    setSelectedTopicId(firstTopic?.topic.id ?? "");
-  }, [board, selectedTopic]);
+    if (window.matchMedia("(max-width: 1279px)").matches) {
+      inspectorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedTopicId]);
+
+  function closeInspector() {
+    const topicId = selectedTopicId;
+    setSelectedTopicId("");
+    queueMicrotask(() => topicButtonRefs.current.get(topicId)?.focus());
+  }
 
   return (
     <section className="min-w-0 max-w-full rounded-[1.25rem] border border-border bg-white/80 p-4" data-testid="curriculum-program">
@@ -125,10 +146,25 @@ export function CourseWorkspacePanel({
           <Layers3 className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-extrabold">{t("courses.title")}</h2>
         </div>
-        <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {t("common.actions.refresh")}
-        </Button>
+        <div className="flex max-w-full flex-wrap justify-end gap-2">
+          {canManage ? (
+            <Button
+              aria-controls="curriculum-course-create-form"
+              aria-expanded={courseCreateOpen}
+              disabled={disabled}
+              onClick={() => setCourseCreateOpen((open) => !open)}
+              type="button"
+              variant={courseCreateOpen ? "outline" : "default"}
+            >
+              {courseCreateOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {courseCreateOpen ? t("common.actions.cancel") : t("courses.actions.newTrack")}
+            </Button>
+          ) : null}
+          <Button disabled={disabled} onClick={onRefresh} type="button" variant="outline">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {t("common.actions.refresh")}
+          </Button>
+        </div>
       </div>
 
       {!profile ? (
@@ -137,8 +173,16 @@ export function CourseWorkspacePanel({
         </div>
       ) : (
         <div className="mt-4 grid min-w-0 max-w-full gap-4">
-          {canManage ? (
-            <CourseCreateForm disabled={disabled} onCreate={onCreateCourse} />
+          {canManage && courseCreateOpen ? (
+            <div id="curriculum-course-create-form">
+              <CourseCreateForm
+                disabled={disabled}
+                onCreate={(input) => {
+                  onCreateCourse(input);
+                  setCourseCreateOpen(false);
+                }}
+              />
+            </div>
           ) : null}
 
           {message ? (
@@ -147,61 +191,77 @@ export function CourseWorkspacePanel({
             </div>
           ) : null}
 
+          <div className="flex min-w-0 items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-semibold leading-5 text-muted-foreground">
+            <BookMarked className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <p className="min-w-0 break-words [overflow-wrap:anywhere]">
+              {canManage ? t("courses.guide.manager") : t("courses.guide.student")}
+            </p>
+          </div>
+
           {courses.length === 0 ? (
             <div className="rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
               {canManage ? t("courses.empty.manager") : t("courses.empty.student")}
             </div>
           ) : (
-            <div className="grid min-w-0 max-w-full gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)]" data-testid="curriculum-board">
+            <div
+              className={`grid min-w-0 max-w-full gap-4 xl:items-start ${
+                selectedTopic ? "xl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)]" : ""
+              }`}
+              data-inspector-open={selectedTopic ? "true" : "false"}
+              data-testid="curriculum-board"
+            >
               <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain pb-2" data-testid="curriculum-levels-scroller">
-                <div className="grid min-w-full max-w-full auto-cols-[minmax(18rem,1fr)] grid-flow-col gap-3" data-testid="curriculum-levels">
+                <div className="grid min-w-full max-w-full auto-cols-[minmax(16rem,1fr)] grid-flow-col gap-3 sm:auto-cols-[minmax(18rem,1fr)]" data-testid="curriculum-levels">
                   {board.map((track) => (
                     <LevelTrackColumn
                       canManage={canManage}
                       disabled={disabled}
                       key={track.course.id}
                       onCreateTopic={(input) => onCreateTopic(track.course.id, input)}
+                      onTopicCreated={(createdTopic) => {
+                        setCreatingTopicCourseId("");
+                        setSelectedTopicId(createdTopic.id);
+                      }}
                       onDeleteCourse={() => onDeleteCourse(track.course.id)}
                       onSelectTopic={setSelectedTopicId}
+                      onTopicButtonRef={(topicId, button) => {
+                        if (button) {
+                          topicButtonRefs.current.set(topicId, button);
+                        } else {
+                          topicButtonRefs.current.delete(topicId);
+                        }
+                      }}
+                      onToggleTopicCreate={() => {
+                        setCreatingTopicCourseId((courseId) => courseId === track.course.id ? "" : track.course.id);
+                      }}
                       selectedTopicId={selectedTopicId}
+                      topicCreateOpen={creatingTopicCourseId === track.course.id}
                       track={track}
                     />
                   ))}
                 </div>
               </div>
 
-              <TopicInspector
-                activeMaterials={activeMaterials}
-                canManage={canManage}
-                disabled={disabled}
-                onCreateLesson={(input) => {
-                  if (selectedTrack && selectedTopic) {
-                    onCreateLesson(selectedTrack.course.id, input);
-                  }
-                }}
-                onDeleteLesson={(lessonId) => {
-                  if (selectedTrack) {
-                    onDeleteLesson(selectedTrack.course.id, lessonId);
-                  }
-                }}
-                onDeleteTopic={() => {
-                  if (selectedTrack && selectedTopic) {
+              {selectedTopic && selectedTrack ? (
+                <TopicInspector
+                  activeMaterials={activeMaterials}
+                  canManage={canManage}
+                  disabled={disabled}
+                  inspectorRef={inspectorRef}
+                  key={selectedTopic.topic.id}
+                  onClose={closeInspector}
+                  onCreateLesson={(input) => onCreateLesson(selectedTrack.course.id, input)}
+                  onDeleteLesson={(lessonId) => onDeleteLesson(selectedTrack.course.id, lessonId)}
+                  onDeleteTopic={() => {
                     onDeleteTopic(selectedTrack.course.id, selectedTopic.topic.id);
-                  }
-                }}
-                onReplaceLessonCards={(lessonId, input) => {
-                  if (selectedTrack) {
-                    onReplaceLessonCards(selectedTrack.course.id, lessonId, input);
-                  }
-                }}
-                onUpdateTopic={(input) => {
-                  if (selectedTrack && selectedTopic) {
-                    onUpdateTopic(selectedTrack.course.id, selectedTopic.topic.id, input);
-                  }
-                }}
-                selectedTopic={selectedTopic}
-                selectedTrack={selectedTrack}
-              />
+                    closeInspector();
+                  }}
+                  onReplaceLessonCards={(lessonId, input) => onReplaceLessonCards(selectedTrack.course.id, lessonId, input)}
+                  onUpdateTopic={(input) => onUpdateTopic(selectedTrack.course.id, selectedTopic.topic.id, input)}
+                  selectedTopic={selectedTopic}
+                  selectedTrack={selectedTrack}
+                />
+              ) : null}
             </div>
           )}
         </div>
@@ -216,15 +276,23 @@ function LevelTrackColumn({
   onCreateTopic,
   onDeleteCourse,
   onSelectTopic,
+  onToggleTopicCreate,
+  onTopicCreated,
+  onTopicButtonRef,
   selectedTopicId,
+  topicCreateOpen,
   track,
 }: {
   canManage: boolean;
   disabled: boolean;
-  onCreateTopic: (input: CurriculumTopicInput) => void;
+  onCreateTopic: (input: CurriculumTopicInput) => Promise<CurriculumTopic | null>;
   onDeleteCourse: () => void;
   onSelectTopic: (topicId: string) => void;
+  onToggleTopicCreate: () => void;
+  onTopicCreated: (topic: CurriculumTopic) => void;
+  onTopicButtonRef: (topicId: string, button: HTMLButtonElement | null) => void;
   selectedTopicId: string;
+  topicCreateOpen: boolean;
   track: CurriculumLevelTrack;
 }) {
   const { t } = useAppTranslation();
@@ -268,6 +336,7 @@ function LevelTrackColumn({
         ) : (
           track.topics.map((topic) => (
             <TopicBoardCard
+              buttonRef={(button) => onTopicButtonRef(topic.topic.id, button)}
               key={topic.topic.id}
               onSelect={() => onSelectTopic(topic.topic.id)}
               selected={selectedTopicId === topic.topic.id}
@@ -278,28 +347,55 @@ function LevelTrackColumn({
       </div>
 
       {track.untitledLessons.length > 0 ? (
-        <div className="rounded-xl border border-border bg-white/80 p-3">
-          <div className="text-xs font-extrabold uppercase text-muted-foreground">{t("courses.empty.untitledLessons")}</div>
+        <details className="group min-w-0 rounded-xl border border-border bg-white/80 p-3">
+          <summary className="flex min-w-0 cursor-pointer list-none items-center justify-between gap-2 text-xs font-extrabold uppercase text-muted-foreground">
+            <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+              {t("courses.empty.untitledLessons")} · {track.untitledLessons.length}
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
           <div className="mt-2 grid gap-1">
-            {track.untitledLessons.slice(0, 3).map((lesson) => (
+            {track.untitledLessons.map((lesson) => (
               <div className="break-words text-xs font-bold text-muted-foreground [overflow-wrap:anywhere]" key={lesson.id}>
                 {lesson.orderIndex ?? "?"}. {lesson.title}
               </div>
             ))}
           </div>
-        </div>
+        </details>
       ) : null}
 
-      {canManage ? <TopicCreateForm disabled={disabled} onCreate={onCreateTopic} /> : null}
+      {canManage ? (
+        <div className="grid min-w-0 gap-2">
+          <Button
+            aria-controls={`curriculum-topic-create-${track.course.id}`}
+            aria-expanded={topicCreateOpen}
+            className="h-auto min-h-10 max-w-full whitespace-normal text-center"
+            disabled={disabled}
+            onClick={onToggleTopicCreate}
+            type="button"
+            variant={topicCreateOpen ? "outline" : "default"}
+          >
+            {topicCreateOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {topicCreateOpen ? t("common.actions.cancel") : t("courses.form.createTopic")}
+          </Button>
+          {topicCreateOpen ? (
+            <div id={`curriculum-topic-create-${track.course.id}`}>
+              <TopicCreateForm disabled={disabled} onCreate={onCreateTopic} onCreated={onTopicCreated} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }
 
 function TopicBoardCard({
+  buttonRef,
   onSelect,
   selected,
   topic,
 }: {
+  buttonRef: (button: HTMLButtonElement | null) => void;
   onSelect: () => void;
   selected: boolean;
   topic: CurriculumTopicCard;
@@ -308,9 +404,13 @@ function TopicBoardCard({
 
   return (
     <button
+      aria-controls="curriculum-topic-inspector"
+      aria-label={t("courses.actions.openTopic", { title: topic.topic.title })}
+      aria-pressed={selected}
       className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-white p-3 text-left transition hover:border-primary/40 data-[active=true]:border-primary data-[active=true]:shadow-sm"
       data-active={selected ? "true" : "false"}
       onClick={onSelect}
+      ref={buttonRef}
       type="button"
     >
       <div className="flex items-start justify-between gap-2">
@@ -354,6 +454,8 @@ function TopicInspector({
   activeMaterials,
   canManage,
   disabled,
+  inspectorRef,
+  onClose,
   onCreateLesson,
   onDeleteLesson,
   onDeleteTopic,
@@ -365,69 +467,107 @@ function TopicInspector({
   activeMaterials: LessonMaterial[];
   canManage: boolean;
   disabled: boolean;
+  inspectorRef: Ref<HTMLElement>;
+  onClose: () => void;
   onCreateLesson: (input: CourseLessonInput) => void;
   onDeleteLesson: (lessonId: string) => void;
   onDeleteTopic: () => void;
   onReplaceLessonCards: (lessonId: string, input: LessonTemplateCardsInput) => void;
   onUpdateTopic: (input: CurriculumTopicInput) => void;
-  selectedTopic: CurriculumTopicCard | null;
-  selectedTrack: CurriculumLevelTrack | null;
+  selectedTopic: CurriculumTopicCard;
+  selectedTrack: CurriculumLevelTrack;
 }) {
   const { t } = useAppTranslation();
-
-  if (!selectedTopic || !selectedTrack) {
-    return (
-      <aside className="min-w-0 max-w-full rounded-2xl border border-border bg-muted/45 p-4 text-sm font-semibold text-muted-foreground" data-testid="curriculum-topic-inspector">
-        {t("courses.empty.selectTopic")}
-      </aside>
-    );
-  }
+  const [lessonCreateOpen, setLessonCreateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const lessonCreateId = `curriculum-lesson-create-${selectedTopic.topic.id}`;
+  const settingsId = `curriculum-topic-settings-${selectedTopic.topic.id}`;
 
   return (
-    <aside className="grid min-w-0 max-w-full content-start gap-4 overflow-hidden rounded-2xl border border-border bg-white p-4" data-testid="curriculum-topic-inspector">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-primary">
-            {selectedTrack.levelLabel}
-          </span>
-          <span className="max-w-full break-words rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground [overflow-wrap:anywhere]">
-            {selectedTrack.course.title}
-          </span>
-        </div>
-        <h3 className="mt-3 break-words text-lg font-extrabold [overflow-wrap:anywhere]">
-          {selectedTopic.topic.title}
-        </h3>
-        {selectedTopic.topic.description ? (
-          <p className="mt-2 break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
-            {selectedTopic.topic.description}
-          </p>
-        ) : null}
-        {selectedTopic.topic.tagSlugs.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {selectedTopic.topic.tagSlugs.map((tag) => (
-              <span className="inline-flex max-w-full items-center gap-1 break-all rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground" key={tag}>
-                <Tags className="h-3 w-3 shrink-0" />
-                {tag}
-              </span>
-            ))}
+    <aside
+      className="grid min-w-0 max-w-full scroll-mt-4 content-start gap-4 overflow-hidden rounded-2xl border border-border bg-white p-4 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto"
+      data-testid="curriculum-topic-inspector"
+      id="curriculum-topic-inspector"
+      ref={inspectorRef}
+    >
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-extrabold uppercase tracking-wide text-muted-foreground">
+            {t("courses.inspector.title")}
           </div>
-        ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-primary">
+              {selectedTrack.levelLabel}
+            </span>
+            <span className="max-w-full break-words rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground [overflow-wrap:anywhere]">
+              {selectedTrack.course.title}
+            </span>
+          </div>
+          <h3 className="mt-3 break-words text-lg font-extrabold [overflow-wrap:anywhere]">
+            {selectedTopic.topic.title}
+          </h3>
+          {selectedTopic.topic.description ? (
+            <p className="mt-2 break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
+              {selectedTopic.topic.description}
+            </p>
+          ) : null}
+          {selectedTopic.topic.tagSlugs.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {selectedTopic.topic.tagSlugs.map((tag) => (
+                <span className="inline-flex max-w-full items-center gap-1 break-all rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground" key={tag}>
+                  <Tags className="h-3 w-3 shrink-0" />
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <Button
+          aria-label={t("courses.actions.closeInspector")}
+          className="h-10 shrink-0 px-3"
+          onClick={onClose}
+          type="button"
+          variant="outline"
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
-      {canManage ? (
-        <TopicSettingsForm
-          disabled={disabled}
-          onDelete={onDeleteTopic}
-          onUpdate={onUpdateTopic}
-          topic={selectedTopic.topic}
-        />
-      ) : null}
-
       <div className="grid min-w-0 max-w-full gap-3">
-        <div className="flex items-center gap-2">
-          <ListChecks className="h-4 w-4 text-primary" />
-          <h4 className="text-sm font-extrabold">{t("courses.inspector.lessons")}</h4>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <ListChecks className="h-4 w-4 shrink-0 text-primary" />
+            <h4 className="break-words text-sm font-extrabold [overflow-wrap:anywhere]">{t("courses.inspector.lessons")}</h4>
+          </div>
+          {canManage ? (
+            <Button
+              aria-controls={lessonCreateId}
+              aria-expanded={lessonCreateOpen}
+              className="h-auto min-h-10 max-w-full whitespace-normal text-center"
+              disabled={disabled}
+              onClick={() => setLessonCreateOpen((open) => !open)}
+              type="button"
+              variant={lessonCreateOpen ? "outline" : "default"}
+            >
+              {lessonCreateOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {lessonCreateOpen ? t("common.actions.cancel") : t("courses.form.createLesson")}
+            </Button>
+          ) : null}
         </div>
+
+        {canManage && lessonCreateOpen ? (
+          <div id={lessonCreateId}>
+            <CourseLessonCreateForm
+              disabled={disabled}
+              materials={activeMaterials}
+              onCreate={(input) => {
+                onCreateLesson(input);
+                setLessonCreateOpen(false);
+              }}
+              topicId={selectedTopic.topic.id}
+            />
+          </div>
+        ) : null}
 
         {selectedTopic.lessons.length === 0 ? (
           <div className="rounded-xl border border-border bg-muted/50 p-3 text-sm font-semibold text-muted-foreground">
@@ -449,12 +589,30 @@ function TopicInspector({
       </div>
 
       {canManage ? (
-        <CourseLessonCreateForm
-          disabled={disabled}
-          materials={activeMaterials}
-          onCreate={onCreateLesson}
-          topicId={selectedTopic.topic.id}
-        />
+        <div className="grid min-w-0 gap-2 border-t border-border pt-3">
+          <Button
+            aria-controls={settingsId}
+            aria-expanded={settingsOpen}
+            className="h-auto min-h-10 max-w-full whitespace-normal text-center"
+            disabled={disabled}
+            onClick={() => setSettingsOpen((open) => !open)}
+            type="button"
+            variant="outline"
+          >
+            <Settings2 className="h-4 w-4" />
+            {t("courses.inspector.topicSettings")}
+          </Button>
+          {settingsOpen ? (
+            <div id={settingsId}>
+              <TopicSettingsForm
+                disabled={disabled}
+                onDelete={onDeleteTopic}
+                onUpdate={onUpdateTopic}
+                topic={selectedTopic.topic}
+              />
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </aside>
   );
@@ -557,11 +715,14 @@ function CourseCreateForm({
 function TopicCreateForm({
   disabled,
   onCreate,
+  onCreated,
 }: {
   disabled: boolean;
-  onCreate: (input: CurriculumTopicInput) => void;
+  onCreate: (input: CurriculumTopicInput) => Promise<CurriculumTopic | null>;
+  onCreated: (topic: CurriculumTopic) => void;
 }) {
   const { t } = useAppTranslation();
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<TopicFormState>({
     title: "",
     description: "",
@@ -573,22 +734,33 @@ function TopicCreateForm({
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onCreate({
-      title: form.title,
-      description: form.description.trim() || null,
-      orderIndex: parseOptionalNumber(form.orderIndex),
-      tagSlugs: parseTagList(form.tagSlugs),
-    });
-    setForm({ title: "", description: "", orderIndex: "", tagSlugs: "" });
+    setSubmitting(true);
+    let createdTopic: CurriculumTopic | null = null;
+    try {
+      createdTopic = await onCreate({
+        title: form.title,
+        description: form.description.trim() || null,
+        orderIndex: parseOptionalNumber(form.orderIndex),
+        tagSlugs: parseTagList(form.tagSlugs),
+      });
+      if (createdTopic) {
+        setForm({ title: "", description: "", orderIndex: "", tagSlugs: "" });
+      }
+    } finally {
+      setSubmitting(false);
+    }
+    if (createdTopic) {
+      onCreated(createdTopic);
+    }
   }
 
   return (
-    <form className="grid gap-2 rounded-xl border border-border bg-white p-3" onSubmit={submit}>
+    <form className="grid gap-2 rounded-xl border border-border bg-white p-3" onSubmit={(event) => void submit(event)}>
       <input
         className="playsay-input"
-        disabled={disabled}
+        disabled={disabled || submitting}
         maxLength={160}
         onChange={(event) => updateField("title", event.target.value)}
         placeholder={t("courses.form.topicTitlePlaceholder")}
@@ -598,7 +770,7 @@ function TopicCreateForm({
       <div className="grid min-w-0 gap-2 sm:grid-cols-[5rem_minmax(0,1fr)]">
         <input
           className="playsay-input"
-          disabled={disabled}
+          disabled={disabled || submitting}
           min={0}
           onChange={(event) => updateField("orderIndex", event.target.value)}
           placeholder={t("courses.form.orderPlaceholder")}
@@ -607,15 +779,15 @@ function TopicCreateForm({
         />
         <input
           className="playsay-input"
-          disabled={disabled}
+          disabled={disabled || submitting}
           maxLength={240}
           onChange={(event) => updateField("tagSlugs", event.target.value)}
           placeholder={t("courses.form.topicTagsPlaceholder")}
           value={form.tagSlugs}
         />
       </div>
-      <Button disabled={disabled || form.title.trim().length === 0} type="submit">
-        <Plus className="h-4 w-4" />
+      <Button disabled={disabled || submitting || form.title.trim().length === 0} type="submit">
+        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         {t("courses.form.createTopic")}
       </Button>
     </form>
@@ -829,8 +1001,10 @@ function LessonComposition({
   onReplaceCards: (input: LessonTemplateCardsInput) => void;
 }) {
   const { t } = useAppTranslation();
+  const [cardCreateOpen, setCardCreateOpen] = useState(false);
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
   const sortedCards = [...(lesson.cards ?? [])].sort((left, right) => (left.orderIndex ?? 0) - (right.orderIndex ?? 0));
+  const cardCreateId = `curriculum-card-add-${lesson.id}`;
 
   function replaceCards(cards: LessonTemplateCardInput[]) {
     onReplaceCards({ cards: normalizeCardOrder(cards) });
@@ -862,7 +1036,7 @@ function LessonComposition({
         ) : (
           sortedCards.map((card, index) => (
             <div className="grid min-w-0 max-w-full gap-2 overflow-hidden rounded-lg border border-border bg-white p-2" key={card.id}>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="break-words text-sm font-extrabold [overflow-wrap:anywhere]">{card.materialTitle}</div>
                   <div className="mt-1 flex flex-wrap gap-1.5 text-xs font-bold text-muted-foreground">
@@ -871,7 +1045,7 @@ function LessonComposition({
                   </div>
                 </div>
                 {canManage ? (
-                  <div className="flex shrink-0 gap-1">
+                  <div className="flex max-w-full flex-wrap gap-1">
                     <Button
                       aria-label={t("courses.actions.moveCardUp")}
                       disabled={disabled || index === 0}
@@ -908,11 +1082,32 @@ function LessonComposition({
       </div>
 
       {canManage ? (
-        <LessonCardAddForm
-          disabled={disabled}
-          materials={activeMaterials}
-          onAdd={(card) => replaceCards([...sortedCards, card])}
-        />
+        <div className="mt-3 grid min-w-0 gap-2">
+          <Button
+            aria-controls={cardCreateId}
+            aria-expanded={cardCreateOpen}
+            className="h-auto min-h-10 max-w-full whitespace-normal text-center"
+            disabled={disabled}
+            onClick={() => setCardCreateOpen((open) => !open)}
+            type="button"
+            variant="outline"
+          >
+            {cardCreateOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {cardCreateOpen ? t("common.actions.cancel") : t("courses.actions.addCard")}
+          </Button>
+          {cardCreateOpen ? (
+            <div id={cardCreateId}>
+              <LessonCardAddForm
+                disabled={disabled}
+                materials={activeMaterials}
+                onAdd={(card) => {
+                  replaceCards([...sortedCards, card]);
+                  setCardCreateOpen(false);
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </article>
   );

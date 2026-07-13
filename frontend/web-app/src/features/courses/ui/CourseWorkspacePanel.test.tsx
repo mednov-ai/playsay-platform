@@ -1,54 +1,204 @@
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+// @vitest-environment-options { "url": "http://localhost/" }
+
+import "@testing-library/jest-dom/vitest";
+import { useState } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AppProviders } from "../../../app/AppProviders";
 import type {
   Course,
   CourseLesson,
   CurriculumTopic,
+  CurriculumTopicInput,
   LessonMaterial,
   MeProfile,
 } from "../../../shared/api/playsay";
 import { CourseWorkspacePanel } from "./CourseWorkspacePanel";
+import { i18n } from "../../../shared/i18n";
 
-describe("CourseWorkspacePanel responsive layout", () => {
-  it("keeps teacher lesson controls wrapping inside the topic inspector", () => {
-    const markup = renderPanel(teacherProfile);
-
-    expect(markup).toContain("overflow-x-auto");
-    expect(markup).toContain("overscroll-x-contain");
-    expect(markup).toContain("flex-[1_1_5rem]");
-    expect(markup).toContain("flex-[3_1_12rem]");
-    expect(markup).toContain("whitespace-normal");
-    expect(markup).not.toContain("truncate");
-    expect(markup).not.toContain("sm:grid-cols-[5rem_6rem_1fr]");
-    expect(markup).not.toContain("sm:grid-cols-[minmax(0,1fr)_8rem_5rem_auto]");
-    expect(markup).toContain("very-long-topic-tag-without-natural-breaks");
-  });
-
-  it("keeps the level scroller but hides management forms for students", () => {
-    const markup = renderPanel(studentProfile);
-
-    expect(markup).toContain("overflow-x-auto");
-    expect(markup).toContain("Starter Adventures");
-    expect(markup).not.toContain("Создать уровень");
-    expect(markup).not.toContain("Добавить урок");
-    expect(markup).not.toContain("Добавить карточку");
+vi.hoisted(() => {
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      clear: () => values.clear(),
+      getItem: (key: string) => values.get(key) ?? null,
+      key: (index: number) => Array.from(values.keys())[index] ?? null,
+      get length() {
+        return values.size;
+      },
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
   });
 });
 
-function renderPanel(profile: MeProfile): string {
-  return renderToStaticMarkup(
+afterEach(cleanup);
+beforeAll(async () => {
+  await i18n.changeLanguage("ru");
+});
+
+describe("CourseWorkspacePanel contextual program flow", () => {
+  it("starts with the full-width board and opens or closes the inspector explicitly", async () => {
+    renderPanel(teacherProfile);
+
+    const board = screen.getByTestId("curriculum-board");
+    const topicButton = screen.getByRole("button", { name: "Открыть тему «Family and introductions»" });
+    expect(board).toHaveAttribute("data-inspector-open", "false");
+    expect(screen.queryByTestId("curriculum-topic-inspector")).not.toBeInTheDocument();
+
+    fireEvent.click(topicButton);
+
+    expect(board).toHaveAttribute("data-inspector-open", "true");
+    expect(screen.getByTestId("curriculum-topic-inspector")).toBeInTheDocument();
+    expect(topicButton).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("very-long-topic-tag-without-natural-breaks")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть тему" }));
+
+    await waitFor(() => expect(screen.queryByTestId("curriculum-topic-inspector")).not.toBeInTheDocument());
+    expect(topicButton).toHaveFocus();
+  });
+
+  it("keeps only one topic selected and clears a selection removed by refresh", () => {
+    const secondTopic = { ...topic, id: "topic-travel", title: "Travel and airports" } as CurriculumTopic;
+    const view = renderPanel(teacherProfile, { topics: { [course.id]: [topic, secondTopic] } });
+    const firstButton = screen.getByRole("button", { name: "Открыть тему «Family and introductions»" });
+    const secondButton = screen.getByRole("button", { name: "Открыть тему «Travel and airports»" });
+
+    fireEvent.click(firstButton);
+    fireEvent.click(secondButton);
+
+    expect(firstButton).toHaveAttribute("aria-pressed", "false");
+    expect(secondButton).toHaveAttribute("aria-pressed", "true");
+
+    view.rerender(panelElement(teacherProfile, { topics: { [course.id]: [] } }));
+    expect(screen.queryByTestId("curriculum-topic-inspector")).not.toBeInTheDocument();
+    expect(screen.getByTestId("curriculum-board")).toHaveAttribute("data-inspector-open", "false");
+  });
+
+  it("selects and opens a topic returned by a successful create mutation", async () => {
+    render(<TopicCreationHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить тему" }));
+    fireEvent.change(screen.getByPlaceholderText("Путешествия"), { target: { value: "New topic" } });
+    fireEvent.click(screen.getByRole("button", { name: "Добавить тему" }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "New topic" })).toBeInTheDocument());
+    expect(screen.getByTestId("curriculum-topic-inspector")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Путешествия")).not.toBeInTheDocument();
+  });
+
+  it("reveals only the requested management form", () => {
+    renderPanel(teacherProfile);
+
+    expect(screen.queryByPlaceholderText("English A1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Новый уровень" }));
+    expect(screen.getByPlaceholderText("English A1")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Открыть тему «Family and introductions»" }));
+    expect(screen.queryByDisplayValue("Family and introductions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("curriculum-lesson-create-form")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("curriculum-card-add-form")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Настройки темы" }));
+    expect(screen.getByDisplayValue("Family and introductions")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Новый урок" }));
+    expect(screen.getByTestId("curriculum-lesson-create-form")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить карточку" }));
+    expect(screen.getByTestId("curriculum-card-add-form")).toBeInTheDocument();
+  });
+
+  it("keeps topic creation limited to one level at a time", () => {
+    const secondCourse = { ...course, id: "course-a2", level: "A2", title: "Next Adventures" } as Course;
+    renderPanel(teacherProfile, {
+      courses: [course, secondCourse],
+      lessons: { [course.id]: [lesson], [secondCourse.id]: [] },
+      topics: { [course.id]: [topic], [secondCourse.id]: [] },
+    });
+
+    const topicButtons = screen.getAllByRole("button", { name: "Добавить тему" });
+    fireEvent.click(topicButtons[0]);
+    expect(screen.getAllByPlaceholderText("Путешествия")).toHaveLength(1);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Добавить тему" })[0]);
+    expect(screen.getAllByPlaceholderText("Путешествия")).toHaveLength(1);
+  });
+
+  it("opens a read-only inspector for students", () => {
+    renderPanel(studentProfile);
+
+    expect(screen.queryByRole("button", { name: "Новый уровень" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Добавить тему" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Открыть тему «Family and introductions»" }));
+
+    expect(screen.getByTestId("curriculum-topic-inspector")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Настройки темы" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Новый урок" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Удалить урок" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Закрыть тему" })).toBeInTheDocument();
+  });
+
+  it("keeps horizontal overflow on the level scroller only", () => {
+    renderPanel(teacherProfile);
+
+    expect(screen.getByTestId("curriculum-levels-scroller")).toHaveClass("overflow-x-auto", "overscroll-x-contain");
+    expect(screen.getByTestId("curriculum-program")).toHaveClass("min-w-0", "max-w-full");
+    expect(screen.getByTestId("curriculum-board")).not.toHaveClass("overflow-x-auto");
+  });
+});
+
+function TopicCreationHarness() {
+  const [currentTopics, setCurrentTopics] = useState<Record<string, CurriculumTopic[]>>({ [course.id]: [] });
+
+  async function createTopic(_courseId: string, input: CurriculumTopicInput) {
+    const createdTopic = {
+      ...topic,
+      description: input.description ?? null,
+      id: "topic-created",
+      orderIndex: input.orderIndex ?? null,
+      tagSlugs: input.tagSlugs,
+      title: input.title,
+    } as CurriculumTopic;
+    setCurrentTopics({ [course.id]: [createdTopic] });
+    return createdTopic;
+  }
+
+  return panelElement(teacherProfile, { onCreateTopic: createTopic, topics: currentTopics });
+}
+
+function renderPanel(
+  profile: MeProfile,
+  overrides: Partial<Parameters<typeof panelElement>[1]> = {},
+) {
+  return render(panelElement(profile, overrides));
+}
+
+function panelElement(
+  profile: MeProfile,
+  overrides: {
+    courses?: Course[];
+    lessons?: Record<string, CourseLesson[]>;
+    onCreateTopic?: (courseId: string, input: CurriculumTopicInput) => Promise<CurriculumTopic | null>;
+    topics?: Record<string, CurriculumTopic[]>;
+  } = {},
+) {
+  return (
     <AppProviders>
       <CourseWorkspacePanel
-        courses={[course]}
+        courses={overrides.courses ?? [course]}
         disabled={false}
-        lessons={{ [course.id]: [lesson] }}
+        lessons={overrides.lessons ?? { [course.id]: [lesson] }}
         loading={false}
         materials={[material]}
         message={null}
         onCreateCourse={() => undefined}
         onCreateLesson={() => undefined}
-        onCreateTopic={() => undefined}
+        onCreateTopic={overrides.onCreateTopic ?? (async () => null)}
         onDeleteCourse={() => undefined}
         onDeleteLesson={() => undefined}
         onDeleteTopic={() => undefined}
@@ -56,9 +206,9 @@ function renderPanel(profile: MeProfile): string {
         onReplaceLessonCards={() => undefined}
         onUpdateTopic={() => undefined}
         profile={profile}
-        topics={{ [course.id]: [topic] }}
+        topics={overrides.topics ?? { [course.id]: [topic] }}
       />
-    </AppProviders>,
+    </AppProviders>
   );
 }
 

@@ -103,7 +103,9 @@ export function CourseWorkspacePanel({
   const { t } = useAppTranslation();
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const board = useMemo(() => buildCurriculumBoard({ courses, lessons, topics }), [courses, lessons, topics]);
-  const [selectedTopicId, setSelectedTopicId] = useState<string>("");
+  const [selectedTopicId, setSelectedTopicId] = useState<string>(
+    () => board.flatMap((track) => track.topics)[0]?.topic.id ?? "",
+  );
   const selectedTopic = findTopicCard(board, selectedTopicId);
   const selectedTrack = selectedTopic ? board.find((track) => track.course.id === selectedTopic.topic.courseId) ?? null : null;
   const activeMaterials = materials.filter((material) => material.status !== "ARCHIVED");
@@ -117,7 +119,7 @@ export function CourseWorkspacePanel({
   }, [board, selectedTopic]);
 
   return (
-    <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
+    <section className="min-w-0 max-w-full rounded-[1.25rem] border border-border bg-white/80 p-4" data-testid="curriculum-program">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div className="flex items-center gap-2">
           <Layers3 className="h-5 w-5 text-primary" />
@@ -134,7 +136,7 @@ export function CourseWorkspacePanel({
           {t("courses.loginRequired")}
         </div>
       ) : (
-        <div className="mt-4 grid gap-4">
+        <div className="mt-4 grid min-w-0 max-w-full gap-4">
           {canManage ? (
             <CourseCreateForm disabled={disabled} onCreate={onCreateCourse} />
           ) : null}
@@ -150,9 +152,9 @@ export function CourseWorkspacePanel({
               {canManage ? t("courses.empty.manager") : t("courses.empty.student")}
             </div>
           ) : (
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)]">
-              <div className="overflow-x-auto pb-2">
-                <div className="grid min-w-full auto-cols-[minmax(18rem,1fr)] grid-flow-col gap-3">
+            <div className="grid min-w-0 max-w-full gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)]" data-testid="curriculum-board">
+              <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain pb-2" data-testid="curriculum-levels-scroller">
+                <div className="grid min-w-full max-w-full auto-cols-[minmax(18rem,1fr)] grid-flow-col gap-3" data-testid="curriculum-levels">
                   {board.map((track) => (
                     <LevelTrackColumn
                       canManage={canManage}
@@ -228,7 +230,7 @@ function LevelTrackColumn({
   const { t } = useAppTranslation();
 
   return (
-    <article className="grid content-start gap-3 rounded-2xl border border-border bg-muted/45 p-3">
+    <article className="grid min-w-0 max-w-full content-start gap-3 rounded-2xl border border-border bg-muted/45 p-3" data-testid="curriculum-level-track">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -239,7 +241,7 @@ function LevelTrackColumn({
               {track.course.isPublished ? t("courses.status.published") : t("courses.status.draft")}
             </span>
           </div>
-          <h3 className="mt-2 truncate text-base font-extrabold">{track.course.title}</h3>
+          <h3 className="mt-2 break-words text-base font-extrabold [overflow-wrap:anywhere]">{track.course.title}</h3>
           <p className="mt-1 text-xs font-bold text-muted-foreground">
             {t("courses.summary.topicCount", { count: track.topics.length })} ·{" "}
             {t("courses.summary.lessonCount", { count: (track.course.lessonCount ?? 0) })}
@@ -253,7 +255,9 @@ function LevelTrackColumn({
       </div>
 
       {track.course.description ? (
-        <p className="text-sm leading-6 text-muted-foreground">{track.course.description}</p>
+        <p className="break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
+          {track.course.description}
+        </p>
       ) : null}
 
       <div className="grid gap-2">
@@ -278,7 +282,7 @@ function LevelTrackColumn({
           <div className="text-xs font-extrabold uppercase text-muted-foreground">{t("courses.empty.untitledLessons")}</div>
           <div className="mt-2 grid gap-1">
             {track.untitledLessons.slice(0, 3).map((lesson) => (
-              <div className="truncate text-xs font-bold text-muted-foreground" key={lesson.id}>
+              <div className="break-words text-xs font-bold text-muted-foreground [overflow-wrap:anywhere]" key={lesson.id}>
                 {lesson.orderIndex ?? "?"}. {lesson.title}
               </div>
             ))}
@@ -304,14 +308,14 @@ function TopicBoardCard({
 
   return (
     <button
-      className="rounded-xl border border-border bg-white p-3 text-left transition hover:border-primary/40 data-[active=true]:border-primary data-[active=true]:shadow-sm"
+      className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-white p-3 text-left transition hover:border-primary/40 data-[active=true]:border-primary data-[active=true]:shadow-sm"
       data-active={selected ? "true" : "false"}
       onClick={onSelect}
       type="button"
     >
       <div className="flex items-start justify-between gap-2">
         <span className="min-w-0">
-          <span className="block truncate text-sm font-extrabold">{topic.topic.title}</span>
+          <span className="block break-words text-sm font-extrabold [overflow-wrap:anywhere]">{topic.topic.title}</span>
           {topic.topic.description ? (
             <span className="mt-1 line-clamp-2 block text-xs font-semibold leading-5 text-muted-foreground">
               {topic.topic.description}
@@ -331,7 +335,7 @@ function TopicBoardCard({
       {topic.previewLessons.length > 0 ? (
         <div className="mt-3 grid gap-1">
           {topic.previewLessons.map((lesson) => (
-            <span className="truncate text-xs font-bold text-foreground" key={lesson.id}>
+            <span className="break-words text-xs font-bold text-foreground [overflow-wrap:anywhere]" key={lesson.id}>
               {lesson.orderIndex ?? "?"}. {lesson.title}
             </span>
           ))}
@@ -373,32 +377,36 @@ function TopicInspector({
 
   if (!selectedTopic || !selectedTrack) {
     return (
-      <aside className="rounded-2xl border border-border bg-muted/45 p-4 text-sm font-semibold text-muted-foreground">
+      <aside className="min-w-0 max-w-full rounded-2xl border border-border bg-muted/45 p-4 text-sm font-semibold text-muted-foreground" data-testid="curriculum-topic-inspector">
         {t("courses.empty.selectTopic")}
       </aside>
     );
   }
 
   return (
-    <aside className="grid content-start gap-4 rounded-2xl border border-border bg-white p-4">
-      <div>
+    <aside className="grid min-w-0 max-w-full content-start gap-4 overflow-hidden rounded-2xl border border-border bg-white p-4" data-testid="curriculum-topic-inspector">
+      <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-primary">
             {selectedTrack.levelLabel}
           </span>
-          <span className="rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground">
+          <span className="max-w-full break-words rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground [overflow-wrap:anywhere]">
             {selectedTrack.course.title}
           </span>
         </div>
-        <h3 className="mt-3 text-lg font-extrabold">{selectedTopic.topic.title}</h3>
+        <h3 className="mt-3 break-words text-lg font-extrabold [overflow-wrap:anywhere]">
+          {selectedTopic.topic.title}
+        </h3>
         {selectedTopic.topic.description ? (
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{selectedTopic.topic.description}</p>
+          <p className="mt-2 break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
+            {selectedTopic.topic.description}
+          </p>
         ) : null}
         {selectedTopic.topic.tagSlugs.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {selectedTopic.topic.tagSlugs.map((tag) => (
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground" key={tag}>
-                <Tags className="h-3 w-3" />
+              <span className="inline-flex max-w-full items-center gap-1 break-all rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground" key={tag}>
+                <Tags className="h-3 w-3 shrink-0" />
                 {tag}
               </span>
             ))}
@@ -415,7 +423,7 @@ function TopicInspector({
         />
       ) : null}
 
-      <div className="grid gap-3">
+      <div className="grid min-w-0 max-w-full gap-3">
         <div className="flex items-center gap-2">
           <ListChecks className="h-4 w-4 text-primary" />
           <h4 className="text-sm font-extrabold">{t("courses.inspector.lessons")}</h4>
@@ -486,7 +494,7 @@ function CourseCreateForm({
 
   return (
     <form className="grid gap-3 rounded-2xl border border-border bg-muted/50 p-3" onSubmit={submit}>
-      <div className="grid gap-3 sm:grid-cols-[1fr_7rem_7rem]">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem]">
         <FormField label={t("courses.form.courseTitle")}>
           <input
             className="playsay-input"
@@ -587,7 +595,7 @@ function TopicCreateForm({
         required
         value={form.title}
       />
-      <div className="grid gap-2 sm:grid-cols-[5rem_1fr]">
+      <div className="grid min-w-0 gap-2 sm:grid-cols-[5rem_minmax(0,1fr)]">
         <input
           className="playsay-input"
           disabled={disabled}
@@ -662,7 +670,7 @@ function TopicSettingsForm({
           value={form.title}
         />
       </FormField>
-      <div className="grid gap-2 sm:grid-cols-[5rem_1fr]">
+      <div className="grid min-w-0 gap-2 sm:grid-cols-[5rem_minmax(0,1fr)]">
         <FormField label={t("courses.form.order")}>
           <input
             className="playsay-input"
@@ -693,11 +701,11 @@ function TopicSettingsForm({
         />
       </FormField>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
+        <Button className="h-auto min-h-10 max-w-full whitespace-normal text-center" disabled={disabled} onClick={onDelete} type="button" variant="outline">
           <Trash2 className="h-4 w-4" />
           {t("courses.actions.deleteTopic")}
         </Button>
-        <Button disabled={disabled || form.title.trim().length === 0} type="submit">
+        <Button className="h-auto min-h-10 max-w-full whitespace-normal text-center" disabled={disabled || form.title.trim().length === 0} type="submit">
           <Save className="h-4 w-4" />
           {t("common.actions.save")}
         </Button>
@@ -752,7 +760,7 @@ function CourseLessonCreateForm({
   }
 
   return (
-    <form className="grid gap-2 rounded-xl border border-border bg-muted/45 p-3" onSubmit={submit}>
+    <form className="grid gap-2 rounded-xl border border-border bg-muted/45 p-3" data-testid="curriculum-lesson-create-form" onSubmit={submit}>
       <div className="text-xs font-extrabold uppercase text-muted-foreground">{t("courses.form.createLesson")}</div>
       <input
         className="playsay-input"
@@ -763,9 +771,9 @@ function CourseLessonCreateForm({
         required
         value={form.title}
       />
-      <div className="grid gap-2 sm:grid-cols-[5rem_6rem_1fr]">
+      <div className="flex min-w-0 max-w-full flex-wrap gap-2">
         <input
-          className="playsay-input"
+          className="playsay-input min-w-0 flex-[1_1_5rem]"
           disabled={disabled}
           min={0}
           onChange={(event) => updateField("orderIndex", event.target.value)}
@@ -774,7 +782,7 @@ function CourseLessonCreateForm({
           value={form.orderIndex}
         />
         <input
-          className="playsay-input"
+          className="playsay-input min-w-0 flex-[1_1_6rem]"
           disabled={disabled}
           max={480}
           min={1}
@@ -784,7 +792,7 @@ function CourseLessonCreateForm({
           value={form.plannedDurationMin}
         />
         <select
-          className="playsay-input"
+          className="playsay-input min-w-0 max-w-full flex-[3_1_12rem]"
           disabled={disabled || materials.length === 0}
           onChange={(event) => updateField("materialId", event.target.value)}
           value={form.materialId}
@@ -797,7 +805,7 @@ function CourseLessonCreateForm({
           ))}
         </select>
       </div>
-      <Button disabled={disabled || form.title.trim().length === 0} type="submit">
+      <Button className="h-auto min-h-10 max-w-full whitespace-normal text-center" disabled={disabled || form.title.trim().length === 0} type="submit">
         <Plus className="h-4 w-4" />
         {t("courses.form.addLesson")}
       </Button>
@@ -829,17 +837,17 @@ function LessonComposition({
   }
 
   return (
-    <article className="rounded-xl border border-border bg-muted/35 p-3">
+    <article className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-muted/35 p-3" data-testid="curriculum-lesson-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-extrabold">{lesson.title}</div>
+          <div className="break-words text-sm font-extrabold [overflow-wrap:anywhere]">{lesson.title}</div>
           <div className="mt-1 text-xs font-bold text-muted-foreground">
             {t("courses.summary.lessonOrder", { order: lesson.orderIndex ?? "?" })} ·{" "}
             {formatDuration(lesson.plannedDurationMin, translate)}
           </div>
         </div>
         {canManage ? (
-          <Button disabled={disabled} onClick={onDelete} type="button" variant="outline">
+          <Button className="h-auto min-h-10 max-w-full whitespace-normal text-center" disabled={disabled} onClick={onDelete} type="button" variant="outline">
             <Trash2 className="h-4 w-4" />
             {t("courses.actions.deleteLesson")}
           </Button>
@@ -853,10 +861,10 @@ function LessonComposition({
           </div>
         ) : (
           sortedCards.map((card, index) => (
-            <div className="grid gap-2 rounded-lg border border-border bg-white p-2" key={card.id}>
+            <div className="grid min-w-0 max-w-full gap-2 overflow-hidden rounded-lg border border-border bg-white p-2" key={card.id}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-extrabold">{card.materialTitle}</div>
+                  <div className="break-words text-sm font-extrabold [overflow-wrap:anywhere]">{card.materialTitle}</div>
                   <div className="mt-1 flex flex-wrap gap-1.5 text-xs font-bold text-muted-foreground">
                     <span>{t(`courses.roles.${card.role.toLowerCase()}`, { defaultValue: card.role })}</span>
                     <span>{formatDuration(card.plannedDurationMin, translate)}</span>
@@ -944,9 +952,9 @@ function LessonCardAddForm({
   }
 
   return (
-    <form className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_5rem_auto]" onSubmit={submit}>
+    <form className="mt-2 flex min-w-0 max-w-full flex-wrap gap-2" data-testid="curriculum-card-add-form" onSubmit={submit}>
       <select
-        className="playsay-input"
+        className="playsay-input min-w-0 max-w-full flex-[3_1_12rem]"
         disabled={disabled || materials.length === 0}
         onChange={(event) => updateField("materialId", event.target.value)}
         value={form.materialId}
@@ -959,7 +967,7 @@ function LessonCardAddForm({
         ))}
       </select>
       <select
-        className="playsay-input"
+        className="playsay-input min-w-[8rem] max-w-full flex-[1_1_8rem]"
         disabled={disabled}
         onChange={(event) => updateField("role", event.target.value)}
         value={form.role}
@@ -971,7 +979,7 @@ function LessonCardAddForm({
         ))}
       </select>
       <input
-        className="playsay-input"
+        className="playsay-input min-w-[5rem] max-w-full flex-[1_1_5rem]"
         disabled={disabled}
         max={480}
         min={1}
@@ -980,7 +988,7 @@ function LessonCardAddForm({
         type="number"
         value={form.plannedDurationMin}
       />
-      <Button disabled={disabled || !form.materialId} type="submit">
+      <Button className="h-auto min-h-10 max-w-full shrink-0 whitespace-normal text-center" disabled={disabled || !form.materialId} type="submit">
         <Plus className="h-4 w-4" />
         {t("courses.form.addCard")}
       </Button>

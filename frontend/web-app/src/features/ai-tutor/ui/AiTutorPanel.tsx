@@ -44,13 +44,17 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
   const [remoteAudioStream, setRemoteAudioStream] = useState<MediaStream | null>(null);
   const [evaluation, setEvaluation] = useState<TurnEvaluation | null>(null);
   const [summary, setSummary] = useState<NonNullable<AiTutorSession["summary"]> | null>(null);
+  const avatarAudioContext = useRef<AudioContext | null>(null);
   const realtime = useRef<RealtimeConversation | null>(null);
   const isStudent = appProfile?.roles.includes("STUDENT") ?? false;
   const needsBirthDate = isStudent && !appProfile?.birthDate;
   const canLoadCatalog = Boolean(appProfile) && !needsBirthDate;
   const agePolicy = agePolicyFromBirthDate(appProfile?.birthDate);
 
-  useEffect(() => () => realtime.current?.close(), []);
+  useEffect(() => () => {
+    realtime.current?.close();
+    closeAvatarAudioContext();
+  }, []);
 
   useEffect(() => {
     if (!canLoadCatalog) {
@@ -82,6 +86,15 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
   const selectedPersona = personas.find(({ id }) => id === personaId);
 
   async function start() {
+    closeAvatarAudioContext();
+    if (typeof AudioContext !== "undefined") {
+      try {
+        avatarAudioContext.current = new AudioContext();
+        void avatarAudioContext.current.resume().catch(() => undefined);
+      } catch {
+        avatarAudioContext.current = null;
+      }
+    }
     setLoading(true);
     try {
       const created = await createAiTutorSession({
@@ -107,9 +120,11 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
         });
         setMessage(null);
       } else {
+        closeAvatarAudioContext();
         setMessage(t("aiTutor.session.demoNotice"));
       }
     } catch {
+      closeAvatarAudioContext();
       setMessage(t("aiTutor.errors.start"));
     } finally {
       setLoading(false);
@@ -120,6 +135,7 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
     if (!session) return;
     realtime.current?.close();
     realtime.current = null;
+    closeAvatarAudioContext();
     setAvatarActivity("idle");
     setRemoteAudioStream(null);
     setLoading(true);
@@ -141,6 +157,7 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
       <div className="grid min-h-[36rem] lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,.8fr)]">
         <TutorAvatar
           activity={avatarActivity}
+          audioContext={avatarAudioContext.current}
           audioStream={remoteAudioStream}
           persona={selectedPersona}
           sessionActive={Boolean(session)}
@@ -191,10 +208,17 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
       </div>
     </section>
   );
+
+  function closeAvatarAudioContext() {
+    const context = avatarAudioContext.current;
+    avatarAudioContext.current = null;
+    if (context && context.state !== "closed") void context.close().catch(() => undefined);
+  }
 }
 
-function TutorAvatar({ activity, audioStream, persona, sessionActive }: {
+function TutorAvatar({ activity, audioContext, audioStream, persona, sessionActive }: {
   activity: AvatarActivity;
+  audioContext: AudioContext | null;
   audioStream: MediaStream | null;
   persona?: TutorPersona;
   sessionActive: boolean;
@@ -202,7 +226,7 @@ function TutorAvatar({ activity, audioStream, persona, sessionActive }: {
   const { t } = useAppTranslation();
   return (
     <div className="relative min-h-80 overflow-hidden bg-[#fff5e9] dark:bg-[#21160f]">
-      <AiTutorAvatarStage activity={activity} audioStream={audioStream} persona={persona} />
+      <AiTutorAvatarStage activity={activity} audioContext={audioContext} audioStream={audioStream} persona={persona} />
       <div className="absolute inset-x-4 bottom-4 z-10 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg backdrop-blur dark:border-white/10 dark:bg-black/70">
         <p className="text-xs font-bold uppercase tracking-wider text-primary">
           {sessionActive ? t("aiTutor.session.live") : t("aiTutor.avatar.label")}

@@ -45,8 +45,9 @@ export function TutorPortrait({ className, imageClassName, loading = "lazy", per
   );
 }
 
-export function AiTutorAvatarStage({ activity, audioStream, persona }: {
+export function AiTutorAvatarStage({ activity, audioContext, audioStream, persona }: {
   activity: AvatarActivity;
+  audioContext?: AudioContext | null;
   audioStream: MediaStream | null;
   persona?: TutorPersona;
 }) {
@@ -57,6 +58,7 @@ export function AiTutorAvatarStage({ activity, audioStream, persona }: {
 
   useAudioReactiveMouth({
     activity,
+    audioContext,
     audioStream,
     enabled: Boolean(animationAssets),
     reducedMotion,
@@ -168,8 +170,9 @@ function useBlinkScheduler(enabled: boolean, reducedMotion: boolean) {
   return blinking;
 }
 
-function useAudioReactiveMouth({ activity, audioStream, enabled, reducedMotion, stageRef }: {
+function useAudioReactiveMouth({ activity, audioContext, audioStream, enabled, reducedMotion, stageRef }: {
   activity: AvatarActivity;
+  audioContext?: AudioContext | null;
   audioStream: MediaStream | null;
   enabled: boolean;
   reducedMotion: boolean;
@@ -179,18 +182,20 @@ function useAudioReactiveMouth({ activity, audioStream, enabled, reducedMotion, 
     const stage = stageRef.current;
     if (!stage) return;
     stage.dataset.mouthFrame = "neutral";
-    if (!enabled || reducedMotion || activity !== "speaking" || !audioStream || typeof AudioContext === "undefined") return;
+    if (!enabled || reducedMotion || activity !== "speaking" || !audioStream || (!audioContext && typeof AudioContext === "undefined")) return;
 
-    let audioContext: AudioContext | null = null;
+    let activeAudioContext: AudioContext | null = null;
+    let ownsAudioContext = false;
     let analyser: AnalyserNode;
     let source: MediaStreamAudioSourceNode;
     try {
-      audioContext = new AudioContext();
-      analyser = audioContext.createAnalyser();
-      source = audioContext.createMediaStreamSource(audioStream);
+      activeAudioContext = audioContext && audioContext.state !== "closed" ? audioContext : new AudioContext();
+      ownsAudioContext = activeAudioContext !== audioContext;
+      analyser = activeAudioContext.createAnalyser();
+      source = activeAudioContext.createMediaStreamSource(audioStream);
       source.connect(analyser);
     } catch {
-      if (audioContext) void audioContext.close().catch(() => undefined);
+      if (ownsAudioContext && activeAudioContext) void activeAudioContext.close().catch(() => undefined);
       return;
     }
     const signal = new Uint8Array(analyser.fftSize = 256);
@@ -218,7 +223,7 @@ function useAudioReactiveMouth({ activity, audioStream, enabled, reducedMotion, 
     };
     const start = () => {
       if (document.visibilityState === "hidden") return;
-      void audioContext.resume().catch(() => undefined);
+      void activeAudioContext.resume().catch(() => undefined);
       animationFrame = window.requestAnimationFrame(sample);
     };
     const handleVisibilityChange = () => {
@@ -226,7 +231,7 @@ function useAudioReactiveMouth({ activity, audioStream, enabled, reducedMotion, 
       stage.dataset.mouthFrame = "neutral";
       mouthFrame = "neutral";
       if (document.visibilityState === "hidden") {
-        void audioContext.suspend().catch(() => undefined);
+        void activeAudioContext.suspend().catch(() => undefined);
       } else {
         start();
       }
@@ -240,7 +245,7 @@ function useAudioReactiveMouth({ activity, audioStream, enabled, reducedMotion, 
       source.disconnect();
       analyser.disconnect();
       stage.dataset.mouthFrame = "neutral";
-      void audioContext.close().catch(() => undefined);
+      if (ownsAudioContext) void activeAudioContext.close().catch(() => undefined);
     };
-  }, [activity, audioStream, enabled, reducedMotion, stageRef]);
+  }, [activity, audioContext, audioStream, enabled, reducedMotion, stageRef]);
 }

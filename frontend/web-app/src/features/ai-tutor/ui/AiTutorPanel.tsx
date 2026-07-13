@@ -15,6 +15,7 @@ import {
 } from "../../../shared/api/aiTutor";
 import type { AppUserProfile } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
+import type { AvatarActivity } from "../model/avatarAnimation";
 import { connectRealtimeConversation, type RealtimeConversation } from "../model/realtimeConversation";
 import { AiTutorAvatarStage, TutorPortrait } from "./AiTutorAvatarStage";
 
@@ -39,7 +40,8 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
   const [session, setSession] = useState<AiTutorSession | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [speaking, setSpeaking] = useState(false);
+  const [avatarActivity, setAvatarActivity] = useState<AvatarActivity>("idle");
+  const [remoteAudioStream, setRemoteAudioStream] = useState<MediaStream | null>(null);
   const [evaluation, setEvaluation] = useState<TurnEvaluation | null>(null);
   const [summary, setSummary] = useState<NonNullable<AiTutorSession["summary"]> | null>(null);
   const realtime = useRef<RealtimeConversation | null>(null);
@@ -94,13 +96,14 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
         realtime.current = await connectRealtimeConversation({
           clientSecret: created.realtime.clientSecret,
           model: created.realtime.model,
-          onSpeakingChange: setSpeaking,
+          onActivityChange: setAvatarActivity,
           onError: () => setMessage(t("aiTutor.errors.connection")),
           onEvaluation: (next, eventId) => {
             const turnEvaluation = { ...next, clientTurnId: eventId };
             if (feedbackMode !== "SESSION_END") setEvaluation(turnEvaluation);
             void appendTurnEvaluation(created.id, eventId, turnEvaluation);
           },
+          onRemoteAudioStream: setRemoteAudioStream,
         });
         setMessage(null);
       } else {
@@ -117,6 +120,8 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
     if (!session) return;
     realtime.current?.close();
     realtime.current = null;
+    setAvatarActivity("idle");
+    setRemoteAudioStream(null);
     setLoading(true);
     try {
       const completed = await finishAiTutorSession(session.id);
@@ -135,9 +140,10 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
     <section className="overflow-hidden rounded-3xl border border-border bg-white/90 shadow-sm dark:bg-zinc-950/80">
       <div className="grid min-h-[36rem] lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,.8fr)]">
         <TutorAvatar
+          activity={avatarActivity}
+          audioStream={remoteAudioStream}
           persona={selectedPersona}
           sessionActive={Boolean(session)}
-          speaking={speaking}
         />
         <div className="flex flex-col gap-5 p-5 sm:p-7">
           <header>
@@ -187,15 +193,16 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
   );
 }
 
-function TutorAvatar({ persona, sessionActive, speaking }: {
+function TutorAvatar({ activity, audioStream, persona, sessionActive }: {
+  activity: AvatarActivity;
+  audioStream: MediaStream | null;
   persona?: TutorPersona;
   sessionActive: boolean;
-  speaking: boolean;
 }) {
   const { t } = useAppTranslation();
   return (
     <div className="relative min-h-80 overflow-hidden bg-[#fff5e9] dark:bg-[#21160f]">
-      <AiTutorAvatarStage persona={persona} speaking={speaking} />
+      <AiTutorAvatarStage activity={activity} audioStream={audioStream} persona={persona} />
       <div className="absolute inset-x-4 bottom-4 z-10 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg backdrop-blur dark:border-white/10 dark:bg-black/70">
         <p className="text-xs font-bold uppercase tracking-wider text-primary">
           {sessionActive ? t("aiTutor.session.live") : t("aiTutor.avatar.label")}

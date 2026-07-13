@@ -71,7 +71,7 @@ try {
   addCheck("keycloak-login-and-profiles");
 
   await verifyAiTutorPersonaSwitching(teacher.page);
-  addCheck("ai-tutor-personas-switch-avatar");
+  addCheck("ai-tutor-personas-switch-animated-avatar");
 
   const material = await createSmokeMaterial(teacher.tokens.accessToken);
   created.materialId = material.id;
@@ -206,6 +206,19 @@ async function verifyAiTutorPersonaSwitching(page) {
   await page.locator('[data-tab-id="aiTutor"]').click();
   await page.locator('[data-testid="ai-tutor-avatar-image"]').waitFor({ timeout: timeoutMs });
 
+  const animationAssets = ["blink", "mouth-small", "mouth-open", "mouth-wide"]
+    .flatMap((layer) => ["maya", "leo", "nova"].map((personaId) => `/avatars/animated/${personaId}/${layer}.webp`));
+  const unavailableAssets = await page.evaluate(async (assetUrls) => {
+    const checks = await Promise.all(assetUrls.map(async (assetUrl) => {
+      const response = await fetch(assetUrl, { cache: "no-store" });
+      return response.ok && response.headers.get("content-type")?.includes("image/webp") ? null : assetUrl;
+    }));
+    return checks.filter(Boolean);
+  }, animationAssets);
+  if (unavailableAssets.length > 0) {
+    throw new Error(`AI tutor animation assets are unavailable: ${unavailableAssets.join(", ")}`);
+  }
+
   for (const personaId of ["maya", "leo", "nova"]) {
     const card = page.locator(`[data-testid="ai-tutor-persona-card-${personaId}"]`);
     await card.click();
@@ -216,11 +229,17 @@ async function verifyAiTutorPersonaSwitching(page) {
     await page.waitForFunction((nextPersonaId) => {
       const stage = document.querySelector('[data-testid="ai-tutor-avatar-stage"]');
       const image = document.querySelector('[data-testid="ai-tutor-avatar-image"]');
+      const animationLayers = Array.from(stage?.querySelectorAll('[data-avatar-layer]') ?? []);
       return stage?.getAttribute("data-persona-id") === nextPersonaId &&
         image instanceof HTMLImageElement &&
         image.getAttribute("src") === `/avatars/${nextPersonaId}.webp` &&
         image.complete &&
-        image.naturalWidth > 0;
+        image.naturalWidth > 0 &&
+        animationLayers.length === 4 &&
+        animationLayers.every((layer) => layer instanceof HTMLImageElement &&
+          layer.getAttribute("src")?.startsWith(`/avatars/animated/${nextPersonaId}/`) &&
+          layer.complete && layer.naturalWidth > 0) &&
+        image.parentElement?.getAttribute("data-avatar-fallback") === "false";
     }, personaId, { timeout: timeoutMs });
   }
 

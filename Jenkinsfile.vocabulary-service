@@ -144,24 +144,13 @@ spec:
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
 
-          env.RUN_DB_MIGRATE = 'true'
-          def before = params.GITHUB_BEFORE?.trim()
-          if (before ==~ /[0-9a-f]{40}/ && env.GIT_COMMIT ==~ /[0-9a-f]{40}/ && !(before ==~ /0{40}/)) {
-            def beforeExists = sh(script: "git cat-file -e ${before}^{commit}", returnStatus: true) == 0
-            def isAncestor = beforeExists && sh(script: "git merge-base --is-ancestor ${before} ${env.GIT_COMMIT}", returnStatus: true) == 0
-            if (isAncestor) {
-              def changed = sh(script: "git diff --name-only ${before} ${env.GIT_COMMIT} -- backend/vocabulary-service/src/main/resources/db/changelog", returnStdout: true).trim()
-              env.RUN_DB_MIGRATE = changed ? 'true' : 'false'
-            }
-          }
-
           currentBuild.displayName = env.BUILD_LABEL
           currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
           echo "Build label: ${env.BUILD_LABEL}"
           echo "Source branch: ${env.CI_BRANCH}"
           echo "Source commit: ${env.GIT_COMMIT}"
           echo "Deploy to dev: ${env.DEPLOY_TO_DEV}"
-          echo "Run DB migrate: ${env.RUN_DB_MIGRATE}"
+          echo "Run DB migrate: ${env.DEPLOY_TO_DEV} (Liquibase update is idempotent)"
         }
       }
     }
@@ -178,7 +167,7 @@ spec:
 
     stage('DB migrate') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' && env.RUN_DB_MIGRATE == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' }
       }
       steps {
         container('liquibase') {

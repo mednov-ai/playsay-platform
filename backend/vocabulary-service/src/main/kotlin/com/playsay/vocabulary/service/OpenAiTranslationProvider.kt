@@ -72,7 +72,7 @@ class OpenAiTranslationProvider(
         "model" to cleanModel,
         "store" to false,
         "max_output_tokens" to 1_200,
-        "reasoning" to mapOf("effort" to "minimal"),
+        "reasoning" to mapOf("effort" to "none"),
         "input" to listOf(
             message("system", systemPrompt),
             message("user", userPrompt(sourceText, sourceLanguage, targetLanguage, context, instruction, previousTranslations)),

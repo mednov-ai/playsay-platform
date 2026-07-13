@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, RotateCcw, Save, ShieldCheck, User } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, RefreshCw, RotateCcw, Save, ShieldCheck, User } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import type {
@@ -29,6 +29,7 @@ export function ProfileAccountPanel({
   error,
   isAdmin,
   isAuthenticated,
+  onBack,
   onRefreshAdminUsers,
   onResetProfile,
   onSaveProfile,
@@ -44,6 +45,7 @@ export function ProfileAccountPanel({
   error: string | null;
   isAdmin: boolean;
   isAuthenticated: boolean;
+  onBack: () => void;
   onRefreshAdminUsers: () => void;
   onResetProfile: () => void;
   onSaveProfile: (input: UpdateUserProfileInput) => Promise<void>;
@@ -53,9 +55,39 @@ export function ProfileAccountPanel({
   status: SessionStatus;
 }) {
   const { t } = useAppTranslation();
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
 
   return (
-    <section className="rounded-[1.5rem] border border-border bg-white/90 p-5 shadow-[0_22px_70px_rgba(35,25,15,0.08)]">
+    <section
+      aria-labelledby="profile-page-title"
+      className="rounded-[1.5rem] border border-border bg-white/90 p-5 shadow-[0_22px_70px_rgba(35,25,15,0.08)] dark:bg-zinc-950/80"
+      data-testid="profile-account-panel"
+    >
+      <header className="mb-6 flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <span className="text-xs font-black uppercase tracking-[0.16em] text-primary">{t("profile.page.eyebrow")}</span>
+          <h1
+            className="mt-1 text-2xl font-extrabold focus:outline-none"
+            id="profile-page-title"
+            ref={titleRef}
+            tabIndex={-1}
+          >
+            {t("profile.page.title")}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-muted-foreground">
+            {t("profile.page.subtitle")}
+          </p>
+        </div>
+        <Button className="shrink-0" onClick={onBack} type="button" variant="outline">
+          <ArrowLeft className="h-4 w-4" />
+          {t("profile.actions.backToWorkspace")}
+        </Button>
+      </header>
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <section className="min-w-0">
           <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
+import { lazy, Suspense, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { publicSiteUrl } from "@playsay/shared-ui";
 import { CalendarPlus, Loader2, LogIn, LogOut, User, UserPlus, Video } from "lucide-react";
 import { type WorkspaceTab, type WorkspaceTabDefinition } from "../entities/workspace/model";
@@ -43,6 +43,7 @@ import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 import officialLogoUrl from "../shared/assets/playsay-official-logo.jpg";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
 import { useAppTheme } from "./AppProviders";
+import { profilePath } from "./routes";
 
 const BillingPanel = lazy(() => import("../features/payments/ui/BillingPanel").then((module) => ({ default: module.BillingPanel })));
 const CourseWorkspacePanel = lazy(() => (
@@ -95,6 +96,7 @@ export type AppShellProps = {
   isAdmin: boolean;
   isAuthenticated: boolean;
   isClassroomOpen: boolean;
+  isProfileRoute: boolean;
   joinScheduledLesson: (lesson: ScheduledLesson, options?: { updateRoute?: boolean }) => Promise<void>;
   leaveScheduledLessonRoom: () => void;
   linkMaterialToCourseLesson: (courseId: string, lesson: CourseLesson, materialId: string | null) => Promise<void>;
@@ -111,7 +113,6 @@ export type AppShellProps = {
   preparationLessonId?: string | null;
   profile: MeProfile | null;
   profileMessage: string | null;
-  profileOpen: boolean;
   profileSaving: boolean;
   refreshAdminUsers: () => Promise<void>;
   refreshCourses: () => Promise<void>;
@@ -126,7 +127,6 @@ export type AppShellProps = {
   scheduleLoading: boolean;
   scheduleMessage: string | null;
   scheduledLessons: ScheduledLesson[];
-  setProfileOpen: Dispatch<SetStateAction<boolean>>;
   setWorkspaceTab: Dispatch<SetStateAction<WorkspaceTab>>;
   status: SessionStatus;
   startScheduledLesson?: (lesson: ScheduledLesson) => Promise<void>;
@@ -139,6 +139,8 @@ export type AppShellProps = {
   upsertMaterial: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
   workspaceTab: WorkspaceTab;
   workspaceTabs: WorkspaceTabDefinition[];
+  openProfile: () => void;
+  closeProfile: () => void;
   openLessonPreparation?: (lessonId: string) => void;
   closeLessonPreparation?: () => void;
 };
@@ -178,6 +180,7 @@ export function AppShell(props: AppShellProps) {
     isAdmin,
     isAuthenticated,
     isClassroomOpen,
+    isProfileRoute,
     joinScheduledLesson,
     leaveScheduledLessonRoom,
     linkMaterialToCourseLesson,
@@ -194,7 +197,6 @@ export function AppShell(props: AppShellProps) {
     preparationLessonId = null,
     profile,
     profileMessage,
-    profileOpen,
     profileSaving,
     refreshAdminUsers,
     refreshCourses,
@@ -209,7 +211,6 @@ export function AppShell(props: AppShellProps) {
     scheduleLoading,
     scheduleMessage,
     scheduledLessons,
-    setProfileOpen,
     setWorkspaceTab,
     status,
     startScheduledLesson = async () => undefined,
@@ -222,6 +223,8 @@ export function AppShell(props: AppShellProps) {
     upsertMaterial,
     workspaceTab,
     workspaceTabs,
+    openProfile,
+    closeProfile,
     openLessonPreparation = () => undefined,
     closeLessonPreparation = () => undefined,
   } = props;
@@ -232,9 +235,23 @@ export function AppShell(props: AppShellProps) {
 
   function focusScheduleCreateForm() {
     setWorkspaceTab("schedule");
-    window.requestAnimationFrame(() => {
+    const dispatchOpenWizard = () => {
       window.dispatchEvent(new CustomEvent("playsay:assign-lesson"));
-    });
+    };
+    if (isProfileRoute) {
+      closeProfile();
+      window.requestAnimationFrame(() => window.requestAnimationFrame(dispatchOpenWizard));
+      return;
+    }
+    window.requestAnimationFrame(dispatchOpenWizard);
+  }
+
+  function handleProfileNavigation(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    openProfile();
   }
 
   return (
@@ -273,14 +290,16 @@ export function AppShell(props: AppShellProps) {
                   {t("schedule.wizard.assign")}
                 </Button>
               ) : null}
-              <Button
-                aria-expanded={profileOpen}
-                onClick={() => setProfileOpen((current) => !current)}
-                type="button"
-                variant="outline"
-              >
-                <User className="h-4 w-4" />
-                {t("shell.actions.profile")}
+              <Button asChild variant="outline">
+                <a
+                  aria-current={isProfileRoute ? "page" : undefined}
+                  className={isProfileRoute ? "border-primary bg-primary/10 text-primary shadow-sm hover:bg-primary/15" : undefined}
+                  href={profilePath()}
+                  onClick={handleProfileNavigation}
+                >
+                  <User className="h-4 w-4" />
+                  {t("shell.actions.profile")}
+                </a>
               </Button>
               <Button aria-label={t("shell.aria.logout")} variant="outline" onClick={logout}>
                 <LogOut className="h-4 w-4" />
@@ -303,6 +322,28 @@ export function AppShell(props: AppShellProps) {
           </Suspense>
         ) : !isAuthenticated ? (
           <WelcomeLanding profileSaving={profileSaving} status={status} />
+        ) : isProfileRoute ? (
+          <div className="grid flex-1">
+            <Suspense fallback={<PanelFallback />}>
+              <ProfileAccountPanel
+                adminLoading={adminLoading}
+                adminMessage={adminMessage}
+                adminUsers={adminUsers}
+                appProfile={appProfile}
+                error={error}
+                isAdmin={isAdmin}
+                isAuthenticated={isAuthenticated}
+                onBack={closeProfile}
+                onRefreshAdminUsers={() => void refreshAdminUsers()}
+                onResetProfile={() => void resetProfile()}
+                onSaveProfile={saveProfile}
+                profile={profile}
+                profileMessage={profileMessage}
+                profileSaving={profileSaving}
+                status={status}
+              />
+            </Suspense>
+          </div>
         ) : preparationLesson && canManageSchedule ? (
           <Suspense fallback={<PanelFallback />}>
             <LessonPreparationPanel
@@ -323,25 +364,6 @@ export function AppShell(props: AppShellProps) {
         ) : (
           <div className="grid flex-1 gap-5">
             <Suspense fallback={<PanelFallback />}>
-              {profileOpen ? (
-                <ProfileAccountPanel
-                  adminLoading={adminLoading}
-                  adminMessage={adminMessage}
-                  adminUsers={adminUsers}
-                  appProfile={appProfile}
-                  error={error}
-                  isAdmin={isAdmin}
-                  isAuthenticated={isAuthenticated}
-                  onRefreshAdminUsers={() => void refreshAdminUsers()}
-                  onResetProfile={() => void resetProfile()}
-                  onSaveProfile={saveProfile}
-                  profile={profile}
-                  profileMessage={profileMessage}
-                  profileSaving={profileSaving}
-                  status={status}
-                />
-              ) : null}
-
               {workspaceTabs.length > 1 ? (
                 <WorkspaceTabs activeTab={workspaceTab} onSelect={setWorkspaceTab} tabs={workspaceTabs} />
               ) : null}
@@ -384,7 +406,7 @@ export function AppShell(props: AppShellProps) {
               ) : null}
 
               {workspaceTab === "aiTutor" ? (
-                <AiTutorPanel appProfile={appProfile} onOpenProfile={() => setProfileOpen(true)} />
+                <AiTutorPanel appProfile={appProfile} onOpenProfile={openProfile} />
               ) : null}
 
               {workspaceTab === "vocabulary" ? <VocabularyPanel /> : null}

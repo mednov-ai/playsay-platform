@@ -128,6 +128,14 @@ export const ru = {
     },
   },
   profile: {
+    page: {
+      eyebrow: "Настройки аккаунта",
+      title: "Профиль",
+      subtitle: "Управляйте личными данными и настройками Play&Say.",
+    },
+    actions: {
+      backToWorkspace: "В рабочую область",
+    },
     sections: {
       user: "Пользователь",
       account: "Профиль Play&Say",

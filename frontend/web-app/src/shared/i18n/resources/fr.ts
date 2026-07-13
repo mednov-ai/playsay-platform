@@ -128,6 +128,14 @@ export const fr = {
     },
   },
   profile: {
+    page: {
+      eyebrow: "Paramètres du compte",
+      title: "Profil",
+      subtitle: "Gérez vos informations personnelles et les paramètres Play&Say.",
+    },
+    actions: {
+      backToWorkspace: "Retour à l’espace de travail",
+    },
     sections: {
       user: "Utilisateur",
       account: "Profil Play&Say",

@@ -27,6 +27,7 @@ describe("ProfileAccountPanel", () => {
       error: null,
       isAdmin: false,
       isAuthenticated: true,
+      onBack: vi.fn(),
       onRefreshAdminUsers: vi.fn(),
       onResetProfile: vi.fn(),
       onSaveProfile: vi.fn(),
@@ -45,5 +46,7 @@ describe("ProfileAccountPanel", () => {
     expect(markup).toContain("Страна");
     expect(markup).toContain("Россия");
     expect(markup).toContain("Дата рождения");
+    expect(markup).toContain("Настройки аккаунта");
+    expect(markup).toContain("В рабочую область");
   });
 });

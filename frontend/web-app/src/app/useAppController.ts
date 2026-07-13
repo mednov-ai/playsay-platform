@@ -26,7 +26,16 @@ import {
   type ScheduledLesson,
   type UpdateUserProfileInput,
 } from "../shared/api/playsay";
-import { classroomLessonIdFromPath, lessonPreparationIdFromPath, lessonPreparationPath } from "./routes";
+import {
+  classroomLessonIdFromPath,
+  isProfilePath,
+  lessonPreparationIdFromPath,
+  lessonPreparationPath,
+  profileHistoryState,
+  profilePath,
+  profileReturnPathFromHistoryState,
+  subscribeToPathnameHistory,
+} from "./routes";
 import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
 import { useCourseWorkspaceData } from "../features/courses";
 import { usePaymentInvoicesData } from "../features/payments";
@@ -56,9 +65,7 @@ export function useAppController(): AppShellProps {
   const [error, setError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
-  const profileOpen = useAppShellUiStore((state) => state.profileOpen);
   const resetShellUi = useAppShellUiStore((state) => state.resetShellUi);
-  const setProfileOpen = useAppShellUiStore((state) => state.setProfileOpen);
   const setWorkspaceTab = useAppShellUiStore((state) => state.setWorkspaceTab);
   const workspaceTab = useAppShellUiStore((state) => state.workspaceTab);
   const [adminUsers, setAdminUsers] = useState<AdminUserProfile[]>([]);
@@ -78,6 +85,7 @@ export function useAppController(): AppShellProps {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const routeLessonId = classroomLessonIdFromPath(currentPath);
   const preparationLessonId = lessonPreparationIdFromPath(currentPath);
+  const isProfileRoute = isProfilePath(currentPath);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,12 +185,7 @@ export function useAppController(): AppShellProps {
   }, []);
 
   useEffect(() => {
-    function updatePathFromHistory() {
-      setCurrentPath(window.location.pathname);
-    }
-
-    window.addEventListener("popstate", updatePathFromHistory);
-    return () => window.removeEventListener("popstate", updatePathFromHistory);
+    return subscribeToPathnameHistory(window, setCurrentPath);
   }, []);
 
   useEffect(() => {
@@ -342,6 +345,27 @@ export function useAppController(): AppShellProps {
     navigateToPath("/");
   }
 
+  function openProfile() {
+    if (isProfileRoute) {
+      return;
+    }
+    const nextPath = profilePath();
+    window.history.pushState(profileHistoryState(currentPath), "", nextPath);
+    setCurrentPath(nextPath);
+  }
+
+  function closeProfile() {
+    if (!isProfileRoute) {
+      return;
+    }
+    if (profileReturnPathFromHistoryState(window.history.state)) {
+      window.history.back();
+      return;
+    }
+    window.history.replaceState({}, "", "/");
+    setCurrentPath("/");
+  }
+
   function logout() {
     const logoutUrl = buildLogoutUrl();
     clearTokens();
@@ -424,6 +448,7 @@ export function useAppController(): AppShellProps {
     isAdmin,
     isAuthenticated,
     isClassroomOpen,
+    isProfileRoute,
     joinScheduledLesson,
     leaveScheduledLessonRoom,
     linkMaterialToCourseLesson,
@@ -440,7 +465,6 @@ export function useAppController(): AppShellProps {
     preparationLessonId,
     profile,
     profileMessage,
-    profileOpen,
     profileSaving,
     refreshAdminUsers,
     refreshCourses,
@@ -455,7 +479,6 @@ export function useAppController(): AppShellProps {
     scheduleLoading,
     scheduleMessage,
     scheduledLessons,
-    setProfileOpen,
     setWorkspaceTab,
     status,
     startScheduledLesson,
@@ -468,6 +491,8 @@ export function useAppController(): AppShellProps {
     upsertMaterial,
     workspaceTab,
     workspaceTabs,
+    openProfile,
+    closeProfile,
     openLessonPreparation,
     closeLessonPreparation,
   };

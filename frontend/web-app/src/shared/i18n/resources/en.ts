@@ -128,6 +128,14 @@ export const en = {
     },
   },
   profile: {
+    page: {
+      eyebrow: "Account settings",
+      title: "Profile",
+      subtitle: "Manage your personal details and Play&Say settings.",
+    },
+    actions: {
+      backToWorkspace: "Back to workspace",
+    },
     sections: {
       user: "User",
       account: "Play&Say profile",

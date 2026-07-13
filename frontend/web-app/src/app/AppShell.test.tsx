@@ -25,6 +25,20 @@ describe("AppShell", () => {
     expect(markup).toContain("Назначить урок");
     expect(markup).not.toContain("Войти в урок");
   });
+
+  it("renders profile as a dedicated route instead of stacking it above the workspace", () => {
+    const props = appShellProps();
+    props.isProfileRoute = true;
+    const markup = renderToStaticMarkup(createElement(
+      AppProviders,
+      null,
+      createElement(AppShell, props),
+    ));
+
+    expect(markup).toContain('href="/profile"');
+    expect(markup).toContain('aria-current="page"');
+    expect(markup).not.toContain('aria-label="Рабочие разделы"');
+  });
 });
 
 function appShellProps(): AppShellProps {
@@ -70,6 +84,7 @@ function appShellProps(): AppShellProps {
     isAdmin: false,
     isAuthenticated: true,
     isClassroomOpen: false,
+    isProfileRoute: false,
     joinScheduledLesson: vi.fn(),
     leaveScheduledLessonRoom: vi.fn(),
     linkMaterialToCourseLesson: vi.fn(),
@@ -85,7 +100,6 @@ function appShellProps(): AppShellProps {
     paymentMessage: null,
     profile: teacherProfile,
     profileMessage: null,
-    profileOpen: false,
     profileSaving: false,
     refreshAdminUsers: vi.fn(),
     refreshCourses: vi.fn(),
@@ -101,7 +115,6 @@ function appShellProps(): AppShellProps {
     scheduleLoading: false,
     scheduleMessage: null,
     scheduledLessons: [],
-    setProfileOpen: vi.fn(),
     setWorkspaceTab: vi.fn(),
     status: "authenticated",
     studentUsers: [],
@@ -111,5 +124,7 @@ function appShellProps(): AppShellProps {
     upsertMaterial: vi.fn(),
     workspaceTab: "schedule",
     workspaceTabs: workspaceTabsForProfile(teacherProfile),
+    openProfile: vi.fn(),
+    closeProfile: vi.fn(),
   };
 }

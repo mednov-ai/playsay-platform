@@ -25,6 +25,46 @@ export function paymentTokenFromPath(pathname: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+export function profilePath(): string {
+  return "/profile";
+}
+
+export function isProfilePath(pathname: string): boolean {
+  return /^\/profile\/?$/.test(pathname);
+}
+
+type PathnameHistorySource = {
+  location: { pathname: string };
+  addEventListener(type: "popstate", listener: () => void): void;
+  removeEventListener(type: "popstate", listener: () => void): void;
+};
+
+export function subscribeToPathnameHistory(
+  source: PathnameHistorySource,
+  onPathnameChange: (pathname: string) => void,
+): () => void {
+  function updatePathname() {
+    onPathnameChange(source.location.pathname);
+  }
+
+  source.addEventListener("popstate", updatePathname);
+  return () => source.removeEventListener("popstate", updatePathname);
+}
+
+const profileReturnPathKey = "playsayProfileReturnPath";
+
+export function profileHistoryState(returnPath: string): Record<string, string> {
+  return { [profileReturnPathKey]: returnPath };
+}
+
+export function profileReturnPathFromHistoryState(state: unknown): string | null {
+  if (!state || typeof state !== "object") {
+    return null;
+  }
+  const returnPath = (state as Record<string, unknown>)[profileReturnPathKey];
+  return typeof returnPath === "string" && returnPath.startsWith("/") ? returnPath : null;
+}
+
 export function isStudentInvitePath(pathname: string): boolean {
   return /^\/join\/?$/.test(pathname);
 }

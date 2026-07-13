@@ -85,6 +85,7 @@ function props(): AppShellProps {
     isAdmin: false,
     isAuthenticated: true,
     isClassroomOpen: false,
+    isProfileRoute: false,
     joinScheduledLesson: async () => undefined,
     leaveScheduledLessonRoom: () => undefined,
     linkMaterialToCourseLesson: async () => undefined,
@@ -104,7 +105,6 @@ function props(): AppShellProps {
       username: "teacher-demo",
     } as AppShellProps["profile"],
     profileMessage: null,
-    profileOpen: false,
     profileSaving: false,
     refreshAdminUsers: async () => undefined,
     refreshCourses: async () => undefined,
@@ -119,7 +119,6 @@ function props(): AppShellProps {
     scheduleLoading: false,
     scheduleMessage: null,
     scheduledLessons: [],
-    setProfileOpen: () => undefined,
     setWorkspaceTab: () => undefined,
     status: "authenticated",
     studentUsers: [],
@@ -131,5 +130,7 @@ function props(): AppShellProps {
     upsertMaterial: async () => null,
     workspaceTab: "schedule",
     workspaceTabs: [],
+    openProfile: () => undefined,
+    closeProfile: () => undefined,
   };
 }

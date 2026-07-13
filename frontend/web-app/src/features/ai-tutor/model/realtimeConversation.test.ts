@@ -27,7 +27,10 @@ describe("Realtime turn evaluation", () => {
 });
 
 describe("Realtime avatar activity", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it("maps learner and tutor audio lifecycle without letting microphone events override tutor speech", () => {
     expect(activityForRealtimeEvent("idle", "input_audio_buffer.speech_started")).toBe("listening");
@@ -38,14 +41,16 @@ describe("Realtime avatar activity", () => {
     expect(activityForRealtimeEvent("speaking", "output_audio_buffer.stopped")).toBe("idle");
   });
 
-  it("publishes the remote audio stream and clears all media resources on close", async () => {
-    const localTrack = { stop: vi.fn() };
-    const localStream = { getTracks: () => [localTrack] } as unknown as MediaStream;
+  it("runs one greeting and one response per learner turn without reacting to tutor audio", async () => {
+    vi.useFakeTimers();
+    const localTrack = { enabled: true, stop: vi.fn() };
+    const localStream = { getAudioTracks: () => [localTrack], getTracks: () => [localTrack] } as unknown as MediaStream;
     const remoteStream = {} as MediaStream;
     const dataChannel = new FakeDataChannel();
     const peer = new FakePeer(dataChannel);
     const audio = { autoplay: false, srcObject: null as MediaProvider | null };
     const onActivityChange = vi.fn();
+    const onEvaluation = vi.fn();
     const onRemoteAudioStream = vi.fn();
 
     vi.stubGlobal("navigator", { mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(localStream) } });
@@ -58,18 +63,64 @@ describe("Realtime avatar activity", () => {
       model: "realtime-model",
       onActivityChange,
       onError: vi.fn(),
-      onEvaluation: vi.fn(),
+      onEvaluation,
       onRemoteAudioStream,
     });
+
+    expect(localTrack.enabled).toBe(false);
+    dataChannel.receive({ type: "session.created" });
+    dataChannel.receive({ type: "session.created" });
+    expect(dataChannel.sentEventsOfType("session.update")).toHaveLength(1);
+    expect(dataChannel.sentEventsOfType("response.create")).toHaveLength(1);
 
     peer.ontrack?.({ streams: [remoteStream] } as unknown as RTCTrackEvent);
     expect(audio.srcObject).toBe(remoteStream);
     expect(onRemoteAudioStream).toHaveBeenCalledWith(remoteStream);
 
-    dataChannel.onmessage?.({ data: JSON.stringify({ type: "input_audio_buffer.speech_started" }) } as MessageEvent);
-    dataChannel.onmessage?.({ data: JSON.stringify({ type: "input_audio_buffer.speech_stopped" }) } as MessageEvent);
-    dataChannel.onmessage?.({ data: JSON.stringify({ type: "output_audio_buffer.started" }) } as MessageEvent);
-    expect(onActivityChange.mock.calls.map(([activity]) => activity)).toEqual(["listening", "thinking", "speaking"]);
+    dataChannel.receive({ type: "response.created" });
+    dataChannel.receive({ type: "output_audio_buffer.started" });
+    dataChannel.receive({ type: "input_audio_buffer.speech_started" });
+    dataChannel.receive({ type: "input_audio_buffer.speech_stopped" });
+    expect(dataChannel.sentEventsOfType("response.create")).toHaveLength(1);
+    dataChannel.receive({ type: "response.done", response: { output: [] } });
+    dataChannel.receive({ type: "output_audio_buffer.stopped" });
+    await vi.advanceTimersByTimeAsync(239);
+    expect(localTrack.enabled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(localTrack.enabled).toBe(true);
+
+    dataChannel.receive({ type: "input_audio_buffer.speech_started" });
+    dataChannel.receive({ type: "input_audio_buffer.speech_stopped" });
+    dataChannel.receive({
+      type: "response.done",
+      event_id: "evaluation-event",
+      response: {
+        output: [{
+          type: "function_call",
+          name: "evaluate_learner_turn",
+          call_id: "evaluation-call",
+          arguments: JSON.stringify(accepted),
+        }],
+      },
+    });
+    expect(onEvaluation).toHaveBeenCalledWith(accepted, "evaluation-event");
+    expect(dataChannel.sentEventsOfType("conversation.item.create")).toHaveLength(1);
+    expect(dataChannel.sentEventsOfType("response.create")).toHaveLength(3);
+    expect(localTrack.enabled).toBe(false);
+
+    dataChannel.receive({
+      type: "response.done",
+      response: {
+        output: [{
+          type: "function_call",
+          name: "evaluate_learner_turn",
+          call_id: "invalid-evaluation-call",
+          arguments: "not-json",
+        }],
+      },
+    });
+    expect(dataChannel.sentEventsOfType("conversation.item.create")).toHaveLength(2);
+    expect(dataChannel.sentEventsOfType("response.create")).toHaveLength(4);
 
     conversation.close();
     expect(onActivityChange).toHaveBeenLastCalledWith("idle");
@@ -86,6 +137,16 @@ class FakeDataChannel {
   onmessage: ((event: MessageEvent) => void) | null = null;
   readyState = "open";
   send = vi.fn();
+
+  receive(event: object) {
+    this.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);
+  }
+
+  sentEventsOfType(type: string) {
+    return this.send.mock.calls
+      .map(([event]) => JSON.parse(String(event)) as { type?: string })
+      .filter((event) => event.type === type);
+  }
 }
 
 class FakePeer {

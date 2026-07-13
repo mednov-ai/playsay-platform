@@ -31,7 +31,16 @@ class RealtimeCredentialService(
                     "type" to "realtime",
                     "model" to model,
                     "instructions" to instructions,
-                    "audio" to mapOf("output" to mapOf("voice" to voice)),
+                    "audio" to mapOf(
+                        "input" to mapOf(
+                            "turn_detection" to mapOf(
+                                "type" to "server_vad",
+                                "create_response" to false,
+                                "interrupt_response" to false,
+                            ),
+                        ),
+                        "output" to mapOf("voice" to voice),
+                    ),
                     "tools" to listOf(
                         mapOf(
                             "type" to "function",

@@ -206,7 +206,7 @@ async function verifyAiTutorPersonaSwitching(page) {
   await page.locator('[data-tab-id="aiTutor"]').click();
   await page.locator('[data-testid="ai-tutor-avatar-image"]').waitFor({ timeout: timeoutMs });
 
-  const animationAssets = ["blink", "mouth-small", "mouth-open", "mouth-wide"]
+  const animationAssets = ["blink", "blink-half", "mouth-small", "mouth-open", "mouth-wide"]
     .flatMap((layer) => ["maya", "leo", "nova"].map((personaId) => `/avatars/animated/${personaId}/${layer}.webp`));
   const unavailableAssets = await page.evaluate(async (assetUrls) => {
     const checks = await Promise.all(assetUrls.map(async (assetUrl) => {
@@ -235,7 +235,7 @@ async function verifyAiTutorPersonaSwitching(page) {
         image.getAttribute("src") === `/avatars/${nextPersonaId}.webp` &&
         image.complete &&
         image.naturalWidth > 0 &&
-        animationLayers.length === 4 &&
+        animationLayers.length === 5 &&
         animationLayers.every((layer) => layer instanceof HTMLImageElement &&
           layer.getAttribute("src")?.startsWith(`/avatars/animated/${nextPersonaId}/`) &&
           layer.complete && layer.naturalWidth > 0) &&

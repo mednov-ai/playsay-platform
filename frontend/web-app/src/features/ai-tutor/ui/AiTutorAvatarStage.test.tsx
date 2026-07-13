@@ -21,6 +21,9 @@ describe("AI tutor portraits", () => {
     expect(markup).toContain('data-testid="ai-tutor-avatar-image"');
     expect(markup).toContain('src="/avatars/leo.webp"');
     expect(markup).toContain('src="/avatars/animated/leo/blink.webp"');
+    expect(markup).toContain('src="/avatars/animated/leo/blink-half.webp"');
+    expect(markup).toContain('data-avatar-layer="blink-half"');
+    expect(markup).toContain('data-avatar-layer="blink-closed"');
     expect(markup).toContain('src="/avatars/animated/leo/mouth-wide.webp"');
     expect(markup).not.toContain('/avatars/animated/maya/');
     expect(markup).not.toContain('/avatars/animated/nova/');

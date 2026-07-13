@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { TutorPersona } from "../../../shared/api/aiTutor";
 import {
   avatarAnimationManifest,
+  createAvatarBlinkScheduler,
   markAvatarLayerBroken,
   mouthFrameForLevel,
-  nextBlinkDelay,
   voiceLevelForTimeDomainSignal,
   type AvatarActivity,
   type MouthFrame,
@@ -87,7 +87,8 @@ export function AiTutorAvatarStage({ activity, audioContext, audioStream, person
         />
         {animationAssets && !reducedMotion ? (
           <>
-            <AvatarLayer asset={animationAssets.blink} kind="blink" />
+            <AvatarLayer asset={animationAssets.blinkHalf} kind="blink-half" />
+            <AvatarLayer asset={animationAssets.blinkClosed} kind="blink-closed" />
             <AvatarLayer asset={animationAssets.mouthSmall} kind="mouth-small" />
             <AvatarLayer asset={animationAssets.mouthOpen} kind="mouth-open" />
             <AvatarLayer asset={animationAssets.mouthWide} kind="mouth-wide" />
@@ -99,7 +100,7 @@ export function AiTutorAvatarStage({ activity, audioContext, audioStream, person
   );
 }
 
-function AvatarLayer({ asset, kind }: { asset: string; kind: "blink" | "mouth-small" | "mouth-open" | "mouth-wide" }) {
+function AvatarLayer({ asset, kind }: { asset: string; kind: "blink-half" | "blink-closed" | "mouth-small" | "mouth-open" | "mouth-wide" }) {
   return (
     <img
       alt=""
@@ -137,32 +138,19 @@ function useBlinkScheduler(enabled: boolean, reducedMotion: boolean) {
       return;
     }
 
-    let blinkTimer = 0;
-    let openEyesTimer = 0;
-    const clearTimers = () => {
-      window.clearTimeout(blinkTimer);
-      window.clearTimeout(openEyesTimer);
-    };
-    const scheduleBlink = () => {
-      blinkTimer = window.setTimeout(() => {
-        if (document.visibilityState === "hidden") return;
-        setBlinking(true);
-        openEyesTimer = window.setTimeout(() => {
-          setBlinking(false);
-          scheduleBlink();
-        }, 140);
-      }, nextBlinkDelay());
-    };
+    const scheduler = createAvatarBlinkScheduler({
+      clearTimeout: (timerId) => window.clearTimeout(timerId),
+      isHidden: () => document.visibilityState === "hidden",
+      onBlinkingChange: setBlinking,
+      setTimeout: (callback, delay) => window.setTimeout(callback, delay),
+    });
     const handleVisibilityChange = () => {
-      clearTimers();
-      setBlinking(false);
-      if (document.visibilityState !== "hidden") scheduleBlink();
+      scheduler.reset();
     };
 
-    if (document.visibilityState !== "hidden") scheduleBlink();
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      clearTimers();
+      scheduler.stop();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [enabled, reducedMotion]);

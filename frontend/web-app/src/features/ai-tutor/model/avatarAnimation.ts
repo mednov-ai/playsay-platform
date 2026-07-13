@@ -9,7 +9,8 @@ type AvatarFeatureBox = {
 };
 
 export type AvatarAnimationAssets = {
-  blink: string;
+  blinkClosed: string;
+  blinkHalf: string;
   eyes: AvatarFeatureBox;
   mouth: AvatarFeatureBox;
   mouthOpen: string;
@@ -19,7 +20,8 @@ export type AvatarAnimationAssets = {
 
 export const avatarAnimationManifest: Readonly<Record<string, AvatarAnimationAssets>> = {
   maya: {
-    blink: "/avatars/animated/maya/blink.webp",
+    blinkClosed: "/avatars/animated/maya/blink.webp",
+    blinkHalf: "/avatars/animated/maya/blink-half.webp",
     eyes: { x: 405, y: 285, width: 270, height: 125 },
     mouth: { x: 435, y: 410, width: 215, height: 145 },
     mouthSmall: "/avatars/animated/maya/mouth-small.webp",
@@ -27,7 +29,8 @@ export const avatarAnimationManifest: Readonly<Record<string, AvatarAnimationAss
     mouthWide: "/avatars/animated/maya/mouth-wide.webp",
   },
   leo: {
-    blink: "/avatars/animated/leo/blink.webp",
+    blinkClosed: "/avatars/animated/leo/blink.webp",
+    blinkHalf: "/avatars/animated/leo/blink-half.webp",
     eyes: { x: 390, y: 280, width: 270, height: 110 },
     mouth: { x: 430, y: 405, width: 190, height: 140 },
     mouthSmall: "/avatars/animated/leo/mouth-small.webp",
@@ -35,7 +38,8 @@ export const avatarAnimationManifest: Readonly<Record<string, AvatarAnimationAss
     mouthWide: "/avatars/animated/leo/mouth-wide.webp",
   },
   nova: {
-    blink: "/avatars/animated/nova/blink.webp",
+    blinkClosed: "/avatars/animated/nova/blink.webp",
+    blinkHalf: "/avatars/animated/nova/blink-half.webp",
     eyes: { x: 380, y: 315, width: 325, height: 130 },
     mouth: { x: 440, y: 440, width: 220, height: 150 },
     mouthSmall: "/avatars/animated/nova/mouth-small.webp",
@@ -43,6 +47,59 @@ export const avatarAnimationManifest: Readonly<Record<string, AvatarAnimationAss
     mouthWide: "/avatars/animated/nova/mouth-wide.webp",
   },
 };
+
+export const BLINK_DURATION_MS = 160;
+
+type AvatarBlinkSchedulerOptions = {
+  clearTimeout: (timerId: number) => void;
+  isHidden: () => boolean;
+  onBlinkingChange: (blinking: boolean) => void;
+  random?: () => number;
+  setTimeout: (callback: () => void, delay: number) => number;
+};
+
+export function createAvatarBlinkScheduler({
+  clearTimeout,
+  isHidden,
+  onBlinkingChange,
+  random = Math.random,
+  setTimeout,
+}: AvatarBlinkSchedulerOptions) {
+  let blinkTimer = 0;
+  let openEyesTimer = 0;
+  let stopped = false;
+
+  const clearTimers = () => {
+    clearTimeout(blinkTimer);
+    clearTimeout(openEyesTimer);
+    blinkTimer = 0;
+    openEyesTimer = 0;
+  };
+  const scheduleBlink = () => {
+    if (stopped || isHidden()) return;
+    blinkTimer = setTimeout(() => {
+      if (stopped || isHidden()) return;
+      onBlinkingChange(true);
+      openEyesTimer = setTimeout(() => {
+        if (stopped) return;
+        onBlinkingChange(false);
+        scheduleBlink();
+      }, BLINK_DURATION_MS);
+    }, nextBlinkDelay(random()));
+  };
+  const reset = () => {
+    clearTimers();
+    onBlinkingChange(false);
+    scheduleBlink();
+  };
+  const stop = () => {
+    stopped = true;
+    clearTimers();
+  };
+
+  scheduleBlink();
+  return { reset, stop };
+}
 
 export function nextBlinkDelay(randomValue = Math.random()): number {
   return 4_500 + Math.max(0, Math.min(1, randomValue)) * 4_000;

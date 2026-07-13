@@ -701,11 +701,37 @@ textarea {
   width: 100%;
 }
 
-[data-blinking="true"] [data-avatar-layer="blink"],
+[data-avatar-layer="blink-half"],
+[data-avatar-layer="blink-closed"] {
+  transition: none;
+}
+
+[data-blinking="true"] [data-avatar-layer="blink-half"] {
+  animation: playsay-ai-avatar-blink-half 160ms step-end both;
+}
+
+[data-blinking="true"] [data-avatar-layer="blink-closed"] {
+  animation: playsay-ai-avatar-blink-closed 160ms step-end both;
+}
+
 [data-mouth-frame="small"] [data-avatar-layer="mouth-small"],
 [data-mouth-frame="open"] [data-avatar-layer="mouth-open"],
 [data-mouth-frame="wide"] [data-avatar-layer="mouth-wide"] {
   opacity: 1;
+}
+
+@keyframes playsay-ai-avatar-blink-half {
+  0%, 15.625% { opacity: 0; }
+  15.625%, 31.25% { opacity: 1; }
+  31.25%, 45% { opacity: 0; }
+  45%, 67.5% { opacity: 1; }
+  67.5%, 100% { opacity: 0; }
+}
+
+@keyframes playsay-ai-avatar-blink-closed {
+  0%, 31.25% { opacity: 0; }
+  31.25%, 45% { opacity: 1; }
+  45%, 100% { opacity: 0; }
 }
 
 .playsay-ai-avatar-glow {

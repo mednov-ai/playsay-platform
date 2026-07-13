@@ -7,6 +7,7 @@ import java.net.http.HttpResponse
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment
@@ -26,6 +27,19 @@ import org.springframework.http.HttpStatus
 class MaterialVideoPlaybackSecurityTest @Autowired constructor(
     @param:LocalServerPort private val port: Int,
 ) {
+    @Test
+    fun `prometheus metrics are available to the internal scraper without bearer auth`() {
+        val response = HttpClient.newHttpClient().send(
+            HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:$port/actuator/prometheus"),
+            ).GET().build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(HttpStatus.OK.value(), response.statusCode())
+        assertTrue(response.body().contains("jvm_memory_used_bytes"))
+    }
+
     @Test
     fun `old gateway stream endpoint is no longer a public video route`() {
         val response = HttpClient.newHttpClient().send(

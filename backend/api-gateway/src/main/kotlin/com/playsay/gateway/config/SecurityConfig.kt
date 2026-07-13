@@ -25,6 +25,7 @@ class SecurityConfig {
                         "/hello",
                         "/actuator/health",
                         "/actuator/health/**",
+                        "/actuator/prometheus",
                         "/error",
                         "/v3/api-docs",
                         "/v3/api-docs.yaml",

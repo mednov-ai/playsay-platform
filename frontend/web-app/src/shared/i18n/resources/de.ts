@@ -228,6 +228,7 @@ export const de = {
     avatar: { label: "Dein Tutor", fallback: "KI-Tutor", hint: "Wähle ein Szenario und sprich los." },
     profileRequired: { title: "Geburtsdatum hinzufügen", body: "Es wird im Profil gespeichert und dient zur automatischen Auswahl altersgerechter Themen und Gesprächsformen.", action: "Profil öffnen" },
     fields: { age: "Altersmodus", persona: "Tutor und Stimme", scenario: "Gesprächsthema", topic: "Dein Thema", topicPlaceholder: "Zum Beispiel Spiele, Reisen oder Musik", feedback: "Korrekturen" },
+    accents: { generalAmerican: "Amerikanisches Englisch", standardBritish: "Britisches Englisch" },
     age: { CHILD: "Kind", TEEN: "Jugendlich", ADULT: "Erwachsen", fromProfile: "aus dem Profil" },
     feedback: { EVERY_TURN: "Eine hilfreiche Korrektur nach jedem Beitrag", SIGNIFICANT: "Nur wichtige oder wiederkehrende Korrekturen", SESSION_END: "Gesprächsfluss bewahren und am Ende auswerten" },
     feedbackShort: { EVERY_TURN: "Jeder Beitrag", SIGNIFICANT: "Wichtig", SESSION_END: "Am Ende" },

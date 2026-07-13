@@ -228,6 +228,7 @@ export const en = {
     avatar: { label: "Your tutor", fallback: "AI tutor", hint: "Choose a scenario and start speaking." },
     profileRequired: { title: "Add your date of birth", body: "It is stored in your profile and used to select age-appropriate topics and conversation style automatically.", action: "Open profile" },
     fields: { age: "Age mode", persona: "Tutor and voice", scenario: "Conversation topic", topic: "Your topic", topicPlaceholder: "For example: games, travel, or music", feedback: "Corrections" },
+    accents: { generalAmerican: "American English", standardBritish: "British English" },
     age: { CHILD: "Child", TEEN: "Teen", ADULT: "Adult", fromProfile: "from profile" },
     feedback: { EVERY_TURN: "One useful correction after every turn", SIGNIFICANT: "Only important or recurring corrections", SESSION_END: "Keep the flow and review corrections at the end" },
     feedbackShort: { EVERY_TURN: "Every turn", SIGNIFICANT: "Important", SESSION_END: "At the end" },

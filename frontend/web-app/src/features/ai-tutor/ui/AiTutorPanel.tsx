@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Loader2, Mic, PhoneOff, RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -16,10 +16,12 @@ import {
 import type { AppUserProfile } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import { connectRealtimeConversation, type RealtimeConversation } from "../model/realtimeConversation";
+import { AiTutorAvatarStage, TutorPortrait } from "./AiTutorAvatarStage";
 
-const AvatarStage = lazy(() =>
-  import("./AiTutorAvatarStage").then((module) => ({ default: module.AiTutorAvatarStage })),
-);
+export const tutorAccentTranslationKeys: Record<string, string> = {
+  GENERAL_AMERICAN: "aiTutor.accents.generalAmerican",
+  STANDARD_BRITISH: "aiTutor.accents.standardBritish",
+};
 
 type AiTutorPanelProps = {
   appProfile: AppUserProfile | null;
@@ -133,7 +135,7 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
     <section className="overflow-hidden rounded-3xl border border-border bg-white/90 shadow-sm dark:bg-zinc-950/80">
       <div className="grid min-h-[36rem] lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,.8fr)]">
         <TutorAvatar
-          personaName={selectedPersona?.name}
+          persona={selectedPersona}
           sessionActive={Boolean(session)}
           speaking={speaking}
         />
@@ -185,22 +187,20 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
   );
 }
 
-function TutorAvatar({ personaName, sessionActive, speaking }: {
-  personaName?: string;
+function TutorAvatar({ persona, sessionActive, speaking }: {
+  persona?: TutorPersona;
   sessionActive: boolean;
   speaking: boolean;
 }) {
   const { t } = useAppTranslation();
   return (
     <div className="relative min-h-80 overflow-hidden bg-[#fff5e9] dark:bg-[#21160f]">
-      <Suspense fallback={<div className="grid h-full place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
-        <AvatarStage speaking={speaking} />
-      </Suspense>
-      <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg backdrop-blur dark:border-white/10 dark:bg-black/70">
+      <AiTutorAvatarStage persona={persona} speaking={speaking} />
+      <div className="absolute inset-x-4 bottom-4 z-10 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg backdrop-blur dark:border-white/10 dark:bg-black/70">
         <p className="text-xs font-bold uppercase tracking-wider text-primary">
           {sessionActive ? t("aiTutor.session.live") : t("aiTutor.avatar.label")}
         </p>
-        <strong className="text-lg">{personaName ?? t("aiTutor.avatar.fallback")}</strong>
+        <strong className="text-lg">{persona?.name ?? t("aiTutor.avatar.fallback")}</strong>
         <p className="text-sm text-muted-foreground">
           {sessionActive ? t("aiTutor.session.prompt") : t("aiTutor.avatar.hint")}
         </p>
@@ -288,11 +288,12 @@ function SessionSetup(props: SessionSetupProps) {
           {t(`aiTutor.age.${props.agePolicy}`)} · {t("aiTutor.age.fromProfile")}
         </div>
       </Field>
-      <Field label={t("aiTutor.fields.persona")}>
-        <select className="h-11 w-full rounded-xl border border-border bg-background px-3" onChange={(event) => props.onPersonaChange(event.target.value)} value={props.personaId}>
-          {props.personas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name} · {persona.accent}</option>)}
-        </select>
-      </Field>
+      <TutorPersonaPicker
+        disabled={props.loading}
+        onPersonaChange={props.onPersonaChange}
+        personaId={props.personaId}
+        personas={props.personas}
+      />
       <Field label={t("aiTutor.fields.scenario")}>
         <select className="h-11 w-full rounded-xl border border-border bg-background px-3" onChange={(event) => props.onScenarioChange(event.target.value)} value={props.scenarioId}>
           {props.scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.title} · {scenario.cefrLevel}</option>)}
@@ -317,6 +318,57 @@ function SessionSetup(props: SessionSetupProps) {
         {t("aiTutor.actions.start")}
       </Button>
     </div>
+  );
+}
+
+export function TutorPersonaPicker({ disabled, onPersonaChange, personaId, personas }: {
+  disabled: boolean;
+  onPersonaChange: (id: string) => void;
+  personaId: string;
+  personas: TutorPersona[];
+}) {
+  const { t } = useAppTranslation();
+
+  return (
+    <fieldset className="grid gap-1.5" data-testid="ai-tutor-persona-picker">
+      <legend className="mb-1.5 text-sm font-bold">{t("aiTutor.fields.persona")}</legend>
+      <div className="grid grid-cols-3 gap-2">
+        {personas.map((persona) => {
+          const selected = persona.id === personaId;
+          const accentKey = tutorAccentTranslationKeys[persona.accent];
+          return (
+            <label
+              className={`grid min-w-0 cursor-pointer content-start justify-items-center gap-2 rounded-2xl border p-2 text-center transition focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 ${selected ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/50"} ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+              data-persona-id={persona.id}
+              data-selected={selected}
+              data-testid={`ai-tutor-persona-card-${persona.id}`}
+              key={persona.id}
+            >
+              <input
+                checked={selected}
+                className="sr-only"
+                disabled={disabled}
+                name="ai-tutor-persona"
+                onChange={() => onPersonaChange(persona.id)}
+                type="radio"
+                value={persona.id}
+              />
+              <TutorPortrait
+                className="block h-14 w-14 overflow-hidden rounded-xl border border-white/80 bg-muted shadow-sm dark:border-white/10"
+                imageClassName="h-full w-full object-cover"
+                persona={persona}
+              />
+              <span className="min-w-0">
+                <strong className="block truncate text-sm">{persona.name}</strong>
+                <span className="mt-0.5 block text-[0.68rem] leading-tight text-muted-foreground">
+                  {accentKey ? t(accentKey) : persona.accent}
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 

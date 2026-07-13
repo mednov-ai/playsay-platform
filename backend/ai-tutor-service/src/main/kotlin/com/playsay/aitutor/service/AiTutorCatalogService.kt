@@ -9,9 +9,9 @@ import org.springframework.stereotype.Service
 class AiTutorCatalogService {
     private val allPolicies = AgePolicy.entries.toSet()
     private val personas = listOf(
-        TutorPersonaResponse("maya", "Maya", "coral", "GENERAL_AMERICAN", "/avatars/maya.glb", allPolicies),
-        TutorPersonaResponse("leo", "Leo", "verse", "STANDARD_BRITISH", "/avatars/leo.glb", allPolicies),
-        TutorPersonaResponse("nova", "Nova", "sage", "GENERAL_AMERICAN", "/avatars/nova.glb", setOf(AgePolicy.TEEN, AgePolicy.ADULT)),
+        TutorPersonaResponse("maya", "Maya", "coral", "GENERAL_AMERICAN", "/avatars/maya.webp", allPolicies),
+        TutorPersonaResponse("leo", "Leo", "verse", "STANDARD_BRITISH", "/avatars/leo.webp", allPolicies),
+        TutorPersonaResponse("nova", "Nova", "sage", "GENERAL_AMERICAN", "/avatars/nova.webp", setOf(AgePolicy.TEEN, AgePolicy.ADULT)),
     )
     private val scenarios = listOf(
         ConversationScenarioResponse("meet-someone", "Meeting someone", "Introduce yourself and keep a friendly conversation going.", "A1", "EVERYDAY", "Introduce yourself and learn two things about the other person.", listOf("Give a relevant introduction", "Ask or answer simple personal-interest questions"), listOf("Say your name and one fact", "Ask a follow-up question"), allPolicies),

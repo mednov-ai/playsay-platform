@@ -70,6 +70,9 @@ try {
   ]);
   addCheck("keycloak-login-and-profiles");
 
+  await verifyAiTutorPersonaSwitching(teacher.page);
+  addCheck("ai-tutor-personas-switch-avatar");
+
   const material = await createSmokeMaterial(teacher.tokens.accessToken);
   created.materialId = material.id;
   summary.materialId = material.id;
@@ -196,6 +199,35 @@ async function createSession(nextBrowser, role, credentials) {
   }, { storageKey: tokenStorageKey, tokenSet: tokens });
 
   return { context, page, role, tokens };
+}
+
+async function verifyAiTutorPersonaSwitching(page) {
+  await page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+  await page.locator('[data-tab-id="aiTutor"]').click();
+  await page.locator('[data-testid="ai-tutor-avatar-image"]').waitFor({ timeout: timeoutMs });
+
+  for (const personaId of ["maya", "leo", "nova"]) {
+    const card = page.locator(`[data-testid="ai-tutor-persona-card-${personaId}"]`);
+    await card.click();
+    const radio = card.locator('input[type="radio"]');
+    if (!await radio.isChecked()) {
+      throw new Error(`AI tutor persona ${personaId} was not selected.`);
+    }
+    await page.waitForFunction((nextPersonaId) => {
+      const stage = document.querySelector('[data-testid="ai-tutor-avatar-stage"]');
+      const image = document.querySelector('[data-testid="ai-tutor-avatar-image"]');
+      return stage?.getAttribute("data-persona-id") === nextPersonaId &&
+        image instanceof HTMLImageElement &&
+        image.getAttribute("src") === `/avatars/${nextPersonaId}.webp` &&
+        image.complete &&
+        image.naturalWidth > 0;
+    }, personaId, { timeout: timeoutMs });
+  }
+
+  const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  if (horizontalOverflow > 1) {
+    throw new Error(`AI tutor layout overflows horizontally by ${horizontalOverflow}px.`);
+  }
 }
 
 async function loginWithKeycloakUi(page, credentials) {

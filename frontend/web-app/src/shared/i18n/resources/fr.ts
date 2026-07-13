@@ -228,6 +228,7 @@ export const fr = {
     avatar: { label: "Votre professeur", fallback: "Professeur IA", hint: "Choisissez un scénario et commencez à parler." },
     profileRequired: { title: "Ajoutez votre date de naissance", body: "Elle est enregistrée dans votre profil et permet de choisir automatiquement des sujets et un style adaptés à l’âge.", action: "Ouvrir le profil" },
     fields: { age: "Mode d’âge", persona: "Professeur et voix", scenario: "Sujet de conversation", topic: "Votre sujet", topicPlaceholder: "Par exemple : jeux, voyages ou musique", feedback: "Corrections" },
+    accents: { generalAmerican: "Anglais américain", standardBritish: "Anglais britannique" },
     age: { CHILD: "Enfant", TEEN: "Adolescent", ADULT: "Adulte", fromProfile: "selon le profil" },
     feedback: { EVERY_TURN: "Une correction utile après chaque prise de parole", SIGNIFICANT: "Uniquement les erreurs importantes ou récurrentes", SESSION_END: "Préserver le dialogue et faire le bilan à la fin" },
     feedbackShort: { EVERY_TURN: "Chaque réponse", SIGNIFICANT: "Importantes", SESSION_END: "À la fin" },

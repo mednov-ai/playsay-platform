@@ -336,7 +336,7 @@ export const de = {
       noStudentsFound: "Keine Schüler gefunden",
       createManagedStudentTitle: "Neuer Schüler",
       createManagedStudentUsername: "Benutzername",
-      createManagedStudentUsernameHint: "3–64 Zeichen: Buchstaben, Zahlen, Punkt, Bindestrich oder Unterstrich",
+      createManagedStudentUsernameHint: "3–64: Buchstaben, Zahlen und . _ -",
       createManagedStudentUsernameInvalid: "Geben Sie einen gültigen Benutzernamen ein",
       createManagedStudentFirstName: "Vorname",
       createManagedStudentLastName: "Nachname (optional)",

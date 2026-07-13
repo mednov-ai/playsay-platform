@@ -336,7 +336,7 @@ export const en = {
       noStudentsFound: "No students found",
       createManagedStudentTitle: "New student",
       createManagedStudentUsername: "Username",
-      createManagedStudentUsernameHint: "3–64 characters: letters, numbers, dot, hyphen, or underscore",
+      createManagedStudentUsernameHint: "3–64: letters, numbers and . _ -",
       createManagedStudentUsernameInvalid: "Enter a valid username",
       createManagedStudentFirstName: "First name",
       createManagedStudentLastName: "Last name (optional)",

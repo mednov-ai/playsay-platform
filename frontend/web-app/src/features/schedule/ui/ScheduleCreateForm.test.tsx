@@ -103,6 +103,12 @@ describe("ScheduleCreateForm", () => {
     );
 
     expect(markup).toContain('data-schedule-managed-student-form="true"');
+    expect(markup).toContain('class="playsay-schedule-managed-student-fields"');
+    expect(markup).toContain('autoComplete="off"');
+    expect(markup).toContain('name="managedStudentUsername"');
+    expect(markup).toContain('name="managedStudentFirstName"');
+    expect(markup).toContain('name="managedStudentLastName"');
+    expect(markup).toContain('name="managedStudentEmail"');
     expect(markup).toContain("Новый ученик");
     expect(markup).toContain("Логин");
     expect(markup).toContain("Имя");

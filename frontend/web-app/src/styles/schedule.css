@@ -1043,8 +1043,8 @@
 
 .playsay-schedule-student-dialog {
   display: grid;
-  width: min(100%, 34rem);
-  max-height: min(42rem, calc(100dvh - 2rem));
+  width: min(100%, 44rem);
+  max-height: min(46rem, calc(100dvh - 1.5rem));
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: 0.8rem;
   border: 1px solid hsl(var(--border));
@@ -1052,7 +1052,7 @@
   background: hsl(var(--background));
   box-shadow: 0 1.5rem 4rem rgb(17 17 17 / 0.22);
   overflow: hidden;
-  padding: 0.9rem;
+  padding: clamp(0.8rem, 2vw, 1rem);
 }
 
 .playsay-schedule-student-dialog-head,
@@ -1124,9 +1124,10 @@
   font-weight: 950;
 }
 
-.playsay-schedule-managed-student-form > div {
+.playsay-schedule-managed-student-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
   gap: 0.6rem;
 }
 
@@ -1155,10 +1156,20 @@
 }
 
 .playsay-schedule-managed-student-actions {
+  display: flex;
+  min-width: 0;
   align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.playsay-schedule-managed-student-actions button {
+  flex: 0 0 auto;
+  min-width: 10rem;
 }
 
 .playsay-schedule-managed-student-actions p {
+  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   color: hsl(var(--muted-foreground));
@@ -1170,9 +1181,13 @@
 .playsay-schedule-student-dialog-list {
   display: grid;
   min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
   gap: 0.5rem;
   overflow: auto;
+  overscroll-behavior: contain;
   padding-right: 0.15rem;
+  scrollbar-gutter: stable;
 }
 
 .playsay-schedule-student-option {
@@ -1187,6 +1202,10 @@
   font-size: 0.9rem;
   font-weight: 900;
   padding: 0.75rem;
+}
+
+.playsay-schedule-student-option > * {
+  min-width: 0;
 }
 
 .playsay-schedule-student-option-identity {
@@ -1259,6 +1278,17 @@
   }
 }
 
+@media (max-width: 760px) {
+  .playsay-schedule-student-dialog {
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .playsay-schedule-managed-student-fields,
+  .playsay-schedule-student-dialog-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .playsay-schedule-header,
   .playsay-schedule-create-footer {
@@ -1278,9 +1308,13 @@
   .playsay-schedule-step-row,
   .playsay-schedule-time-grid,
   .playsay-schedule-recurrence-grid,
-  .playsay-schedule-weekly-grid,
-  .playsay-schedule-managed-student-form > div {
+  .playsay-schedule-weekly-grid {
     grid-template-columns: 1fr;
+  }
+
+  .playsay-schedule-managed-student-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .playsay-schedule-wizard-progress {
@@ -1327,16 +1361,18 @@
     flex-direction: column;
   }
 
-  .playsay-schedule-student-picker,
-  .playsay-schedule-student-dialog-actions {
+  .playsay-schedule-student-picker {
     align-items: stretch;
     grid-template-columns: 1fr;
     flex-direction: column;
   }
 
-  .playsay-schedule-student-picker button,
-  .playsay-schedule-student-dialog-actions button {
+  .playsay-schedule-student-picker button {
     width: 100%;
+  }
+
+  .playsay-schedule-student-dialog-actions button {
+    flex: 1 1 0;
   }
 
   .playsay-schedule-time-grid [data-schedule-duration-field="true"] .playsay-input {

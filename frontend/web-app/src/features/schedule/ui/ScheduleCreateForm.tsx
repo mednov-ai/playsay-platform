@@ -792,23 +792,27 @@ export function ScheduleStudentPickerDialog({
 
         {onCreateManagedStudent ? (
           <form
+            autoComplete="off"
             className="playsay-schedule-managed-student-form"
             data-schedule-managed-student-form="true"
             onSubmit={(event) => void submitManagedStudent(event)}
           >
             <h4>{t("schedule.form.createManagedStudentTitle")}</h4>
-            <div>
+            <div className="playsay-schedule-managed-student-fields">
               <label>
                 <span>{t("schedule.form.createManagedStudentUsername")}</span>
                 <input
                   aria-invalid={managedStudentUsernameInvalid}
+                  autoComplete="off"
                   className="playsay-input"
                   disabled={disabled || managedStudentLoading}
                   maxLength={64}
                   minLength={3}
+                  name="managedStudentUsername"
                   onChange={(event) => setManagedStudentUsername(event.target.value)}
                   pattern={"[A-Za-z0-9._\\-]{3,64}"}
                   required
+                  spellCheck={false}
                   type="text"
                   value={managedStudentUsername}
                 />
@@ -821,9 +825,11 @@ export function ScheduleStudentPickerDialog({
               <label>
                 <span>{t("schedule.form.createManagedStudentFirstName")}</span>
                 <input
+                  autoComplete="off"
                   className="playsay-input"
                   disabled={disabled || managedStudentLoading}
                   maxLength={120}
+                  name="managedStudentFirstName"
                   onChange={(event) => setManagedStudentFirstName(event.target.value)}
                   required
                   type="text"
@@ -833,9 +839,11 @@ export function ScheduleStudentPickerDialog({
               <label>
                 <span>{t("schedule.form.createManagedStudentLastName")}</span>
                 <input
+                  autoComplete="off"
                   className="playsay-input"
                   disabled={disabled || managedStudentLoading}
                   maxLength={120}
+                  name="managedStudentLastName"
                   onChange={(event) => setManagedStudentLastName(event.target.value)}
                   type="text"
                   value={managedStudentLastName}
@@ -845,10 +853,13 @@ export function ScheduleStudentPickerDialog({
                 <span>{t("schedule.form.createManagedStudentEmail")}</span>
                 <input
                   aria-invalid={managedStudentEmailInvalid}
+                  autoComplete="off"
                   className="playsay-input"
                   disabled={disabled || managedStudentLoading}
                   maxLength={320}
+                  name="managedStudentEmail"
                   onChange={(event) => setManagedStudentEmail(event.target.value)}
+                  spellCheck={false}
                   type="email"
                   value={managedStudentEmail}
                 />

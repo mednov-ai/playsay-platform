@@ -344,7 +344,7 @@ export const ru = {
       noStudentsFound: "Ученики не найдены",
       createManagedStudentTitle: "Новый ученик",
       createManagedStudentUsername: "Логин",
-      createManagedStudentUsernameHint: "3–64 символа: латиница, цифры, точка, дефис или подчёркивание",
+      createManagedStudentUsernameHint: "3–64: латиница, цифры и . _ -",
       createManagedStudentUsernameInvalid: "Введите корректный логин",
       createManagedStudentFirstName: "Имя",
       createManagedStudentLastName: "Фамилия (необязательно)",

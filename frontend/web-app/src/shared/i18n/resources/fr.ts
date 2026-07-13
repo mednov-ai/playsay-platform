@@ -336,7 +336,7 @@ export const fr = {
       noStudentsFound: "Aucun élève trouvé",
       createManagedStudentTitle: "Nouvel élève",
       createManagedStudentUsername: "Identifiant",
-      createManagedStudentUsernameHint: "3 à 64 caractères : lettres, chiffres, point, tiret ou soulignement",
+      createManagedStudentUsernameHint: "3–64 : lettres, chiffres et . _ -",
       createManagedStudentUsernameInvalid: "Saisissez un identifiant valide",
       createManagedStudentFirstName: "Prénom",
       createManagedStudentLastName: "Nom (facultatif)",

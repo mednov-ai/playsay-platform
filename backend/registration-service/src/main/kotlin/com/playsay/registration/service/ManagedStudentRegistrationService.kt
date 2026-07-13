@@ -25,60 +25,75 @@ class ManagedStudentRegistrationService(
 
     @Transactional
     fun createManagedStudent(command: ManagedStudentCommand): ManagedStudentResult {
-        val email = command.email.normalizedEmail()
-        val displayName = clean(command.displayName, 120)
-            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Display name is required.")
-        val existing = keycloak.findUserByEmail(email)
+        val username = command.username.normalizedUsername()
+        val firstName = clean(command.firstName, 120)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "First name is required.")
+        val lastName = clean(command.lastName, 120)
+        val email = command.email.normalizedOptionalEmail()
+        val existing = keycloak.findUserByUsername(username)
+        val emailOwner = email?.let(keycloak::findUserByEmail)
+        if (emailOwner != null && emailOwner.subject != existing?.subject) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Email already belongs to another account.")
+        }
         if (existing != null) {
             if (!existing.managedStudent) {
-                throw ResponseStatusException(HttpStatus.CONFLICT, "Email already belongs to a non-managed account.")
+                throw ResponseStatusException(HttpStatus.CONFLICT, "Username already belongs to a non-managed account.")
             }
             if (!existing.enabled || !existing.emailVerified) {
-                keycloak.enableVerifiedUser(email)
+                keycloak.enableVerifiedUser(username)
             }
-            keycloak.assignRealmRole(email, studentRole)
+            keycloak.assignRealmRole(username, studentRole)
             return ManagedStudentResult(
                 subject = existing.subject,
+                username = existing.username,
                 email = existing.email,
-                displayName = displayName,
+                firstName = firstName,
+                lastName = lastName,
             )
         }
 
         val created = keycloak.createDisabledUser(
             KeycloakUserCreateCommand(
+                username = username,
                 email = email,
                 password = newManagedStudentPassword(),
-                displayName = displayName,
+                firstName = firstName,
+                lastName = lastName,
                 enabled = true,
-                emailVerified = true,
+                emailVerified = email != null,
                 managedStudent = true,
             ),
         )
         if (!created) {
-            val duplicate = keycloak.findUserByEmail(email)
+            val duplicate = keycloak.findUserByUsername(username)
             if (duplicate?.managedStudent == true) {
                 return ManagedStudentResult(
                     subject = duplicate.subject,
+                    username = duplicate.username,
                     email = duplicate.email,
-                    displayName = displayName,
+                    firstName = firstName,
+                    lastName = lastName,
                 )
             }
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Email already belongs to a non-managed account.")
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Username already belongs to a non-managed account.")
         }
 
-        val user = keycloak.findUserByEmail(email)
+        val user = keycloak.findUserByUsername(username)
             ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Managed student was not found after provisioning.")
-        keycloak.assignRealmRole(email, studentRole)
+        keycloak.assignRealmRole(username, studentRole)
         return ManagedStudentResult(
             subject = user.subject,
+            username = user.username,
             email = user.email,
-            displayName = displayName,
+            firstName = firstName,
+            lastName = lastName,
         )
     }
 
     @Transactional
     fun createManagedStudentInvite(command: ManagedStudentInviteCommand): ManagedStudentInviteResult {
-        val email = command.email.normalizedEmail()
+        val username = command.username.normalizedLoginIdentifier()
+        val email = command.email.normalizedOptionalEmail()
         val continueUrl = allowedReturnTo(command.continueUrl)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Continue URL is not allowed.")
         val now = Instant.now(clock)
@@ -88,6 +103,7 @@ class ManagedStudentRegistrationService(
             tokenHash = tokenService.hash(tokenService.normalizeStudentInviteCode(token)),
             keycloakSubject = command.subject.trim().takeIf { it.isNotEmpty() }
                 ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Subject is required."),
+            usernameNormalized = username,
             emailNormalized = email,
             displayName = clean(command.displayName, 120),
             lessonId = command.lessonId,
@@ -106,6 +122,7 @@ class ManagedStudentRegistrationService(
         val invite = resolvePendingInvite(token, remoteAddress, lockForUpdate = false)
         return ManagedStudentInviteLookupResult(
             subject = invite.keycloakSubject,
+            username = invite.usernameNormalized,
             email = invite.emailNormalized,
             displayName = invite.displayName,
             lessonId = invite.lessonId,
@@ -127,10 +144,10 @@ class ManagedStudentRegistrationService(
         }
 
         val password = newManagedStudentPassword()
-        keycloak.enableVerifiedUser(invite.emailNormalized)
-        keycloak.assignRealmRole(invite.emailNormalized, studentRole)
-        keycloak.updatePassword(invite.emailNormalized, password)
-        val tokens = keycloak.passwordGrant(invite.emailNormalized, password, studentTokenClientId)
+        keycloak.enableVerifiedUser(invite.usernameNormalized)
+        keycloak.assignRealmRole(invite.usernameNormalized, studentRole)
+        keycloak.updatePassword(invite.usernameNormalized, password)
+        val tokens = keycloak.passwordGrant(invite.usernameNormalized, password, studentTokenClientId)
 
         invite.status = managedInviteStatusConsumed
         invite.consumedAt = now
@@ -184,6 +201,21 @@ class ManagedStudentRegistrationService(
         trim().lowercase().takeIf { it.isNotBlank() }
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required.")
 
+    private fun String.normalizedUsername(): String {
+        val normalized = trim().lowercase()
+        if (!managedStudentUsernameRegex.matches(normalized)) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Username format is invalid.")
+        }
+        return normalized
+    }
+
+    private fun String.normalizedLoginIdentifier(): String =
+        trim().lowercase().takeIf { it.isNotBlank() }
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Username is required.")
+
+    private fun String?.normalizedOptionalEmail(): String? =
+        this?.trim()?.takeIf { it.isNotEmpty() }?.normalizedEmail()
+
     private fun clean(value: String?, maxLength: Int): String? {
         val cleaned = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         if (cleaned.length > maxLength) {
@@ -202,5 +234,6 @@ class ManagedStudentRegistrationService(
         const val studentRole = "STUDENT"
         const val studentInviteCodeGenerationAttempts = 10
         const val secondsPerDay: Long = 24 * 60 * 60
+        val managedStudentUsernameRegex = Regex("^[a-z0-9._-]{3,64}$")
     }
 }

@@ -1139,6 +1139,17 @@
   font-weight: 900;
 }
 
+.playsay-schedule-managed-student-form label small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.7rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.playsay-schedule-managed-student-form label .playsay-field-error {
+  color: hsl(var(--destructive));
+}
+
 .playsay-schedule-managed-student-form .playsay-input {
   min-height: 2.35rem;
 }
@@ -1176,6 +1187,17 @@
   font-size: 0.9rem;
   font-weight: 900;
   padding: 0.75rem;
+}
+
+.playsay-schedule-student-option-identity {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.playsay-schedule-student-option-identity small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  font-weight: 750;
 }
 
 .playsay-schedule-student-empty {

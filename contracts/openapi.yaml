@@ -749,6 +749,8 @@ paths:
           description: Missing or invalid bearer token
         "403":
           description: Current user is not a teacher/admin
+        "409":
+          description: Username or email already belongs to another account
       security:
       - bearerAuth: []
   /schedule/lessons:
@@ -3356,18 +3358,31 @@ components:
     ManagedStudentRequest:
       type: object
       properties:
-        email:
+        username:
           type: string
-          format: email
-          maxLength: 320
-          minLength: 0
-        displayName:
+          maxLength: 64
+          minLength: 3
+          pattern: "^[A-Za-z0-9._-]+$"
+        firstName:
           type: string
           maxLength: 120
           minLength: 0
+        lastName:
+          type:
+          - string
+          - "null"
+          maxLength: 120
+          minLength: 0
+        email:
+          type:
+          - string
+          - "null"
+          format: email
+          maxLength: 320
+          minLength: 0
       required:
-      - displayName
-      - email
+      - firstName
+      - username
     LiveKitRoomTokenResponse:
       type: object
       properties:

@@ -22,6 +22,41 @@ import {
 import type { AdminUserProfile, LessonMaterial, ManagedStudentInput, ScheduledLessonInput } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 
+const managedStudentUsernamePattern = /^[a-z0-9._-]{3,64}$/;
+const managedStudentEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function managedStudentInputFromDraft(draft: {
+  username: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}): ManagedStudentInput | null {
+  const username = draft.username.trim().toLowerCase();
+  const firstName = draft.firstName.trim();
+  const lastName = draft.lastName.trim();
+  const email = draft.email.trim().toLowerCase();
+  if (
+    !managedStudentUsernamePattern.test(username)
+    || !firstName
+    || firstName.length > 120
+    || lastName.length > 120
+    || email.length > 320
+    || (email && !managedStudentEmailPattern.test(email))
+  ) {
+    return null;
+  }
+  return {
+    username,
+    firstName,
+    ...(lastName ? { lastName } : {}),
+    ...(email ? { email } : {}),
+  };
+}
+
+export function selectedSubjectsAfterManagedStudentCreation(subjects: string[], createdSubject: string): string[] {
+  return subjects.includes(createdSubject) ? subjects : [...subjects, createdSubject];
+}
+
 export function ScheduleCreateForm({
   disabled,
   lessonOptions,
@@ -652,8 +687,25 @@ export function ScheduleStudentPickerDialog({
 }) {
   const { t } = useAppTranslation();
   const visibleStudents = filterScheduleStudents(studentUsers, searchQuery);
+  const [managedStudentUsername, setManagedStudentUsername] = useState("");
+  const [managedStudentFirstName, setManagedStudentFirstName] = useState("");
+  const [managedStudentLastName, setManagedStudentLastName] = useState("");
   const [managedStudentEmail, setManagedStudentEmail] = useState("");
-  const [managedStudentName, setManagedStudentName] = useState("");
+  const normalizedManagedStudentUsername = managedStudentUsername.trim().toLowerCase();
+  const normalizedManagedStudentEmail = managedStudentEmail.trim().toLowerCase();
+  const managedStudentUsernameInvalid = Boolean(
+    normalizedManagedStudentUsername && !managedStudentUsernamePattern.test(normalizedManagedStudentUsername),
+  );
+  const managedStudentEmailInvalid = Boolean(
+    normalizedManagedStudentEmail && !managedStudentEmailPattern.test(normalizedManagedStudentEmail),
+  );
+  const managedStudentInput = managedStudentInputFromDraft({
+    username: managedStudentUsername,
+    firstName: managedStudentFirstName,
+    lastName: managedStudentLastName,
+    email: managedStudentEmail,
+  });
+  const managedStudentSubmitDisabled = Boolean(disabled || managedStudentLoading || !managedStudentInput);
 
   useEffect(() => {
     if (!open) {
@@ -686,18 +738,21 @@ export function ScheduleStudentPickerDialog({
     if (!onCreateManagedStudent || managedStudentLoading) {
       return;
     }
-    const created = await onCreateManagedStudent({
-      displayName: managedStudentName.trim(),
-      email: managedStudentEmail.trim(),
-    });
+    if (managedStudentSubmitDisabled) {
+      return;
+    }
+    if (!managedStudentInput) {
+      return;
+    }
+    const created = await onCreateManagedStudent(managedStudentInput);
     if (!created) {
       return;
     }
-    if (!draftSubjects.includes(created.subject)) {
-      onDraftSubjectsChange([...draftSubjects, created.subject]);
-    }
+    onDraftSubjectsChange(selectedSubjectsAfterManagedStudentCreation(draftSubjects, created.subject));
+    setManagedStudentUsername("");
+    setManagedStudentFirstName("");
+    setManagedStudentLastName("");
     setManagedStudentEmail("");
-    setManagedStudentName("");
   }
 
   return (
@@ -744,34 +799,68 @@ export function ScheduleStudentPickerDialog({
             <h4>{t("schedule.form.createManagedStudentTitle")}</h4>
             <div>
               <label>
-                <span>{t("schedule.form.createManagedStudentEmail")}</span>
+                <span>{t("schedule.form.createManagedStudentUsername")}</span>
                 <input
+                  aria-invalid={managedStudentUsernameInvalid}
                   className="playsay-input"
                   disabled={disabled || managedStudentLoading}
-                  maxLength={320}
-                  onChange={(event) => setManagedStudentEmail(event.target.value)}
+                  maxLength={64}
+                  minLength={3}
+                  onChange={(event) => setManagedStudentUsername(event.target.value)}
+                  pattern={"[A-Za-z0-9._\\-]{3,64}"}
                   required
-                  type="email"
-                  value={managedStudentEmail}
+                  type="text"
+                  value={managedStudentUsername}
                 />
+                {managedStudentUsernameInvalid ? (
+                  <small className="playsay-field-error">{t("schedule.form.createManagedStudentUsernameInvalid")}</small>
+                ) : (
+                  <small>{t("schedule.form.createManagedStudentUsernameHint")}</small>
+                )}
               </label>
               <label>
-                <span>{t("schedule.form.createManagedStudentName")}</span>
+                <span>{t("schedule.form.createManagedStudentFirstName")}</span>
                 <input
                   className="playsay-input"
                   disabled={disabled || managedStudentLoading}
                   maxLength={120}
-                  onChange={(event) => setManagedStudentName(event.target.value)}
+                  onChange={(event) => setManagedStudentFirstName(event.target.value)}
                   required
                   type="text"
-                  value={managedStudentName}
+                  value={managedStudentFirstName}
                 />
+              </label>
+              <label>
+                <span>{t("schedule.form.createManagedStudentLastName")}</span>
+                <input
+                  className="playsay-input"
+                  disabled={disabled || managedStudentLoading}
+                  maxLength={120}
+                  onChange={(event) => setManagedStudentLastName(event.target.value)}
+                  type="text"
+                  value={managedStudentLastName}
+                />
+              </label>
+              <label>
+                <span>{t("schedule.form.createManagedStudentEmail")}</span>
+                <input
+                  aria-invalid={managedStudentEmailInvalid}
+                  className="playsay-input"
+                  disabled={disabled || managedStudentLoading}
+                  maxLength={320}
+                  onChange={(event) => setManagedStudentEmail(event.target.value)}
+                  type="email"
+                  value={managedStudentEmail}
+                />
+                {managedStudentEmailInvalid ? (
+                  <small className="playsay-field-error">{t("schedule.form.createManagedStudentEmailInvalid")}</small>
+                ) : null}
               </label>
             </div>
             <div className="playsay-schedule-managed-student-actions">
-              {managedStudentMessage ? <p>{managedStudentMessage}</p> : null}
+              {managedStudentMessage ? <p className="playsay-field-error" role="alert">{managedStudentMessage}</p> : null}
               <Button
-                disabled={disabled || managedStudentLoading || !managedStudentEmail.trim() || !managedStudentName.trim()}
+                disabled={managedStudentSubmitDisabled}
                 type="submit"
               >
                 {managedStudentLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
@@ -788,9 +877,13 @@ export function ScheduleStudentPickerDialog({
             </div>
           ) : visibleStudents.map((student) => {
             const label = studentLabel(student) ?? student.subject;
+            const showUsername = Boolean(student.username && student.username !== label);
             return (
               <label className="playsay-schedule-student-option" key={student.subject}>
-                <span className="min-w-0 truncate">{label}</span>
+                <span className="playsay-schedule-student-option-identity min-w-0">
+                  <span className="truncate">{label}</span>
+                  {showUsername ? <small className="truncate">@{student.username}</small> : null}
+                </span>
                 <input
                   checked={draftSubjects.includes(student.subject)}
                   disabled={disabled}

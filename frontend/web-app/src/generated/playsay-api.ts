@@ -484,15 +484,28 @@ export interface LessonTemplateCardsRequest {
 
 export interface ManagedStudentRequest {
   /**
-     * @minLength 0
-     * @maxLength 320
+     * @minLength 3
+     * @maxLength 64
+     * @pattern ^[A-Za-z0-9._-]+$
      */
-  email: string;
+  username: string;
   /**
      * @minLength 0
      * @maxLength 120
      */
-  displayName: string;
+  firstName: string;
+  /**
+     * @minLength 0
+     * @maxLength 120
+     * @nullable
+     */
+  lastName?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 320
+     * @nullable
+     */
+  email?: string | null;
 }
 
 export interface LiveKitRoomTokenResponse {
@@ -2560,10 +2573,15 @@ export type createManagedStudentResponse403 = {
   status: 403
 }
 
+export type createManagedStudentResponse409 = {
+  data: void
+  status: 409
+}
+
 export type createManagedStudentResponseSuccess = (createManagedStudentResponse200) & {
   headers: Headers;
 };
-export type createManagedStudentResponseError = (createManagedStudentResponse400 | createManagedStudentResponse401 | createManagedStudentResponse403) & {
+export type createManagedStudentResponseError = (createManagedStudentResponse400 | createManagedStudentResponse401 | createManagedStudentResponse403 | createManagedStudentResponse409) & {
   headers: Headers;
 };
 

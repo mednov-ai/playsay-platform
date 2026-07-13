@@ -145,8 +145,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
             AppUserEntity(
                 id = UUID.randomUUID(),
                 keycloakSubject = "managed-student-1",
-                username = "new.student@example.com",
-                email = "new.student@example.com",
+                username = "new.student",
+                email = null,
                 name = "New Student",
                 roles = "STUDENT",
                 displayName = "New Student",
@@ -175,6 +175,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertFalse(links.links.single().url.contains("?token="))
         assertEquals(lesson.id, RecordingScheduledLessonRegistrationGateway.invites.single().lessonId)
         assertEquals("managed-student-1", RecordingScheduledLessonRegistrationGateway.invites.single().subject)
+        assertEquals("new.student", RecordingScheduledLessonRegistrationGateway.invites.single().username)
+        assertEquals(null, RecordingScheduledLessonRegistrationGateway.invites.single().email)
         assertTrue(RecordingScheduledLessonRegistrationGateway.invites.single().continueUrl.endsWith("/lessons/${lesson.id}/classroom"))
     }
 
@@ -195,6 +197,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         ).body!!
         RecordingScheduledLessonRegistrationGateway.lookupResponse = ManagedStudentInviteLookupResponse(
             subject = studentSubject,
+            username = "managed.one",
             email = "managed@example.com",
             displayName = "Managed Student",
             lessonId = lesson.id,
@@ -230,6 +233,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         ).body!!
         RecordingScheduledLessonRegistrationGateway.lookupResponse = ManagedStudentInviteLookupResponse(
             subject = studentSubject,
+            username = "managed.one",
             email = "managed@example.com",
             displayName = "Managed Student",
             lessonId = lesson.id,
@@ -1107,8 +1111,11 @@ private object RecordingScheduledLessonRegistrationGateway : RegistrationGateway
     override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse =
         ManagedStudentProvisionResponse(
             subject = "managed-student-1",
+            username = request.username,
             email = request.email,
-            displayName = request.displayName,
+            firstName = request.firstName,
+            lastName = request.lastName,
+            displayName = listOfNotNull(request.firstName, request.lastName).joinToString(" "),
         )
 
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse {

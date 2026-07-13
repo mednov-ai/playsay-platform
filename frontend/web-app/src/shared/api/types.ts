@@ -28,8 +28,10 @@ export type AdminUserProfile = UserProfileResponse & {
   managedByTeacher?: boolean;
 };
 export type ManagedStudentInput = {
-  email: string;
-  displayName: string;
+  username: string;
+  firstName: string;
+  lastName?: string;
+  email?: string;
 };
 export type Course = CourseResponse;
 export type CourseLesson = CourseLessonResponse & {

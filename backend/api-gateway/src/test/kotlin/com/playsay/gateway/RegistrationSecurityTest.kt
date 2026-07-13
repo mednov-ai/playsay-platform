@@ -128,7 +128,14 @@ private class AnonymousRegistrationGateway : RegistrationGateway {
         RegistrationResponse(status = "PASSWORD_RESET")
 
     override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse =
-        ManagedStudentProvisionResponse(subject = "student-subject", email = request.email, displayName = request.displayName)
+        ManagedStudentProvisionResponse(
+            subject = "student-subject",
+            username = request.username,
+            email = request.email,
+            firstName = request.firstName,
+            lastName = request.lastName,
+            displayName = listOfNotNull(request.firstName, request.lastName).joinToString(" "),
+        )
 
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =
         ManagedStudentInviteResponse(token = "student-invite-token", expiresAt = Instant.parse("2026-07-09T12:00:00Z"))

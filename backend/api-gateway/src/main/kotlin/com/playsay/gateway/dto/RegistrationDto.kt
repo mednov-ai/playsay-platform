@@ -70,13 +70,17 @@ data class RegistrationResponse(
 
 data class ManagedStudentProvisionResponse(
     val subject: String,
-    val email: String,
-    val displayName: String?,
+    val username: String,
+    val email: String?,
+    val firstName: String,
+    val lastName: String?,
+    val displayName: String,
 )
 
 data class ManagedStudentInviteRequest(
     val subject: String,
-    val email: String,
+    val username: String,
+    val email: String?,
     val displayName: String?,
     val lessonId: UUID,
     val continueUrl: String,
@@ -89,7 +93,8 @@ data class ManagedStudentInviteResponse(
 
 data class ManagedStudentInviteLookupResponse(
     val subject: String,
-    val email: String,
+    val username: String,
+    val email: String?,
     val displayName: String?,
     val lessonId: UUID,
     val continueUrl: String,

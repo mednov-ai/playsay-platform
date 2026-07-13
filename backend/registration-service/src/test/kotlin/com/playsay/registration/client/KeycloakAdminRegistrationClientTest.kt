@@ -42,9 +42,11 @@ class KeycloakAdminRegistrationClientTest {
 
             val created = client.createDisabledUser(
                 KeycloakUserCreateCommand(
+                    username = "managed.student",
                     email = "managed@example.com",
                     password = "Aa1!managed",
-                    displayName = "Managed Student",
+                    firstName = "Managed",
+                    lastName = "Student",
                     enabled = true,
                     emailVerified = true,
                     managedStudent = true,
@@ -53,6 +55,8 @@ class KeycloakAdminRegistrationClientTest {
 
             val createBody = objectMapper.readTree(requests.single { it.path.endsWith("/admin/realms/playsay/users") }.body)
             assertTrue(created)
+            assertEquals("managed.student", createBody.get("username").asText())
+            assertEquals("managed@example.com", createBody.get("email").asText())
             assertEquals("Managed", createBody.get("firstName").asText())
             assertEquals("Student", createBody.get("lastName").asText())
             assertTrue(createBody.get("requiredActions").isArray)

@@ -145,16 +145,51 @@ class UserProfileControllerTest @Autowired constructor(
 
         val created = controller.createManagedStudent(
             teacher,
-            ManagedStudentRequest(email = "new.student@example.com", displayName = "New Student"),
+            ManagedStudentRequest(
+                username = "new.student",
+                firstName = "New",
+                lastName = "Student",
+                email = "new.student@example.com",
+            ),
         )
 
         assertEquals("managed-student-1", created.subject)
+        assertEquals("new.student", created.username)
         assertEquals("new.student@example.com", created.email)
         assertEquals("New Student", created.displayName)
         assertEquals(listOf("STUDENT"), created.roles)
         assertEquals(true, created.managedByTeacher)
         assertEquals(listOf("new.student@example.com"), controller.listStudents(teacher).map { student -> student.email })
-        assertEquals(listOf("new.student@example.com"), RecordingManagedStudentRegistrationGateway.created.map { request -> request.email })
+        assertEquals(listOf("new.student"), RecordingManagedStudentRegistrationGateway.created.map { request -> request.username })
+    }
+
+    @Test
+    fun `teacher creates managed student without email or last name`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+
+        val created = controller.createManagedStudent(
+            teacher,
+            ManagedStudentRequest(username = "young.learner", firstName = "Mia"),
+        )
+
+        assertEquals("young.learner", created.username)
+        assertEquals(null, created.email)
+        assertEquals("Mia", created.name)
+        assertEquals("Mia", created.displayName)
+        assertEquals(true, created.managedByTeacher)
+    }
+
+    @Test
+    fun `student cannot create managed student`() {
+        val error = assertFailsWith<ResponseStatusException> {
+            controller.createManagedStudent(
+                authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT"),
+                ManagedStudentRequest(username = "young.learner", firstName = "Mia"),
+            )
+        }
+
+        assertEquals(HttpStatus.FORBIDDEN, error.statusCode)
+        assertEquals(emptyList(), RecordingManagedStudentRegistrationGateway.created)
     }
 
     @Test
@@ -241,8 +276,11 @@ private object RecordingManagedStudentRegistrationGateway : RegistrationGateway 
         created += request
         return ManagedStudentProvisionResponse(
             subject = "managed-student-1",
+            username = request.username,
             email = request.email,
-            displayName = request.displayName,
+            firstName = request.firstName,
+            lastName = request.lastName,
+            displayName = listOfNotNull(request.firstName, request.lastName).joinToString(" "),
         )
     }
 

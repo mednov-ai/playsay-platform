@@ -105,11 +105,11 @@ class UserProfileStore(
             createdAt = now,
         )
 
-        profile.username = provisioned.email
+        profile.username = provisioned.username
         profile.email = provisioned.email
         profile.name = provisioned.displayName
         profile.roles = MetaData.Roles.STUDENT
-        profile.displayName = clean(provisioned.displayName ?: request.displayName, 120)
+        profile.displayName = clean(provisioned.displayName, 120)
         profile.countryCode = profile.countryCode ?: defaultCountryCode
         profile.managedByTeacher = true
         profile.managedByTeacherUserId = teacherUserId

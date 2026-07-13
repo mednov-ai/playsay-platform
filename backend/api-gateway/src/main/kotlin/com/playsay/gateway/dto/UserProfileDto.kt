@@ -3,6 +3,7 @@ package com.playsay.gateway.dto
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 import java.time.Instant
 import java.time.LocalDate
@@ -40,11 +41,16 @@ data class UpdateUserProfileRequest(
 )
 
 data class ManagedStudentRequest(
-    @field:Email
     @field:NotBlank
-    @field:Size(max = 320)
-    val email: String,
+    @field:Size(min = 3, max = 64)
+    @field:Pattern(regexp = "^[A-Za-z0-9._-]+$")
+    val username: String,
     @field:NotBlank
     @field:Size(max = 120)
-    val displayName: String,
+    val firstName: String,
+    @field:Size(max = 120)
+    val lastName: String? = null,
+    @field:Email
+    @field:Size(max = 320)
+    val email: String? = null,
 )

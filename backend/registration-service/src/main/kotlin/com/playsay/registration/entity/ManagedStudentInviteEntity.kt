@@ -17,8 +17,10 @@ class ManagedStudentInviteEntity(
     var tokenHash: String = "",
     @Column(name = "keycloak_subject", nullable = false, length = 255)
     var keycloakSubject: String = "",
-    @Column(name = "email_normalized", nullable = false, length = 320)
-    var emailNormalized: String = "",
+    @Column(name = "username_normalized", nullable = false, length = 320)
+    var usernameNormalized: String = "",
+    @Column(name = "email_normalized", length = 320)
+    var emailNormalized: String? = null,
     @Column(name = "display_name", length = 120)
     var displayName: String? = null,
     @Column(name = "lesson_id", nullable = false)

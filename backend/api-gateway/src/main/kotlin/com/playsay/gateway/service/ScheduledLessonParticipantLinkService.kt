@@ -36,8 +36,9 @@ class ScheduledLessonParticipantLinkService(
                     val invite = registrationGateway.createManagedStudentInvite(
                         ManagedStudentInviteRequest(
                             subject = participant.subject,
-                            email = user.email
-                                ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_REQUIRED, "email"),
+                            username = user.username
+                                ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_REQUIRED, "username"),
+                            email = user.email,
                             displayName = displayName,
                             lessonId = lesson.id,
                             continueUrl = classroomUrl,

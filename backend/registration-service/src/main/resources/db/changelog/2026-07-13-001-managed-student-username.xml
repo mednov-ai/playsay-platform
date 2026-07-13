@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-13-001-managed-student-username" author="codex">
+        <addColumn tableName="managed_student_invites">
+            <column name="username_normalized" type="VARCHAR(320)"/>
+        </addColumn>
+        <update tableName="managed_student_invites">
+            <column name="username_normalized" valueComputed="LOWER(email_normalized)"/>
+        </update>
+        <addNotNullConstraint
+            tableName="managed_student_invites"
+            columnName="username_normalized"
+            columnDataType="VARCHAR(320)"/>
+        <dropNotNullConstraint
+            tableName="managed_student_invites"
+            columnName="email_normalized"
+            columnDataType="VARCHAR(320)"/>
+    </changeSet>
+</databaseChangeLog>

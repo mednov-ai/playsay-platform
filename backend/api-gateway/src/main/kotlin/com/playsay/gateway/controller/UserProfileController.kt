@@ -135,6 +135,7 @@ class UserProfileController(
             ApiResponse(responseCode = "400", description = "Invalid managed student payload", content = [Content()]),
             ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
             ApiResponse(responseCode = "403", description = "Current user is not a teacher/admin", content = [Content()]),
+            ApiResponse(responseCode = "409", description = "Username or email already belongs to another account", content = [Content()]),
         ],
     )
     fun createManagedStudent(

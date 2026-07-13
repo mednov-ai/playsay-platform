@@ -72,11 +72,14 @@ class RegistrationService(
             updatedAt = now,
         )
 
+        val profileName = keycloakProfileName(email, pending.displayName)
         val created = keycloak.createDisabledUser(
             KeycloakUserCreateCommand(
+                username = email,
                 email = email,
                 password = command.password,
-                displayName = pending.displayName,
+                firstName = profileName.firstName,
+                lastName = profileName.lastName,
                 enabled = false,
                 emailVerified = false,
             ),
@@ -350,6 +353,25 @@ class RegistrationService(
     private fun allowedReturnTo(value: String?): String? =
         returnToPolicy.allow(clean(value, 1024))
 
+    private fun keycloakProfileName(email: String, displayName: String?): KeycloakProfileName {
+        val normalized = displayName
+            ?.trim()
+            ?.replace(Regex("\\s+"), " ")
+            ?.takeIf { it.isNotBlank() }
+            ?: email.substringBefore("@").takeIf { it.isNotBlank() }
+            ?: "student"
+        val parts = normalized.split(" ", limit = 2)
+        return KeycloakProfileName(
+            firstName = parts.first().take(keycloakNameMaxLength),
+            lastName = parts.getOrNull(1)?.takeIf { it.isNotBlank() }?.take(keycloakNameMaxLength),
+        )
+    }
+
+    private data class KeycloakProfileName(
+        val firstName: String,
+        val lastName: String?,
+    )
+
     private companion object {
         const val registrationStatusPending = "PENDING"
         const val registrationStatusConfirmed = "CONFIRMED"
@@ -360,6 +382,7 @@ class RegistrationService(
         const val passwordResetStatusConsumed = "CONSUMED"
         const val passwordResetStatusExpired = "EXPIRED"
         const val studentRole = "STUDENT"
+        const val keycloakNameMaxLength = 255
         val passwordResetCodeRegex = Regex("\\d{6}")
     }
 }

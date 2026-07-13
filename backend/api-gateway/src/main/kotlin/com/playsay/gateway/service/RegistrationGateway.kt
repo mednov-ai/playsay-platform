@@ -103,10 +103,15 @@ class HttpRegistrationGateway(
         if (response.statusCode() != expectedStatus.value()) {
             logger.warn("registration-service request failed path={} status={}", path, response.statusCode())
             val status = runCatching { HttpStatus.valueOf(response.statusCode()) }.getOrNull()
+            val errorCode = when {
+                path == "/api/internal/managed-students" && status == HttpStatus.CONFLICT ->
+                    MetaData.ErrorCodes.MANAGED_STUDENT_IDENTITY_CONFLICT
+                status?.is4xxClientError == true -> MetaData.ErrorCodes.INVALID_REQUEST
+                else -> MetaData.ErrorCodes.REGISTRATION_SERVICE_UNAVAILABLE
+            }
             throw ProjectResponseException.localized(
                 status?.takeIf { it.is4xxClientError } ?: HttpStatus.SERVICE_UNAVAILABLE,
-                status?.takeIf { it.is4xxClientError }?.let { MetaData.ErrorCodes.INVALID_REQUEST }
-                    ?: MetaData.ErrorCodes.REGISTRATION_SERVICE_UNAVAILABLE,
+                errorCode,
             )
         }
         return runCatching { objectMapper.readValue(response.body(), responseType) }.getOrElse {

@@ -22,12 +22,9 @@ class KeycloakAdminRegistrationClient(
     private val clientSecret: String,
 ) : KeycloakRegistrationClient {
     override fun createDisabledUser(command: KeycloakUserCreateCommand): Boolean {
-        val profileName = keycloakProfileName(command.email, command.displayName)
         val payload = linkedMapOf<String, Any?>(
-            "username" to command.email,
-            "email" to command.email,
-            "firstName" to profileName.firstName,
-            "lastName" to profileName.lastName,
+            "username" to command.username,
+            "firstName" to command.firstName,
             "enabled" to command.enabled,
             "emailVerified" to command.emailVerified,
             "credentials" to listOf(
@@ -35,6 +32,8 @@ class KeycloakAdminRegistrationClient(
             ),
             "requiredActions" to emptyList<String>(),
         )
+        command.email?.let { email -> payload["email"] = email }
+        command.lastName?.let { lastName -> payload["lastName"] = lastName }
         if (command.managedStudent) {
             payload["attributes"] = mapOf(managedStudentAttribute to listOf("true"))
         }
@@ -50,19 +49,14 @@ class KeycloakAdminRegistrationClient(
         return true
     }
 
-    override fun findUserByEmail(email: String): KeycloakRegistrationUser? =
-        userByEmail(email)?.let { user ->
-            KeycloakRegistrationUser(
-                subject = user.requiredText("id"),
-                email = user.get("email")?.asText()?.takeIf { it.isNotBlank() } ?: email,
-                enabled = user.get("enabled")?.asBoolean(false) ?: false,
-                emailVerified = user.get("emailVerified")?.asBoolean(false) ?: false,
-                managedStudent = user.managedStudent(),
-            )
-        }
+    override fun findUserByUsername(username: String): KeycloakRegistrationUser? =
+        userByUsername(username)?.toRegistrationUser(username)
 
-    override fun enableVerifiedUser(email: String) {
-        val id = userIdByEmail(email)
+    override fun findUserByEmail(email: String): KeycloakRegistrationUser? =
+        userByEmail(email)?.toRegistrationUser(email)
+
+    override fun enableVerifiedUser(username: String) {
+        val id = userIdByUsername(username)
         val payload = mapOf("enabled" to true, "emailVerified" to true)
         val response = sendAdmin(
             path = "/admin/realms/$realm/users/$id",
@@ -72,8 +66,8 @@ class KeycloakAdminRegistrationClient(
         require(response.statusCode() in 200..299) { "Keycloak user enable failed with HTTP ${response.statusCode()}" }
     }
 
-    override fun assignRealmRole(email: String, role: String) {
-        val id = userIdByEmail(email)
+    override fun assignRealmRole(username: String, role: String) {
+        val id = userIdByUsername(username)
         val roleResponse = sendAdmin(path = "/admin/realms/$realm/roles/${role.urlEncoded()}", method = "GET")
         require(roleResponse.statusCode() in 200..299) { "Keycloak role fetch failed with HTTP ${roleResponse.statusCode()}" }
         val response = sendAdmin(
@@ -84,8 +78,8 @@ class KeycloakAdminRegistrationClient(
         require(response.statusCode() in 200..299) { "Keycloak role mapping failed with HTTP ${response.statusCode()}" }
     }
 
-    override fun updatePassword(email: String, newPassword: String) {
-        val id = userIdByEmail(email)
+    override fun updatePassword(username: String, newPassword: String) {
+        val id = userIdByUsername(username)
         val payload = mapOf("type" to "password", "value" to newPassword, "temporary" to false)
         val response = sendAdmin(
             path = "/admin/realms/$realm/users/$id/reset-password",
@@ -95,11 +89,11 @@ class KeycloakAdminRegistrationClient(
         require(response.statusCode() in 200..299) { "Keycloak password reset failed with HTTP ${response.statusCode()}" }
     }
 
-    override fun passwordGrant(email: String, password: String, clientId: String): KeycloakTokenSet {
+    override fun passwordGrant(username: String, password: String, clientId: String): KeycloakTokenSet {
         val body = listOf(
             "grant_type" to "password",
             "client_id" to clientId,
-            "username" to email,
+            "username" to username,
             "password" to password,
             "scope" to "openid profile email",
         ).joinToString("&") { (key, value) -> "${key.urlEncoded()}=${value.urlEncoded()}" }
@@ -118,9 +112,19 @@ class KeycloakAdminRegistrationClient(
         )
     }
 
-    private fun userIdByEmail(email: String): String {
-        return userByEmail(email)?.get("id")?.asText()
-            ?: error("Keycloak user not found for registration email.")
+    private fun userIdByUsername(username: String): String {
+        return userByUsername(username)?.get("id")?.asText()
+            ?: error("Keycloak user not found for registration username.")
+    }
+
+    private fun userByUsername(username: String): JsonNode? {
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/users?username=${username.urlEncoded()}&exact=true&briefRepresentation=false",
+            method = "GET",
+        )
+        require(response.statusCode() in 200..299) { "Keycloak user lookup failed with HTTP ${response.statusCode()}" }
+        val users = objectMapper.readTree(response.body())
+        return users.firstOrNull()
     }
 
     private fun userByEmail(email: String): JsonNode? {
@@ -175,30 +179,20 @@ class KeycloakAdminRegistrationClient(
             }
             ?: false
 
+    private fun JsonNode.toRegistrationUser(fallbackUsername: String): KeycloakRegistrationUser =
+        KeycloakRegistrationUser(
+            subject = requiredText("id"),
+            username = get("username")?.asText()?.takeIf { it.isNotBlank() } ?: fallbackUsername,
+            email = get("email")?.asText()?.takeIf { it.isNotBlank() },
+            enabled = get("enabled")?.asBoolean(false) ?: false,
+            emailVerified = get("emailVerified")?.asBoolean(false) ?: false,
+            managedStudent = managedStudent(),
+        )
+
     private fun String.urlEncoded(): String =
         URLEncoder.encode(this, StandardCharsets.UTF_8)
 
-    private fun keycloakProfileName(email: String, displayName: String?): KeycloakProfileName {
-        val fallbackName = email.substringBefore("@").takeIf { it.isNotBlank() } ?: "student"
-        val normalized = displayName
-            ?.trim()
-            ?.replace(Regex("\\s+"), " ")
-            ?.takeIf { it.isNotBlank() }
-            ?: fallbackName
-        val parts = normalized.split(" ", limit = 2)
-        return KeycloakProfileName(
-            firstName = parts.first().take(keycloakNameMaxLength),
-            lastName = (parts.getOrNull(1)?.takeIf { it.isNotBlank() } ?: "-").take(keycloakNameMaxLength),
-        )
-    }
-
-    private data class KeycloakProfileName(
-        val firstName: String,
-        val lastName: String,
-    )
-
     private companion object {
         const val managedStudentAttribute = "playsay_managed_student"
-        const val keycloakNameMaxLength = 255
     }
 }

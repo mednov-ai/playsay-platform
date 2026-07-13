@@ -36,36 +36,44 @@ data class RegistrationResult(
 )
 
 data class KeycloakUserCreateCommand(
-    val email: String,
+    val username: String,
+    val email: String?,
     val password: String,
-    val displayName: String?,
+    val firstName: String,
+    val lastName: String?,
     val enabled: Boolean,
     val emailVerified: Boolean,
     val managedStudent: Boolean = false,
 )
 
 data class KeycloakRegistrationUser(
-    val email: String,
+    val username: String,
+    val email: String?,
     val enabled: Boolean,
     val emailVerified: Boolean,
-    val subject: String = email,
+    val subject: String = username,
     val managedStudent: Boolean = false,
 )
 
 data class ManagedStudentCommand(
-    val email: String,
-    val displayName: String,
+    val username: String,
+    val firstName: String,
+    val lastName: String?,
+    val email: String?,
 )
 
 data class ManagedStudentResult(
     val subject: String,
-    val email: String,
-    val displayName: String?,
+    val username: String,
+    val email: String?,
+    val firstName: String,
+    val lastName: String?,
 )
 
 data class ManagedStudentInviteCommand(
     val subject: String,
-    val email: String,
+    val username: String,
+    val email: String?,
     val displayName: String?,
     val lessonId: java.util.UUID,
     val continueUrl: String,
@@ -78,7 +86,8 @@ data class ManagedStudentInviteResult(
 
 data class ManagedStudentInviteLookupResult(
     val subject: String,
-    val email: String,
+    val username: String,
+    val email: String?,
     val displayName: String?,
     val lessonId: java.util.UUID,
     val continueUrl: String,
@@ -103,15 +112,17 @@ data class KeycloakTokenSet(
 interface KeycloakRegistrationClient {
     fun createDisabledUser(command: KeycloakUserCreateCommand): Boolean
 
+    fun findUserByUsername(username: String): KeycloakRegistrationUser?
+
     fun findUserByEmail(email: String): KeycloakRegistrationUser?
 
-    fun enableVerifiedUser(email: String)
+    fun enableVerifiedUser(username: String)
 
-    fun assignRealmRole(email: String, role: String)
+    fun assignRealmRole(username: String, role: String)
 
-    fun updatePassword(email: String, newPassword: String)
+    fun updatePassword(username: String, newPassword: String)
 
-    fun passwordGrant(email: String, password: String, clientId: String): KeycloakTokenSet
+    fun passwordGrant(username: String, password: String, clientId: String): KeycloakTokenSet
 }
 
 data class RegistrationEmailCommand(

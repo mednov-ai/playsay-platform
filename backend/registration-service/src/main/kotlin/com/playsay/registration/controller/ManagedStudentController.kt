@@ -34,14 +34,19 @@ class ManagedStudentController(
     fun createManagedStudent(@Valid @RequestBody request: ManagedStudentRequest): ManagedStudentResponse {
         val result = registrationService.createManagedStudent(
             ManagedStudentCommand(
+                username = request.username,
+                firstName = request.firstName,
+                lastName = request.lastName,
                 email = request.email,
-                displayName = request.displayName,
             ),
         )
         return ManagedStudentResponse(
             subject = result.subject,
+            username = result.username,
             email = result.email,
-            displayName = result.displayName,
+            firstName = result.firstName,
+            lastName = result.lastName,
+            displayName = listOfNotNull(result.firstName, result.lastName).joinToString(" "),
         )
     }
 
@@ -55,6 +60,7 @@ class ManagedStudentController(
         val result = registrationService.createManagedStudentInvite(
             ManagedStudentInviteCommand(
                 subject = request.subject,
+                username = request.username,
                 email = request.email,
                 displayName = request.displayName,
                 lessonId = request.lessonId,
@@ -79,6 +85,7 @@ class ManagedStudentController(
         )
         return ManagedStudentInviteLookupResponse(
             subject = result.subject,
+            username = result.username,
             email = result.email,
             displayName = result.displayName,
             lessonId = result.lessonId,

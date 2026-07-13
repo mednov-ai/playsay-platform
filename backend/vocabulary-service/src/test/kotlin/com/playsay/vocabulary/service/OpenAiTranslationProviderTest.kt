@@ -26,6 +26,7 @@ class OpenAiTranslationProviderTest {
             .andExpect(header("Authorization", "Bearer test-key"))
             .andExpect(content().string(containsString("vocabulary_translation_variants")))
             .andExpect(content().string(containsString("\"effort\":\"none\"")))
+            .andExpect(content().string(containsString("\"maxItems\":3")))
             .andExpect(content().string(containsString("travel context")))
             .andExpect(content().string(containsString("previous meaning")))
             .andRespond(withSuccess(openAiResponse, MediaType.APPLICATION_JSON))

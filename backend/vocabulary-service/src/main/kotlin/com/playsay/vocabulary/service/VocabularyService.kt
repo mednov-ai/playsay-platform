@@ -20,7 +20,14 @@ import java.util.UUID
 class VocabularyService(private val entries: VocabularyEntryRepo, private val users: VocabularyUserRepo, private val participants: VocabularyLessonParticipantRepo, private val translationProvider: TranslationProvider) {
     fun suggest(subject: String, request: TranslationSuggestionRequest): TranslationSuggestionResponse {
         val languages = languages(subject, request.sourceLanguage, request.targetLanguage)
-        return translationProvider.suggest(cleanSource(request.sourceText), languages.first, languages.second, request.context?.trim())
+        return translationProvider.suggest(
+            cleanSource(request.sourceText),
+            languages.first,
+            languages.second,
+            request.context?.trim()?.takeIf(String::isNotEmpty),
+            request.instruction?.trim()?.takeIf(String::isNotEmpty),
+            request.previousTranslations.map(String::trim).filter(String::isNotEmpty).distinct().take(8),
+        )
     }
 
     @Transactional

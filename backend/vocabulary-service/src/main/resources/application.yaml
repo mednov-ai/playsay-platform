@@ -22,4 +22,4 @@ logging.level.org.hibernate.orm.connections.pooling: WARN
 playsay.vocabulary.translation:
   api-key: ${PLAYSAY_VOCABULARY_OPENAI_API_KEY:}
   base-url: ${PLAYSAY_VOCABULARY_OPENAI_BASE_URL:https://api.openai.com/v1}
-  model: ${PLAYSAY_VOCABULARY_OPENAI_MODEL:gpt-5-mini}
+  model: ${PLAYSAY_VOCABULARY_OPENAI_MODEL:gpt-5.4-mini}

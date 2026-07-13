@@ -14,15 +14,26 @@ data class TranslationSuggestionRequest(
     @field:Size(max = 16) val sourceLanguage: String? = null,
     @field:Size(max = 16) val targetLanguage: String? = null,
     @field:Size(max = 1_000) val context: String? = null,
+    @field:Size(max = 500) val instruction: String? = null,
+    @field:Size(max = 8) val previousTranslations: List<@Size(max = 500) String> = emptyList(),
 )
 
-data class TranslationSuggestionResponse(
+data class TranslationVariantResponse(
     val translation: String,
     val partOfSpeech: String?,
     val example: String?,
     val exampleTranslation: String?,
-    val source: String,
 )
+
+data class TranslationSuggestionResponse(
+    val variants: List<TranslationVariantResponse>,
+    val source: String,
+) {
+    val translation: String = variants.firstOrNull()?.translation.orEmpty()
+    val partOfSpeech: String? = variants.firstOrNull()?.partOfSpeech
+    val example: String? = variants.firstOrNull()?.example
+    val exampleTranslation: String? = variants.firstOrNull()?.exampleTranslation
+}
 
 data class CreateVocabularyEntryRequest(
     @field:Size(max = 255) val ownerSubject: String? = null,

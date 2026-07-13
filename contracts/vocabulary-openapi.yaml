@@ -6,7 +6,10 @@ paths:
   /translation-suggestions:
     post:
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TranslationSuggestionRequest' } } } }
-      responses: { '200': { description: Editable translation suggestion } }
+      responses:
+        '200':
+          description: Editable translation and usage variants
+          content: { application/json: { schema: { $ref: '#/components/schemas/TranslationSuggestion' } } }
   /entries:
     get: { responses: { '200': { description: Active vocabulary entries } } }
     post:
@@ -23,7 +26,7 @@ components:
   schemas:
     SourceType: { type: string, enum: [LESSON, HOMEWORK, MANUAL] }
     TranslationState: { type: string, enum: [MISSING, SUGGESTED, CONFIRMED] }
-    TranslationSuggestionRequest:
+    SourceTerm:
       type: object
       required: [sourceText]
       properties:
@@ -31,9 +34,40 @@ components:
         sourceLanguage: { type: string, maxLength: 16 }
         targetLanguage: { type: string, maxLength: 16 }
         context: { type: string, maxLength: 1000 }
+    TranslationSuggestionRequest:
+      allOf:
+        - { $ref: '#/components/schemas/SourceTerm' }
+        - type: object
+          properties:
+            instruction: { type: string, maxLength: 500 }
+            previousTranslations:
+              type: array
+              maxItems: 8
+              items: { type: string, maxLength: 500 }
+    TranslationVariant:
+      type: object
+      required: [translation]
+      properties:
+        translation: { type: string, maxLength: 500 }
+        partOfSpeech: { type: [string, 'null'], maxLength: 80 }
+        example: { type: [string, 'null'], maxLength: 1000 }
+        exampleTranslation: { type: [string, 'null'], maxLength: 1000 }
+    TranslationSuggestion:
+      type: object
+      required: [variants, source, translation]
+      properties:
+        variants:
+          type: array
+          maxItems: 4
+          items: { $ref: '#/components/schemas/TranslationVariant' }
+        source: { type: string, enum: [OPENAI, UNAVAILABLE] }
+        translation: { type: string, maxLength: 500, description: First variant for backward compatibility }
+        partOfSpeech: { type: [string, 'null'], maxLength: 80 }
+        example: { type: [string, 'null'], maxLength: 1000 }
+        exampleTranslation: { type: [string, 'null'], maxLength: 1000 }
     CreateEntry:
       allOf:
-        - { $ref: '#/components/schemas/TranslationSuggestionRequest' }
+        - { $ref: '#/components/schemas/SourceTerm' }
         - type: object
           required: [sourceType]
           properties:

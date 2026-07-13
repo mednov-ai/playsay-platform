@@ -219,9 +219,9 @@ export const de = {
   },
   vocabulary: {
     title: "Mein Wörterbuch", description: "Wörter aus Unterricht, Hausaufgaben und eigener Übung.", search: "Wort suchen", empty: "Noch keine Wörter — füge das erste hinzu.", translationMissing: "Übersetzung fehlt noch",
-    quickAdd: { title: "Zum Wörterbuch hinzufügen" }, fields: { word: "Wort oder Ausdruck", translation: "Übersetzung", allParticipants: "Für alle Teilnehmenden hinzufügen" },
-    actions: { add: "Hinzufügen", suggest: "Übersetzung vorschlagen", save: "Speichern", search: "Suchen", archive: "Archivieren" },
-    messages: { saved: "Wort gespeichert.", saveFailed: "Wort konnte nicht gespeichert werden.", translationUnavailable: "Der Übersetzer ist nicht verfügbar — bitte manuell eingeben." },
+    quickAdd: { title: "Zum Wörterbuch hinzufügen" }, variants: { title: "Übersetzungs- und Verwendungsvarianten" }, fields: { word: "Wort oder Ausdruck", translation: "Ausgewählte Übersetzung", aiInstruction: "Präzisierung für die KI", aiInstructionPlaceholder: "Zum Beispiel: Bedeutung für Reisen oder Verwendung als Verb", allParticipants: "Für alle Teilnehmenden hinzufügen" },
+    actions: { add: "Hinzufügen", suggest: "Übersetzung vorschlagen", regenerate: "Andere Varianten", save: "Speichern", search: "Suchen", archive: "Archivieren" },
+    messages: { translating: "Die KI sucht automatisch Übersetzungen und Beispiele…", saved: "Wort gespeichert.", saveFailed: "Wort konnte nicht gespeichert werden.", translationUnavailable: "Der Übersetzer ist nicht verfügbar — bitte manuell eingeben." },
   },
   aiTutor: {
     eyebrow: "Selbstständiges Üben", title: "Gespräch mit einem KI-Tutor", subtitle: "Wähle Thema, Stimme und Korrekturhäufigkeit.",

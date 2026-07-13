@@ -219,9 +219,9 @@ export const fr = {
   },
   vocabulary: {
     title: "Mon vocabulaire", description: "Mots des cours, devoirs et exercices personnels.", search: "Chercher un mot", empty: "Aucun mot — ajoutez le premier.", translationMissing: "Traduction non renseignée",
-    quickAdd: { title: "Ajouter au vocabulaire" }, fields: { word: "Mot ou expression", translation: "Traduction", allParticipants: "Ajouter pour tous les participants" },
-    actions: { add: "Ajouter", suggest: "Proposer une traduction", save: "Enregistrer", search: "Chercher", archive: "Archiver" },
-    messages: { saved: "Mot enregistré.", saveFailed: "Impossible d’enregistrer le mot.", translationUnavailable: "Le traducteur est indisponible — saisissez la traduction manuellement." },
+    quickAdd: { title: "Ajouter au vocabulaire" }, variants: { title: "Variantes de traduction et d’usage" }, fields: { word: "Mot ou expression", translation: "Traduction choisie", aiInstruction: "Précision pour l’IA", aiInstructionPlaceholder: "Par exemple : sens lié au voyage ou emploi comme verbe", allParticipants: "Ajouter pour tous les participants" },
+    actions: { add: "Ajouter", suggest: "Proposer une traduction", regenerate: "Autres variantes", save: "Enregistrer", search: "Chercher", archive: "Archiver" },
+    messages: { translating: "L’IA recherche automatiquement des traductions et des exemples…", saved: "Mot enregistré.", saveFailed: "Impossible d’enregistrer le mot.", translationUnavailable: "Le traducteur est indisponible — saisissez la traduction manuellement." },
   },
   aiTutor: {
     eyebrow: "Pratique autonome", title: "Conversation avec un professeur IA", subtitle: "Choisissez le sujet, la voix et la fréquence des corrections.",

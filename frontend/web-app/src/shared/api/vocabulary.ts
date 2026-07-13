@@ -4,12 +4,23 @@ import { apiJson } from "./http";
 export type VocabularySourceType = "LESSON" | "HOMEWORK" | "MANUAL";
 export type TranslationState = "MISSING" | "SUGGESTED" | "CONFIRMED";
 
-export interface TranslationSuggestion {
+export interface TranslationVariant {
   translation: string;
   partOfSpeech?: string;
   example?: string;
   exampleTranslation?: string;
+}
+
+export interface TranslationSuggestion extends TranslationVariant {
+  variants: TranslationVariant[];
   source: string;
+}
+
+export interface TranslationSuggestionInput {
+  sourceText: string;
+  context?: string;
+  instruction?: string;
+  previousTranslations?: string[];
 }
 
 export interface VocabularyEntry {
@@ -42,8 +53,8 @@ export interface CreateVocabularyEntry {
   context?: string;
 }
 
-export function suggestVocabularyTranslation(input: Pick<CreateVocabularyEntry, "sourceText" | "context">): Promise<TranslationSuggestion> {
-  return apiJson("/api/vocabulary/translation-suggestions", { method: "POST", body: JSON.stringify(input) }, authConfig);
+export function suggestVocabularyTranslation(input: TranslationSuggestionInput, signal?: AbortSignal): Promise<TranslationSuggestion> {
+  return apiJson("/api/vocabulary/translation-suggestions", { method: "POST", body: JSON.stringify(input), signal }, authConfig);
 }
 
 export function createVocabularyEntry(input: CreateVocabularyEntry): Promise<VocabularyEntry> {

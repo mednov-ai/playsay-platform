@@ -44,6 +44,8 @@ data class KeycloakUserCreateCommand(
     val enabled: Boolean,
     val emailVerified: Boolean,
     val managedStudent: Boolean = false,
+    val temporaryPassword: Boolean = false,
+    val requiredActions: List<String> = emptyList(),
 )
 
 data class KeycloakRegistrationUser(
@@ -53,6 +55,8 @@ data class KeycloakRegistrationUser(
     val emailVerified: Boolean,
     val subject: String = username,
     val managedStudent: Boolean = false,
+    val displayName: String? = null,
+    val roles: Set<String> = emptySet(),
 )
 
 data class ManagedStudentCommand(
@@ -123,6 +127,20 @@ interface KeycloakRegistrationClient {
     fun updatePassword(username: String, newPassword: String)
 
     fun passwordGrant(username: String, password: String, clientId: String): KeycloakTokenSet
+
+    fun findUserBySubject(subject: String): KeycloakRegistrationUser? = null
+
+    fun setRealmRoles(subject: String, roles: Set<String>) {
+        error("Realm role management is not supported by this Keycloak client.")
+    }
+
+    fun deleteUser(subject: String) {
+        error("User deletion is not supported by this Keycloak client.")
+    }
+
+    fun sendRequiredActionsEmail(subject: String, actions: List<String>) {
+        error("Required actions email is not supported by this Keycloak client.")
+    }
 }
 
 data class RegistrationEmailCommand(

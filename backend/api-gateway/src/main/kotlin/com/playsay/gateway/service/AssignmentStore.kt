@@ -53,6 +53,7 @@ class AssignmentStore(
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val appUserRepo: AppUserRepo,
     private val userProfileStore: UserProfileStore,
+    private val studentAccessPolicy: StudentAccessPolicy,
     private val materialScoringService: MaterialScoringService,
     private val progressCalculator: AssignmentProgressCalculator,
     private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
@@ -65,6 +66,7 @@ class AssignmentStore(
         val teacherUserId = userProfileStore.currentUserId(authentication)
         val material = assignableMaterial(authentication, teacherUserId, request.materialId)
         val recipients = resolveRecipientUsers(request.studentSubjects)
+        requireRecipientAccess(authentication, teacherUserId, recipients)
         val now = Instant.now()
         val title = request.title.optionalClean("title", 160) ?: material.title
         val instructions = request.instructions.optionalClean("instructions", 2_000)
@@ -98,9 +100,6 @@ class AssignmentStore(
         val currentUserId = userProfileStore.currentUserId(authentication)
         val lesson = lessonRepo.findById(lessonId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        if (!authentication.isAssignmentAdmin() && lesson.teacherUserId != currentUserId) {
-            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        }
         val scheduleRow = lessonRepo.findScheduleRowById(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         val materialId = scheduleRow.materialId
@@ -108,6 +107,7 @@ class AssignmentStore(
         val material = materialById(materialId)
         val participantRows = lessonParticipantRepo.findParticipantRowsByLessonIds(listOf(lessonId))
         val recipients = lessonHomeworkRecipients(participantRows, request.studentSubjects)
+        requireRecipientAccess(authentication, currentUserId, recipients)
         val now = Instant.now()
         val title = request.title.optionalClean("title", 160) ?: scheduleRow.lessonTitle ?: material.title
         val instructions = request.instructions.optionalClean("instructions", 2_000)
@@ -122,7 +122,7 @@ class AssignmentStore(
 
         assignment.lessonId = lessonId
         assignment.sourceLessonId = lessonId
-        assignment.teacherUserId = lesson.teacherUserId ?: currentUserId
+        assignment.teacherUserId = currentUserId
         assignment.materialId = material.id
         assignment.title = title
         assignment.instructions = instructions
@@ -148,11 +148,12 @@ class AssignmentStore(
                 status = MetaData.AssignmentStatuses.ARCHIVED,
             )
         } else {
-            assignmentRepo.findByTeacherUserIdAndTypeAndStatusNotOrderByUpdatedAtDesc(
-                teacherUserId = currentUserId,
+            assignmentRepo.findByTypeAndStatusNotOrderByUpdatedAtDesc(
                 type = MetaData.AssignmentTypes.HOMEWORK,
                 status = MetaData.AssignmentStatuses.ARCHIVED,
-            )
+            ).filter { assignment ->
+                assignment.teacherUserId == currentUserId || canAccessEveryRecipient(currentUserId, assignment.id)
+            }
         }
 
         return assignments.mapNotNull { assignment -> summaryIfMaterialAvailable(assignment) }
@@ -277,7 +278,7 @@ class AssignmentStore(
         ) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
         if (!authentication.isAssignmentAdmin()) {
             val currentUserId = userProfileStore.currentUserId(authentication)
-            if (assignment.teacherUserId != currentUserId) {
+            if (assignment.teacherUserId != currentUserId && !canAccessEveryRecipient(currentUserId, assignment.id)) {
                 throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
             }
         }
@@ -468,6 +469,26 @@ class AssignmentStore(
         }
         return normalized.map { subject -> requireNotNull(users[subject]) }
     }
+
+    private fun requireRecipientAccess(
+        authentication: JwtAuthenticationToken,
+        actorUserId: UUID,
+        recipients: List<AppUserEntity>,
+    ) {
+        if (!authentication.isAssignmentAdmin() &&
+            !studentAccessPolicy.canAccessEveryStudent(actorUserId, recipients.map(AppUserEntity::id))
+        ) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.STUDENT_ACCESS_DENIED)
+        }
+    }
+
+    private fun canAccessEveryRecipient(actorUserId: UUID, assignmentId: UUID): Boolean =
+        studentAccessPolicy.canAccessEveryStudent(
+            actorUserId,
+            assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignmentId)
+                .filter { it.archivedAt == null }
+                .map(AssignmentRecipientEntity::studentUserId),
+        )
 
     private fun lessonHomeworkRecipients(
         participants: List<LessonParticipantRow>,

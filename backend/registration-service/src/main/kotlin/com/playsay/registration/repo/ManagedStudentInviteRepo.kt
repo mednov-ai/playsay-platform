@@ -22,4 +22,6 @@ interface ManagedStudentInviteRepo : JpaRepository<ManagedStudentInviteEntity, U
     fun findPendingLookupByTokenHashAndStatus(tokenHash: String, status: String): ManagedStudentInviteEntity?
 
     fun existsByTokenHash(tokenHash: String): Boolean
+
+    fun deleteByKeycloakSubject(keycloakSubject: String): Long
 }

@@ -8,9 +8,13 @@ import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.StudentProfileRepo
+import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.toApplicationRoles
+import com.playsay.gateway.utils.toStoredRoles
 import java.time.Instant
 import java.time.LocalDate
+import java.time.Clock
 import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -22,6 +26,8 @@ class UserProfileStore(
     private val userRepo: AppUserRepo,
     private val studentProfileRepo: StudentProfileRepo,
     private val registrationGateway: RegistrationGateway,
+    private val delegationRepo: TeacherDelegationRepo,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun current(authentication: JwtAuthenticationToken): UserProfileResponse {
@@ -29,6 +35,10 @@ class UserProfileStore(
         val profile = userRepo.findByKeycloakSubject(identity.subject)
             ?.also { existing -> updateIdentity(existing, identity) }
             ?: insertProfile(identity)
+
+        if (profile.deletedAt != null) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.USER_DELETED)
+        }
 
         return profile.toResponse(studentProfileRepo.findByUserId(profile.id))
     }
@@ -42,7 +52,7 @@ class UserProfileStore(
         profile.username = identity.username
         profile.email = identity.email
         profile.name = identity.name
-        profile.roles = identity.roles.toStoredRoles()
+        updateRolesFromToken(profile, identity)
         profile.displayName = clean(request.displayName, 120)
         profile.locale = clean(request.locale, 16)
         profile.countryCode = cleanCountryCode(request.countryCode) ?: defaultCountryCode
@@ -63,7 +73,7 @@ class UserProfileStore(
         profile.username = identity.username
         profile.email = identity.email
         profile.name = identity.name
-        profile.roles = identity.roles.toStoredRoles()
+        updateRolesFromToken(profile, identity)
         profile.displayName = identity.defaultDisplayName()
         profile.locale = null
         profile.countryCode = defaultCountryCode
@@ -89,7 +99,14 @@ class UserProfileStore(
     @Transactional(readOnly = true)
     fun listStudents(authentication: JwtAuthenticationToken): List<UserProfileResponse> {
         requireTeacherOrAdmin(authentication)
-        return listStudentProfiles()
+        if (authentication.authorities.any { it.authority == MetaData.Authorities.ADMIN }) {
+            return listStudentProfiles()
+        }
+        val actorId = currentUserId(authentication)
+        val studentIds = appUserIdsVisibleToTeacher(actorId)
+        val profiles = userRepo.findByIdIn(studentIds)
+        val studentsByUserId = studentProfileRepo.findByUserIdIn(studentIds).associateBy { it.userId }
+        return profiles.map { profile -> profile.toResponse(studentsByUserId[profile.id]) }
     }
 
     @Transactional
@@ -111,8 +128,9 @@ class UserProfileStore(
         profile.roles = MetaData.Roles.STUDENT
         profile.displayName = clean(provisioned.displayName, 120)
         profile.countryCode = profile.countryCode ?: defaultCountryCode
-        profile.managedByTeacher = true
-        profile.managedByTeacherUserId = teacherUserId
+        val actorIsTeacher = authentication.authorities.any { it.authority == MetaData.Authorities.TEACHER }
+        profile.managedByTeacher = actorIsTeacher
+        profile.managedByTeacherUserId = teacherUserId.takeIf { actorIsTeacher }
         profile.updatedAt = now
 
         return saveProfile(profile).toResponse()
@@ -129,6 +147,12 @@ class UserProfileStore(
             val studentsByUserId = studentProfileRepo.findByUserIdIn(profiles.map { it.id }).associateBy { it.userId }
             profiles.map { profile -> profile.toResponse(studentsByUserId[profile.id]) }
         }
+
+    private fun appUserIdsVisibleToTeacher(teacherUserId: UUID): List<UUID> =
+        (
+            userRepo.findByManagedByTeacherUserIdOrderByDisplayNameAscUsernameAsc(teacherUserId).map(AppUserEntity::id) +
+                delegationRepo.findActiveStudentIds(teacherUserId, Instant.now(clock))
+            ).distinct()
 
     @Transactional
     fun currentUserId(authentication: JwtAuthenticationToken): UUID {
@@ -183,9 +207,17 @@ class UserProfileStore(
         profile.username = identity.username
         profile.email = identity.email
         profile.name = identity.name
-        profile.roles = identity.roles.toStoredRoles()
+        updateRolesFromToken(profile, identity)
 
         saveProfile(profile)
+    }
+
+    private fun updateRolesFromToken(profile: AppUserEntity, identity: CurrentIdentity) {
+        val rolesChangedAt = profile.rolesChangedAt
+        if (rolesChangedAt == null || !identity.issuedAt.isBefore(rolesChangedAt)) {
+            profile.roles = identity.roles.toStoredRoles()
+            profile.rolesChangedAt = null
+        }
     }
 
     private fun saveProfile(profile: AppUserEntity): AppUserEntity =
@@ -234,6 +266,7 @@ private data class CurrentIdentity(
     val email: String?,
     val name: String?,
     val roles: List<String>,
+    val issuedAt: Instant,
 )
 
 private fun JwtAuthenticationToken.toIdentity(): CurrentIdentity =
@@ -243,6 +276,7 @@ private fun JwtAuthenticationToken.toIdentity(): CurrentIdentity =
         email = token.getClaimAsString("email"),
         name = token.getClaimAsString("name"),
         roles = applicationRoles(),
+        issuedAt = token.issuedAt ?: Instant.EPOCH,
     )
 
 private fun JwtAuthenticationToken.applicationRoles(): List<String> =
@@ -271,16 +305,6 @@ private fun AppUserEntity.toResponse(studentProfile: StudentProfileEntity? = nul
 
 private fun CurrentIdentity.defaultDisplayName(): String? =
     name ?: username
-
-private fun List<String>.toStoredRoles(): String =
-    joinToString(",")
-
-private fun String?.toApplicationRoles(): List<String> =
-    this
-        ?.split(",")
-        ?.mapNotNull { role -> role.trim().takeIf { it.isNotEmpty() } }
-        ?.sorted()
-        ?: emptyList()
 
 private const val defaultCountryCode = "RU"
 private val countryCodePattern = Regex("^[A-Z]{2}$")

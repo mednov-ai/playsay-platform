@@ -41,6 +41,7 @@ data class LessonTemplateCardRow(
 )
 
 interface CourseRepo : JpaRepository<CourseEntity, UUID> {
+    fun findByCreatedByUserId(createdByUserId: UUID): List<CourseEntity>
     @Query(
         """
         select new com.playsay.gateway.repo.CourseSummaryRow(c, count(lt.id))

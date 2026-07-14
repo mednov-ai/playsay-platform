@@ -10,6 +10,7 @@ export const translationDomains = [
   "courses",
   "materials",
   "classroom",
+  "userManagement",
   "payments",
   "errors",
 ] as const;

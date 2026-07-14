@@ -10,13 +10,14 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern
 import org.springframework.security.web.SecurityFilterChain
 
 @Configuration
 class SecurityConfig {
     @Bean
-    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain =
+    fun securityFilterChain(http: HttpSecurity, staleJwtFilter: StaleJwtFilter): SecurityFilterChain =
         http
             .csrf { csrf -> csrf.disable() }
             .authorizeHttpRequests { requests ->
@@ -57,6 +58,7 @@ class SecurityConfig {
                     jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())
                 }
             }
+            .addFilterAfter(staleJwtFilter, BearerTokenAuthenticationFilter::class.java)
             .build()
 
     @Bean

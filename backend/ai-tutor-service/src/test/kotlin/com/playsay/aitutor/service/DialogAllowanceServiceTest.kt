@@ -12,7 +12,7 @@ import com.playsay.aitutor.repo.ConversationSessionRepository
 import com.playsay.aitutor.repo.DialogCreditAccountRepository
 import com.playsay.aitutor.repo.DialogCreditLedgerRepository
 import com.playsay.aitutor.repo.LearnerAppUserRepository
-import com.playsay.aitutor.repo.LearnerLessonParticipantRepository
+import com.playsay.aitutor.repo.LearnerTeacherDelegationRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -28,14 +28,14 @@ import org.mockito.Mockito
 
 class DialogAllowanceServiceTest {
     private val users = Mockito.mock(LearnerAppUserRepository::class.java)
-    private val lessons = Mockito.mock(LearnerLessonParticipantRepository::class.java)
+    private val delegations = Mockito.mock(LearnerTeacherDelegationRepository::class.java)
     private val accounts = Mockito.mock(DialogCreditAccountRepository::class.java)
     private val ledger = Mockito.mock(DialogCreditLedgerRepository::class.java)
     private val sessions = Mockito.mock(ConversationSessionRepository::class.java)
     private val now = Instant.parse("2026-07-14T12:00:00Z")
     private val service = DialogAllowanceService(
         users,
-        lessons,
+        delegations,
         accounts,
         ledger,
         sessions,
@@ -203,7 +203,7 @@ class DialogAllowanceServiceTest {
         val student = student()
         Mockito.`when`(users.findByKeycloakSubject(teacher.keycloakSubject)).thenReturn(teacher)
         Mockito.`when`(users.findById(student.id)).thenReturn(Optional.of(student))
-        Mockito.`when`(lessons.findStudentUserIdsByTeacherUserId(teacher.id)).thenReturn(emptyList())
+        Mockito.`when`(delegations.hasActiveAccess(teacher.id, student.id, now)).thenReturn(false)
 
         val error = assertFailsWith<AiTutorResponseException> {
             service.grant(teacher.keycloakSubject, student.id, GrantDialogCreditsRequest(1, UUID.randomUUID()))

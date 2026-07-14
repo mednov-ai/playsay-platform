@@ -63,6 +63,8 @@ const SchedulePanel = lazy(() => import("../features/schedule/ui/SchedulePanel")
 const LessonPreparationPanel = lazy(() => import("../features/schedule/ui/LessonPreparationPanel").then((module) => ({ default: module.LessonPreparationPanel })));
 const AiTutorPanel = lazy(() => import("../features/ai-tutor/ui/AiTutorPanel").then((module) => ({ default: module.AiTutorPanel })));
 const VocabularyPanel = lazy(() => import("../features/vocabulary/ui/VocabularyPanel").then((module) => ({ default: module.VocabularyPanel })));
+const TeacherStudentsPanel = lazy(() => import("../features/user-management/ui/TeacherStudentsPanel").then((module) => ({ default: module.TeacherStudentsPanel })));
+const AdminUsersPanel = lazy(() => import("../features/user-management/ui/AdminUsersPanel").then((module) => ({ default: module.AdminUsersPanel })));
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -410,6 +412,10 @@ export function AppShell(props: AppShellProps) {
               ) : null}
 
               {workspaceTab === "vocabulary" ? <VocabularyPanel /> : null}
+
+              {workspaceTab === "students" ? <TeacherStudentsPanel /> : null}
+
+              {workspaceTab === "users" ? <AdminUsersPanel /> : null}
 
               {workspaceTab === "materials" ? (
                 <MaterialLibraryPanel

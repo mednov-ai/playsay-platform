@@ -44,7 +44,6 @@ class CollaborationTokenService(
         if (secretBytes.size < 32) {
             throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.COLLABORATION_NOT_CONFIGURED)
         }
-
         val now = Instant.now()
         val expiresAt = now.plusSeconds(tokenTtlSeconds.coerceIn(60, 3_600))
         val claims = JWTClaimsSet.Builder()
@@ -84,6 +83,7 @@ class CollaborationDocumentService(
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val userProfileStore: UserProfileStore,
+    private val lessonAuthorizationService: ScheduledLessonAuthorizationService,
     private val lessonMaterialStore: LessonMaterialStore,
     private val tokenService: CollaborationTokenService,
     private val objectMapper: ObjectMapper,
@@ -162,7 +162,6 @@ class CollaborationDocumentService(
         if (authentication.canManageCollaboration()) {
             return documents.map { document -> document.toResponse(usersById[document.studentUserId]) }
         }
-
         val currentUserId = userProfileStore.currentUserId(authentication)
         return documents
             .filter { document ->
@@ -251,6 +250,9 @@ class CollaborationDocumentService(
         materialId: UUID,
     ): ScheduledMaterialLookupRow {
         if (authentication.canManageCollaboration()) {
+            if (!lessonAuthorizationService.canManageLesson(authentication, lessonId)) {
+                throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
+            }
             val lookup = lessonRepo.findScheduledMaterialLookup(lessonId)
                 ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
             val materialIds = if (lookup.workMode == MetaData.LessonWorkModes.PARALLEL) {

@@ -31,6 +31,7 @@ data class LessonMaterialRow(
 )
 
 interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
+    fun findByOwnerTeacherUserId(ownerTeacherUserId: UUID): List<LessonMaterialEntity>
     fun existsByIdAndStatusNot(id: UUID, status: String): Boolean
 
     fun findAllByStatusNot(status: String): List<LessonMaterialEntity>

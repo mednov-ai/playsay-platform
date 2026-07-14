@@ -5,6 +5,7 @@ import com.playsay.gateway.dto.*
 import com.playsay.gateway.repo.*
 import com.playsay.gateway.service.*
 import java.time.LocalDate
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -129,14 +130,34 @@ class UserProfileControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `teacher can list known student profiles`() {
+    fun `teacher lists only own student profiles`() {
         controller.current(authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT"))
         controller.current(authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER"))
         controller.current(authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN"))
+        val teacher = authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER")
+        controller.createManagedStudent(
+            teacher,
+            ManagedStudentRequest(username = "new.student", firstName = "New", lastName = "Student"),
+        )
 
-        val users = controller.listStudents(authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER"))
+        val users = controller.listStudents(teacher)
 
-        assertEquals(listOf("student.one"), users.map { user -> user.username })
+        assertEquals(listOf("new.student"), users.map { user -> user.username })
+    }
+
+    @Test
+    fun `stale jwt does not restore roles changed by administrator`() {
+        val staleTeacherToken = authentication(subject = "stale-user", username = "stale.user", role = "ROLE_TEACHER")
+        controller.current(staleTeacherToken)
+        val stored = appUserRepo.findByKeycloakSubject("stale-user")!!
+        stored.roles = "STUDENT"
+        stored.rolesChangedAt = Instant.now()
+        appUserRepo.saveAndFlush(stored)
+
+        val profile = controller.current(staleTeacherToken)
+
+        assertEquals(listOf("STUDENT"), profile.roles)
+        assertEquals("STUDENT", appUserRepo.findByKeycloakSubject("stale-user")!!.roles)
     }
 
     @Test

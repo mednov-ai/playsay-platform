@@ -23,6 +23,7 @@ class SecurityConfig {
                         "/actuator/health",
                         "/actuator/health/**",
                         "/api/anonymous/**",
+                        "/internal/user-data/**",
                     ).permitAll()
                     .anyRequest().authenticated()
             }

@@ -482,6 +482,76 @@ export interface LessonTemplateCardsRequest {
   cards: LessonTemplateCardRequest[];
 }
 
+export interface UpdateUserRolesRequest {
+  /** @minItems 1 */
+  roles: string[];
+  /** @nullable */
+  replacementTeacherSubject?: string | null;
+}
+
+export interface TeacherDirectoryEntry {
+  subject: string;
+  displayName: string;
+}
+
+export interface UserManagementUser {
+  id: string;
+  subject: string;
+  /** @nullable */
+  username?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  displayName?: string | null;
+  roles: string[];
+  status: string;
+  primaryTeacher?: TeacherDirectoryEntry | null;
+  activeDelegates: TeacherDirectoryEntry[];
+}
+
+export interface AssignPrimaryTeacherRequest {
+  /** @minLength 1 */
+  teacherSubject: string;
+}
+
+export interface TeacherStudentResponse {
+  student: UserManagementUser;
+  access: string;
+}
+
+export interface AttachStudentRequest {
+  /**
+     * @minLength 0
+     * @maxLength 320
+     */
+  usernameOrEmail: string;
+}
+
+export interface CreateDelegationRequest {
+  /** @nullable */
+  primaryTeacherSubject?: string | null;
+  /** @minItems 1 */
+  delegateTeacherSubjects: string[];
+  /** @minItems 1 */
+  studentSubjects: string[];
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface TeacherDelegationResponse {
+  id: string;
+  primaryTeacher: TeacherDirectoryEntry;
+  delegateTeacher: TeacherDirectoryEntry;
+  students: UserManagementUser[];
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  createdBySubject: string;
+  createdAt: string;
+  /** @nullable */
+  revokedAt?: string | null;
+}
+
 export interface ManagedStudentRequest {
   /**
      * @minLength 3
@@ -1097,6 +1167,36 @@ export interface ConfirmRegistrationRequest {
   token: string;
 }
 
+export interface CreateUserManagementUserRequest {
+  /**
+     * @minLength 3
+     * @maxLength 64
+     * @pattern ^[A-Za-z0-9._-]+$
+     */
+  username: string;
+  /**
+     * @minLength 0
+     * @maxLength 120
+     */
+  firstName: string;
+  /**
+     * @minLength 0
+     * @maxLength 120
+     * @nullable
+     */
+  lastName?: string | null;
+  /**
+     * @minLength 0
+     * @maxLength 320
+     * @nullable
+     */
+  email?: string | null;
+  /** @minItems 1 */
+  roles: string[];
+  /** @nullable */
+  primaryTeacherSubject?: string | null;
+}
+
 export interface MaterialAssetUpdateRequest {
   /**
      * @maxItems 16
@@ -1180,6 +1280,23 @@ export interface HelloResponse {
   timestamp: string;
 }
 
+export interface UserDeletionOperationResponse {
+  operationId: string;
+  targetSubject: string;
+  status: string;
+  /** @nullable */
+  errorCode?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  completedAt?: string | null;
+}
+
+export type DelegationsParams = {
+direction?: string;
+status?: string;
+};
+
 export type AppendScheduledLessonImagePageParams = {
 title?: string;
 };
@@ -1204,8 +1321,22 @@ export type AppendMaterialImagePageBody = {
   file: Blob;
 };
 
+export type UsersParams = {
+query?: string;
+role?: string;
+status?: string;
+};
+
+export type Delegations1Params = {
+status?: string;
+};
+
 export type ListCollaborationDocumentsParams = {
 materialId: string;
+};
+
+export type _DeleteParams = {
+replacementTeacherSubject?: string;
 };
 
 export type getMyUserProfileResponse200 = {
@@ -2580,6 +2711,255 @@ export const replaceCourseLessonCards = async (courseId: string,
 
   const data: replaceCourseLessonCardsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as replaceCourseLessonCardsResponse
+}
+
+
+
+export type updateRolesResponse200 = {
+  data: UserManagementUser
+  status: 200
+}
+
+export type updateRolesResponseSuccess = (updateRolesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateRolesResponse = (updateRolesResponseSuccess)
+
+export const getUpdateRolesUrl = (subject: string,) => {
+
+
+
+
+  return `/api/admin/user-management/users/${subject}/roles`
+}
+
+export const updateRoles = async (subject: string,
+    updateUserRolesRequest: UpdateUserRolesRequest, options?: RequestInit): Promise<updateRolesResponse> => {
+
+  const res = await fetch(getUpdateRolesUrl(subject),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateUserRolesRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateRolesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateRolesResponse
+}
+
+
+
+export type assignTeacherResponse200 = {
+  data: TeacherStudentResponse
+  status: 200
+}
+
+export type assignTeacherResponseSuccess = (assignTeacherResponse200) & {
+  headers: Headers;
+};
+;
+
+export type assignTeacherResponse = (assignTeacherResponseSuccess)
+
+export const getAssignTeacherUrl = (subject: string,) => {
+
+
+
+
+  return `/api/admin/user-management/students/${subject}/teacher`
+}
+
+export const assignTeacher = async (subject: string,
+    assignPrimaryTeacherRequest: AssignPrimaryTeacherRequest, options?: RequestInit): Promise<assignTeacherResponse> => {
+
+  const res = await fetch(getAssignTeacherUrl(subject),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(assignPrimaryTeacherRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: assignTeacherResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as assignTeacherResponse
+}
+
+
+
+export type removeTeacherResponse204 = {
+  data: void
+  status: 204
+}
+
+export type removeTeacherResponseSuccess = (removeTeacherResponse204) & {
+  headers: Headers;
+};
+;
+
+export type removeTeacherResponse = (removeTeacherResponseSuccess)
+
+export const getRemoveTeacherUrl = (subject: string,) => {
+
+
+
+
+  return `/api/admin/user-management/students/${subject}/teacher`
+}
+
+export const removeTeacher = async (subject: string, options?: RequestInit): Promise<removeTeacherResponse> => {
+
+  const res = await fetch(getRemoveTeacherUrl(subject),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: removeTeacherResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as removeTeacherResponse
+}
+
+
+
+export type attachResponse200 = {
+  data: TeacherStudentResponse
+  status: 200
+}
+
+export type attachResponseSuccess = (attachResponse200) & {
+  headers: Headers;
+};
+;
+
+export type attachResponse = (attachResponseSuccess)
+
+export const getAttachUrl = () => {
+
+
+
+
+  return `/api/teacher/students/attach`
+}
+
+export const attach = async (attachStudentRequest: AttachStudentRequest, options?: RequestInit): Promise<attachResponse> => {
+
+  const res = await fetch(getAttachUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(attachStudentRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: attachResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as attachResponse
+}
+
+
+
+export type delegationsResponse200 = {
+  data: TeacherDelegationResponse[]
+  status: 200
+}
+
+export type delegationsResponseSuccess = (delegationsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type delegationsResponse = (delegationsResponseSuccess)
+
+export const getDelegationsUrl = (params?: DelegationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/teacher/delegations?${stringifiedParams}` : `/api/teacher/delegations`
+}
+
+export const delegations = async (params?: DelegationsParams, options?: RequestInit): Promise<delegationsResponse> => {
+
+  const res = await fetch(getDelegationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: delegationsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as delegationsResponse
+}
+
+
+
+export type createDelegationResponse201 = {
+  data: TeacherDelegationResponse[]
+  status: 201
+}
+
+export type createDelegationResponseSuccess = (createDelegationResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createDelegationResponse = (createDelegationResponseSuccess)
+
+export const getCreateDelegationUrl = () => {
+
+
+
+
+  return `/api/teacher/delegations`
+}
+
+export const createDelegation = async (createDelegationRequest: CreateDelegationRequest, options?: RequestInit): Promise<createDelegationResponse> => {
+
+  const res = await fetch(getCreateDelegationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createDelegationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createDelegationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createDelegationResponse
 }
 
 
@@ -5051,6 +5431,180 @@ export const confirm1 = async (confirmRegistrationRequest: ConfirmRegistrationRe
 
 
 
+export type usersResponse200 = {
+  data: UserManagementUser[]
+  status: 200
+}
+
+export type usersResponseSuccess = (usersResponse200) & {
+  headers: Headers;
+};
+;
+
+export type usersResponse = (usersResponseSuccess)
+
+export const getUsersUrl = (params?: UsersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/user-management/users?${stringifiedParams}` : `/api/admin/user-management/users`
+}
+
+export const users = async (params?: UsersParams, options?: RequestInit): Promise<usersResponse> => {
+
+  const res = await fetch(getUsersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: usersResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as usersResponse
+}
+
+
+
+export type createResponse201 = {
+  data: UserManagementUser
+  status: 201
+}
+
+export type createResponseSuccess = (createResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createResponse = (createResponseSuccess)
+
+export const getCreateUrl = () => {
+
+
+
+
+  return `/api/admin/user-management/users`
+}
+
+export const create = async (createUserManagementUserRequest: CreateUserManagementUserRequest, options?: RequestInit): Promise<createResponse> => {
+
+  const res = await fetch(getCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createUserManagementUserRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createResponse
+}
+
+
+
+export type delegations1Response200 = {
+  data: TeacherDelegationResponse[]
+  status: 200
+}
+
+export type delegations1ResponseSuccess = (delegations1Response200) & {
+  headers: Headers;
+};
+;
+
+export type delegations1Response = (delegations1ResponseSuccess)
+
+export const getDelegations1Url = (params?: Delegations1Params,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/user-management/delegations?${stringifiedParams}` : `/api/admin/user-management/delegations`
+}
+
+export const delegations1 = async (params?: Delegations1Params, options?: RequestInit): Promise<delegations1Response> => {
+
+  const res = await fetch(getDelegations1Url(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: delegations1Response['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as delegations1Response
+}
+
+
+
+export type createDelegation1Response201 = {
+  data: TeacherDelegationResponse[]
+  status: 201
+}
+
+export type createDelegation1ResponseSuccess = (createDelegation1Response201) & {
+  headers: Headers;
+};
+;
+
+export type createDelegation1Response = (createDelegation1ResponseSuccess)
+
+export const getCreateDelegation1Url = () => {
+
+
+
+
+  return `/api/admin/user-management/delegations`
+}
+
+export const createDelegation1 = async (createDelegationRequest: CreateDelegationRequest, options?: RequestInit): Promise<createDelegation1Response> => {
+
+  const res = await fetch(getCreateDelegation1Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createDelegationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createDelegation1Response['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createDelegation1Response
+}
+
+
+
 export type updateMaterialAssetResponse200 = {
   data: MaterialAssetResponse
   status: 200
@@ -5167,6 +5721,86 @@ export const listStudentProfiles = async ( options?: RequestInit): Promise<listS
 
   const data: listStudentProfilesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listStudentProfilesResponse
+}
+
+
+
+export type directoryResponse200 = {
+  data: TeacherDirectoryEntry[]
+  status: 200
+}
+
+export type directoryResponseSuccess = (directoryResponse200) & {
+  headers: Headers;
+};
+;
+
+export type directoryResponse = (directoryResponseSuccess)
+
+export const getDirectoryUrl = () => {
+
+
+
+
+  return `/api/teachers/directory`
+}
+
+export const directory = async ( options?: RequestInit): Promise<directoryResponse> => {
+
+  const res = await fetch(getDirectoryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: directoryResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as directoryResponse
+}
+
+
+
+export type studentsResponse200 = {
+  data: TeacherStudentResponse[]
+  status: 200
+}
+
+export type studentsResponseSuccess = (studentsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type studentsResponse = (studentsResponseSuccess)
+
+export const getStudentsUrl = () => {
+
+
+
+
+  return `/api/teacher/students`
+}
+
+export const students = async ( options?: RequestInit): Promise<studentsResponse> => {
+
+  const res = await fetch(getStudentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: studentsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as studentsResponse
 }
 
 
@@ -5862,4 +6496,213 @@ export const listUserProfiles = async ( options?: RequestInit): Promise<listUser
 
   const data: listUserProfilesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listUserProfilesResponse
+}
+
+
+
+export type operationResponse200 = {
+  data: UserDeletionOperationResponse
+  status: 200
+}
+
+export type operationResponseSuccess = (operationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type operationResponse = (operationResponseSuccess)
+
+export const getOperationUrl = (operationId: string,) => {
+
+
+
+
+  return `/api/admin/user-management/operations/${operationId}`
+}
+
+export const operation = async (operationId: string, options?: RequestInit): Promise<operationResponse> => {
+
+  const res = await fetch(getOperationUrl(operationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: operationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as operationResponse
+}
+
+
+
+export type detachResponse204 = {
+  data: void
+  status: 204
+}
+
+export type detachResponseSuccess = (detachResponse204) & {
+  headers: Headers;
+};
+;
+
+export type detachResponse = (detachResponseSuccess)
+
+export const getDetachUrl = (subject: string,) => {
+
+
+
+
+  return `/api/teacher/students/${subject}`
+}
+
+export const detach = async (subject: string, options?: RequestInit): Promise<detachResponse> => {
+
+  const res = await fetch(getDetachUrl(subject),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: detachResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as detachResponse
+}
+
+
+
+export type revokeDelegationResponse204 = {
+  data: void
+  status: 204
+}
+
+export type revokeDelegationResponseSuccess = (revokeDelegationResponse204) & {
+  headers: Headers;
+};
+;
+
+export type revokeDelegationResponse = (revokeDelegationResponseSuccess)
+
+export const getRevokeDelegationUrl = (id: string,) => {
+
+
+
+
+  return `/api/teacher/delegations/${id}`
+}
+
+export const revokeDelegation = async (id: string, options?: RequestInit): Promise<revokeDelegationResponse> => {
+
+  const res = await fetch(getRevokeDelegationUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: revokeDelegationResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as revokeDelegationResponse
+}
+
+
+
+export type _deleteResponse202 = {
+  data: UserDeletionOperationResponse
+  status: 202
+}
+
+export type _deleteResponseSuccess = (_deleteResponse202) & {
+  headers: Headers;
+};
+;
+
+export type _deleteResponse = (_deleteResponseSuccess)
+
+export const getDeleteUrl = (subject: string,
+    params?: _DeleteParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/user-management/users/${subject}?${stringifiedParams}` : `/api/admin/user-management/users/${subject}`
+}
+
+export const _delete = async (subject: string,
+    params?: _DeleteParams, options?: RequestInit): Promise<_deleteResponse> => {
+
+  const res = await fetch(getDeleteUrl(subject,params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: _deleteResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as _deleteResponse
+}
+
+
+
+export type revokeDelegation1Response204 = {
+  data: void
+  status: 204
+}
+
+export type revokeDelegation1ResponseSuccess = (revokeDelegation1Response204) & {
+  headers: Headers;
+};
+;
+
+export type revokeDelegation1Response = (revokeDelegation1ResponseSuccess)
+
+export const getRevokeDelegation1Url = (id: string,) => {
+
+
+
+
+  return `/api/admin/user-management/delegations/${id}`
+}
+
+export const revokeDelegation1 = async (id: string, options?: RequestInit): Promise<revokeDelegation1Response> => {
+
+  const res = await fetch(getRevokeDelegation1Url(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: revokeDelegation1Response['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as revokeDelegation1Response
 }

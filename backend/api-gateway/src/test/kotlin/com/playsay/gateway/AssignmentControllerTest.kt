@@ -90,6 +90,7 @@ class AssignmentControllerTest @Autowired constructor(
         courseRepo.deleteAllInBatch()
         lessonMaterialRepo.deleteAllInBatch()
         appUserRepo.deleteAllInBatch()
+        appUserRepo.seedPrimaryTeacherWithStudents()
     }
 
     @Test

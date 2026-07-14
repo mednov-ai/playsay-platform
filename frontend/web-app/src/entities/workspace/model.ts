@@ -1,6 +1,6 @@
 import type { MeProfile } from "../../shared/api/playsay";
 
-export type WorkspaceTab = "schedule" | "homework" | "vocabulary" | "aiTutor" | "materials" | "courses" | "billing";
+export type WorkspaceTab = "schedule" | "students" | "users" | "homework" | "vocabulary" | "aiTutor" | "materials" | "courses" | "billing";
 
 export type WorkspaceTabDefinition = {
   id: WorkspaceTab;
@@ -33,8 +33,25 @@ export function workspaceTabsForProfile(profile: MeProfile | null): WorkspaceTab
     ];
   }
 
+  const managementTabs: WorkspaceTabDefinition[] = [];
+  if (profile?.roles.includes("TEACHER")) {
+    managementTabs.push({
+      id: "students",
+      labelKey: "workspace.tabs.students.label",
+      descriptionKey: "workspace.tabs.students.description",
+    });
+  }
+  if (profile?.roles.includes("ADMIN")) {
+    managementTabs.push({
+      id: "users",
+      labelKey: "workspace.tabs.users.label",
+      descriptionKey: "workspace.tabs.users.description",
+    });
+  }
+
   return [
     scheduleTab,
+    ...managementTabs,
     { id: "vocabulary", labelKey: "workspace.tabs.vocabulary.label", descriptionKey: "workspace.tabs.vocabulary.description" },
     { id: "aiTutor", labelKey: "workspace.tabs.aiTutor.label", descriptionKey: "workspace.tabs.aiTutor.description" },
     {

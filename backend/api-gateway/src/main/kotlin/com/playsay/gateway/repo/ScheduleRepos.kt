@@ -54,6 +54,9 @@ data class ScheduledMaterialLookupRow(
 )
 
 interface LessonRepo : JpaRepository<LessonEntity, UUID> {
+    fun countByTeacherUserIdAndStatus(teacherUserId: UUID, status: String): Long
+
+    fun findByTeacherUserId(teacherUserId: UUID): List<LessonEntity>
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """
@@ -346,6 +349,8 @@ interface LessonParticipantRepo : JpaRepository<LessonParticipantEntity, UUID> {
     fun deleteByLessonId(lessonId: UUID): Long
 
     fun findByLessonId(lessonId: UUID): List<LessonParticipantEntity>
+
+    fun findByStudentUserId(studentUserId: UUID): List<LessonParticipantEntity>
 
     @Query(
         """

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
 
 interface VocabularyEntryRepo : JpaRepository<VocabularyEntryEntity, UUID> {
+    fun deleteByOwnerSubject(ownerSubject: String): Long
     fun findByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguage(ownerSubject: String, normalizedSource: String, sourceLanguage: String, targetLanguage: String): VocabularyEntryEntity?
     fun findAllByOwnerSubjectAndStatusOrderByUpdatedAtDesc(ownerSubject: String, status: EntryStatus): List<VocabularyEntryEntity>
     fun findByIdAndOwnerSubject(id: UUID, ownerSubject: String): VocabularyEntryEntity?

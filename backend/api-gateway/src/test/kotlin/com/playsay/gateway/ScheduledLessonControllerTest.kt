@@ -108,6 +108,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         courseRepo.deleteAllInBatch()
         lessonMaterialRepo.deleteAllInBatch()
         appUserRepo.deleteAllInBatch()
+        appUserRepo.seedPrimaryTeacherWithStudents()
     }
 
     @Test
@@ -185,6 +186,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val studentSubject = "managed-student-1"
         userProfileStore.currentUserId(authentication(subject = studentSubject, username = "managed.one", role = "ROLE_STUDENT"))
+        appUserRepo.assignStudentToTeacher(studentSubject)
         val scheduledStart = Instant.now().plus(Duration.ofMinutes(20)).truncatedTo(ChronoUnit.MICROS)
         val scheduledEnd = scheduledStart.plus(Duration.ofMinutes(45))
         val lesson = scheduleController.create(
@@ -223,6 +225,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val studentSubject = "managed-student-1"
         userProfileStore.currentUserId(authentication(subject = studentSubject, username = "managed.one", role = "ROLE_STUDENT"))
+        appUserRepo.assignStudentToTeacher(studentSubject)
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(

@@ -14,7 +14,7 @@ import com.playsay.aitutor.repo.ConversationSessionRepository
 import com.playsay.aitutor.repo.DialogCreditAccountRepository
 import com.playsay.aitutor.repo.DialogCreditLedgerRepository
 import com.playsay.aitutor.repo.LearnerAppUserRepository
-import com.playsay.aitutor.repo.LearnerLessonParticipantRepository
+import com.playsay.aitutor.repo.LearnerTeacherDelegationRepository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class DialogAllowanceService(
     private val users: LearnerAppUserRepository,
-    private val lessonParticipants: LearnerLessonParticipantRepository,
+    private val delegations: LearnerTeacherDelegationRepository,
     private val accounts: DialogCreditAccountRepository,
     private val ledger: DialogCreditLedgerRepository,
     private val sessions: ConversationSessionRepository,
@@ -46,7 +46,7 @@ class DialogAllowanceService(
         } else {
             val relatedIds = buildSet {
                 users.findAllByManagedByTeacherUserId(actor.id).forEach { add(it.id) }
-                addAll(lessonParticipants.findStudentUserIdsByTeacherUserId(actor.id))
+                addAll(delegations.findActiveStudentUserIds(actor.id, clock.instant()))
             }
             users.findAllById(relatedIds)
                 .sortedBy { it.displayLabel().lowercase() }
@@ -278,7 +278,7 @@ class DialogAllowanceService(
 
     private fun canManage(actor: LearnerAppUserEntity, student: LearnerAppUserEntity): Boolean =
         student.managedByTeacherUserId == actor.id ||
-            student.id in lessonParticipants.findStudentUserIdsByTeacherUserId(actor.id)
+            delegations.hasActiveAccess(actor.id, student.id, clock.instant())
 
     private fun requireTeacherOrAdmin(user: LearnerAppUserEntity) {
         if (!user.hasRole(TEACHER_ROLE) && !user.hasRole(ADMIN_ROLE)) {

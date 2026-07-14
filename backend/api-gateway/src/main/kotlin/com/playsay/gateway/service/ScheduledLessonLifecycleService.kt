@@ -18,6 +18,7 @@ class ScheduledLessonLifecycleService(
     private val lessonRepo: LessonRepo,
     private val lessonReminderService: LessonReminderService,
     private val scheduledLessonStore: ScheduledLessonStore,
+    private val authorizationService: ScheduledLessonAuthorizationService,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional
@@ -25,6 +26,9 @@ class ScheduledLessonLifecycleService(
         authentication.requireLessonManager()
         val lesson = lessonRepo.lockById(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        if (!authorizationService.canManageLesson(authentication, lessonId)) {
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        }
 
         if (lesson.status in closedLessonStatuses) {
             throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_CANNOT_START)

@@ -14,10 +14,19 @@ interface AppUserRepo : JpaRepository<AppUserEntity, UUID> {
 
     fun findByIdIn(ids: Collection<UUID>): List<AppUserEntity>
 
+    fun findByUsernameIgnoreCase(username: String): AppUserEntity?
+
+    fun findByEmailIgnoreCase(email: String): AppUserEntity?
+
+    fun findByManagedByTeacherUserIdOrderByDisplayNameAscUsernameAsc(teacherUserId: UUID): List<AppUserEntity>
+
+    fun countByRolesContainingAndDeletedAtIsNull(role: String): Long
+
     @Query(
         """
         select u
           from AppUserEntity u
+         where u.deletedAt is null
          order by coalesce(u.username, u.keycloakSubject)
         """,
     )
@@ -28,6 +37,7 @@ interface AppUserRepo : JpaRepository<AppUserEntity, UUID> {
         select u
           from AppUserEntity u
          where u.roles like concat('%', :role, '%')
+           and u.deletedAt is null
          order by coalesce(u.displayName, u.username, u.keycloakSubject)
         """,
     )
@@ -39,4 +49,6 @@ interface StudentProfileRepo : JpaRepository<StudentProfileEntity, UUID> {
     fun findByUserIdIn(userIds: Collection<UUID>): List<StudentProfileEntity>
 }
 
-interface TeacherProfileRepo : JpaRepository<TeacherProfileEntity, UUID>
+interface TeacherProfileRepo : JpaRepository<TeacherProfileEntity, UUID> {
+    fun findByUserId(userId: UUID): TeacherProfileEntity?
+}

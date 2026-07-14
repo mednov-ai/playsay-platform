@@ -104,6 +104,7 @@ class CollaborationDocumentControllerTest @Autowired constructor(
         courseRepo.deleteAllInBatch()
         lessonMaterialRepo.deleteAllInBatch()
         appUserRepo.deleteAllInBatch()
+        appUserRepo.seedPrimaryTeacherWithStudents()
     }
 
     @Test

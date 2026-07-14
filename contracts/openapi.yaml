@@ -722,6 +722,130 @@ paths:
                 $ref: "#/components/schemas/CourseLessonResponse"
       security:
       - bearerAuth: []
+  /admin/user-management/users/{subject}/roles:
+    put:
+      tags:
+      - user-management-controller
+      operationId: updateRoles
+      parameters:
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRolesRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserManagementUser"
+  /admin/user-management/students/{subject}/teacher:
+    put:
+      tags:
+      - admin-delegation-controller
+      operationId: assignTeacher
+      parameters:
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignPrimaryTeacherRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherStudentResponse"
+    delete:
+      tags:
+      - admin-delegation-controller
+      operationId: removeTeacher
+      parameters:
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+  /teacher/students/attach:
+    post:
+      tags:
+      - teacher-management-controller
+      operationId: attach
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachStudentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherStudentResponse"
+  /teacher/delegations:
+    get:
+      tags:
+      - teacher-management-controller
+      operationId: delegations
+      parameters:
+      - name: direction
+        in: query
+        required: false
+        schema:
+          type: string
+          default: granted
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherDelegationResponse"
+    post:
+      tags:
+      - teacher-management-controller
+      operationId: createDelegation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDelegationRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherDelegationResponse"
   /students/managed:
     post:
       tags:
@@ -1962,6 +2086,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RegistrationResponse"
+  /admin/user-management/users:
+    get:
+      tags:
+      - user-management-controller
+      operationId: users
+      parameters:
+      - name: query
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserManagementUser"
+    post:
+      tags:
+      - user-management-controller
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserManagementUserRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserManagementUser"
+  /admin/user-management/delegations:
+    get:
+      tags:
+      - admin-delegation-controller
+      operationId: delegations_1
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherDelegationResponse"
+    post:
+      tags:
+      - admin-delegation-controller
+      operationId: createDelegation_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDelegationRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherDelegationResponse"
   /materials/{materialId}/assets/{assetId}:
     patch:
       tags:
@@ -2027,6 +2237,34 @@ paths:
           description: Current user is not a teacher/admin
       security:
       - bearerAuth: []
+  /teachers/directory:
+    get:
+      tags:
+      - teacher-management-controller
+      operationId: directory
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherDirectoryEntry"
+  /teacher/students:
+    get:
+      tags:
+      - teacher-management-controller
+      operationId: students
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherStudentResponse"
   /schedule/lessons/{lessonId}/material:
     get:
       tags:
@@ -2365,6 +2603,92 @@ paths:
           description: Current user is not an admin
       security:
       - bearerAuth: []
+  /admin/user-management/operations/{operationId}:
+    get:
+      tags:
+      - user-management-controller
+      operationId: operation
+      parameters:
+      - name: operationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDeletionOperationResponse"
+  /teacher/students/{subject}:
+    delete:
+      tags:
+      - teacher-management-controller
+      operationId: detach
+      parameters:
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+  /teacher/delegations/{id}:
+    delete:
+      tags:
+      - teacher-management-controller
+      operationId: revokeDelegation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+  /admin/user-management/users/{subject}:
+    delete:
+      tags:
+      - user-management-controller
+      operationId: delete
+      parameters:
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: replacementTeacherSubject
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDeletionOperationResponse"
+  /admin/user-management/delegations/{id}:
+    delete:
+      tags:
+      - admin-delegation-controller
+      operationId: revokeDelegation_1
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
 components:
   schemas:
     UpdateUserProfileRequest:
@@ -3355,6 +3679,170 @@ components:
             $ref: "#/components/schemas/LessonTemplateCardRequest"
       required:
       - cards
+    UpdateUserRolesRequest:
+      type: object
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          uniqueItems: true
+        replacementTeacherSubject:
+          type:
+          - string
+          - "null"
+      required:
+      - roles
+    TeacherDirectoryEntry:
+      type: object
+      properties:
+        subject:
+          type: string
+        displayName:
+          type: string
+      required:
+      - displayName
+      - subject
+    UserManagementUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+        username:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+        displayName:
+          type:
+          - string
+          - "null"
+        roles:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        primaryTeacher:
+          oneOf:
+          - $ref: "#/components/schemas/TeacherDirectoryEntry"
+          - type: "null"
+        activeDelegates:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeacherDirectoryEntry"
+      required:
+      - activeDelegates
+      - id
+      - roles
+      - status
+      - subject
+    AssignPrimaryTeacherRequest:
+      type: object
+      properties:
+        teacherSubject:
+          type: string
+          minLength: 1
+      required:
+      - teacherSubject
+    TeacherStudentResponse:
+      type: object
+      properties:
+        student:
+          $ref: "#/components/schemas/UserManagementUser"
+        access:
+          type: string
+      required:
+      - access
+      - student
+    AttachStudentRequest:
+      type: object
+      properties:
+        usernameOrEmail:
+          type: string
+          maxLength: 320
+          minLength: 0
+      required:
+      - usernameOrEmail
+    CreateDelegationRequest:
+      type: object
+      properties:
+        primaryTeacherSubject:
+          type:
+          - string
+          - "null"
+        delegateTeacherSubjects:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          uniqueItems: true
+        studentSubjects:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          uniqueItems: true
+        startsAt:
+          type: string
+          format: date
+        endsAt:
+          type: string
+          format: date
+      required:
+      - delegateTeacherSubjects
+      - endsAt
+      - startsAt
+      - studentSubjects
+    TeacherDelegationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        primaryTeacher:
+          $ref: "#/components/schemas/TeacherDirectoryEntry"
+        delegateTeacher:
+          $ref: "#/components/schemas/TeacherDirectoryEntry"
+        students:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserManagementUser"
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        createdBySubject:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - createdAt
+      - createdBySubject
+      - delegateTeacher
+      - endsAt
+      - id
+      - primaryTeacher
+      - startsAt
+      - status
+      - students
     ManagedStudentRequest:
       type: object
       properties:
@@ -4347,6 +4835,45 @@ components:
           minLength: 0
       required:
       - token
+    CreateUserManagementUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 64
+          minLength: 3
+          pattern: "^[A-Za-z0-9._-]+$"
+        firstName:
+          type: string
+          maxLength: 120
+          minLength: 0
+        lastName:
+          type:
+          - string
+          - "null"
+          maxLength: 120
+          minLength: 0
+        email:
+          type:
+          - string
+          - "null"
+          format: email
+          maxLength: 320
+          minLength: 0
+        roles:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          uniqueItems: true
+        primaryTeacherSubject:
+          type:
+          - string
+          - "null"
+      required:
+      - firstName
+      - roles
+      - username
     MaterialAssetUpdateRequest:
       type: object
       properties:
@@ -4538,6 +5065,37 @@ components:
       - message
       - service
       - timestamp
+    UserDeletionOperationResponse:
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        targetSubject:
+          type: string
+        status:
+          type: string
+        errorCode:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - createdAt
+      - operationId
+      - status
+      - targetSubject
+      - updatedAt
   securitySchemes:
     bearerAuth:
       type: http

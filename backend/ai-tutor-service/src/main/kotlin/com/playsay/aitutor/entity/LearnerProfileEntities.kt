@@ -5,6 +5,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import java.time.LocalDate
+import java.time.Instant
 import java.util.UUID
 
 /** Read-only projection of the application user used to enforce learner age policy. */
@@ -65,5 +66,25 @@ class LearnerLessonEntity(
 class LearnerLessonParticipantEntity(
     @Id var id: UUID = UUID.randomUUID(),
     @Column(name = "lesson_id", nullable = false) var lessonId: UUID = UUID.randomUUID(),
+    @Column(name = "student_user_id", nullable = false) var studentUserId: UUID = UUID.randomUUID(),
+)
+
+/** Read-only projection of temporary student access owned by api-gateway. */
+@Entity
+@Table(name = "teacher_delegation")
+class LearnerTeacherDelegationEntity(
+    @Id var id: UUID = UUID.randomUUID(),
+    @Column(name = "delegate_teacher_user_id", nullable = false) var delegateTeacherUserId: UUID = UUID.randomUUID(),
+    @Column(name = "starts_at", nullable = false) var startsAt: Instant = Instant.EPOCH,
+    @Column(name = "ends_at", nullable = false) var endsAt: Instant = Instant.EPOCH,
+    @Column(name = "revoked_at") var revokedAt: Instant? = null,
+)
+
+/** Read-only projection of the students selected for a temporary delegation. */
+@Entity
+@Table(name = "teacher_delegation_student")
+class LearnerTeacherDelegationStudentEntity(
+    @Id var id: UUID = UUID.randomUUID(),
+    @Column(name = "delegation_id", nullable = false) var delegationId: UUID = UUID.randomUUID(),
     @Column(name = "student_user_id", nullable = false) var studentUserId: UUID = UUID.randomUUID(),
 )

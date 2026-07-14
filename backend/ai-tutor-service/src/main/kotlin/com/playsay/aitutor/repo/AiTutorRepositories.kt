@@ -8,6 +8,8 @@ import com.playsay.aitutor.entity.LearnerLessonParticipantEntity
 import com.playsay.aitutor.entity.LearnerAppUserEntity
 import com.playsay.aitutor.entity.LearnerStudentProfileEntity
 import com.playsay.aitutor.entity.LearnerVocabularyEntryEntity
+import com.playsay.aitutor.entity.LearnerTeacherDelegationEntity
+import com.playsay.aitutor.entity.LearnerTeacherDelegationStudentEntity
 import com.playsay.aitutor.entity.SessionEventEntity
 import com.playsay.aitutor.entity.StoredDialogCreditSource
 import com.playsay.aitutor.entity.StoredSessionStatus
@@ -15,7 +17,9 @@ import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.jpa.repository.Modifying
 import java.util.UUID
+import java.time.Instant
 
 interface ConversationSessionRepository : JpaRepository<ConversationSessionEntity, UUID> {
     fun findByIdAndSubject(id: UUID, subject: String): ConversationSessionEntity?
@@ -24,11 +28,13 @@ interface ConversationSessionRepository : JpaRepository<ConversationSessionEntit
     fun existsBySubject(subject: String): Boolean
     fun countBySubjectAndStatus(subject: String, status: StoredSessionStatus): Long
     fun findAllBySubjectAndStatus(subject: String, status: StoredSessionStatus): List<ConversationSessionEntity>
+    fun findAllBySubject(subject: String): List<ConversationSessionEntity>
 }
 
 interface SessionEventRepository : JpaRepository<SessionEventEntity, Long> {
     fun existsBySessionIdAndClientEventId(sessionId: UUID, clientEventId: String): Boolean
     fun findAllBySessionIdOrderByCreatedAtAsc(sessionId: UUID): List<SessionEventEntity>
+    fun deleteBySessionId(sessionId: UUID): Long
 }
 
 interface LearnerAppUserRepository : JpaRepository<LearnerAppUserEntity, UUID> {
@@ -72,6 +78,37 @@ interface LearnerLessonParticipantRepository : JpaRepository<LearnerLessonPartic
     fun findStudentUserIdsByTeacherUserId(teacherUserId: UUID): List<UUID>
 }
 
+interface LearnerTeacherDelegationRepository : JpaRepository<LearnerTeacherDelegationEntity, UUID> {
+    @Query(
+        """
+        select distinct selected.studentUserId
+          from LearnerTeacherDelegationEntity delegation, LearnerTeacherDelegationStudentEntity selected
+         where selected.delegationId = delegation.id
+           and delegation.delegateTeacherUserId = :teacherUserId
+           and delegation.revokedAt is null
+           and delegation.startsAt <= :at
+           and delegation.endsAt > :at
+        """,
+    )
+    fun findActiveStudentUserIds(teacherUserId: UUID, at: Instant): List<UUID>
+
+    @Query(
+        """
+        select count(delegation) > 0
+          from LearnerTeacherDelegationEntity delegation, LearnerTeacherDelegationStudentEntity selected
+         where selected.delegationId = delegation.id
+           and delegation.delegateTeacherUserId = :teacherUserId
+           and selected.studentUserId = :studentUserId
+           and delegation.revokedAt is null
+           and delegation.startsAt <= :at
+           and delegation.endsAt > :at
+        """,
+    )
+    fun hasActiveAccess(teacherUserId: UUID, studentUserId: UUID, at: Instant): Boolean
+}
+
+interface LearnerTeacherDelegationStudentRepository : JpaRepository<LearnerTeacherDelegationStudentEntity, UUID>
+
 interface DialogCreditAccountRepository : JpaRepository<DialogCreditAccountEntity, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select account from DialogCreditAccountEntity account where account.studentUserId = :studentUserId")
@@ -80,4 +117,9 @@ interface DialogCreditAccountRepository : JpaRepository<DialogCreditAccountEntit
 
 interface DialogCreditLedgerRepository : JpaRepository<DialogCreditLedgerEntity, UUID> {
     fun findBySourceAndSourceReference(source: StoredDialogCreditSource, sourceReference: UUID): DialogCreditLedgerEntity?
+    fun deleteByStudentUserId(studentUserId: UUID): Long
+
+    @Modifying
+    @Query("update DialogCreditLedgerEntity ledger set ledger.actorSubject = null where ledger.actorSubject = :subject")
+    fun anonymizeActorSubject(subject: String): Int
 }

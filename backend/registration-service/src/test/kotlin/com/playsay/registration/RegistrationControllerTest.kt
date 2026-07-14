@@ -48,6 +48,7 @@ import org.springframework.http.HttpStatus
         "playsay.registration.keycloak.client-secret=test-secret",
         "playsay.registration.email-service.base-url=http://127.0.0.1:18086",
         "playsay.registration.email-service.service-token=test-token",
+        "playsay.registration.internal-service-token=test-internal-token",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -143,6 +144,48 @@ class RegistrationControllerTest @Autowired constructor(
         assertFalse(createdUser.emailVerified)
         assertTrue(response.body().contains("young.learner"))
         assertTrue(response.body().contains("Mia"))
+    }
+
+    @Test
+    fun `internal user management invites admin teacher staff with temporary credentials`() {
+        val response = createManagedUser(
+            """{"username":"staff.one","firstName":"Staff","lastName":"One","email":"staff@example.com","roles":["ADMIN","TEACHER"],"managedStudent":false}""",
+        )
+
+        assertEquals(HttpStatus.CREATED.value(), response.statusCode(), response.body())
+        assertTrue(response.body().contains("ADMIN"))
+        assertTrue(response.body().contains("TEACHER"))
+        val created = RecordingKeycloakRegistrationClient.createdUsers.single()
+        assertTrue(created.temporaryPassword)
+        assertEquals(listOf("VERIFY_EMAIL", "UPDATE_PASSWORD"), created.requiredActions)
+        assertEquals(setOf("ADMIN", "TEACHER"), RecordingKeycloakRegistrationClient.updatedRoleSets.single().second)
+        assertEquals(listOf("VERIFY_EMAIL", "UPDATE_PASSWORD"), RecordingKeycloakRegistrationClient.requiredActionEmails.single().second)
+    }
+
+    @Test
+    fun `internal user management rejects mixed student role and staff without email`() {
+        val mixedRoles = createManagedUser(
+            """{"username":"mixed.user","firstName":"Mixed","email":"mixed@example.com","roles":["STUDENT","TEACHER"],"managedStudent":false}""",
+        )
+        val staffWithoutEmail = createManagedUser(
+            """{"username":"staff.noemail","firstName":"Staff","roles":["TEACHER"],"managedStudent":false}""",
+        )
+
+        assertEquals(HttpStatus.BAD_REQUEST.value(), mixedRoles.statusCode(), mixedRoles.body())
+        assertEquals(HttpStatus.BAD_REQUEST.value(), staffWithoutEmail.statusCode(), staffWithoutEmail.body())
+        assertTrue(RecordingKeycloakRegistrationClient.createdUsers.isEmpty())
+    }
+
+    @Test
+    fun `internal user management rejects missing service token`() {
+        val response = httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/internal/user-management/users/exact?identifier=student"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.statusCode())
     }
 
     @Test
@@ -591,6 +634,7 @@ class RegistrationControllerTest @Autowired constructor(
     ): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/internal/managed-students"))
+                .header("X-PlaySay-Service-Token", "test-internal-token")
                 .header("content-type", "application/json")
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
@@ -606,6 +650,16 @@ class RegistrationControllerTest @Autowired constructor(
             HttpResponse.BodyHandlers.ofString(),
         )
 
+    private fun createManagedUser(body: String): HttpResponse<String> =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/internal/user-management/users"))
+                .header("X-PlaySay-Service-Token", "test-internal-token")
+                .header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
     private fun createManagedStudentInvite(
         subject: String,
         username: String,
@@ -616,6 +670,7 @@ class RegistrationControllerTest @Autowired constructor(
     ): ManagedInviteFixture {
         val response = httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/internal/managed-student-invites"))
+                .header("X-PlaySay-Service-Token", "test-internal-token")
                 .header("content-type", "application/json")
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
@@ -647,6 +702,7 @@ class RegistrationControllerTest @Autowired constructor(
     private fun lookupManagedStudentInvite(token: String): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/internal/managed-student-invites/lookup"))
+                .header("X-PlaySay-Service-Token", "test-internal-token")
                 .header("content-type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString("""{"token":"$token"}"""))
                 .build(),
@@ -692,6 +748,9 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
     val assignedRoles = mutableListOf<String>()
     val updatedPasswords = mutableMapOf<String, String>()
     val passwordGrantUsers = mutableListOf<String>()
+    val updatedRoleSets = mutableListOf<Pair<String, Set<String>>>()
+    val requiredActionEmails = mutableListOf<Pair<String, List<String>>>()
+    val deletedSubjects = mutableListOf<String>()
 
     fun reset() {
         existingUsers.clear()
@@ -700,6 +759,9 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
         assignedRoles.clear()
         updatedPasswords.clear()
         passwordGrantUsers.clear()
+        updatedRoleSets.clear()
+        requiredActionEmails.clear()
+        deletedSubjects.clear()
     }
 
     override fun createDisabledUser(command: KeycloakUserCreateCommand): Boolean {
@@ -714,6 +776,7 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
             enabled = command.enabled,
             emailVerified = command.emailVerified,
             managedStudent = command.managedStudent,
+            displayName = listOfNotNull(command.firstName, command.lastName).joinToString(" "),
         )
         return true
     }
@@ -723,6 +786,24 @@ private object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient 
 
     override fun findUserByEmail(email: String): KeycloakRegistrationUser? =
         existingUsers.values.firstOrNull { it.email == email }
+
+    override fun findUserBySubject(subject: String): KeycloakRegistrationUser? =
+        existingUsers.values.firstOrNull { it.subject == subject }
+
+    override fun setRealmRoles(subject: String, roles: Set<String>) {
+        updatedRoleSets += subject to roles
+        val entry = existingUsers.entries.firstOrNull { it.value.subject == subject } ?: return
+        entry.setValue(entry.value.copy(roles = roles))
+    }
+
+    override fun deleteUser(subject: String) {
+        deletedSubjects += subject
+        existingUsers.entries.removeIf { it.value.subject == subject }
+    }
+
+    override fun sendRequiredActionsEmail(subject: String, actions: List<String>) {
+        requiredActionEmails += subject to actions
+    }
 
     override fun enableVerifiedUser(username: String) {
         enabledUsers += username

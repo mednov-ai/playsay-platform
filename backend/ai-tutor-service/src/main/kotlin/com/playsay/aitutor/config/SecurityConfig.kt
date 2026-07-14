@@ -12,7 +12,7 @@ class SecurityConfig {
         http
             .csrf { it.disable() }
             .authorizeHttpRequests { requests ->
-                requests.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                requests.requestMatchers("/actuator/health", "/actuator/health/**", "/internal/user-data/**").permitAll()
                     .anyRequest().authenticated()
             }
             .oauth2ResourceServer { it.jwt {} }

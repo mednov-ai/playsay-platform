@@ -37,6 +37,8 @@ logging:
     org.hibernate.orm.connections.pooling: warn
 
 playsay:
+  user-data:
+    service-token: ${PLAYSAY_USER_DATA_SERVICE_TOKEN:}
   keyboard:
     anonymous:
       fingerprint-secret: ${PLAYSAY_KEYBOARD_ANONYMOUS_FINGERPRINT_SECRET:dev-keyboard-anonymous}

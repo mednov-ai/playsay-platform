@@ -141,3 +141,30 @@ data class ConsumeStudentInviteResponse(
     val expiresIn: Long,
     val continueUrl: String,
 )
+
+data class InternalUserIdentityResponse(
+    val subject: String,
+    val username: String,
+    val email: String?,
+    val displayName: String?,
+    val roles: Set<String>,
+    val enabled: Boolean,
+)
+
+data class InternalCreateUserRequest(
+    @field:NotBlank @field:Size(min = 3, max = 64)
+    @field:Pattern(regexp = "^[A-Za-z0-9._-]+$")
+    val username: String,
+    @field:NotBlank @field:Size(max = 120)
+    val firstName: String,
+    @field:Size(max = 120)
+    val lastName: String? = null,
+    @field:Email @field:Size(max = 320)
+    val email: String? = null,
+    val roles: Set<String>,
+    val managedStudent: Boolean = false,
+)
+
+data class InternalUpdateRolesRequest(
+    val roles: Set<String>,
+)

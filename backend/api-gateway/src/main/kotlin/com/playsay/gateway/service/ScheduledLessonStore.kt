@@ -24,7 +24,6 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-
 @Component
 class ScheduledLessonStore(
     private val lessonRepo: LessonRepo,
@@ -33,6 +32,7 @@ class ScheduledLessonStore(
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val appUserRepo: AppUserRepo,
     private val userProfileStore: UserProfileStore,
+    private val authorizationService: ScheduledLessonAuthorizationService,
     private val lessonReminderService: LessonReminderService,
     private val participantLinkService: ScheduledLessonParticipantLinkService,
     private val eventPublisher: ApplicationEventPublisher,
@@ -40,7 +40,7 @@ class ScheduledLessonStore(
     @Transactional(readOnly = true)
     fun list(authentication: JwtAuthenticationToken): List<ScheduledLessonResponse> {
         val rows = if (authentication.canManageSchedule()) {
-            lessonRepo.findScheduleRowsForManager()
+            lessonRepo.findScheduleRowsForManager().filter { row -> authorizationService.canManageLesson(authentication, row.id) }
         } else {
             val now = Instant.now()
             lessonRepo.findScheduleRowsForStudent(
@@ -49,7 +49,6 @@ class ScheduledLessonStore(
                 excludedStatuses = expiredParticipantStatuses,
             )
         }
-
         return rows.withParticipants()
     }
 
@@ -67,6 +66,7 @@ class ScheduledLessonStore(
         validateMaterialId(authentication, values.materialId)
         values.participantAssignments.forEach { assignment -> validateMaterialId(authentication, assignment.materialId) }
         val participants = participants(values.participantSubjects)
+        requireParticipantAccess(authentication, participants)
         val materialAssignments = participantMaterialAssignments(values, participants)
         val now = Instant.now()
         val occurrences = values.occurrences()
@@ -94,7 +94,6 @@ class ScheduledLessonStore(
                     updatedAt = now,
                 ),
             )
-
             replaceParticipants(id, participants, materialAssignments)
             lessonReminderService.rebuildPendingReminders(
                 lessonId = id,
@@ -120,11 +119,13 @@ class ScheduledLessonStore(
         authentication.requireScheduleManager()
         val lesson = lessonRepo.findById(lessonId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        requireLessonManagement(authentication, lessonId)
         val values = request.validated(allowRecurrence = false)
         validateLessonTemplate(values.lessonTemplateId)
         validateMaterialId(authentication, values.materialId)
         values.participantAssignments.forEach { assignment -> validateMaterialId(authentication, assignment.materialId) }
         val participants = participants(values.participantSubjects)
+        requireParticipantAccess(authentication, participants)
         val materialAssignments = participantMaterialAssignments(values, participants)
 
         lesson.lessonTemplateId = values.lessonTemplateId
@@ -157,6 +158,7 @@ class ScheduledLessonStore(
         materialId: UUID,
     ): ScheduledLessonResponse {
         authentication.requireScheduleManager()
+        requireLessonManagement(authentication, lessonId)
         validateMaterialId(authentication, materialId)
         val lesson = lessonRepo.lockById(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
@@ -166,7 +168,6 @@ class ScheduledLessonStore(
                 MetaData.ErrorCodes.MATERIAL_IMAGE_PAGE_PARALLEL_UNSUPPORTED,
             )
         }
-
         lesson.materialId = materialId
         lesson.updatedAt = Instant.now()
         lessonRepo.saveAndFlush(lesson)
@@ -179,10 +180,10 @@ class ScheduledLessonStore(
     @Transactional
     fun delete(authentication: JwtAuthenticationToken, lessonId: UUID) {
         authentication.requireScheduleManager()
+        requireLessonManagement(authentication, lessonId)
         if (!lessonRepo.existsById(lessonId)) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
-
         lessonReminderService.cancelPendingReminders(lessonId)
         lessonRepo.deleteById(lessonId)
         eventPublisher.publishEvent(LessonDeletedEvent(lessonId))
@@ -193,8 +194,8 @@ class ScheduledLessonStore(
         authentication.requireScheduleManager()
         val lesson = lessonRepo.findById(lessonId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        requireLessonManagement(authentication, lessonId)
         val now = Instant.now()
-
         lesson.status = MetaData.LessonStatuses.COMPLETED
         lesson.actualEnd = now
         lesson.updatedAt = now
@@ -209,6 +210,7 @@ class ScheduledLessonStore(
     @Transactional
     fun createParticipantLinks(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonParticipantLinksResponse {
         authentication.requireScheduleManager()
+        requireLessonManagement(authentication, lessonId)
         val lesson = find(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         return participantLinkService.createLinks(lesson, participantsFor(listOf(lessonId)))
@@ -216,7 +218,7 @@ class ScheduledLessonStore(
 
     private fun findVisible(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonRow? {
         val lesson = if (authentication.canManageSchedule()) {
-            find(lessonId)
+            find(lessonId)?.takeIf { authorizationService.canManageLesson(authentication, lessonId) }
         } else {
             lessonRepo.findScheduleRowByIdForStudent(lessonId, authentication.token.subject)
         } ?: return null
@@ -264,7 +266,6 @@ class ScheduledLessonStore(
         if (cleanedSubjects.isEmpty()) {
             return emptyList()
         }
-
         val users = appUserRepo.findByKeycloakSubjectIn(cleanedSubjects)
             .associate { user -> user.keycloakSubject to user.id }
 
@@ -274,6 +275,22 @@ class ScheduledLessonStore(
         }
 
         return cleanedSubjects.map { subject -> ScheduledParticipant(subject = subject, userId = requireNotNull(users[subject])) }
+    }
+
+    private fun requireParticipantAccess(
+        authentication: JwtAuthenticationToken,
+        participants: List<ScheduledParticipant>,
+    ) {
+        if (participants.isEmpty()) return
+        if (!authorizationService.canManageStudents(authentication, participants.map(ScheduledParticipant::userId))) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.STUDENT_ACCESS_DENIED)
+        }
+    }
+
+    private fun requireLessonManagement(authentication: JwtAuthenticationToken, lessonId: UUID) {
+        if (!authorizationService.canManageLesson(authentication, lessonId)) {
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        }
     }
 
     private fun participantMaterialAssignments(
@@ -352,7 +369,6 @@ class ScheduledLessonStore(
         if (materialId == null) {
             return
         }
-
         val exists = if (authentication.isScheduleAdmin()) {
             lessonMaterialRepo.existsByIdAndStatusNot(materialId, MetaData.MaterialStatuses.ARCHIVED)
         } else {

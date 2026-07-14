@@ -26,6 +26,7 @@ data class MaterialSubmissionRow(
 )
 
 interface AssignmentRepo : JpaRepository<AssignmentEntity, UUID> {
+    fun findByTeacherUserId(teacherUserId: UUID): List<AssignmentEntity>
     fun findFirstByLessonIdAndMaterialIdAndMaterialBlockIdIsNullAndTypeOrderByCreatedAtAsc(
         lessonId: UUID,
         materialId: UUID,

@@ -7,5 +7,6 @@ interface LayoutMasteryProfileRepo : JpaRepository<LayoutMasteryProfileEntity, L
     fun findByKeycloakSubjectAndLayout(keycloakSubject: String, layout: String): LayoutMasteryProfileEntity?
     fun findByAnonymousProfileIdAndLayout(anonymousProfileId: Long, layout: String): LayoutMasteryProfileEntity?
     fun findByKeycloakSubjectOrderByLayoutAsc(keycloakSubject: String): List<LayoutMasteryProfileEntity>
+    fun deleteByKeycloakSubject(keycloakSubject: String): Long
     fun findByAnonymousProfileIdOrderByLayoutAsc(anonymousProfileId: Long): List<LayoutMasteryProfileEntity>
 }

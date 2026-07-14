@@ -39,6 +39,12 @@ class AppUserEntity(
     var managedByTeacher: Boolean = false,
     @Column(name = "managed_by_teacher_user_id")
     var managedByTeacherUserId: UUID? = null,
+    @Column(name = "roles_changed_at")
+    var rolesChangedAt: Instant? = null,
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null,
+    @Column(name = "deleted_by_user_id")
+    var deletedByUserId: UUID? = null,
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)

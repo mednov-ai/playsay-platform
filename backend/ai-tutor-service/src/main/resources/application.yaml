@@ -31,6 +31,8 @@ logging:
     org.hibernate.orm.connections.pooling: WARN
 
 playsay:
+  user-data:
+    service-token: ${PLAYSAY_USER_DATA_SERVICE_TOKEN:}
   ai-tutor:
     realtime:
       provider: ${PLAYSAY_AI_TUTOR_REALTIME_PROVIDER:stub}

@@ -28,9 +28,9 @@ class KeycloakAdminRegistrationClient(
             "enabled" to command.enabled,
             "emailVerified" to command.emailVerified,
             "credentials" to listOf(
-                mapOf("type" to "password", "value" to command.password, "temporary" to false),
+                mapOf("type" to "password", "value" to command.password, "temporary" to command.temporaryPassword),
             ),
-            "requiredActions" to emptyList<String>(),
+            "requiredActions" to command.requiredActions,
         )
         command.email?.let { email -> payload["email"] = email }
         command.lastName?.let { lastName -> payload["lastName"] = lastName }
@@ -55,6 +55,13 @@ class KeycloakAdminRegistrationClient(
     override fun findUserByEmail(email: String): KeycloakRegistrationUser? =
         userByEmail(email)?.toRegistrationUser(email)
 
+    override fun findUserBySubject(subject: String): KeycloakRegistrationUser? {
+        val response = sendAdmin(path = "/admin/realms/$realm/users/${subject.urlEncoded()}", method = "GET")
+        if (response.statusCode() == 404) return null
+        require(response.statusCode() in 200..299) { "Keycloak user lookup failed with HTTP ${response.statusCode()}" }
+        return objectMapper.readTree(response.body()).toRegistrationUser(subject).withRoles(realmRoles(subject))
+    }
+
     override fun enableVerifiedUser(username: String) {
         val id = userIdByUsername(username)
         val payload = mapOf("enabled" to true, "emailVerified" to true)
@@ -76,6 +83,46 @@ class KeycloakAdminRegistrationClient(
             body = "[${roleResponse.body()}]",
         )
         require(response.statusCode() in 200..299) { "Keycloak role mapping failed with HTTP ${response.statusCode()}" }
+    }
+
+    override fun setRealmRoles(subject: String, roles: Set<String>) {
+        val current = realmRoleRepresentations(subject).filter { it.get("name")?.asText() in applicationRoles }
+        val currentNames = current.mapNotNull { it.get("name")?.asText() }.toSet()
+        val toRemove = current.filter { it.get("name")?.asText() !in roles }
+        if (toRemove.isNotEmpty()) {
+            val response = sendAdmin(
+                path = "/admin/realms/$realm/users/${subject.urlEncoded()}/role-mappings/realm",
+                method = "DELETE",
+                body = objectMapper.writeValueAsString(toRemove),
+            )
+            require(response.statusCode() in 200..299) { "Keycloak role removal failed with HTTP ${response.statusCode()}" }
+        }
+        val toAdd = roles - currentNames
+        if (toAdd.isNotEmpty()) {
+            val representations = toAdd.map { role -> roleRepresentation(role) }
+            val response = sendAdmin(
+                path = "/admin/realms/$realm/users/${subject.urlEncoded()}/role-mappings/realm",
+                method = "POST",
+                body = objectMapper.writeValueAsString(representations),
+            )
+            require(response.statusCode() in 200..299) { "Keycloak role mapping failed with HTTP ${response.statusCode()}" }
+        }
+    }
+
+    override fun deleteUser(subject: String) {
+        val response = sendAdmin(path = "/admin/realms/$realm/users/${subject.urlEncoded()}", method = "DELETE")
+        require(response.statusCode() in 200..299 || response.statusCode() == 404) {
+            "Keycloak user delete failed with HTTP ${response.statusCode()}"
+        }
+    }
+
+    override fun sendRequiredActionsEmail(subject: String, actions: List<String>) {
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/users/${subject.urlEncoded()}/execute-actions-email",
+            method = "PUT",
+            body = objectMapper.writeValueAsString(actions),
+        )
+        require(response.statusCode() in 200..299) { "Keycloak required actions email failed with HTTP ${response.statusCode()}" }
     }
 
     override fun updatePassword(username: String, newPassword: String) {
@@ -137,6 +184,26 @@ class KeycloakAdminRegistrationClient(
         return users.firstOrNull()
     }
 
+    private fun realmRoles(subject: String): Set<String> =
+        realmRoleRepresentations(subject)
+            .mapNotNull { it.get("name")?.asText() }
+            .filterTo(linkedSetOf()) { it in applicationRoles }
+
+    private fun realmRoleRepresentations(subject: String): List<JsonNode> {
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/users/${subject.urlEncoded()}/role-mappings/realm",
+            method = "GET",
+        )
+        require(response.statusCode() in 200..299) { "Keycloak role lookup failed with HTTP ${response.statusCode()}" }
+        return objectMapper.readTree(response.body()).toList()
+    }
+
+    private fun roleRepresentation(role: String): JsonNode {
+        val response = sendAdmin(path = "/admin/realms/$realm/roles/${role.urlEncoded()}", method = "GET")
+        require(response.statusCode() in 200..299) { "Keycloak role fetch failed with HTTP ${response.statusCode()}" }
+        return objectMapper.readTree(response.body())
+    }
+
     private fun sendAdmin(path: String, method: String, body: String? = null): HttpResponse<String> {
         val builder = HttpRequest.newBuilder(URI.create("${keycloakBaseUrl.trimEnd('/')}$path"))
             .header("authorization", "Bearer ${accessToken()}")
@@ -187,12 +254,19 @@ class KeycloakAdminRegistrationClient(
             enabled = get("enabled")?.asBoolean(false) ?: false,
             emailVerified = get("emailVerified")?.asBoolean(false) ?: false,
             managedStudent = managedStudent(),
+            displayName = listOfNotNull(
+                get("firstName")?.asText()?.takeIf { it.isNotBlank() },
+                get("lastName")?.asText()?.takeIf { it.isNotBlank() },
+            ).joinToString(" ").takeIf { it.isNotBlank() },
         )
+
+    private fun KeycloakRegistrationUser.withRoles(roles: Set<String>): KeycloakRegistrationUser = copy(roles = roles)
 
     private fun String.urlEncoded(): String =
         URLEncoder.encode(this, StandardCharsets.UTF_8)
 
     private companion object {
         const val managedStudentAttribute = "playsay_managed_student"
+        val applicationRoles = setOf("STUDENT", "TEACHER", "ADMIN")
     }
 }

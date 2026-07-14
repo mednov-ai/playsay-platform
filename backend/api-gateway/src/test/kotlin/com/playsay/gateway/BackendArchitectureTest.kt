@@ -30,6 +30,7 @@ class BackendArchitectureTest {
     @Test
     fun `top level package folders are intentional`() {
         val intentionalFolders = setOf(
+            "client",
             "config",
             "controller",
             "dto",

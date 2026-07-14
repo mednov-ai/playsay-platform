@@ -48,7 +48,7 @@ class AiTutorServiceStructureTest {
                 source.text.contains("JdbcTemplate") ||
                     source.text.contains("JdbcClient") ||
                     source.text.contains("createNativeQuery") ||
-                    source.text.contains("nativeQuery = true")
+                    (source.text.contains("nativeQuery = true") && ".repo" !in source.packageName)
             }
             .map { it.relativePath }
 

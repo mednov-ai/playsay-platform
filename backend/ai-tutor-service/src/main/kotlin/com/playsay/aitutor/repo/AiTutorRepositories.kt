@@ -120,6 +120,9 @@ interface DialogCreditLedgerRepository : JpaRepository<DialogCreditLedgerEntity,
     fun deleteByStudentUserId(studentUserId: UUID): Long
 
     @Modifying
-    @Query("update DialogCreditLedgerEntity ledger set ledger.actorSubject = null where ledger.actorSubject = :subject")
+    @Query(
+        value = "update ai_tutor_dialog_ledger set actor_subject = null where actor_subject = :subject",
+        nativeQuery = true,
+    )
     fun anonymizeActorSubject(subject: String): Int
 }

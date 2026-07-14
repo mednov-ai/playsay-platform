@@ -64,10 +64,11 @@ try {
   const studentB = await createSession(browser, "studentB", passwords.studentB);
   sessions.push(teacher, studentA, studentB);
 
-  const [studentAProfile, studentBProfile] = await Promise.all([
+  const [rawStudentAProfile, studentBProfile] = await Promise.all([
     apiRequest(studentA.tokens.accessToken, "GET", "/users/me/profile", 200),
     apiRequest(studentB.tokens.accessToken, "GET", "/users/me/profile", 200),
   ]);
+  const studentAProfile = await ensureStudentBirthDate(studentA.tokens.accessToken, rawStudentAProfile);
   addCheck("keycloak-login-and-profiles");
 
   await verifyAiTutorPersonaSwitching(teacher.page);
@@ -257,22 +258,14 @@ async function verifyAiDialogAllowanceGrantAndDebit(teacher, student, studentSub
   if (!before.limited || !Number.isInteger(before.remainingDialogs) || before.maxDurationSeconds !== 600) {
     throw new Error(`Unexpected student dialog allowance: ${JSON.stringify(before)}`);
   }
+  if (!before.canStart || before.remainingDialogs < 1) {
+    throw new Error(`AI dialog smoke requires at least one existing demo credit: ${JSON.stringify(before)}`);
+  }
 
   const teacherAllowances = await apiRequest(teacher.tokens.accessToken, "GET", "/ai-tutor/teacher/dialog-allowances", 200);
   const studentAllowance = teacherAllowances.find((entry) => entry.studentSubject === studentSubject);
   if (!studentAllowance) {
     throw new Error(`Teacher allowance list does not include lesson participant ${studentSubject}.`);
-  }
-
-  const granted = await apiRequest(
-    teacher.tokens.accessToken,
-    "POST",
-    `/ai-tutor/teacher/dialog-allowances/${studentAllowance.studentUserId}/grants`,
-    200,
-    { quantity: 1, requestId: randomUUID() },
-  );
-  if (granted.remainingDialogs !== before.remainingDialogs + 1) {
-    throw new Error(`Dialog grant changed balance unexpectedly: before=${before.remainingDialogs}, after=${granted.remainingDialogs}.`);
   }
 
   const session = await apiRequest(student.tokens.accessToken, "POST", "/ai-tutor/sessions", 201, {
@@ -285,6 +278,17 @@ async function verifyAiDialogAllowanceGrantAndDebit(teacher, student, studentSub
     throw new Error("AI dialog smoke expected live Realtime credentials and a server expiry.");
   }
   await apiRequest(student.tokens.accessToken, "POST", `/ai-tutor/sessions/${session.id}/finish`, 200);
+
+  const granted = await apiRequest(
+    teacher.tokens.accessToken,
+    "POST",
+    `/ai-tutor/teacher/dialog-allowances/${studentAllowance.studentUserId}/grants`,
+    200,
+    { quantity: 1, requestId: randomUUID() },
+  );
+  if (granted.remainingDialogs !== before.remainingDialogs) {
+    throw new Error(`Dialog grant did not restore the debited balance: before=${before.remainingDialogs}, after=${granted.remainingDialogs}.`);
+  }
 
   const after = await apiRequest(student.tokens.accessToken, "GET", "/ai-tutor/dialog-allowance", 200);
   if (after.remainingDialogs !== before.remainingDialogs) {
@@ -299,6 +303,20 @@ async function verifyAiDialogAllowanceGrantAndDebit(teacher, student, studentSub
   await student.page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
   await student.page.locator('[data-tab-id="aiTutor"]').click();
   await student.page.locator('[data-testid="ai-tutor-dialog-allowance"]').waitFor({ timeout: timeoutMs });
+}
+
+async function ensureStudentBirthDate(token, profile) {
+  if (profile.birthDate) {
+    return profile;
+  }
+  return apiRequest(token, "PUT", "/users/me/profile", 200, {
+    birthDate: "2000-01-01",
+    countryCode: profile.countryCode,
+    displayName: profile.displayName,
+    learningGoal: profile.learningGoal,
+    locale: profile.locale,
+    timezone: profile.timezone,
+  });
 }
 
 async function loginWithKeycloakUi(page, credentials) {

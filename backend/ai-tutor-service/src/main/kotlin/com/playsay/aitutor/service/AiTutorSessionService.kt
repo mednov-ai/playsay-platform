@@ -21,6 +21,7 @@ class AiTutorSessionService(
     private val events: SessionEventRepository,
     private val realtime: RealtimeCredentialService,
     private val agePolicies: LearnerAgePolicyService,
+    private val allowances: DialogAllowanceService,
     private val objectMapper: ObjectMapper,
     private val vocabularyEntries: LearnerVocabularyEntryRepository,
     private val clock: Clock = Clock.systemUTC(),
@@ -32,19 +33,40 @@ class AiTutorSessionService(
         val scenario = requireNotNull(catalog.scenario(request.scenarioId, agePolicy)) { "Scenario is unavailable for this age policy" }
         val vocabularyGoals = runCatching { vocabularyEntries.findTop5ByOwnerSubjectAndStatusOrderByUpdatedAtDesc(subject).map { it.sourceText } }.getOrDefault(emptyList())
         require(scenario.freeConversation || request.freeTopic.isNullOrBlank()) { "Free topic is supported only for free conversation" }
-        val entity = sessions.save(
+
+        request.clientRequestId
+            ?.let { requestId -> sessions.findBySubjectAndClientRequestId(subject, requestId) }
+            ?.let { existing ->
+                return resumeIdempotent(existing, subject, persona, scenario, request, vocabularyGoals)
+            }
+
+        val preparation = allowances.prepareForSession(subject, request.clientRequestId)
+        preparation.existingSession?.let { existing ->
+            return resumeIdempotent(existing, subject, persona, scenario, request, vocabularyGoals)
+        }
+        val account = preparation.account
+        val startedAt = clock.instant()
+        val entity = sessions.saveAndFlush(
             ConversationSessionEntity(
                 subject = subject,
                 personaId = persona.id,
                 scenarioId = scenario.id,
                 feedbackMode = request.feedbackMode.name,
                 agePolicy = agePolicy.name,
-                freeTopic = request.freeTopic?.trim(),
+                freeTopic = request.freeTopic?.trim()?.ifBlank { null },
+                clientRequestId = request.clientRequestId,
+                startedAt = startedAt,
+                expiresAt = startedAt.plus(DialogAllowanceService.DIALOG_DURATION),
                 vocabularyGoalsJson = objectMapper.writeValueAsString(vocabularyGoals),
             ),
         )
         val credentials = realtime.create(persona.voice, instructions(persona, scenario, request, vocabularyGoals))
-        return entity.toResponse(credentials)
+        if (credentials.available && account != null) {
+            allowances.consume(account, subject, entity.id)
+            entity.dialogCreditConsumed = true
+            sessions.save(entity)
+        }
+        return entity.toResponse(credentials, allowances.currentAllowance(subject))
     }
 
     @Transactional
@@ -61,19 +83,25 @@ class AiTutorSessionService(
                 ),
             )
         }
-        return session.toResponse()
+        return session.toResponse(allowance = allowances.currentAllowance(subject))
     }
 
     @Transactional
     fun finish(subject: String, sessionId: UUID): ConversationSessionResponse {
         val session = sessions.findByIdAndSubject(sessionId, subject) ?: error("Session not found")
-        if (session.status == StoredSessionStatus.COMPLETED) return session.toResponse()
+        if (session.status == StoredSessionStatus.COMPLETED || session.status == StoredSessionStatus.EXPIRED) {
+            return session.toResponse(allowance = allowances.currentAllowance(subject))
+        }
         val completedAt = clock.instant()
+        if (!DialogAllowanceService.effectiveExpiry(session.startedAt, session.expiresAt).isAfter(completedAt)) {
+            expire(session)
+            return session.toResponse(allowance = allowances.currentAllowance(subject))
+        }
         session.status = StoredSessionStatus.COMPLETED
         session.completedAt = completedAt
         session.durationSeconds = Duration.between(session.startedAt, completedAt).seconds.coerceAtLeast(0)
         session.summaryJson = objectMapper.writeValueAsString(buildSummary(session))
-        return sessions.save(session).toResponse()
+        return sessions.save(session).toResponse(allowance = allowances.currentAllowance(subject))
     }
 
     fun progress(subject: String): LearnerProgressResponse {
@@ -98,9 +126,63 @@ class AiTutorSessionService(
     }
 
     private fun ownedActiveSession(subject: String, id: UUID): ConversationSessionEntity =
-        (sessions.findByIdAndSubject(id, subject) ?: error("Session not found")).also {
-            check(it.status == StoredSessionStatus.ACTIVE) { "Session is not active" }
+        (sessions.findByIdAndSubject(id, subject) ?: error("Session not found")).also { session ->
+            if (session.status == StoredSessionStatus.ACTIVE &&
+                !DialogAllowanceService.effectiveExpiry(session.startedAt, session.expiresAt).isAfter(clock.instant())
+            ) {
+                expire(session)
+            }
+            check(session.status == StoredSessionStatus.ACTIVE) { "Session is not active" }
         }
+
+    private fun resumeIdempotent(
+        session: ConversationSessionEntity,
+        subject: String,
+        persona: TutorPersonaResponse,
+        scenario: ConversationScenarioResponse,
+        request: CreateSessionRequest,
+        vocabularyGoals: List<String>,
+    ): ConversationSessionResponse {
+        if (!session.matches(request)) {
+            throw AiTutorResponseException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                AiTutorErrorCodes.DIALOG_REQUEST_CONFLICT,
+                "The client request id was already used for another dialog",
+            )
+        }
+        if (session.status != StoredSessionStatus.ACTIVE ||
+            !DialogAllowanceService.effectiveExpiry(session.startedAt, session.expiresAt).isAfter(clock.instant())
+        ) {
+            if (session.status == StoredSessionStatus.ACTIVE) expire(session)
+            throw AiTutorResponseException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                AiTutorErrorCodes.DIALOG_REQUEST_CONFLICT,
+                "The idempotent dialog request is no longer active",
+            )
+        }
+        val account = if (session.dialogCreditConsumed) null else allowances.prepareForSession(subject, request.clientRequestId).account
+        val credentials = realtime.create(persona.voice, instructions(persona, scenario, request, vocabularyGoals))
+        if (credentials.available && !session.dialogCreditConsumed && account != null) {
+            allowances.consume(account, subject, session.id)
+            session.dialogCreditConsumed = true
+            sessions.save(session)
+        }
+        return session.toResponse(credentials, allowances.currentAllowance(subject))
+    }
+
+    private fun expire(session: ConversationSessionEntity) {
+        val expiresAt = DialogAllowanceService.effectiveExpiry(session.startedAt, session.expiresAt)
+        session.status = StoredSessionStatus.EXPIRED
+        session.completedAt = expiresAt
+        session.durationSeconds = Duration.between(session.startedAt, expiresAt).seconds.coerceAtLeast(0)
+        sessions.save(session)
+    }
+
+    private fun ConversationSessionEntity.matches(request: CreateSessionRequest): Boolean =
+        personaId == request.personaId &&
+            scenarioId == request.scenarioId &&
+            feedbackMode == request.feedbackMode.name &&
+            freeTopic == request.freeTopic?.trim()?.ifBlank { null }
 
     private fun validateEvaluation(evaluation: TurnEvaluationRequest) {
         if (evaluation.verdict == TurnVerdict.IMPROVE) {
@@ -146,18 +228,23 @@ class AiTutorSessionService(
         Never evaluate accent or pronunciation. If audio is unclear, ask the learner to repeat and do not evaluate that turn.
         """.trimIndent()
 
-    private fun ConversationSessionEntity.toResponse(credentials: RealtimeCredentialsResponse? = null) = ConversationSessionResponse(
+    private fun ConversationSessionEntity.toResponse(
+        credentials: RealtimeCredentialsResponse? = null,
+        allowance: DialogAllowanceResponse? = null,
+    ) = ConversationSessionResponse(
         id = id,
         status = SessionStatus.valueOf(status.name),
         personaId = personaId,
         scenarioId = scenarioId,
         feedbackMode = FeedbackMode.valueOf(feedbackMode),
         startedAt = startedAt,
+        expiresAt = DialogAllowanceService.effectiveExpiry(startedAt, expiresAt),
         completedAt = completedAt,
         realtime = credentials,
         summary = summaryJson.takeUnless { it == "{}" }?.let { json ->
             runCatching { objectMapper.readValue(json, SessionSummaryResponse::class.java) }.getOrNull()
         },
         vocabularyGoals = runCatching { objectMapper.readValue(vocabularyGoalsJson, Array<String>::class.java).toList() }.getOrDefault(emptyList()),
+        allowance = allowance,
     )
 }

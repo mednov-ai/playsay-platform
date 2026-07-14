@@ -19,12 +19,15 @@ class ConversationSessionEntity(
     @Column(name = "feedback_mode", nullable = false, length = 24) var feedbackMode: String,
     @Column(name = "age_policy", nullable = false, length = 16) var agePolicy: String,
     @Column(name = "free_topic", length = 240) var freeTopic: String? = null,
+    @Column(name = "client_request_id") var clientRequestId: UUID? = null,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) var status: StoredSessionStatus = StoredSessionStatus.ACTIVE,
     @Column(name = "started_at", nullable = false) var startedAt: Instant = Instant.now(),
+    @Column(name = "expires_at") var expiresAt: Instant? = null,
     @Column(name = "completed_at") var completedAt: Instant? = null,
+    @Column(name = "dialog_credit_consumed", nullable = false) var dialogCreditConsumed: Boolean = false,
     @Column(name = "duration_seconds", nullable = false) var durationSeconds: Long = 0,
     @Column(name = "summary_json", nullable = false, length = 16_000) var summaryJson: String = "{}",
     @Column(name = "vocabulary_goals_json", nullable = false, length = 8_000) var vocabularyGoalsJson: String = "[]",
 )
 
-enum class StoredSessionStatus { ACTIVE, COMPLETED, FAILED }
+enum class StoredSessionStatus { ACTIVE, COMPLETED, FAILED, EXPIRED }

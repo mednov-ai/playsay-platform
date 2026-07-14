@@ -241,6 +241,18 @@ export const de = {
     feedback: { EVERY_TURN: "Eine hilfreiche Korrektur nach jedem Beitrag", SIGNIFICANT: "Nur wichtige oder wiederkehrende Korrekturen", SESSION_END: "Gesprächsfluss bewahren und am Ende auswerten" },
     feedbackShort: { EVERY_TURN: "Jeder Beitrag", SIGNIFICANT: "Wichtig", SESSION_END: "Am Ende" },
     actions: { start: "Gespräch starten" },
+    allowance: {
+      student: {
+        available: "Verfügbare Gespräche: {{count}}", duration: "Jedes Gespräch dauert bis zu {{minutes}} Minuten.", exhaustedTitle: "Keine Gespräche mehr verfügbar", exhausted: "Wende dich an deine Lehrkraft, um weiterzulernen.",
+        contactTeacher: "Wende dich zum Weiterlernen an deine Lehrkraft: {{name}}.", teacherFallback: "deine Lehrkraft", activeTitle: "Gespräch bereits aktiv", activeElsewhere: "Du hast bereits ein aktives KI-Gespräch. Beende es oder warte bis zum Zeitlimit.",
+        timeRemainingLabel: "Noch {{time}} in diesem Gespräch", timeWarning: "Noch eine Minute – bringe deinen Gedanken zu Ende.",
+      },
+      teacher: {
+        eyebrow: "Nutzungskontrolle", title: "KI-Gespräche für Lernende", subtitle: "Füge Gespräche nur für Lernende hinzu, die selbstständig sprechen üben sollen.",
+        searchLabel: "Lernende suchen", searchPlaceholder: "Lernende suchen", presetsLabel: "Schnellauswahl der Gesprächsanzahl", quantityLabel: "Anzahl der Gespräche", remaining: "Verbleibende Gespräche: {{count}}", add: "Hinzufügen",
+        empty: "Es gibt noch keine Lernenden, denen du KI-Gespräche geben kannst.", noSearchResults: "Keine passenden Lernenden gefunden.", loadError: "Der Zugriff der Lernenden konnte nicht geladen werden.", grantError: "Gespräche konnten nicht hinzugefügt werden. Versuche es erneut.", grantSuccess: "Für {{name}} wurden {{count}} Gespräche hinzugefügt.",
+      },
+    },
     evaluation: { accepted: "Angenommen", improve: "Verbessern wir es" },
     summary: { title: "Gespräch beendet", body: "Angenommen: {{accepted}} · Verbessert: {{improved}} · Ziele erreicht: {{goals}}", focus: "Nächster Fokus: {{issues}}" },
     session: { live: "Gespräch", prompt: "Sprich natürlich. Dein Tutor hört zu.", repeat: "Wiederholen", continue: "Weiter", finish: "Beenden", saved: "Das Gespräch wurde gespeichert.", demoNotice: "Realtime-Sprache ist in dieser Umgebung nicht konfiguriert; die Sitzung ist für die Provider-Aktivierung bereit." },

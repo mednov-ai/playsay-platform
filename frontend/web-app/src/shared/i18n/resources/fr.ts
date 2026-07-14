@@ -241,6 +241,18 @@ export const fr = {
     feedback: { EVERY_TURN: "Une correction utile après chaque prise de parole", SIGNIFICANT: "Uniquement les erreurs importantes ou récurrentes", SESSION_END: "Préserver le dialogue et faire le bilan à la fin" },
     feedbackShort: { EVERY_TURN: "Chaque réponse", SIGNIFICANT: "Importantes", SESSION_END: "À la fin" },
     actions: { start: "Commencer la conversation" },
+    allowance: {
+      student: {
+        available: "Conversations disponibles : {{count}}", duration: "Chaque conversation dure jusqu’à {{minutes}} minutes.", exhaustedTitle: "Plus aucune conversation disponible", exhausted: "Contactez votre professeur pour poursuivre votre apprentissage.",
+        contactTeacher: "Pour poursuivre votre apprentissage, contactez votre professeur : {{name}}.", teacherFallback: "votre professeur", activeTitle: "Conversation déjà active", activeElsewhere: "Une conversation avec l’IA est déjà active. Terminez-la ou attendez la fin du temps imparti.",
+        timeRemainingLabel: "Il reste {{time}} dans cette conversation", timeWarning: "Il reste une minute — terminez votre idée.",
+      },
+      teacher: {
+        eyebrow: "Contrôle de l’utilisation", title: "Accès des élèves aux conversations IA", subtitle: "Ajoutez des conversations uniquement aux élèves qui ont besoin de pratiquer en autonomie.",
+        searchLabel: "Rechercher des élèves", searchPlaceholder: "Rechercher un élève", presetsLabel: "Choix rapide du nombre de conversations", quantityLabel: "Nombre de conversations", remaining: "Conversations restantes : {{count}}", add: "Ajouter",
+        empty: "Vous n’avez pas encore d’élèves auxquels attribuer des conversations IA.", noSearchResults: "Aucun élève ne correspond à cette recherche.", loadError: "Impossible de charger l’accès des élèves.", grantError: "Impossible d’ajouter les conversations. Réessayez.", grantSuccess: "{{count}} conversations ajoutées pour {{name}}.",
+      },
+    },
     evaluation: { accepted: "Accepté", improve: "Améliorons la réponse" },
     summary: { title: "Conversation terminée", body: "Acceptées : {{accepted}} · Améliorées : {{improved}} · Objectifs atteints : {{goals}}", focus: "Prochain axe : {{issues}}" },
     session: { live: "Conversation", prompt: "Parlez naturellement. Votre professeur vous écoute.", repeat: "Répéter", continue: "Continuer", finish: "Terminer", saved: "La conversation a été enregistrée.", demoNotice: "La voix Realtime n’est pas configurée dans cet environnement ; l’interface est prête pour l’activation du fournisseur." },

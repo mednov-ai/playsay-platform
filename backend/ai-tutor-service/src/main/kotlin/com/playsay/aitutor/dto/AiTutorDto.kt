@@ -2,17 +2,20 @@ package com.playsay.aitutor.dto
 
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
 import java.time.Instant
 import java.util.UUID
 
 enum class FeedbackMode { EVERY_TURN, SIGNIFICANT, SESSION_END }
 enum class AgePolicy { CHILD, TEEN, ADULT }
-enum class SessionStatus { ACTIVE, COMPLETED, FAILED }
+enum class SessionStatus { ACTIVE, COMPLETED, FAILED, EXPIRED }
 enum class SessionEventType { TURN_EVALUATION }
 enum class TurnVerdict { ACCEPTED, IMPROVE }
 enum class GoalResult { MET, PARTIAL, NOT_MET }
 enum class LanguageIssueCategory { GRAMMAR, VOCABULARY, RELEVANCE, CLARITY }
+enum class DialogAllowanceNextAction { NONE, CONTACT_TEACHER, PURCHASE }
 
 data class TutorPersonaResponse(
     val id: String,
@@ -41,6 +44,7 @@ data class CreateSessionRequest(
     @field:NotBlank val scenarioId: String,
     val feedbackMode: FeedbackMode = FeedbackMode.SIGNIFICANT,
     @field:Size(max = 240) val freeTopic: String? = null,
+    val clientRequestId: UUID? = null,
 )
 
 data class RealtimeCredentialsResponse(
@@ -58,10 +62,40 @@ data class ConversationSessionResponse(
     val scenarioId: String,
     val feedbackMode: FeedbackMode,
     val startedAt: Instant,
+    val expiresAt: Instant?,
     val completedAt: Instant?,
     val realtime: RealtimeCredentialsResponse? = null,
     val summary: SessionSummaryResponse? = null,
     val vocabularyGoals: List<String> = emptyList(),
+    val allowance: DialogAllowanceResponse? = null,
+)
+
+data class DialogAllowanceResponse(
+    val limited: Boolean,
+    val remainingDialogs: Int?,
+    val canStart: Boolean,
+    val maxDurationSeconds: Long,
+    val nextAction: DialogAllowanceNextAction,
+    val teacherDisplayName: String? = null,
+)
+
+data class StudentDialogAllowanceResponse(
+    val studentUserId: UUID,
+    val studentSubject: String,
+    val displayName: String,
+    val remainingDialogs: Int,
+    val updatedAt: Instant?,
+)
+
+data class GrantDialogCreditsRequest(
+    @field:Min(1) @field:Max(100) val quantity: Int,
+    val requestId: UUID,
+)
+
+data class AiTutorErrorResponse(
+    val status: Int,
+    val errorCode: String,
+    val message: String,
 )
 
 data class SessionSummaryResponse(

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import path from "node:path";
 
@@ -85,6 +85,9 @@ try {
   created.lessonId = lesson.id;
   summary.lessonId = lesson.id;
   addCheck("temporary-group-lesson-created");
+
+  await verifyAiDialogAllowanceGrantAndDebit(teacher, studentA, studentAProfile.subject);
+  addCheck("ai-dialog-allowance-grant-and-net-zero-debit");
 
   await Promise.all([
     ensureCollaborationDocument(studentA.tokens.accessToken, lesson.id, material.id, "GROUP"),
@@ -247,6 +250,55 @@ async function verifyAiTutorPersonaSwitching(page) {
   if (horizontalOverflow > 1) {
     throw new Error(`AI tutor layout overflows horizontally by ${horizontalOverflow}px.`);
   }
+}
+
+async function verifyAiDialogAllowanceGrantAndDebit(teacher, student, studentSubject) {
+  const before = await apiRequest(student.tokens.accessToken, "GET", "/ai-tutor/dialog-allowance", 200);
+  if (!before.limited || !Number.isInteger(before.remainingDialogs) || before.maxDurationSeconds !== 600) {
+    throw new Error(`Unexpected student dialog allowance: ${JSON.stringify(before)}`);
+  }
+
+  const teacherAllowances = await apiRequest(teacher.tokens.accessToken, "GET", "/ai-tutor/teacher/dialog-allowances", 200);
+  const studentAllowance = teacherAllowances.find((entry) => entry.studentSubject === studentSubject);
+  if (!studentAllowance) {
+    throw new Error(`Teacher allowance list does not include lesson participant ${studentSubject}.`);
+  }
+
+  const granted = await apiRequest(
+    teacher.tokens.accessToken,
+    "POST",
+    `/ai-tutor/teacher/dialog-allowances/${studentAllowance.studentUserId}/grants`,
+    200,
+    { quantity: 1, requestId: randomUUID() },
+  );
+  if (granted.remainingDialogs !== before.remainingDialogs + 1) {
+    throw new Error(`Dialog grant changed balance unexpectedly: before=${before.remainingDialogs}, after=${granted.remainingDialogs}.`);
+  }
+
+  const session = await apiRequest(student.tokens.accessToken, "POST", "/ai-tutor/sessions", 201, {
+    clientRequestId: randomUUID(),
+    feedbackMode: "SIGNIFICANT",
+    personaId: "maya",
+    scenarioId: "meet-someone",
+  });
+  if (!session.realtime?.available || !session.expiresAt) {
+    throw new Error("AI dialog smoke expected live Realtime credentials and a server expiry.");
+  }
+  await apiRequest(student.tokens.accessToken, "POST", `/ai-tutor/sessions/${session.id}/finish`, 200);
+
+  const after = await apiRequest(student.tokens.accessToken, "GET", "/ai-tutor/dialog-allowance", 200);
+  if (after.remainingDialogs !== before.remainingDialogs) {
+    throw new Error(`AI dialog smoke did not restore the original balance: before=${before.remainingDialogs}, after=${after.remainingDialogs}.`);
+  }
+
+  await teacher.page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+  await teacher.page.locator('[data-tab-id="aiTutor"]').click();
+  await teacher.page.locator('[data-testid="ai-tutor-teacher-allowances"]').waitFor({ timeout: timeoutMs });
+  await teacher.page.locator(`[data-student-id="${studentAllowance.studentUserId}"]`).waitFor({ timeout: timeoutMs });
+
+  await student.page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+  await student.page.locator('[data-tab-id="aiTutor"]').click();
+  await student.page.locator('[data-testid="ai-tutor-dialog-allowance"]').waitFor({ timeout: timeoutMs });
 }
 
 async function loginWithKeycloakUi(page, credentials) {

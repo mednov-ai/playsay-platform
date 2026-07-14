@@ -12,7 +12,38 @@ paths:
   /sessions:
     post:
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateSession' } } } }
-      responses: { '201': { description: Session with optional ephemeral Realtime credentials } }
+      responses:
+        '201':
+          description: Session with optional ephemeral Realtime credentials and current dialog allowance
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConversationSession' } } }
+        '409':
+          description: Dialog credits exhausted, another dialog is active, or an idempotency key conflicts
+          content: { application/json: { schema: { $ref: '#/components/schemas/AiTutorError' } } }
+  /dialog-allowance:
+    get:
+      responses:
+        '200':
+          description: Current user's server-authoritative dialog allowance
+          content: { application/json: { schema: { $ref: '#/components/schemas/DialogAllowance' } } }
+  /teacher/dialog-allowances:
+    get:
+      responses:
+        '200':
+          description: Dialog allowances for students managed or taught by the current teacher
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/StudentDialogAllowance' } }
+        '403': { description: Teacher or administrator role is required }
+  /teacher/dialog-allowances/{studentUserId}/grants:
+    post:
+      parameters: [{ in: path, name: studentUserId, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/GrantDialogCredits' } } } }
+      responses:
+        '200':
+          description: Updated student dialog allowance
+          content: { application/json: { schema: { $ref: '#/components/schemas/StudentDialogAllowance' } } }
+        '403': { description: Student is not manageable by the current teacher }
+        '409': { description: The request id conflicts with an earlier grant }
   /sessions/{sessionId}/events:
     post:
       parameters: [{ in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }]
@@ -21,7 +52,10 @@ paths:
   /sessions/{sessionId}/finish:
     post:
       parameters: [{ in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: Completed session } }
+      responses:
+        '200':
+          description: Completed or expired session
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConversationSession' } } }
   /progress:
     get: { responses: { '200': { description: Learner AI tutor progress } } }
   /assessment:
@@ -31,6 +65,7 @@ components:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
   schemas:
     FeedbackMode: { type: string, enum: [EVERY_TURN, SIGNIFICANT, SESSION_END] }
+    SessionStatus: { type: string, enum: [ACTIVE, COMPLETED, FAILED, EXPIRED] }
     TurnVerdict: { type: string, enum: [ACCEPTED, IMPROVE] }
     GoalResult: { type: string, enum: [MET, PARTIAL, NOT_MET] }
     LanguageIssueCategory: { type: string, enum: [GRAMMAR, VOCABULARY, RELEVANCE, CLARITY] }
@@ -42,6 +77,62 @@ components:
         scenarioId: { type: string }
         feedbackMode: { $ref: '#/components/schemas/FeedbackMode' }
         freeTopic: { type: string, maxLength: 240 }
+        clientRequestId: { type: string, format: uuid }
+    DialogAllowance:
+      type: object
+      required: [limited, canStart, maxDurationSeconds, nextAction]
+      properties:
+        limited: { type: boolean }
+        remainingDialogs: { type: [integer, 'null'], minimum: 0 }
+        canStart: { type: boolean }
+        maxDurationSeconds: { type: integer, minimum: 1 }
+        nextAction: { type: string, enum: [NONE, CONTACT_TEACHER, PURCHASE] }
+        teacherDisplayName: { type: [string, 'null'] }
+    RealtimeCredentials:
+      type: object
+      required: [available, model, voice]
+      properties:
+        available: { type: boolean }
+        clientSecret: { type: [string, 'null'] }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        model: { type: string }
+        voice: { type: string }
+    ConversationSession:
+      type: object
+      required: [id, status, personaId, scenarioId, feedbackMode, startedAt]
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/SessionStatus' }
+        personaId: { type: string }
+        scenarioId: { type: string }
+        feedbackMode: { $ref: '#/components/schemas/FeedbackMode' }
+        startedAt: { type: string, format: date-time }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        realtime: { anyOf: [{ $ref: '#/components/schemas/RealtimeCredentials' }, { type: 'null' }] }
+        allowance: { anyOf: [{ $ref: '#/components/schemas/DialogAllowance' }, { type: 'null' }] }
+    AiTutorError:
+      type: object
+      required: [status, errorCode, message]
+      properties:
+        status: { type: integer }
+        errorCode: { type: string }
+        message: { type: string }
+    StudentDialogAllowance:
+      type: object
+      required: [studentUserId, studentSubject, displayName, remainingDialogs]
+      properties:
+        studentUserId: { type: string, format: uuid }
+        studentSubject: { type: string }
+        displayName: { type: string }
+        remainingDialogs: { type: integer, minimum: 0 }
+        updatedAt: { type: [string, 'null'], format: date-time }
+    GrantDialogCredits:
+      type: object
+      required: [quantity, requestId]
+      properties:
+        quantity: { type: integer, minimum: 1, maximum: 100 }
+        requestId: { type: string, format: uuid }
     TurnEvaluation:
       type: object
       required: [clientTurnId, verdict, goalResult, original, improved, explanation, category, encouragement]

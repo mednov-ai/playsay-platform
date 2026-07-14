@@ -241,6 +241,18 @@ export const en = {
     feedback: { EVERY_TURN: "One useful correction after every turn", SIGNIFICANT: "Only important or recurring corrections", SESSION_END: "Keep the flow and review corrections at the end" },
     feedbackShort: { EVERY_TURN: "Every turn", SIGNIFICANT: "Important", SESSION_END: "At the end" },
     actions: { start: "Start conversation" },
+    allowance: {
+      student: {
+        available: "Conversations available: {{count}}", duration: "Each conversation lasts up to {{minutes}} minutes.", exhaustedTitle: "No conversations left", exhausted: "Contact your teacher to continue learning.",
+        contactTeacher: "To continue learning, contact your teacher: {{name}}.", teacherFallback: "your teacher", activeTitle: "Conversation already active", activeElsewhere: "You already have an active AI conversation. Finish it or wait for its time limit.",
+        timeRemainingLabel: "{{time}} left in this conversation", timeWarning: "One minute left — finish your thought.",
+      },
+      teacher: {
+        eyebrow: "Usage control", title: "Student access to AI conversations", subtitle: "Add conversations only for students who need independent speaking practice.",
+        searchLabel: "Search students", searchPlaceholder: "Find a student", presetsLabel: "Quick conversation amounts", quantityLabel: "Number of conversations", remaining: "Conversations left: {{count}}", add: "Add",
+        empty: "You do not have students who can receive AI conversations yet.", noSearchResults: "No students match this search.", loadError: "Could not load student access.", grantError: "Could not add conversations. Try again.", grantSuccess: "Added {{count}} conversations for {{name}}.",
+      },
+    },
     evaluation: { accepted: "Accepted", improve: "Let's improve it" },
     summary: { title: "Conversation complete", body: "Accepted: {{accepted}} · Improved: {{improved}} · Goals met: {{goals}}", focus: "Focus next: {{issues}}" },
     session: { live: "Conversation", prompt: "Speak naturally. Your tutor is listening.", repeat: "Repeat", continue: "Continue", finish: "Finish", saved: "The conversation was saved.", demoNotice: "Realtime voice is not configured in this environment; the session shell is ready for provider activation." },

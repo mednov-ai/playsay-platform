@@ -18,6 +18,12 @@ class LearnerAppUserEntity(
     var keycloakSubject: String = "",
     @Column(name = "roles", length = 255)
     var roles: String? = null,
+    @Column(name = "username", length = 255)
+    var username: String? = null,
+    @Column(name = "display_name", length = 120)
+    var displayName: String? = null,
+    @Column(name = "managed_by_teacher_user_id")
+    var managedByTeacherUserId: UUID? = null,
 )
 
 /** Read-only projection of the student profile; writes remain owned by api-gateway. */
@@ -43,4 +49,21 @@ class LearnerVocabularyEntryEntity(
     @Column var translation: String? = null,
     @Column(nullable = false) var status: String = "ACTIVE",
     @Column(name = "updated_at", nullable = false) var updatedAt: java.time.Instant = java.time.Instant.EPOCH,
+)
+
+/** Read-only projection used to authorize teachers through their scheduled lessons. */
+@Entity
+@Table(name = "lesson")
+class LearnerLessonEntity(
+    @Id var id: UUID = UUID.randomUUID(),
+    @Column(name = "teacher_user_id") var teacherUserId: UUID? = null,
+)
+
+/** Read-only projection of the student side of a scheduled lesson. */
+@Entity
+@Table(name = "lesson_participant")
+class LearnerLessonParticipantEntity(
+    @Id var id: UUID = UUID.randomUUID(),
+    @Column(name = "lesson_id", nullable = false) var lessonId: UUID = UUID.randomUUID(),
+    @Column(name = "student_user_id", nullable = false) var studentUserId: UUID = UUID.randomUUID(),
 )

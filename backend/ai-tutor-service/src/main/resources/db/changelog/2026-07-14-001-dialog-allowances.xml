@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-14-001-dialog-allowances" author="codex">
+        <addColumn tableName="ai_tutor_sessions">
+            <column name="client_request_id" type="UUID"/>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="dialog_credit_consumed" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <addUniqueConstraint
+            tableName="ai_tutor_sessions"
+            columnNames="keycloak_subject,client_request_id"
+            constraintName="uq_ai_tutor_session_client_request"/>
+        <createIndex tableName="ai_tutor_sessions" indexName="idx_ai_tutor_subject_status_started">
+            <column name="keycloak_subject"/>
+            <column name="status"/>
+            <column name="started_at"/>
+        </createIndex>
+
+        <createTable tableName="ai_tutor_dialog_accounts">
+            <column name="student_user_id" type="UUID">
+                <constraints primaryKey="true" nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_ai_dialog_account_student"/>
+            </column>
+            <column name="remaining_dialogs" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+
+        <createTable tableName="ai_tutor_dialog_ledger">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="student_user_id" type="UUID">
+                <constraints nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_ai_dialog_ledger_student"/>
+            </column>
+            <column name="source" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="source_reference" type="UUID"><constraints nullable="false"/></column>
+            <column name="actor_subject" type="VARCHAR(255)"/>
+            <column name="session_id" type="UUID">
+                <constraints referencedTableName="ai_tutor_sessions" referencedColumnNames="id" foreignKeyName="fk_ai_dialog_ledger_session"/>
+            </column>
+            <column name="delta" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="balance_after" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="ai_tutor_dialog_ledger"
+            columnNames="source,source_reference"
+            constraintName="uq_ai_dialog_ledger_source_reference"/>
+        <createIndex tableName="ai_tutor_dialog_ledger" indexName="idx_ai_dialog_ledger_student_created">
+            <column name="student_user_id"/>
+            <column name="created_at"/>
+        </createIndex>
+        <sql>
+            ALTER TABLE ai_tutor_dialog_accounts
+                ADD CONSTRAINT chk_ai_dialog_account_nonnegative CHECK (remaining_dialogs &gt;= 0);
+            ALTER TABLE ai_tutor_dialog_ledger
+                ADD CONSTRAINT chk_ai_dialog_ledger_delta CHECK (delta &lt;&gt; 0);
+            ALTER TABLE ai_tutor_dialog_ledger
+                ADD CONSTRAINT chk_ai_dialog_ledger_balance CHECK (balance_after &gt;= 0);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

@@ -3,6 +3,7 @@ package com.playsay.aitutor.controller
 import com.playsay.aitutor.dto.*
 import com.playsay.aitutor.service.AiTutorCatalogService
 import com.playsay.aitutor.service.AiTutorSessionService
+import com.playsay.aitutor.service.DialogAllowanceService
 import com.playsay.aitutor.service.LearnerAgePolicyService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -16,6 +17,7 @@ class AiTutorController(
     private val catalog: AiTutorCatalogService,
     private val sessions: AiTutorSessionService,
     private val agePolicy: LearnerAgePolicyService,
+    private val allowances: DialogAllowanceService,
 ) {
     @GetMapping("/personas")
     fun personas(authentication: JwtAuthenticationToken) = catalog.personas(agePolicy.resolve(authentication.token.subject))
@@ -27,6 +29,21 @@ class AiTutorController(
     @ResponseStatus(HttpStatus.CREATED)
     fun create(authentication: JwtAuthenticationToken, @Valid @RequestBody request: CreateSessionRequest) =
         sessions.create(authentication.token.subject, request)
+
+    @GetMapping("/dialog-allowance")
+    fun dialogAllowance(authentication: JwtAuthenticationToken) =
+        allowances.currentAllowance(authentication.token.subject)
+
+    @GetMapping("/teacher/dialog-allowances")
+    fun teacherDialogAllowances(authentication: JwtAuthenticationToken) =
+        allowances.teacherAllowances(authentication.token.subject)
+
+    @PostMapping("/teacher/dialog-allowances/{studentUserId}/grants")
+    fun grantDialogAllowance(
+        authentication: JwtAuthenticationToken,
+        @PathVariable studentUserId: UUID,
+        @Valid @RequestBody request: GrantDialogCreditsRequest,
+    ) = allowances.grant(authentication.token.subject, studentUserId, request)
 
     @PostMapping("/sessions/{sessionId}/events")
     fun event(authentication: JwtAuthenticationToken, @PathVariable sessionId: UUID, @Valid @RequestBody request: SessionEventRequest) =

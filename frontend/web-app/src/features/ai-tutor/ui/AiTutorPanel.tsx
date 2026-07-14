@@ -1,18 +1,24 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Loader2, Mic, PhoneOff, RotateCcw, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Clock3, Loader2, MessageCircle, Mic, PhoneOff, Plus, RefreshCw, RotateCcw, Search, Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   appendTurnEvaluation,
   createAiTutorSession,
   fetchAiTutorCatalog,
+  fetchDialogAllowance,
+  fetchTeacherDialogAllowances,
   finishAiTutorSession,
+  grantTeacherDialogCredits,
   type AgePolicy,
   type AiTutorSession,
   type ConversationScenario,
+  type DialogAllowance,
   type FeedbackMode,
+  type StudentDialogAllowance,
   type TurnEvaluation,
   type TutorPersona,
 } from "../../../shared/api/aiTutor";
+import { ApiError } from "../../../shared/api/errors";
 import type { AppUserProfile } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { AvatarActivity } from "../model/avatarAnimation";
@@ -38,6 +44,11 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
   const [scenarioId, setScenarioId] = useState("");
   const [freeTopic, setFreeTopic] = useState("");
   const [session, setSession] = useState<AiTutorSession | null>(null);
+  const [allowance, setAllowance] = useState<DialogAllowance | null>(null);
+  const [teacherAllowances, setTeacherAllowances] = useState<StudentDialogAllowance[]>([]);
+  const [teacherAllowancesLoading, setTeacherAllowancesLoading] = useState(false);
+  const [teacherAllowanceMessage, setTeacherAllowanceMessage] = useState<string | null>(null);
+  const [grantingStudentId, setGrantingStudentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [avatarActivity, setAvatarActivity] = useState<AvatarActivity>("idle");
@@ -46,7 +57,9 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
   const [summary, setSummary] = useState<NonNullable<AiTutorSession["summary"]> | null>(null);
   const avatarAudioContext = useRef<AudioContext | null>(null);
   const realtime = useRef<RealtimeConversation | null>(null);
+  const pendingStartRequestId = useRef<string | null>(null);
   const isStudent = appProfile?.roles.includes("STUDENT") ?? false;
+  const canManageDialogAllowances = appProfile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const needsBirthDate = isStudent && !appProfile?.birthDate;
   const canLoadCatalog = Boolean(appProfile) && !needsBirthDate;
   const agePolicy = agePolicyFromBirthDate(appProfile?.birthDate);
@@ -60,6 +73,7 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
     if (!canLoadCatalog) {
       setPersonas([]);
       setScenarios([]);
+      setAllowance(null);
       setPersonaId("");
       setScenarioId("");
       return;
@@ -72,6 +86,7 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
         if (!active) return;
         setPersonas(catalog.personas);
         setScenarios(catalog.scenarios);
+        setAllowance(catalog.allowance);
         setPersonaId((current) => catalog.personas.some(({ id }) => id === current) ? current : (catalog.personas[0]?.id ?? ""));
         setScenarioId((current) => catalog.scenarios.some(({ id }) => id === current) ? current : (catalog.scenarios[0]?.id ?? ""));
         setMessage(null);
@@ -82,10 +97,31 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
     return () => { active = false; };
   }, [canLoadCatalog, appProfile?.birthDate, t]);
 
+  const loadTeacherAllowances = useCallback(async () => {
+    if (!canManageDialogAllowances) {
+      setTeacherAllowances([]);
+      return;
+    }
+    setTeacherAllowancesLoading(true);
+    try {
+      setTeacherAllowances(await fetchTeacherDialogAllowances());
+      setTeacherAllowanceMessage(null);
+    } catch {
+      setTeacherAllowanceMessage(t("aiTutor.allowance.teacher.loadError"));
+    } finally {
+      setTeacherAllowancesLoading(false);
+    }
+  }, [canManageDialogAllowances, t]);
+
+  useEffect(() => {
+    void loadTeacherAllowances();
+  }, [loadTeacherAllowances]);
+
   const selectedScenario = scenarios.find(({ id }) => id === scenarioId);
   const selectedPersona = personas.find(({ id }) => id === personaId);
 
   async function start() {
+    if (allowance && !allowance.canStart) return;
     closeAvatarAudioContext();
     if (typeof AudioContext !== "undefined") {
       try {
@@ -96,15 +132,20 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
       }
     }
     setLoading(true);
+    const clientRequestId = pendingStartRequestId.current ?? crypto.randomUUID();
+    pendingStartRequestId.current = clientRequestId;
+    let createdSession: AiTutorSession | null = null;
     try {
       const created = await createAiTutorSession({
         personaId,
         scenarioId,
         feedbackMode,
         freeTopic: selectedScenario?.freeConversation ? freeTopic : undefined,
+        clientRequestId,
       });
+      createdSession = created;
       setSummary(null);
-      setSession(created);
+      setAllowance(created.allowance ?? allowance);
       if (created.realtime?.available && created.realtime.clientSecret) {
         realtime.current = await connectRealtimeConversation({
           clientSecret: created.realtime.clientSecret,
@@ -118,14 +159,41 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
           },
           onRemoteAudioStream: setRemoteAudioStream,
         });
+        setSession(created);
+        pendingStartRequestId.current = null;
         setMessage(null);
       } else {
         closeAvatarAudioContext();
+        setSession(created);
+        pendingStartRequestId.current = null;
         setMessage(t("aiTutor.session.demoNotice"));
       }
-    } catch {
+    } catch (caught) {
       closeAvatarAudioContext();
-      setMessage(t("aiTutor.errors.start"));
+      realtime.current?.close();
+      realtime.current = null;
+      setRemoteAudioStream(null);
+      if (createdSession) {
+        pendingStartRequestId.current = null;
+        const completed = await finishAiTutorSession(createdSession.id).catch(() => null);
+        const refreshed = completed?.allowance ?? await fetchDialogAllowance().catch(() => allowance);
+        setAllowance(refreshed);
+        setSession(null);
+        setMessage(t("aiTutor.errors.connection"));
+      } else if (caught instanceof ApiError && caught.errorCode === "AI_DIALOG_CREDITS_EXHAUSTED") {
+        setSession(null);
+        pendingStartRequestId.current = null;
+        const refreshed = await fetchDialogAllowance().catch(() => null);
+        if (refreshed) setAllowance(refreshed);
+        setMessage(t("aiTutor.allowance.student.exhausted"));
+      } else if (caught instanceof ApiError && caught.errorCode === "AI_DIALOG_ALREADY_ACTIVE") {
+        setSession(null);
+        pendingStartRequestId.current = null;
+        setMessage(t("aiTutor.allowance.student.activeElsewhere"));
+      } else {
+        setSession(null);
+        setMessage(t("aiTutor.errors.start"));
+      }
     } finally {
       setLoading(false);
     }
@@ -142,6 +210,8 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
     try {
       const completed = await finishAiTutorSession(session.id);
       setSummary(completed.summary ?? null);
+      const refreshedAllowance = completed.allowance ?? await fetchDialogAllowance().catch(() => allowance);
+      setAllowance(refreshedAllowance);
       setSession(null);
       setEvaluation(null);
       setMessage(t("aiTutor.session.saved"));
@@ -152,9 +222,23 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
     }
   }
 
+  async function grantDialogs(studentUserId: string, quantity: number) {
+    setGrantingStudentId(studentUserId);
+    try {
+      const updated = await grantTeacherDialogCredits(studentUserId, quantity, crypto.randomUUID());
+      setTeacherAllowances((current) => current.map((entry) => entry.studentUserId === studentUserId ? updated : entry));
+      setTeacherAllowanceMessage(t("aiTutor.allowance.teacher.grantSuccess", { count: quantity, name: updated.displayName }));
+    } catch {
+      setTeacherAllowanceMessage(t("aiTutor.allowance.teacher.grantError"));
+    } finally {
+      setGrantingStudentId(null);
+    }
+  }
+
   return (
-    <section className="overflow-hidden rounded-3xl border border-border bg-white/90 shadow-sm dark:bg-zinc-950/80">
-      <div className="grid min-h-[36rem] lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,.8fr)]">
+    <div className="grid gap-5">
+      <section className="overflow-hidden rounded-3xl border border-border bg-white/90 shadow-sm dark:bg-zinc-950/80">
+        <div className="grid min-h-[36rem] lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,.8fr)]">
         <TutorAvatar
           activity={avatarActivity}
           audioContext={avatarAudioContext.current}
@@ -183,10 +267,12 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
               onFinish={() => void finish()}
               onRepeat={() => realtime.current?.repeat()}
               scenario={selectedScenario}
+              expiresAt={session.expiresAt}
             />
           ) : (
             <SessionSetup
               agePolicy={isStudent ? agePolicy : "ADULT"}
+              allowance={allowance}
               feedbackMode={feedbackMode}
               freeTopic={freeTopic}
               loading={loading}
@@ -205,8 +291,19 @@ export function AiTutorPanel({ appProfile, onOpenProfile }: AiTutorPanelProps) {
           )}
           {message ? <p className="rounded-xl bg-muted px-3 py-2 text-sm" role="status">{message}</p> : null}
         </div>
-      </div>
-    </section>
+        </div>
+      </section>
+      {canManageDialogAllowances ? (
+        <TeacherDialogAllowancesPanel
+          allowances={teacherAllowances}
+          grantingStudentId={grantingStudentId}
+          loading={teacherAllowancesLoading}
+          message={teacherAllowanceMessage}
+          onGrant={grantDialogs}
+          onRefresh={() => void loadTeacherAllowances()}
+        />
+      ) : null}
+    </div>
   );
 
   function closeAvatarAudioContext() {
@@ -253,8 +350,9 @@ function ProfileRequired({ onOpenProfile }: { onOpenProfile: () => void }) {
   );
 }
 
-function ActiveSession({ evaluation, feedbackMode, loading, onClearEvaluation, onFinish, onRepeat, scenario }: {
+export function ActiveSession({ evaluation, expiresAt, feedbackMode, loading, onClearEvaluation, onFinish, onRepeat, scenario }: {
   evaluation: TurnEvaluation | null;
+  expiresAt?: string | null;
   feedbackMode: FeedbackMode;
   loading: boolean;
   onClearEvaluation: () => void;
@@ -263,13 +361,28 @@ function ActiveSession({ evaluation, feedbackMode, loading, onClearEvaluation, o
   scenario?: ConversationScenario;
 }) {
   const { t } = useAppTranslation();
+  const remainingSeconds = useDialogRemainingSeconds(expiresAt, onFinish);
+  const expiringSoon = remainingSeconds !== null && remainingSeconds <= 60;
   return (
     <div className="flex flex-1 flex-col justify-between gap-5">
       <div className="grid gap-3">
         <div className="rounded-2xl border border-border bg-muted/40 p-4">
-          <p className="font-bold">{scenario?.title}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-bold">{scenario?.title}</p>
+            {remainingSeconds !== null ? (
+              <span
+                aria-label={t("aiTutor.allowance.student.timeRemainingLabel", { time: formatDialogTime(remainingSeconds) })}
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-extrabold ${expiringSoon ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-background"}`}
+                data-testid="ai-tutor-dialog-countdown"
+              >
+                <Clock3 className="h-3.5 w-3.5" />
+                {formatDialogTime(remainingSeconds)}
+              </span>
+            ) : null}
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">{scenario?.conversationGoal}</p>
           <p className="mt-2 text-xs text-muted-foreground">{t(`aiTutor.feedback.${feedbackMode}`)}</p>
+          {expiringSoon ? <p className="mt-2 text-xs font-bold text-primary" role="status">{t("aiTutor.allowance.student.timeWarning")}</p> : null}
         </div>
         <EvaluationCard evaluation={evaluation} />
       </div>
@@ -293,6 +406,7 @@ function EvaluationCard({ evaluation }: { evaluation: TurnEvaluation | null }) {
 
 type SessionSetupProps = {
   agePolicy: AgePolicy;
+  allowance: DialogAllowance | null;
   feedbackMode: FeedbackMode;
   freeTopic: string;
   loading: boolean;
@@ -314,6 +428,7 @@ function SessionSetup(props: SessionSetupProps) {
   return (
     <div className="grid gap-4">
       {props.summary ? <SessionSummary summary={props.summary} /> : null}
+      <DialogAllowanceCard allowance={props.allowance} />
       <Field label={t("aiTutor.fields.age")}>
         <div className="rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm font-semibold">
           {t(`aiTutor.age.${props.agePolicy}`)} · {t("aiTutor.age.fromProfile")}
@@ -344,11 +459,48 @@ function SessionSetup(props: SessionSetupProps) {
           ))}
         </div>
       </Field>
-      <Button disabled={props.loading || !props.personaId || !props.scenarioId} onClick={props.onStart} type="button">
+      <Button disabled={props.loading || !props.personaId || !props.scenarioId || props.allowance?.canStart === false} onClick={props.onStart} type="button">
         {props.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
         {t("aiTutor.actions.start")}
       </Button>
     </div>
+  );
+}
+
+export function DialogAllowanceCard({ allowance }: { allowance: DialogAllowance | null }) {
+  const { t } = useAppTranslation();
+  if (!allowance?.limited) return null;
+  const remaining = allowance.remainingDialogs ?? 0;
+  const minutes = Math.ceil(allowance.maxDurationSeconds / 60);
+  const exhausted = remaining <= 0;
+  const activeElsewhere = !exhausted && !allowance.canStart;
+  return (
+    <aside
+      className={`rounded-2xl border p-4 ${exhausted ? "border-primary/30 bg-primary/5" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}
+      data-testid="ai-tutor-dialog-allowance"
+    >
+      <div className="flex items-start gap-3">
+        <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${exhausted ? "bg-primary/10 text-primary" : "bg-emerald-100 text-emerald-700"}`}>
+          <MessageCircle className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <strong className="block text-sm">
+            {exhausted
+              ? t("aiTutor.allowance.student.exhaustedTitle")
+              : activeElsewhere
+                ? t("aiTutor.allowance.student.activeTitle")
+              : t("aiTutor.allowance.student.available", { count: remaining })}
+          </strong>
+          <p className={`mt-1 text-xs leading-5 ${exhausted ? "text-muted-foreground" : "text-emerald-800"}`}>
+            {exhausted
+              ? t("aiTutor.allowance.student.contactTeacher", { name: allowance.teacherDisplayName ?? t("aiTutor.allowance.student.teacherFallback") })
+              : activeElsewhere
+                ? t("aiTutor.allowance.student.activeElsewhere")
+              : t("aiTutor.allowance.student.duration", { minutes })}
+          </p>
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -403,6 +555,123 @@ export function TutorPersonaPicker({ disabled, onPersonaChange, personaId, perso
   );
 }
 
+export function TeacherDialogAllowancesPanel({ allowances, grantingStudentId, loading, message, onGrant, onRefresh }: {
+  allowances: StudentDialogAllowance[];
+  grantingStudentId: string | null;
+  loading: boolean;
+  message: string | null;
+  onGrant: (studentUserId: string, quantity: number) => Promise<void>;
+  onRefresh: () => void;
+}) {
+  const { t } = useAppTranslation();
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleAllowances = normalizedQuery
+    ? allowances.filter((entry) => `${entry.displayName} ${entry.studentSubject}`.toLowerCase().includes(normalizedQuery))
+    : allowances;
+
+  return (
+    <section
+      className="rounded-3xl border border-border bg-white/90 p-5 shadow-sm dark:bg-zinc-950/80 sm:p-7"
+      data-testid="ai-tutor-teacher-allowances"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <span className="text-xs font-black uppercase tracking-[0.14em] text-primary">{t("aiTutor.allowance.teacher.eyebrow")}</span>
+          <h2 className="mt-1 text-xl font-black">{t("aiTutor.allowance.teacher.title")}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t("aiTutor.allowance.teacher.subtitle")}</p>
+        </div>
+        <Button disabled={loading} onClick={onRefresh} type="button" variant="outline">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          {t("common.actions.refresh")}
+        </Button>
+      </div>
+
+      <label className="relative mt-5 block">
+        <span className="sr-only">{t("aiTutor.allowance.teacher.searchLabel")}</span>
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("aiTutor.allowance.teacher.searchPlaceholder")}
+          type="search"
+          value={query}
+        />
+      </label>
+
+      {message ? <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-sm" role="status">{message}</p> : null}
+
+      <div className="mt-4 grid gap-3">
+        {!loading && visibleAllowances.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-muted/50 p-4 text-sm font-semibold text-muted-foreground">
+            {normalizedQuery ? t("aiTutor.allowance.teacher.noSearchResults") : t("aiTutor.allowance.teacher.empty")}
+          </p>
+        ) : visibleAllowances.map((entry) => (
+          <DialogGrantRow
+            busy={grantingStudentId === entry.studentUserId}
+            entry={entry}
+            key={entry.studentUserId}
+            onGrant={onGrant}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DialogGrantRow({ busy, entry, onGrant }: {
+  busy: boolean;
+  entry: StudentDialogAllowance;
+  onGrant: (studentUserId: string, quantity: number) => Promise<void>;
+}) {
+  const { t } = useAppTranslation();
+  const [quantity, setQuantity] = useState("1");
+  const parsedQuantity = Number(quantity);
+  const validQuantity = Number.isInteger(parsedQuantity) && parsedQuantity >= 1 && parsedQuantity <= 100;
+
+  return (
+    <article className="grid gap-4 rounded-2xl border border-border bg-muted/35 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center" data-student-id={entry.studentUserId}>
+      <div className="min-w-0">
+        <strong className="block truncate">{entry.displayName}</strong>
+        <span className="mt-1 block text-sm font-semibold text-muted-foreground">
+          {t("aiTutor.allowance.teacher.remaining", { count: entry.remainingDialogs })}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div aria-label={t("aiTutor.allowance.teacher.presetsLabel")} className="flex gap-1" role="group">
+          {[1, 5, 10].map((preset) => (
+            <button
+              className="h-9 rounded-lg border border-border bg-background px-2.5 text-xs font-extrabold hover:border-primary disabled:opacity-50"
+              disabled={busy}
+              key={preset}
+              onClick={() => setQuantity(String(preset))}
+              type="button"
+            >
+              +{preset}
+            </button>
+          ))}
+        </div>
+        <label className="sr-only" htmlFor={`ai-dialog-grant-${entry.studentUserId}`}>{t("aiTutor.allowance.teacher.quantityLabel")}</label>
+        <input
+          className="h-9 w-20 rounded-lg border border-border bg-background px-2 text-center text-sm font-bold outline-none focus:border-primary"
+          disabled={busy}
+          id={`ai-dialog-grant-${entry.studentUserId}`}
+          inputMode="numeric"
+          max={100}
+          min={1}
+          onChange={(event) => setQuantity(event.target.value)}
+          type="number"
+          value={quantity}
+        />
+        <Button disabled={busy || !validQuantity} onClick={() => void onGrant(entry.studentUserId, parsedQuantity)} type="button">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          {t("aiTutor.allowance.teacher.add")}
+        </Button>
+      </div>
+    </article>
+  );
+}
+
 function SessionSummary({ summary }: { summary: NonNullable<AiTutorSession["summary"]> }) {
   const { t } = useAppTranslation();
   return (
@@ -416,6 +685,42 @@ function SessionSummary({ summary }: { summary: NonNullable<AiTutorSession["summ
 
 function Field({ children, label }: { children: ReactNode; label: string }) {
   return <label className="grid gap-1.5 text-sm font-bold"><span>{label}</span>{children}</label>;
+}
+
+export function dialogRemainingSeconds(expiresAt?: string | null, nowMs = Date.now()): number | null {
+  if (!expiresAt) return null;
+  const expiresAtMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresAtMs)) return null;
+  return Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1_000));
+}
+
+function useDialogRemainingSeconds(expiresAt: string | null | undefined, onExpired: () => void): number | null {
+  const [remainingSeconds, setRemainingSeconds] = useState(() => dialogRemainingSeconds(expiresAt));
+  const onExpiredRef = useRef(onExpired);
+  const handledExpiryRef = useRef<string | null>(null);
+  onExpiredRef.current = onExpired;
+
+  useEffect(() => {
+    const tick = () => {
+      const next = dialogRemainingSeconds(expiresAt);
+      setRemainingSeconds(next);
+      if (next === 0 && expiresAt && handledExpiryRef.current !== expiresAt) {
+        handledExpiryRef.current = expiresAt;
+        onExpiredRef.current();
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 1_000);
+    return () => window.clearInterval(timer);
+  }, [expiresAt]);
+
+  return remainingSeconds;
+}
+
+function formatDialogTime(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 export function agePolicyFromBirthDate(birthDate?: string | null, today = new Date()): AgePolicy {

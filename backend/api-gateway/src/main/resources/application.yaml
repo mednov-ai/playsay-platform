@@ -51,6 +51,12 @@ playsay:
     api-key: ${PLAYSAY_LIVEKIT_API_KEY:}
     api-secret: ${PLAYSAY_LIVEKIT_API_SECRET:}
     token-ttl-seconds: ${PLAYSAY_LIVEKIT_TOKEN_TTL_SECONDS:3600}
+  lesson-translation:
+    enabled: ${PLAYSAY_LESSON_TRANSLATION_ENABLED:false}
+    provider: ${PLAYSAY_LESSON_TRANSLATION_PROVIDER:stub}
+    api-key: ${PLAYSAY_LESSON_TRANSLATION_API_KEY:${OPENAI_API_KEY:}}
+    model: ${PLAYSAY_LESSON_TRANSLATION_MODEL:gpt-realtime-translate}
+    base-url: ${PLAYSAY_LESSON_TRANSLATION_BASE_URL:${OPENAI_BASE_URL:https://api.openai.com/v1}}
   collaboration:
     websocket-url: ${PLAYSAY_COLLABORATION_WEBSOCKET_URL:wss://online.play-and-say.ru/collab/ws}
     token-secret: ${PLAYSAY_COLLABORATION_TOKEN_SECRET:}

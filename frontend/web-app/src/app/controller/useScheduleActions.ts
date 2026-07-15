@@ -269,6 +269,7 @@ export function useScheduleActions({
         workMode: lesson.workMode,
         materialId: lesson.materialId ?? null,
         participants: lesson.participants,
+        teacherSubject: lesson.teacherSubject ?? null,
         teacherName: lesson.teacherName ?? null,
       });
       setRoomMessage(t("classroom.messages.roomReady"));

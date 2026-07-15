@@ -76,6 +76,7 @@
 }
 
 .playsay-classroom-conference {
+  position: relative;
   display: grid;
   height: 100%;
   min-height: 0;
@@ -280,6 +281,69 @@
 .playsay-classroom-controls {
   justify-content: center;
   gap: 0.5rem;
+}
+
+.playsay-translation-button {
+  border-color: rgb(255 92 0 / 0.55);
+  background: rgb(255 92 0 / 0.18);
+  color: #ffffff;
+  touch-action: none;
+  user-select: none;
+}
+
+.playsay-translation-button:hover:not(:disabled),
+.playsay-translation-button[data-active="true"] {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.playsay-translation-button[data-active="true"] {
+  box-shadow: 0 0 0 4px rgb(255 92 0 / 0.2);
+}
+
+.playsay-translation-overlay {
+  position: absolute;
+  z-index: 4;
+  right: 0.75rem;
+  bottom: calc(var(--lk-control-bar-height) + 0.625rem);
+  left: 0.75rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  pointer-events: none;
+}
+
+.playsay-translation-status,
+.playsay-translation-disclosure,
+.playsay-translation-caption {
+  max-width: min(100%, 42rem);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 0.75rem;
+  background: rgb(17 17 17 / 0.88);
+  box-shadow: 0 0.4rem 1.5rem rgb(0 0 0 / 0.24);
+  color: #ffffff;
+  text-align: center;
+}
+
+.playsay-translation-status {
+  padding: 0.35rem 0.65rem;
+  color: rgb(255 255 255 / 0.78);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.playsay-translation-caption {
+  padding: 0.55rem 0.85rem;
+  font-size: clamp(0.9rem, 2vw, 1.15rem);
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.playsay-translation-disclosure {
+  padding: 0.45rem 0.7rem;
+  color: rgb(255 255 255 / 0.72);
+  font-size: 0.7rem;
+  line-height: 1.3;
 }
 
 .playsay-lesson-exit {

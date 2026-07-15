@@ -7,6 +7,7 @@ import type {
   CurriculumTopicResponse,
   LessonTemplateCardRequest,
   LessonTemplateCardsRequest,
+  LessonTranslationSessionResponse,
   LiveKitRoomTokenResponse,
   MeResponse,
   ScheduledLessonMaterialAssignmentRequest,
@@ -75,6 +76,7 @@ export type ScheduledLessonInput = ScheduledLessonRequest & {
   recurrence?: ScheduledLessonRecurrenceInput | null;
 };
 export type LiveKitRoomToken = LiveKitRoomTokenResponse;
+export type LessonTranslationSession = LessonTranslationSessionResponse;
 export type StudentInviteAuthenticatedResult = {
   status?: "AUTHENTICATED";
   accessToken: string;

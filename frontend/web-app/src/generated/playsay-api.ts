@@ -578,6 +578,16 @@ export interface ManagedStudentRequest {
   email?: string | null;
 }
 
+export interface LessonTranslationSessionResponse {
+  clientSecret: string;
+  /** @nullable */
+  expiresAt?: string | null;
+  model: string;
+  callsUrl: string;
+  targetLanguage: string;
+  sourceParticipantIdentity: string;
+}
+
 export interface LiveKitRoomTokenResponse {
   serverUrl: string;
   token: string;
@@ -3138,6 +3148,77 @@ export const createScheduledLesson = async (scheduledLessonRequest: ScheduledLes
 
   const data: createScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createScheduledLessonResponse
+}
+
+
+
+export type createLessonTranslationSessionResponse200 = {
+  data: LessonTranslationSessionResponse
+  status: 200
+}
+
+export type createLessonTranslationSessionResponse401 = {
+  data: void
+  status: 401
+}
+
+export type createLessonTranslationSessionResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createLessonTranslationSessionResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createLessonTranslationSessionResponse409 = {
+  data: void
+  status: 409
+}
+
+export type createLessonTranslationSessionResponse503 = {
+  data: void
+  status: 503
+}
+
+export type createLessonTranslationSessionResponseSuccess = (createLessonTranslationSessionResponse200) & {
+  headers: Headers;
+};
+export type createLessonTranslationSessionResponseError = (createLessonTranslationSessionResponse401 | createLessonTranslationSessionResponse403 | createLessonTranslationSessionResponse404 | createLessonTranslationSessionResponse409 | createLessonTranslationSessionResponse503) & {
+  headers: Headers;
+};
+
+export type createLessonTranslationSessionResponse = (createLessonTranslationSessionResponseSuccess | createLessonTranslationSessionResponseError)
+
+export const getCreateLessonTranslationSessionUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/translation-session`
+}
+
+/**
+ * Returns a short-lived listener-side credential for a two-person individual lesson.
+ * @summary Create a realtime lesson translation session
+ */
+export const createLessonTranslationSession = async (lessonId: string, options?: RequestInit): Promise<createLessonTranslationSessionResponse> => {
+
+  const res = await fetch(getCreateLessonTranslationSessionUrl(lessonId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createLessonTranslationSessionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createLessonTranslationSessionResponse
 }
 
 

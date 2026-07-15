@@ -216,6 +216,16 @@
     margin: 0;
   }
 
+  .playsay-translation-overlay {
+    right: 0.5rem;
+    bottom: calc(3.15rem + env(safe-area-inset-bottom) + 0.45rem);
+    left: 0.5rem;
+  }
+
+  .playsay-translation-disclosure {
+    max-width: 22rem;
+  }
+
   .playsay-screen-share-label {
     top: 2.9rem;
     left: 0.75rem;

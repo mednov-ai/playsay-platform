@@ -925,6 +925,40 @@ paths:
           description: Current user cannot manage schedule
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/translation-session:
+    post:
+      tags:
+      - Schedule
+      summary: Create a realtime lesson translation session
+      description: Returns a short-lived listener-side credential for a two-person
+        individual lesson.
+      operationId: createLessonTranslationSession
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Realtime translation credential
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonTranslationSessionResponse"
+        "401":
+          description: Authentication is required
+        "403":
+          description: Current user is not the lesson teacher or student
+        "404":
+          description: Active lesson not found
+        "409":
+          description: Translation is unavailable for the lesson or profile language
+        "503":
+          description: Realtime translation provider is unavailable
+      security:
+      - bearerAuth: []
   /schedule/lessons/{lessonId}/start:
     post:
       tags:
@@ -3871,6 +3905,30 @@ components:
       required:
       - firstName
       - username
+    LessonTranslationSessionResponse:
+      type: object
+      properties:
+        clientSecret:
+          type: string
+        expiresAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        model:
+          type: string
+        callsUrl:
+          type: string
+        targetLanguage:
+          type: string
+        sourceParticipantIdentity:
+          type: string
+      required:
+      - callsUrl
+      - clientSecret
+      - model
+      - sourceParticipantIdentity
+      - targetLanguage
     LiveKitRoomTokenResponse:
       type: object
       properties:

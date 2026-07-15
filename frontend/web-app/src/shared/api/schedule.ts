@@ -1,6 +1,7 @@
 import {
   createScheduledLesson,
   createScheduledLessonRoomToken,
+  createLessonTranslationSession as createLessonTranslationSessionGenerated,
   completeScheduledLesson as completeScheduledLessonGenerated,
   deleteScheduledLesson,
   getScheduledLesson,
@@ -11,7 +12,7 @@ import {
 import { authConfig, clearTokens } from "./auth";
 import { apiErrorFromData } from "./errors";
 import { apiJson, authorizedOptions } from "./http";
-import type { LiveKitRoomToken, ScheduledLesson, ScheduledLessonInput, ScheduledLessonParticipantLinks } from "./types";
+import type { LessonTranslationSession, LiveKitRoomToken, ScheduledLesson, ScheduledLessonInput, ScheduledLessonParticipantLinks } from "./types";
 
 export async function fetchScheduledLessons(config = authConfig): Promise<ScheduledLesson[]> {
   const response = await listScheduledLessons(await authorizedOptions(config));
@@ -123,6 +124,23 @@ export async function enterScheduledLessonRoom(lessonId: string, config = authCo
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Video room token request failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function createLessonTranslationSession(
+  lessonId: string,
+  config = authConfig,
+): Promise<LessonTranslationSession> {
+  const response = await createLessonTranslationSessionGenerated(lessonId, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw apiErrorFromData(response.status, response.data as unknown, `Translation session request failed with HTTP ${response.status}.`);
   }
 
   return response.data;

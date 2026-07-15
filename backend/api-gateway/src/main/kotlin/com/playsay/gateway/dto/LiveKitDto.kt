@@ -9,3 +9,12 @@ data class LiveKitRoomTokenResponse(
     val identity: String,
     val expiresAt: Instant,
 )
+
+data class LessonTranslationSessionResponse(
+    val clientSecret: String,
+    val expiresAt: Instant?,
+    val model: String,
+    val callsUrl: String,
+    val targetLanguage: String,
+    val sourceParticipantIdentity: String,
+)

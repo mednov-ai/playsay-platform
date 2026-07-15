@@ -4,12 +4,24 @@ import { Track } from "livekit-client";
 import { ScreenShare, Video } from "lucide-react";
 import { ClassroomControlBar } from "./ClassroomControlBar";
 import { useAppTranslation } from "../../../shared/i18n";
+import { useLessonTranslation } from "../hooks/useLessonTranslation";
+import type { TranslationRole } from "../model/realtimeTranslation";
 
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
 type ClassroomStripLayout = "single" | "row";
 export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly";
 
-export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
+export function ClassroomVideoStage({
+  lessonId,
+  lessonType,
+  mode,
+  translationRole,
+}: {
+  lessonId: string;
+  lessonType: string;
+  mode: ClassroomVideoMode;
+  translationRole: TranslationRole | null;
+}) {
   const { t } = useAppTranslation();
   const controlsRef = useRef<HTMLDivElement | null>(null);
   const focusRef = useRef<HTMLDivElement | null>(null);
@@ -17,6 +29,7 @@ export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
   const stripRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const [pipPosition, setPipPosition] = useState({ x: 12, y: 120 });
+  const translation = useLessonTranslation({ lessonId, lessonType, role: translationRole });
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
@@ -175,7 +188,8 @@ export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
               </div>
             )}
         </div>
-        <ClassroomControlBar setControlsRef={(node) => { controlsRef.current = node; }} />
+        <ClassroomTranslationOverlay translation={translation} />
+        <ClassroomControlBar role={translationRole} setControlsRef={(node) => { controlsRef.current = node; }} translation={translation} />
         <RoomAudioRenderer />
         <ConnectionStateToast />
       </div>
@@ -220,11 +234,59 @@ export function ClassroomVideoStage({ mode }: { mode: ClassroomVideoMode }) {
             : null}
         </div>
       </div>
-      <ClassroomControlBar setControlsRef={(node) => { controlsRef.current = node; }} />
+      <ClassroomTranslationOverlay translation={translation} />
+      <ClassroomControlBar role={translationRole} setControlsRef={(node) => { controlsRef.current = node; }} translation={translation} />
       <RoomAudioRenderer />
       <ConnectionStateToast />
     </div>
   );
+}
+
+function ClassroomTranslationOverlay({ translation }: { translation: ReturnType<typeof useLessonTranslation> }) {
+  const { t } = useAppTranslation();
+  const latestCaption = [...translation.captions].reverse().find((caption) => caption.text.trim())?.text.trim();
+  if (!translation.localEnabled && !translation.canEnable) return null;
+
+  const statusText = translationStatusText(translation, t);
+  return (
+    <div className="playsay-translation-overlay" data-status={translation.status}>
+      <div aria-live="polite" className="playsay-translation-status">{statusText}</div>
+      {latestCaption ? <div aria-live="polite" className="playsay-translation-caption">{latestCaption}</div> : null}
+      {!translation.localEnabled && translation.canEnable ? (
+        <div className="playsay-translation-disclosure">{t("classroom.translation.disclosure")}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function translationStatusText(
+  translation: ReturnType<typeof useLessonTranslation>,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const knownErrorCodes = new Set([
+    "LESSON_TRANSLATION_ACCESS_DENIED",
+    "LESSON_TRANSLATION_NOT_INDIVIDUAL",
+    "LESSON_TRANSLATION_PARTICIPANTS_INVALID",
+    "LESSON_TRANSLATION_LANGUAGE_UNAVAILABLE",
+    "LESSON_TRANSLATION_NOT_REQUIRED",
+    "LESSON_TRANSLATION_PROVIDER_UNAVAILABLE",
+    "LESSON_TRANSLATION_CONNECTION_FAILED",
+  ]);
+  if (translation.errorCode) {
+    const errorCode = knownErrorCodes.has(translation.errorCode)
+      ? translation.errorCode
+      : "LESSON_TRANSLATION_CONNECTION_FAILED";
+    return t(`classroom.translation.errors.${errorCode}`);
+  }
+  if (!translation.localEnabled) return t("classroom.translation.enableHint");
+  if (!translation.remoteEnabled) return t("classroom.translation.waitingPeer");
+  if (translation.status === "connecting") return t("classroom.translation.connecting");
+  if (translation.status === "starting") return t("classroom.translation.starting");
+  if (translation.status === "speaking") return t("classroom.translation.speaking");
+  if (translation.status === "receiving") return t("classroom.translation.receiving");
+  if (translation.status === "draining") return t("classroom.translation.draining");
+  if (translation.status === "ready") return t("classroom.translation.ready");
+  return t("classroom.translation.waiting");
 }
 
 function ClassroomGridVideoTile({ trackRef }: { trackRef: ClassroomTrackReference }) {

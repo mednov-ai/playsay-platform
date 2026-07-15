@@ -13,6 +13,7 @@ export type LessonRoomSession = LiveKitRoomToken & {
   workMode: string;
   materialId: string | null;
   participants: ScheduledLesson["participants"];
+  teacherSubject: string | null;
   teacherName: string | null;
 };
 
@@ -40,6 +41,7 @@ export function roomSessionFromScheduledLesson(
     workMode: lesson.workMode,
     materialId: lesson.materialId ?? null,
     participants: lesson.participants,
+    teacherSubject: lesson.teacherSubject ?? session.teacherSubject,
     teacherName: lesson.teacherName ?? session.teacherName,
   };
 }

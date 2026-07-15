@@ -69,6 +69,11 @@ export function LiveLessonExperience({
   const displayName = profile?.name ?? profile?.username ?? t("classroom.participantFallback");
   const lessonTypeLabel = formatLessonType(session.lessonType, translate);
   const canManageLesson = canAssignLessons(profile);
+  const translationRole = session.identity === session.teacherSubject
+    ? "teacher"
+    : session.participants.some((participant) => participant.subject === session.identity)
+      ? "student"
+      : null;
   const videoOnly = !session.materialId && !canManageLesson;
   const rawViewportMode = useClassroomViewportMode();
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
@@ -186,7 +191,12 @@ export function LiveLessonExperience({
             token={session.token}
             video
           >
-            <ClassroomVideoStage mode={classroomVideoMode} />
+            <ClassroomVideoStage
+              lessonId={session.lessonId}
+              lessonType={session.lessonType}
+              mode={classroomVideoMode}
+              translationRole={translationRole}
+            />
           </LiveKitRoom>
         </div>
       </section>

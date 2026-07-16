@@ -97,7 +97,7 @@ acquire() {
 
   now_epoch="$(date +%s)"
   deadline_epoch="$((now_epoch + 2400))"
-  now_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  now_iso="$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)"
   state_patch="$(jq -nc \
     --arg holder "$HOLDER" \
     --arg pod "$AGENT_POD" \
@@ -179,4 +179,3 @@ case "${1:-}" in
     exit 2
     ;;
 esac
-

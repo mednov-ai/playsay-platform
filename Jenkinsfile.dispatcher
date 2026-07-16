@@ -32,6 +32,15 @@ spec:
   activeDeadlineSeconds: 600
   serviceAccountName: jenkins
   containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 384Mi
     - name: node
       image: node:22
       command: ["cat"]

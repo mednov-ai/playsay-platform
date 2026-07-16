@@ -11,6 +11,15 @@ spec:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch
   containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 384Mi
     - name: gradle
       image: gradle:8-jdk21
       command: ["cat"]

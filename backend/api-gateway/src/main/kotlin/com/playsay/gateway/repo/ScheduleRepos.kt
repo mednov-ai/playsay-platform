@@ -8,11 +8,13 @@ import java.time.Instant
 import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 
 data class ScheduledLessonRow(
     val id: UUID,
     val lessonTemplateId: UUID?,
+    val inheritTemplateMaterial: Boolean,
     val materialId: UUID?,
     val materialTitle: String?,
     val courseId: UUID?,
@@ -57,6 +59,19 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
     fun countByTeacherUserIdAndStatus(teacherUserId: UUID, status: String): Long
 
     fun findByTeacherUserId(teacherUserId: UUID): List<LessonEntity>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        select l
+          from LessonEntity l
+         where l.id = :sourceId
+            or l.recurrenceSeriesId = :sourceId
+         order by l.recurrenceIndex
+        """,
+    )
+    fun findByScheduleSourceId(sourceId: UUID): List<LessonEntity>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """
@@ -72,7 +87,12 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
         select new com.playsay.gateway.repo.ScheduledLessonRow(
             l.id,
             l.lessonTemplateId,
-            coalesce(l.materialId, lt.materialId),
+            l.inheritTemplateMaterial,
+            case
+                when l.materialId is not null then l.materialId
+                when l.inheritTemplateMaterial = true then lt.materialId
+                else null
+            end,
             lm.title,
             lt.courseId,
             c.title,
@@ -96,7 +116,9 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           left join CourseEntity c on c.id = lt.courseId
           left join LessonMaterialEntity lm on lm.id = case
               when l.workMode = 'PARALLEL' then null
-              else coalesce(l.materialId, lt.materialId)
+              when l.materialId is not null then l.materialId
+              when l.inheritTemplateMaterial = true then lt.materialId
+              else null
           end
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
          order by case when l.scheduledStart is null then 1 else 0 end,
@@ -111,7 +133,15 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
         select new com.playsay.gateway.repo.ScheduledLessonRow(
             l.id,
             l.lessonTemplateId,
-            coalesce(l.materialId, lt.materialId),
+            l.inheritTemplateMaterial,
+            coalesce(
+                lpCurrent.materialId,
+                case
+                    when l.materialId is not null then l.materialId
+                    when l.inheritTemplateMaterial = true then lt.materialId
+                    else null
+                end
+            ),
             lm.title,
             lt.courseId,
             c.title,
@@ -135,7 +165,14 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           join AppUserEntity currentStudent on currentStudent.id = lpCurrent.studentUserId
           left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
           left join CourseEntity c on c.id = lt.courseId
-          left join LessonMaterialEntity lm on lm.id = coalesce(lpCurrent.materialId, l.materialId, lt.materialId)
+          left join LessonMaterialEntity lm on lm.id = coalesce(
+              lpCurrent.materialId,
+              case
+                  when l.materialId is not null then l.materialId
+                  when l.inheritTemplateMaterial = true then lt.materialId
+                  else null
+              end
+          )
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
          where currentStudent.keycloakSubject = :subject
            and l.status not in :excludedStatuses
@@ -156,7 +193,12 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
         select new com.playsay.gateway.repo.ScheduledLessonRow(
             l.id,
             l.lessonTemplateId,
-            coalesce(l.materialId, lt.materialId),
+            l.inheritTemplateMaterial,
+            case
+                when l.materialId is not null then l.materialId
+                when l.inheritTemplateMaterial = true then lt.materialId
+                else null
+            end,
             lm.title,
             lt.courseId,
             c.title,
@@ -180,7 +222,9 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           left join CourseEntity c on c.id = lt.courseId
           left join LessonMaterialEntity lm on lm.id = case
               when l.workMode = 'PARALLEL' then null
-              else coalesce(l.materialId, lt.materialId)
+              when l.materialId is not null then l.materialId
+              when l.inheritTemplateMaterial = true then lt.materialId
+              else null
           end
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
          where l.id = :lessonId
@@ -193,7 +237,15 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
         select new com.playsay.gateway.repo.ScheduledLessonRow(
             l.id,
             l.lessonTemplateId,
-            coalesce(lpCurrent.materialId, l.materialId, lt.materialId),
+            l.inheritTemplateMaterial,
+            coalesce(
+                lpCurrent.materialId,
+                case
+                    when l.materialId is not null then l.materialId
+                    when l.inheritTemplateMaterial = true then lt.materialId
+                    else null
+                end
+            ),
             lm.title,
             lt.courseId,
             c.title,
@@ -217,7 +269,14 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           join AppUserEntity currentStudent on currentStudent.id = lpCurrent.studentUserId
           left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
           left join CourseEntity c on c.id = lt.courseId
-          left join LessonMaterialEntity lm on lm.id = coalesce(lpCurrent.materialId, l.materialId, lt.materialId)
+          left join LessonMaterialEntity lm on lm.id = coalesce(
+              lpCurrent.materialId,
+              case
+                  when l.materialId is not null then l.materialId
+                  when l.inheritTemplateMaterial = true then lt.materialId
+                  else null
+              end
+          )
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
          where l.id = :lessonId
            and currentStudent.keycloakSubject = :subject
@@ -290,7 +349,9 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.workMode,
             case
                 when l.workMode = 'PARALLEL' then null
-                else coalesce(l.materialId, lt.materialId)
+                when l.materialId is not null then l.materialId
+                when l.inheritTemplateMaterial = true then lt.materialId
+                else null
             end
         )
           from LessonEntity l
@@ -308,7 +369,14 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.scheduledStart,
             l.scheduledEnd,
             l.workMode,
-            coalesce(lpCurrent.materialId, l.materialId, lt.materialId)
+            coalesce(
+                lpCurrent.materialId,
+                case
+                    when l.materialId is not null then l.materialId
+                    when l.inheritTemplateMaterial = true then lt.materialId
+                    else null
+                end
+            )
         )
           from LessonEntity l
           join LessonParticipantEntity lpCurrent on lpCurrent.lessonId = l.id
@@ -327,7 +395,14 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           left join LessonTemplateEntity lt on lt.id = l.lessonTemplateId
           join LessonParticipantEntity lp on lp.lessonId = l.id
           join AppUserEntity student on student.id = lp.studentUserId
-         where coalesce(lp.materialId, l.materialId, lt.materialId) = :materialId
+         where coalesce(
+                   lp.materialId,
+                   case
+                       when l.materialId is not null then l.materialId
+                       when l.inheritTemplateMaterial = true then lt.materialId
+                       else null
+                   end
+               ) = :materialId
            and student.keycloakSubject = :subject
            and l.status not in :excludedStatuses
            and l.scheduledStart is not null
@@ -451,6 +526,10 @@ interface LessonParticipantRepo : JpaRepository<LessonParticipantEntity, UUID> {
 
 interface LessonEmailReminderRepo : JpaRepository<LessonEmailReminderEntity, UUID> {
     fun deleteByLessonIdAndStatusIn(lessonId: UUID, statuses: Collection<String>): Long
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from LessonEmailReminderEntity r where r.lessonId = :lessonId")
+    fun deleteByLessonId(lessonId: UUID): Int
 
     fun existsByIdempotencyKey(idempotencyKey: String): Boolean
 

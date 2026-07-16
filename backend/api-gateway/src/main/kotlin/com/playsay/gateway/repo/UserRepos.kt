@@ -5,7 +5,9 @@ import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.entity.TeacherProfileEntity
 import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
+import jakarta.persistence.LockModeType
 
 interface AppUserRepo : JpaRepository<AppUserEntity, UUID> {
     fun findByKeycloakSubject(keycloakSubject: String): AppUserEntity?
@@ -13,6 +15,10 @@ interface AppUserRepo : JpaRepository<AppUserEntity, UUID> {
     fun findByKeycloakSubjectIn(keycloakSubjects: Collection<String>): List<AppUserEntity>
 
     fun findByIdIn(ids: Collection<UUID>): List<AppUserEntity>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from AppUserEntity u where u.id in :ids order by u.id")
+    fun lockByIdIn(ids: Collection<UUID>): List<AppUserEntity>
 
     fun findByUsernameIgnoreCase(username: String): AppUserEntity?
 

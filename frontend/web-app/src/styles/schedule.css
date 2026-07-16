@@ -385,7 +385,11 @@
 }
 
 .playsay-schedule-material-option {
+  position: relative;
   display: grid;
+  min-height: 9rem;
+  min-width: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
   border: 1px solid hsl(var(--border));
   border-radius: 0.9rem;
@@ -400,13 +404,37 @@
 }
 
 .playsay-schedule-material-option > button {
+  position: relative;
   display: grid;
+  min-width: 0;
+  align-content: center;
   gap: 0.25rem;
   border: 0;
   background: transparent;
   color: inherit;
   padding: 0.85rem;
   text-align: left;
+}
+
+.playsay-schedule-material-option--single {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.playsay-schedule-material-option--single > button {
+  height: 100%;
+  padding-right: 2.8rem;
+}
+
+.playsay-schedule-material-check {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  padding: 0.15rem;
 }
 
 .playsay-schedule-material-option > button:last-child:not(:first-child) {

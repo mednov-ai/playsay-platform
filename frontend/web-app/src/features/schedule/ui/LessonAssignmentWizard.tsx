@@ -57,7 +57,7 @@ export function LessonAssignmentWizard({
 }) {
   const { t } = useAppTranslation();
   const [step, setStep] = useState<WizardStep>(0);
-  const [form, setForm] = useState<ScheduleFormState>(() => defaultScheduleForm(lessonOptions[0]?.id ?? ""));
+  const [form, setForm] = useState<ScheduleFormState>(() => defaultScheduleForm(""));
   const [studentPickerOpen, setStudentPickerOpen] = useState(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [draftStudentSubjects, setDraftStudentSubjects] = useState<string[]>([]);
@@ -76,20 +76,11 @@ export function LessonAssignmentWizard({
   useEffect(() => {
     if (!open) {
       setStep(0);
+      setForm(defaultScheduleForm(""));
       setCreatedLesson(null);
       setPreviewMaterial(null);
     }
   }, [open]);
-
-  useEffect(() => {
-    setForm((current) => {
-      const option = lessonOptions.find((item) => item.id === current.lessonTemplateId) ?? lessonOptions[0];
-      if (!option || current.lessonTemplateId) {
-        return current;
-      }
-      return { ...current, lessonTemplateId: option.id, materialId: option.materialId };
-    });
-  }, [lessonOptions]);
 
   useEffect(() => {
     if (!open) {
@@ -128,7 +119,9 @@ export function LessonAssignmentWizard({
     setForm((current) => ({
       ...current,
       lessonTemplateId,
-      materialId: option?.materialId ?? current.materialId,
+      materialId: option?.materialId ?? "",
+      inheritTemplateMaterial: false,
+      defaultParallelMaterialId: option?.materialId ?? "",
     }));
   }
 
@@ -157,6 +150,7 @@ export function LessonAssignmentWizard({
     const created = await onCreate({
       lessonTemplateId: form.lessonTemplateId || null,
       materialId: form.workMode === "PARALLEL" ? null : form.materialId || null,
+      inheritTemplateMaterial: false,
       scheduledStart: localScheduleDateTimeToIso(form.scheduledDate, form.scheduledTime),
       scheduledEnd: localScheduleEndIso(form.scheduledDate, form.scheduledTime, form.durationMinutes),
       status: "SCHEDULED",
@@ -304,13 +298,25 @@ export function LessonAssignmentWizard({
                   <p>{t("schedule.wizard.materialSubtitle")}</p>
                   {activeMaterials.length ? (
                     <div className="playsay-schedule-material-grid">
-                      <button className="playsay-schedule-material-option" data-selected={!form.materialId ? "true" : "false"} onClick={() => setForm((current) => ({ ...current, materialId: "", defaultParallelMaterialId: "" }))} type="button">
-                        <strong>{t("schedule.form.noMaterial")}</strong>
-                        <span>{t("schedule.wizard.chooseLater")}</span>
-                      </button>
+                      <div className="playsay-schedule-material-option playsay-schedule-material-option--single" data-selected={!form.materialId ? "true" : "false"}>
+                        <button
+                          aria-pressed={!form.materialId}
+                          onClick={() => setForm((current) => ({ ...current, materialId: "", inheritTemplateMaterial: false, defaultParallelMaterialId: "" }))}
+                          type="button"
+                        >
+                          {!form.materialId ? <Check aria-hidden="true" className="playsay-schedule-material-check" /> : null}
+                          <strong>{t("schedule.form.noMaterial")}</strong>
+                          <span>{t("schedule.wizard.chooseLater")}</span>
+                        </button>
+                      </div>
                       {activeMaterials.map((material) => (
                         <div className="playsay-schedule-material-option" data-selected={form.materialId === material.id ? "true" : "false"} key={material.id}>
-                          <button onClick={() => setForm((current) => ({ ...current, materialId: material.id, defaultParallelMaterialId: material.id }))} type="button">
+                          <button
+                            aria-pressed={form.materialId === material.id}
+                            onClick={() => setForm((current) => ({ ...current, materialId: material.id, inheritTemplateMaterial: false, defaultParallelMaterialId: material.id }))}
+                            type="button"
+                          >
+                            {form.materialId === material.id ? <Check aria-hidden="true" className="playsay-schedule-material-check" /> : null}
                             <strong>{material.title}</strong>
                             <span>{material.cefrLevel} · {t("schedule.wizard.blocks", { count: material.blockCount })}</span>
                           </button>

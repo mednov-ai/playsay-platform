@@ -59,6 +59,7 @@ function lesson(patch: Partial<ScheduledLesson>): ScheduledLesson {
   return {
     createdAt: "2026-01-01T00:00:00.000Z",
     id: "lesson-1",
+    inheritTemplateMaterial: false,
     lessonTitle: "Starter speaking",
     participants: [],
     scheduledEnd: null,

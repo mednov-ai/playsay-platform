@@ -6,7 +6,9 @@ import com.playsay.gateway.entity.UserDeletionOperationEntity
 import com.playsay.gateway.entity.UserManagementAuditEntity
 import java.time.Instant
 import java.util.UUID
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 
@@ -14,6 +16,38 @@ interface TeacherDelegationRepo : JpaRepository<TeacherDelegationEntity, UUID> {
     fun findAllByOrderByCreatedAtDesc(): List<TeacherDelegationEntity>
     fun findByPrimaryTeacherUserIdOrderByCreatedAtDesc(primaryTeacherUserId: UUID): List<TeacherDelegationEntity>
     fun findByDelegateTeacherUserIdOrderByCreatedAtDesc(delegateTeacherUserId: UUID): List<TeacherDelegationEntity>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        select d
+          from TeacherDelegationEntity d
+         where d.sourceKind = :sourceKind
+           and d.sourceId = :sourceId
+        """,
+    )
+    fun lockBySource(sourceKind: String, sourceId: UUID): List<TeacherDelegationEntity>
+
+    @Query(
+        """
+        select distinct d
+          from TeacherDelegationEntity d, TeacherDelegationStudentEntity ds
+         where ds.delegationId = d.id
+           and ds.studentUserId = :studentUserId
+           and d.primaryTeacherUserId = :primaryTeacherUserId
+           and d.delegateTeacherUserId = :delegateTeacherUserId
+           and d.revokedAt is null
+           and d.startsAt <= :startsAt
+           and d.endsAt >= :endsAt
+        """,
+    )
+    fun findCoveringAccess(
+        primaryTeacherUserId: UUID,
+        delegateTeacherUserId: UUID,
+        studentUserId: UUID,
+        startsAt: Instant,
+        endsAt: Instant,
+    ): List<TeacherDelegationEntity>
 
     @Query(
         """
@@ -91,6 +125,7 @@ interface TeacherDelegationRepo : JpaRepository<TeacherDelegationEntity, UUID> {
 interface TeacherDelegationStudentRepo : JpaRepository<TeacherDelegationStudentEntity, UUID> {
     fun findByDelegationIdIn(delegationIds: Collection<UUID>): List<TeacherDelegationStudentEntity>
     fun findByDelegationId(delegationId: UUID): List<TeacherDelegationStudentEntity>
+    fun deleteByDelegationId(delegationId: UUID): Long
 }
 
 interface UserManagementAuditRepo : JpaRepository<UserManagementAuditEntity, UUID>

@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus
 internal data class ValidatedScheduledLessonRequest(
     val lessonTemplateId: UUID?,
     val materialId: UUID?,
+    val inheritTemplateMaterial: Boolean,
     val scheduledStart: Instant?,
     val scheduledEnd: Instant?,
     val status: String,
@@ -68,9 +69,18 @@ internal fun ScheduledLessonRequest.validated(allowRecurrence: Boolean = true): 
         throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_LESSON_RECURRENCE)
     }
 
+    val inheritsTemplateMaterial = when {
+        cleanedWorkMode != MetaData.LessonWorkModes.SHARED -> false
+        materialId != null -> false
+        inheritTemplateMaterial != null -> inheritTemplateMaterial && lessonTemplateId != null
+        lessonTemplateId != null -> true
+        else -> false
+    }
+
     return ValidatedScheduledLessonRequest(
         lessonTemplateId = lessonTemplateId,
         materialId = materialId,
+        inheritTemplateMaterial = inheritsTemplateMaterial,
         scheduledStart = scheduledStart,
         scheduledEnd = scheduledEnd,
         status = cleanedStatus,

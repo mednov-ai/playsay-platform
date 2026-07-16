@@ -464,6 +464,7 @@ class RepositoryQueryCoverageTest @Autowired constructor(
                 id = id,
                 lessonTemplateId = template?.id,
                 materialId = material?.id,
+                inheritTemplateMaterial = template != null && material == null,
                 teacherUserId = teacher.id,
                 scheduledStart = scheduledStart,
                 scheduledEnd = scheduledEnd,

@@ -23,6 +23,7 @@ function lesson(patch: Partial<ScheduledLesson>): ScheduledLesson {
   return {
     createdAt: "2026-01-01T00:00:00.000Z",
     id: patch.id ?? "lesson-1",
+    inheritTemplateMaterial: false,
     participants: [],
     scheduledEnd: null,
     scheduledStart: null,
@@ -121,6 +122,7 @@ describe("schedule model", () => {
     const form = {
       defaultParallelMaterialId: "",
       durationMinutes: "45",
+      inheritTemplateMaterial: false,
       lessonTemplateId: "lesson-template-1",
       materialId: "material-1",
       participantMaterialIds: {},

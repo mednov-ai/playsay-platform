@@ -36,6 +36,11 @@ object MetaData {
         const val WEEKLY_BY_WEEK = "WEEKLY_BY_WEEK"
     }
 
+    object DelegationSourceKinds {
+        const val MANUAL = "MANUAL"
+        const val SCHEDULE = "SCHEDULE"
+    }
+
     object LessonReminderTypes {
         const val LESSON_START_30M = "LESSON_START_30M"
     }

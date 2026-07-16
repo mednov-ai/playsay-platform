@@ -3,6 +3,8 @@ package com.playsay.gateway
 import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.entity.AppUserEntity
+import com.playsay.gateway.entity.TeacherDelegationEntity
+import com.playsay.gateway.entity.TeacherDelegationStudentEntity
 import com.playsay.gateway.repo.*
 import com.playsay.gateway.service.*
 import com.nimbusds.jose.JWSAlgorithm
@@ -76,6 +78,9 @@ class ScheduledLessonControllerTest @Autowired constructor(
     private val courseRepo: CourseRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val appUserRepo: AppUserRepo,
+    private val teacherDelegationRepo: TeacherDelegationRepo,
+    private val teacherDelegationStudentRepo: TeacherDelegationStudentRepo,
+    private val userManagementAuditRepo: UserManagementAuditRepo,
     private val dataSource: DataSource,
 ) {
     @TestConfiguration
@@ -107,6 +112,9 @@ class ScheduledLessonControllerTest @Autowired constructor(
         lessonTemplateRepo.deleteAllInBatch()
         courseRepo.deleteAllInBatch()
         lessonMaterialRepo.deleteAllInBatch()
+        teacherDelegationStudentRepo.deleteAllInBatch()
+        teacherDelegationRepo.deleteAllInBatch()
+        userManagementAuditRepo.deleteAllInBatch()
         appUserRepo.deleteAllInBatch()
         appUserRepo.seedPrimaryTeacherWithStudents()
     }
@@ -739,12 +747,241 @@ class ScheduledLessonControllerTest @Autowired constructor(
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
+        val withoutMaterial = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplate.id,
+                materialId = null,
+                inheritTemplateMaterial = false,
+                scheduledStart = futureStart(180),
+                scheduledEnd = futureEnd(180),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
 
         assertEquals(templateMaterial.id, inherited.materialId)
+        assertTrue(inherited.inheritTemplateMaterial)
         assertEquals("Template material", inherited.materialTitle)
         assertEquals(directMaterial.id, direct.materialId)
+        assertFalse(direct.inheritTemplateMaterial)
         assertEquals("Direct material", direct.materialTitle)
+        assertNull(withoutMaterial.materialId)
+        assertNull(withoutMaterial.materialTitle)
+        assertFalse(withoutMaterial.inheritTemplateMaterial)
+        assertNull(lessonRepo.findScheduledMaterialLookup(withoutMaterial.id)?.materialId)
         assertEquals(directMaterial.id, scheduleController.get(student, direct.id).materialId)
+    }
+
+    @Test
+    fun `scheduling assigns an unowned student to the lesson teacher`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val teacherId = userProfileStore.currentUserId(teacher)
+        val student = appUserRepo.findByKeycloakSubject("student-1")!!
+        student.managedByTeacher = false
+        student.managedByTeacherUserId = null
+        appUserRepo.saveAndFlush(student)
+
+        scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                participantSubjects = listOf("student-1"),
+            ),
+        )
+
+        val attached = appUserRepo.findByKeycloakSubject("student-1")!!
+        assertTrue(attached.managedByTeacher)
+        assertEquals(teacherId, attached.managedByTeacherUserId)
+        assertTrue(teacherDelegationRepo.findAll().isEmpty())
+    }
+
+    @Test
+    fun `pure admin does not become the student's teacher`() {
+        val admin = authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN")
+        userProfileStore.currentUserId(admin)
+        val student = appUserRepo.findByKeycloakSubject("student-1")!!
+        student.managedByTeacher = false
+        student.managedByTeacherUserId = null
+        appUserRepo.saveAndFlush(student)
+
+        scheduleController.create(
+            admin,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                participantSubjects = listOf("student-1"),
+            ),
+        )
+
+        assertNull(appUserRepo.findByKeycloakSubject("student-1")!!.managedByTeacherUserId)
+        assertTrue(teacherDelegationRepo.findAll().isEmpty())
+    }
+
+    @Test
+    fun `admin update attaches student to the stored lesson teacher`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val teacherId = userProfileStore.currentUserId(teacher)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+            ),
+        ).body!!
+        val student = appUserRepo.findByKeycloakSubject("student-1")!!
+        student.managedByTeacher = false
+        student.managedByTeacherUserId = null
+        appUserRepo.saveAndFlush(student)
+        val admin = authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN")
+        userProfileStore.currentUserId(admin)
+
+        scheduleController.update(
+            admin,
+            lesson.id,
+            ScheduledLessonRequest(
+                scheduledStart = lesson.scheduledStart,
+                scheduledEnd = lesson.scheduledEnd,
+                participantSubjects = listOf("student-1"),
+            ),
+        )
+
+        assertEquals(teacherId, appUserRepo.findByKeycloakSubject("student-1")!!.managedByTeacherUserId)
+    }
+
+    @Test
+    fun `admin teacher schedules foreign student through schedule delegation and deletion revokes it`() {
+        val teacher = authentication(
+            subject = "teacher-1",
+            username = "teacher.one",
+            role = "ROLE_TEACHER",
+            "ROLE_ADMIN",
+        )
+        val teacherId = userProfileStore.currentUserId(teacher)
+        appUserRepo.seedPrimaryTeacherWithStudents("teacher-2", "foreign-student")
+        val primaryTeacherId = appUserRepo.findByKeycloakSubject("teacher-2")!!.id
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                participantSubjects = listOf("foreign-student"),
+            ),
+        ).body!!
+
+        assertEquals(primaryTeacherId, appUserRepo.findByKeycloakSubject("foreign-student")!!.managedByTeacherUserId)
+        val delegation = teacherDelegationRepo.findAll().single()
+        assertEquals(primaryTeacherId, delegation.primaryTeacherUserId)
+        assertEquals(teacherId, delegation.delegateTeacherUserId)
+        assertEquals("SCHEDULE", delegation.sourceKind)
+        assertEquals(lesson.id, delegation.sourceId)
+        assertEquals(
+            appUserRepo.findByKeycloakSubject("foreign-student")!!.id,
+            teacherDelegationStudentRepo.findByDelegationId(delegation.id).single().studentUserId,
+        )
+        assertTrue(userManagementAuditRepo.findAll().any { audit ->
+            audit.action == "SCHEDULE_CREATE" && audit.details.contains(lesson.id.toString())
+        })
+
+        scheduleController.delete(teacher, lesson.id)
+
+        assertNotNull(teacherDelegationRepo.findById(delegation.id).orElseThrow().revokedAt)
+    }
+
+    @Test
+    fun `ordinary teacher cannot create a new delegation for a foreign student`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        appUserRepo.seedPrimaryTeacherWithStudents("teacher-2", "foreign-student")
+
+        val error = assertFailsWith<ResponseStatusException> {
+            scheduleController.create(
+                teacher,
+                ScheduledLessonRequest(
+                    scheduledStart = futureStart(60),
+                    scheduledEnd = futureEnd(60),
+                    participantSubjects = listOf("foreign-student"),
+                ),
+            )
+        }
+
+        assertEquals(HttpStatus.FORBIDDEN, error.statusCode)
+        assertTrue(lessonRepo.findAll().isEmpty())
+        assertTrue(teacherDelegationRepo.findAll().isEmpty())
+    }
+
+    @Test
+    fun `ordinary teacher reuses a covering manual delegation`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val teacherId = userProfileStore.currentUserId(teacher)
+        appUserRepo.seedPrimaryTeacherWithStudents("teacher-2", "foreign-student")
+        val primaryTeacherId = appUserRepo.findByKeycloakSubject("teacher-2")!!.id
+        val studentId = appUserRepo.findByKeycloakSubject("foreign-student")!!.id
+        val now = Instant.now()
+        val manual = teacherDelegationRepo.saveAndFlush(
+            TeacherDelegationEntity(
+                primaryTeacherUserId = primaryTeacherId,
+                delegateTeacherUserId = teacherId,
+                startsAt = now.minus(Duration.ofHours(1)),
+                endsAt = now.plus(Duration.ofDays(3)),
+                createdByUserId = primaryTeacherId,
+                createdAt = now,
+            ),
+        )
+        teacherDelegationStudentRepo.saveAndFlush(
+            TeacherDelegationStudentEntity(
+                delegationId = manual.id,
+                studentUserId = studentId,
+                createdAt = now,
+            ),
+        )
+
+        val created = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                participantSubjects = listOf("foreign-student"),
+            ),
+        ).body!!
+
+        assertEquals(listOf("foreign-student"), created.participants.map { participant -> participant.subject })
+        assertEquals(listOf("MANUAL"), teacherDelegationRepo.findAll().map { delegation -> delegation.sourceKind })
+    }
+
+    @Test
+    fun `series keeps one schedule delegation until its last lesson is deleted`() {
+        val teacher = authentication(
+            subject = "teacher-1",
+            username = "teacher.one",
+            role = "ROLE_TEACHER",
+            "ROLE_ADMIN",
+        )
+        userProfileStore.currentUserId(teacher)
+        appUserRepo.seedPrimaryTeacherWithStudents("teacher-2", "foreign-student")
+        val firstStart = futureWeekdayStart(DayOfWeek.MONDAY)
+        val created = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = firstStart,
+                scheduledEnd = firstStart.plus(Duration.ofMinutes(45)),
+                participantSubjects = listOf("foreign-student"),
+                recurrence = ScheduledLessonRecurrenceRequest(
+                    mode = "WEEKLY_COUNT",
+                    count = 2,
+                    weekdays = listOf("MONDAY"),
+                    timeZone = "UTC",
+                ),
+            ),
+        ).body!!
+        val seriesLessons = scheduleController.list(teacher)
+        val delegation = teacherDelegationRepo.findAll().single()
+
+        assertEquals(created.recurrenceSeriesId, delegation.sourceId)
+        assertEquals(2, seriesLessons.size)
+        scheduleController.delete(teacher, seriesLessons.first().id)
+        assertNull(teacherDelegationRepo.findById(delegation.id).orElseThrow().revokedAt)
+        scheduleController.delete(teacher, seriesLessons.last().id)
+        assertNotNull(teacherDelegationRepo.findById(delegation.id).orElseThrow().revokedAt)
     }
 
     @Test
@@ -1010,6 +1247,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         subject: String,
         username: String,
         role: String,
+        vararg additionalRoles: String,
     ): JwtAuthenticationToken {
         val jwt = Jwt.withTokenValue("token-$subject")
             .header("alg", "none")
@@ -1019,7 +1257,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
             .claim("name", username.replace(".", " ").replaceFirstChar { char -> char.uppercase() })
             .build()
 
-        return JwtAuthenticationToken(jwt, listOf(SimpleGrantedAuthority(role)))
+        return JwtAuthenticationToken(jwt, (listOf(role) + additionalRoles).map(::SimpleGrantedAuthority))
     }
 
     private fun webhookBody(event: String, roomName: String, identity: String, createdAt: Instant): String =

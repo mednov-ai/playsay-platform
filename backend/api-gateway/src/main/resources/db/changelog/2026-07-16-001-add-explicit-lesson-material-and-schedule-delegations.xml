@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-16-001-explicit-lesson-material" author="codex">
+        <addColumn tableName="lesson">
+            <column name="inherit_template_material" type="BOOLEAN" defaultValueBoolean="false"/>
+        </addColumn>
+        <sql>
+            UPDATE lesson
+               SET inherit_template_material = TRUE
+             WHERE work_mode = 'SHARED'
+               AND material_id IS NULL
+               AND lesson_template_id IS NOT NULL
+        </sql>
+        <addNotNullConstraint
+            tableName="lesson"
+            columnName="inherit_template_material"
+            columnDataType="BOOLEAN"
+            defaultNullValue="false"/>
+    </changeSet>
+
+    <changeSet id="2026-07-16-002-schedule-delegation-source" author="codex">
+        <addColumn tableName="teacher_delegation">
+            <column name="source_kind" type="VARCHAR(24)" defaultValue="MANUAL">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_id" type="UUID"/>
+        </addColumn>
+        <sql>
+            ALTER TABLE teacher_delegation
+            ADD CONSTRAINT chk_teacher_delegation_source_kind
+            CHECK (source_kind IN ('MANUAL', 'SCHEDULE'))
+        </sql>
+        <createIndex tableName="teacher_delegation" indexName="idx_teacher_delegation_source">
+            <column name="source_kind"/>
+            <column name="source_id"/>
+        </createIndex>
+        <addUniqueConstraint
+            tableName="teacher_delegation"
+            columnNames="source_kind,source_id,primary_teacher_user_id,delegate_teacher_user_id"
+            constraintName="uq_teacher_delegation_schedule_source"/>
+    </changeSet>
+</databaseChangeLog>

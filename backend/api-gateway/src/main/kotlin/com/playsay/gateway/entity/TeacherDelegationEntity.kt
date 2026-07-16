@@ -20,6 +20,10 @@ class TeacherDelegationEntity(
     var startsAt: Instant = Instant.EPOCH,
     @Column(name = "ends_at", nullable = false)
     var endsAt: Instant = Instant.EPOCH,
+    @Column(name = "source_kind", nullable = false, length = 24)
+    var sourceKind: String = "MANUAL",
+    @Column(name = "source_id")
+    var sourceId: UUID? = null,
     @Column(name = "created_by_user_id", nullable = false)
     var createdByUserId: UUID = UUID.randomUUID(),
     @Column(name = "created_at", nullable = false)

@@ -116,6 +116,8 @@ export interface ScheduledLessonRequest {
   /** @nullable */
   materialId?: string | null;
   /** @nullable */
+  inheritTemplateMaterial?: boolean | null;
+  /** @nullable */
   scheduledStart?: string | null;
   /** @nullable */
   scheduledEnd?: string | null;
@@ -147,6 +149,7 @@ export interface ScheduledLessonResponse {
   lessonTemplateId?: string | null;
   /** @nullable */
   materialId?: string | null;
+  inheritTemplateMaterial: boolean;
   /** @nullable */
   materialTitle?: string | null;
   /** @nullable */

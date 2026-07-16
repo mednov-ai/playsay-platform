@@ -52,6 +52,7 @@ class LessonRealtimePrincipalTest {
             id = UUID.randomUUID(),
             lessonTemplateId = null,
             materialId = null,
+            inheritTemplateMaterial = false,
             materialTitle = null,
             courseId = null,
             courseTitle = null,

@@ -80,7 +80,12 @@ export function useScheduleActions({
     setScheduleMessage(null);
     try {
       const created = await saveScheduledLesson(input);
-      setScheduledLessons(await fetchScheduledLessons());
+      const [freshSchedule, freshStudents] = await Promise.all([
+        fetchScheduledLessons(),
+        fetchStudentProfiles(),
+      ]);
+      setScheduledLessons(freshSchedule);
+      setStudentUsers(freshStudents);
       const createdCount = input.recurrence?.mode === "WEEKLY_COUNT"
         ? input.recurrence.count
         : input.recurrence?.mode === "WEEKLY_BY_WEEK"
@@ -153,6 +158,7 @@ export function useScheduleActions({
       const updated = await editScheduledLesson(lessonId, {
         lessonTemplateId: lesson.lessonTemplateId ?? null,
         materialId,
+        inheritTemplateMaterial: false,
         scheduledStart: lesson.scheduledStart ?? null,
         scheduledEnd: lesson.scheduledEnd ?? null,
         status: lesson.status as ScheduledLessonInput["status"],
@@ -193,7 +199,8 @@ export function useScheduleActions({
     try {
       await editScheduledLesson(lesson.id, {
         lessonTemplateId: lesson.lessonTemplateId ?? null,
-        materialId: lesson.materialId ?? null,
+        materialId: lesson.inheritTemplateMaterial ? null : lesson.materialId ?? null,
+        inheritTemplateMaterial: lesson.inheritTemplateMaterial,
         scheduledStart: lesson.scheduledStart ?? null,
         scheduledEnd: lesson.scheduledEnd ?? null,
         status: "CANCELLED",

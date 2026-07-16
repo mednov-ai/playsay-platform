@@ -23,6 +23,8 @@ class LessonEntity(
     var lessonTemplate: LessonTemplateEntity? = null,
     @Column(name = "material_id")
     var materialId: UUID? = null,
+    @Column(name = "inherit_template_material", nullable = false)
+    var inheritTemplateMaterial: Boolean = false,
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "material_id", insertable = false, updatable = false)
     var material: LessonMaterialEntity? = null,

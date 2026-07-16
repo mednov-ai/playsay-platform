@@ -14,6 +14,7 @@ export type ScheduleFormState = {
   defaultParallelMaterialId: string;
   durationMinutes: string;
   lessonTemplateId: string;
+  inheritTemplateMaterial: boolean;
   materialId: string;
   participantMaterialIds: Record<string, string>;
   scheduledDate: string;
@@ -67,6 +68,7 @@ export function defaultScheduleForm(lessonTemplateId: string): ScheduleFormState
     defaultParallelMaterialId: "",
     durationMinutes: "45",
     lessonTemplateId,
+    inheritTemplateMaterial: false,
     materialId: "",
     participantMaterialIds: {},
     scheduledDate: toLocalDateValue(start),

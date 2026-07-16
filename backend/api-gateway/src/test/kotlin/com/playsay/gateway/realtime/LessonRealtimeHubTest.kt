@@ -45,6 +45,7 @@ class LessonRealtimeHubTest {
             id = id,
             lessonTemplateId = null,
             materialId = null,
+            inheritTemplateMaterial = false,
             materialTitle = null,
             courseId = null,
             courseTitle = null,

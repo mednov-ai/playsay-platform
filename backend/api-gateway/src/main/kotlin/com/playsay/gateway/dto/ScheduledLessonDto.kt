@@ -7,6 +7,7 @@ import java.util.UUID
 data class ScheduledLessonRequest(
     val lessonTemplateId: UUID? = null,
     val materialId: UUID? = null,
+    val inheritTemplateMaterial: Boolean? = null,
     val scheduledStart: Instant? = null,
     val scheduledEnd: Instant? = null,
     @field:Schema(allowableValues = ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
@@ -47,6 +48,7 @@ data class ScheduledLessonResponse(
     val id: UUID,
     val lessonTemplateId: UUID?,
     val materialId: UUID?,
+    val inheritTemplateMaterial: Boolean,
     val materialTitle: String?,
     val courseId: UUID?,
     val courseTitle: String?,

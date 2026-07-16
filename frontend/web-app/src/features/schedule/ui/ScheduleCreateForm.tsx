@@ -77,7 +77,7 @@ export function ScheduleCreateForm({
   studentUsers: AdminUserProfile[];
 }) {
   const { t } = useAppTranslation();
-  const [form, setForm] = useState<ScheduleFormState>(() => defaultScheduleForm(lessonOptions[0]?.id ?? ""));
+  const [form, setForm] = useState<ScheduleFormState>(() => defaultScheduleForm(""));
   const [studentPickerOpen, setStudentPickerOpen] = useState(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [draftStudentSubjects, setDraftStudentSubjects] = useState<string[]>([]);
@@ -103,21 +103,6 @@ export function ScheduleCreateForm({
     : createDisabledReason === "recurrence"
       ? t("schedule.form.createRequiresRecurrence")
       : null;
-
-  useEffect(() => {
-    setForm((current) => {
-      const selectedOption = lessonOptions.find((option) => option.id === current.lessonTemplateId) ?? lessonOptions[0];
-      if (!selectedOption) {
-        return current;
-      }
-      return {
-        ...current,
-        lessonTemplateId: current.lessonTemplateId || selectedOption.id,
-        materialId: current.materialId || selectedOption.materialId,
-        defaultParallelMaterialId: current.defaultParallelMaterialId || selectedOption.materialId,
-      };
-    });
-  }, [lessonOptions]);
 
   function updateField<Key extends keyof ScheduleFormState>(field: Key, value: ScheduleFormState[Key]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -217,6 +202,7 @@ export function ScheduleCreateForm({
     setForm((current) => ({
       ...current,
       lessonTemplateId,
+      inheritTemplateMaterial: false,
       materialId: selectedOption?.materialId ?? "",
       defaultParallelMaterialId: selectedOption?.materialId ?? "",
       participantMaterialIds: {},
@@ -276,6 +262,7 @@ export function ScheduleCreateForm({
           ? form.defaultParallelMaterialId || null
           : null
         : form.materialId || null,
+      inheritTemplateMaterial: false,
       scheduledStart: localScheduleDateTimeToIso(form.scheduledDate, form.scheduledTime),
       scheduledEnd: localScheduleEndIso(form.scheduledDate, form.scheduledTime, form.durationMinutes),
       status: "SCHEDULED",

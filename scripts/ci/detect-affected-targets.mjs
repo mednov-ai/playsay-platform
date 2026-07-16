@@ -107,9 +107,14 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
-    if (path === "contracts/openapi.yaml" || path.startsWith("backend/api-gateway/")) {
+    if (path === "contracts/openapi.yaml") {
       targets.add("api-gateway");
       targets.add("web-app");
+      continue;
+    }
+
+    if (path.startsWith("backend/api-gateway/")) {
+      targets.add("api-gateway");
       continue;
     }
 

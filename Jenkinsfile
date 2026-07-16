@@ -6,6 +6,7 @@ apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins
+  activeDeadlineSeconds: 2400
   securityContext:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch
@@ -14,6 +15,9 @@ spec:
       image: gradle:8-jdk21
       command: ["cat"]
       tty: true
+      env:
+        - name: JAVA_TOOL_OPTIONS
+          value: "-XX:ActiveProcessorCount=1"
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /home/gradle/.gradle
@@ -23,8 +27,8 @@ spec:
           cpu: 450m
           memory: 1Gi
         limits:
-          cpu: "2"
-          memory: 3Gi
+          cpu: "1"
+          memory: 2Gi
     - name: node-frontend
       image: node:22
       command: ["cat"]
@@ -38,7 +42,7 @@ spec:
           cpu: 250m
           memory: 512Mi
         limits:
-          cpu: 1500m
+          cpu: "1"
           memory: 1Gi
     - name: node-collaboration
       image: node:22
@@ -157,6 +161,32 @@ spec:
       image: alpine:3.20
       command: ["cat"]
       tty: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+    - name: capacity-guard
+      image: alpine/k8s:1.33.1
+      command: ["/bin/sh", "/scripts/guard.sh"]
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      resources:
+        requests:
+          cpu: 10m
+          memory: 24Mi
+        limits:
+          cpu: 100m
+          memory: 96Mi
+      volumeMounts:
+        - name: capacity-scripts
+          mountPath: /scripts
+          readOnly: true
     - name: smoke
       image: mcr.microsoft.com/playwright:v1.56.1-noble
       command: ["cat"]
@@ -222,6 +252,10 @@ spec:
           cpu: 500m
           memory: 512Mi
   volumes:
+    - name: capacity-scripts
+      configMap:
+        name: playsay-ci-capacity-scripts
+        defaultMode: 0555
     - name: kaniko-docker-config
       emptyDir: {}
     - name: jenkins-agent-cache
@@ -236,6 +270,7 @@ spec:
     disableConcurrentBuilds()
     skipDefaultCheckout(true)
     timestamps()
+    timeout(time: 30, unit: 'MINUTES')
   }
 
   parameters {
@@ -346,6 +381,14 @@ spec:
       }
     }
 
+    stage('Reserve build capacity') {
+      steps {
+        container('tools') {
+          sh 'apk add --no-cache curl jq kubectl && CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh acquire'
+        }
+      }
+    }
+
     stage('Build, test, and validate') {
       parallel {
         stage('Backend validation') {
@@ -353,40 +396,20 @@ spec:
             expression { env.RUN_API_GATEWAY == 'true' || env.RUN_MEDIA_SERVICE == 'true' || env.RUN_PAYMENT_SERVICE == 'true' || env.RUN_REGISTRATION_SERVICE == 'true' || env.RUN_EMAIL_SERVICE == 'true' }
           }
           stages {
-            stage('Backend tests') {
+            stage('Backend test and package') {
               steps {
                 container('gradle') {
                   dir('backend') {
-                    echo "Running backend tests for ${env.BUILD_LABEL}"
+                    echo "Testing and packaging affected backend services for ${env.BUILD_LABEL}"
                     sh '''
                       set -eu
                       TASKS=""
-                      if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:test"; fi
-                      if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:test"; fi
-                      if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:test"; fi
-                      if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then TASKS="$TASKS :registration-service:test"; fi
-                      if [ "$RUN_EMAIL_SERVICE" = "true" ]; then TASKS="$TASKS :email-service:test"; fi
-                      gradle $TASKS --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process
-                    '''
-                  }
-                }
-              }
-            }
-
-            stage('Backend package') {
-              steps {
-                container('gradle') {
-                  dir('backend') {
-                    echo "Packaging affected backend services for ${env.BUILD_LABEL}"
-                    sh '''
-                      set -eu
-                      TASKS=""
-                      if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:bootJar"; fi
-                      if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:bootJar"; fi
-                      if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:bootJar"; fi
-                      if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then TASKS="$TASKS :registration-service:bootJar"; fi
-                      if [ "$RUN_EMAIL_SERVICE" = "true" ]; then TASKS="$TASKS :email-service:bootJar"; fi
-                      gradle $TASKS --no-daemon --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process
+                      if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:test :api-gateway:bootJar :api-gateway:exportOpenApi"; fi
+                      if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:test :media-service:bootJar"; fi
+                      if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:test :payment-service:bootJar"; fi
+                      if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then TASKS="$TASKS :registration-service:test :registration-service:bootJar"; fi
+                      if [ "$RUN_EMAIL_SERVICE" = "true" ]; then TASKS="$TASKS :email-service:test :email-service:bootJar"; fi
+                      gradle $TASKS -PlowMemoryTests --no-daemon --stacktrace --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process
                     '''
                   }
                 }
@@ -398,12 +421,6 @@ spec:
                 expression { env.RUN_API_GATEWAY == 'true' }
               }
               steps {
-                container('gradle') {
-                  dir('backend') {
-                    echo "Exporting api-gateway OpenAPI contract for ${env.BUILD_LABEL}"
-                    sh 'gradle :api-gateway:exportOpenApi --no-daemon --stacktrace --max-workers=2 -Dkotlin.compiler.execution.strategy=in-process'
-                  }
-                }
                 sh '''
                   set -eu
                   git diff --exit-code -- contracts/openapi.yaml || {
@@ -1068,6 +1085,17 @@ JSON
 
   post {
     always {
+      script {
+        if (fileExists('scripts/ci/manage-build-capacity.sh')) {
+          try {
+            container('tools') {
+              sh 'command -v kubectl >/dev/null 2>&1 || apk add --no-cache jq kubectl; CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh restore'
+            }
+          } catch (err) {
+            echo "Capacity restore deferred to watchdog: ${err}"
+          }
+        }
+      }
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

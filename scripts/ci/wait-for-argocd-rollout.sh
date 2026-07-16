@@ -24,6 +24,14 @@ POLL_SECONDS="${PLAYSAY_DEV_ROLLOUT_POLL_SECONDS:-10}"
 ARGOCD_REFRESH_MODE="${ARGOCD_REFRESH_MODE:-webhook}"
 DEADLINE="$(( $(date +%s) + TIMEOUT_SECONDS ))"
 
+if [ -x "./scripts/ci/manage-build-capacity.sh" ]; then
+  for app in $APPS; do
+    CI_BUILD_ID="${JOB_NAME:-jenkins}-${BUILD_NUMBER:-unknown}" \
+      CI_TARGET_APP="$app" \
+      ./scripts/ci/manage-build-capacity.sh restore-target
+  done
+fi
+
 if [ "$ARGOCD_REFRESH_MODE" = "annotate" ]; then
   kubectl -n argocd annotate application $APPS argocd.argoproj.io/refresh=hard --overwrite || true
 elif [ "$ARGOCD_REFRESH_MODE" != "webhook" ]; then

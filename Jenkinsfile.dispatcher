@@ -1,35 +1,12 @@
 pipeline {
-  agent {
-    kubernetes {
-      yaml """
-apiVersion: v1
-kind: Pod
-spec:
-  serviceAccountName: jenkins
-  securityContext:
-    fsGroup: 1000
-    fsGroupChangePolicy: OnRootMismatch
-  containers:
-    - name: node
-      image: node:22
-      command: ["cat"]
-      tty: true
-      resources:
-        requests:
-          cpu: 100m
-          memory: 192Mi
-        limits:
-          cpu: 500m
-          memory: 512Mi
-"""
-    }
-  }
+  agent none
 
   options {
     buildDiscarder(logRotator(numToKeepStr: '30'))
     disableConcurrentBuilds()
     skipDefaultCheckout(true)
     timestamps()
+    timeout(time: 360, unit: 'MINUTES')
   }
 
   parameters {
@@ -37,7 +14,7 @@ spec:
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA.', trim: true)
     string(name: 'FORCE_TARGETS', defaultValue: '', description: 'Optional manual override: all or comma-separated deploy targets.', trim: true)
-    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1', description: 'Maximum downstream module jobs to run at once. Dev default is 1 for single-node VPS stability; use 2 only after checking node memory and swap.', trim: true)
+    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1', description: 'Single-node dev capacity is fixed to one downstream module job.', trim: true)
   }
 
   environment {
@@ -45,12 +22,35 @@ spec:
   }
 
   stages {
-    stage('Checkout') {
+    stage('Analyze changes') {
+      agent {
+        kubernetes {
+          yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  activeDeadlineSeconds: 600
+  serviceAccountName: jenkins
+  containers:
+    - name: node
+      image: node:22
+      command: ["cat"]
+      tty: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 384Mi
+"""
+        }
+      }
       steps {
         script {
           def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
           def requestedCommit = params.GITHUB_AFTER?.trim()
-          def scmVars = checkout([
+          checkout([
             $class: 'GitSCM',
             branches: [[name: "*/${requestedBranch}"]],
             doGenerateSubmoduleConfigurations: false,
@@ -67,46 +67,24 @@ spec:
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
           currentBuild.displayName = "dispatch-${env.BUILD_NUMBER}"
           currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
-          echo "Dispatcher source branch: ${env.CI_BRANCH}"
-          echo "Dispatcher source commit: ${env.GIT_COMMIT}"
         }
-      }
-    }
 
-    stage('Detect affected targets') {
-      steps {
         container('node') {
           sh '''
             set -eu
             if ! command -v git >/dev/null 2>&1; then
-              if command -v apt-get >/dev/null 2>&1; then
-                apt-get update
-                apt-get install -y --no-install-recommends git ca-certificates
-              elif command -v apk >/dev/null 2>&1; then
-                apk add --no-cache git ca-certificates
-              else
-                echo "git is required for affected-target detection"
-                exit 1
-              fi
+              apt-get update
+              apt-get install -y --no-install-recommends git ca-certificates
             fi
             git config --global --add safe.directory "$WORKSPACE"
             GITHUB_BEFORE="${GITHUB_BEFORE:-}" \
             GITHUB_AFTER="${GITHUB_AFTER:-}" \
             FORCE_TARGETS="${FORCE_TARGETS:-}" \
-              node scripts/ci/detect-affected-targets.mjs > affected-targets.json
-            GITHUB_BEFORE="${GITHUB_BEFORE:-}" \
-            GITHUB_AFTER="${GITHUB_AFTER:-}" \
-            FORCE_TARGETS="${FORCE_TARGETS:-}" \
               node scripts/ci/detect-affected-targets.mjs --env > affected-targets.env
-            cat affected-targets.json
             cat affected-targets.env
           '''
         }
-      }
-    }
 
-    stage('Dispatch downstream jobs') {
-      steps {
         script {
           def detection = [:]
           readFile('affected-targets.env').split('\\n').each { line ->
@@ -115,89 +93,59 @@ spec:
               detection[line.substring(0, separator)] = line.substring(separator + 1).trim()
             }
           }
-          def jobs = (detection.AFFECTED_JOBS ?: '').split(',').collect { it.trim() }.findAll { it }
-          def maxParallelText = params.MAX_PARALLEL_MODULE_JOBS?.trim() ?: '1'
-          if (!(maxParallelText ==~ /[1-9]/)) {
-            error "MAX_PARALLEL_MODULE_JOBS must be an integer from 1 to 9; got '${maxParallelText}'"
+          env.AFFECTED_JOBS = detection.AFFECTED_JOBS ?: ''
+          env.AFFECTED_TARGETS = detection.AFFECTED_TARGETS ?: ''
+          env.AFFECTED_REASON = detection.AFFECTED_REASON ?: 'unknown'
+          echo "Dispatcher source branch: ${env.CI_BRANCH}"
+          echo "Dispatcher source commit: ${env.GIT_COMMIT}"
+          echo "Affected targets: ${env.AFFECTED_TARGETS ?: '(none)'}"
+          echo "Detection reason: ${env.AFFECTED_REASON}"
+        }
+      }
+    }
+
+    stage('Dispatch downstream jobs') {
+      steps {
+        script {
+          if ((params.MAX_PARALLEL_MODULE_JOBS?.trim() ?: '1') != '1') {
+            error 'MAX_PARALLEL_MODULE_JOBS is fixed to 1 on the single-node dev cluster.'
           }
-          def maxParallelModuleJobs = maxParallelText.toInteger()
-          echo "Affected targets: ${detection.AFFECTED_TARGETS ?: '(none)'}"
-          echo "Detection reason: ${detection.AFFECTED_REASON ?: '(unknown)'}"
+          def jobs = (env.AFFECTED_JOBS ?: '').split(',').collect { it.trim() }.findAll { it }
           if (jobs.isEmpty()) {
             echo 'No downstream jobs needed for this change.'
             return
           }
 
-          dir('downstream-results') {
-            deleteDir()
-            writeFile file: '.initialized', text: ''
-          }
-
-          def indexedJobs = []
+          def downstreamResults = []
           jobs.eachWithIndex { jobName, index ->
-            indexedJobs << [name: jobName, index: index]
-          }
-          def batches = indexedJobs.collate(maxParallelModuleJobs)
-          echo "Dispatching ${jobs.size()} downstream job(s) with max parallelism ${maxParallelModuleJobs}"
-
-          batches.eachWithIndex { batch, batchIndex ->
-            echo "Starting downstream batch ${batchIndex + 1}/${batches.size()}: ${batch.collect { it.name }.join(', ')}"
-            def branches = [:]
-            batch.each { job ->
-              def branchJobName = job.name
-              def branchResultFile = "downstream-results/${job.index}-${branchJobName.replaceAll(/[^A-Za-z0-9_.-]/, '_')}.properties"
-              branches[branchJobName] = {
-                def downstreamParams = [
-                  string(name: 'BRANCH_NAME', value: env.CI_BRANCH),
-                  string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
-                  string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
-                ]
-                try {
-                  echo "Triggering ${branchJobName}"
-                  def downstreamBuild = build job: branchJobName, parameters: downstreamParams, wait: true, propagate: false
-                  def downstreamResult = downstreamBuild?.result ?: 'UNKNOWN'
-                  def downstreamNumber = downstreamBuild?.number ?: ''
-                  def downstreamUrl = downstreamBuild?.absoluteUrl ?: ''
-                  echo "${branchJobName} completed with ${downstreamResult}"
-                  writeFile file: branchResultFile, text: "job=${branchJobName}\nresult=${downstreamResult}\nnumber=${downstreamNumber}\nurl=${downstreamUrl}\n"
-                } catch (err) {
-                  def sanitizedError = err.toString().replace('\n', ' ')
-                  echo "${branchJobName} dispatch failed: ${sanitizedError}"
-                  writeFile file: branchResultFile, text: "job=${branchJobName}\nresult=FAILURE\nnumber=\nurl=\nerror=${sanitizedError}\n"
-                }
-              }
-            }
-            parallel branches
-          }
-
-          def downstreamResults = indexedJobs.collect { job ->
-            def resultFile = "downstream-results/${job.index}-${job.name.replaceAll(/[^A-Za-z0-9_.-]/, '_')}.properties"
-            if (!fileExists(resultFile)) {
-              [job: job.name, result: 'FAILURE', number: '', url: '', error: 'missing result file']
-            } else {
-              def values = [:]
-              readFile(resultFile).split('\\n').each { line ->
-                def separator = line.indexOf('=')
-                if (separator > 0) {
-                  values[line.substring(0, separator)] = line.substring(separator + 1)
-                }
-              }
-              values
+            def downstreamParams = [
+              string(name: 'BRANCH_NAME', value: env.CI_BRANCH),
+              string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
+              string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
+            ]
+            echo "Triggering ${jobName} (${index + 1}/${jobs.size()})"
+            try {
+              def downstreamBuild = build job: jobName, parameters: downstreamParams, wait: true, propagate: false
+              downstreamResults << [
+                job: jobName,
+                result: downstreamBuild?.result ?: 'UNKNOWN',
+                number: downstreamBuild?.number ?: '',
+                url: downstreamBuild?.absoluteUrl ?: ''
+              ]
+            } catch (err) {
+              downstreamResults << [job: jobName, result: 'FAILURE', number: '', url: '', error: err.toString()]
             }
           }
+
           def resultSummary = downstreamResults.collect { result ->
             def buildRef = result.number ? " #${result.number}" : ''
             "${result.job}=${result.result}${buildRef}"
           }.join(', ')
           echo "Downstream module job results: ${resultSummary}"
 
-          def failures = downstreamResults.findAll { result -> result.result != 'SUCCESS' }
+          def failures = downstreamResults.findAll { it.result != 'SUCCESS' }
           if (!failures.isEmpty()) {
-            def failureSummary = failures.collect { result ->
-              def buildRef = result.number ? " #${result.number}" : ''
-              "${result.job}=${result.result}${buildRef}"
-            }.join(', ')
-            error "Downstream module job failures: ${failureSummary}"
+            error "Downstream module job failures: ${failures.collect { it.job + '=' + it.result }.join(', ')}"
           }
         }
       }

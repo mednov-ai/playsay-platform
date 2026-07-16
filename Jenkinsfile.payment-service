@@ -6,6 +6,7 @@ apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins
+  activeDeadlineSeconds: 2400
   securityContext:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch
@@ -14,6 +15,9 @@ spec:
       image: gradle:8-jdk21
       command: ["cat"]
       tty: true
+      env:
+        - name: JAVA_TOOL_OPTIONS
+          value: "-XX:ActiveProcessorCount=1"
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /home/gradle/.gradle
@@ -23,8 +27,8 @@ spec:
           cpu: 450m
           memory: 1Gi
         limits:
-          cpu: "2"
-          memory: 3Gi
+          cpu: "1"
+          memory: 2Gi
     - name: liquibase
       image: liquibase/liquibase:5.0.3
       command: ["cat"]
@@ -73,7 +77,37 @@ spec:
       image: alpine:3.20
       command: ["cat"]
       tty: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+    - name: capacity-guard
+      image: alpine/k8s:1.33.1
+      command: ["/bin/sh", "/scripts/guard.sh"]
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      resources:
+        requests:
+          cpu: 10m
+          memory: 24Mi
+        limits:
+          cpu: 100m
+          memory: 96Mi
+      volumeMounts:
+        - name: capacity-scripts
+          mountPath: /scripts
+          readOnly: true
   volumes:
+    - name: capacity-scripts
+      configMap:
+        name: playsay-ci-capacity-scripts
+        defaultMode: 0555
     - name: kaniko-docker-config
       emptyDir: {}
     - name: jenkins-agent-cache
@@ -88,6 +122,7 @@ spec:
     disableConcurrentBuilds()
     skipDefaultCheckout(true)
     timestamps()
+    timeout(time: 30, unit: 'MINUTES')
   }
 
   parameters {
@@ -162,11 +197,19 @@ spec:
       }
     }
 
+    stage('Reserve build capacity') {
+      steps {
+        container('tools') {
+          sh 'apk add --no-cache curl jq kubectl && CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh acquire'
+        }
+      }
+    }
+
     stage('Test and package') {
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :payment-service:test :payment-service:bootJar --no-daemon --stacktrace --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :payment-service:test :payment-service:bootJar --no-daemon --stacktrace --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process'
           }
         }
       }
@@ -283,6 +326,17 @@ EOF
 
   post {
     always {
+      script {
+        if (fileExists('scripts/ci/manage-build-capacity.sh')) {
+          try {
+            container('tools') {
+              sh 'command -v kubectl >/dev/null 2>&1 || apk add --no-cache jq kubectl; CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh restore'
+            }
+          } catch (err) {
+            echo "Capacity restore deferred to watchdog: ${err}"
+          }
+        }
+      }
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

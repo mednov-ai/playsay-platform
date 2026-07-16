@@ -32,11 +32,19 @@ test("web-app changes trigger only web-app job", () => {
   assertDetection(["frontend/web-app/src/App.tsx"], ["web-app"], ["playsay-web-app-develop"]);
 });
 
-test("api-gateway and contract changes trigger api-gateway and web-app", () => {
+test("api-gateway contract changes trigger api-gateway and web-app", () => {
   assertDetection(
-    ["backend/api-gateway/src/main/kotlin/com/playsay/gateway/GatewayController.kt", "contracts/openapi.yaml"],
+    ["contracts/openapi.yaml"],
     ["api-gateway", "web-app"],
     ["playsay-api-gateway-develop", "playsay-web-app-develop"],
+  );
+});
+
+test("internal api-gateway changes do not rebuild web-app", () => {
+  assertDetection(
+    ["backend/api-gateway/src/main/kotlin/com/playsay/gateway/GatewayController.kt"],
+    ["api-gateway"],
+    ["playsay-api-gateway-develop"],
   );
 });
 

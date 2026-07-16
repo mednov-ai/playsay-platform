@@ -41,7 +41,7 @@ class OpenAiLessonTranslationCredentialProviderTest {
             val credential = provider.create("fr", "hashed-user-identifier")
 
             val json = objectMapper.readTree(requestBody.get())
-            assertEquals("translation", json.path("session").path("type").asText())
+            assertEquals(false, json.path("session").has("type"))
             assertEquals("gpt-realtime-translate", json.path("session").path("model").asText())
             assertEquals("fr", json.path("session").path("audio").path("output").path("language").asText())
             assertEquals("Bearer permanent-secret", authorization.get())

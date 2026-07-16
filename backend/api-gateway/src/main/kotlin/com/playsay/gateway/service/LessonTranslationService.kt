@@ -56,7 +56,6 @@ class OpenAiLessonTranslationCredentialProvider(
         val body = objectMapper.writeValueAsString(
             mapOf(
                 "session" to mapOf(
-                    "type" to "translation",
                     "model" to model,
                     "audio" to mapOf("output" to mapOf("language" to targetLanguage)),
                 ),

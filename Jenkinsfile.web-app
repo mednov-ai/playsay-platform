@@ -283,6 +283,32 @@ EOF
       }
     }
 
+    stage('Restore runtime for smoke') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' }
+      }
+      steps {
+        container('tools') {
+          sh '''
+            set -eu
+            CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh restore
+            for deployment in \
+              ai-tutor-service \
+              vocabulary-service \
+              media-service \
+              registration-service \
+              email-service \
+              payment-service \
+              keyboard-app \
+              keyboard-service
+            do
+              kubectl -n playsay-dev rollout status "deployment/${deployment}" --timeout=180s
+            done
+          '''
+        }
+      }
+    }
+
     stage('UI smoke') {
       when {
         expression { env.DEPLOY_TO_DEV == 'true' }

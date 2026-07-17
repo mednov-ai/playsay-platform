@@ -50,6 +50,7 @@ export type MaterialHtmlGameSync = {
   effects: MaterialHtmlGameEffect[];
   inputs: MaterialHtmlGameInputEvent[];
   isAuthority: boolean;
+  ready: boolean;
   publishEffect: (effect: MaterialHtmlGameEffect) => void;
   publishInput: (event: MaterialHtmlGameInputEvent) => void;
   publishSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;

@@ -42,12 +42,12 @@ export function HtmlGameFrame({
   }, [blockId, sync?.isAuthority]);
 
   useEffect(() => {
-    if (!html || !sync?.isAuthority) {
+    if (!html || !sync?.isAuthority || !sync.ready) {
       return undefined;
     }
     sync.setAuthorityRun(blockId, channel);
     return () => sync.setAuthorityRun(blockId, null);
-  }, [blockId, channel, html, sync?.isAuthority, sync?.setAuthorityRun]);
+  }, [blockId, channel, html, sync?.isAuthority, sync?.ready, sync?.setAuthorityRun]);
 
   useEffect(() => {
     function handleMessage(messageEvent: MessageEvent<BridgeMessage>) {

@@ -1,8 +1,26 @@
+// @vitest-environment jsdom
+// @vitest-environment-options { "url": "http://localhost/" }
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
+
+const apiMocks = vi.hoisted(() => ({
+  fetchAnnotation: vi.fn(),
+  saveAnnotation: vi.fn(),
+}));
+
+vi.mock("../../../shared/api/playsay", () => ({
+  fetchScheduledLessonMaterialAnnotation: apiMocks.fetchAnnotation,
+  saveScheduledLessonMaterialAnnotation: apiMocks.saveAnnotation,
+}));
+
+vi.mock("../../../shared/i18n", () => ({
+  i18n: { t: (key: string) => key },
+  useAppTranslation: () => ({ t: (key: string) => key }),
+}));
 
 const material = {
   id: "material-1",
@@ -52,7 +70,60 @@ const staticImageMaterial = {
   blockCount: 1,
 } satisfies LessonMaterial;
 
+const twoPageMaterial = {
+  ...material,
+  document: {
+    schemaVersion: 1,
+    pages: [
+      ...material.document.pages,
+      {
+        id: "page-2",
+        title: "Second page",
+        layout: "FLOW",
+        blocks: [{ id: "block-2", type: "text", content: "Second task." }],
+      },
+    ],
+  },
+  blockCount: 2,
+} satisfies LessonMaterial;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  apiMocks.fetchAnnotation.mockResolvedValue({
+    content: {
+      activePageId: "page-2",
+      coordinateSpace: "material-page",
+      schemaVersion: 2,
+      strokes: [],
+    },
+  });
+  apiMocks.saveAnnotation.mockResolvedValue({});
+});
+
 describe("LessonTaskCanvas", () => {
+  it("applies a live upload page once and then keeps a manual page selection", async () => {
+    const { container } = render(createElement(LessonTaskCanvas, {
+      canControlPages: true,
+      lessonId: "lesson-1",
+      liveActivePageId: "page-2",
+      material: twoPageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+    const buttons = container.querySelectorAll<HTMLButtonElement>(".playsay-page-picker-button");
+
+    await waitFor(() => expect(buttons[1]?.getAttribute("data-active")).toBe("true"));
+    fireEvent.click(buttons[0]!);
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+
+    expect(buttons[0]?.getAttribute("data-active")).toBe("true");
+    expect(buttons[1]?.getAttribute("data-active")).toBe("false");
+  });
+
   it("lets teacher monitor mode hide fake pagination and submit controls", () => {
     const markup = renderToStaticMarkup(createElement(LessonTaskCanvas, {
       collaborationControls: null,

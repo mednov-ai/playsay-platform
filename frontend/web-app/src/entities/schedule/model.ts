@@ -202,14 +202,28 @@ export function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean
   return (startMs === null || startMs <= nowMs) && (endMs === null || endMs > nowMs);
 }
 
-export function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+export function isLessonInAccessWindow(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
   const startMs = dateValueMs(lesson.scheduledStart);
   const endMs = dateValueMs(lesson.scheduledEnd);
-  return lesson.status === "IN_PROGRESS" &&
-    startMs !== null &&
+  return startMs !== null &&
     endMs !== null &&
     startMs - LESSON_ACCESS_GRACE_MS <= nowMs &&
     endMs + LESSON_ACCESS_GRACE_MS >= nowMs;
+}
+
+export function isScheduledLessonReadyToStart(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+  return lesson.status === "SCHEDULED" && isLessonInAccessWindow(lesson, nowMs);
+}
+
+export function isTeacherLessonActionable(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+  if (isArchivedScheduleLesson(lesson, nowMs)) {
+    return false;
+  }
+  return lesson.status === "IN_PROGRESS" || isScheduledLessonReadyToStart(lesson, nowMs);
+}
+
+export function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+  return lesson.status === "IN_PROGRESS" && isLessonInAccessWindow(lesson, nowMs);
 }
 
 export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number, t: ScheduleTranslate): string {
@@ -219,6 +233,10 @@ export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number, t: Sc
 
   if (lesson.status === "COMPLETED" || isScheduleExpired(lesson, nowMs)) {
     return t("schedule.state.expired");
+  }
+
+  if (isScheduledLessonReadyToStart(lesson, nowMs)) {
+    return t("schedule.state.readyToStart");
   }
 
   if (isJoinableScheduledLesson(lesson, nowMs)) {
@@ -276,6 +294,15 @@ export function compareScheduleLessons(left: ScheduledLesson, right: ScheduledLe
 
 export function compareJoinableLessons(left: ScheduledLesson, right: ScheduledLesson, nowMs: number): number {
   return compareScheduleLessons(left, right, nowMs);
+}
+
+export function nextTeacherActionLesson(lessons: ScheduledLesson[], nowMs: number): ScheduledLesson | null {
+  return lessons
+    .filter((lesson) => isTeacherLessonActionable(lesson, nowMs))
+    .sort((left, right) => {
+      const statusRank = Number(right.status === "IN_PROGRESS") - Number(left.status === "IN_PROGRESS");
+      return statusRank || compareScheduleLessons(left, right, nowMs);
+    })[0] ?? null;
 }
 
 export function splitScheduleLessonsForDashboard(

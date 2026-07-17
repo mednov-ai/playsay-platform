@@ -295,6 +295,7 @@ export const de = {
       live: "Live",
       opensSoon: "Öffnet bald",
       closingSoon: "Noch offen",
+      readyToStart: "Jetzt starten",
       planned: "Geplant",
     },
     lessonType: {
@@ -396,7 +397,9 @@ export const de = {
     },
     actions: {
       join: "Stunde betreten",
+      start: "Stunde starten",
       prepare: "Stunde vorbereiten",
+      prepareShort: "Vorbereiten",
       more: "Weitere Aktionen",
       joinUnavailable: "Der Zutritt öffnet 10 Minuten vorher und schließt 10 Minuten danach.",
       joinWindowHint: "Öffnet 10 Minuten vorher",

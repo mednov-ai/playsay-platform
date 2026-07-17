@@ -50,6 +50,33 @@ describe("AppShell teacher header", () => {
     expect(markup).toContain("Начать урок");
     expect(markup).toContain("Mila");
   });
+
+  it("replaces lesson assignment with direct start when the nearest lesson is ready", () => {
+    const readyLesson = {
+      createdAt: "2026-05-20T10:00:00.000Z",
+      id: "lesson-ready",
+      lessonTitle: "Speaking warm-up",
+      participants: [{ subject: "student-1", displayName: "Mila" }],
+      scheduledEnd: "2026-05-28T10:45:00.000Z",
+      scheduledStart: "2026-05-28T10:00:00.000Z",
+      status: "SCHEDULED",
+      type: "INDIVIDUAL",
+      updatedAt: "2026-05-20T10:00:00.000Z",
+      workMode: "SHARED",
+    } as AppShellProps["scheduledLessons"][number];
+    const shellProps = props();
+    shellProps.scheduledLessons = [readyLesson];
+
+    const markup = renderToStaticMarkup(
+      <AppProviders>
+        <AppShell {...shellProps} />
+      </AppProviders>,
+    );
+
+    expect(markup).toContain('data-lesson-invite-location="header"');
+    expect(markup).toContain("Начать урок");
+    expect(markup).not.toContain("Назначить урок");
+  });
 });
 
 function props(): AppShellProps {

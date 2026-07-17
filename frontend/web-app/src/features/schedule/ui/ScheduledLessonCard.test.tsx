@@ -22,6 +22,7 @@ describe("ScheduledLessonCard", () => {
           onCopyLink={() => undefined}
           onDelete={() => undefined}
           onJoin={() => undefined}
+          onStart={() => undefined}
           roomLoading={false}
         />
       </AppProviders>,
@@ -46,12 +47,43 @@ describe("ScheduledLessonCard", () => {
           onCopyLink={() => undefined}
           onDelete={() => undefined}
           onJoin={() => undefined}
+          onStart={() => undefined}
           roomLoading={false}
         />
       </AppProviders>,
     );
 
     expect(markup).toContain("Ссылки");
+  });
+
+  it("promotes direct lesson start during the live access window", () => {
+    const markup = renderToStaticMarkup(
+      <AppProviders>
+        <ScheduledLessonCard
+          canManage
+          disabled={false}
+          lesson={lesson({
+            scheduledStart: "2026-05-28T10:10:00.000Z",
+            scheduledEnd: "2026-05-28T10:55:00.000Z",
+          })}
+          linkCopied={false}
+          nowMs={Date.parse("2026-05-28T10:00:00.000Z")}
+          onCancel={() => undefined}
+          onComplete={() => undefined}
+          onCopyLink={() => undefined}
+          onDelete={() => undefined}
+          onJoin={() => undefined}
+          onStart={() => undefined}
+          roomLoading={false}
+        />
+      </AppProviders>,
+    );
+
+    expect(markup).toContain('data-lesson-action="start"');
+    expect(markup).toContain('data-lesson-invite-location="card"');
+    expect(markup).toContain("Начать урок");
+    expect(markup).toContain("Подготовить");
+    expect(markup).toContain("Пора начинать");
   });
 });
 

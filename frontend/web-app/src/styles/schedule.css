@@ -140,6 +140,36 @@
   padding: 0.9rem;
 }
 
+.playsay-schedule-card--actionable {
+  border-color: hsl(var(--primary) / 0.48);
+  background:
+    radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.11), transparent 42%),
+    hsl(var(--surface));
+  box-shadow: 0 0.8rem 2.2rem hsl(var(--primary) / 0.1);
+}
+
+.playsay-lesson-invite {
+  position: relative;
+  isolation: isolate;
+  box-shadow: 0 0.55rem 1.4rem hsl(var(--primary) / 0.24);
+  animation: playsay-lesson-invite 2.4s ease-in-out infinite;
+}
+
+@keyframes playsay-lesson-invite {
+  0%, 100% {
+    box-shadow: 0 0.55rem 1.4rem hsl(var(--primary) / 0.2), 0 0 0 0 hsl(var(--primary) / 0.2);
+  }
+  50% {
+    box-shadow: 0 0.7rem 1.75rem hsl(var(--primary) / 0.3), 0 0 0 0.38rem hsl(var(--primary) / 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playsay-lesson-invite {
+    animation: none;
+  }
+}
+
 .playsay-schedule-card-menu {
   position: relative;
 }

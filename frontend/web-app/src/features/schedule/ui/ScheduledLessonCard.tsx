@@ -1,10 +1,11 @@
-import { BookOpen, CheckCircle2, Copy, EllipsisVertical, Loader2, RotateCcw, Trash2, Video } from "lucide-react";
+import { BookOpen, CheckCircle2, Copy, EllipsisVertical, Loader2, Play, RotateCcw, Trash2, Video } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   formatDateTime,
   formatLessonType,
   isArchivedScheduleLesson,
   isJoinableScheduledLesson,
+  isScheduledLessonReadyToStart,
   scheduleStateLabel,
 } from "../../../entities/schedule/model";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
@@ -21,6 +22,7 @@ export function ScheduledLessonCard({
   onCopyLink,
   onDelete,
   onJoin,
+  onStart,
   onPrepare = () => undefined,
   roomLoading,
 }: {
@@ -34,6 +36,7 @@ export function ScheduledLessonCard({
   onCopyLink: () => void;
   onDelete: () => void;
   onJoin: () => void;
+  onStart: () => void;
   onPrepare?: () => void;
   roomLoading: boolean;
 }) {
@@ -41,10 +44,15 @@ export function ScheduledLessonCard({
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
   const joinable = isJoinableScheduledLesson(lesson, nowMs);
   const archived = isArchivedScheduleLesson(lesson, nowMs);
+  const readyToStart = canManage && isScheduledLessonReadyToStart(lesson, nowMs);
+  const teacherLessonLive = canManage && !archived && lesson.status === "IN_PROGRESS";
   const stateLabel = scheduleStateLabel(lesson, nowMs, translate);
 
   return (
-    <article className="playsay-schedule-card">
+    <article
+      className={`playsay-schedule-card${readyToStart || teacherLessonLive ? " playsay-schedule-card--actionable" : ""}`}
+      data-lesson-action={readyToStart ? "start" : teacherLessonLive ? "join" : undefined}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -88,13 +96,32 @@ export function ScheduledLessonCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canManage && !archived && lesson.status !== "IN_PROGRESS" ? (
+          {readyToStart ? (
+            <>
+              <Button
+                className="playsay-lesson-invite"
+                data-lesson-invite-location="card"
+                disabled={disabled || roomLoading}
+                onClick={onStart}
+                type="button"
+              >
+                {roomLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {t("schedule.actions.start")}
+              </Button>
+              <Button disabled={disabled || roomLoading} onClick={onPrepare} type="button" variant="outline">
+                <BookOpen className="h-4 w-4" />
+                {t("schedule.actions.prepareShort")}
+              </Button>
+            </>
+          ) : canManage && !archived && lesson.status !== "IN_PROGRESS" ? (
             <Button disabled={disabled} onClick={onPrepare} type="button">
               <BookOpen className="h-4 w-4" />
               {t("schedule.actions.prepare")}
             </Button>
-          ) : joinable || (canManage && lesson.status === "IN_PROGRESS") ? (
+          ) : joinable || teacherLessonLive ? (
             <Button
+              className={teacherLessonLive ? "playsay-lesson-invite" : undefined}
+              data-lesson-invite-location={teacherLessonLive ? "card" : undefined}
               disabled={disabled || roomLoading}
               onClick={onJoin}
               type="button"

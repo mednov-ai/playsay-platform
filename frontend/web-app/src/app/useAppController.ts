@@ -188,15 +188,22 @@ export function useAppController(): AppShellProps {
     return subscribeToPathnameHistory(window, setCurrentPath);
   }, []);
 
+  const routeLesson = routeLessonId
+    ? scheduledLessons.find((lesson) => lesson.id === routeLessonId) ?? null
+    : null;
+  const classroomLesson = routeLesson && (canAccessClassroomPreJoin(routeLesson, profile, nowMs))
+    ? routeLesson
+    : null;
+
   useEffect(() => {
-    document.body.classList.toggle("playsay-classroom-active", roomSession !== null);
+    document.body.classList.toggle("playsay-classroom-active", classroomLesson !== null || roomSession !== null);
     return () => document.body.classList.remove("playsay-classroom-active");
-  }, [roomSession]);
+  }, [classroomLesson, roomSession]);
 
   const isAuthenticated = status === "authenticated" && profile !== null;
   const isAdmin = profile?.roles.includes("ADMIN") ?? false;
   const canManagePeople = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
-  const isClassroomOpen = roomSession !== null;
+  const isClassroomOpen = classroomLesson !== null || roomSession !== null;
   const workspaceTabs = workspaceTabsForProfile(profile);
   const nextJoinableLesson = [...scheduledLessons]
     .filter((lesson) => isJoinableScheduledLesson(lesson, nowMs))
@@ -268,6 +275,7 @@ export function useAppController(): AppShellProps {
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     completeScheduledLesson,
+    confirmScheduledLessonJoin,
     closeClassroom,
     copyScheduledLessonLinks,
     createManagedStudent,
@@ -327,15 +335,11 @@ export function useAppController(): AppShellProps {
       return;
     }
 
-    const routeLesson = scheduledLessons.find((lesson) => lesson.id === routeLessonId);
-    if (routeLesson) {
-      if (!canManagePeople && !isJoinableScheduledLesson(routeLesson, nowMs)) {
-        setRoomMessage(t("schedule.messages.alreadyClosed"));
-        return;
-      }
-      void joinScheduledLesson(routeLesson, { updateRoute: false });
+    if (!routeLesson || (!canManagePeople && !isJoinableScheduledLesson(routeLesson, nowMs))) {
+      setRoomMessage(t("schedule.messages.alreadyClosed"));
+      navigateToPath("/");
     }
-  }, [nowMs, routeLessonId, roomLoadingLessonId, roomSession, scheduledLessons, status]);
+  }, [canManagePeople, nowMs, routeLesson, routeLessonId, roomLoadingLessonId, roomSession, status, t]);
 
   function openLessonPreparation(lessonId: string) {
     navigateToPath(lessonPreparationPath(lessonId));
@@ -495,7 +499,14 @@ export function useAppController(): AppShellProps {
     closeProfile,
     openLessonPreparation,
     closeLessonPreparation,
+    classroomLesson,
+    confirmScheduledLessonJoin,
   };
+}
+
+function canAccessClassroomPreJoin(lesson: ScheduledLesson, profile: MeProfile | null, nowMs: number): boolean {
+  const canManagePeople = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
+  return canManagePeople || isJoinableScheduledLesson(lesson, nowMs);
 }
 
 function userProfileInputWithLanguage(profile: AppUserProfile, language: SupportedLanguage): UpdateUserProfileInput {

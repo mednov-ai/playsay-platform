@@ -1,6 +1,14 @@
 import { LESSON_ACCESS_GRACE_MS, dateValueMs, isClosedScheduleStatus } from "../../../entities/schedule/model";
 import type { LiveKitRoomToken, ScheduledLesson } from "../../../shared/api/playsay";
 
+export type ClassroomMediaChoices = {
+  audioDeviceId: string;
+  audioEnabled: boolean;
+  audioOutputDeviceId: string;
+  videoDeviceId: string;
+  videoEnabled: boolean;
+};
+
 export type LessonRoomSession = LiveKitRoomToken & {
   courseTitle: string | null;
   lessonId: string;
@@ -15,6 +23,7 @@ export type LessonRoomSession = LiveKitRoomToken & {
   participants: ScheduledLesson["participants"];
   teacherSubject: string | null;
   teacherName: string | null;
+  mediaChoices: ClassroomMediaChoices;
 };
 
 export function upsertScheduledLesson(current: ScheduledLesson[], lesson: ScheduledLesson): ScheduledLesson[] {

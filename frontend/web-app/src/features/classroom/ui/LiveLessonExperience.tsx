@@ -184,12 +184,18 @@ export function LiveLessonExperience({
 
         <div className="playsay-classroom-room min-h-0 flex-1">
           <LiveKitRoom
-            audio
+            audio={session.mediaChoices.audioEnabled ? {
+              autoGainControl: true,
+              deviceId: session.mediaChoices.audioDeviceId,
+              echoCancellation: true,
+              noiseSuppression: true,
+            } : false}
             connect
             data-lk-theme="default"
+            options={{ audioOutput: { deviceId: session.mediaChoices.audioOutputDeviceId } }}
             serverUrl={session.serverUrl}
             token={session.token}
-            video
+            video={session.mediaChoices.videoEnabled ? { deviceId: session.mediaChoices.videoDeviceId } : false}
           >
             <ClassroomVideoStage
               lessonId={session.lessonId}

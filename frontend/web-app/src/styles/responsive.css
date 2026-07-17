@@ -5,6 +5,15 @@
 }
 
 @media (max-width: 980px) {
+  .playsay-prejoin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playsay-prejoin-preview,
+  .playsay-prejoin-camera-off {
+    min-height: min(42dvh, 25rem);
+  }
+
   .playsay-workspace-tabs {
     grid-template-columns: 1fr;
   }
@@ -47,6 +56,38 @@
 }
 
 @media (max-width: 640px) {
+  .playsay-prejoin {
+    border: 0;
+    border-radius: 0;
+    padding: 0.8rem;
+  }
+
+  .playsay-prejoin-header .playsay-brand-copy {
+    display: none;
+  }
+
+  .playsay-prejoin-intro h1 {
+    font-size: 1.65rem;
+  }
+
+  .playsay-prejoin-grid {
+    flex: 0 0 auto;
+  }
+
+  .playsay-prejoin-preview,
+  .playsay-prejoin-camera-off {
+    min-height: 14rem;
+  }
+
+  .playsay-prejoin-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .playsay-prejoin-join {
+    width: 100%;
+  }
+
   .playsay-matching-editor-head {
     display: none;
   }

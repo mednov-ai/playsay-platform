@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { classroomLessonIdFromPath, classroomPath } from "../routes";
 import {
+  type ClassroomMediaChoices,
   type LessonRoomSession,
 } from "../../features/classroom";
 import { participantAssignmentsFromLesson } from "../../entities/schedule/model";
@@ -256,13 +257,20 @@ export function useScheduleActions({
     lesson: ScheduledLesson,
     options: { updateRoute?: boolean } = {},
   ) {
+    setRoomMessage(null);
+    if (options.updateRoute ?? true) {
+      navigateToPath(classroomPath(lesson.id));
+    }
+  }
+
+  async function confirmScheduledLessonJoin(
+    lesson: ScheduledLesson,
+    mediaChoices: ClassroomMediaChoices,
+  ) {
     setRoomLoadingLessonId(lesson.id);
     setRoomMessage(null);
     try {
       const token = await enterScheduledLessonRoom(lesson.id);
-      if (options.updateRoute ?? true) {
-        navigateToPath(classroomPath(lesson.id));
-      }
       setRoomSession({
         ...token,
         courseTitle: lesson.courseTitle ?? null,
@@ -278,6 +286,7 @@ export function useScheduleActions({
         participants: lesson.participants,
         teacherSubject: lesson.teacherSubject ?? null,
         teacherName: lesson.teacherName ?? null,
+        mediaChoices,
       });
       setRoomMessage(t("classroom.messages.roomReady"));
     } catch (caught) {
@@ -303,6 +312,7 @@ export function useScheduleActions({
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     completeScheduledLesson,
+    confirmScheduledLessonJoin,
     closeClassroom,
     copyScheduledLessonLinks,
     createManagedStudent,

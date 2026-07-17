@@ -37,7 +37,7 @@ import { BrandMark } from "../shared/ui/BrandMark";
 import { WorkspaceTabs } from "../widgets/workspace-tabs/WorkspaceTabs";
 import { Button } from "../components/ui/button";
 import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
-import type { LessonRoomSession } from "../features/classroom";
+import type { ClassroomMediaChoices, LessonRoomSession } from "../features/classroom";
 import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 import officialLogoUrl from "../shared/assets/playsay-official-logo.jpg";
@@ -52,6 +52,9 @@ const CourseWorkspacePanel = lazy(() => (
 const HomeworkPanel = lazy(() => import("../features/homework/ui/HomeworkPanel").then((module) => ({ default: module.HomeworkPanel })));
 const LiveLessonExperience = lazy(() => (
   import("../features/classroom/ui/LiveLessonExperience").then((module) => ({ default: module.LiveLessonExperience }))
+));
+const ClassroomPreJoin = lazy(() => (
+  import("../features/classroom/ui/ClassroomPreJoin").then((module) => ({ default: module.ClassroomPreJoin }))
 ));
 const MaterialLibraryPanel = lazy(() => (
   import("../features/materials/ui/MaterialLibraryPanel").then((module) => ({ default: module.MaterialLibraryPanel }))
@@ -74,7 +77,9 @@ export type AppShellProps = {
   appProfile: AppUserProfile | null;
   assignMaterialToScheduledLesson: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   cancelScheduledLesson: (lesson: ScheduledLesson) => Promise<void>;
+  classroomLesson: ScheduledLesson | null;
   completeScheduledLesson: (lessonId: string) => Promise<void>;
+  confirmScheduledLessonJoin: (lesson: ScheduledLesson, mediaChoices: ClassroomMediaChoices) => Promise<void>;
   copyScheduledLessonLinks: (lesson: ScheduledLesson) => Promise<boolean>;
   courseLessons: CourseLessonMap;
   courseLoading: boolean;
@@ -158,7 +163,9 @@ export function AppShell(props: AppShellProps) {
     appProfile,
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
+    classroomLesson,
     completeScheduledLesson,
+    confirmScheduledLessonJoin,
     copyScheduledLessonLinks,
     courseLessons,
     courseLoading,
@@ -320,6 +327,16 @@ export function AppShell(props: AppShellProps) {
               onLeave={leaveScheduledLessonRoom}
               profile={profile}
               session={roomSession}
+            />
+          </Suspense>
+        ) : classroomLesson ? (
+          <Suspense fallback={<PanelFallback />}>
+            <ClassroomPreJoin
+              joining={roomLoadingLessonId === classroomLesson.id}
+              lesson={classroomLesson}
+              message={roomMessage}
+              onBack={leaveScheduledLessonRoom}
+              onJoin={(choices) => confirmScheduledLessonJoin(classroomLesson, choices)}
             />
           </Suspense>
         ) : !isAuthenticated ? (

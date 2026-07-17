@@ -1,6 +1,6 @@
-import { StartMediaButton, TrackToggle } from "@livekit/components-react";
+import { MediaDeviceMenu, StartMediaButton, TrackToggle, usePersistentUserChoices } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { Languages, LoaderCircle, ScreenShare } from "lucide-react";
+import { ChevronUp, Languages, LoaderCircle, ScreenShare } from "lucide-react";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { LessonTranslationController } from "../hooks/useLessonTranslation";
 import type { TranslationRole } from "../model/realtimeTranslation";
@@ -15,11 +15,41 @@ export function ClassroomControlBar({
   translation: LessonTranslationController;
 }) {
   const { t } = useAppTranslation();
+  const {
+    saveAudioInputDeviceId,
+    saveAudioInputEnabled,
+    saveVideoInputDeviceId,
+    saveVideoInputEnabled,
+  } = usePersistentUserChoices();
 
   return (
     <div className="lk-control-bar playsay-classroom-controls" ref={setControlsRef}>
-      <TrackToggle source={Track.Source.Microphone}>{t("classroom.controls.microphone")}</TrackToggle>
-      <TrackToggle source={Track.Source.Camera}>{t("classroom.controls.camera")}</TrackToggle>
+      <div className="lk-button-group playsay-device-control">
+        <TrackToggle onChange={(enabled, userInitiated) => { if (userInitiated) saveAudioInputEnabled(enabled); }} source={Track.Source.Microphone}>
+          {t("classroom.controls.microphone")}
+        </TrackToggle>
+        <MediaDeviceMenu
+          aria-label={t("classroom.controls.chooseMicrophone")}
+          kind="audioinput"
+          onActiveDeviceChange={(_kind, deviceId) => saveAudioInputDeviceId(deviceId)}
+          title={t("classroom.controls.chooseMicrophone")}
+        >
+          <ChevronUp className="h-4 w-4" />
+        </MediaDeviceMenu>
+      </div>
+      <div className="lk-button-group playsay-device-control">
+        <TrackToggle onChange={(enabled, userInitiated) => { if (userInitiated) saveVideoInputEnabled(enabled); }} source={Track.Source.Camera}>
+          {t("classroom.controls.camera")}
+        </TrackToggle>
+        <MediaDeviceMenu
+          aria-label={t("classroom.controls.chooseCamera")}
+          kind="videoinput"
+          onActiveDeviceChange={(_kind, deviceId) => saveVideoInputDeviceId(deviceId)}
+          title={t("classroom.controls.chooseCamera")}
+        >
+          <ChevronUp className="h-4 w-4" />
+        </MediaDeviceMenu>
+      </div>
       <TrackToggle source={Track.Source.ScreenShare}>
         <ScreenShare className="h-4 w-4" />
         {t("classroom.controls.screen")}

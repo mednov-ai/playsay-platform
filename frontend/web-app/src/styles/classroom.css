@@ -5,6 +5,264 @@
   --lk-control-bar-height: 4.5rem;
 }
 
+.playsay-prejoin {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.55rem;
+  overflow: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 8% 4%, rgb(255 222 61 / 0.16), transparent 28rem),
+    radial-gradient(circle at 95% 18%, rgb(107 218 180 / 0.13), transparent 26rem),
+    hsl(var(--background));
+  box-shadow: 0 24px 80px rgb(38 25 13 / 0.11);
+  padding-block: 1rem;
+  padding-inline: clamp(1rem, 2.2vw, 2rem);
+}
+
+.playsay-prejoin-header,
+.playsay-prejoin-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.playsay-prejoin-intro {
+  max-width: 48rem;
+}
+
+.playsay-prejoin-intro > span {
+  color: hsl(var(--primary));
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.playsay-prejoin-intro h1 {
+  margin-top: 0.2rem;
+  color: hsl(var(--foreground));
+  font-size: clamp(1.75rem, 3vw, 2.6rem);
+  font-weight: 950;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.playsay-prejoin-intro p {
+  margin-top: 0.45rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 650;
+}
+
+.playsay-prejoin-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1 0 auto;
+  grid-template-columns: minmax(20rem, 1.25fr) minmax(22rem, 0.95fr);
+  gap: 1rem;
+}
+
+.playsay-prejoin-preview {
+  position: relative;
+  min-height: 24rem;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: #111111;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+.playsay-prejoin-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.playsay-prejoin-camera-off {
+  display: grid;
+  height: 100%;
+  min-height: 24rem;
+  place-content: center;
+  justify-items: center;
+  gap: 0.75rem;
+  color: rgb(255 255 255 / 0.72);
+}
+
+.playsay-prejoin-preview-label {
+  position: absolute;
+  bottom: 0.8rem;
+  left: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 0.75rem;
+  background: rgb(17 17 17 / 0.78);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 850;
+  padding: 0.45rem 0.65rem;
+}
+
+.playsay-prejoin-checks {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+}
+
+.playsay-prejoin-card {
+  display: grid;
+  gap: 0.45rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.88);
+  box-shadow: 0 10px 28px rgb(44 30 17 / 0.055);
+  padding: 0.65rem;
+}
+
+.playsay-prejoin-card[data-ready="true"] {
+  border-color: rgb(62 168 122 / 0.35);
+  box-shadow: inset 3px 0 0 rgb(62 168 122 / 0.8), 0 10px 28px rgb(44 30 17 / 0.045);
+}
+
+.playsay-prejoin-card > header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.playsay-prejoin-card > header > span {
+  display: inline-grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
+}
+
+.playsay-prejoin-card > header small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.playsay-prejoin-card[data-ready="true"] > header small {
+  color: #27835c;
+}
+
+.playsay-prejoin-card p {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.playsay-prejoin-card > .playsay-prejoin-select,
+.playsay-prejoin-card > button {
+  width: 100%;
+}
+
+.playsay-prejoin-select {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.playsay-prejoin-select > span {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.playsay-prejoin-select select {
+  width: 100%;
+  min-height: 2.25rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.7rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 0.8rem;
+  font-weight: 750;
+  padding: 0 0.7rem;
+}
+
+.playsay-prejoin-meter {
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: hsl(var(--muted));
+}
+
+.playsay-prejoin-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6bdaa9, hsl(var(--primary)));
+  transition: width 80ms linear;
+}
+
+.playsay-prejoin-heard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.playsay-prejoin-heard > span {
+  width: 100%;
+  color: hsl(var(--foreground));
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.playsay-prejoin-notice,
+.playsay-prejoin-warning {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border: 1px solid rgb(255 92 0 / 0.25);
+  border-radius: 0.9rem;
+  background: rgb(255 244 235 / 0.9);
+  color: hsl(var(--foreground));
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.7rem 0.85rem;
+}
+
+.playsay-prejoin-warning p {
+  margin-top: 0.18rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.playsay-prejoin-footer {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 0.9rem;
+}
+
+.playsay-prejoin-footer > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.playsay-prejoin-footer > div svg {
+  color: #27835c;
+}
+
+.playsay-prejoin-join {
+  min-width: 12rem;
+}
+
 .playsay-live-room [data-lk-theme="default"] {
   height: 100%;
   min-height: 28rem;
@@ -281,6 +539,16 @@
 .playsay-classroom-controls {
   justify-content: center;
   gap: 0.5rem;
+}
+
+.playsay-device-control {
+  display: inline-flex;
+}
+
+.playsay-device-control > .lk-button-menu {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  padding-inline: 0;
 }
 
 .playsay-translation-button {
@@ -1107,6 +1375,7 @@
 }
 
 .dark .playsay-classroom-shell,
+.dark .playsay-prejoin-card,
 .dark .playsay-workbench,
 .dark .playsay-task-board,
 .dark .playsay-page-button,
@@ -1114,6 +1383,11 @@
 .dark .playsay-teacher-live-editor,
 .dark .playsay-material-list-item {
   background: hsl(var(--surface));
+}
+
+.dark .playsay-prejoin-notice,
+.dark .playsay-prejoin-warning {
+  background: hsl(var(--surface-strong));
 }
 
 .dark .playsay-workbench-topbar,

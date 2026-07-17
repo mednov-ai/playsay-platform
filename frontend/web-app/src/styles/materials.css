@@ -395,6 +395,65 @@
   margin-top: 0;
 }
 
+.playsay-rendered-material[data-html-game-presentation="focus"] .playsay-material-blocks-html-game {
+  height: 100%;
+}
+
+.playsay-rendered-material[data-html-game-presentation="minimized"] .playsay-material-blocks-html-game {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+
+.playsay-html-game-launcher {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  width: min(100%, 22rem);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin: clamp(1rem, 4vw, 3rem) auto;
+  border: 1px solid rgb(255 92 0 / 0.28);
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow: 0 0.75rem 2rem rgb(35 25 15 / 0.12);
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.playsay-html-game-launcher > span {
+  display: inline-grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border-radius: 0.875rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.playsay-html-game-launcher strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-html-game-launcher:hover,
+.playsay-html-game-launcher:focus-visible {
+  border-color: hsl(var(--primary));
+  outline: 2px solid rgb(255 92 0 / 0.2);
+  outline-offset: 2px;
+}
+
 .playsay-render-block {
   min-width: 0;
   border: 1px solid hsl(var(--border));
@@ -877,6 +936,11 @@
   min-height: 24rem;
   border: 0;
   background: #ffffff;
+}
+
+.playsay-html-game[data-fill-available="true"] {
+  border: 0;
+  border-radius: 0;
 }
 
 .playsay-html-game[data-paused="true"] iframe {

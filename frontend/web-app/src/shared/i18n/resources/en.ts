@@ -1131,6 +1131,12 @@ export const en = {
       nextTask: "Next task",
       pageIndicator: "{{current}} of {{total}}",
     },
+    presentation: {
+      expandImage: "Expand image",
+      collapseImage: "Collapse image",
+      minimizeGame: "Minimize game",
+      restoreGame: "Restore game",
+    },
     material: {
       pickerEmpty: "No material selected",
       assignedAria: "Assigned tasks",

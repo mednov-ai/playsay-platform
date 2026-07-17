@@ -34,6 +34,7 @@ export function RenderedMaterialBlock({
   block,
   htmlAssets = {},
   htmlGameSync,
+  htmlGameFillAvailable = false,
   mode,
   onAnswerChange,
   onAssetTagsChange,
@@ -49,6 +50,7 @@ export function RenderedMaterialBlock({
   block: MaterialEditorBlock;
   htmlAssets?: Record<string, string>;
   htmlGameSync?: MaterialHtmlGameSync;
+  htmlGameFillAvailable?: boolean;
   materialId?: string;
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
@@ -294,6 +296,7 @@ export function RenderedMaterialBlock({
             {pageLayout === "HTML_GAME" ? null : <h4>{block.title}</h4>}
             <HtmlGameFrame
               blockId={block.id}
+              fillAvailable={htmlGameFillAvailable}
               height={block.height ?? 640}
               html={html}
               sync={htmlGameSync}

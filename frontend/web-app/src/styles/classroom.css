@@ -633,6 +633,23 @@
   background: #fffdfb;
 }
 
+.playsay-workbench[data-presentation-mode="html-game-focus"] .playsay-workbench-topbar,
+.playsay-workbench[data-presentation-mode="image-focus"] .playsay-workbench-topbar,
+.playsay-workbench[data-presentation-mode="html-game-focus"] .playsay-assignment-strip,
+.playsay-workbench[data-presentation-mode="image-focus"] .playsay-assignment-strip,
+.playsay-workbench[data-presentation-mode="html-game-focus"] .playsay-submission-monitor,
+.playsay-workbench[data-presentation-mode="image-focus"] .playsay-submission-monitor,
+.playsay-workbench[data-presentation-mode="html-game-focus"] .playsay-lesson-inline-message,
+.playsay-workbench[data-presentation-mode="image-focus"] .playsay-lesson-inline-message {
+  display: none;
+}
+
+.playsay-workbench[data-presentation-mode="html-game-focus"] .playsay-workbench-body,
+.playsay-workbench[data-presentation-mode="image-focus"] .playsay-workbench-body {
+  gap: 0;
+  padding: 0;
+}
+
 .playsay-workbench-topbar {
   display: flex;
   min-height: 3.25rem;
@@ -960,6 +977,26 @@
   background: #ffffff;
 }
 
+.playsay-task-board[data-presentation-mode="html-game-focus"],
+.playsay-task-board[data-presentation-mode="image-focus"] {
+  border: 0;
+  border-radius: 0;
+}
+
+.playsay-task-board[data-presentation-mode="html-game-focus"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-annotation-toolbar {
+  display: none;
+}
+
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-task-footer,
+.playsay-task-board[data-presentation-mode="image-focus"] .playsay-task-footer {
+  display: none;
+}
+
 .playsay-teacher-task-reveal {
   place-content: center;
   align-items: center;
@@ -1053,6 +1090,32 @@
     linear-gradient(180deg, #ffffff 0%, #fffdfb 100%);
 }
 
+.playsay-presentation-floating-action {
+  position: absolute;
+  z-index: 8;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.8);
+  border-radius: 0.75rem;
+  background: rgb(17 17 17 / 0.78);
+  box-shadow: 0 0.5rem 1.5rem rgb(17 17 17 / 0.2);
+  color: #ffffff;
+  cursor: pointer;
+  backdrop-filter: blur(0.5rem);
+}
+
+.playsay-presentation-floating-action:hover,
+.playsay-presentation-floating-action:focus-visible {
+  background: hsl(var(--primary));
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
 .playsay-task-document {
   height: 100%;
   overflow: auto;
@@ -1074,6 +1137,41 @@
 
 .playsay-task-document-surface > .playsay-rendered-material {
   min-height: 100%;
+}
+
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-task-document {
+  overflow: hidden;
+  padding: 0;
+}
+
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-task-document-surface,
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-rendered-material,
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-material-blocks-html-game,
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-render-block-html-game,
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-html-game,
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-html-game iframe {
+  min-height: 0;
+  height: 100%;
+}
+
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-rendered-material {
+  display: flex;
+  flex-direction: column;
+}
+
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-material-blocks-html-game {
+  flex: 1 1 auto;
+}
+
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-page-picker,
+.playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-material-score-badge,
+.playsay-task-board[data-presentation-mode="image-focus"] .playsay-page-picker,
+.playsay-task-board[data-presentation-mode="image-focus"] .playsay-material-score-badge {
+  display: none;
+}
+
+.playsay-task-board[data-presentation-mode="image-focus"] .playsay-task-document {
+  padding: 0;
 }
 
 .playsay-task-document-surface .playsay-presence-layer {

@@ -14,12 +14,14 @@ type BridgeMessage =
 
 export function HtmlGameFrame({
   blockId,
+  fillAvailable = false,
   height,
   html,
   sync,
   title,
 }: {
   blockId: string;
+  fillAvailable?: boolean;
   height: number;
   html?: string;
   sync?: MaterialHtmlGameSync;
@@ -147,6 +149,7 @@ export function HtmlGameFrame({
     <div
       className="playsay-html-game"
       data-authority={sync?.isAuthority ? "true" : "false"}
+      data-fill-available={fillAvailable ? "true" : "false"}
       data-paused={authorityAvailable ? "false" : "true"}
     >
       <iframe
@@ -154,7 +157,7 @@ export function HtmlGameFrame({
         ref={iframeRef}
         sandbox="allow-scripts allow-forms allow-pointer-lock"
         srcDoc={srcDoc}
-        style={{ height }}
+        style={{ height: fillAvailable ? "100%" : height }}
         title={title}
       />
       {isMirror && !authorityAvailable ? (

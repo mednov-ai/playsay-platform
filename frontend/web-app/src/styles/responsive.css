@@ -351,6 +351,13 @@
     grid-template-columns: 2.55rem minmax(0, 1fr);
   }
 
+  .playsay-presentation-floating-action {
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
   .playsay-annotation-toolbar {
     gap: 0.375rem;
     padding: 0.425rem 0.3rem;

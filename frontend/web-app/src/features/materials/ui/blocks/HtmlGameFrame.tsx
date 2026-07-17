@@ -46,7 +46,7 @@ export function HtmlGameFrame({
       return undefined;
     }
     sync.setAuthorityRun(blockId, channel);
-    return () => sync.setAuthorityRun(null, null);
+    return () => sync.setAuthorityRun(blockId, null);
   }, [blockId, channel, html, sync?.isAuthority, sync?.setAuthorityRun]);
 
   useEffect(() => {

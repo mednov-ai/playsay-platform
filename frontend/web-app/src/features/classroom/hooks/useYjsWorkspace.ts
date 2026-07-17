@@ -153,14 +153,13 @@ export function useYjsWorkspace({
     runtimeRef.current?.setHtmlGameSnapshot(blockId, gameSnapshot);
   }, []);
 
-  const setHtmlGameAuthorityRun = useCallback((blockId: string | null, runId: string | null) => {
+  const setHtmlGameAuthorityRun = useCallback((blockId: string, runId: string | null) => {
     runtimeRef.current?.updateHtmlGameAuthority(blockId, runId);
   }, []);
 
   const htmlGameSync = useCallback((isAuthority: boolean): MaterialHtmlGameSync => ({
     authorityRuns: Object.fromEntries(participants
-      .filter((participant) => participant.htmlGameBlockId && participant.htmlGameRunId)
-      .map((participant) => [participant.htmlGameBlockId, participant.htmlGameRunId])),
+      .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))),
     effects: htmlGameEffects,
     inputs: htmlGameInputs,
     isAuthority,

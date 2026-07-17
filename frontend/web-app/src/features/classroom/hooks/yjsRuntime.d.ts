@@ -13,8 +13,7 @@ export type CollaborationParticipant = {
   clientId: number;
   color: string;
   cursor: CollaborationCursor | null;
-  htmlGameBlockId: string | null;
-  htmlGameRunId: string | null;
+  htmlGameAuthorityRuns: Record<string, string>;
   name: string;
 };
 
@@ -27,7 +26,7 @@ export type YjsWorkspaceRuntime = {
   publishHtmlGameEffect: (effect: MaterialHtmlGameEffect) => void;
   publishHtmlGameInput: (event: MaterialHtmlGameInputEvent) => void;
   setHtmlGameSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
-  updateHtmlGameAuthority: (blockId: string | null, runId: string | null) => void;
+  updateHtmlGameAuthority: (blockId: string, runId: string | null) => void;
   snapshot: () => LessonMaterialJson;
   startSocketSync: (socket: WebSocket) => void;
   updateCursor: (cursor: CollaborationCursor | null) => void;
@@ -45,3 +44,9 @@ export function createYjsWorkspaceRuntime(options: {
   participantName: string;
   snapshot?: LessonMaterialJson | null;
 }): YjsWorkspaceRuntime;
+
+export function updateHtmlGameAuthorityRuns(
+  current: unknown,
+  blockId: string,
+  runId: string | null,
+): Record<string, string>;

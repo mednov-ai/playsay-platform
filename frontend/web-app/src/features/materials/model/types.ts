@@ -53,7 +53,7 @@ export type MaterialHtmlGameSync = {
   publishEffect: (effect: MaterialHtmlGameEffect) => void;
   publishInput: (event: MaterialHtmlGameInputEvent) => void;
   publishSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
-  setAuthorityRun: (blockId: string | null, runId: string | null) => void;
+  setAuthorityRun: (blockId: string, runId: string | null) => void;
   snapshots: Record<string, MaterialHtmlGameSnapshot>;
 };
 

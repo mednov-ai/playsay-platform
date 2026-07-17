@@ -1102,6 +1102,51 @@ paths:
           description: Object storage failed
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/html-game-page:
+    post:
+      tags:
+      - Materials
+      summary: Append an HTML game during a live scheduled lesson
+      description: Uploads a self-contained HTML game and appends it to a lesson-specific
+        material copy. Requires TEACHER or ADMIN role.
+      operationId: appendScheduledLessonHtmlGamePage
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "201":
+          description: Live lesson HTML game appended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveLessonHtmlGamePageResponse"
+        "400":
+          description: Invalid HTML game or unsupported lesson mode
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage live lesson materials
+        "404":
+          description: Scheduled lesson or material not found
+        "502":
+          description: Object storage failed
+      security:
+      - bearerAuth: []
   /schedule/lessons/{lessonId}/homework:
     post:
       tags:
@@ -1587,6 +1632,76 @@ paths:
           description: Current user cannot edit material
         "404":
           description: Material not found
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets/images:
+    post:
+      tags:
+      - Materials
+      summary: Upload an image asset
+      description: "Uploads a JPEG, PNG, WebP, or safe SVG image without changing\
+        \ the material document."
+      operationId: uploadMaterialImageAsset
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAssetResponse"
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets/html-games:
+    post:
+      tags:
+      - Materials
+      summary: Upload a self-contained HTML game
+      description: Uploads a validated UTF-8 HTML game without changing the material
+        document.
+      operationId: uploadMaterialHtmlGameAsset
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAssetResponse"
       security:
       - bearerAuth: []
   /materials/{materialId}/answer-suggestions:
@@ -4011,6 +4126,19 @@ components:
       - activePageId
       - lesson
       - material
+    LiveLessonHtmlGamePageResponse:
+      type: object
+      properties:
+        lesson:
+          $ref: "#/components/schemas/ScheduledLessonResponse"
+        material:
+          $ref: "#/components/schemas/LessonMaterialResponse"
+        activePageId:
+          type: string
+      required:
+      - activePageId
+      - lesson
+      - material
     LessonHomeworkRequest:
       type: object
       properties:
@@ -4527,6 +4655,43 @@ components:
           type:
           - boolean
           - "null"
+    MaterialAssetResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        materialId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        storageKey:
+          type:
+          - string
+          - "null"
+        externalUrl:
+          type:
+          - string
+          - "null"
+        contentUrl:
+          type:
+          - string
+          - "null"
+        provider:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/JsonNode"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - kind
+      - materialId
+      - metadata
+      - provider
     MaterialAnswerSuggestionsRequest:
       type: object
       properties:
@@ -4950,43 +5115,6 @@ components:
             type: string
             maxLength: 40
           maxItems: 16
-    MaterialAssetResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        materialId:
-          type: string
-          format: uuid
-        kind:
-          type: string
-        storageKey:
-          type:
-          - string
-          - "null"
-        externalUrl:
-          type:
-          - string
-          - "null"
-        contentUrl:
-          type:
-          - string
-          - "null"
-        provider:
-          type: string
-        metadata:
-          $ref: "#/components/schemas/JsonNode"
-        createdAt:
-          type: string
-          format: date-time
-      required:
-      - createdAt
-      - id
-      - kind
-      - materialId
-      - metadata
-      - provider
     PublicPaymentInvoiceResponse:
       type: object
       properties:

@@ -135,6 +135,7 @@ export type MaterialImagePageResult = {
 export type LiveLessonImagePageResult = MaterialImagePageResult & {
   lesson: ScheduledLesson;
 };
+export type LiveLessonHtmlGamePageResult = LiveLessonImagePageResult;
 export type LessonMaterialInput = {
   title: string;
   description?: string | null;

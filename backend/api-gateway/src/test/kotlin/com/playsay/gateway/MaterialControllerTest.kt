@@ -420,6 +420,7 @@ class MaterialControllerTest @Autowired constructor(
         val block = response.material.document["pages"][1]["blocks"][0]
         assertEquals("image", block["type"].asText())
         assertEquals("contain", block["objectFit"].asText())
+        assertEquals("FULL", block["imageSize"].asText())
         assertTrue(block["url"].asText().startsWith("material-asset:"))
 
         val assets = materialAssetController.listAssets(teacher, material.id)
@@ -597,6 +598,186 @@ class MaterialControllerTest @Autowired constructor(
                 parallelLesson.id,
                 imageFile(name = "parallel.png", contentType = "image/png"),
             )
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, parallelError.statusCode)
+    }
+
+    @Test
+    fun `teacher uploads reusable image and html game assets without changing material document`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val material = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Reusable game", status = "DRAFT"),
+        ).body!!
+
+        val imageResponse = materialAssetController.uploadImageAsset(
+            teacher,
+            material.id,
+            imageFile(name = "picture.webp", contentType = "image/webp"),
+        )
+        val gameResponse = materialAssetController.uploadHtmlGameAsset(
+            teacher,
+            material.id,
+            htmlFile(name = "memory.html"),
+        )
+
+        assertEquals(HttpStatus.CREATED, imageResponse.statusCode)
+        assertEquals("UPLOADED_IMAGE", imageResponse.body!!.kind)
+        assertEquals(HttpStatus.CREATED, gameResponse.statusCode)
+        assertEquals("HTML_GAME", gameResponse.body!!.kind)
+        assertEquals("text/html", gameResponse.body!!.metadata["mimeType"].asText())
+        assertTrue(gameResponse.body!!.metadata["selfContained"].asBoolean())
+        assertEquals(1, materialCrudController.get(teacher, material.id).document["pages"].size())
+        val gameContent = materialAssetController.assetContent(teacher, material.id, gameResponse.body!!.id)
+        assertEquals("text/html", gameContent.headers.contentType?.toString())
+        assertTrue(assertNotNull(gameContent.body).decodeToString().contains("Memory game"))
+
+        val studentError = assertFailsWith<ResponseStatusException> {
+            materialAssetController.uploadHtmlGameAsset(student, material.id, htmlFile(name = "student.html"))
+        }
+        assertEquals(HttpStatus.FORBIDDEN, studentError.statusCode)
+    }
+
+    @Test
+    fun `live html game creates lesson copy becomes active and reuses it for later uploads`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val reusableMaterial = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Reusable lesson", status = "PUBLISHED"),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = reusableMaterial.id,
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val gameUpload = materialImagePageController.appendLiveLessonHtmlGamePage(
+            teacher,
+            lesson.id,
+            htmlFile(name = "race.html"),
+        ).body!!
+
+        assertTrue(gameUpload.material.id != reusableMaterial.id)
+        assertEquals(gameUpload.material.id, gameUpload.lesson.materialId)
+        assertEquals(gameUpload.activePageId, gameUpload.material.document["pages"][1]["id"].asText())
+        assertEquals("HTML_GAME", gameUpload.material.document["pages"][1]["layout"].asText())
+        val block = gameUpload.material.document["pages"][1]["blocks"][0]
+        assertEquals("htmlGame", block["type"].asText())
+        assertTrue(block["url"].asText().startsWith("material-asset:"))
+        assertEquals(1, materialCrudController.get(teacher, reusableMaterial.id).document["pages"].size())
+        assertEquals(gameUpload.activePageId, scheduledMaterialController.scheduledLessonMaterialAnnotation(student, lesson.id).content["activePageId"].asText())
+        val gameAsset = materialAssetController.listAssets(student, gameUpload.material.id).single { asset -> asset.kind == "HTML_GAME" }
+        assertEquals("text/html", materialAssetController.assetContent(student, gameUpload.material.id, gameAsset.id).headers.contentType?.toString())
+
+        val imageUpload = materialImagePageController.appendLiveLessonImagePage(
+            teacher,
+            lesson.id,
+            imageFile(name = "after-game.png", contentType = "image/png"),
+        ).body!!
+        assertEquals(gameUpload.material.id, imageUpload.material.id)
+        assertEquals(3, imageUpload.material.document["pages"].size())
+        assertEquals(imageUpload.activePageId, imageUpload.material.document["pages"][2]["id"].asText())
+    }
+
+    @Test
+    fun `html game upload validates format encoding sandbox rules size role and lesson mode`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(studentOne)
+        userProfileStore.currentUserId(studentTwo)
+        val material = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Game validation", status = "PUBLISHED"),
+        ).body!!
+        val sharedLesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = material.id,
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val unsupported = assertFailsWith<ResponseStatusException> {
+            materialAssetController.uploadHtmlGameAsset(
+                teacher,
+                material.id,
+                imageFile(name = "game.txt", contentType = "text/plain", bytes = "<html></html>".toByteArray()),
+            )
+        }
+        val invalidUtf8 = assertFailsWith<ResponseStatusException> {
+            materialAssetController.uploadHtmlGameAsset(
+                teacher,
+                material.id,
+                imageFile(name = "game.html", contentType = "text/html", bytes = byteArrayOf(0xC3.toByte(), 0x28)),
+            )
+        }
+        val unsafeFrame = assertFailsWith<ResponseStatusException> {
+            materialAssetController.uploadHtmlGameAsset(
+                teacher,
+                material.id,
+                htmlFile(content = "<html><body><iframe srcdoc=\"unsafe\"></iframe></body></html>"),
+            )
+        }
+        val externalScript = assertFailsWith<ResponseStatusException> {
+            materialAssetController.uploadHtmlGameAsset(
+                teacher,
+                material.id,
+                htmlFile(content = "<html><head><script src=\"https://example.com/game.js\"></script></head></html>"),
+            )
+        }
+        val relativeScript = assertFailsWith<ResponseStatusException> {
+            materialAssetController.uploadHtmlGameAsset(
+                teacher,
+                material.id,
+                htmlFile(content = "<html><head><script src=\"game.js\"></script></head></html>"),
+            )
+        }
+        val oversized = assertFailsWith<ResponseStatusException> {
+            materialAssetController.uploadHtmlGameAsset(
+                teacher,
+                material.id,
+                imageFile(name = "large.html", contentType = "text/html", bytes = ByteArray(5 * 1024 * 1024 + 1) { 1 }),
+            )
+        }
+        val studentError = assertFailsWith<ResponseStatusException> {
+            materialImagePageController.appendLiveLessonHtmlGamePage(studentOne, sharedLesson.id, htmlFile())
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, unsupported.statusCode)
+        assertEquals(HttpStatus.BAD_REQUEST, invalidUtf8.statusCode)
+        assertEquals(HttpStatus.BAD_REQUEST, unsafeFrame.statusCode)
+        assertEquals(HttpStatus.BAD_REQUEST, externalScript.statusCode)
+        assertEquals(HttpStatus.BAD_REQUEST, relativeScript.statusCode)
+        assertEquals(HttpStatus.BAD_REQUEST, oversized.statusCode)
+        assertEquals(HttpStatus.FORBIDDEN, studentError.statusCode)
+
+        val parallelMaterial = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Parallel game", status = "PUBLISHED"),
+        ).body!!
+        val parallelLesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = parallelMaterial.id,
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
+                type = "GROUP",
+                workMode = "PARALLEL",
+                participantSubjects = listOf("student-1", "student-2"),
+            ),
+        ).body!!
+        val parallelError = assertFailsWith<ResponseStatusException> {
+            materialImagePageController.appendLiveLessonHtmlGamePage(teacher, parallelLesson.id, htmlFile())
         }
         assertEquals(HttpStatus.BAD_REQUEST, parallelError.statusCode)
     }
@@ -1746,6 +1927,12 @@ class MaterialControllerTest @Autowired constructor(
         bytes: ByteArray = byteArrayOf(1, 2, 3, 4),
     ): MockMultipartFile =
         MockMultipartFile("file", name, contentType, bytes)
+
+    private fun htmlFile(
+        name: String = "game.html",
+        content: String = "<html><head><title>Memory game</title></head><body><button id=\"start\">Start</button><script>document.querySelector('#start').addEventListener('click', () => document.body.dataset.started = 'true')</script></body></html>",
+    ): MockMultipartFile =
+        MockMultipartFile("file", name, "text/html", content.toByteArray(Charsets.UTF_8))
 
     private fun authentication(
         subject: String = UUID.randomUUID().toString(),

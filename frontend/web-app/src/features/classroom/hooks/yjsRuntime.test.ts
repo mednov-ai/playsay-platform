@@ -8,6 +8,9 @@ describe("yjs workspace runtime annotations", () => {
     const runtime = createYjsWorkspaceRuntime({
       color: "#ff5c00",
       onAnnotationChange: (strokes) => annotationChanges.push(strokes),
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
       onParticipantsChange: () => undefined,
       onTextChange: () => undefined,
       participantName: "Student",
@@ -64,6 +67,9 @@ describe("yjs workspace runtime annotations", () => {
       const runtime = createYjsWorkspaceRuntime({
         color: "#ff5c00",
         onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
         onParticipantsChange: () => undefined,
         onTextChange: () => undefined,
         participantName: "Student",
@@ -80,6 +86,9 @@ describe("yjs workspace runtime annotations", () => {
       const restored = createYjsWorkspaceRuntime({
         color: "#00a878",
         onAnnotationChange: (strokes) => restoredAnnotationChanges.push(strokes),
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
         onParticipantsChange: () => undefined,
         onTextChange: (text) => restoredTextChanges.push(text),
         participantName: "Teacher",
@@ -91,6 +100,39 @@ describe("yjs workspace runtime annotations", () => {
       expect(restoredAnnotationChanges.at(-1)).toEqual([stroke]);
 
       restored.destroy();
+    });
+  });
+
+  it("persists HTML game state separately for each block", () => {
+    withWindowBase64(() => {
+      const snapshots: Array<Record<string, { html: string; sequence: number; updatedAt: number }>> = [];
+      const inputs: Array<Array<{ id: string }>> = [];
+      const effects: Array<Array<{ id: string }>> = [];
+      const runtime = createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: (nextEffects) => effects.push(nextEffects),
+        onHtmlGameInputsChange: (nextInputs) => inputs.push(nextInputs),
+        onHtmlGameSnapshotsChange: (nextSnapshots) => snapshots.push(nextSnapshots),
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Teacher",
+        snapshot: null,
+      });
+
+      runtime.setHtmlGameSnapshot("game-a", { html: "<p>one</p>", sequence: 1, updatedAt: 10 });
+      runtime.setHtmlGameSnapshot("game-b", { html: "<p>two</p>", sequence: 4, updatedAt: 20 });
+      runtime.publishHtmlGameInput({ at: 30, blockId: "game-a", id: "input-1", targetId: "start", type: "click" });
+      runtime.publishHtmlGameEffect({ at: 40, blockId: "game-a", id: "effect-1", kind: "speech", payload: { text: "go" } });
+
+      expect(snapshots.at(-1)).toEqual({
+        "game-a": { html: "<p>one</p>", sequence: 1, updatedAt: 10 },
+        "game-b": { html: "<p>two</p>", sequence: 4, updatedAt: 20 },
+      });
+      expect(inputs.at(-1)?.at(-1)?.id).toBe("input-1");
+      expect(effects.at(-1)?.at(-1)?.id).toBe("effect-1");
+
+      runtime.destroy();
     });
   });
 });

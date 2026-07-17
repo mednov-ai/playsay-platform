@@ -28,6 +28,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.multipart.MultipartFile
 
 private typealias StoredLessonMaterial = LessonMaterialRow
 private typealias ScheduledMaterialLookup = ScheduledMaterialLookupRow
@@ -237,6 +238,34 @@ class LessonMaterialStore(
             MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
         )
         return materialAssetService.update(materialId, assetId, request)
+    }
+
+    @Transactional
+    fun uploadImageAsset(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        file: MultipartFile,
+    ): MaterialAssetResponse {
+        lessonMaterialCatalogService.requireEditable(
+            authentication,
+            materialId,
+            MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
+        )
+        return materialAssetService.uploadImageAsset(materialId, file)
+    }
+
+    @Transactional
+    fun uploadHtmlGameAsset(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        file: MultipartFile,
+    ): MaterialAssetResponse {
+        lessonMaterialCatalogService.requireEditable(
+            authentication,
+            materialId,
+            MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
+        )
+        return materialAssetService.uploadHtmlGameAsset(materialId, file)
     }
 
     private fun materialForAccessibleScheduledLesson(

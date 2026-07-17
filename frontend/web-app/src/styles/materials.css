@@ -3,6 +3,42 @@
   gap: 0.875rem;
 }
 
+.playsay-inline-upload {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid rgb(255 92 0 / 0.32);
+  border-radius: 0.75rem;
+  background: #fff7f1;
+  color: hsl(var(--primary));
+  cursor: pointer;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.playsay-inline-upload:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.playsay-asset-reference {
+  min-height: 2.5rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--muted) / 0.35);
+  color: hsl(var(--muted-foreground));
+  padding: 0.65rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .playsay-matching-editor {
   display: grid;
   gap: 0.625rem;
@@ -237,12 +273,18 @@
 
 .playsay-rendered-material {
   position: relative;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .playsay-static-image-page {
   display: grid;
+  min-width: 0;
   min-height: 100%;
+  width: 100%;
+  max-width: 100%;
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
@@ -340,7 +382,17 @@
 }
 
 .playsay-material-blocks-static-image {
+  min-width: 0;
   min-height: 0;
+  gap: 0;
+  margin-top: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.playsay-material-blocks-html-game {
+  min-height: 0;
+  margin-top: 0;
 }
 
 .playsay-render-block {
@@ -353,7 +405,10 @@
 
 .playsay-render-block-static-image {
   display: grid;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
+  max-width: 100%;
   border: 0;
   background: transparent;
   padding: 0;
@@ -760,17 +815,90 @@
   background: #fff7f1;
 }
 
+.playsay-rendered-image[data-image-size="SMALL"] img {
+  width: min(100%, 18rem);
+}
+
+.playsay-rendered-image[data-image-size="MEDIUM"] img {
+  width: min(100%, 28rem);
+}
+
+.playsay-rendered-image[data-image-size="LARGE"] img {
+  width: min(100%, 42rem);
+}
+
+.playsay-rendered-image[data-image-size="FULL"] img {
+  width: 100%;
+}
+
 .playsay-rendered-image-static {
+  min-width: 0;
   min-height: 0;
-  place-items: center;
+  width: 100%;
+  max-width: 100%;
+  gap: 0;
 }
 
 .playsay-rendered-image-static img {
   width: 100%;
-  height: 100%;
-  max-height: min(72vh, 54rem);
+  max-width: 100%;
+  height: auto;
+  max-height: none;
   object-fit: contain;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.playsay-render-block-html-game {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.playsay-material-blocks-html-game .playsay-render-block-html-game {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.playsay-html-game {
+  position: relative;
+  min-height: 24rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
   background: #ffffff;
+}
+
+.playsay-html-game iframe {
+  display: block;
+  width: 100%;
+  min-height: 24rem;
+  border: 0;
+  background: #ffffff;
+}
+
+.playsay-html-game[data-paused="true"] iframe {
+  pointer-events: none;
+}
+
+.playsay-html-game-placeholder,
+.playsay-html-game-waiting {
+  display: flex;
+  min-height: 16rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 850;
+}
+
+.playsay-html-game-waiting {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: rgb(255 253 251 / 0.92);
 }
 
 .playsay-rendered-image[data-editable="true"] img {

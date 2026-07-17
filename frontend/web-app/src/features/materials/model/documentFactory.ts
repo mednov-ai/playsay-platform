@@ -69,9 +69,11 @@ export function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
     case "videoEmbed":
       return { ...base, provider: "YOUTUBE", url: "" };
     case "image":
-      return { ...base, caption: "", url: "" };
+      return { ...base, caption: "", imageSize: "MEDIUM", url: "" };
     case "generatedImage":
-      return { ...base, caption: "", prompt: "" };
+      return { ...base, caption: "", imageSize: "MEDIUM", prompt: "" };
+    case "htmlGame":
+      return { ...base, height: 640, url: "" };
     case "flashcards":
       return {
         ...base,

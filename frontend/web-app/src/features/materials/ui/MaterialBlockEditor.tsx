@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -31,6 +31,7 @@ export function MaterialBlockEditor({
   onSuggestAcceptedAnswers,
   onToggleCollapsed,
   onUpdate,
+  onUploadAsset,
 }: {
   assetLibrary: MaterialAssetLibraryItem[];
   block: MaterialEditorBlock;
@@ -43,11 +44,13 @@ export function MaterialBlockEditor({
   onSuggestAcceptedAnswers?: (blockId: string, itemIds: string[]) => void;
   onToggleCollapsed: () => void;
   onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
+  onUploadAsset: (kind: "image" | "htmlGame", file: File) => Promise<void>;
 }) {
   const { t } = useAppTranslation();
   const [flashcardsSource, setFlashcardsSource] = useState(() => formatFlashcards(block.cards));
   const [videoClipStartSource, setVideoClipStartSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.startSeconds));
   const [videoClipEndSource, setVideoClipEndSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.endSeconds));
+  const [uploading, setUploading] = useState(false);
   const collapseLabel = collapsed ? t("materials.blockEditor.expandBlock") : t("materials.blockEditor.collapseBlock");
 
   useEffect(() => {
@@ -71,6 +74,18 @@ export function MaterialBlockEditor({
     setVideoClipStartSource(formatMaterialVideoClipTime(normalizedClip?.startSeconds));
     setVideoClipEndSource(formatMaterialVideoClipTime(normalizedClip?.endSeconds));
     onUpdate({ videoClip: normalizedClip });
+  }
+
+  async function uploadAsset(kind: "image" | "htmlGame", file: File | undefined) {
+    if (!file) {
+      return;
+    }
+    setUploading(true);
+    try {
+      await onUploadAsset(kind, file);
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -182,7 +197,7 @@ export function MaterialBlockEditor({
         ) : null}
 
         {block.type === "image" || block.type === "generatedImage" ? (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-3">
             <FormField label={block.type === "generatedImage" ? t("materials.blockEditor.prompt") : t("materials.blockEditor.imageUrl")}>
               {block.type === "generatedImage" ? (
                 <textarea
@@ -193,14 +208,44 @@ export function MaterialBlockEditor({
                   value={block.prompt ?? ""}
                 />
               ) : (
-                <input
-                  className="playsay-input"
-                  disabled={disabled}
-                  onChange={(event) => onUpdate({ url: event.target.value })}
-                  placeholder={t("materials.blockEditor.linkPlaceholder")}
-                  value={block.url ?? ""}
-                />
+                <div className="grid gap-2">
+                  <input
+                    className="playsay-input"
+                    disabled={disabled || uploading}
+                    onChange={(event) => onUpdate({ url: event.target.value })}
+                    placeholder={t("materials.blockEditor.linkPlaceholder")}
+                    value={block.url ?? ""}
+                  />
+                  <label className="playsay-inline-upload">
+                    <input
+                      accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                      className="sr-only"
+                      disabled={disabled || uploading}
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        event.currentTarget.value = "";
+                        void uploadAsset("image", file);
+                      }}
+                      type="file"
+                    />
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {uploading ? t("materials.blockEditor.uploading") : t("materials.blockEditor.uploadImage")}
+                  </label>
+                </div>
               )}
+            </FormField>
+            <FormField label={t("materials.blockEditor.imageSize")}>
+              <select
+                className="playsay-input"
+                disabled={disabled}
+                onChange={(event) => onUpdate({ imageSize: event.target.value as NonNullable<MaterialEditorBlock["imageSize"]> })}
+                value={block.imageSize ?? "MEDIUM"}
+              >
+                <option value="SMALL">{t("materials.blockEditor.imageSizeSmall")}</option>
+                <option value="MEDIUM">{t("materials.blockEditor.imageSizeMedium")}</option>
+                <option value="LARGE">{t("materials.blockEditor.imageSizeLarge")}</option>
+                <option value="FULL">{t("materials.blockEditor.imageSizeFull")}</option>
+              </select>
             </FormField>
             <FormField label={t("materials.blockEditor.caption")}>
               <textarea
@@ -208,6 +253,42 @@ export function MaterialBlockEditor({
                 disabled={disabled}
                 onChange={(event) => onUpdate({ caption: event.target.value })}
                 value={block.caption ?? ""}
+              />
+            </FormField>
+          </div>
+        ) : null}
+
+        {block.type === "htmlGame" ? (
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+            <FormField label={t("materials.blockEditor.htmlGameFile")}>
+              <div className="grid gap-2">
+                <div className="playsay-asset-reference">{block.url || t("materials.blockEditor.htmlGameEmpty")}</div>
+                <label className="playsay-inline-upload">
+                  <input
+                    accept="text/html,.html"
+                    className="sr-only"
+                    disabled={disabled || uploading}
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      void uploadAsset("htmlGame", file);
+                    }}
+                    type="file"
+                  />
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {uploading ? t("materials.blockEditor.uploading") : t("materials.blockEditor.uploadHtmlGame")}
+                </label>
+              </div>
+            </FormField>
+            <FormField label={t("materials.blockEditor.gameHeight")}>
+              <input
+                className="playsay-input"
+                disabled={disabled}
+                max={800}
+                min={360}
+                onChange={(event) => onUpdate({ height: Number(event.target.value) })}
+                type="number"
+                value={block.height ?? 640}
               />
             </FormField>
           </div>

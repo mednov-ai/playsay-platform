@@ -10,20 +10,64 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import java.util.UUID
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
 
 @RestController
 @Tag(name = "Materials")
 class MaterialAssetController(
     private val store: LessonMaterialStore,
 ) {
+    @PostMapping(
+        "/materials/{materialId}/assets/images",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "uploadMaterialImageAsset",
+        summary = "Upload an image asset",
+        description = "Uploads a JPEG, PNG, WebP, or safe SVG image without changing the material document.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun uploadImageAsset(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @RequestPart("file") file: MultipartFile,
+    ): ResponseEntity<MaterialAssetResponse> =
+        ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(store.uploadImageAsset(authentication, materialId, file))
+
+    @PostMapping(
+        "/materials/{materialId}/assets/html-games",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "uploadMaterialHtmlGameAsset",
+        summary = "Upload a self-contained HTML game",
+        description = "Uploads a validated UTF-8 HTML game without changing the material document.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun uploadHtmlGameAsset(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @RequestPart("file") file: MultipartFile,
+    ): ResponseEntity<MaterialAssetResponse> =
+        ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(store.uploadHtmlGameAsset(authentication, materialId, file))
+
     @GetMapping("/materials/{materialId}/assets", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
         operationId = "listMaterialAssets",

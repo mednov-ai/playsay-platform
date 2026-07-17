@@ -11,7 +11,51 @@ export type MaterialBlockType =
   | "freeWriting"
   | "speakingPrompt"
   | "drawingArea"
-  | "generatedImage";
+  | "generatedImage"
+  | "htmlGame";
+
+export type MaterialImageSize = "SMALL" | "MEDIUM" | "LARGE" | "FULL";
+
+export type MaterialHtmlGameInputEvent = {
+  id: string;
+  at: number;
+  blockId: string;
+  type: "click" | "pointerdown" | "pointerup" | "keydown" | "keyup" | "dragstart" | "dragover" | "drop";
+  targetId: string;
+  key?: string;
+  code?: string;
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  shiftKey?: boolean;
+};
+
+export type MaterialHtmlGameEffect = {
+  id: string;
+  at: number;
+  blockId: string;
+  kind: "audio" | "speech";
+  payload: Record<string, string | number | boolean>;
+};
+
+export type MaterialHtmlGameSnapshot = {
+  html: string;
+  runId?: string;
+  sequence: number;
+  updatedAt: number;
+};
+
+export type MaterialHtmlGameSync = {
+  authorityRuns: Record<string, string>;
+  effects: MaterialHtmlGameEffect[];
+  inputs: MaterialHtmlGameInputEvent[];
+  isAuthority: boolean;
+  publishEffect: (effect: MaterialHtmlGameEffect) => void;
+  publishInput: (event: MaterialHtmlGameInputEvent) => void;
+  publishSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
+  setAuthorityRun: (blockId: string | null, runId: string | null) => void;
+  snapshots: Record<string, MaterialHtmlGameSnapshot>;
+};
 
 export type MaterialMatchingTargetKind = "TEXT" | "IMAGE";
 
@@ -117,6 +161,7 @@ export type MaterialEditorBlock = {
   caption?: string;
   alt?: string;
   objectFit?: "contain" | "cover";
+  imageSize?: MaterialImageSize;
   cards?: Array<{ id: string; front: string; back: string; example?: string }>;
   items?: Array<{
     id?: string;
@@ -151,7 +196,7 @@ export type MaterialExerciseItem = NonNullable<MaterialEditorBlock["items"]>[num
 export type MaterialEditorPage = {
   id: string;
   title: string;
-  layout: "FLOW" | "WORKSHEET" | "STATIC_IMAGE";
+  layout: "FLOW" | "WORKSHEET" | "STATIC_IMAGE" | "HTML_GAME";
   blocks: MaterialEditorBlock[];
 };
 

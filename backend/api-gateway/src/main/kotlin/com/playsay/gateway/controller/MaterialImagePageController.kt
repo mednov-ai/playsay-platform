@@ -1,6 +1,7 @@
 package com.playsay.gateway.controller
 
 import com.playsay.gateway.dto.LiveLessonImagePageResponse
+import com.playsay.gateway.dto.LiveLessonHtmlGamePageResponse
 import com.playsay.gateway.dto.MaterialImagePageResponse
 import com.playsay.gateway.service.MaterialImagePageService
 import io.swagger.v3.oas.annotations.Operation
@@ -87,4 +88,34 @@ class MaterialImagePageController(
         ResponseEntity
             .status(HttpStatus.CREATED)
             .body(service.appendLiveLessonImagePage(authentication, lessonId, file, title))
+
+    @PostMapping(
+        "/schedule/lessons/{lessonId}/html-game-page",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "appendScheduledLessonHtmlGamePage",
+        summary = "Append an HTML game during a live scheduled lesson",
+        description = "Uploads a self-contained HTML game and appends it to a lesson-specific material copy. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "201", description = "Live lesson HTML game appended"),
+            ApiResponse(responseCode = "400", description = "Invalid HTML game or unsupported lesson mode", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot manage live lesson materials", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
+            ApiResponse(responseCode = "502", description = "Object storage failed", content = [Content()]),
+        ],
+    )
+    fun appendLiveLessonHtmlGamePage(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @RequestPart("file") file: MultipartFile,
+    ): ResponseEntity<LiveLessonHtmlGamePageResponse> =
+        ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(service.appendLiveLessonHtmlGamePage(authentication, lessonId, file))
 }

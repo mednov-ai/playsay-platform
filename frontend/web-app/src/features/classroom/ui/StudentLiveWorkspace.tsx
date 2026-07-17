@@ -38,7 +38,7 @@ export function StudentLiveWorkspace({
   const { t } = useAppTranslation();
   const participantColor = collaborationParticipantColor(profileSubject ?? displayName);
   const groupAnnotationDocumentState = useCollaborationDocument({
-    enabled: sharedPresenceEnabled,
+    enabled: true,
     lessonId,
     materialId: material.id,
     mode: "group",
@@ -46,7 +46,7 @@ export function StudentLiveWorkspace({
   const groupAnnotationWorkspace = useYjsWorkspace({
     color: participantColor,
     document: groupAnnotationDocumentState.document,
-    enabled: sharedPresenceEnabled && Boolean(groupAnnotationDocumentState.document),
+    enabled: Boolean(groupAnnotationDocumentState.document),
     participantName: displayName,
   });
   const annotationSync = useMemo(() => {
@@ -69,6 +69,10 @@ export function StudentLiveWorkspace({
     groupAnnotationWorkspace.updateCursor,
     sharedPresenceEnabled,
   ]);
+  const htmlGameSync = useMemo(
+    () => groupAnnotationWorkspace.htmlGameSync(false),
+    [groupAnnotationWorkspace.htmlGameSync],
+  );
 
   return (
     <section className="playsay-live-workspace" aria-label={t("classroom.collaboration.workspaceAria")}>
@@ -80,6 +84,7 @@ export function StudentLiveWorkspace({
         lessonId={lessonId}
         material={material}
         annotationSync={annotationSync}
+        htmlGameSync={htmlGameSync}
         onSaveAnswers={onSaveAnswers}
         score={score}
         submission={submission}

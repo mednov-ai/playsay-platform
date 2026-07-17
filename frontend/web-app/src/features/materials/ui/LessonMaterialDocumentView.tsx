@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { FileText } from "lucide-react";
-import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
+import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, fetchMaterialAssetText, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
 import {
   MaterialAnswerBlock,
   MaterialAnswerState,
   MaterialEditorBlock,
+  MaterialHtmlGameSync,
   MaterialRenderMode,
   defaultMaterialPage,
   editorDocumentFromJson,
@@ -29,6 +30,7 @@ export function LessonMaterialDocumentView({
   onBlockPatch,
   score,
   showScoreBadge = true,
+  htmlGameSync,
 }: {
   activePageId?: string | null;
   allowVideoFullscreen?: boolean;
@@ -43,6 +45,7 @@ export function LessonMaterialDocumentView({
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   score?: number | null;
   showScoreBadge?: boolean;
+  htmlGameSync?: MaterialHtmlGameSync;
 }) {
   const { t } = useAppTranslation();
   const document = editorDocumentFromJson(material.document);
@@ -52,12 +55,14 @@ export function LessonMaterialDocumentView({
   const assetIds = materialDocumentAssetIds(document);
   const assetKey = assetIds.join("|");
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  const [htmlAssets, setHtmlAssets] = useState<Record<string, string>>({});
   const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
   const videoFullscreenAllowed = allowVideoFullscreen ?? mode === "teacherPreview";
   const pagePickerVisible = document.pages.length > 1;
   const pagePickerEnabled = canControlPages || activePageId === undefined;
   const isStaticImagePage = page.layout === "STATIC_IMAGE";
+  const isHtmlGamePage = page.layout === "HTML_GAME";
 
   useEffect(() => {
     setInternalActivePageId(null);
@@ -69,6 +74,7 @@ export function LessonMaterialDocumentView({
 
     if (material.id === "preview" || assetKey.length === 0) {
       setAssetUrls({});
+      setHtmlAssets({});
       setAssetTags({});
       return () => {
         active = false;
@@ -78,6 +84,9 @@ export function LessonMaterialDocumentView({
     fetchMaterialAssets(material.id)
       .then(async (assets) => {
         const entries = await Promise.all(assets.map(async (asset) => {
+          if (asset.kind === "HTML_GAME") {
+            return null;
+          }
           const externalUrl = asset.externalUrl?.trim();
           if (externalUrl) {
             return [asset.id, externalUrl] as const;
@@ -96,8 +105,13 @@ export function LessonMaterialDocumentView({
           return [asset.id, objectUrl] as const;
         }));
 
+        const htmlEntries = await Promise.all(assets
+          .filter((asset) => asset.kind === "HTML_GAME" && asset.contentUrl?.trim())
+          .map(async (asset) => [asset.id, await fetchMaterialAssetText(material.id, asset.id)] as const));
+
         if (active) {
           setAssetUrls(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null)));
+          setHtmlAssets(Object.fromEntries(htmlEntries));
           setAssetTags(materialAssetTagsMap(assets));
         }
       })
@@ -106,6 +120,7 @@ export function LessonMaterialDocumentView({
         objectUrls.clear();
         if (active) {
           setAssetUrls({});
+          setHtmlAssets({});
           setAssetTags({});
         }
       });
@@ -129,10 +144,12 @@ export function LessonMaterialDocumentView({
           <strong>{formatMaterialScore(numericScore)}</strong>
         </div>
       ) : null}
-      <div className="playsay-task-kicker">
-        <FileText className="h-4 w-4 text-primary" />
-        {material.title}
-      </div>
+      {!isStaticImagePage && !isHtmlGamePage ? (
+        <div className="playsay-task-kicker">
+          <FileText className="h-4 w-4 text-primary" />
+          {material.title}
+        </div>
+      ) : null}
       {pagePickerVisible ? (
         <nav className="playsay-page-picker" aria-label={t("materials.renderer.pagePicker")}>
           {document.pages.map((item, index) => (
@@ -157,9 +174,9 @@ export function LessonMaterialDocumentView({
           ))}
         </nav>
       ) : null}
-      <h3>{page.title}</h3>
-      {material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
-      <div className={`playsay-material-blocks${isStaticImagePage ? " playsay-material-blocks-static-image" : ""}`}>
+      {!isStaticImagePage && !isHtmlGamePage ? <h3>{page.title}</h3> : null}
+      {!isStaticImagePage && !isHtmlGamePage && material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
+      <div className={`playsay-material-blocks${isStaticImagePage ? " playsay-material-blocks-static-image" : ""}${isHtmlGamePage ? " playsay-material-blocks-html-game" : ""}`}>
         {page.blocks.map((block) => (
           <RenderedMaterialBlock
             allowVideoFullscreen={videoFullscreenAllowed}
@@ -167,6 +184,8 @@ export function LessonMaterialDocumentView({
             assetTags={assetTags}
             assetUrls={assetUrls}
             block={block}
+            htmlAssets={htmlAssets}
+            htmlGameSync={htmlGameSync}
             key={block.id}
             materialId={material.id}
             mode={mode}

@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { type CourseLessonMap } from "../../../entities/schedule/model";
 import {
   fetchMaterialAssets,
+  uploadMaterialHtmlGameAsset,
+  uploadMaterialImageAsset,
   type Course,
   type CourseLesson,
   type LessonMaterial,
@@ -94,6 +96,7 @@ export function MaterialLibraryPanel({
   const [authorMode, setAuthorMode] = useState<MaterialAuthorMode>("preview");
   const [playPreviewOpen, setPlayPreviewOpen] = useState(false);
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
+  const [assetUploadMessage, setAssetUploadMessage] = useState<string | null>(null);
   const { assetLibrary, currentMaterialAssets, syncMaterialAssets } = useMaterialAssets({
     canManage,
     formMaterialId: form.id,
@@ -375,6 +378,45 @@ export function MaterialLibraryPanel({
     await onSave(materialFormToInput(nextForm), nextForm.id ?? undefined);
   }
 
+  async function uploadBlockAsset(blockId: string, kind: "image" | "htmlGame", file: File) {
+    setAssetUploadMessage(null);
+    const fallbackTitle = file.name.replace(/\.[^.]+$/, "").trim() || t("materials.defaults.materialTitle");
+    let workingForm = form.title.trim() ? form : { ...form, title: fallbackTitle };
+    let materialId = workingForm.id;
+    if (!materialId) {
+      const saved = await onSave(materialFormToInput(workingForm));
+      if (!saved) {
+        setAssetUploadMessage(t("materials.messages.assetUploadFailed"));
+        return;
+      }
+      workingForm = materialToForm(saved);
+      materialId = saved.id;
+      setForm(workingForm);
+    }
+
+    try {
+      const asset = kind === "image"
+        ? await uploadMaterialImageAsset(materialId, file)
+        : await uploadMaterialHtmlGameAsset(materialId, file);
+      const nextForm = materialFormWithBlockPatch(workingForm, blockId, {
+        url: `material-asset:${asset.id}`,
+        ...(kind === "image" ? { alt: fallbackTitle, imageSize: workingForm.document.pages.flatMap((page) => page.blocks).find((block) => block.id === blockId)?.imageSize ?? "MEDIUM" } : { height: 640 }),
+      });
+      const saved = await onSave(materialFormToInput(nextForm), materialId);
+      if (!saved) {
+        setForm(nextForm);
+        setAssetUploadMessage(t("materials.messages.assetLinkSaveFailed"));
+        return;
+      }
+      setForm(materialToForm(saved));
+      const assets = await fetchMaterialAssets(materialId);
+      syncMaterialAssets(saved, assets);
+      setAssetUploadMessage(kind === "image" ? t("materials.messages.imageUploaded") : t("materials.messages.htmlGameUploaded"));
+    } catch (caught) {
+      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.assetUploadFailed"));
+    }
+  }
+
   if (!profile) {
     return (
       <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
@@ -438,7 +480,7 @@ export function MaterialLibraryPanel({
                 disabled={disabled}
                 form={form}
                 imageGenerationProgress={imageGenerationProgress}
-                message={message}
+                message={assetUploadMessage ?? message}
                 onArchive={onArchive}
                 onBlockPatch={updateMaterialBlock}
                 onBlockPatchCommit={(blockId, patch) => void persistMaterialBlockPatch(blockId, patch)}
@@ -455,7 +497,7 @@ export function MaterialLibraryPanel({
                 disabled={disabled}
                 form={form}
                 imageGenerationProgress={imageGenerationProgress}
-                message={message}
+                message={assetUploadMessage ?? message}
                 onAddBlock={addBlock}
                 onArchive={onArchive}
                 onDuplicate={duplicateCurrentMaterial}
@@ -464,6 +506,7 @@ export function MaterialLibraryPanel({
                 onPreview={() => setAuthorMode("preview")}
                 onRemoveBlock={removeBlock}
                 onUpdateBlock={updateBlock}
+                onUploadBlockAsset={(blockId, kind, file) => uploadBlockAsset(blockId, kind, file)}
                 onUpdateForm={updateForm}
                 pendingImageTargetsCount={pendingImageTargetsCount}
               />

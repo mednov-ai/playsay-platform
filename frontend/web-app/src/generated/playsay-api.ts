@@ -630,6 +630,12 @@ export interface LiveLessonImagePageResponse {
   activePageId: string;
 }
 
+export interface LiveLessonHtmlGamePageResponse {
+  lesson: ScheduledLessonResponse;
+  material: LessonMaterialResponse;
+  activePageId: string;
+}
+
 export interface LessonHomeworkRequest {
   /**
      * @maxItems 100
@@ -906,6 +912,21 @@ export interface MaterialGenerateImagesRequest {
   maxImages?: number | null;
   /** @nullable */
   regenerate?: boolean | null;
+}
+
+export interface MaterialAssetResponse {
+  id: string;
+  materialId: string;
+  kind: string;
+  /** @nullable */
+  storageKey?: string | null;
+  /** @nullable */
+  externalUrl?: string | null;
+  /** @nullable */
+  contentUrl?: string | null;
+  provider: string;
+  metadata: JsonNode;
+  createdAt: string;
 }
 
 export interface MaterialAnswerSuggestionsRequest {
@@ -1219,21 +1240,6 @@ export interface MaterialAssetUpdateRequest {
   tags?: string[] | null;
 }
 
-export interface MaterialAssetResponse {
-  id: string;
-  materialId: string;
-  kind: string;
-  /** @nullable */
-  storageKey?: string | null;
-  /** @nullable */
-  externalUrl?: string | null;
-  /** @nullable */
-  contentUrl?: string | null;
-  provider: string;
-  metadata: JsonNode;
-  createdAt: string;
-}
-
 export interface PublicPaymentInvoiceResponse {
   number: string;
   status: string;
@@ -1318,6 +1324,10 @@ export type AppendScheduledLessonImagePageBody = {
   file: Blob;
 };
 
+export type AppendScheduledLessonHtmlGamePageBody = {
+  file: Blob;
+};
+
 export type GetCurrentCollaborationDocumentParams = {
 materialId: string;
 documentKind?: string;
@@ -1331,6 +1341,14 @@ title?: string;
 };
 
 export type AppendMaterialImagePageBody = {
+  file: Blob;
+};
+
+export type UploadMaterialImageAssetBody = {
+  file: Blob;
+};
+
+export type UploadMaterialHtmlGameAssetBody = {
   file: Blob;
 };
 
@@ -3499,6 +3517,82 @@ if(appendScheduledLessonImagePageBody?.file !== undefined) {
 
 
 
+export type appendScheduledLessonHtmlGamePageResponse201 = {
+  data: LiveLessonHtmlGamePageResponse
+  status: 201
+}
+
+export type appendScheduledLessonHtmlGamePageResponse400 = {
+  data: void
+  status: 400
+}
+
+export type appendScheduledLessonHtmlGamePageResponse401 = {
+  data: void
+  status: 401
+}
+
+export type appendScheduledLessonHtmlGamePageResponse403 = {
+  data: void
+  status: 403
+}
+
+export type appendScheduledLessonHtmlGamePageResponse404 = {
+  data: void
+  status: 404
+}
+
+export type appendScheduledLessonHtmlGamePageResponse502 = {
+  data: void
+  status: 502
+}
+
+export type appendScheduledLessonHtmlGamePageResponseSuccess = (appendScheduledLessonHtmlGamePageResponse201) & {
+  headers: Headers;
+};
+export type appendScheduledLessonHtmlGamePageResponseError = (appendScheduledLessonHtmlGamePageResponse400 | appendScheduledLessonHtmlGamePageResponse401 | appendScheduledLessonHtmlGamePageResponse403 | appendScheduledLessonHtmlGamePageResponse404 | appendScheduledLessonHtmlGamePageResponse502) & {
+  headers: Headers;
+};
+
+export type appendScheduledLessonHtmlGamePageResponse = (appendScheduledLessonHtmlGamePageResponseSuccess | appendScheduledLessonHtmlGamePageResponseError)
+
+export const getAppendScheduledLessonHtmlGamePageUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/html-game-page`
+}
+
+/**
+ * Uploads a self-contained HTML game and appends it to a lesson-specific material copy. Requires TEACHER or ADMIN role.
+ * @summary Append an HTML game during a live scheduled lesson
+ */
+export const appendScheduledLessonHtmlGamePage = async (lessonId: string,
+    appendScheduledLessonHtmlGamePageBody?: AppendScheduledLessonHtmlGamePageBody, options?: RequestInit): Promise<appendScheduledLessonHtmlGamePageResponse> => {
+    const formData = new FormData();
+if(appendScheduledLessonHtmlGamePageBody?.file !== undefined) {
+ formData.append(`file`, appendScheduledLessonHtmlGamePageBody.file);
+ }
+
+  const res = await fetch(getAppendScheduledLessonHtmlGamePageUrl(lessonId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: appendScheduledLessonHtmlGamePageResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as appendScheduledLessonHtmlGamePageResponse
+}
+
+
+
 export type createHomeworkFromScheduledLessonResponse201 = {
   data: TeacherAssignmentDetailResponse
   status: 201
@@ -4408,6 +4502,104 @@ export const generateMaterialImages = async (materialId: string,
 
   const data: generateMaterialImagesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as generateMaterialImagesResponse
+}
+
+
+
+export type uploadMaterialImageAssetResponse200 = {
+  data: MaterialAssetResponse
+  status: 200
+}
+
+export type uploadMaterialImageAssetResponseSuccess = (uploadMaterialImageAssetResponse200) & {
+  headers: Headers;
+};
+;
+
+export type uploadMaterialImageAssetResponse = (uploadMaterialImageAssetResponseSuccess)
+
+export const getUploadMaterialImageAssetUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/images`
+}
+
+/**
+ * Uploads a JPEG, PNG, WebP, or safe SVG image without changing the material document.
+ * @summary Upload an image asset
+ */
+export const uploadMaterialImageAsset = async (materialId: string,
+    uploadMaterialImageAssetBody?: UploadMaterialImageAssetBody, options?: RequestInit): Promise<uploadMaterialImageAssetResponse> => {
+    const formData = new FormData();
+if(uploadMaterialImageAssetBody?.file !== undefined) {
+ formData.append(`file`, uploadMaterialImageAssetBody.file);
+ }
+
+  const res = await fetch(getUploadMaterialImageAssetUrl(materialId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: uploadMaterialImageAssetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as uploadMaterialImageAssetResponse
+}
+
+
+
+export type uploadMaterialHtmlGameAssetResponse200 = {
+  data: MaterialAssetResponse
+  status: 200
+}
+
+export type uploadMaterialHtmlGameAssetResponseSuccess = (uploadMaterialHtmlGameAssetResponse200) & {
+  headers: Headers;
+};
+;
+
+export type uploadMaterialHtmlGameAssetResponse = (uploadMaterialHtmlGameAssetResponseSuccess)
+
+export const getUploadMaterialHtmlGameAssetUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/html-games`
+}
+
+/**
+ * Uploads a validated UTF-8 HTML game without changing the material document.
+ * @summary Upload a self-contained HTML game
+ */
+export const uploadMaterialHtmlGameAsset = async (materialId: string,
+    uploadMaterialHtmlGameAssetBody?: UploadMaterialHtmlGameAssetBody, options?: RequestInit): Promise<uploadMaterialHtmlGameAssetResponse> => {
+    const formData = new FormData();
+if(uploadMaterialHtmlGameAssetBody?.file !== undefined) {
+ formData.append(`file`, uploadMaterialHtmlGameAssetBody.file);
+ }
+
+  const res = await fetch(getUploadMaterialHtmlGameAssetUrl(materialId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: uploadMaterialHtmlGameAssetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as uploadMaterialHtmlGameAssetResponse
 }
 
 

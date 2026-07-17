@@ -53,8 +53,40 @@ describe("material document accepted answers", () => {
     expect(document.pages[1].layout).toBe("STATIC_IMAGE");
     expect(document.pages[1].blocks[0]).toMatchObject({
       alt: "Worksheet scan",
+      imageSize: "MEDIUM",
       objectFit: "contain",
       url: "material-asset:asset-1",
+    });
+  });
+
+  it("keeps HTML game pages and explicit image sizes through serde", () => {
+    const document = editorDocumentFromJson({
+      schemaVersion: 1,
+      pages: [
+        {
+          id: "page-image",
+          title: "Picture",
+          layout: "FLOW",
+          blocks: [{ id: "image-full", type: "image", title: "Picture", imageSize: "FULL", url: "material-asset:image-1" }],
+        },
+        {
+          id: "page-game",
+          title: "Race",
+          layout: "HTML_GAME",
+          blocks: [{ id: "game-1", type: "htmlGame", title: "Race", height: 640, url: "material-asset:game-1" }],
+        },
+      ],
+    });
+
+    expect(document.pages[0].blocks[0].imageSize).toBe("FULL");
+    expect(document.pages[1]).toMatchObject({
+      layout: "HTML_GAME",
+      blocks: [{ id: "game-1", type: "htmlGame", height: 640, url: "material-asset:game-1" }],
+    });
+    expect(cleanMaterialBlock(document.pages[1].blocks[0])).toMatchObject({
+      type: "htmlGame",
+      height: 640,
+      url: "material-asset:game-1",
     });
   });
 

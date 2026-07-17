@@ -11,6 +11,7 @@ import {
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
   type MaterialEditorPage,
+  type MaterialHtmlGameSync,
   type MaterialRenderMode,
 } from "../../model/materialDocument";
 import { RenderedMarkdown, MarkdownInline } from "../markdown/RenderedMarkdown";
@@ -21,6 +22,7 @@ import { RenderedChoiceExercise } from "./RenderedChoiceExercise";
 import { RenderedFillGapExercise } from "./RenderedFillGapExercise";
 import { RenderedMatchingPairsExercise } from "./RenderedMatchingPairsExercise";
 import { useAppTranslation } from "../../../../shared/i18n";
+import { HtmlGameFrame } from "./HtmlGameFrame";
 
 type MaterialVideoQuality = "LOW" | "MEDIUM" | "HIGH";
 
@@ -30,6 +32,8 @@ export function RenderedMaterialBlock({
   assetTags,
   assetUrls,
   block,
+  htmlAssets = {},
+  htmlGameSync,
   mode,
   onAnswerChange,
   onAssetTagsChange,
@@ -43,6 +47,8 @@ export function RenderedMaterialBlock({
   assetTags: Record<string, string[]>;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
+  htmlAssets?: Record<string, string>;
+  htmlGameSync?: MaterialHtmlGameSync;
   materialId?: string;
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
@@ -242,14 +248,16 @@ export function RenderedMaterialBlock({
         const assetId = materialAssetIdFromUrl(block.url);
         const imageUrl = resolveMaterialImageUrl(block.url, assetUrls);
         const imageHeight = block.height ? `${block.height}px` : undefined;
+        const imageSize = block.imageSize ?? "MEDIUM";
         const objectFit = block.objectFit ?? (pageLayout === "STATIC_IMAGE" ? "contain" : undefined);
         return blockSection(
           <>
-            <h4>{block.title}</h4>
+            {pageLayout === "STATIC_IMAGE" ? null : <h4>{block.title}</h4>}
             {imageUrl ? (
               <figure
                 className={`playsay-rendered-image${pageLayout === "STATIC_IMAGE" ? " playsay-rendered-image-static" : ""}`}
                 data-editable={mode === "teacherPreview" && Boolean(onBlockPatch) ? "true" : "false"}
+                data-image-size={imageSize}
                 style={{ "--playsay-image-height": imageHeight, "--playsay-image-fit": objectFit } as CSSProperties}
               >
                 <img alt={block.alt || block.caption || block.prompt || block.title} src={imageUrl} />
@@ -263,7 +271,7 @@ export function RenderedMaterialBlock({
                     tags={assetId ? assetTags[assetId] ?? [] : []}
                   />
                 ) : null}
-                {block.caption ? <figcaption><RenderedMarkdown className="playsay-caption-markdown" value={block.caption} /></figcaption> : null}
+                {pageLayout !== "STATIC_IMAGE" && block.caption ? <figcaption><RenderedMarkdown className="playsay-caption-markdown" value={block.caption} /></figcaption> : null}
               </figure>
             ) : (
               <figure className="playsay-image-placeholder">
@@ -275,6 +283,24 @@ export function RenderedMaterialBlock({
               </figure>
             )}
           </>,
+        );
+      }
+    case "htmlGame":
+      {
+        const assetId = materialAssetIdFromUrl(block.url);
+        const html = assetId ? htmlAssets[assetId] : undefined;
+        return blockSection(
+          <>
+            {pageLayout === "HTML_GAME" ? null : <h4>{block.title}</h4>}
+            <HtmlGameFrame
+              blockId={block.id}
+              height={block.height ?? 640}
+              html={html}
+              sync={htmlGameSync}
+              title={block.title}
+            />
+          </>,
+          "playsay-render-block playsay-render-block-html-game",
         );
       }
     case "flashcards":

@@ -77,6 +77,12 @@ data class LiveLessonImagePageResponse(
     val activePageId: String,
 )
 
+data class LiveLessonHtmlGamePageResponse(
+    val lesson: ScheduledLessonResponse,
+    val material: LessonMaterialResponse,
+    val activePageId: String,
+)
+
 data class MaterialAssetUpdateRequest(
     @field:ArraySchema(maxItems = 16, schema = Schema(maxLength = 40), arraySchema = Schema(nullable = true))
     val tags: List<String>? = null,

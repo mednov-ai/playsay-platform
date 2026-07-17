@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BookOpen, Bot, FileText, ImageIcon, Layers3, Link2, MousePointer2, PenLine, Users, Video } from "lucide-react";
+import { BookOpen, Bot, FileText, Gamepad2, ImageIcon, Layers3, Link2, MousePointer2, PenLine, Users, Video } from "lucide-react";
 import type { MaterialBlockType } from "../model/materialDocument";
 
 export function materialBlockIcon(type: MaterialBlockType): ReactNode {
@@ -23,6 +23,8 @@ export function materialBlockIcon(type: MaterialBlockType): ReactNode {
       return <Users className="h-4 w-4" />;
     case "drawingArea":
       return <MousePointer2 className="h-4 w-4" />;
+    case "htmlGame":
+      return <Gamepad2 className="h-4 w-4" />;
     case "text":
     default:
       return <BookOpen className="h-4 w-4" />;

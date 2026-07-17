@@ -1061,8 +1061,15 @@
 
 .playsay-task-document-surface {
   position: relative;
+  min-width: 0;
   min-height: 100%;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
+}
+
+.playsay-task-document-surface:has(.playsay-static-image-page) {
+  overflow: visible;
 }
 
 .playsay-task-document-surface > .playsay-rendered-material {

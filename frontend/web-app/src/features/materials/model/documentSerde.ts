@@ -193,6 +193,7 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   const caption = asString(block.caption);
   const alt = asString(block.alt);
   const objectFit = normalizeMaterialObjectFit(asString(block.objectFit));
+  const imageSize = normalizeMaterialImageSize(asString(block.imageSize));
   const height = asNumber(block.height);
   const videoClip = normalizeMaterialVideoClip(block.videoClip);
 
@@ -219,6 +220,9 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   }
   if (objectFit) {
     result.objectFit = objectFit;
+  }
+  if (type === "image" || type === "generatedImage") {
+    result.imageSize = imageSize;
   }
   if (height !== null) {
     result.height = Math.min(800, Math.max(120, height));
@@ -290,6 +294,9 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   }
   if (block.objectFit === "contain" || block.objectFit === "cover") {
     clean.objectFit = block.objectFit;
+  }
+  if (block.type === "image" || block.type === "generatedImage") {
+    clean.imageSize = normalizeMaterialImageSize(block.imageSize);
   }
   if (block.height) {
     clean.height = Math.min(800, Math.max(120, block.height));
@@ -435,7 +442,7 @@ export function materialMatchingPairTargetKind(pair: MaterialMatchingPair): Mate
 
 function normalizeMaterialPageLayout(value: string): MaterialEditorPage["layout"] {
   const layout = value.trim().toUpperCase();
-  if (layout === "WORKSHEET" || layout === "STATIC_IMAGE") {
+  if (layout === "WORKSHEET" || layout === "STATIC_IMAGE" || layout === "HTML_GAME") {
     return layout;
   }
   return "FLOW";
@@ -444,6 +451,11 @@ function normalizeMaterialPageLayout(value: string): MaterialEditorPage["layout"
 function normalizeMaterialObjectFit(value: string): MaterialEditorBlock["objectFit"] {
   const fit = value.trim().toLowerCase();
   return fit === "contain" || fit === "cover" ? fit : undefined;
+}
+
+export function normalizeMaterialImageSize(value: string | undefined): NonNullable<MaterialEditorBlock["imageSize"]> {
+  const size = value?.trim().toUpperCase();
+  return size === "SMALL" || size === "LARGE" || size === "FULL" ? size : "MEDIUM";
 }
 
 export function normalizeMatchingTargetKind(value: string): MaterialMatchingTargetKind | null {

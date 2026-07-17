@@ -17,6 +17,7 @@ import type {
   LessonMaterialSubmissionInput,
   LessonMaterialUrlDraftInput,
   LiveLessonImagePageResult,
+  LiveLessonHtmlGamePageResult,
   MaterialImagePageResult,
   MaterialVideoPlayback,
   MaterialVideoPlaybackInput,
@@ -166,6 +167,40 @@ export async function updateMaterialAsset(
   );
 }
 
+export async function uploadMaterialImageAsset(
+  materialId: string,
+  file: File,
+  config = authConfig,
+): Promise<LessonMaterialAsset> {
+  return uploadMaterialAsset(`/api/materials/${materialId}/assets/images`, file, config);
+}
+
+export async function uploadMaterialHtmlGameAsset(
+  materialId: string,
+  file: File,
+  config = authConfig,
+): Promise<LessonMaterialAsset> {
+  return uploadMaterialAsset(`/api/materials/${materialId}/assets/html-games`, file, config);
+}
+
+export async function fetchMaterialAssetText(
+  materialId: string,
+  assetId: string,
+  config = authConfig,
+): Promise<string> {
+  const authorized = await authorizedOptions(config);
+  const response = await fetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
+    headers: authorized.headers,
+  });
+  if (response.status === 401) {
+    clearTokens();
+  }
+  if (response.status !== 200) {
+    throw await apiErrorFromResponse(response, `Material asset content request failed with HTTP ${response.status}.`);
+  }
+  return response.text();
+}
+
 export async function appendMaterialImagePage(
   materialId: string,
   file: File,
@@ -182,6 +217,14 @@ export async function appendScheduledLessonImagePage(
   config = authConfig,
 ): Promise<LiveLessonImagePageResult> {
   return uploadImagePage<LiveLessonImagePageResult>(`/api/schedule/lessons/${lessonId}/image-page`, file, title, config);
+}
+
+export async function appendScheduledLessonHtmlGamePage(
+  lessonId: string,
+  file: File,
+  config = authConfig,
+): Promise<LiveLessonHtmlGamePageResult> {
+  return uploadImagePage<LiveLessonHtmlGamePageResult>(`/api/schedule/lessons/${lessonId}/html-game-page`, file, null, config);
 }
 
 export async function fetchScheduledLessonMaterial(
@@ -226,6 +269,28 @@ async function uploadImagePage<T>(
   }
 
   return (await response.json()) as T;
+}
+
+async function uploadMaterialAsset(
+  path: string,
+  file: File,
+  config = authConfig,
+): Promise<LessonMaterialAsset> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const authorized = await authorizedOptions(config);
+  const response = await fetch(path, {
+    body: formData,
+    headers: authorized.headers,
+    method: "POST",
+  });
+  if (response.status === 401) {
+    clearTokens();
+  }
+  if (response.status !== 201) {
+    throw await apiErrorFromResponse(response, `Material asset upload failed with HTTP ${response.status}.`);
+  }
+  return (await response.json()) as LessonMaterialAsset;
 }
 
 export async function fetchScheduledLessonMaterialSubmission(

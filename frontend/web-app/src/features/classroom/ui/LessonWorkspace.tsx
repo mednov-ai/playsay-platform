@@ -1,4 +1,4 @@
-import { BookOpen, Clock3, Eye, ImagePlus, Loader2, Plus, Users } from "lucide-react";
+import { BookOpen, Clock3, Eye, FileCode2, ImagePlus, Loader2, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Button } from "../../../components/ui/button";
 import { canAssignLessons } from "../../../entities/workspace/model";
@@ -54,10 +54,13 @@ export function LessonWorkspace({
     material,
     materialError,
     materialLoading,
+    liveActivePageId,
     selectedMaterialId,
     setSelectedMaterialId,
     uploadImagePage,
+    uploadHtmlGamePage,
     uploadingImagePage,
+    uploadingHtmlGamePage,
   } = useLessonMaterial({ onAssignMaterial, session });
   const canMonitorSubmissions = canAssignLessons(profile);
   const assignedParticipants = session.participants.filter((participant) => Boolean(participant.materialId));
@@ -132,6 +135,10 @@ export function LessonWorkspace({
     teacherAnnotationWorkspace.setAnnotationStrokes,
     teacherAnnotationWorkspace.updateCursor,
   ]);
+  const teacherHtmlGameSync = useMemo(
+    () => teacherAnnotationWorkspace.htmlGameSync(true),
+    [teacherAnnotationWorkspace.htmlGameSync],
+  );
 
   useEffect(() => {
     if (!canMonitorSubmissions || teacherWorkParticipants.length === 0) {
@@ -166,6 +173,14 @@ export function LessonWorkspace({
     event.currentTarget.value = "";
     if (file) {
       void uploadImagePage(file);
+    }
+  }
+
+  function handleHtmlGamePageSelect(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (file) {
+      void uploadHtmlGamePage(file);
     }
   }
 
@@ -235,6 +250,19 @@ export function LessonWorkspace({
                   {uploadingImagePage ? t("classroom.actions.uploadingImagePage") : t("classroom.actions.addImagePage")}
                 </label>
               </Button>
+              <Button asChild variant="outline">
+                <label aria-disabled={uploadingHtmlGamePage ? "true" : "false"} className="playsay-live-image-upload">
+                  <input
+                    accept="text/html,.html"
+                    className="sr-only"
+                    disabled={uploadingHtmlGamePage}
+                    onChange={handleHtmlGamePageSelect}
+                    type="file"
+                  />
+                  {uploadingHtmlGamePage ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode2 className="h-4 w-4" />}
+                  {uploadingHtmlGamePage ? t("classroom.actions.uploadingHtmlGamePage") : t("classroom.actions.addHtmlGamePage")}
+                </label>
+              </Button>
             </div>
           ) : null}
           <div className="playsay-lesson-statusline">
@@ -300,6 +328,8 @@ export function LessonWorkspace({
                 lessonId={session.lessonId}
                 material={visibleMaterial}
                 annotationSync={isParallelWork ? null : teacherAnnotationSync}
+                htmlGameSync={isParallelWork ? undefined : teacherHtmlGameSync}
+                liveActivePageId={liveActivePageId}
                 onSaveAnswers={(content) => void saveMaterialAnswers(content, activeParticipant?.subject)}
                 score={lessonScore}
                 submission={activeStudentSubmission}

@@ -17,6 +17,7 @@ import {
   materialLiveScore,
   type MaterialAnswerBlock,
   type MaterialAnswerState,
+  type MaterialHtmlGameSync,
 } from "../../materials";
 import {
   annotationStrokesForPage,
@@ -47,9 +48,13 @@ export function LessonTaskCanvas({
   submissionSaving,
   teacherName,
   canControlPages = false,
+  htmlGameSync,
+  liveActivePageId,
 }: {
   annotationSync?: LiveAnnotationSync | null;
   canControlPages?: boolean;
+  htmlGameSync?: MaterialHtmlGameSync;
+  liveActivePageId?: string | null;
   collaborationControls?: ReactNode;
   lessonId: string;
   material?: LessonMaterial | null;
@@ -84,6 +89,12 @@ export function LessonTaskCanvas({
   useEffect(() => {
     setAnswers(materialAnswersFromSubmission(submission));
   }, [material?.id, submission?.id, submission?.updatedAt]);
+
+  useEffect(() => {
+    if (liveActivePageId && document?.pages.some((page) => page.id === liveActivePageId)) {
+      setActivePageId(liveActivePageId);
+    }
+  }, [document, liveActivePageId, setActivePageId]);
 
   function updateAnswer(blockId: string, answer: MaterialAnswerBlock) {
     setAnswers((current) => ({
@@ -193,6 +204,7 @@ export function LessonTaskCanvas({
                 answers={answers}
                 canControlPages={canControlPages}
                 material={material}
+                htmlGameSync={htmlGameSync}
                 mode="classroom"
                 onActivePageIdChange={setActivePageId}
                 onAnswerChange={updateAnswer}

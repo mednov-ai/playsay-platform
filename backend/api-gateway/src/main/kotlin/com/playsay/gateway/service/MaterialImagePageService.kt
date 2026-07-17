@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.node.TextNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.LiveLessonImagePageResponse
+import com.playsay.gateway.dto.LiveLessonHtmlGamePageResponse
 import com.playsay.gateway.dto.MaterialImagePageResponse
 import com.playsay.gateway.dto.MaterialAnnotationRequest
 import com.playsay.gateway.entity.LessonMaterialEntity
@@ -15,7 +16,6 @@ import com.playsay.gateway.mapper.LessonMaterialResponseMapper
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.LessonRepo
 import com.playsay.gateway.utils.MetaData
-import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -31,6 +31,7 @@ class MaterialImagePageService(
     private val lessonMaterialCatalogService: LessonMaterialCatalogService,
     private val scheduledLessonStore: ScheduledLessonStore,
     private val materialAssetService: MaterialAssetService,
+    private val materialAssetUploadService: MaterialAssetUploadService,
     private val materialAnnotationService: MaterialAnnotationService,
     private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
     private val messageProvider: MessageProvider,
@@ -50,7 +51,7 @@ class MaterialImagePageService(
         )
         val material = lessonMaterialRepo.findById(materialId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        val activePageId = appendImagePage(material, validatedImageFile(file), title)
+        val activePageId = appendImagePage(material, materialAssetUploadService.validateImageFile(file), title)
         return MaterialImagePageResponse(
             material = lessonMaterialResponseMapper.toResponse(requireMaterialRow(material.id)),
             activePageId = activePageId,
@@ -65,33 +66,46 @@ class MaterialImagePageService(
         title: String?,
     ): LiveLessonImagePageResponse {
         lessonMaterialCatalogService.requireMaterialManager(authentication)
-        val lesson = lessonRepo.lockById(lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        if (lesson.workMode == MetaData.LessonWorkModes.PARALLEL) {
-            throw ProjectResponseException.localized(
-                HttpStatus.BAD_REQUEST,
-                MetaData.ErrorCodes.MATERIAL_IMAGE_PAGE_PARALLEL_UNSUPPORTED,
-            )
-        }
-
-        val upload = validatedImageFile(file)
-        val currentMaterialId = lessonRepo.findScheduledMaterialLookup(lessonId)?.materialId
-        val targetMaterial = if (currentMaterialId == null) {
-            createEmptyLiveLessonMaterial(authentication, lessonId, upload, title)
-        } else {
-            val currentMaterial = lessonMaterialRepo.findById(currentMaterialId).orElse(null)
-                ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-            if (currentMaterial.isLiveLessonCopyFor(lessonId)) {
-                currentMaterial
-            } else {
-                createLiveLessonMaterialCopy(authentication, lessonId, currentMaterial)
-            }
-        }
+        requireSupportedLiveLesson(lessonId, MetaData.ErrorCodes.MATERIAL_IMAGE_PAGE_PARALLEL_UNSUPPORTED)
+        val upload = materialAssetUploadService.validateImageFile(file)
+        val targetMaterial = targetLiveLessonMaterial(
+            authentication = authentication,
+            lessonId = lessonId,
+            originalFileName = upload.originalFileName,
+            title = title,
+            fallbackTitle = messageProvider[MetaData.Messages.MATERIAL_STATIC_IMAGE_PAGE_TITLE],
+        )
 
         val activePageId = appendImagePage(targetMaterial, upload, title)
         saveActiveLessonPage(lessonId, targetMaterial.id, activePageId)
         val updatedLesson = scheduledLessonStore.assignSharedMaterial(authentication, lessonId, targetMaterial.id)
         return LiveLessonImagePageResponse(
+            lesson = updatedLesson,
+            material = lessonMaterialResponseMapper.toResponse(requireMaterialRow(targetMaterial.id)),
+            activePageId = activePageId,
+        )
+    }
+
+    @Transactional
+    fun appendLiveLessonHtmlGamePage(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+        file: MultipartFile,
+    ): LiveLessonHtmlGamePageResponse {
+        lessonMaterialCatalogService.requireMaterialManager(authentication)
+        requireSupportedLiveLesson(lessonId, MetaData.ErrorCodes.MATERIAL_HTML_GAME_PARALLEL_UNSUPPORTED)
+        val upload = materialAssetUploadService.validateHtmlGameFile(file)
+        val targetMaterial = targetLiveLessonMaterial(
+            authentication = authentication,
+            lessonId = lessonId,
+            originalFileName = upload.originalFileName,
+            title = null,
+            fallbackTitle = messageProvider[MetaData.Messages.MATERIAL_HTML_GAME_PAGE_TITLE],
+        )
+        val activePageId = appendHtmlGamePage(targetMaterial, upload)
+        saveActiveLessonPage(lessonId, targetMaterial.id, activePageId)
+        val updatedLesson = scheduledLessonStore.assignSharedMaterial(authentication, lessonId, targetMaterial.id)
+        return LiveLessonHtmlGamePageResponse(
             lesson = updatedLesson,
             material = lessonMaterialResponseMapper.toResponse(requireMaterialRow(targetMaterial.id)),
             activePageId = activePageId,
@@ -142,18 +156,39 @@ class MaterialImagePageService(
         return target
     }
 
+    private fun targetLiveLessonMaterial(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+        originalFileName: String?,
+        title: String?,
+        fallbackTitle: String,
+    ): LessonMaterialEntity {
+        val currentMaterialId = lessonRepo.findScheduledMaterialLookup(lessonId)?.materialId
+        if (currentMaterialId == null) {
+            return createEmptyLiveLessonMaterial(authentication, lessonId, originalFileName, title, fallbackTitle)
+        }
+        val currentMaterial = lessonMaterialRepo.findById(currentMaterialId).orElse(null)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        return if (currentMaterial.isLiveLessonCopyFor(lessonId)) {
+            currentMaterial
+        } else {
+            createLiveLessonMaterialCopy(authentication, lessonId, currentMaterial)
+        }
+    }
+
     private fun createEmptyLiveLessonMaterial(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,
-        upload: UploadedImageFile,
+        originalFileName: String?,
         title: String?,
+        fallbackTitle: String,
     ): LessonMaterialEntity {
         val now = Instant.now()
         return lessonMaterialRepo.saveAndFlush(
             LessonMaterialEntity(
                 id = UUID.randomUUID(),
                 ownerTeacherUserId = lessonMaterialCatalogService.currentUserId(authentication),
-                title = cleanPageTitle(title, upload.originalFileName),
+                title = cleanPageTitle(title, originalFileName, fallbackTitle),
                 description = null,
                 language = "en",
                 cefrLevel = "A2",
@@ -181,12 +216,16 @@ class MaterialImagePageService(
         )
     }
 
-    private fun appendImagePage(material: LessonMaterialEntity, upload: UploadedImageFile, title: String?): String {
+    private fun appendImagePage(material: LessonMaterialEntity, upload: ValidatedMaterialAssetFile, title: String?): String {
         val document = readMaterialDocument(material)
         val pages = materialPages(document)
         val pageId = "page-${UUID.randomUUID()}"
-        val pageTitle = cleanPageTitle(title, upload.originalFileName)
-        val assetId = materialAssetService.insertUploadedImageAsset(
+        val pageTitle = cleanPageTitle(
+            title,
+            upload.originalFileName,
+            messageProvider[MetaData.Messages.MATERIAL_STATIC_IMAGE_PAGE_TITLE],
+        )
+        val assetId = materialAssetUploadService.insertUploadedImageAsset(
             materialId = material.id,
             originalFileName = upload.originalFileName,
             contentType = upload.contentType,
@@ -200,41 +239,25 @@ class MaterialImagePageService(
         return pageId
     }
 
-    private fun validatedImageFile(file: MultipartFile): UploadedImageFile {
-        val contentType = normalizedContentType(file.contentType)
-            ?: throw ProjectResponseException.localized(
-                HttpStatus.BAD_REQUEST,
-                MetaData.ErrorCodes.MATERIAL_IMAGE_PAGE_UNSUPPORTED_TYPE,
-            )
-        if (contentType !in supportedStaticImageContentTypes) {
-            throw ProjectResponseException.localized(
-                HttpStatus.BAD_REQUEST,
-                MetaData.ErrorCodes.MATERIAL_IMAGE_PAGE_UNSUPPORTED_TYPE,
-            )
-        }
-        if (file.size > staticImagePageMaxBytes) {
-            throw ProjectResponseException.localized(
-                HttpStatus.BAD_REQUEST,
-                MetaData.ErrorCodes.MATERIAL_IMAGE_PAGE_TOO_LARGE,
-                staticImagePageMaxMegabytes,
-            )
-        }
-        val bytes = file.bytes
-        if (bytes.isEmpty()) {
-            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_EMPTY, "file")
-        }
-        if (contentType == "image/svg+xml" && !isSafeSvg(bytes)) {
-            throw ProjectResponseException.localized(
-                HttpStatus.BAD_REQUEST,
-                MetaData.ErrorCodes.MATERIAL_IMAGE_PAGE_UNSAFE_SVG,
-            )
-        }
-
-        return UploadedImageFile(
-            originalFileName = cleanOriginalFileName(file.originalFilename),
-            contentType = contentType,
-            bytes = bytes,
+    private fun appendHtmlGamePage(material: LessonMaterialEntity, upload: ValidatedMaterialAssetFile): String {
+        val document = readMaterialDocument(material)
+        val pages = materialPages(document)
+        val pageId = "page-${UUID.randomUUID()}"
+        val pageTitle = cleanPageTitle(
+            title = null,
+            originalFileName = upload.originalFileName,
+            fallbackTitle = messageProvider[MetaData.Messages.MATERIAL_HTML_GAME_PAGE_TITLE],
         )
+        val assetId = materialAssetUploadService.insertHtmlGameAsset(
+            materialId = material.id,
+            originalFileName = upload.originalFileName,
+            bytes = upload.bytes,
+        )
+        pages.add(htmlGamePage(pageId, pageTitle, assetId))
+        material.document = objectMapper.writeValueAsString(document)
+        material.updatedAt = Instant.now()
+        lessonMaterialRepo.saveAndFlush(material)
+        return pageId
     }
 
     private fun staticImagePage(pageId: String, title: String, assetId: UUID): ObjectNode =
@@ -251,6 +274,23 @@ class MaterialImagePageService(
                     put("alt", title)
                     put("caption", "")
                     put("objectFit", "contain")
+                    put("imageSize", "FULL")
+                },
+            )
+        }
+
+    private fun htmlGamePage(pageId: String, title: String, assetId: UUID): ObjectNode =
+        objectMapper.createObjectNode().apply {
+            put("id", pageId)
+            put("title", title)
+            put("layout", "HTML_GAME")
+            putArray("blocks").add(
+                objectMapper.createObjectNode().apply {
+                    put("id", "block-$pageId")
+                    put("type", "htmlGame")
+                    put("title", title)
+                    put("url", "material-asset:$assetId")
+                    put("height", 640)
                 },
             )
         }
@@ -267,14 +307,22 @@ class MaterialImagePageService(
     private fun materialPages(document: ObjectNode): ArrayNode =
         (document.get("pages") as? ArrayNode) ?: document.putArray("pages")
 
-    private fun cleanPageTitle(title: String?, originalFileName: String?): String =
+    private fun cleanPageTitle(title: String?, originalFileName: String?, fallbackTitle: String): String =
         title?.trim()?.takeIf { value -> value.isNotEmpty() }?.take(160)
             ?: originalFileName
                 ?.substringBeforeLast('.', missingDelimiterValue = originalFileName)
                 ?.trim()
                 ?.takeIf { value -> value.isNotEmpty() }
                 ?.take(160)
-            ?: messageProvider[MetaData.Messages.MATERIAL_STATIC_IMAGE_PAGE_TITLE]
+            ?: fallbackTitle
+
+    private fun requireSupportedLiveLesson(lessonId: UUID, parallelErrorCode: String) {
+        val lesson = lessonRepo.lockById(lessonId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        if (lesson.workMode == MetaData.LessonWorkModes.PARALLEL) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, parallelErrorCode)
+        }
+    }
 
     private fun liveLessonCopyMeta(lessonId: UUID, source: LessonMaterialEntity?): ObjectNode =
         objectMapper.createObjectNode().apply {
@@ -353,47 +401,4 @@ class MaterialImagePageService(
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
 }
 
-private data class UploadedImageFile(
-    val originalFileName: String?,
-    val contentType: String,
-    val bytes: ByteArray,
-)
-
 private const val materialAssetReferencePrefix = "material-asset:"
-private const val staticImagePageMaxMegabytes = 12
-private const val staticImagePageMaxBytes = staticImagePageMaxMegabytes * 1024 * 1024
-private val supportedStaticImageContentTypes = setOf("image/jpeg", "image/png", "image/webp", "image/svg+xml")
-private val unsafeSvgPatterns = listOf(
-    Regex("""<\s*script\b""", RegexOption.IGNORE_CASE),
-    Regex("""<\s*foreignObject\b""", RegexOption.IGNORE_CASE),
-    Regex("""\s+on[a-z]+\s*=""", RegexOption.IGNORE_CASE),
-    Regex("""javascript\s*:""", RegexOption.IGNORE_CASE),
-    Regex("""<\s*!\s*doctype\b""", RegexOption.IGNORE_CASE),
-    Regex("""<\s*!\s*entity\b""", RegexOption.IGNORE_CASE),
-    Regex("""<\?\s*xml-stylesheet\b""", RegexOption.IGNORE_CASE),
-    Regex("""\b(?:href|xlink:href)\s*=\s*["']\s*(?:https?:|//|data:)""", RegexOption.IGNORE_CASE),
-)
-
-private fun normalizedContentType(value: String?): String? =
-    value
-        ?.substringBefore(';')
-        ?.trim()
-        ?.lowercase()
-        ?.let { contentType -> if (contentType == "image/jpg") "image/jpeg" else contentType }
-        ?.takeIf { contentType -> contentType.isNotEmpty() }
-
-private fun cleanOriginalFileName(value: String?): String? =
-    value
-        ?.replace('\\', '/')
-        ?.substringAfterLast('/')
-        ?.trim()
-        ?.takeIf { fileName -> fileName.isNotEmpty() }
-        ?.take(240)
-
-private fun isSafeSvg(bytes: ByteArray): Boolean {
-    val text = runCatching { bytes.toString(StandardCharsets.UTF_8) }.getOrNull() ?: return false
-    if (!Regex("""<\s*svg\b""", RegexOption.IGNORE_CASE).containsMatchIn(text)) {
-        return false
-    }
-    return unsafeSvgPatterns.none { pattern -> pattern.containsMatchIn(text) }
-}

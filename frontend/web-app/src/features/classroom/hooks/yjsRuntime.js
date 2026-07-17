@@ -12,6 +12,9 @@ const messageAwareness = 1;
 export function createYjsWorkspaceRuntime({
   color,
   onAnnotationChange,
+  onHtmlGameEffectsChange,
+  onHtmlGameInputsChange,
+  onHtmlGameSnapshotsChange,
   onParticipantsChange,
   onTextChange,
   participantName,
@@ -21,6 +24,9 @@ export function createYjsWorkspaceRuntime({
   applyPersistedSnapshot(ydoc, snapshot);
   const ytext = ydoc.getText("workspace");
   const yannotations = ydoc.getMap("annotations");
+  const yhtmlGameSnapshots = ydoc.getMap("htmlGameSnapshots");
+  const yhtmlGameInputs = ydoc.getArray("htmlGameInputs");
+  const yhtmlGameEffects = ydoc.getArray("htmlGameEffects");
   const awareness = new awarenessProtocol.Awareness(ydoc);
   let socket = null;
   let disposed = false;
@@ -34,6 +40,15 @@ export function createYjsWorkspaceRuntime({
     if (!disposed) {
       onAnnotationChange(annotationStrokesFromMap(yannotations));
     }
+  };
+  const updateHtmlGameSnapshots = () => {
+    if (!disposed) onHtmlGameSnapshotsChange(Object.fromEntries(yhtmlGameSnapshots.entries()));
+  };
+  const updateHtmlGameInputs = () => {
+    if (!disposed) onHtmlGameInputsChange(yhtmlGameInputs.toArray());
+  };
+  const updateHtmlGameEffects = () => {
+    if (!disposed) onHtmlGameEffectsChange(yhtmlGameEffects.toArray());
   };
   const syncUpdateHandler = (update, origin) => {
     if (origin !== socket) {
@@ -53,14 +68,21 @@ export function createYjsWorkspaceRuntime({
 
   ytext.observe(updateLocalText);
   yannotations.observe(updateLocalAnnotations);
+  yhtmlGameSnapshots.observe(updateHtmlGameSnapshots);
+  yhtmlGameInputs.observe(updateHtmlGameInputs);
+  yhtmlGameEffects.observe(updateHtmlGameEffects);
   ydoc.on("update", syncUpdateHandler);
   awareness.on("update", awarenessUpdateHandler);
   awareness.setLocalState({
     cursor: null,
+    htmlGameAuthority: { blockId: null, runId: null },
     user: { color, name: participantName },
   });
   updateLocalText();
   updateLocalAnnotations();
+  updateHtmlGameSnapshots();
+  updateHtmlGameInputs();
+  updateHtmlGameEffects();
 
   return {
     destroy() {
@@ -69,12 +91,21 @@ export function createYjsWorkspaceRuntime({
       awareness.destroy();
       ytext.unobserve(updateLocalText);
       yannotations.unobserve(updateLocalAnnotations);
+      yhtmlGameSnapshots.unobserve(updateHtmlGameSnapshots);
+      yhtmlGameInputs.unobserve(updateHtmlGameInputs);
+      yhtmlGameEffects.unobserve(updateHtmlGameEffects);
       ydoc.off("update", syncUpdateHandler);
       ydoc.destroy();
       onParticipantsChange([]);
     },
     getText() {
       return ytext.toString();
+    },
+    publishHtmlGameEffect(effect) {
+      boundedArrayPush(yhtmlGameEffects, effect, 120);
+    },
+    publishHtmlGameInput(event) {
+      boundedArrayPush(yhtmlGameInputs, event, 200);
     },
     handleSocketMessage(data) {
       handleMessage(ydoc, awareness, socket, data);
@@ -96,6 +127,9 @@ export function createYjsWorkspaceRuntime({
         });
       });
     },
+    setHtmlGameSnapshot(blockId, snapshot) {
+      yhtmlGameSnapshots.set(blockId, snapshot);
+    },
     snapshot() {
       return {
         schemaVersion: 1,
@@ -112,6 +146,9 @@ export function createYjsWorkspaceRuntime({
     updateCursor(cursor) {
       awareness.setLocalStateField("cursor", cursor);
     },
+    updateHtmlGameAuthority(blockId, runId) {
+      awareness.setLocalStateField("htmlGameAuthority", { blockId, runId });
+    },
     updateText(nextText) {
       if (ytext.toString() === nextText) {
         return;
@@ -123,6 +160,14 @@ export function createYjsWorkspaceRuntime({
       onTextChange(nextText);
     },
   };
+}
+
+function boundedArrayPush(array, value, limit) {
+  array.doc?.transact(() => {
+    array.push([value]);
+    const overflow = array.length - limit;
+    if (overflow > 0) array.delete(0, overflow);
+  });
 }
 
 function annotationStrokesFromMap(yannotations) {
@@ -224,10 +269,13 @@ function updateParticipants(awareness, onParticipantsChange) {
       const root = asObject(state);
       const user = asObject(root?.user);
       const cursor = asObject(root?.cursor);
+      const htmlGameAuthority = asObject(root?.htmlGameAuthority);
       return {
         clientId,
         color: asString(user?.color) || "#2574ff",
         cursor: cursor ? { x: clamp01(asNumber(cursor.x)), y: clamp01(asNumber(cursor.y)) } : null,
+        htmlGameBlockId: asString(htmlGameAuthority?.blockId) || null,
+        htmlGameRunId: asString(htmlGameAuthority?.runId) || null,
         name: asString(user?.name) || "Play&Say",
       };
     });

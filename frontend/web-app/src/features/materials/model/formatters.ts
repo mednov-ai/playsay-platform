@@ -179,6 +179,8 @@ export function materialBlockLabel(type: MaterialBlockType): string {
       return i18n.t("materials.blockTypes.speakingPrompt");
     case "drawingArea":
       return i18n.t("materials.blockTypes.drawingArea");
+    case "htmlGame":
+      return i18n.t("materials.blockTypes.htmlGame");
     default:
       return i18n.t("materials.blockTypes.fallback");
   }
@@ -367,6 +369,7 @@ export function normalizeMaterialBlockType(value: string): MaterialBlockType | n
     "freeWriting",
     "speakingPrompt",
     "drawingArea",
+    "htmlGame",
     "generatedImage",
   ];
 

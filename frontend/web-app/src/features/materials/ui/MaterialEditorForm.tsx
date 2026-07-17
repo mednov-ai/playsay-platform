@@ -32,6 +32,7 @@ export function MaterialEditorForm({
   onRemoveBlock,
   onSuggestAcceptedAnswers,
   onUpdateBlock,
+  onUploadBlockAsset,
   onUpdateForm,
   pendingImageTargetsCount,
 }: {
@@ -50,6 +51,7 @@ export function MaterialEditorForm({
   onRemoveBlock: (blockId: string) => void;
   onSuggestAcceptedAnswers: (blockId: string, itemIds: string[]) => void;
   onUpdateBlock: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
+  onUploadBlockAsset: (blockId: string, kind: "image" | "htmlGame", file: File) => Promise<void>;
   onUpdateForm: <Key extends keyof MaterialFormState>(field: Key, value: MaterialFormState[Key]) => void;
   pendingImageTargetsCount: number;
 }) {
@@ -182,7 +184,7 @@ export function MaterialEditorForm({
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
-            {(["text", "videoEmbed", "image", "generatedImage", "flashcards", "fillGaps", "multipleChoice", "matchingPairs", "freeWriting", "speakingPrompt", "drawingArea"] as MaterialBlockType[]).map((type) => (
+            {(["text", "videoEmbed", "image", "generatedImage", "htmlGame", "flashcards", "fillGaps", "multipleChoice", "matchingPairs", "freeWriting", "speakingPrompt", "drawingArea"] as MaterialBlockType[]).map((type) => (
               <Button disabled={disabled} key={type} onClick={() => onAddBlock(type)} type="button" variant="outline">
                 {materialBlockIcon(type)}
                 {materialBlockLabel(type)}
@@ -241,6 +243,7 @@ export function MaterialEditorForm({
               onSuggestAcceptedAnswers={onSuggestAcceptedAnswers}
               onToggleCollapsed={() => toggleBlockCollapsed(block.id)}
               onUpdate={(patch) => onUpdateBlock(block.id, patch)}
+              onUploadAsset={(kind, file) => onUploadBlockAsset(block.id, kind, file)}
             />
           ))
         )}

@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
+import org.springframework.web.multipart.MultipartFile
 
 private typealias StoredMaterialAsset = MaterialAssetEntity
 
@@ -43,6 +44,7 @@ private val materialImageTagStopWords = setOf(
 class MaterialAssetService(
     private val materialAssetRepo: MaterialAssetRepo,
     private val materialObjectStorage: MaterialObjectStorage,
+    private val materialAssetUploadService: MaterialAssetUploadService,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) {
     fun list(materialId: UUID): List<MaterialAssetResponse> =
@@ -92,42 +94,25 @@ class MaterialAssetService(
     fun findAssets(materialId: UUID): List<MaterialAssetEntity> =
         materialAssetRepo.findByMaterialId(materialId)
 
-    fun insertUploadedImageAsset(
-        materialId: UUID,
-        originalFileName: String?,
-        contentType: String,
-        bytes: ByteArray,
-    ): UUID {
-        val id = UUID.randomUUID()
-        val storageKey = "material-assets/$materialId/$id.${contentType.materialImageExtension()}"
-        try {
-            materialObjectStorage.putObject(storageKey, bytes, contentType)
-            materialAssetRepo.saveAndFlush(
-                MaterialAssetEntity(
-                    id = id,
-                    materialId = materialId,
-                    kind = "UPLOADED_IMAGE",
-                    storageKey = storageKey,
-                    externalUrl = null,
-                    provider = "USER",
-                    metadata = objectMapper.writeValueAsString(
-                        uploadedImageMetadata(
-                            originalFileName = originalFileName,
-                            contentType = contentType,
-                            byteSize = bytes.size,
-                            storageKey = storageKey,
-                        ),
-                    ),
-                    createdAt = Instant.now(),
-                ),
-            )
-        } catch (exception: MaterialObjectStorageException) {
-            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
-        } catch (exception: RuntimeException) {
-            runCatching { materialObjectStorage.deleteObject(storageKey) }
-            throw exception
-        }
-        return id
+    fun uploadImageAsset(materialId: UUID, file: MultipartFile): MaterialAssetResponse {
+        val upload = materialAssetUploadService.validateImageFile(file)
+        val assetId = materialAssetUploadService.insertUploadedImageAsset(
+            materialId = materialId,
+            originalFileName = upload.originalFileName,
+            contentType = upload.contentType,
+            bytes = upload.bytes,
+        )
+        return requireNotNull(findAsset(assetId)).toResponse(objectMapper)
+    }
+
+    fun uploadHtmlGameAsset(materialId: UUID, file: MultipartFile): MaterialAssetResponse {
+        val upload = materialAssetUploadService.validateHtmlGameFile(file)
+        val assetId = materialAssetUploadService.insertHtmlGameAsset(
+            materialId = materialId,
+            originalFileName = upload.originalFileName,
+            bytes = upload.bytes,
+        )
+        return requireNotNull(findAsset(assetId)).toResponse(objectMapper)
     }
 
     fun copyAssets(sourceMaterialId: UUID, targetMaterialId: UUID, assetIds: Set<UUID>): Map<UUID, UUID> {
@@ -333,21 +318,6 @@ class MaterialAssetService(
             generated.revisedPrompt?.let { value -> put("revisedPrompt", value) }
         }
 
-    private fun uploadedImageMetadata(
-        originalFileName: String?,
-        contentType: String,
-        byteSize: Int,
-        storageKey: String,
-    ): ObjectNode =
-        objectMapper.createObjectNode().apply {
-            originalFileName?.takeIf { fileName -> fileName.isNotBlank() }?.let { fileName -> put("fileName", fileName.take(240)) }
-            put("mimeType", contentType)
-            put("byteSize", byteSize)
-            put("storageKey", storageKey)
-            put("safeSvg", contentType == "image/svg+xml")
-            replace("tags", objectMapper.createArrayNode())
-        }
-
     private fun copiedAssetMetadata(asset: StoredMaterialAsset, storageKey: String?): ObjectNode =
         runCatching { objectMapper.readTree(asset.metadata).deepCopy<ObjectNode>() }
             .getOrElse { objectMapper.createObjectNode() }
@@ -431,12 +401,3 @@ private fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): Material
         metadata = objectMapper.readTree(metadata),
         createdAt = createdAt,
     )
-
-private fun String.materialImageExtension(): String =
-    when (lowercase()) {
-        "image/jpeg", "image/jpg" -> "jpg"
-        "image/png" -> "png"
-        "image/webp" -> "webp"
-        "image/svg+xml" -> "svg"
-        else -> "bin"
-    }

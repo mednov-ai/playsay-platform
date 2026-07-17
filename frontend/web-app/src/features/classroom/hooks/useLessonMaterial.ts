@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   appendScheduledLessonImagePage,
+  appendScheduledLessonHtmlGamePage,
   fetchScheduledLessonMaterial,
   type LessonMaterial,
   type LiveLessonImagePageResult,
+  type LiveLessonHtmlGamePageResult,
   type ScheduledLesson,
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -23,6 +25,8 @@ export function useLessonMaterial({
   const [selectedMaterialId, setSelectedMaterialId] = useState(session.materialId ?? "");
   const [assigningMaterial, setAssigningMaterial] = useState(false);
   const [uploadingImagePage, setUploadingImagePage] = useState(false);
+  const [uploadingHtmlGamePage, setUploadingHtmlGamePage] = useState(false);
+  const [liveActivePageId, setLiveActivePageId] = useState<string | null>(null);
   const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,6 +37,7 @@ export function useLessonMaterial({
     if (
       assignmentMessage !== t("classroom.messages.materialAssigned") &&
       assignmentMessage !== t("classroom.messages.imagePageAdded") &&
+      assignmentMessage !== t("classroom.messages.htmlGamePageAdded") &&
       assignmentMessage !== t("classroom.messages.materialUnassigned")
     ) {
       return undefined;
@@ -81,6 +86,7 @@ export function useLessonMaterial({
   async function assignMaterial() {
     setAssigningMaterial(true);
     setAssignmentMessage(null);
+    setLiveActivePageId(null);
     try {
       const updated = await onAssignMaterial(session.lessonId, selectedMaterialId || null);
       if (!updated) {
@@ -113,6 +119,7 @@ export function useLessonMaterial({
       const result = await appendScheduledLessonImagePage(session.lessonId, file, file.name);
       setMaterial(result.material);
       setSelectedMaterialId(result.lesson.materialId ?? result.material.id);
+      setLiveActivePageId(result.activePageId);
       setMaterialError(null);
       setAssignmentMessage(t("classroom.messages.imagePageAdded"));
       return result;
@@ -124,6 +131,25 @@ export function useLessonMaterial({
     }
   }
 
+  async function uploadHtmlGamePage(file: File): Promise<LiveLessonHtmlGamePageResult | null> {
+    setUploadingHtmlGamePage(true);
+    setAssignmentMessage(null);
+    try {
+      const result = await appendScheduledLessonHtmlGamePage(session.lessonId, file);
+      setMaterial(result.material);
+      setSelectedMaterialId(result.lesson.materialId ?? result.material.id);
+      setLiveActivePageId(result.activePageId);
+      setMaterialError(null);
+      setAssignmentMessage(t("classroom.messages.htmlGamePageAdded"));
+      return result;
+    } catch (caught) {
+      setAssignmentMessage(caught instanceof Error ? caught.message : t("classroom.messages.htmlGamePageUploadFailed"));
+      return null;
+    } finally {
+      setUploadingHtmlGamePage(false);
+    }
+  }
+
   return {
     assigningMaterial,
     assignmentMessage,
@@ -131,9 +157,12 @@ export function useLessonMaterial({
     material,
     materialError,
     materialLoading,
+    liveActivePageId,
     selectedMaterialId,
     setSelectedMaterialId,
     uploadImagePage,
+    uploadHtmlGamePage,
     uploadingImagePage,
+    uploadingHtmlGamePage,
   };
 }

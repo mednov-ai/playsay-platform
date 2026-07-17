@@ -12,6 +12,7 @@ import {
   type CollaborationParticipant,
   type YjsWorkspaceRuntime,
 } from "./yjsRuntime";
+import type { MaterialHtmlGameEffect, MaterialHtmlGameInputEvent, MaterialHtmlGameSnapshot, MaterialHtmlGameSync } from "../../materials/model/materialDocument";
 
 export type { CollaborationCursor, CollaborationParticipant };
 
@@ -32,6 +33,9 @@ export function useYjsWorkspace({
   const [status, setStatus] = useState<YjsWorkspaceStatus>("idle");
   const [annotationStrokes, setAnnotationStrokesState] = useState<AnnotationStroke[]>([]);
   const [text, setText] = useState("");
+  const [htmlGameSnapshots, setHtmlGameSnapshots] = useState<Record<string, MaterialHtmlGameSnapshot>>({});
+  const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
+  const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -41,6 +45,9 @@ export function useYjsWorkspace({
       setParticipants([]);
       setStatus("idle");
       setText("");
+      setHtmlGameSnapshots({});
+      setHtmlGameInputs([]);
+      setHtmlGameEffects([]);
       return undefined;
     }
 
@@ -48,6 +55,9 @@ export function useYjsWorkspace({
     const runtime = createYjsWorkspaceRuntime({
       color,
       onAnnotationChange: setAnnotationStrokesState,
+      onHtmlGameEffectsChange: setHtmlGameEffects,
+      onHtmlGameInputsChange: setHtmlGameInputs,
+      onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onParticipantsChange: setParticipants,
       onTextChange: setText,
       participantName,
@@ -96,6 +106,9 @@ export function useYjsWorkspace({
       runtimeRef.current = null;
       setAnnotationStrokesState([]);
       setParticipants([]);
+      setHtmlGameSnapshots({});
+      setHtmlGameInputs([]);
+      setHtmlGameEffects([]);
     };
   }, [color, document?.id, enabled, participantName]);
 
@@ -128,10 +141,41 @@ export function useYjsWorkspace({
     return runtime.snapshot();
   }, []);
 
+  const publishHtmlGameInput = useCallback((event: MaterialHtmlGameInputEvent) => {
+    runtimeRef.current?.publishHtmlGameInput(event);
+  }, []);
+
+  const publishHtmlGameEffect = useCallback((effect: MaterialHtmlGameEffect) => {
+    runtimeRef.current?.publishHtmlGameEffect(effect);
+  }, []);
+
+  const publishHtmlGameSnapshot = useCallback((blockId: string, gameSnapshot: MaterialHtmlGameSnapshot) => {
+    runtimeRef.current?.setHtmlGameSnapshot(blockId, gameSnapshot);
+  }, []);
+
+  const setHtmlGameAuthorityRun = useCallback((blockId: string | null, runId: string | null) => {
+    runtimeRef.current?.updateHtmlGameAuthority(blockId, runId);
+  }, []);
+
+  const htmlGameSync = useCallback((isAuthority: boolean): MaterialHtmlGameSync => ({
+    authorityRuns: Object.fromEntries(participants
+      .filter((participant) => participant.htmlGameBlockId && participant.htmlGameRunId)
+      .map((participant) => [participant.htmlGameBlockId, participant.htmlGameRunId])),
+    effects: htmlGameEffects,
+    inputs: htmlGameInputs,
+    isAuthority,
+    publishEffect: publishHtmlGameEffect,
+    publishInput: publishHtmlGameInput,
+    publishSnapshot: publishHtmlGameSnapshot,
+    setAuthorityRun: setHtmlGameAuthorityRun,
+    snapshots: htmlGameSnapshots,
+  }), [htmlGameEffects, htmlGameInputs, htmlGameSnapshots, participants, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGameSnapshot, setHtmlGameAuthorityRun]);
+
   return {
     annotationStrokes,
     connected: status === "connected",
     participants,
+    htmlGameSync,
     setAnnotationStrokes,
     snapshot,
     status,

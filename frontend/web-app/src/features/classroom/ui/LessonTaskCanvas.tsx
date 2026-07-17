@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type PointerEvent, type ReactNode } from "react";
 import { Eraser, Loader2, MousePointer2, PenLine, Send, Undo2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -66,7 +66,10 @@ export function LessonTaskCanvas({
   teacherName: string;
 }) {
   const { t } = useAppTranslation();
-  const document = material ? editorDocumentFromJson(material.document, material.title) : null;
+  const document = useMemo(
+    () => (material ? editorDocumentFromJson(material.document, material.title) : null),
+    [material],
+  );
   const firstPageId = document?.pages[0]?.id ?? null;
   const {
     activePageId,

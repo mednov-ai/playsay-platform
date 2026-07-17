@@ -1159,6 +1159,12 @@ export const ru = {
       nextTask: "Следующее задание",
       pageIndicator: "{{current}} из {{total}}",
     },
+    presentation: {
+      expandImage: "Развернуть изображение",
+      collapseImage: "Свернуть изображение",
+      minimizeGame: "Свернуть игру",
+      restoreGame: "Вернуть игру",
+    },
     material: {
       pickerEmpty: "Материал не выбран",
       assignedAria: "Назначенные задания",

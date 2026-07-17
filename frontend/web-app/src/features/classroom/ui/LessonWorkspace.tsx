@@ -26,7 +26,7 @@ import {
   materialBlockLabel,
   materialDocumentBlocks,
 } from "../../materials";
-import { LessonTaskCanvas } from "./LessonTaskCanvas";
+import { LessonTaskCanvas, type LessonPresentationMode } from "./LessonTaskCanvas";
 import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -77,6 +77,7 @@ export function LessonWorkspace({
   const canManageMaterial = canAssignLessons(profile) && !isParallelWork;
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
   const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
+  const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
 
   useEffect(() => {
     setTeacherTaskVisible((current) => teacherTaskVisibilityAfterLiveUpload(
@@ -196,7 +197,7 @@ export function LessonWorkspace({
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
-    <section className="playsay-workbench">
+    <section className="playsay-workbench" data-presentation-mode={presentationMode}>
       <header className="playsay-workbench-topbar">
         <nav className="playsay-lesson-tabs" aria-label={t("classroom.tabs.aria")}>
           <button className="playsay-lesson-tab" data-active="true" type="button">
@@ -340,6 +341,7 @@ export function LessonWorkspace({
                 htmlGameSync={isParallelWork ? undefined : teacherHtmlGameSync}
                 liveActivePageId={liveActivePageId}
                 onSaveAnswers={(content) => void saveMaterialAnswers(content, activeParticipant?.subject)}
+                onPresentationModeChange={setPresentationMode}
                 score={lessonScore}
                 submission={activeStudentSubmission}
                 submissionMessage={submissionMessage}
@@ -364,6 +366,7 @@ export function LessonWorkspace({
               lessonId={session.lessonId}
               material={visibleMaterial}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              onPresentationModeChange={setPresentationMode}
               score={lessonScore}
               submission={submission}
               submissionMessage={submissionMessage}
@@ -376,6 +379,7 @@ export function LessonWorkspace({
               lessonId={session.lessonId}
               material={visibleMaterial}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              onPresentationModeChange={setPresentationMode}
               profileSubject={profile?.subject}
               score={lessonScore}
               sharedPresenceEnabled={studentSharedPresenceEnabled}
@@ -400,6 +404,7 @@ export function LessonWorkspace({
             <LessonTaskCanvas
               lessonId={session.lessonId}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
+              onPresentationModeChange={setPresentationMode}
               score={lessonScore}
               submission={submission}
               submissionMessage={submissionMessage}

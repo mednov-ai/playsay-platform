@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type PointerEvent, type ReactNode } from "react";
-import { Eraser, Loader2, MousePointer2, PenLine, Send, Undo2 } from "lucide-react";
+import { Eraser, Loader2, Maximize2, Minimize2, MousePointer2, PenLine, Send, Undo2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   type LessonMaterial,
@@ -36,6 +36,8 @@ type LiveAnnotationSync = {
   updateCursor: (cursor: CollaborationCursor | null) => void;
 };
 
+export type LessonPresentationMode = "default" | "html-game-focus" | "html-game-minimized" | "image-focus";
+
 export function LessonTaskCanvas({
   annotationSync,
   collaborationControls,
@@ -50,11 +52,13 @@ export function LessonTaskCanvas({
   canControlPages = false,
   htmlGameSync,
   liveActivePageId,
+  onPresentationModeChange,
 }: {
   annotationSync?: LiveAnnotationSync | null;
   canControlPages?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
   liveActivePageId?: string | null;
+  onPresentationModeChange?: (mode: LessonPresentationMode) => void;
   collaborationControls?: ReactNode;
   lessonId: string;
   material?: LessonMaterial | null;
@@ -85,6 +89,7 @@ export function LessonTaskCanvas({
     setAnnotationTool,
   } = useLessonAnnotation({ initialPageId: firstPageId, lessonId, liveAnnotation: annotationSync, materialId: material?.id });
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
+  const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const activePage = document?.pages.find((page) => page.id === activePageId) ?? document?.pages[0] ?? null;
   const visibleAnnotationStrokes = annotationStrokesForPage(annotationStrokes, activePage?.id ?? activePageId);
   const activePageAcceptsAnswers = materialPageAcceptsAnswers(activePage);
@@ -98,6 +103,16 @@ export function LessonTaskCanvas({
       setActivePageId(liveActivePageId);
     }
   }, [document, liveActivePageId, setActivePageId]);
+
+  useEffect(() => {
+    setPresentationMode(activePage?.layout === "HTML_GAME" ? "html-game-focus" : "default");
+  }, [activePage?.id, activePage?.layout, material?.id]);
+
+  useEffect(() => {
+    onPresentationModeChange?.(presentationMode);
+  }, [onPresentationModeChange, presentationMode]);
+
+  useEffect(() => () => onPresentationModeChange?.("default"), [onPresentationModeChange]);
 
   function updateAnswer(blockId: string, answer: MaterialAnswerBlock) {
     setAnswers((current) => ({
@@ -156,7 +171,7 @@ export function LessonTaskCanvas({
   }
 
   return (
-    <div className="playsay-task-board">
+    <div className="playsay-task-board" data-presentation-mode={presentationMode}>
       <aside className="playsay-annotation-toolbar" aria-label={t("classroom.annotation.toolbar")}>
         <AnnotationToolButton active={annotationTool === "pointer"} label={t("classroom.annotation.pointer")} onClick={() => setAnnotationTool("pointer")} testId="annotation-tool-pointer">
           <MousePointer2 className="h-4 w-4" />
@@ -189,9 +204,33 @@ export function LessonTaskCanvas({
             />
           ))}
         </div>
+        {activePage?.layout === "STATIC_IMAGE" ? (
+          <AnnotationToolButton
+            active={presentationMode === "image-focus"}
+            label={presentationMode === "image-focus"
+              ? t("classroom.presentation.collapseImage")
+              : t("classroom.presentation.expandImage")}
+            onClick={() => setPresentationMode((current) => current === "image-focus" ? "default" : "image-focus")}
+            testId="static-image-focus-toggle"
+          >
+            {presentationMode === "image-focus" ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </AnnotationToolButton>
+        ) : null}
       </aside>
 
       <div className="playsay-task-page">
+        {presentationMode === "html-game-focus" ? (
+          <button
+            aria-label={t("classroom.presentation.minimizeGame")}
+            className="playsay-presentation-floating-action"
+            data-testid="html-game-minimize"
+            onClick={() => setPresentationMode("html-game-minimized")}
+            title={t("classroom.presentation.minimizeGame")}
+            type="button"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </button>
+        ) : null}
         <div className="playsay-task-document">
           <div
             className="playsay-task-document-surface"
@@ -208,9 +247,15 @@ export function LessonTaskCanvas({
                 canControlPages={canControlPages}
                 material={material}
                 htmlGameSync={htmlGameSync}
+                htmlGamePresentation={presentationMode === "html-game-focus"
+                  ? "focus"
+                  : presentationMode === "html-game-minimized"
+                    ? "minimized"
+                    : "normal"}
                 mode="classroom"
                 onActivePageIdChange={setActivePageId}
                 onAnswerChange={updateAnswer}
+                onHtmlGameRestore={() => setPresentationMode("html-game-focus")}
                 score={displayScore}
               />
             ) : (

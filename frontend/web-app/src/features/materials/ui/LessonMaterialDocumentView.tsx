@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { FileText } from "lucide-react";
+import { FileText, Gamepad2, Maximize2 } from "lucide-react";
 import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, fetchMaterialAssetText, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
 import {
   MaterialAnswerBlock,
@@ -31,6 +31,8 @@ export function LessonMaterialDocumentView({
   score,
   showScoreBadge = true,
   htmlGameSync,
+  htmlGamePresentation = "normal",
+  onHtmlGameRestore,
 }: {
   activePageId?: string | null;
   allowVideoFullscreen?: boolean;
@@ -46,6 +48,8 @@ export function LessonMaterialDocumentView({
   score?: number | null;
   showScoreBadge?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
+  htmlGamePresentation?: "focus" | "minimized" | "normal";
+  onHtmlGameRestore?: () => void;
 }) {
   const { t } = useAppTranslation();
   const document = editorDocumentFromJson(material.document);
@@ -137,6 +141,7 @@ export function LessonMaterialDocumentView({
       className={`playsay-rendered-material${isStaticImagePage ? " playsay-static-image-page" : ""}`}
       data-playsay-layout={page.layout}
       data-playsay-page-id={page.id}
+      data-html-game-presentation={isHtmlGamePage ? htmlGamePresentation : undefined}
     >
       {showScoreBadge && numericScore !== null ? (
         <div className="playsay-material-score-badge">
@@ -176,7 +181,10 @@ export function LessonMaterialDocumentView({
       ) : null}
       {!isStaticImagePage && !isHtmlGamePage ? <h3>{page.title}</h3> : null}
       {!isStaticImagePage && !isHtmlGamePage && material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
-      <div className={`playsay-material-blocks${isStaticImagePage ? " playsay-material-blocks-static-image" : ""}${isHtmlGamePage ? " playsay-material-blocks-html-game" : ""}`}>
+      <div
+        aria-hidden={isHtmlGamePage && htmlGamePresentation === "minimized" ? "true" : undefined}
+        className={`playsay-material-blocks${isStaticImagePage ? " playsay-material-blocks-static-image" : ""}${isHtmlGamePage ? " playsay-material-blocks-html-game" : ""}`}
+      >
         {page.blocks.map((block) => (
           <RenderedMaterialBlock
             allowVideoFullscreen={videoFullscreenAllowed}
@@ -186,6 +194,7 @@ export function LessonMaterialDocumentView({
             block={block}
             htmlAssets={htmlAssets}
             htmlGameSync={htmlGameSync}
+            htmlGameFillAvailable={isHtmlGamePage && htmlGamePresentation === "focus"}
             key={block.id}
             materialId={material.id}
             mode={mode}
@@ -200,6 +209,19 @@ export function LessonMaterialDocumentView({
           />
         ))}
       </div>
+      {isHtmlGamePage && htmlGamePresentation === "minimized" ? (
+        <button
+          aria-label={t("classroom.presentation.restoreGame")}
+          className="playsay-html-game-launcher"
+          data-testid="html-game-restore"
+          onClick={onHtmlGameRestore}
+          type="button"
+        >
+          <span><Gamepad2 className="h-6 w-6" /></span>
+          <strong>{page.title}</strong>
+          <Maximize2 className="h-4 w-4" />
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -1131,6 +1131,12 @@ export const fr = {
       nextTask: "Exercice suivant",
       pageIndicator: "{{current}} sur {{total}}",
     },
+    presentation: {
+      expandImage: "Agrandir l’image",
+      collapseImage: "Réduire l’image",
+      minimizeGame: "Réduire le jeu",
+      restoreGame: "Restaurer le jeu",
+    },
     material: {
       pickerEmpty: "Aucun support sélectionné",
       assignedAria: "Exercices attribués",

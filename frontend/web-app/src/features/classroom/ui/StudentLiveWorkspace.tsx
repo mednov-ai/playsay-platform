@@ -8,13 +8,14 @@ import { useAppTranslation } from "../../../shared/i18n";
 import { useCollaborationDocument } from "../hooks/useCollaborationDocument";
 import { useYjsWorkspace } from "../hooks/useYjsWorkspace";
 import { collaborationParticipantColor } from "../model/collaboration";
-import { LessonTaskCanvas } from "./LessonTaskCanvas";
+import { LessonTaskCanvas, type LessonPresentationMode } from "./LessonTaskCanvas";
 
 export function StudentLiveWorkspace({
   displayName,
   lessonId,
   material,
   onSaveAnswers,
+  onPresentationModeChange,
   profileSubject,
   score,
   sharedPresenceEnabled = false,
@@ -27,6 +28,7 @@ export function StudentLiveWorkspace({
   lessonId: string;
   material: LessonMaterial;
   onSaveAnswers: (content: LessonMaterialJson) => void;
+  onPresentationModeChange?: (mode: LessonPresentationMode) => void;
   profileSubject?: string | null;
   score: number | null;
   sharedPresenceEnabled?: boolean;
@@ -86,6 +88,7 @@ export function StudentLiveWorkspace({
         annotationSync={annotationSync}
         htmlGameSync={htmlGameSync}
         onSaveAnswers={onSaveAnswers}
+        onPresentationModeChange={onPresentationModeChange}
         score={score}
         submission={submission}
         submissionMessage={submissionMessage}

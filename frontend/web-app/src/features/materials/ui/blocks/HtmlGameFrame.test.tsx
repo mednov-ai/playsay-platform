@@ -1,8 +1,19 @@
+// @vitest-environment jsdom
+// @vitest-environment-options { "url": "http://localhost/" }
+
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { MaterialHtmlGameSync } from "../../model/materialDocument";
 import { HtmlGameFrame, createSandboxedGameDocument } from "./HtmlGameFrame";
 
+vi.mock("../../../../shared/i18n", () => ({
+  useAppTranslation: () => ({ t: (key: string) => key }),
+}));
+
 const gameHtml = "<html><head><title>Game</title></head><body><button id=\"start\">Start</button><script>document.body.dataset.ready = 'true'</script></body></html>";
+
+afterEach(cleanup);
 
 describe("HTML game sandbox", () => {
   it("injects an offline bridge and keeps game scripts only in the authority document", () => {
@@ -31,5 +42,35 @@ describe("HTML game sandbox", () => {
     expect(markup).toContain('sandbox="allow-scripts allow-forms allow-pointer-lock"');
     expect(markup).not.toContain("allow-same-origin");
     expect(markup).not.toContain("allow-top-navigation");
+  });
+
+  it("announces a mounted authority run when collaboration finishes connecting", () => {
+    const setAuthorityRun = vi.fn();
+    const createSync = (ready: boolean): MaterialHtmlGameSync => ({
+      authorityRuns: {},
+      effects: [],
+      inputs: [],
+      isAuthority: true,
+      publishEffect: vi.fn(),
+      publishInput: vi.fn(),
+      publishSnapshot: vi.fn(),
+      ready,
+      setAuthorityRun,
+      snapshots: {},
+    });
+    const { rerender, unmount } = render(
+      <HtmlGameFrame blockId="game-1" height={640} html={gameHtml} sync={createSync(false)} title="Game" />,
+    );
+
+    expect(setAuthorityRun).not.toHaveBeenCalled();
+
+    rerender(
+      <HtmlGameFrame blockId="game-1" height={640} html={gameHtml} sync={createSync(true)} title="Game" />,
+    );
+
+    expect(setAuthorityRun).toHaveBeenCalledWith("game-1", expect.any(String));
+
+    unmount();
+    expect(setAuthorityRun).toHaveBeenLastCalledWith("game-1", null);
   });
 });

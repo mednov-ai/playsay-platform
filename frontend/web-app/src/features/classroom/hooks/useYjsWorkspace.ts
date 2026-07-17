@@ -163,12 +163,13 @@ export function useYjsWorkspace({
     effects: htmlGameEffects,
     inputs: htmlGameInputs,
     isAuthority,
+    ready: status === "connected",
     publishEffect: publishHtmlGameEffect,
     publishInput: publishHtmlGameInput,
     publishSnapshot: publishHtmlGameSnapshot,
     setAuthorityRun: setHtmlGameAuthorityRun,
     snapshots: htmlGameSnapshots,
-  }), [htmlGameEffects, htmlGameInputs, htmlGameSnapshots, participants, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGameSnapshot, setHtmlGameAuthorityRun]);
+  }), [htmlGameEffects, htmlGameInputs, htmlGameSnapshots, participants, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, status]);
 
   return {
     annotationStrokes,

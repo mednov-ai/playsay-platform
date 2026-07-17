@@ -77,6 +77,15 @@ export function LessonWorkspace({
   const canManageMaterial = canAssignLessons(profile) && !isParallelWork;
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
   const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
+
+  useEffect(() => {
+    setTeacherTaskVisible((current) => teacherTaskVisibilityAfterLiveUpload(
+      current,
+      canMonitorSubmissions,
+      liveActivePageId,
+    ));
+  }, [canMonitorSubmissions, liveActivePageId]);
+
   const activeParticipant = canMonitorSubmissions
     ? teacherWorkParticipants.find((participant) => participant.subject === activeStudentSubject) ?? teacherWorkParticipants[0] ?? null
     : null;
@@ -402,4 +411,12 @@ export function LessonWorkspace({
       </div>
     </section>
   );
+}
+
+export function teacherTaskVisibilityAfterLiveUpload(
+  current: boolean,
+  canMonitorSubmissions: boolean,
+  liveActivePageId: string | null,
+): boolean {
+  return current || (canMonitorSubmissions && Boolean(liveActivePageId));
 }

@@ -81,7 +81,7 @@ export function useLessonMaterial({
     return () => {
       cancelled = true;
     };
-  }, [session.lessonId, session.materialId]);
+  }, [session.lessonId, session.lessonUpdatedAt, session.materialId]);
 
   async function assignMaterial() {
     setAssigningMaterial(true);

@@ -126,6 +126,7 @@ try {
   addCheck("annotation-sync-stays-inside-material-after-scroll-and-resize");
 
   await studentB.page.reload({ waitUntil: "domcontentloaded" });
+  await completeClassroomPreJoin(studentB.page);
   await studentB.page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
   await waitForSharedPresenceReady(studentB.page);
   await waitForLocatorCount(studentB.page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path", 1, "student B annotation path after reload");
@@ -509,6 +510,17 @@ async function openClassroom(page, lessonId, readySelector, options = {}) {
     waitUntil: "domcontentloaded",
     timeout: timeoutMs,
   });
+  await completeClassroomPreJoin(page);
+  if (options.revealTeacherTask) {
+    const revealButton = page.locator("button").filter({ hasText: /Показать задание|Show task|Aufgabe anzeigen|Afficher la tâche/i }).first();
+    await revealButton.waitFor({ timeout: timeoutMs });
+    await revealButton.click();
+  }
+  await page.locator(readySelector).waitFor({ timeout: timeoutMs });
+  await page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
+}
+
+async function completeClassroomPreJoin(page) {
   const preJoinButton = page.locator("[data-testid='classroom-prejoin-join']");
   await preJoinButton.waitFor({ timeout: timeoutMs });
   await preJoinButton.click();
@@ -518,13 +530,6 @@ async function openClassroom(page, lessonId, readySelector, options = {}) {
   if (await continueAnywayButton.isVisible()) {
     await continueAnywayButton.click();
   }
-  if (options.revealTeacherTask) {
-    const revealButton = page.locator("button").filter({ hasText: /Показать задание|Show task|Aufgabe anzeigen|Afficher la tâche/i }).first();
-    await revealButton.waitFor({ timeout: timeoutMs });
-    await revealButton.click();
-  }
-  await page.locator(readySelector).waitFor({ timeout: timeoutMs });
-  await page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
 }
 
 async function assertStudentDocumentChromeHidden(page) {

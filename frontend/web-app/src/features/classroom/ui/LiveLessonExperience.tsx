@@ -271,7 +271,7 @@ export function shouldShowLessonWorkspace({
   videoOnly: boolean;
   viewportMode: ClassroomViewportMode;
 }): boolean {
-  if (videoOnly || viewportMode !== "desktop") {
+  if (videoOnly || viewportMode === "mobileLandscape") {
     return false;
   }
 

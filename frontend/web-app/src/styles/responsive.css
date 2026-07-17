@@ -639,7 +639,7 @@
 
 @media (max-width: 640px) and (orientation: portrait) {
   .playsay-classroom-shell[data-video-expanded="false"] {
-    grid-template-rows: clamp(24rem, 64dvh, calc(100vw * 16 / 9)) minmax(0, 1fr);
+    grid-template-rows: clamp(9.75rem, 25dvh, 12rem) minmax(0, 1fr);
   }
 
   .playsay-classroom-shell[data-video-only="true"][data-video-expanded="false"] {

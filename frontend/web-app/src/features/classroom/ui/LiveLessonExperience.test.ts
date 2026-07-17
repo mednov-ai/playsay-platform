@@ -43,12 +43,12 @@ describe("classroomViewportMode", () => {
     expect(effectiveClassroomViewportMode("desktop", true)).toBe("desktop");
   });
 
-  it("hides lesson workspace on mobile while keeping desktop work visible", () => {
+  it("keeps lesson work visible in mobile portrait and reserves mobile landscape for video", () => {
     expect(shouldShowLessonWorkspace({
       canManageLesson: false,
       videoOnly: false,
       viewportMode: "mobilePortrait",
-    })).toBe(false);
+    })).toBe(true);
     expect(shouldShowLessonWorkspace({
       canManageLesson: false,
       videoOnly: false,
@@ -63,7 +63,7 @@ describe("classroomViewportMode", () => {
       canManageLesson: true,
       videoOnly: false,
       viewportMode: "mobilePortrait",
-    })).toBe(false);
+    })).toBe(true);
     expect(shouldShowLessonWorkspace({
       canManageLesson: true,
       videoOnly: false,

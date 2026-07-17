@@ -51,6 +51,7 @@ describe("useScheduleActions classroom entry", () => {
     expect(apiMocks.enterScheduledLessonRoom).toHaveBeenCalledWith("lesson-1");
     expect(input.setRoomSession).toHaveBeenCalledWith(expect.objectContaining({
       lessonId: "lesson-1",
+      lessonUpdatedAt: "2026-07-17T09:00:00Z",
       mediaChoices,
       token: "token",
     }));

@@ -16,6 +16,7 @@ export type LessonRoomSession = LiveKitRoomToken & {
   lessonTemplateId: string | null;
   lessonStartsAt: string | null;
   lessonStatus: string;
+  lessonUpdatedAt: string;
   lessonTitle: string;
   lessonType: string;
   workMode: string;
@@ -44,6 +45,7 @@ export function roomSessionFromScheduledLesson(
     lessonEndsAt: lesson.scheduledEnd ?? null,
     lessonStartsAt: lesson.scheduledStart ?? null,
     lessonStatus: lesson.status,
+    lessonUpdatedAt: lesson.updatedAt,
     lessonTemplateId: lesson.lessonTemplateId ?? null,
     lessonTitle: lesson.lessonTitle ?? lesson.courseTitle ?? session.lessonTitle,
     lessonType: lesson.type,

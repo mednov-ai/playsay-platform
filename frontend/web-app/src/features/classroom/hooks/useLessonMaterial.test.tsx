@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
 import type { LessonRoomSession } from "../model/session";
@@ -52,6 +52,40 @@ beforeEach(() => {
 });
 
 describe("useLessonMaterial live uploads", () => {
+  it("reloads the same lesson-only material after every realtime lesson revision", async () => {
+    const firstRevision = material("copy-live", "page-image-1");
+    const secondRevision = {
+      ...material("copy-live", "page-image-2"),
+      document: {
+        pages: [
+          { blocks: [], id: "page-image-1", layout: "STATIC_IMAGE", title: "Long image" },
+          { blocks: [], id: "page-image-2", layout: "STATIC_IMAGE", title: "Wide image" },
+        ],
+        schemaVersion: 1,
+      },
+    } satisfies LessonMaterial;
+    apiMocks.fetchMaterial
+      .mockResolvedValueOnce(firstRevision)
+      .mockResolvedValueOnce(secondRevision);
+    const { result, rerender } = renderHook(
+      ({ lessonUpdatedAt }) => useLessonMaterial({
+        onAssignMaterial: vi.fn(),
+        session: {
+          ...session,
+          lessonUpdatedAt,
+          materialId: "copy-live",
+        },
+      }),
+      { initialProps: { lessonUpdatedAt: "2026-07-17T09:00:00Z" } },
+    );
+
+    await waitFor(() => expect(result.current.material).toBe(firstRevision));
+    rerender({ lessonUpdatedAt: "2026-07-17T09:01:00Z" });
+
+    await waitFor(() => expect(result.current.material).toBe(secondRevision));
+    expect(apiMocks.fetchMaterial).toHaveBeenCalledTimes(2);
+  });
+
   it("applies an uploaded image and its active page as soon as the endpoint resolves", async () => {
     const uploadedMaterial = material("copy-1", "page-image");
     apiMocks.appendImage.mockResolvedValue({

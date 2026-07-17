@@ -18,6 +18,7 @@ export type MaterialImageSize = "SMALL" | "MEDIUM" | "LARGE" | "FULL";
 
 export type MaterialHtmlGameInputEvent = {
   id: string;
+  runId?: string;
   at: number;
   blockId: string;
   type: "click" | "pointerdown" | "pointerup" | "keydown" | "keyup" | "dragstart" | "dragover" | "drop";

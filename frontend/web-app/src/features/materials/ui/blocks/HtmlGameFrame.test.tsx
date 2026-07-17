@@ -13,7 +13,10 @@ vi.mock("../../../../shared/i18n", () => ({
 
 const gameHtml = "<html><head><title>Game</title></head><body><button id=\"start\">Start</button><script>document.body.dataset.ready = 'true'</script></body></html>";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("HTML game sandbox", () => {
   it("injects an offline bridge and keeps game scripts only in the authority document", () => {
@@ -72,5 +75,56 @@ describe("HTML game sandbox", () => {
 
     unmount();
     expect(setAuthorityRun).toHaveBeenLastCalledWith("game-1", null);
+  });
+
+  it("does not replay delayed input history into a newly restarted authority", () => {
+    const setAuthorityRun = vi.fn();
+    const createSync = (inputs: MaterialHtmlGameSync["inputs"]): MaterialHtmlGameSync => ({
+      authorityRuns: {},
+      effects: [],
+      inputs,
+      isAuthority: true,
+      publishEffect: vi.fn(),
+      publishInput: vi.fn(),
+      publishSnapshot: vi.fn(),
+      ready: true,
+      setAuthorityRun,
+      snapshots: {},
+    });
+    const { container, rerender } = render(
+      <HtmlGameFrame blockId="game-1" height={640} html={gameHtml} sync={createSync([])} title="Game" />,
+    );
+    const iframeWindow = container.querySelector("iframe")?.contentWindow;
+    expect(iframeWindow).not.toBeNull();
+    const postMessage = vi.spyOn(iframeWindow!, "postMessage");
+    const currentRunId = setAuthorityRun.mock.calls.find((call) => call[1] !== null)?.[1];
+    expect(currentRunId).toEqual(expect.any(String));
+
+    rerender(
+      <HtmlGameFrame
+        blockId="game-1"
+        height={640}
+        html={gameHtml}
+        sync={createSync([{ at: 900, blockId: "game-1", id: "old", runId: "old-run", targetId: "__document__", type: "click" }])}
+        title="Game"
+      />,
+    );
+
+    expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "applyInput" }), "*");
+
+    rerender(
+      <HtmlGameFrame
+        blockId="game-1"
+        height={640}
+        html={gameHtml}
+        sync={createSync([
+          { at: 900, blockId: "game-1", id: "old", runId: "old-run", targetId: "__document__", type: "click" },
+          { at: 1_100, blockId: "game-1", id: "new", runId: currentRunId, targetId: "__document__", type: "click" },
+        ])}
+        title="Game"
+      />,
+    );
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ id: "new" }), type: "applyInput" }), "*");
   });
 });

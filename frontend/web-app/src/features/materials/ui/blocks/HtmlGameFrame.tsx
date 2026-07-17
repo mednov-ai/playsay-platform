@@ -39,7 +39,7 @@ export function HtmlGameFrame({
   useEffect(() => {
     handledInputsRef.current = null;
     handledEffectsRef.current = null;
-  }, [blockId, sync?.isAuthority]);
+  }, [blockId, channel, sync?.isAuthority]);
 
   useEffect(() => {
     if (!html || !sync?.isAuthority || !sync.ready) {
@@ -68,6 +68,7 @@ export function HtmlGameFrame({
           at: Date.now(),
           blockId,
           id: crypto.randomUUID(),
+          runId: sync.isAuthority ? channel : sync.authorityRuns[blockId],
         };
         if (sync.isAuthority) {
           (handledInputsRef.current ??= new Set()).add(input.id);
@@ -99,6 +100,9 @@ export function HtmlGameFrame({
         return;
       }
       handledInputsRef.current?.add(event.id);
+      if (event.runId !== channel) {
+        return;
+      }
       iframeRef.current?.contentWindow?.postMessage({ channel, type: "applyInput", event }, "*");
     });
   }, [blockId, channel, sync?.inputs, sync?.isAuthority]);

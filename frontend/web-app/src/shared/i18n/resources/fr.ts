@@ -295,6 +295,7 @@ export const fr = {
       live: "En direct",
       opensSoon: "Bientôt ouvert",
       closingSoon: "Encore ouvert",
+      readyToStart: "Prêt à commencer",
       planned: "Planifié",
     },
     lessonType: {
@@ -396,7 +397,9 @@ export const fr = {
     },
     actions: {
       join: "Entrer en cours",
+      start: "Commencer le cours",
       prepare: "Préparer le cours",
+      prepareShort: "Préparer",
       more: "Autres actions",
       joinUnavailable: "L'accès ouvre 10 minutes avant et ferme 10 minutes après.",
       joinWindowHint: "Ouvre 10 minutes avant",

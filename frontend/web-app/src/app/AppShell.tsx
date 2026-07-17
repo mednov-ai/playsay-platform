@@ -1,8 +1,8 @@
 import { lazy, Suspense, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { publicSiteUrl } from "@playsay/shared-ui";
-import { CalendarPlus, Loader2, LogIn, LogOut, User, UserPlus, Video } from "lucide-react";
+import { CalendarPlus, Loader2, LogIn, LogOut, Play, User, UserPlus, Video } from "lucide-react";
 import { type WorkspaceTab, type WorkspaceTabDefinition } from "../entities/workspace/model";
-import type { CourseLessonMap } from "../entities/schedule/model";
+import { nextTeacherActionLesson, type CourseLessonMap } from "../entities/schedule/model";
 import {
   startLogin,
   type AdminUserProfile,
@@ -241,6 +241,10 @@ export function AppShell(props: AppShellProps) {
   const preparationLesson = preparationLessonId
     ? scheduledLessons.find((lesson) => lesson.id === preparationLessonId) ?? null
     : null;
+  const teacherActionLesson = canManageSchedule
+    ? nextTeacherActionLesson(scheduledLessons, nowMs)
+    : null;
+  const headerTeacherActionLesson = preparationLessonId === teacherActionLesson?.id ? null : teacherActionLesson;
 
   function focusScheduleCreateForm() {
     setWorkspaceTab("schedule");
@@ -288,6 +292,29 @@ export function AppShell(props: AppShellProps) {
                 >
                   {nextLessonLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
                   {t("shell.actions.joinLesson")}
+                </Button>
+              ) : canManageSchedule && headerTeacherActionLesson ? (
+                <Button
+                  className="min-w-40 playsay-lesson-invite"
+                  data-lesson-invite-location="header"
+                  disabled={anyLessonLoading}
+                  onClick={() => {
+                    if (headerTeacherActionLesson.status === "IN_PROGRESS") {
+                      void joinScheduledLesson(headerTeacherActionLesson);
+                    } else {
+                      void startScheduledLesson(headerTeacherActionLesson);
+                    }
+                  }}
+                  type="button"
+                >
+                  {roomLoadingLessonId === headerTeacherActionLesson.id
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : headerTeacherActionLesson.status === "IN_PROGRESS"
+                      ? <Video className="h-4 w-4" />
+                      : <Play className="h-4 w-4" />}
+                  {headerTeacherActionLesson.status === "IN_PROGRESS"
+                    ? t("shell.actions.joinLesson")
+                    : t("schedule.actions.start")}
                 </Button>
               ) : canManageSchedule ? (
                 <Button
@@ -405,6 +432,7 @@ export function AppShell(props: AppShellProps) {
                   onJoin={(lesson) => void joinScheduledLesson(lesson)}
                   onOpenMaterials={() => setWorkspaceTab("materials")}
                   onPrepare={openLessonPreparation}
+                  onStart={(lesson) => void startScheduledLesson(lesson)}
                   onRefresh={() => void refreshSchedule()}
                   profile={profile}
                   roomLoadingLessonId={roomLoadingLessonId}

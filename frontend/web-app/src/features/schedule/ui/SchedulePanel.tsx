@@ -37,6 +37,7 @@ export function SchedulePanel({
   onJoin,
   onOpenMaterials,
   onPrepare,
+  onStart,
   onRefresh,
   profile,
   roomLoadingLessonId,
@@ -60,6 +61,7 @@ export function SchedulePanel({
   onJoin: (lesson: ScheduledLesson) => void;
   onOpenMaterials?: () => void;
   onPrepare?: (lessonId: string) => void;
+  onStart: (lesson: ScheduledLesson) => void;
   onRefresh: () => void;
   profile: MeProfile | null;
   roomLoadingLessonId: string | null;
@@ -120,6 +122,7 @@ export function SchedulePanel({
       onDelete={() => onDelete(lesson.id)}
       onJoin={() => onJoin(lesson)}
       onPrepare={() => onPrepare?.(lesson.id)}
+      onStart={() => onStart(lesson)}
       roomLoading={roomLoadingLessonId === lesson.id}
     />
   );

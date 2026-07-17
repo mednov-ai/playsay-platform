@@ -297,6 +297,7 @@ export const ru = {
       live: "В эфире",
       opensSoon: "Откроется скоро",
       closingSoon: "Открыт после урока",
+      readyToStart: "Пора начинать",
       planned: "Запланирован",
     },
     lessonType: {
@@ -404,7 +405,9 @@ export const ru = {
     },
     actions: {
       join: "Войти в урок",
+      start: "Начать урок",
       prepare: "Подготовить урок",
+      prepareShort: "Подготовить",
       more: "Ещё действия",
       joinUnavailable: "Вход откроется за 10 минут до урока и закроется через 10 минут после.",
       joinWindowHint: "Откроется за 10 минут",

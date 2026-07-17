@@ -24,6 +24,7 @@ describe("SchedulePanel", () => {
           onDelete={() => undefined}
           onJoin={() => undefined}
           onRefresh={() => undefined}
+          onStart={() => undefined}
           profile={teacherProfile}
           roomLoadingLessonId={null}
           roomMessage={null}

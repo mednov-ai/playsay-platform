@@ -295,6 +295,7 @@ export const en = {
       live: "Live",
       opensSoon: "Opens soon",
       closingSoon: "Still open",
+      readyToStart: "Ready to start",
       planned: "Planned",
     },
     lessonType: {
@@ -396,7 +397,9 @@ export const en = {
     },
     actions: {
       join: "Join lesson",
+      start: "Start lesson",
       prepare: "Prepare lesson",
+      prepareShort: "Prepare",
       more: "More actions",
       joinUnavailable: "Entry opens 10 minutes before the lesson and closes 10 minutes after.",
       joinWindowHint: "Opens 10 minutes before",

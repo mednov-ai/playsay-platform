@@ -6,7 +6,10 @@ import {
   formatLessonType,
   formatParticipantCount,
   isJoinableScheduledLesson,
+  isScheduledLessonReadyToStart,
+  isTeacherLessonActionable,
   isWeeklyRecurrenceValid,
+  nextTeacherActionLesson,
   splitScheduleLessonsForDashboard,
   scheduleStateLabel,
   scheduleRecurrenceInput,
@@ -42,7 +45,7 @@ describe("schedule model", () => {
     expect(scheduleStateLabel(lesson({ status: "CANCELLED" }), nowMs, t)).toBe("schedule.state.cancelled");
     expect(scheduleStateLabel(lesson({ scheduledEnd: "2026-05-28T09:00:00.000Z" }), nowMs, t)).toBe("schedule.state.expired");
     expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-28T09:30:00.000Z", scheduledEnd: "2026-05-28T10:30:00.000Z" }), nowMs, t)).toBe("schedule.state.live");
-    expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T09:30:00.000Z", scheduledEnd: "2026-05-28T10:30:00.000Z" }), nowMs, t)).toBe("schedule.state.planned");
+    expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T09:30:00.000Z", scheduledEnd: "2026-05-28T10:30:00.000Z" }), nowMs, t)).toBe("schedule.state.readyToStart");
     expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T11:00:00.000Z" }), nowMs, t)).toBe("schedule.state.planned");
     expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-28T10:08:00.000Z", scheduledEnd: "2026-05-28T10:53:00.000Z" }), nowMs, t)).toBe("schedule.state.opensSoon");
     expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-28T09:07:00.000Z", scheduledEnd: "2026-05-28T09:52:00.000Z" }), nowMs, t)).toBe("schedule.state.closingSoon");
@@ -76,6 +79,47 @@ describe("schedule model", () => {
       scheduledStart: null,
       scheduledEnd: "2026-05-28T10:45:00.000Z",
     }), nowMs)).toBe(false);
+  });
+
+  it("promotes a scheduled lesson for teacher start only inside the access window", () => {
+    const nowMs = Date.parse("2026-05-28T10:00:00.000Z");
+    const tooEarly = lesson({
+      scheduledStart: "2026-05-28T10:11:00.000Z",
+      scheduledEnd: "2026-05-28T10:56:00.000Z",
+    });
+    const ready = lesson({
+      scheduledStart: "2026-05-28T10:10:00.000Z",
+      scheduledEnd: "2026-05-28T10:55:00.000Z",
+    });
+    const stillRecoverable = lesson({
+      scheduledStart: "2026-05-28T09:05:00.000Z",
+      scheduledEnd: "2026-05-28T09:50:00.000Z",
+    });
+
+    expect(isScheduledLessonReadyToStart(tooEarly, nowMs)).toBe(false);
+    expect(isScheduledLessonReadyToStart(ready, nowMs)).toBe(true);
+    expect(isTeacherLessonActionable(ready, nowMs)).toBe(true);
+    expect(isTeacherLessonActionable(stillRecoverable, nowMs)).toBe(true);
+    expect(isTeacherLessonActionable(lesson({ ...ready, status: "IN_PROGRESS" }), nowMs)).toBe(true);
+    expect(isTeacherLessonActionable(lesson({ ...ready, status: "COMPLETED" }), nowMs)).toBe(false);
+  });
+
+  it("keeps an already live lesson ahead of a scheduled lesson in the teacher action", () => {
+    const nowMs = Date.parse("2026-05-28T10:00:00.000Z");
+    const scheduled = lesson({
+      id: "scheduled",
+      scheduledStart: "2026-05-28T09:55:00.000Z",
+      scheduledEnd: "2026-05-28T10:40:00.000Z",
+    });
+    const live = lesson({
+      id: "live",
+      status: "IN_PROGRESS",
+      scheduledStart: "2026-05-28T10:00:00.000Z",
+      scheduledEnd: "2026-05-28T10:45:00.000Z",
+    });
+
+    expect(nextTeacherActionLesson([scheduled, live], nowMs)?.id).toBe("live");
+    expect(nextTeacherActionLesson([lesson({ scheduledStart: "2026-05-28T12:00:00.000Z", scheduledEnd: "2026-05-28T12:45:00.000Z" })], nowMs)).toBeNull();
   });
 
   it("sorts current and upcoming lessons before archived lessons", () => {

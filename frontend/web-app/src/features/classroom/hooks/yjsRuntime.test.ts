@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
-import { createYjsWorkspaceRuntime, type AnnotationStroke } from "./yjsRuntime";
+import { createYjsWorkspaceRuntime, type AnnotationStroke, updateHtmlGameAuthorityRuns } from "./yjsRuntime";
 
 describe("yjs workspace runtime annotations", () => {
   it("stores annotation strokes in the collaboration document", () => {
@@ -134,6 +134,15 @@ describe("yjs workspace runtime annotations", () => {
 
       runtime.destroy();
     });
+  });
+
+  it("keeps simultaneous HTML game authority runs separately per block", () => {
+    const first = updateHtmlGameAuthorityRuns({}, "game-a", "run-a");
+    const second = updateHtmlGameAuthorityRuns(first, "game-b", "run-b");
+
+    expect(second).toEqual({ "game-a": "run-a", "game-b": "run-b" });
+    expect(updateHtmlGameAuthorityRuns(second, "game-a", null)).toEqual({ "game-b": "run-b" });
+    expect(second).toEqual({ "game-a": "run-a", "game-b": "run-b" });
   });
 });
 

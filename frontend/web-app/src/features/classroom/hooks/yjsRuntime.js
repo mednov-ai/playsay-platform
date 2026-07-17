@@ -75,7 +75,7 @@ export function createYjsWorkspaceRuntime({
   awareness.on("update", awarenessUpdateHandler);
   awareness.setLocalState({
     cursor: null,
-    htmlGameAuthority: { blockId: null, runId: null },
+    htmlGameAuthorities: {},
     user: { color, name: participantName },
   });
   updateLocalText();
@@ -147,7 +147,10 @@ export function createYjsWorkspaceRuntime({
       awareness.setLocalStateField("cursor", cursor);
     },
     updateHtmlGameAuthority(blockId, runId) {
-      awareness.setLocalStateField("htmlGameAuthority", { blockId, runId });
+      awareness.setLocalStateField(
+        "htmlGameAuthorities",
+        updateHtmlGameAuthorityRuns(awareness.getLocalState()?.htmlGameAuthorities, blockId, runId),
+      );
     },
     updateText(nextText) {
       if (ytext.toString() === nextText) {
@@ -168,6 +171,19 @@ function boundedArrayPush(array, value, limit) {
     const overflow = array.length - limit;
     if (overflow > 0) array.delete(0, overflow);
   });
+}
+
+export function updateHtmlGameAuthorityRuns(current, blockId, runId) {
+  const next = normalizeStringRecord(current);
+  if (!blockId) {
+    return next;
+  }
+  if (runId) {
+    next[blockId] = runId;
+  } else {
+    delete next[blockId];
+  }
+  return next;
 }
 
 function annotationStrokesFromMap(yannotations) {
@@ -270,12 +286,17 @@ function updateParticipants(awareness, onParticipantsChange) {
       const user = asObject(root?.user);
       const cursor = asObject(root?.cursor);
       const htmlGameAuthority = asObject(root?.htmlGameAuthority);
+      const htmlGameAuthorityRuns = normalizeStringRecord(root?.htmlGameAuthorities);
+      const legacyBlockId = asString(htmlGameAuthority?.blockId);
+      const legacyRunId = asString(htmlGameAuthority?.runId);
+      if (legacyBlockId && legacyRunId && !htmlGameAuthorityRuns[legacyBlockId]) {
+        htmlGameAuthorityRuns[legacyBlockId] = legacyRunId;
+      }
       return {
         clientId,
         color: asString(user?.color) || "#2574ff",
         cursor: cursor ? { x: clamp01(asNumber(cursor.x)), y: clamp01(asNumber(cursor.y)) } : null,
-        htmlGameBlockId: asString(htmlGameAuthority?.blockId) || null,
-        htmlGameRunId: asString(htmlGameAuthority?.runId) || null,
+        htmlGameAuthorityRuns,
         name: asString(user?.name) || "Play&Say",
       };
     });
@@ -326,6 +347,16 @@ function base64ToUint8Array(value) {
 
 function asObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+function normalizeStringRecord(value) {
+  const record = asObject(value);
+  if (!record) {
+    return {};
+  }
+  return Object.fromEntries(Object.entries(record)
+    .map(([key, item]) => [asString(key), asString(item)])
+    .filter(([key, item]) => key && item));
 }
 
 function asString(value) {

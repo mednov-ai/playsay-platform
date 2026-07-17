@@ -312,7 +312,13 @@ export function ClassroomPreJoin({
           <CheckCircle2 className="h-5 w-5" />
           <span>{warnings.length === 0 ? t("classroom.preJoin.allReady") : t("classroom.preJoin.canContinue")}</span>
         </div>
-        <Button className="playsay-prejoin-join" disabled={joining} onClick={() => void submit()} type="button">
+        <Button
+          className="playsay-prejoin-join"
+          data-testid="classroom-prejoin-join"
+          disabled={joining}
+          onClick={() => void submit()}
+          type="button"
+        >
           {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {showWarning && warnings.length > 0 ? t("classroom.preJoin.continueAnyway") : t("classroom.preJoin.join")}
         </Button>

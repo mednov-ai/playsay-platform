@@ -509,6 +509,15 @@ async function openClassroom(page, lessonId, readySelector, options = {}) {
     waitUntil: "domcontentloaded",
     timeout: timeoutMs,
   });
+  const preJoinButton = page.locator("[data-testid='classroom-prejoin-join']");
+  await preJoinButton.waitFor({ timeout: timeoutMs });
+  await preJoinButton.click();
+  const continueAnywayButton = preJoinButton.filter({
+    hasText: /Всё равно войти|Join anyway|Trotzdem teilnehmen|Entrer quand même/i,
+  });
+  if (await continueAnywayButton.isVisible()) {
+    await continueAnywayButton.click();
+  }
   if (options.revealTeacherTask) {
     const revealButton = page.locator("button").filter({ hasText: /Показать задание|Show task|Aufgabe anzeigen|Afficher la tâche/i }).first();
     await revealButton.waitFor({ timeout: timeoutMs });

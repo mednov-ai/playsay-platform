@@ -9,6 +9,7 @@ import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -71,6 +72,7 @@ class UserProfileControllerTest @Autowired constructor(
         assertEquals("Student One", initial.displayName)
         assertNull(initial.locale)
         assertEquals("RU", initial.countryCode)
+        assertFalse(initial.lessonTranslationAllowed)
 
         val updated = controller.update(
             authentication,

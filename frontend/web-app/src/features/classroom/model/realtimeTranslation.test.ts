@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { appendTranscriptDelta, translationCollisionWinner } from "./realtimeTranslation";
+import { appendTranscriptDelta, lessonTranslationEligible, translationCollisionWinner } from "./realtimeTranslation";
 
 describe("realtime lesson translation", () => {
   it("gives the teacher priority when both participants press at once", () => {
     expect(translationCollisionWinner("teacher", "student")).toBe("local");
     expect(translationCollisionWinner("student", "teacher")).toBe("incoming");
+  });
+
+  it("keeps translation hidden until the student profile explicitly allows it", () => {
+    expect(lessonTranslationEligible({
+      allowed: false,
+      lessonType: "INDIVIDUAL",
+      remoteParticipantCount: 1,
+      role: "teacher",
+    })).toBe(false);
+    expect(lessonTranslationEligible({
+      allowed: true,
+      lessonType: "INDIVIDUAL",
+      remoteParticipantCount: 1,
+      role: "student",
+    })).toBe(true);
+    expect(lessonTranslationEligible({
+      allowed: true,
+      lessonType: "GROUP",
+      remoteParticipantCount: 1,
+      role: "teacher",
+    })).toBe(false);
   });
 
   it("appends provider transcript deltas without inserting spaces", () => {

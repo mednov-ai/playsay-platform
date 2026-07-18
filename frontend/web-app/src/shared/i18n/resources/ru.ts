@@ -1139,6 +1139,7 @@ export const ru = {
         LESSON_TRANSLATION_PARTICIPANTS_INVALID: "Для перевода нужны один учитель и один ученик",
         LESSON_TRANSLATION_LANGUAGE_UNAVAILABLE: "Укажите язык интерфейса в профиле ученика",
         LESSON_TRANSLATION_NOT_REQUIRED: "В профиле уже выбран английский язык",
+        LESSON_TRANSLATION_PERMISSION_REQUIRED: "Голосовой перевод не разрешён в профиле ученика",
         LESSON_TRANSLATION_PROVIDER_UNAVAILABLE: "Сервис перевода временно недоступен",
         LESSON_TRANSLATION_CONNECTION_FAILED: "Соединение с переводчиком потеряно",
       },
@@ -1279,6 +1280,11 @@ export const ru = {
     },
   },
   userManagement: {
+    translationPermission: {
+      label: "Голосовой перевод",
+      hint: "Показывать ученику и преподавателю кнопку перевода на индивидуальном уроке.",
+      aria: "Разрешить голосовой перевод для {{name}}",
+    },
     teacher: {
       eyebrow: "Рабочее место преподавателя",
       title: "Ученики",
@@ -1353,6 +1359,8 @@ export const ru = {
       teacherUpdated: "Основной преподаватель обновлён.",
       rolesUpdated: "Роли обновлены. Новый токен применит изменения без перезаписи stale JWT.",
       delegationCreated: "Делегирование создано.",
+      translationPermissionSaved: "Настройка голосового перевода сохранена.",
+      translationPermissionFailed: "Не удалось изменить настройку голосового перевода.",
     },
     empty: {
       teachers: "Нет доступных преподавателей.",

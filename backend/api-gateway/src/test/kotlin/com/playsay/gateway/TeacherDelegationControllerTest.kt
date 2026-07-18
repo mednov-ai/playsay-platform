@@ -3,12 +3,15 @@ package com.playsay.gateway
 import com.playsay.gateway.controller.AdminDelegationController
 import com.playsay.gateway.controller.TeacherManagementController
 import com.playsay.gateway.dto.CreateDelegationRequest
+import com.playsay.gateway.dto.UpdateStudentLessonTranslationPermissionRequest
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
+import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.repo.TeacherDelegationStudentRepo
 import com.playsay.gateway.repo.UserManagementAuditRepo
+import com.playsay.gateway.utils.MetaData
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -16,7 +19,9 @@ import javax.sql.DataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import liquibase.integration.spring.SpringLiquibase
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -44,6 +49,7 @@ class TeacherDelegationControllerTest @Autowired constructor(
     private val users: AppUserRepo,
     private val delegations: TeacherDelegationRepo,
     private val selectedStudents: TeacherDelegationStudentRepo,
+    private val studentProfiles: StudentProfileRepo,
     private val audits: UserManagementAuditRepo,
     private val dataSource: DataSource,
 ) {
@@ -60,6 +66,7 @@ class TeacherDelegationControllerTest @Autowired constructor(
         selectedStudents.deleteAllInBatch()
         delegations.deleteAllInBatch()
         audits.deleteAllInBatch()
+        studentProfiles.deleteAllInBatch()
         users.deleteAllInBatch()
     }
 
@@ -118,6 +125,82 @@ class TeacherDelegationControllerTest @Autowired constructor(
         assertEquals(anotherPrimary.keycloakSubject, created.primaryTeacher.subject)
         assertEquals(admin.keycloakSubject, created.createdBySubject)
         assertNotNull(audits.findAll().singleOrNull { it.action == "DELEGATION_CREATED" })
+    }
+
+    @Test
+    fun `primary delegate and admin can update translation permission idempotently`() {
+        val primary = user("primary", "TEACHER")
+        val delegate = user("delegate", "TEACHER")
+        val admin = user("admin", "ADMIN")
+        val student = user("student", "STUDENT", primaryTeacher = primary)
+        val today = LocalDate.now(ZoneId.of("Europe/Moscow"))
+        teacherController.createDelegation(
+            authentication(primary.keycloakSubject, "ROLE_TEACHER"),
+            CreateDelegationRequest(
+                delegateTeacherSubjects = setOf(delegate.keycloakSubject),
+                studentSubjects = setOf(student.keycloakSubject),
+                startsAt = today,
+                endsAt = today,
+            ),
+        )
+
+        assertFalse(teacherController.students(authentication(primary.keycloakSubject, "ROLE_TEACHER")).single().student.lessonTranslationAllowed)
+        val enabled = teacherController.updateLessonTranslationPermission(
+            authentication(primary.keycloakSubject, "ROLE_TEACHER"),
+            student.keycloakSubject,
+            UpdateStudentLessonTranslationPermissionRequest(true),
+        )
+        teacherController.updateLessonTranslationPermission(
+            authentication(primary.keycloakSubject, "ROLE_TEACHER"),
+            student.keycloakSubject,
+            UpdateStudentLessonTranslationPermissionRequest(true),
+        )
+        val disabledByDelegate = teacherController.updateLessonTranslationPermission(
+            authentication(delegate.keycloakSubject, "ROLE_TEACHER"),
+            student.keycloakSubject,
+            UpdateStudentLessonTranslationPermissionRequest(false),
+        )
+        val enabledByAdmin = teacherController.updateLessonTranslationPermission(
+            authentication(admin.keycloakSubject, "ROLE_ADMIN"),
+            student.keycloakSubject,
+            UpdateStudentLessonTranslationPermissionRequest(true),
+        )
+
+        assertTrue(enabled.student.lessonTranslationAllowed)
+        assertEquals("PRIMARY_TEACHER", enabled.access)
+        assertFalse(disabledByDelegate.student.lessonTranslationAllowed)
+        assertEquals("ACTIVE_DELEGATE", disabledByDelegate.access)
+        assertTrue(enabledByAdmin.student.lessonTranslationAllowed)
+        assertEquals("ADMIN", enabledByAdmin.access)
+        assertEquals(3, audits.findAll().count { it.action == "STUDENT_LESSON_TRANSLATION_PERMISSION_CHANGED" })
+    }
+
+    @Test
+    fun `student and unrelated teacher cannot update translation permission`() {
+        val primary = user("primary", "TEACHER")
+        val unrelated = user("unrelated", "TEACHER")
+        val student = user("student", "STUDENT", primaryTeacher = primary)
+        val request = UpdateStudentLessonTranslationPermissionRequest(true)
+
+        val unrelatedError = assertFailsWith<ProjectResponseException> {
+            teacherController.updateLessonTranslationPermission(
+                authentication(unrelated.keycloakSubject, "ROLE_TEACHER"),
+                student.keycloakSubject,
+                request,
+            )
+        }
+        val studentError = assertFailsWith<ProjectResponseException> {
+            teacherController.updateLessonTranslationPermission(
+                authentication(student.keycloakSubject, "ROLE_STUDENT"),
+                student.keycloakSubject,
+                request,
+            )
+        }
+
+        assertEquals(HttpStatus.FORBIDDEN, unrelatedError.statusCode)
+        assertEquals(MetaData.ErrorCodes.STUDENT_ACCESS_DENIED, unrelatedError.errorCode)
+        assertEquals(HttpStatus.FORBIDDEN, studentError.statusCode)
+        assertEquals(MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED, studentError.errorCode)
     }
 
     private fun user(

@@ -15,11 +15,13 @@ export function ClassroomVideoStage({
   lessonId,
   lessonType,
   mode,
+  translationAllowed,
   translationRole,
 }: {
   lessonId: string;
   lessonType: string;
   mode: ClassroomVideoMode;
+  translationAllowed: boolean;
   translationRole: TranslationRole | null;
 }) {
   const { t } = useAppTranslation();
@@ -29,7 +31,7 @@ export function ClassroomVideoStage({
   const stripRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const [pipPosition, setPipPosition] = useState({ x: 12, y: 120 });
-  const translation = useLessonTranslation({ lessonId, lessonType, role: translationRole });
+  const translation = useLessonTranslation({ allowed: translationAllowed, lessonId, lessonType, role: translationRole });
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
@@ -269,6 +271,7 @@ function translationStatusText(
     "LESSON_TRANSLATION_PARTICIPANTS_INVALID",
     "LESSON_TRANSLATION_LANGUAGE_UNAVAILABLE",
     "LESSON_TRANSLATION_NOT_REQUIRED",
+    "LESSON_TRANSLATION_PERMISSION_REQUIRED",
     "LESSON_TRANSLATION_PROVIDER_UNAVAILABLE",
     "LESSON_TRANSLATION_CONNECTION_FAILED",
   ]);

@@ -16,6 +16,7 @@ export type UserManagementUser = {
   status: "ACTIVE" | "DELETED";
   primaryTeacher: TeacherDirectoryEntry | null;
   activeDelegates: TeacherDirectoryEntry[];
+  lessonTranslationAllowed: boolean;
 };
 
 export type TeacherStudent = {
@@ -81,6 +82,14 @@ export function attachStudent(usernameOrEmail: string): Promise<TeacherStudent> 
 
 export function detachStudent(subject: string): Promise<void> {
   return apiJson(`/api/teacher/students/${encodeURIComponent(subject)}`, { method: "DELETE" }, authConfig, 204);
+}
+
+export function updateStudentLessonTranslationPermission(subject: string, allowed: boolean): Promise<TeacherStudent> {
+  return apiJson(
+    `/api/teacher/students/${encodeURIComponent(subject)}/lesson-translation-permission`,
+    { body: JSON.stringify({ allowed }), method: "PUT" },
+    authConfig,
+  );
 }
 
 export function fetchDelegations(scope: "admin" | "granted" | "received"): Promise<TeacherDelegation[]> {

@@ -23,6 +23,8 @@ data class UserProfileResponse(
     val managedByTeacher: Boolean = false,
     @field:Schema(type = "string", format = "date", nullable = true)
     val birthDate: LocalDate? = null,
+    @field:Schema(accessMode = Schema.AccessMode.READ_ONLY)
+    val lessonTranslationAllowed: Boolean = false,
 )
 
 data class UpdateUserProfileRequest(

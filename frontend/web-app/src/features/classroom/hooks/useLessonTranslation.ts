@@ -5,6 +5,7 @@ import { ApiError, createLessonTranslationSession } from "../../../shared/api/pl
 import {
   appendTranscriptDelta,
   connectRealtimeTranslation,
+  lessonTranslationEligible,
   translationCollisionWinner,
   type RealtimeTranslationSidecar,
   type TranslationRole,
@@ -48,10 +49,12 @@ export type LessonTranslationController = {
 };
 
 export function useLessonTranslation({
+  allowed,
   lessonId,
   lessonType,
   role,
 }: {
+  allowed: boolean;
   lessonId: string;
   lessonType: string;
   role: TranslationRole | null;
@@ -91,7 +94,12 @@ export function useLessonTranslation({
     setStatusState(next);
   }, []);
 
-  const eligible = lessonType === "INDIVIDUAL" && remoteParticipants.length <= 1 && role !== null;
+  const eligible = lessonTranslationEligible({
+    allowed,
+    lessonType,
+    remoteParticipantCount: remoteParticipants.length,
+    role,
+  });
 
   useEffect(() => { localEnabledRef.current = localEnabled; }, [localEnabled]);
   useEffect(() => { remoteEnabledRef.current = remoteEnabled; }, [remoteEnabled]);
@@ -100,6 +108,7 @@ export function useLessonTranslation({
   useEffect(() => { statusRef.current = status; }, [status]);
 
   useEffect(() => {
+    if (!eligible) return undefined;
     const bumpTrackRevision = () => setTrackRevision((current) => current + 1);
     room.on(RoomEvent.TrackSubscribed, bumpTrackRevision);
     room.on(RoomEvent.TrackUnsubscribed, bumpTrackRevision);
@@ -107,7 +116,7 @@ export function useLessonTranslation({
       room.off(RoomEvent.TrackSubscribed, bumpTrackRevision);
       room.off(RoomEvent.TrackUnsubscribed, bumpTrackRevision);
     };
-  }, [room]);
+  }, [eligible, room]);
 
   const remoteIdentity = useCallback(() => remoteParticipants[0]?.identity ?? null, [remoteParticipants]);
   const send = useCallback((message: TranslationMessage) => {
@@ -234,6 +243,7 @@ export function useLessonTranslation({
   }, [eligible, failTranslation, lessonId, localEnabled, remoteEnabled, remoteParticipants, retryNonce, scheduleIncomingCompletion, send, trackRevision, updateStatus]);
 
   useEffect(() => {
+    if (!eligible) return undefined;
     const handleData = (payload: Uint8Array, participant?: Participant, _kind?: unknown, topic?: string) => {
       if (topic !== translationTopic || participant?.identity !== remoteIdentity()) return;
       let message: TranslationMessage;
@@ -344,9 +354,10 @@ export function useLessonTranslation({
 
     room.on(RoomEvent.DataReceived, handleData);
     return () => { room.off(RoomEvent.DataReceived, handleData); };
-  }, [failTranslation, finishIncoming, remoteIdentity, remoteParticipants, resetToReady, role, room, scheduleIncomingCompletion, send, updateStatus]);
+  }, [eligible, failTranslation, finishIncoming, remoteIdentity, remoteParticipants, resetToReady, role, room, scheduleIncomingCompletion, send, updateStatus]);
 
   useEffect(() => {
+    if (!eligible) return undefined;
     const announceState = () => {
       if (localEnabledRef.current) {
         send({ type: "state", enabled: true, ready: localReadyRef.current });
@@ -358,15 +369,16 @@ export function useLessonTranslation({
       room.off(RoomEvent.Reconnected, announceState);
       room.off(RoomEvent.ParticipantConnected, announceState);
     };
-  }, [room, send]);
+  }, [eligible, room, send]);
 
   useEffect(() => {
-    if (remoteIdentity() && localEnabledRef.current) {
+    if (eligible && remoteIdentity() && localEnabledRef.current) {
       send({ type: "state", enabled: true, ready: localReadyRef.current });
     }
-  }, [remoteIdentity, send]);
+  }, [eligible, remoteIdentity, send]);
 
   useEffect(() => {
+    if (!eligible) return undefined;
     const releaseForInterruption = () => {
       const outgoing = outgoingRef.current;
       if (outgoing && (statusRef.current === "starting" || statusRef.current === "speaking")) {
@@ -386,7 +398,7 @@ export function useLessonTranslation({
       window.removeEventListener("blur", releaseForInterruption);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [finishIncoming, send, updateStatus]);
+  }, [eligible, finishIncoming, send, updateStatus]);
 
   useEffect(() => () => {
     clearTimer(quietTimerRef);

@@ -16,6 +16,7 @@ fun AppUserEntity.toTeacherDirectoryEntry(): TeacherDirectoryEntry =
 fun AppUserEntity.toUserManagementUser(
     primaryTeacher: AppUserEntity? = null,
     activeDelegates: Collection<AppUserEntity> = emptyList(),
+    lessonTranslationAllowed: Boolean = false,
 ): UserManagementUser =
     UserManagementUser(
         id = id,
@@ -27,6 +28,7 @@ fun AppUserEntity.toUserManagementUser(
         status = if (deletedAt == null) "ACTIVE" else "DELETED",
         primaryTeacher = primaryTeacher?.toTeacherDirectoryEntry(),
         activeDelegates = activeDelegates.map(AppUserEntity::toTeacherDirectoryEntry),
+        lessonTranslationAllowed = lessonTranslationAllowed,
     )
 
 fun UserDeletionOperationEntity.toResponse(): UserDeletionOperationResponse =

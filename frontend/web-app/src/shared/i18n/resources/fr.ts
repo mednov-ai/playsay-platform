@@ -1111,6 +1111,7 @@ export const fr = {
         LESSON_TRANSLATION_PARTICIPANTS_INVALID: "La traduction nécessite un professeur et un élève",
         LESSON_TRANSLATION_LANGUAGE_UNAVAILABLE: "Choisissez la langue de l’interface dans le profil de l’élève",
         LESSON_TRANSLATION_NOT_REQUIRED: "Le profil est déjà configuré en anglais",
+        LESSON_TRANSLATION_PERMISSION_REQUIRED: "La traduction vocale n’est pas autorisée dans le profil de l’élève",
         LESSON_TRANSLATION_PROVIDER_UNAVAILABLE: "La traduction est temporairement indisponible",
         LESSON_TRANSLATION_CONNECTION_FAILED: "La connexion au service de traduction a été interrompue",
       },
@@ -1247,6 +1248,11 @@ export const fr = {
     },
   },
   userManagement: {
+    translationPermission: {
+      label: "Traduction vocale",
+      hint: "Afficher la commande de traduction à l’élève et à l’enseignant pendant les cours individuels.",
+      aria: "Autoriser la traduction vocale pour {{name}}",
+    },
     teacher: {
       eyebrow: "Espace enseignant",
       title: "Élèves",
@@ -1321,6 +1327,8 @@ export const fr = {
       teacherUpdated: "Enseignant principal mis à jour.",
       rolesUpdated: "Rôles mis à jour. Un nouveau jeton les appliquera sans écrasement par un JWT obsolète.",
       delegationCreated: "Délégation créée.",
+      translationPermissionSaved: "Paramètre de traduction vocale enregistré.",
+      translationPermissionFailed: "Le paramètre de traduction vocale n’a pas pu être modifié.",
     },
     empty: {
       teachers: "Aucun enseignant disponible.",

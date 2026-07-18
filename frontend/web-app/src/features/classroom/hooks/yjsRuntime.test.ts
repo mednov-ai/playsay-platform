@@ -1,10 +1,10 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
-import { createYjsWorkspaceRuntime, type AnnotationStroke, updateHtmlGameAuthorityRuns } from "./yjsRuntime";
+import { createYjsWorkspaceRuntime, type AnnotationElement, updateHtmlGameAuthorityRuns } from "./yjsRuntime";
 
 describe("yjs workspace runtime annotations", () => {
   it("stores annotation strokes in the collaboration document", () => {
-    const annotationChanges: AnnotationStroke[][] = [];
+    const annotationChanges: AnnotationElement[][] = [];
     const runtime = createYjsWorkspaceRuntime({
       color: "#ff5c00",
       onAnnotationChange: (strokes) => annotationChanges.push(strokes),
@@ -17,39 +17,54 @@ describe("yjs workspace runtime annotations", () => {
       snapshot: null,
     });
 
-    runtime.setAnnotationStrokes([
+    runtime.setAnnotationElements([
       {
         color: "#00a878",
+        createdAt: 2,
         id: "stroke-2",
+        kind: "stroke",
         pageId: "material",
         points: [{ pageId: "material", x: 25, y: 30 }],
+        strokeWidth: 16,
       },
       {
         color: "#2574ff",
+        createdAt: 1,
         id: "stroke-1",
+        kind: "stroke",
         pageId: "material",
         points: [{ pageId: "material", x: 10, y: 20 }],
+        strokeWidth: 8,
       },
       {
         color: "#ff5c00",
+        createdAt: 3,
         id: "empty",
+        kind: "stroke",
         pageId: "material",
         points: [],
+        strokeWidth: 4,
       },
     ]);
 
     expect(annotationChanges.at(-1)).toEqual([
       {
         color: "#2574ff",
+        createdAt: 1,
         id: "stroke-1",
+        kind: "stroke",
         pageId: "material",
         points: [{ pageId: "material", x: 10, y: 20 }],
+        strokeWidth: 8,
       },
       {
         color: "#00a878",
+        createdAt: 2,
         id: "stroke-2",
+        kind: "stroke",
         pageId: "material",
         points: [{ pageId: "material", x: 25, y: 30 }],
+        strokeWidth: 16,
       },
     ]);
 
@@ -58,11 +73,14 @@ describe("yjs workspace runtime annotations", () => {
 
   it("persists text and annotations in one Yjs snapshot", () => {
     withWindowBase64(() => {
-      const stroke: AnnotationStroke = {
+      const stroke: AnnotationElement = {
         color: "#ff5c00",
+        createdAt: 1,
         id: "stroke-1",
+        kind: "stroke",
         pageId: "material",
         points: [{ pageId: "material", x: 12, y: 34 }],
+        strokeWidth: 8,
       };
       const runtime = createYjsWorkspaceRuntime({
         color: "#ff5c00",
@@ -77,11 +95,11 @@ describe("yjs workspace runtime annotations", () => {
       });
 
       runtime.updateText("Shared draft");
-      runtime.setAnnotationStrokes([stroke]);
+      runtime.setAnnotationElements([stroke]);
       const snapshot = runtime.snapshot();
       runtime.destroy();
 
-      const restoredAnnotationChanges: AnnotationStroke[][] = [];
+      const restoredAnnotationChanges: AnnotationElement[][] = [];
       const restoredTextChanges: string[] = [];
       const restored = createYjsWorkspaceRuntime({
         color: "#00a878",
@@ -101,6 +119,51 @@ describe("yjs workspace runtime annotations", () => {
 
       restored.destroy();
     });
+  });
+
+  it("applies element changes by id without replacing unrelated collaborative objects", () => {
+    const annotationChanges: AnnotationElement[][] = [];
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: (elements) => annotationChanges.push(elements),
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      participantName: "Student",
+      snapshot: null,
+    });
+    const first: AnnotationElement = {
+      color: "#ff5c00",
+      createdAt: 1,
+      id: "stroke-1",
+      kind: "stroke",
+      pageId: "material",
+      points: [{ pageId: "material", x: 10, y: 20 }],
+      strokeWidth: 8,
+    };
+    const second: AnnotationElement = {
+      color: "#2574ff",
+      createdAt: 2,
+      fill: "transparent",
+      height: 120,
+      id: "rectangle-1",
+      kind: "rectangle",
+      pageId: "material",
+      strokeWidth: 4,
+      width: 180,
+      x: 100,
+      y: 120,
+    };
+
+    runtime.setAnnotationElements([first]);
+    runtime.applyAnnotationChanges({ deleteIds: [], upserts: [second] });
+    expect(annotationChanges.at(-1)?.map((element) => element.id)).toEqual(["stroke-1", "rectangle-1"]);
+    runtime.applyAnnotationChanges({ deleteIds: [first.id], upserts: [] });
+    expect(annotationChanges.at(-1)).toEqual([second]);
+
+    runtime.destroy();
   });
 
   it("persists HTML game state separately for each block", () => {

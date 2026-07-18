@@ -47,6 +47,7 @@ describe("RenderedMaterialBlock video playback", () => {
 
     expect(markup).toContain("playsay-render-block-static-image");
     expect(markup).toContain("playsay-rendered-image-static");
+    expect(markup).toContain('data-playsay-annotation-anchor="true"');
     expect(markup).toContain('data-image-size="FULL"');
     expect(markup).not.toContain("<h4>");
     expect(markup).not.toContain("<figcaption>");

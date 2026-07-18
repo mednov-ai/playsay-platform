@@ -133,16 +133,16 @@ export function LessonWorkspace({
     return {
       participants: teacherAnnotationWorkspace.participants,
       ready: teacherAnnotationWorkspace.connected,
-      setStrokes: teacherAnnotationWorkspace.setAnnotationStrokes,
-      strokes: teacherAnnotationWorkspace.annotationStrokes,
+      elements: teacherAnnotationWorkspace.annotationElements,
+      setElements: teacherAnnotationWorkspace.setAnnotationElements,
       updateCursor: teacherAnnotationWorkspace.updateCursor,
     };
   }, [
     teacherAnnotationDocumentState.document?.id,
-    teacherAnnotationWorkspace.annotationStrokes,
+    teacherAnnotationWorkspace.annotationElements,
     teacherAnnotationWorkspace.connected,
     teacherAnnotationWorkspace.participants,
-    teacherAnnotationWorkspace.setAnnotationStrokes,
+    teacherAnnotationWorkspace.setAnnotationElements,
     teacherAnnotationWorkspace.updateCursor,
   ]);
   const teacherHtmlGameSync = useMemo(

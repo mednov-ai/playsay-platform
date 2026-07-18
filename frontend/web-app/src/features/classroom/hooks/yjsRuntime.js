@@ -8,6 +8,15 @@ import * as Y from "yjs";
 
 const messageSync = 0;
 const messageAwareness = 1;
+const annotationElementKinds = new Set([
+  "arrow",
+  "ellipse",
+  "line",
+  "rectangle",
+  "stickyNote",
+  "stroke",
+  "text",
+]);
 
 export function createYjsWorkspaceRuntime({
   color,
@@ -38,7 +47,7 @@ export function createYjsWorkspaceRuntime({
   };
   const updateLocalAnnotations = () => {
     if (!disposed) {
-      onAnnotationChange(annotationStrokesFromMap(yannotations));
+      onAnnotationChange(annotationElementsFromMap(yannotations));
     }
   };
   const updateHtmlGameSnapshots = () => {
@@ -85,6 +94,13 @@ export function createYjsWorkspaceRuntime({
   updateHtmlGameEffects();
 
   return {
+    applyAnnotationChanges({ deleteIds, upserts }) {
+      const nextElements = normalizeAnnotationElements(upserts);
+      ydoc.transact(() => {
+        deleteIds.forEach((id) => yannotations.delete(id));
+        nextElements.forEach((element) => yannotations.set(element.id, element));
+      });
+    },
     destroy() {
       disposed = true;
       socket = null;
@@ -113,17 +129,17 @@ export function createYjsWorkspaceRuntime({
     setSocket(nextSocket) {
       socket = nextSocket;
     },
-    setAnnotationStrokes(strokes) {
-      const nextStrokes = normalizeAnnotationStrokes(strokes);
+    setAnnotationElements(elements) {
+      const nextElements = normalizeAnnotationElements(elements);
       ydoc.transact(() => {
-        const nextIds = new Set(nextStrokes.map((stroke) => stroke.id));
+        const nextIds = new Set(nextElements.map((element) => element.id));
         yannotations.forEach((_value, id) => {
           if (!nextIds.has(id)) {
             yannotations.delete(id);
           }
         });
-        nextStrokes.forEach((stroke) => {
-          yannotations.set(stroke.id, stroke);
+        nextElements.forEach((element) => {
+          yannotations.set(element.id, element);
         });
       });
     },
@@ -186,34 +202,79 @@ export function updateHtmlGameAuthorityRuns(current, blockId, runId) {
   return next;
 }
 
-function annotationStrokesFromMap(yannotations) {
-  return normalizeAnnotationStrokes([...yannotations.values()])
-    .sort((left, right) => left.id.localeCompare(right.id));
+function annotationElementsFromMap(yannotations) {
+  return normalizeAnnotationElements([...yannotations.values()])
+    .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
 }
 
-function normalizeAnnotationStrokes(strokes) {
-  if (!Array.isArray(strokes)) {
+function normalizeAnnotationElements(elements) {
+  if (!Array.isArray(elements)) {
     return [];
   }
-  return strokes
-    .map((stroke) => normalizeAnnotationStroke(stroke))
-    .filter((stroke) => stroke !== null);
+  return elements
+    .map((element, index) => normalizeAnnotationElement(element, index))
+    .filter((element) => element !== null);
 }
 
-function normalizeAnnotationStroke(value) {
-  const stroke = asObject(value);
-  const id = asString(stroke?.id);
-  const color = asString(stroke?.color) || "#ff5c00";
-  const pageId = asString(stroke?.pageId) || "material";
-  const points = Array.isArray(stroke?.points)
-    ? stroke.points
-        .map((point) => normalizeAnnotationPoint(point, pageId))
-        .filter((point) => point !== null)
-    : [];
-  if (!id || points.length === 0) {
+function normalizeAnnotationElement(value, index) {
+  const element = asObject(value);
+  const id = asString(element?.id);
+  const color = asString(element?.color) || "#ff5c00";
+  const pageId = asString(element?.pageId) || "material";
+  const kind = annotationElementKind(element?.kind, element?.points);
+  const createdAt = finiteNumberOr(element?.createdAt, index);
+  if (!id || !kind) {
     return null;
   }
-  return { color, id, pageId, points };
+  const base = { color, createdAt, id, pageId };
+
+  if (kind === "stroke") {
+    const points = Array.isArray(element?.points)
+      ? element.points
+        .map((point) => normalizeAnnotationPoint(point, pageId))
+        .filter((point) => point !== null)
+      : [];
+    return points.length === 0
+      ? null
+      : { ...base, kind, points, strokeWidth: normalizeStrokeWidth(element?.strokeWidth) };
+  }
+  if (kind === "line" || kind === "arrow") {
+    const start = normalizeAnnotationPoint(element?.start, pageId);
+    const end = normalizeAnnotationPoint(element?.end, pageId);
+    return start && end
+      ? { ...base, end, kind, start, strokeWidth: normalizeStrokeWidth(element?.strokeWidth) }
+      : null;
+  }
+
+  const x = finiteNumberOr(element?.x, null);
+  const y = finiteNumberOr(element?.y, null);
+  const width = finiteNumberOr(element?.width, null);
+  const height = finiteNumberOr(element?.height, null);
+  if (x === null || y === null || width === null || height === null) {
+    return null;
+  }
+  if (kind === "text" || kind === "stickyNote") {
+    return {
+      ...base,
+      fill: asString(element?.fill) || (kind === "stickyNote" ? "#fff0a8" : "transparent"),
+      height: Math.max(36, height),
+      kind,
+      text: asString(element?.text),
+      width: Math.max(36, width),
+      x: clampCoordinate(x),
+      y: clampCoordinate(y),
+    };
+  }
+  return {
+    ...base,
+    fill: asString(element?.fill) || "transparent",
+    height: Math.max(36, height),
+    kind,
+    strokeWidth: normalizeStrokeWidth(element?.strokeWidth),
+    width: Math.max(36, width),
+    x: clampCoordinate(x),
+    y: clampCoordinate(y),
+  };
 }
 
 function normalizeAnnotationPoint(value, fallbackPageId) {
@@ -225,9 +286,31 @@ function normalizeAnnotationPoint(value, fallbackPageId) {
   }
   return {
     pageId: asString(point?.pageId) || fallbackPageId,
-    x,
-    y,
+    x: clampCoordinate(x),
+    y: clampCoordinate(y),
   };
+}
+
+function annotationElementKind(kind, legacyPoints) {
+  return annotationElementKinds.has(kind)
+    ? kind
+    : Array.isArray(legacyPoints)
+      ? "stroke"
+      : null;
+}
+
+function normalizeStrokeWidth(value) {
+  const width = finiteNumberOr(value, 8);
+  return width === 4 || width === 16 ? width : 8;
+}
+
+function finiteNumberOr(value, fallback) {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function clampCoordinate(value) {
+  return Math.max(0, Math.min(1000, value));
 }
 
 function handleMessage(ydoc, awareness, socket, data) {

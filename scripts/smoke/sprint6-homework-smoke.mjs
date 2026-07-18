@@ -555,14 +555,15 @@ async function createHomeworkMaterial(token) {
 
 async function createCompletedLesson(token, materialId, participantSubjects) {
   const now = Date.now();
-  return apiRequest(token, "POST", "/schedule/lessons", 201, {
+  const lesson = await apiRequest(token, "POST", "/schedule/lessons", 201, {
     materialId,
     participantSubjects,
     scheduledEnd: new Date(now - 5 * 60 * 1000).toISOString(),
     scheduledStart: new Date(now - 65 * 60 * 1000).toISOString(),
-    status: "COMPLETED",
     type: "GROUP",
   });
+  await apiRequest(token, "POST", `/schedule/lessons/${lesson.id}/start`, 200);
+  return apiRequest(token, "POST", `/schedule/lessons/${lesson.id}/complete`, 200);
 }
 
 function homeworkContent(materialId, items) {

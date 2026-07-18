@@ -497,15 +497,15 @@ async function createSmokeMaterial(token) {
 
 async function createSmokeLesson(token, materialId, participantSubjects) {
   const now = Date.now();
-  return apiRequest(token, "POST", "/schedule/lessons", 201, {
+  const lesson = await apiRequest(token, "POST", "/schedule/lessons", 201, {
     materialId,
     participantSubjects,
     scheduledEnd: new Date(now + 75 * 60 * 1000).toISOString(),
     scheduledStart: new Date(now - 5 * 60 * 1000).toISOString(),
-    status: "IN_PROGRESS",
     type: "GROUP",
     workMode: "SHARED",
   });
+  return apiRequest(token, "POST", `/schedule/lessons/${lesson.id}/start`, 200);
 }
 
 async function ensureCollaborationDocument(token, lessonId, materialId, scope) {

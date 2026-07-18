@@ -7,7 +7,7 @@ import {
 } from "../../../shared/api/playsay";
 import {
   createYjsWorkspaceRuntime,
-  type AnnotationStroke,
+  type AnnotationElement,
   type CollaborationCursor,
   type CollaborationParticipant,
   type YjsWorkspaceRuntime,
@@ -31,7 +31,7 @@ export function useYjsWorkspace({
 }) {
   const [participants, setParticipants] = useState<CollaborationParticipant[]>([]);
   const [status, setStatus] = useState<YjsWorkspaceStatus>("idle");
-  const [annotationStrokes, setAnnotationStrokesState] = useState<AnnotationStroke[]>([]);
+  const [annotationElements, setAnnotationElementsState] = useState<AnnotationElement[]>([]);
   const [text, setText] = useState("");
   const [htmlGameSnapshots, setHtmlGameSnapshots] = useState<Record<string, MaterialHtmlGameSnapshot>>({});
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
@@ -41,7 +41,7 @@ export function useYjsWorkspace({
 
   useEffect(() => {
     if (!enabled || !document) {
-      setAnnotationStrokesState([]);
+      setAnnotationElementsState([]);
       setParticipants([]);
       setStatus("idle");
       setText("");
@@ -54,7 +54,7 @@ export function useYjsWorkspace({
     let disposed = false;
     const runtime = createYjsWorkspaceRuntime({
       color,
-      onAnnotationChange: setAnnotationStrokesState,
+      onAnnotationChange: setAnnotationElementsState,
       onHtmlGameEffectsChange: setHtmlGameEffects,
       onHtmlGameInputsChange: setHtmlGameInputs,
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
@@ -104,7 +104,7 @@ export function useYjsWorkspace({
       socketRef.current = null;
       runtime.destroy();
       runtimeRef.current = null;
-      setAnnotationStrokesState([]);
+      setAnnotationElementsState([]);
       setParticipants([]);
       setHtmlGameSnapshots({});
       setHtmlGameInputs([]);
@@ -125,11 +125,17 @@ export function useYjsWorkspace({
     runtimeRef.current?.updateCursor(cursor);
   }, []);
 
-  const setAnnotationStrokes = useCallback((updater: (current: AnnotationStroke[]) => AnnotationStroke[]) => {
-    setAnnotationStrokesState((current) => {
-      const nextStrokes = updater(current);
-      runtimeRef.current?.setAnnotationStrokes(nextStrokes);
-      return nextStrokes;
+  const setAnnotationElements = useCallback((updater: (current: AnnotationElement[]) => AnnotationElement[]) => {
+    setAnnotationElementsState((current) => {
+      const nextElements = updater(current);
+      const currentById = new Map(current.map((element) => [element.id, element]));
+      const nextIds = new Set(nextElements.map((element) => element.id));
+      const deleteIds = current.filter((element) => !nextIds.has(element.id)).map((element) => element.id);
+      const upserts = nextElements.filter((element) => (
+        JSON.stringify(currentById.get(element.id)) !== JSON.stringify(element)
+      ));
+      runtimeRef.current?.applyAnnotationChanges({ deleteIds, upserts });
+      return nextElements;
     });
   }, []);
 
@@ -172,11 +178,11 @@ export function useYjsWorkspace({
   }), [htmlGameEffects, htmlGameInputs, htmlGameSnapshots, participants, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, status]);
 
   return {
-    annotationStrokes,
+    annotationElements,
     connected: status === "connected",
     participants,
     htmlGameSync,
-    setAnnotationStrokes,
+    setAnnotationElements,
     snapshot,
     status,
     text,

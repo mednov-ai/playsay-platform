@@ -1,5 +1,30 @@
-import { useEffect, useMemo, useState, type PointerEvent, type ReactNode } from "react";
-import { Eraser, Loader2, Maximize2, Minimize2, MousePointer2, PenLine, Send, Undo2 } from "lucide-react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import {
+  ArrowRight,
+  Circle,
+  Eraser,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Minus,
+  MousePointer2,
+  PenLine,
+  RectangleHorizontal,
+  Redo2,
+  Send,
+  StickyNote,
+  Type as TypeIcon,
+  Undo2,
+} from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   type LessonMaterial,
@@ -20,19 +45,20 @@ import {
   type MaterialHtmlGameSync,
 } from "../../materials";
 import {
-  annotationStrokesForPage,
-  pointsToSvgPath,
-  type AnnotationStroke,
+  annotationElementsForPage,
+  type AnnotationElement,
+  type AnnotationStrokeWidth,
 } from "../model/annotation";
 import type { CollaborationCursor, CollaborationParticipant } from "../hooks/useYjsWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
 import { PresenceCursorLayer } from "./PresenceCursorLayer";
+import { AnnotationLayer, type AnnotationLayerBounds } from "./AnnotationLayer";
 
 type LiveAnnotationSync = {
+  elements: AnnotationElement[];
   participants: CollaborationParticipant[];
   ready: boolean;
-  setStrokes: (updater: (current: AnnotationStroke[]) => AnnotationStroke[]) => void;
-  strokes: AnnotationStroke[];
+  setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
   updateCursor: (cursor: CollaborationCursor | null) => void;
 };
 
@@ -78,20 +104,41 @@ export function LessonTaskCanvas({
   const {
     activePageId,
     annotationColor,
-    annotationStrokes,
+    annotationElements,
+    annotationStrokeWidth,
     annotationTool,
     beginAnnotation,
+    beginElementMove,
+    beginElementResize,
+    beginTextEditing,
+    canRedo,
+    canUndo,
+    deleteSelectedElement,
+    editingElementId,
     endAnnotation,
     extendAnnotation,
-    setAnnotationColor,
+    finishTextEditing,
+    redo,
+    selectedElementId,
     setActivePageId,
-    setAnnotationStrokes,
     setAnnotationTool,
+    setSelectedElementId,
+    undo,
+    updateAnnotationText,
+    updateSelectedColor,
+    updateSelectedStrokeWidth,
   } = useLessonAnnotation({ initialPageId: firstPageId, lessonId, liveAnnotation: annotationSync, materialId: material?.id });
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const activePage = document?.pages.find((page) => page.id === activePageId) ?? document?.pages[0] ?? null;
-  const visibleAnnotationStrokes = annotationStrokesForPage(annotationStrokes, activePage?.id ?? activePageId);
+  const materialSurfaceRef = useRef<HTMLDivElement>(null);
+  const annotationAnchorBounds = useAnnotationAnchorBounds(
+    materialSurfaceRef,
+    activePage?.layout === "STATIC_IMAGE",
+    activePage?.id ?? null,
+    presentationMode,
+  );
+  const visibleAnnotationElements = annotationElementsForPage(annotationElements, activePage?.id ?? activePageId);
   const activePageAcceptsAnswers = materialPageAcceptsAnswers(activePage);
 
   useEffect(() => {
@@ -182,15 +229,56 @@ export function LessonTaskCanvas({
         <AnnotationToolButton active={annotationTool === "eraser"} label={t("classroom.annotation.eraser")} onClick={() => setAnnotationTool("eraser")} testId="annotation-tool-eraser">
           <Eraser className="h-4 w-4" />
         </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "line"} label={t("classroom.annotation.line")} onClick={() => setAnnotationTool("line")} testId="annotation-tool-line">
+          <Minus className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "arrow"} label={t("classroom.annotation.arrow")} onClick={() => setAnnotationTool("arrow")} testId="annotation-tool-arrow">
+          <ArrowRight className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "rectangle"} label={t("classroom.annotation.rectangle")} onClick={() => setAnnotationTool("rectangle")} testId="annotation-tool-rectangle">
+          <RectangleHorizontal className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "ellipse"} label={t("classroom.annotation.ellipse")} onClick={() => setAnnotationTool("ellipse")} testId="annotation-tool-ellipse">
+          <Circle className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "text"} label={t("classroom.annotation.text")} onClick={() => setAnnotationTool("text")} testId="annotation-tool-text">
+          <TypeIcon className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "stickyNote"} label={t("classroom.annotation.stickyNote")} onClick={() => setAnnotationTool("stickyNote")} testId="annotation-tool-sticky-note">
+          <StickyNote className="h-4 w-4" />
+        </AnnotationToolButton>
         <AnnotationToolButton
           active={false}
-          disabled={visibleAnnotationStrokes.length === 0}
+          disabled={!canUndo}
           label={t("classroom.annotation.undo")}
-          onClick={() => setAnnotationStrokes((current) => removeLatestStrokeForPage(current, activePage?.id ?? activePageId))}
+          onClick={undo}
           testId="annotation-tool-undo"
         >
           <Undo2 className="h-4 w-4" />
         </AnnotationToolButton>
+        <AnnotationToolButton
+          active={false}
+          disabled={!canRedo}
+          label={t("classroom.annotation.redo")}
+          onClick={redo}
+          testId="annotation-tool-redo"
+        >
+          <Redo2 className="h-4 w-4" />
+        </AnnotationToolButton>
+        <div className="playsay-line-widths" aria-label={t("classroom.annotation.lineWidth")}>
+          {([4, 8, 16] satisfies AnnotationStrokeWidth[]).map((strokeWidth) => (
+            <button
+              aria-label={t("classroom.annotation.lineWidthValue", { value: strokeWidth })}
+              className="playsay-line-width"
+              data-active={annotationStrokeWidth === strokeWidth ? "true" : "false"}
+              key={strokeWidth}
+              onClick={() => updateSelectedStrokeWidth(strokeWidth)}
+              type="button"
+            >
+              <span style={{ height: Math.max(2, strokeWidth / 2) }} />
+            </button>
+          ))}
+        </div>
         <div className="playsay-color-swatches" aria-label={t("classroom.annotation.color")}>
           {["#ff5c00", "#00a878", "#2574ff"].map((color) => (
             <button
@@ -198,7 +286,7 @@ export function LessonTaskCanvas({
               className="playsay-color-swatch"
               data-active={annotationColor === color ? "true" : "false"}
               key={color}
-              onClick={() => setAnnotationColor(color)}
+              onClick={() => updateSelectedColor(color)}
               style={{ backgroundColor: color }}
               type="button"
             />
@@ -239,6 +327,7 @@ export function LessonTaskCanvas({
             data-testid="lesson-material-surface"
             onPointerLeave={clearMaterialCursor}
             onPointerMove={updateMaterialCursor}
+            ref={materialSurfaceRef}
           >
             {material ? (
               <LessonMaterialDocumentView
@@ -261,29 +350,26 @@ export function LessonTaskCanvas({
             ) : (
               <FallbackLessonDocument />
             )}
-            <svg
-              aria-label={t("classroom.annotation.layer")}
-              className="playsay-annotation-layer"
-              data-tool={annotationTool}
-              onPointerCancel={endAnnotation}
-              onPointerDown={beginAnnotation}
-              onPointerMove={extendAnnotation}
-              onPointerUp={endAnnotation}
-              preserveAspectRatio="none"
-              viewBox="0 0 1000 1000"
-            >
-              {visibleAnnotationStrokes.map((stroke) => (
-                <path
-                  d={pointsToSvgPath(stroke.points)}
-                  fill="none"
-                  key={stroke.id}
-                  stroke={stroke.color}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="8"
-                />
-              ))}
-            </svg>
+            <AnnotationLayer
+              anchorBounds={activePage?.layout === "STATIC_IMAGE" ? annotationAnchorBounds : undefined}
+              editingElementId={editingElementId}
+              elements={visibleAnnotationElements}
+              onBegin={beginAnnotation}
+              onDeleteSelected={deleteSelectedElement}
+              onDeselect={() => setSelectedElementId(null)}
+              onEditText={beginTextEditing}
+              onEnd={endAnnotation}
+              onFinishTextEditing={finishTextEditing}
+              onMove={extendAnnotation}
+              onMoveElement={beginElementMove}
+              onRedo={redo}
+              onResizeElement={beginElementResize}
+              onSelectElement={setSelectedElementId}
+              onTextChange={updateAnnotationText}
+              onUndo={undo}
+              selectedElementId={selectedElementId}
+              tool={annotationTool}
+            />
             <PresenceCursorLayer participants={annotationSync?.participants ?? []} />
           </div>
         </div>
@@ -301,16 +387,92 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function removeLatestStrokeForPage(strokes: AnnotationStroke[], pageId: string): AnnotationStroke[] {
-  let latestIndex = -1;
-  for (let index = strokes.length - 1; index >= 0; index -= 1) {
-    if (strokes[index].pageId === pageId) {
-      latestIndex = index;
-      break;
+function useAnnotationAnchorBounds(
+  surfaceRef: RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  pageId: string | null,
+  presentationMode: LessonPresentationMode,
+): AnnotationLayerBounds | null {
+  const [bounds, setBounds] = useState<AnnotationLayerBounds | null>(null);
+
+  useLayoutEffect(() => {
+    if (!enabled) {
+      setBounds(null);
+      return;
     }
-  }
-  if (latestIndex < 0) {
-    return strokes;
-  }
-  return strokes.filter((_, index) => index !== latestIndex);
+
+    const currentSurface = surfaceRef.current;
+    if (!currentSurface) {
+      setBounds(null);
+      return;
+    }
+    const surfaceElement: HTMLDivElement = currentSurface;
+
+    let anchor: HTMLElement | null = null;
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => measure());
+
+    function observeCurrentAnchor() {
+      const nextAnchor = surfaceElement.querySelector<HTMLElement>('[data-playsay-annotation-anchor="true"]');
+      if (nextAnchor === anchor) {
+        return;
+      }
+      if (anchor) {
+        resizeObserver?.unobserve(anchor);
+      }
+      anchor = nextAnchor;
+      if (anchor) {
+        resizeObserver?.observe(anchor);
+      }
+    }
+
+    function measure() {
+      observeCurrentAnchor();
+      if (!anchor) {
+        setBounds(null);
+        return;
+      }
+      const surfaceRect = surfaceElement.getBoundingClientRect();
+      const anchorRect = anchor.getBoundingClientRect();
+      if (anchorRect.width <= 0 || anchorRect.height <= 0) {
+        setBounds(null);
+        return;
+      }
+      const nextBounds = {
+        height: anchorRect.height,
+        left: anchorRect.left - surfaceRect.left,
+        top: anchorRect.top - surfaceRect.top,
+        width: anchorRect.width,
+      };
+      setBounds((current) => sameAnnotationBounds(current, nextBounds) ? current : nextBounds);
+    }
+
+    resizeObserver?.observe(surfaceElement);
+    const mutationObserver = typeof MutationObserver === "undefined"
+      ? null
+      : new MutationObserver(measure);
+    mutationObserver?.observe(surfaceElement, { childList: true, subtree: true });
+    window.addEventListener("resize", measure);
+    measure();
+
+    return () => {
+      window.removeEventListener("resize", measure);
+      mutationObserver?.disconnect();
+      resizeObserver?.disconnect();
+    };
+  }, [enabled, pageId, presentationMode, surfaceRef]);
+
+  return bounds;
+}
+
+function sameAnnotationBounds(
+  current: AnnotationLayerBounds | null,
+  next: AnnotationLayerBounds,
+): boolean {
+  return current !== null &&
+    current.height === next.height &&
+    current.left === next.left &&
+    current.top === next.top &&
+    current.width === next.width;
 }

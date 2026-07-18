@@ -58,16 +58,16 @@ export function StudentLiveWorkspace({
     return {
       participants: groupAnnotationWorkspace.participants,
       ready: groupAnnotationWorkspace.connected,
-      setStrokes: groupAnnotationWorkspace.setAnnotationStrokes,
-      strokes: groupAnnotationWorkspace.annotationStrokes,
+      elements: groupAnnotationWorkspace.annotationElements,
+      setElements: groupAnnotationWorkspace.setAnnotationElements,
       updateCursor: groupAnnotationWorkspace.updateCursor,
     };
   }, [
     groupAnnotationDocumentState.document?.id,
-    groupAnnotationWorkspace.annotationStrokes,
+    groupAnnotationWorkspace.annotationElements,
     groupAnnotationWorkspace.connected,
     groupAnnotationWorkspace.participants,
-    groupAnnotationWorkspace.setAnnotationStrokes,
+    groupAnnotationWorkspace.setAnnotationElements,
     groupAnnotationWorkspace.updateCursor,
     sharedPresenceEnabled,
   ]);

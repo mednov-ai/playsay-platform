@@ -1,8 +1,8 @@
 import type { LessonMaterialJson } from "../../../shared/api/playsay";
-import type { AnnotationStroke } from "../model/annotation";
+import type { AnnotationElement } from "../model/annotation";
 import type { MaterialHtmlGameEffect, MaterialHtmlGameInputEvent, MaterialHtmlGameSnapshot } from "../../materials/model/materialDocument";
 
-export type { AnnotationStroke } from "../model/annotation";
+export type { AnnotationElement } from "../model/annotation";
 
 export type CollaborationCursor = {
   x: number;
@@ -18,11 +18,12 @@ export type CollaborationParticipant = {
 };
 
 export type YjsWorkspaceRuntime = {
+  applyAnnotationChanges: (changes: { deleteIds: string[]; upserts: AnnotationElement[] }) => void;
   destroy: () => void;
   getText: () => string;
   handleSocketMessage: (data: unknown) => void;
   setSocket: (socket: WebSocket | null) => void;
-  setAnnotationStrokes: (strokes: AnnotationStroke[]) => void;
+  setAnnotationElements: (elements: AnnotationElement[]) => void;
   publishHtmlGameEffect: (effect: MaterialHtmlGameEffect) => void;
   publishHtmlGameInput: (event: MaterialHtmlGameInputEvent) => void;
   setHtmlGameSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
@@ -35,7 +36,7 @@ export type YjsWorkspaceRuntime = {
 
 export function createYjsWorkspaceRuntime(options: {
   color: string;
-  onAnnotationChange: (strokes: AnnotationStroke[]) => void;
+  onAnnotationChange: (elements: AnnotationElement[]) => void;
   onHtmlGameEffectsChange: (effects: MaterialHtmlGameEffect[]) => void;
   onHtmlGameInputsChange: (events: MaterialHtmlGameInputEvent[]) => void;
   onHtmlGameSnapshotsChange: (snapshots: Record<string, MaterialHtmlGameSnapshot>) => void;

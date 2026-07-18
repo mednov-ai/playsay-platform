@@ -6,14 +6,20 @@ import {
 import {
   annotationContentFromElements,
   annotationContentFromJson,
+  canReparentMindMapNode,
   compareAnnotationElements,
+  deleteMindMapSubtree,
   emptyAnnotationContent,
   eraseAnnotationElementsAt,
   isStrokeStyledElement,
+  layoutMindMap,
+  mindMapNodeLimit,
+  mindMapNodes,
   moveAnnotationElement,
   resizeAnnotationElement,
   svgPointFromEvent,
   type AnnotationElement,
+  type AnnotationMindMapNode,
   type AnnotationPoint,
   type AnnotationStroke,
   type AnnotationStrokeWidth,
@@ -36,6 +42,7 @@ type ActiveInteraction =
   | { before: AnnotationElement; id: string; mode: "create" }
   | {
       before: AnnotationElement;
+      beforeGroup?: AnnotationElement[];
       handle?: "end" | "ne" | "nw" | "se" | "start" | "sw";
       id: string;
       mode: "move" | "resize";
@@ -62,6 +69,7 @@ export function useLessonAnnotation({
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [historyState, setHistoryState] = useState({ canRedo: false, canUndo: false });
+  const [mindMapLimitReached, setMindMapLimitReached] = useState(false);
   const activeInteractionRef = useRef<ActiveInteraction | null>(null);
   const captureTargetRef = useRef<SVGSVGElement | null>(null);
   const elementsRef = useRef<AnnotationElement[]>([]);
@@ -196,6 +204,10 @@ export function useLessonAnnotation({
 
     event.preventDefault();
     const point = svgPointFromEvent(event, activePageId);
+    if (annotationTool === "mindMap") {
+      createMindMapRoot(point);
+      return;
+    }
     if (annotationTool === "text" || annotationTool === "stickyNote") {
       createTextElement(annotationTool, point);
       return;
@@ -230,6 +242,24 @@ export function useLessonAnnotation({
       return;
     }
     if (interaction.mode === "move") {
+      if (interaction.before.kind === "mindMapNode" && interaction.before.parentId === null && interaction.beforeGroup) {
+        const group = interaction.beforeGroup.filter((element): element is AnnotationMindMapNode => element.kind === "mindMapNode");
+        const bounds = group.reduce((current, node) => ({
+          left: Math.min(current.left, node.x),
+          top: Math.min(current.top, node.y),
+          right: Math.max(current.right, node.x + node.width),
+          bottom: Math.max(current.bottom, node.y + node.height),
+        }), { left: 1000, top: 1000, right: 0, bottom: 0 });
+        const deltaX = Math.max(-bounds.left, Math.min(1000 - bounds.right, point.x - interaction.start.x));
+        const deltaY = Math.max(-bounds.top, Math.min(1000 - bounds.bottom, point.y - interaction.start.y));
+        updateElements((current) => current.map((element) => {
+          const before = interaction.beforeGroup?.find((candidate) => candidate.id === element.id);
+          return before?.kind === "mindMapNode"
+            ? { ...before, x: before.x + deltaX, y: before.y + deltaY }
+            : element;
+        }));
+        return;
+      }
       updateElementWithoutHistory(
         interaction.id,
         moveAnnotationElement(
@@ -294,6 +324,10 @@ export function useLessonAnnotation({
       }
       return;
     }
+    if (interaction.mode === "move" && interaction.before.kind === "mindMapNode") {
+      finalizeMindMapMove(interaction.before, interaction.beforeGroup ?? [interaction.before], currentElement);
+      return;
+    }
     recordHistory([interaction.before], [currentElement]);
   }
 
@@ -305,6 +339,12 @@ export function useLessonAnnotation({
     if (!element) {
       return;
     }
+    if (element.kind === "mindMapNode" && window.matchMedia("(max-width: 767px)").matches) {
+      event.preventDefault();
+      event.stopPropagation();
+      setSelectedElementId(elementId);
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     setSelectedElementId(elementId);
@@ -312,6 +352,7 @@ export function useLessonAnnotation({
     capturePointer(event);
     activeInteractionRef.current = {
       before: element,
+      beforeGroup: element.kind === "mindMapNode" ? mindMapNodes(elementsRef.current, element.mapId) : undefined,
       id: elementId,
       mode: "move",
       start: svgPointFromEvent(event, activePageId),
@@ -347,6 +388,16 @@ export function useLessonAnnotation({
     if (!element) {
       return;
     }
+    if (element.kind === "mindMapNode") {
+      const before = mindMapNodes(elementsRef.current, element.mapId);
+      const next = deleteMindMapSubtree(elementsRef.current, element.id);
+      const after = mindMapNodes(next, element.mapId);
+      updateElements(() => layoutMindMap(next, element.mapId));
+      recordHistory(before, after);
+      setSelectedElementId(null);
+      setEditingElementId(null);
+      return;
+    }
     updateElements((current) => current.filter((candidate) => candidate.id !== selectedElementId));
     recordHistory([element], []);
     setSelectedElementId(null);
@@ -361,7 +412,9 @@ export function useLessonAnnotation({
     if (!selected || selected.kind === "stickyNote") {
       return;
     }
-    const next = { ...selected, color };
+    const next = selected.kind === "mindMapNode" && selected.parentId === null
+      ? { ...selected, fill: color }
+      : { ...selected, color };
     updateElementWithoutHistory(selected.id, next);
     recordHistory([selected], [next]);
   }
@@ -381,7 +434,7 @@ export function useLessonAnnotation({
 
   function beginTextEditing(elementId: string) {
     const element = elementsRef.current.find((candidate) => candidate.id === elementId);
-    if (!element || (element.kind !== "text" && element.kind !== "stickyNote")) {
+    if (!element || (element.kind !== "text" && element.kind !== "stickyNote" && element.kind !== "mindMapNode")) {
       return;
     }
     textEditBeforeRef.current = element;
@@ -391,8 +444,8 @@ export function useLessonAnnotation({
 
   function updateAnnotationText(elementId: string, text: string) {
     updateElements((current) => current.map((element) => (
-      element.id === elementId && (element.kind === "text" || element.kind === "stickyNote")
-        ? { ...element, text: text.slice(0, 3_000) }
+      element.id === elementId && (element.kind === "text" || element.kind === "stickyNote" || element.kind === "mindMapNode")
+        ? { ...element, text: text.slice(0, element.kind === "mindMapNode" ? 500 : 3_000) }
         : element
     )));
   }
@@ -491,6 +544,135 @@ export function useLessonAnnotation({
     setAnnotationTool("pointer");
   }
 
+  function createMindMapRoot(point: AnnotationPoint) {
+    const id = annotationElementId("mindMap");
+    const element: AnnotationMindMapNode = {
+      color: "#ffffff",
+      createdAt: Date.now(),
+      fill: annotationColor,
+      height: 82,
+      id,
+      kind: "mindMapNode",
+      mapId: id,
+      order: 0,
+      pageId: point.pageId,
+      parentId: null,
+      side: "root",
+      text: "",
+      width: 220,
+      x: Math.max(20, Math.min(760, point.x - 110)),
+      y: Math.max(20, Math.min(898, point.y - 41)),
+    };
+    updateElements((current) => [...current, element]);
+    recordHistory([], [element]);
+    textEditBeforeRef.current = element;
+    setSelectedElementId(element.id);
+    setEditingElementId(element.id);
+    setMindMapLimitReached(false);
+    setAnnotationTool("pointer");
+  }
+
+  function addMindMapNode(parentId: string, relation: "child" | "sibling", preferredSide?: "left" | "right") {
+    const selected = elementsRef.current.find((element): element is AnnotationMindMapNode => (
+      element.id === parentId && element.kind === "mindMapNode"
+    ));
+    if (!selected) return;
+    const before = mindMapNodes(elementsRef.current, selected.mapId);
+    if (before.length >= mindMapNodeLimit) {
+      setMindMapLimitReached(true);
+      return;
+    }
+    const root = before.find((node) => node.parentId === null) ?? selected;
+    const actualParent = relation === "sibling" && selected.parentId
+      ? before.find((node) => node.id === selected.parentId) ?? root
+      : selected;
+    const siblings = before.filter((node) => node.parentId === actualParent.id);
+    const side = actualParent.parentId === null
+      ? preferredSide ?? (siblings.filter((node) => node.side === "right").length <= siblings.filter((node) => node.side === "left").length ? "right" : "left")
+      : actualParent.side === "left" ? "left" : "right";
+    const id = annotationElementId("mindMap");
+    const node: AnnotationMindMapNode = {
+      color: annotationColor,
+      createdAt: Date.now(),
+      fill: "#ffffff",
+      height: 78,
+      id,
+      kind: "mindMapNode",
+      mapId: selected.mapId,
+      order: siblings.reduce((maximum, sibling) => Math.max(maximum, sibling.order), -1) + 1,
+      pageId: selected.pageId,
+      parentId: actualParent.id,
+      side,
+      text: "",
+      width: 184,
+      x: actualParent.x,
+      y: actualParent.y,
+    };
+    const afterElements = layoutMindMap([...elementsRef.current, node], node.mapId);
+    updateElements(() => afterElements);
+    const after = mindMapNodes(afterElements, node.mapId);
+    recordHistory(before, after);
+    textEditBeforeRef.current = after.find((candidate) => candidate.id === node.id) ?? node;
+    setSelectedElementId(node.id);
+    setEditingElementId(node.id);
+    setMindMapLimitReached(false);
+  }
+
+  function handleMindMapKey(elementId: string, key: "ArrowDown" | "ArrowLeft" | "ArrowRight" | "ArrowUp" | "Enter" | "Tab") {
+    const selected = elementsRef.current.find((element): element is AnnotationMindMapNode => element.id === elementId && element.kind === "mindMapNode");
+    if (!selected) return;
+    if (key === "Tab") {
+      addMindMapNode(selected.id, "child");
+      return;
+    }
+    if (key === "Enter") {
+      addMindMapNode(selected.id, selected.parentId ? "sibling" : "child");
+      return;
+    }
+    const nodes = mindMapNodes(elementsRef.current, selected.mapId);
+    const siblings = nodes.filter((node) => node.parentId === selected.parentId).sort((left, right) => left.order - right.order);
+    const siblingIndex = siblings.findIndex((node) => node.id === selected.id);
+    const next = key === "ArrowLeft"
+      ? selected.side === "right" ? nodes.find((node) => node.id === selected.parentId) : nodes.find((node) => node.parentId === selected.id)
+      : key === "ArrowRight"
+        ? selected.side === "left" ? nodes.find((node) => node.id === selected.parentId) : nodes.find((node) => node.parentId === selected.id)
+        : key === "ArrowUp"
+          ? siblings[siblingIndex - 1]
+          : siblings[siblingIndex + 1];
+    if (next) setSelectedElementId(next.id);
+  }
+
+  function finalizeMindMapMove(before: AnnotationMindMapNode, beforeGroup: AnnotationElement[], current: AnnotationElement) {
+    if (current.kind !== "mindMapNode") return;
+    if (before.parentId === null) {
+      recordHistory(beforeGroup, mindMapNodes(elementsRef.current, before.mapId));
+      return;
+    }
+    const center = { x: current.x + current.width / 2, y: current.y + current.height / 2 };
+    const target = mindMapNodes(elementsRef.current, current.mapId).find((node) => (
+      node.id !== current.id
+      && center.x >= node.x && center.x <= node.x + node.width
+      && center.y >= node.y && center.y <= node.y + node.height
+      && canReparentMindMapNode(elementsRef.current, current.id, node.id)
+    ));
+    const elements = elementsRef.current;
+    const root = mindMapNodes(elements, current.mapId).find((node) => node.parentId === null);
+    const next = elements.map((element) => {
+      if (element.id !== current.id || element.kind !== "mindMapNode") return element;
+      const parentId = target?.id ?? before.parentId;
+      const parent = target ?? mindMapNodes(elements, current.mapId).find((node) => node.id === parentId);
+      const side: AnnotationMindMapNode["side"] = parent?.parentId === null
+        ? center.x < (root?.x ?? 500) ? "left" : "right"
+        : parent?.side === "left" ? "left" : "right";
+      const siblings = mindMapNodes(elements, current.mapId).filter((node) => node.parentId === parentId && node.id !== current.id);
+      const order = siblings.filter((node) => node.y < center.y).length;
+      return { ...element, order, parentId, side };
+    });
+    const afterElements = layoutMindMap(next, current.mapId);
+    updateElements(() => afterElements);
+    recordHistory(beforeGroup, mindMapNodes(afterElements, current.mapId));
+  }
+
   function capturePointer(event: PointerEvent<SVGElement>) {
     const target = event.currentTarget instanceof SVGSVGElement
       ? event.currentTarget
@@ -560,6 +742,7 @@ export function useLessonAnnotation({
 
   return {
     activePageId,
+    addMindMapNode,
     annotationColor,
     annotationElements,
     annotationStrokeWidth,
@@ -574,6 +757,8 @@ export function useLessonAnnotation({
     editingElementId,
     endAnnotation,
     finishTextEditing,
+    handleMindMapKey,
+    mindMapLimitReached,
     redo,
     selectedElementId,
     setActivePageId,

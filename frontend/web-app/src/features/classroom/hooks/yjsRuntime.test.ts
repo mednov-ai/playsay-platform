@@ -166,6 +166,45 @@ describe("yjs workspace runtime annotations", () => {
     runtime.destroy();
   });
 
+  it("stores collaborative mind map nodes by id", () => {
+    const annotationChanges: AnnotationElement[][] = [];
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: (elements) => annotationChanges.push(elements),
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      participantName: "Teacher",
+      snapshot: null,
+    });
+
+    runtime.applyAnnotationChanges({
+      deleteIds: [],
+      upserts: [{
+        color: "#ffffff",
+        createdAt: 1,
+        fill: "#ff5c00",
+        height: 82,
+        id: "map-1",
+        kind: "mindMapNode",
+        mapId: "map-1",
+        order: 0,
+        pageId: "page-1",
+        parentId: null,
+        side: "root",
+        text: "Present Simple",
+        width: 220,
+        x: 390,
+        y: 450,
+      }],
+    });
+
+    expect(annotationChanges.at(-1)).toEqual([expect.objectContaining({ id: "map-1", kind: "mindMapNode", text: "Present Simple" })]);
+    runtime.destroy();
+  });
+
   it("persists HTML game state separately for each block", () => {
     withWindowBase64(() => {
       const snapshots: Array<Record<string, { html: string; sequence: number; updatedAt: number }>> = [];

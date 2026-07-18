@@ -3,14 +3,18 @@ import {
   annotationContentFromElements,
   annotationContentFromJson,
   annotationElementsForPage,
+  canReparentMindMapNode,
+  deleteMindMapSubtree,
   eraseAnnotationElementsAt,
+  layoutMindMap,
   pointsToSvgPath,
   type AnnotationElement,
+  type AnnotationMindMapNode,
   type AnnotationStroke,
 } from "./annotation";
 
 describe("annotation model", () => {
-  it("stores mixed board elements in schema v3 material-page coordinates", () => {
+  it("stores mixed board elements in schema v4 material-page coordinates", () => {
     const elements: AnnotationElement[] = [
       stroke(),
       {
@@ -46,7 +50,7 @@ describe("annotation model", () => {
         expect.objectContaining({ id: "arrow-1", kind: "arrow", strokeWidth: 16 }),
         expect.objectContaining({ id: "sticky-1", kind: "stickyNote", text: "Remember this" }),
       ]),
-      schemaVersion: 3,
+      schemaVersion: 4,
     });
   });
 
@@ -130,7 +134,54 @@ describe("annotation model", () => {
       { pageId: "material", x: 3.45, y: 4.56 },
     ])).toBe("M 1.0 2.0 L 3.5 4.6");
   });
+
+  it("serializes mind map nodes and lays branches out on both sides", () => {
+    const root = mindMapNode({ id: "map-1", mapId: "map-1", parentId: null, side: "root", x: 390, y: 450 });
+    const left = mindMapNode({ id: "left", mapId: "map-1", parentId: root.id, side: "left", order: 0 });
+    const right = mindMapNode({ id: "right", mapId: "map-1", parentId: root.id, side: "right", order: 0 });
+    const laidOut = layoutMindMap([root, left, right], root.mapId).filter((element): element is AnnotationMindMapNode => element.kind === "mindMapNode");
+
+    expect(laidOut.find((node) => node.id === "left")!.x).toBeLessThan(root.x);
+    expect(laidOut.find((node) => node.id === "right")!.x).toBeGreaterThan(root.x);
+    expect(annotationContentFromElements(laidOut, "page-1")).toEqual(expect.objectContaining({
+      schemaVersion: 4,
+      elements: expect.arrayContaining([expect.objectContaining({ kind: "mindMapNode", mapId: "map-1", parentId: "map-1" })]),
+    }));
+  });
+
+  it("deletes a mind map subtree and prevents cyclic reparenting", () => {
+    const root = mindMapNode({ id: "map-1", mapId: "map-1", parentId: null, side: "root" });
+    const child = mindMapNode({ id: "child", mapId: "map-1", parentId: root.id });
+    const grandchild = mindMapNode({ id: "grandchild", mapId: "map-1", parentId: child.id });
+    const unrelated = stroke();
+    const elements: AnnotationElement[] = [root, child, grandchild, unrelated];
+
+    expect(deleteMindMapSubtree(elements, child.id).map((element) => element.id)).toEqual([root.id, unrelated.id]);
+    expect(canReparentMindMapNode(elements, child.id, grandchild.id)).toBe(false);
+    expect(canReparentMindMapNode(elements, grandchild.id, root.id)).toBe(true);
+  });
 });
+
+function mindMapNode(overrides: Partial<AnnotationMindMapNode> = {}): AnnotationMindMapNode {
+  return {
+    color: "#ff5c00",
+    createdAt: 1,
+    fill: "#ffffff",
+    height: 66,
+    id: "node-1",
+    kind: "mindMapNode",
+    mapId: "map-1",
+    order: 0,
+    pageId: "page-1",
+    parentId: "map-1",
+    side: "right",
+    text: "Rule",
+    width: 184,
+    x: 0,
+    y: 0,
+    ...overrides,
+  };
+}
 
 function stroke(overrides: Partial<AnnotationStroke> = {}): AnnotationStroke {
   return {

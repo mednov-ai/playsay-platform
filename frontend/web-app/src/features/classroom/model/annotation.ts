@@ -10,7 +10,8 @@ export type AnnotationTool =
   | "rectangle"
   | "ellipse"
   | "text"
-  | "stickyNote";
+  | "stickyNote"
+  | "mindMap";
 
 export type AnnotationStrokeWidth = 4 | 8 | 16;
 
@@ -66,17 +67,32 @@ export type AnnotationTextElement = {
   };
 }["stickyNote" | "text"];
 
+export type AnnotationMindMapNode = AnnotationElementBase & {
+  fill: string;
+  height: number;
+  kind: "mindMapNode";
+  mapId: string;
+  order: number;
+  parentId: string | null;
+  side: "left" | "right" | "root";
+  text: string;
+  width: number;
+  x: number;
+  y: number;
+};
+
 export type AnnotationElement =
   | AnnotationStroke
   | AnnotationLinearElement
   | AnnotationBoxElement
-  | AnnotationTextElement;
+  | AnnotationTextElement
+  | AnnotationMindMapNode;
 
 export type AnnotationContent = {
   activePageId: string;
   coordinateSpace: "material-page";
   elements: AnnotationElement[];
-  schemaVersion: 3;
+  schemaVersion: 4;
 };
 
 export function svgPointFromEvent(
@@ -120,7 +136,7 @@ export function emptyAnnotationContent(activePageId = defaultAnnotationPageId): 
     activePageId,
     coordinateSpace: "material-page",
     elements: [],
-    schemaVersion: 3,
+    schemaVersion: 4,
   };
 }
 
@@ -132,7 +148,7 @@ export function annotationContentFromElements(
     activePageId,
     coordinateSpace: "material-page",
     elements: elements.map((element) => serializeAnnotationElement(element)),
-    schemaVersion: 3,
+    schemaVersion: 4,
   };
 }
 
@@ -156,7 +172,7 @@ export function annotationContentFromJson(
     activePageId,
     coordinateSpace: "material-page",
     elements,
-    schemaVersion: 3,
+    schemaVersion: 4,
   };
 }
 
@@ -165,6 +181,111 @@ export function annotationElementsForPage(
   pageId = defaultAnnotationPageId,
 ): AnnotationElement[] {
   return elements.filter((element) => element.pageId === pageId);
+}
+
+export function mindMapNodes(elements: AnnotationElement[], mapId: string): AnnotationMindMapNode[] {
+  return elements.filter((element): element is AnnotationMindMapNode => (
+    element.kind === "mindMapNode" && element.mapId === mapId
+  ));
+}
+
+export function deleteMindMapSubtree(elements: AnnotationElement[], nodeId: string): AnnotationElement[] {
+  const deleteIds = new Set([nodeId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    elements.forEach((element) => {
+      if (element.kind === "mindMapNode" && element.parentId && deleteIds.has(element.parentId) && !deleteIds.has(element.id)) {
+        deleteIds.add(element.id);
+        changed = true;
+      }
+    });
+  }
+  return elements.filter((element) => !deleteIds.has(element.id));
+}
+
+export function canReparentMindMapNode(elements: AnnotationElement[], nodeId: string, parentId: string): boolean {
+  if (nodeId === parentId) return false;
+  const nodes = elements.filter((element): element is AnnotationMindMapNode => element.kind === "mindMapNode");
+  const parentById = new Map(nodes.map((node) => [node.id, node.parentId]));
+  let cursor: string | null | undefined = parentId;
+  while (cursor) {
+    if (cursor === nodeId) return false;
+    cursor = parentById.get(cursor);
+  }
+  return true;
+}
+
+export function layoutMindMap(elements: AnnotationElement[], mapId: string): AnnotationElement[] {
+  const nodes = mindMapNodes(elements, mapId);
+  const root = nodes.find((node) => node.parentId === null) ?? null;
+  if (!root) return elements;
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const childrenByParent = new Map<string, AnnotationMindMapNode[]>();
+  nodes.forEach((node) => {
+    if (!node.parentId || !nodeById.has(node.parentId)) return;
+    const siblings = childrenByParent.get(node.parentId) ?? [];
+    siblings.push(node);
+    childrenByParent.set(node.parentId, siblings);
+  });
+  childrenByParent.forEach((children) => children.sort((left, right) => left.order - right.order || left.createdAt - right.createdAt));
+  const laidOut = new Map<string, AnnotationMindMapNode>([[root.id, root]]);
+  const subtreeHeight = (node: AnnotationMindMapNode): number => {
+    const children = childrenByParent.get(node.id) ?? [];
+    if (children.length === 0) return node.height;
+    return Math.max(node.height, children.reduce((sum, child) => sum + subtreeHeight(child), 0) + mindMapSiblingGap * (children.length - 1));
+  };
+  const layoutSide = (side: "left" | "right") => {
+    const firstLevel = (childrenByParent.get(root.id) ?? []).filter((node) => node.side === side);
+    const total = firstLevel.reduce((sum, node) => sum + subtreeHeight(node), 0) + mindMapSiblingGap * Math.max(0, firstLevel.length - 1);
+    let cursor = root.y + root.height / 2 - total / 2;
+    const place = (node: AnnotationMindMapNode, parent: AnnotationMindMapNode, top: number) => {
+      const height = subtreeHeight(node);
+      const next: AnnotationMindMapNode = {
+        ...node,
+        side,
+        x: side === "right" ? parent.x + parent.width + mindMapLevelGap : parent.x - mindMapLevelGap - node.width,
+        y: top + height / 2 - node.height / 2,
+      };
+      laidOut.set(node.id, next);
+      let childTop = top;
+      (childrenByParent.get(node.id) ?? []).forEach((child) => {
+        place(child, next, childTop);
+        childTop += subtreeHeight(child) + mindMapSiblingGap;
+      });
+    };
+    firstLevel.forEach((node) => {
+      place(node, root, cursor);
+      cursor += subtreeHeight(node) + mindMapSiblingGap;
+    });
+  };
+  layoutSide("left");
+  layoutSide("right");
+  const positioned = [...laidOut.values()];
+  const bounds = positioned.reduce((current, node) => ({
+    left: Math.min(current.left, node.x),
+    top: Math.min(current.top, node.y),
+    right: Math.max(current.right, node.x + node.width),
+    bottom: Math.max(current.bottom, node.y + node.height),
+  }), { left: root.x, top: root.y, right: root.x + root.width, bottom: root.y + root.height });
+  const deltaX = bounds.left < mindMapPagePadding
+    ? mindMapPagePadding - bounds.left
+    : bounds.right > annotationCoordinateMax - mindMapPagePadding
+      ? annotationCoordinateMax - mindMapPagePadding - bounds.right
+      : 0;
+  const deltaY = bounds.top < mindMapPagePadding
+    ? mindMapPagePadding - bounds.top
+    : bounds.bottom > annotationCoordinateMax - mindMapPagePadding
+      ? annotationCoordinateMax - mindMapPagePadding - bounds.bottom
+      : 0;
+  positioned.forEach((node) => laidOut.set(node.id, {
+    ...node,
+    x: clampCoordinate(node.x + deltaX, annotationCoordinateMax - node.width),
+    y: clampCoordinate(node.y + deltaY, annotationCoordinateMax - node.height),
+  }));
+  return elements.map((element) => element.kind === "mindMapNode" && element.mapId === mapId
+    ? laidOut.get(element.id) ?? element
+    : element);
 }
 
 export function pointsToSvgPath(points: AnnotationPoint[]): string {
@@ -247,6 +368,9 @@ export function resizeAnnotationElement(
   if (element.kind === "stroke") {
     return element;
   }
+  if (element.kind === "mindMapNode") {
+    return element;
+  }
 
   const right = element.x + element.width;
   const bottom = element.y + element.height;
@@ -274,7 +398,7 @@ export function resizeAnnotationElement(
 export function isStrokeStyledElement(
   element: AnnotationElement,
 ): element is AnnotationStroke | AnnotationLinearElement | AnnotationBoxElement {
-  return element.kind !== "text" && element.kind !== "stickyNote";
+  return element.kind !== "text" && element.kind !== "stickyNote" && element.kind !== "mindMapNode";
 }
 
 export function compareAnnotationElements(left: AnnotationElement, right: AnnotationElement): number {
@@ -302,6 +426,21 @@ function serializeAnnotationElement(element: AnnotationElement): Record<string, 
       end: serializePoint(element.end),
       start: serializePoint(element.start),
       strokeWidth: element.strokeWidth,
+    };
+  }
+  if (element.kind === "mindMapNode") {
+    return {
+      ...base,
+      fill: element.fill,
+      height: roundCoordinate(element.height),
+      mapId: element.mapId,
+      order: element.order,
+      parentId: element.parentId,
+      side: element.side,
+      text: element.text,
+      width: roundCoordinate(element.width),
+      x: roundCoordinate(element.x),
+      y: roundCoordinate(element.y),
     };
   }
   return {
@@ -354,6 +493,26 @@ function annotationElementFromJson(value: unknown, index: number): AnnotationEle
   const height = asNumber(element.height);
   if (x === null || y === null || width === null || height === null) {
     return null;
+  }
+  if (kind === "mindMapNode") {
+    const parentId = asString(element.parentId).trim() || null;
+    const mapId = asString(element.mapId).trim() || (parentId ? "" : id);
+    if (!mapId) return null;
+    const sideValue = asString(element.side);
+    return {
+      ...base,
+      fill: asString(element.fill) || defaultMindMapFill,
+      height: Math.max(minimumElementSize, height),
+      kind,
+      mapId,
+      order: asNumber(element.order) ?? index,
+      parentId,
+      side: parentId === null ? "root" : sideValue === "left" ? "left" : "right",
+      text: asString(element.text).slice(0, mindMapTextLimit),
+      width: Math.max(minimumElementSize, width),
+      x: clampCoordinate(x),
+      y: clampCoordinate(y),
+    };
   }
   if (kind === "text" || kind === "stickyNote") {
     return {
@@ -472,6 +631,7 @@ const annotationElementKinds = new Set([
   "arrow",
   "ellipse",
   "line",
+  "mindMapNode",
   "rectangle",
   "stickyNote",
   "stroke",
@@ -480,5 +640,11 @@ const annotationElementKinds = new Set([
 const defaultAnnotationColor = "#ff5c00";
 const defaultAnnotationPageId = "material";
 const defaultStickyFill = "#fff0a8";
+const defaultMindMapFill = "#ffffff";
 const eraserRadius = 28;
 const minimumElementSize = 36;
+const mindMapLevelGap = 64;
+const mindMapPagePadding = 20;
+const mindMapSiblingGap = 24;
+export const mindMapNodeLimit = 50;
+export const mindMapTextLimit = 500;

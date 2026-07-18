@@ -12,6 +12,7 @@ const annotationElementKinds = new Set([
   "arrow",
   "ellipse",
   "line",
+  "mindMapNode",
   "rectangle",
   "stickyNote",
   "stroke",
@@ -252,6 +253,25 @@ function normalizeAnnotationElement(value, index) {
   const height = finiteNumberOr(element?.height, null);
   if (x === null || y === null || width === null || height === null) {
     return null;
+  }
+  if (kind === "mindMapNode") {
+    const parentId = asString(element?.parentId) || null;
+    const mapId = asString(element?.mapId) || (parentId ? "" : id);
+    if (!mapId) return null;
+    return {
+      ...base,
+      fill: asString(element?.fill) || "#ffffff",
+      height: Math.max(36, height),
+      kind,
+      mapId,
+      order: finiteNumberOr(element?.order, index),
+      parentId,
+      side: parentId === null ? "root" : element?.side === "left" ? "left" : "right",
+      text: asString(element?.text).slice(0, 500),
+      width: Math.max(36, width),
+      x: clampCoordinate(x),
+      y: clampCoordinate(y),
+    };
   }
   if (kind === "text" || kind === "stickyNote") {
     return {

@@ -17,6 +17,7 @@ import {
   Minimize2,
   Minus,
   MousePointer2,
+  Network,
   PenLine,
   RectangleHorizontal,
   Redo2,
@@ -103,6 +104,7 @@ export function LessonTaskCanvas({
   const firstPageId = document?.pages[0]?.id ?? null;
   const {
     activePageId,
+    addMindMapNode,
     annotationColor,
     annotationElements,
     annotationStrokeWidth,
@@ -118,6 +120,8 @@ export function LessonTaskCanvas({
     endAnnotation,
     extendAnnotation,
     finishTextEditing,
+    handleMindMapKey,
+    mindMapLimitReached,
     redo,
     selectedElementId,
     setActivePageId,
@@ -247,6 +251,9 @@ export function LessonTaskCanvas({
         <AnnotationToolButton active={annotationTool === "stickyNote"} label={t("classroom.annotation.stickyNote")} onClick={() => setAnnotationTool("stickyNote")} testId="annotation-tool-sticky-note">
           <StickyNote className="h-4 w-4" />
         </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "mindMap"} label={t("classroom.annotation.mindMap")} onClick={() => setAnnotationTool("mindMap")} testId="annotation-tool-mind-map">
+          <Network className="h-4 w-4" />
+        </AnnotationToolButton>
         <AnnotationToolButton
           active={false}
           disabled={!canUndo}
@@ -354,6 +361,7 @@ export function LessonTaskCanvas({
               anchorBounds={activePage?.layout === "STATIC_IMAGE" ? annotationAnchorBounds : undefined}
               editingElementId={editingElementId}
               elements={visibleAnnotationElements}
+              onAddMindMapNode={addMindMapNode}
               onBegin={beginAnnotation}
               onDeleteSelected={deleteSelectedElement}
               onDeselect={() => setSelectedElementId(null)}
@@ -362,6 +370,7 @@ export function LessonTaskCanvas({
               onFinishTextEditing={finishTextEditing}
               onMove={extendAnnotation}
               onMoveElement={beginElementMove}
+              onMindMapKey={handleMindMapKey}
               onRedo={redo}
               onResizeElement={beginElementResize}
               onSelectElement={setSelectedElementId}
@@ -370,6 +379,9 @@ export function LessonTaskCanvas({
               selectedElementId={selectedElementId}
               tool={annotationTool}
             />
+            {mindMapLimitReached ? (
+              <div className="playsay-mind-map-limit" role="status">{t("classroom.annotation.mindMapLimit")}</div>
+            ) : null}
             <PresenceCursorLayer participants={annotationSync?.participants ?? []} />
           </div>
         </div>

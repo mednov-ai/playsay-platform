@@ -131,9 +131,13 @@ const gameAndWorksheetMaterial = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Object.defineProperty(window, "PointerEvent", {
+    configurable: true,
+    value: MouseEvent,
+  });
   apiMocks.fetchAnnotation.mockResolvedValue({
     content: {
-      activePageId: "page-2",
+      activePageId: "page-1",
       coordinateSpace: "material-page",
       schemaVersion: 2,
       strokes: [],
@@ -224,6 +228,40 @@ describe("LessonTaskCanvas", () => {
     expect(markup).not.toContain("Submit");
   });
 
+  it("anchors annotations to the rendered static image instead of the material viewport", async () => {
+    const rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if (this.classList.contains("playsay-task-document-surface")) {
+        return domRect({ height: 900, left: 10, top: 20, width: 800 });
+      }
+      if (this.getAttribute("data-playsay-annotation-anchor") === "true") {
+        return domRect({ height: 1200, left: 30, top: 70, width: 760 });
+      }
+      return domRect({ height: 0, left: 0, top: 0, width: 0 });
+    });
+
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: staticImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+
+    await waitFor(() => {
+      const layer = container.querySelector<SVGSVGElement>(".playsay-annotation-layer");
+      expect(layer?.getAttribute("data-anchor-pending")).toBe("false");
+      expect(layer?.style.left).toBe("20px");
+      expect(layer?.style.top).toBe("50px");
+      expect(layer?.style.width).toBe("760px");
+      expect(layer?.style.height).toBe("1200px");
+    });
+
+    rectSpy.mockRestore();
+  });
+
   it("automatically focuses an HTML game and preserves its iframe while minimized", async () => {
     const onPresentationModeChange = vi.fn();
     const { container } = render(createElement(LessonTaskCanvas, {
@@ -299,4 +337,159 @@ describe("LessonTaskCanvas", () => {
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='static-image-focus-toggle']")!);
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
   });
+
+  it("draws with the selected line width and returns one-shot shapes to the pointer", async () => {
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+    const layer = await annotationLayer(container);
+
+    fireEvent.click(container.querySelectorAll<HTMLButtonElement>(".playsay-line-width")[2]!);
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-pen']")!);
+    drawPointer(layer, { x: 100, y: 120 }, { x: 300, y: 320 });
+
+    expect(container.querySelector("path.playsay-annotation-element")?.getAttribute("stroke-width")).toBe("16");
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-rectangle']")!);
+    drawPointer(layer, { x: 350, y: 200 }, { x: 600, y: 450 });
+
+    expect(container.querySelector("rect.playsay-annotation-element")).toBeTruthy();
+    expect(container.querySelector("[data-testid='annotation-tool-pointer']")?.getAttribute("data-active")).toBe("true");
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-undo']")!);
+    expect(container.querySelector("rect.playsay-annotation-element")).toBeNull();
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-redo']")!);
+    expect(container.querySelector("rect.playsay-annotation-element")).toBeTruthy();
+  });
+
+  it("erases a sparse stroke by crossing the middle of its segment while pressed", async () => {
+    apiMocks.fetchAnnotation.mockResolvedValue({
+      content: {
+        activePageId: "page-1",
+        coordinateSpace: "material-page",
+        elements: [{
+          color: "#ff5c00",
+          createdAt: 1,
+          id: "sparse-stroke",
+          kind: "stroke",
+          pageId: "page-1",
+          points: [
+            { pageId: "page-1", x: 100, y: 100 },
+            { pageId: "page-1", x: 900, y: 100 },
+          ],
+          strokeWidth: 8,
+        }],
+        schemaVersion: 3,
+      },
+    });
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+    const layer = await annotationLayer(container);
+    await waitFor(() => expect(container.querySelector("path.playsay-annotation-element")).toBeTruthy());
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-eraser']")!);
+    fireEvent.pointerMove(layer, { clientX: 500, clientY: 100, pointerId: 1 });
+    expect(container.querySelector("path.playsay-annotation-element")).toBeTruthy();
+    fireEvent.pointerDown(layer, { button: 0, clientX: 500, clientY: 100, pointerId: 1 });
+    fireEvent.pointerUp(layer, { button: 0, clientX: 500, clientY: 100, pointerId: 1 });
+
+    expect(container.querySelector("path.playsay-annotation-element")).toBeNull();
+  });
+
+  it("creates an editable sticky note", async () => {
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+    const layer = await annotationLayer(container);
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-sticky-note']")!);
+    fireEvent.pointerDown(layer, { button: 0, clientX: 250, clientY: 260, pointerId: 1 });
+
+    const editor = container.querySelector<HTMLTextAreaElement>(".playsay-annotation-text-stickyNote textarea");
+    expect(editor).toBeTruthy();
+    fireEvent.change(editor!, { target: { value: "New idea" } });
+    fireEvent.blur(editor!);
+    expect(container.querySelector(".playsay-annotation-text-stickyNote")?.textContent).toContain("New idea");
+  });
 });
+
+async function annotationLayer(container: HTMLElement): Promise<SVGSVGElement> {
+  const layer = await waitFor(() => {
+    const element = container.querySelector<SVGSVGElement>(".playsay-annotation-layer");
+    expect(element).toBeTruthy();
+    return element!;
+  });
+  Object.defineProperty(layer, "getBoundingClientRect", {
+    configurable: true,
+    value: () => ({
+      bottom: 1000,
+      height: 1000,
+      left: 0,
+      right: 1000,
+      top: 0,
+      width: 1000,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }),
+  });
+  Object.defineProperty(layer, "setPointerCapture", { configurable: true, value: vi.fn() });
+  Object.defineProperty(layer, "hasPointerCapture", { configurable: true, value: vi.fn(() => true) });
+  Object.defineProperty(layer, "releasePointerCapture", { configurable: true, value: vi.fn() });
+  return layer;
+}
+
+function drawPointer(
+  layer: SVGSVGElement,
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+) {
+  fireEvent.pointerDown(layer, { button: 0, clientX: start.x, clientY: start.y, pointerId: 1 });
+  fireEvent.pointerMove(layer, { buttons: 1, clientX: end.x, clientY: end.y, pointerId: 1 });
+  fireEvent.pointerUp(layer, { button: 0, clientX: end.x, clientY: end.y, pointerId: 1 });
+}
+
+function domRect({
+  height,
+  left,
+  top,
+  width,
+}: {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}): DOMRect {
+  return {
+    bottom: top + height,
+    height,
+    left,
+    right: left + width,
+    top,
+    width,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect;
+}

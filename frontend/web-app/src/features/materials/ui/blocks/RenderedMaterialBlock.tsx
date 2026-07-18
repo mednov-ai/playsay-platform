@@ -258,6 +258,7 @@ export function RenderedMaterialBlock({
             {imageUrl ? (
               <figure
                 className={`playsay-rendered-image${pageLayout === "STATIC_IMAGE" ? " playsay-rendered-image-static" : ""}`}
+                data-playsay-annotation-anchor={pageLayout === "STATIC_IMAGE" ? "true" : undefined}
                 data-editable={mode === "teacherPreview" && Boolean(onBlockPatch) ? "true" : "false"}
                 data-image-size={imageSize}
                 style={{ "--playsay-image-height": imageHeight, "--playsay-image-fit": objectFit } as CSSProperties}

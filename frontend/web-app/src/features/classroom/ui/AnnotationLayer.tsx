@@ -129,7 +129,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
           refY="5"
           viewBox="0 0 10 10"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+          <polygon fill="context-stroke" points="0,0 10,5 0,10" />
         </marker>
       </defs>
       {elements.map((element) => (

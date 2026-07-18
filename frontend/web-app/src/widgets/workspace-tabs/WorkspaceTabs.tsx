@@ -127,6 +127,7 @@ export function WorkspaceTabs({
         aria-expanded={open}
         aria-haspopup="dialog"
         className="playsay-workspace-switcher-trigger"
+        data-testid="workspace-switcher-trigger"
         onClick={toggleMenu}
         ref={triggerRef}
         type="button"

@@ -402,7 +402,12 @@ async function submitKeycloakLoginForm(page, credentials) {
 
 async function openHomeworkTab(page) {
   await page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-  const homeworkTab = page.locator('.playsay-workspace-tab[data-tab-id="homework"]').first();
+  const homeworkTab = page.locator('.playsay-workspace-tab[data-tab-id="homework"]');
+  if (await homeworkTab.count() === 0) {
+    const trigger = page.locator('[data-testid="workspace-switcher-trigger"]');
+    await trigger.waitFor({ timeout: timeoutMs });
+    await trigger.click();
+  }
   await homeworkTab.waitFor({ timeout: timeoutMs });
   await homeworkTab.click();
   await page.locator(".playsay-homework-panel").waitFor({ timeout: timeoutMs });

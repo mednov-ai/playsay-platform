@@ -208,7 +208,7 @@ async function createSession(nextBrowser, role, credentials) {
 
 async function verifyAiTutorPersonaSwitching(page) {
   await page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-  await page.locator('[data-tab-id="aiTutor"]').click();
+  await openWorkspaceTab(page, "aiTutor");
   await page.locator('[data-testid="ai-tutor-avatar-image"]').waitFor({ timeout: timeoutMs });
 
   const animationAssets = ["blink", "blink-half", "mouth-small", "mouth-open", "mouth-wide"]
@@ -297,13 +297,24 @@ async function verifyAiDialogAllowanceGrantAndDebit(teacher, student, studentSub
   }
 
   await teacher.page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-  await teacher.page.locator('[data-tab-id="aiTutor"]').click();
+  await openWorkspaceTab(teacher.page, "aiTutor");
   await teacher.page.locator('[data-testid="ai-tutor-teacher-allowances"]').waitFor({ timeout: timeoutMs });
   await teacher.page.locator(`[data-student-id="${studentAllowance.studentUserId}"]`).waitFor({ timeout: timeoutMs });
 
   await student.page.goto(webBaseUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-  await student.page.locator('[data-tab-id="aiTutor"]').click();
+  await openWorkspaceTab(student.page, "aiTutor");
   await student.page.locator('[data-testid="ai-tutor-dialog-allowance"]').waitFor({ timeout: timeoutMs });
+}
+
+async function openWorkspaceTab(page, tabId) {
+  const tab = page.locator(`[data-tab-id="${tabId}"]`);
+  if (await tab.count() === 0) {
+    const trigger = page.locator('[data-testid="workspace-switcher-trigger"]');
+    await trigger.waitFor({ timeout: timeoutMs });
+    await trigger.click();
+  }
+  await tab.waitFor({ timeout: timeoutMs });
+  await tab.click();
 }
 
 async function ensureStudentBirthDate(token, profile) {

@@ -15,8 +15,10 @@ import type {
   MeProfile,
   ScheduledLesson,
   ScheduledLessonInput,
+  ScheduledLessonScheduleInput,
 } from "../../../shared/api/playsay";
 import { LessonAssignmentWizard } from "./LessonAssignmentWizard";
+import { LessonRescheduleDialog } from "./LessonRescheduleDialog";
 import { ScheduledLessonCard } from "./ScheduledLessonCard";
 import { useAppTranslation } from "../../../shared/i18n";
 
@@ -39,6 +41,7 @@ export function SchedulePanel({
   onPrepare,
   onStart,
   onRefresh,
+  onReschedule = async () => null,
   profile,
   roomLoadingLessonId,
   roomMessage,
@@ -63,6 +66,7 @@ export function SchedulePanel({
   onPrepare?: (lessonId: string) => void;
   onStart: (lesson: ScheduledLesson) => void;
   onRefresh: () => void;
+  onReschedule?: (lessonId: string, input: ScheduledLessonScheduleInput) => Promise<ScheduledLesson | null>;
   profile: MeProfile | null;
   roomLoadingLessonId: string | null;
   roomMessage: string | null;
@@ -75,6 +79,7 @@ export function SchedulePanel({
   const { archivedLessons, mainLessons } = splitScheduleLessonsForDashboard(scheduledLessons, nowMs);
   const [copiedLessonId, setCopiedLessonId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [rescheduleLesson, setRescheduleLesson] = useState<ScheduledLesson | null>(null);
 
   useEffect(() => {
     function openWizard() {
@@ -122,6 +127,7 @@ export function SchedulePanel({
       onDelete={() => onDelete(lesson.id)}
       onJoin={() => onJoin(lesson)}
       onPrepare={() => onPrepare?.(lesson.id)}
+      onReschedule={() => setRescheduleLesson(lesson)}
       onStart={() => onStart(lesson)}
       roomLoading={roomLoadingLessonId === lesson.id}
     />
@@ -224,6 +230,14 @@ export function SchedulePanel({
           onPrepare={onPrepare ?? (() => undefined)}
           open={wizardOpen}
           studentUsers={studentUsers}
+        />
+      ) : null}
+      {canManage && rescheduleLesson ? (
+        <LessonRescheduleDialog
+          disabled={disabled}
+          lesson={rescheduleLesson}
+          onClose={() => setRescheduleLesson(null)}
+          onSave={onReschedule}
         />
       ) : null}
     </section>

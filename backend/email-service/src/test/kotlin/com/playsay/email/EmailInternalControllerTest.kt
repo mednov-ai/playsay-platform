@@ -113,6 +113,28 @@ class EmailInternalControllerTest @Autowired constructor(
         assertTrue(sent.htmlBody.contains("https://online.play-and-say.ru/lessons/lesson-1/classroom"))
     }
 
+    @Test
+    fun `renders lesson rescheduled email in every supported locale`() {
+        val before = RecordingOutboundEmailSender.sent.size
+
+        listOf("ru", "en", "de", "fr").forEach { locale ->
+            val response = sendTransactionalEmail(lessonRescheduledEmailBody(locale))
+            assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+        }
+
+        val sent = RecordingOutboundEmailSender.sent.drop(before)
+        assertEquals(4, sent.size)
+        sent.forEach { email ->
+            assertTrue(email.subject.contains("Play&Say"))
+            assertTrue(email.textBody.contains("18 Jul 2026, 10:00"))
+            assertTrue(email.textBody.contains("18 Jul 2026, 10:45"))
+            assertTrue(email.textBody.contains("19 Jul 2026, 12:00"))
+            assertTrue(email.textBody.contains("19 Jul 2026, 12:45"))
+            assertTrue(email.textBody.contains("Teacher Demo"))
+            assertTrue(email.htmlBody.contains("https://online.play-and-say.ru/lessons/lesson-1/classroom"))
+        }
+    }
+
     private fun sendTransactionalEmail(body: String = transactionalEmailBody()): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/internal/emails/transactional"))
@@ -165,6 +187,26 @@ class EmailInternalControllerTest @Autowired constructor(
             "startsAt": "29 Jun 2026, 10:00",
             "teacherName": "Teacher",
             "studentNames": "Student",
+            "lessonUrl": "https://online.play-and-say.ru/lessons/lesson-1/classroom"
+          }
+        }
+        """.trimIndent()
+
+    private fun lessonRescheduledEmailBody(locale: String): String =
+        """
+        {
+          "to": "student-$locale@example.com",
+          "templateKey": "lesson-rescheduled",
+          "locale": "$locale",
+          "idempotencyKey": "lesson-rescheduled:lesson-1:student-$locale:2026-07-19T12:00:00Z",
+          "model": {
+            "displayName": "Student",
+            "lessonTitle": "Lesson demo",
+            "previousStartsAt": "18 Jul 2026, 10:00",
+            "previousEndsAt": "18 Jul 2026, 10:45",
+            "startsAt": "19 Jul 2026, 12:00",
+            "endsAt": "19 Jul 2026, 12:45",
+            "teacherName": "Teacher Demo",
             "lessonUrl": "https://online.play-and-say.ru/lessons/lesson-1/classroom"
           }
         }

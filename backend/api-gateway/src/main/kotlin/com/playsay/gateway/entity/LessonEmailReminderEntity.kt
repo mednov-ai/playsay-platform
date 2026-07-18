@@ -42,6 +42,14 @@ class LessonEmailReminderEntity(
     var lastError: String? = null,
     @Column(name = "sent_at")
     var sentAt: Instant? = null,
+    @Column(name = "previous_scheduled_start")
+    var previousScheduledStart: Instant? = null,
+    @Column(name = "previous_scheduled_end")
+    var previousScheduledEnd: Instant? = null,
+    @Column(name = "scheduled_start_snapshot")
+    var scheduledStartSnapshot: Instant? = null,
+    @Column(name = "scheduled_end_snapshot")
+    var scheduledEndSnapshot: Instant? = null,
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)

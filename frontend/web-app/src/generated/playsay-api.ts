@@ -1266,6 +1266,11 @@ export interface CreateUserManagementUserRequest {
   primaryTeacherSubject?: string | null;
 }
 
+export interface ScheduledLessonScheduleUpdateRequest {
+  scheduledStart: string;
+  scheduledEnd: string;
+}
+
 export interface MaterialAssetUpdateRequest {
   /**
      * @maxItems 16
@@ -6058,6 +6063,78 @@ export const createDelegation1 = async (createDelegationRequest: CreateDelegatio
 
   const data: createDelegation1Response['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createDelegation1Response
+}
+
+
+
+export type rescheduleScheduledLessonResponse200 = {
+  data: ScheduledLessonResponse
+  status: 200
+}
+
+export type rescheduleScheduledLessonResponse400 = {
+  data: void
+  status: 400
+}
+
+export type rescheduleScheduledLessonResponse401 = {
+  data: void
+  status: 401
+}
+
+export type rescheduleScheduledLessonResponse403 = {
+  data: void
+  status: 403
+}
+
+export type rescheduleScheduledLessonResponse404 = {
+  data: void
+  status: 404
+}
+
+export type rescheduleScheduledLessonResponse409 = {
+  data: void
+  status: 409
+}
+
+export type rescheduleScheduledLessonResponseSuccess = (rescheduleScheduledLessonResponse200) & {
+  headers: Headers;
+};
+export type rescheduleScheduledLessonResponseError = (rescheduleScheduledLessonResponse400 | rescheduleScheduledLessonResponse401 | rescheduleScheduledLessonResponse403 | rescheduleScheduledLessonResponse404 | rescheduleScheduledLessonResponse409) & {
+  headers: Headers;
+};
+
+export type rescheduleScheduledLessonResponse = (rescheduleScheduledLessonResponseSuccess | rescheduleScheduledLessonResponseError)
+
+export const getRescheduleScheduledLessonUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/schedule`
+}
+
+/**
+ * Changes the date and time of only the selected lesson occurrence. Requires TEACHER or ADMIN role.
+ * @summary Reschedule one scheduled lesson
+ */
+export const rescheduleScheduledLesson = async (lessonId: string,
+    scheduledLessonScheduleUpdateRequest: ScheduledLessonScheduleUpdateRequest, options?: RequestInit): Promise<rescheduleScheduledLessonResponse> => {
+
+  const res = await fetch(getRescheduleScheduledLessonUrl(lessonId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(scheduledLessonScheduleUpdateRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: rescheduleScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as rescheduleScheduledLessonResponse
 }
 
 

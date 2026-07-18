@@ -34,13 +34,17 @@ class ScheduledLessonLifecycleService(
             throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_CANNOT_START)
         }
 
+        val now = Instant.now()
+        if (!isLessonInsideAccessWindow(lesson.status, lesson.scheduledStart, lesson.scheduledEnd, now, closedLessonStatuses)) {
+            throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_OUTSIDE_ACCESS_WINDOW)
+        }
+
         if (lesson.status != MetaData.LessonStatuses.IN_PROGRESS) {
-            val now = Instant.now()
             lesson.status = MetaData.LessonStatuses.IN_PROGRESS
             lesson.actualStart = lesson.actualStart ?: now
             lesson.updatedAt = now
             lessonRepo.saveAndFlush(lesson)
-            lessonReminderService.cancelPendingReminders(lessonId)
+            lessonReminderService.cancelPendingStartReminders(lessonId)
         }
 
         return scheduledLessonStore.get(authentication, lessonId).also { started ->

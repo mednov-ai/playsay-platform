@@ -96,6 +96,31 @@ function toLocalTimeValue(date: Date): string {
   return toDateTimeLocalValue(date).slice(11, 16);
 }
 
+export function localScheduleValues(value: string | null | undefined): { date: string; time: string } {
+  const parsed = value ? new Date(value) : new Date();
+  const safeDate = Number.isFinite(parsed.getTime()) ? parsed : new Date();
+  return { date: toLocalDateValue(safeDate), time: toLocalTimeValue(safeDate) };
+}
+
+export function scheduledLessonDurationMinutes(lesson: ScheduledLesson): number {
+  const startMs = dateValueMs(lesson.scheduledStart);
+  const endMs = dateValueMs(lesson.scheduledEnd);
+  if (startMs === null || endMs === null || endMs <= startMs) {
+    return 45;
+  }
+  return normalizedDurationMinutes(Math.round((endMs - startMs) / 60_000));
+}
+
+export function rescheduleInputFromLocalValues(
+  date: string,
+  time: string,
+  durationMinutes: string,
+): { scheduledStart: string; scheduledEnd: string } | null {
+  const scheduledStart = localScheduleDateTimeToIso(date, time);
+  const scheduledEnd = localScheduleEndIso(date, time, durationMinutes);
+  return scheduledStart && scheduledEnd ? { scheduledStart, scheduledEnd } : null;
+}
+
 export function localDateTimeToIso(value: string): string | null {
   return value ? new Date(value).toISOString() : null;
 }
@@ -219,7 +244,7 @@ export function isTeacherLessonActionable(lesson: ScheduledLesson, nowMs = Date.
   if (isArchivedScheduleLesson(lesson, nowMs)) {
     return false;
   }
-  return lesson.status === "IN_PROGRESS" || isScheduledLessonReadyToStart(lesson, nowMs);
+  return isJoinableScheduledLesson(lesson, nowMs) || isScheduledLessonReadyToStart(lesson, nowMs);
 }
 
 export function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
@@ -250,11 +275,16 @@ export function scheduleStateLabel(lesson: ScheduledLesson, nowMs: number, t: Sc
     }
   }
 
-  if (lesson.status === "IN_PROGRESS") {
+  if (isJoinableScheduledLesson(lesson, nowMs)) {
     return t("schedule.state.live");
   }
 
   return t("schedule.state.planned");
+}
+
+export function lessonAccessOpensAt(lesson: ScheduledLesson): string | null {
+  const startMs = dateValueMs(lesson.scheduledStart);
+  return startMs === null ? null : new Date(startMs - LESSON_ACCESS_GRACE_MS).toISOString();
 }
 
 export function scheduleSortRank(lesson: ScheduledLesson, nowMs: number): number {
@@ -262,7 +292,7 @@ export function scheduleSortRank(lesson: ScheduledLesson, nowMs: number): number
     return 3;
   }
 
-  if (lesson.status === "IN_PROGRESS" || isLessonCurrent(lesson, nowMs)) {
+  if (isJoinableScheduledLesson(lesson, nowMs) || isLessonCurrent(lesson, nowMs)) {
     return 0;
   }
 

@@ -13,6 +13,7 @@ import type {
   ScheduledLessonMaterialAssignmentRequest,
   ScheduledLessonRequest,
   ScheduledLessonResponse,
+  ScheduledLessonScheduleUpdateRequest,
   UpdateUserProfileRequest,
   UserProfileResponse,
 } from "../../generated/playsay-api";
@@ -75,6 +76,7 @@ export type ScheduledLessonInput = ScheduledLessonRequest & {
   materialId?: string | null;
   recurrence?: ScheduledLessonRecurrenceInput | null;
 };
+export type ScheduledLessonScheduleInput = ScheduledLessonScheduleUpdateRequest;
 export type LiveKitRoomToken = LiveKitRoomTokenResponse;
 export type LessonTranslationSession = LessonTranslationSessionResponse;
 export type StudentInviteAuthenticatedResult = {

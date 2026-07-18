@@ -47,7 +47,8 @@ describe("AppShell teacher header", () => {
     );
 
     expect(markup).toContain("Подготовка урока");
-    expect(markup).toContain("Начать урок");
+    expect(markup).toContain("Вход в урок откроется");
+    expect(markup).not.toContain("Начать урок");
     expect(markup).toContain("Mila");
   });
 

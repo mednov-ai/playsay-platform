@@ -14,6 +14,7 @@ import {
   fetchScheduledLessons,
   fetchStudentProfiles,
   removeScheduledLesson,
+  rescheduleScheduledLesson as rescheduleScheduledLessonRequest,
   saveScheduledLesson,
   startScheduledLesson as startScheduledLessonRequest,
   type AdminUserProfile,
@@ -21,6 +22,7 @@ import {
   type MeProfile,
   type ScheduledLesson,
   type ScheduledLessonInput,
+  type ScheduledLessonScheduleInput,
   type ScheduledLessonParticipantLink,
 } from "../../shared/api/playsay";
 import { useAppTranslation } from "../../shared/i18n";
@@ -220,6 +222,25 @@ export function useScheduleActions({
     }
   }
 
+  async function rescheduleScheduledLesson(
+    lessonId: string,
+    input: ScheduledLessonScheduleInput,
+  ): Promise<ScheduledLesson | null> {
+    setScheduleLoading(true);
+    setScheduleMessage(null);
+    try {
+      const updated = await rescheduleScheduledLessonRequest(lessonId, input);
+      setScheduledLessons((current) => current.map((lesson) => (lesson.id === lessonId ? updated : lesson)));
+      setScheduleMessage(t("schedule.messages.rescheduled"));
+      return updated;
+    } catch (caught) {
+      setScheduleMessage(applySessionError(caught, t("schedule.messages.rescheduleFailed")));
+      return null;
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+
   async function completeScheduledLesson(lessonId: string) {
     setScheduleLoading(true);
     setRoomMessage(null);
@@ -323,6 +344,7 @@ export function useScheduleActions({
     joinScheduledLesson,
     leaveScheduledLessonRoom,
     refreshSchedule,
+    rescheduleScheduledLesson,
     startScheduledLesson,
   };
 }

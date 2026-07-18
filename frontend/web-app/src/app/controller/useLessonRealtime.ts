@@ -1,5 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
-import { isJoinableScheduledLesson } from "../../entities/schedule/model";
+import { isArchivedScheduleLesson, isJoinableScheduledLesson } from "../../entities/schedule/model";
 import {
   buildLessonRealtimeUrl,
   isRoomSessionExpired,
@@ -184,7 +184,7 @@ export function useLessonRealtime({
   function applyRealtimeLessonSnapshot(lesson: ScheduledLesson) {
     const currentTimeMs = Date.now();
     const canManageSchedule = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
-    const canKeepInSchedule = canManageSchedule || isJoinableScheduledLesson(lesson, currentTimeMs);
+    const canKeepInSchedule = canManageSchedule || !isArchivedScheduleLesson(lesson, currentTimeMs);
 
     setScheduledLessons((current) => (
       canKeepInSchedule
@@ -197,7 +197,8 @@ export function useLessonRealtime({
     }
 
     if (!isJoinableScheduledLesson(lesson, currentTimeMs)) {
-      closeClassroom(t("schedule.messages.finishedOrCancelled"));
+      const currentSession = roomSessionRef.current;
+      closeClassroom(t(realtimeClassroomClosureMessageKey(lesson, currentSession?.lessonStatus)));
       return;
     }
 
@@ -227,4 +228,13 @@ export function useLessonRealtime({
       socket.close();
     }
   }
+}
+
+export function realtimeClassroomClosureMessageKey(
+  lesson: ScheduledLesson,
+  previousStatus: string | null | undefined,
+): "schedule.messages.rescheduledClassroomClosed" | "schedule.messages.finishedOrCancelled" {
+  return lesson.status === "SCHEDULED" && previousStatus === "IN_PROGRESS"
+    ? "schedule.messages.rescheduledClassroomClosed"
+    : "schedule.messages.finishedOrCancelled";
 }

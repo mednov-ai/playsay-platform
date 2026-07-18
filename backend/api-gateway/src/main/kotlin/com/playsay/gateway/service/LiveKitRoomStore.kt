@@ -90,6 +90,7 @@ class LiveKitRoomStore(
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val studentProfileRepo: StudentProfileRepo,
+    private val authorizationService: ScheduledLessonAuthorizationService,
     private val tokenService: LiveKitTokenService,
 ) {
     @Transactional
@@ -112,7 +113,16 @@ class LiveKitRoomStore(
     private fun findJoinableLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LessonEntity? {
         val now = Instant.now()
         return if (authentication.canJoinAnyLiveKitLesson()) {
-            lessonRepo.findById(lessonId).orElse(null)?.takeUnless { lesson -> lesson.status in expiredLiveKitStatuses }
+            val lesson = lessonRepo.findById(lessonId).orElse(null)
+                ?.takeIf { authorizationService.canManageLesson(authentication, lessonId) }
+                ?: return null
+            if (
+                lesson.status != MetaData.LessonStatuses.IN_PROGRESS ||
+                !isLessonInsideAccessWindow(lesson.status, lesson.scheduledStart, lesson.scheduledEnd, now, expiredLiveKitStatuses)
+            ) {
+                throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_OUTSIDE_ACCESS_WINDOW)
+            }
+            lesson
         } else {
             lessonRepo.findJoinableForStudent(
                 lessonId = lessonId,

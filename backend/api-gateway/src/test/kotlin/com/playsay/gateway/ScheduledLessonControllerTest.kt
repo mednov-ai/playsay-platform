@@ -107,6 +107,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
     @BeforeEach
     fun cleanDatabase() {
         RecordingLessonReminderEmailClient.sent.clear()
+        RecordingLessonReminderEmailClient.failFor = null
         RecordingScheduledLessonRegistrationGateway.reset()
         lessonEmailReminderRepo.deleteAllInBatch()
         lessonParticipantRepo.deleteAllInBatch()
@@ -527,6 +528,180 @@ class ScheduledLessonControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `reschedule rebuilds start reminders and supersedes pending student notifications`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val originalStart = futureWeekdayStart(DayOfWeek.MONDAY)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = originalStart,
+                scheduledEnd = originalStart.plus(Duration.ofMinutes(45)),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        val firstStart = originalStart.plus(Duration.ofDays(1))
+        scheduleController.reschedule(
+            teacher,
+            lesson.id,
+            ScheduledLessonScheduleUpdateRequest(firstStart, firstStart.plus(Duration.ofMinutes(45))),
+        )
+        val finalStart = firstStart.plus(Duration.ofHours(2))
+
+        val updated = scheduleController.reschedule(
+            teacher,
+            lesson.id,
+            ScheduledLessonScheduleUpdateRequest(finalStart, finalStart.plus(Duration.ofMinutes(45))),
+        )
+        lessonReminderScheduler.dispatchDueReminders(Instant.now().plus(Duration.ofMinutes(1)))
+
+        val queued = lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
+        val rescheduleNotifications = queued.filter { it.reminderType == "LESSON_RESCHEDULED" }
+        val startReminders = queued.filter { it.reminderType == "LESSON_START_30M" }
+        val email = RecordingLessonReminderEmailClient.sent.single { it.templateKey == "lesson-rescheduled" }
+        assertEquals(finalStart, updated.scheduledStart)
+        assertEquals(2, startReminders.size)
+        assertTrue(startReminders.all { it.dueAt == finalStart.minus(Duration.ofMinutes(30)) })
+        assertEquals(2, rescheduleNotifications.size)
+        assertEquals(1, rescheduleNotifications.count { it.status == "CANCELLED" })
+        assertEquals(1, rescheduleNotifications.count { it.status == "SENT" })
+        assertEquals("student.one@example.com", email.to)
+        assertEquals("Teacher one", email.model["teacherName"])
+        assertNotNull(email.model["previousStartsAt"])
+        assertNotNull(email.model["previousEndsAt"])
+        assertNotNull(email.model["startsAt"])
+        assertNotNull(email.model["endsAt"])
+    }
+
+    @Test
+    fun `same schedule repairs a future in-progress lesson without sending reschedule email`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        lessonRepo.findById(lesson.id).orElseThrow().also { stored ->
+            stored.status = "IN_PROGRESS"
+            stored.actualStart = Instant.now()
+            lessonRepo.saveAndFlush(stored)
+        }
+
+        val repaired = scheduleController.reschedule(
+            teacher,
+            lesson.id,
+            ScheduledLessonScheduleUpdateRequest(requireNotNull(lesson.scheduledStart), requireNotNull(lesson.scheduledEnd)),
+        )
+
+        val stored = lessonRepo.findById(lesson.id).orElseThrow()
+        assertEquals("SCHEDULED", repaired.status)
+        assertNull(stored.actualStart)
+        assertNull(stored.actualEnd)
+        assertTrue(lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
+            .none { it.reminderType == "LESSON_RESCHEDULED" })
+    }
+
+    @Test
+    fun `reschedule changes only the selected lesson occurrence in a series`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val originalStart = futureWeekdayStart(DayOfWeek.MONDAY)
+        val selected = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = originalStart,
+                scheduledEnd = originalStart.plus(Duration.ofMinutes(45)),
+                recurrence = ScheduledLessonRecurrenceRequest(
+                    mode = "WEEKLY_COUNT",
+                    count = 2,
+                    weekdays = listOf("MONDAY"),
+                    timeZone = "UTC",
+                ),
+            ),
+        ).body!!
+        val untouched = scheduleController.list(teacher).single { it.id != selected.id }
+        val movedStart = originalStart.plus(Duration.ofDays(1))
+
+        scheduleController.reschedule(
+            teacher,
+            selected.id,
+            ScheduledLessonScheduleUpdateRequest(movedStart, movedStart.plus(Duration.ofMinutes(45))),
+        )
+
+        val lessons = scheduleController.list(teacher)
+        assertEquals(movedStart, lessons.single { it.id == selected.id }.scheduledStart)
+        assertEquals(untouched.scheduledStart, lessons.single { it.id == untouched.id }.scheduledStart)
+    }
+
+    @Test
+    fun `reschedule rejects invalid duration and closed lessons`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val start = futureStart(60)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(scheduledStart = start, scheduledEnd = start.plus(Duration.ofMinutes(45))),
+        ).body!!
+
+        assertFailsWith<ResponseStatusException> {
+            scheduleController.reschedule(
+                teacher,
+                lesson.id,
+                ScheduledLessonScheduleUpdateRequest(start, start.plus(Duration.ofMinutes(5))),
+            )
+        }.also { error -> assertEquals(HttpStatus.BAD_REQUEST, error.statusCode) }
+
+        scheduleController.complete(teacher, lesson.id)
+        assertFailsWith<ResponseStatusException> {
+            scheduleController.reschedule(
+                teacher,
+                lesson.id,
+                ScheduledLessonScheduleUpdateRequest(start.plus(Duration.ofHours(1)), start.plus(Duration.ofHours(2))),
+            )
+        }.also { error -> assertEquals(HttpStatus.CONFLICT, error.statusCode) }
+    }
+
+    @Test
+    fun `reschedule skips missing email and records provider failure without rollback`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(studentOne)
+        val studentTwoId = userProfileStore.currentUserId(studentTwo)
+        appUserRepo.findById(studentTwoId).orElseThrow().also { user ->
+            user.email = null
+            appUserRepo.saveAndFlush(user)
+        }
+        val originalStart = futureStart(120)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = originalStart,
+                scheduledEnd = originalStart.plus(Duration.ofMinutes(45)),
+                participantSubjects = listOf("student-1", "student-2"),
+            ),
+        ).body!!
+        val movedStart = originalStart.plus(Duration.ofHours(1))
+        RecordingLessonReminderEmailClient.failFor = "student.one@example.com"
+
+        scheduleController.reschedule(
+            teacher,
+            lesson.id,
+            ScheduledLessonScheduleUpdateRequest(movedStart, movedStart.plus(Duration.ofMinutes(45))),
+        )
+        lessonReminderScheduler.dispatchDueReminders(Instant.now().plus(Duration.ofMinutes(1)))
+
+        val notifications = lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
+            .filter { it.reminderType == "LESSON_RESCHEDULED" }
+        assertEquals(setOf("FAILED", "SKIPPED"), notifications.map { it.status }.toSet())
+        assertEquals(movedStart, lessonRepo.findById(lesson.id).orElseThrow().scheduledStart)
+    }
+
+    @Test
     fun `student sees only own scheduled lessons`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
@@ -573,12 +748,22 @@ class ScheduledLessonControllerTest @Autowired constructor(
                 participantSubjects = listOf("student-1"),
             ),
         )
-        scheduleController.create(
+        val cancelledLesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
                 lessonTemplateId = lessonTemplateId,
                 scheduledStart = futureStart(90),
                 scheduledEnd = futureEnd(90),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        scheduleController.update(
+            teacher,
+            cancelledLesson.id,
+            ScheduledLessonRequest(
+                lessonTemplateId = lessonTemplateId,
+                scheduledStart = cancelledLesson.scheduledStart,
+                scheduledEnd = cancelledLesson.scheduledEnd,
                 status = "CANCELLED",
                 participantSubjects = listOf("student-1"),
             ),
@@ -676,16 +861,70 @@ class ScheduledLessonControllerTest @Autowired constructor(
             ScheduledLessonRequest(
                 scheduledStart = Instant.parse("2026-05-25T12:00:00Z"),
                 scheduledEnd = Instant.parse("2026-05-25T12:45:00Z"),
-                status = "IN_PROGRESS",
+                status = "SCHEDULED",
                 type = "INDIVIDUAL",
             ),
         )
 
-        assertEquals("IN_PROGRESS", updated.status)
+        assertEquals("SCHEDULED", updated.status)
         assertEquals("INDIVIDUAL", updated.type)
 
         assertEquals(HttpStatus.NO_CONTENT, scheduleController.delete(teacher, lesson.id).statusCode)
         assertEquals(emptyList(), scheduleController.list(teacher))
+    }
+
+    @Test
+    fun `create and general update cannot perform lifecycle transitions`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val now = Instant.now()
+
+        assertFailsWith<ResponseStatusException> {
+            scheduleController.create(
+                teacher,
+                ScheduledLessonRequest(
+                    scheduledStart = now.plusSeconds(5 * 60),
+                    scheduledEnd = now.plusSeconds(50 * 60),
+                    status = "IN_PROGRESS",
+                ),
+            )
+        }.also { error -> assertEquals(HttpStatus.CONFLICT, error.statusCode) }
+
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = now.plusSeconds(5 * 60),
+                scheduledEnd = now.plusSeconds(50 * 60),
+            ),
+        ).body!!
+        assertFailsWith<ResponseStatusException> {
+            scheduleController.update(
+                teacher,
+                lesson.id,
+                ScheduledLessonRequest(
+                    scheduledStart = lesson.scheduledStart,
+                    scheduledEnd = lesson.scheduledEnd,
+                    status = "COMPLETED",
+                ),
+            )
+        }.also { error -> assertEquals(HttpStatus.CONFLICT, error.statusCode) }
+    }
+
+    @Test
+    fun `teacher cannot start a lesson outside the access window`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.now().plus(Duration.ofHours(1)),
+                scheduledEnd = Instant.now().plus(Duration.ofHours(2)),
+            ),
+        ).body!!
+
+        val error = assertFailsWith<ResponseStatusException> { scheduleController.start(teacher, lesson.id) }
+
+        assertEquals(HttpStatus.CONFLICT, error.statusCode)
+        assertEquals("SCHEDULED", lessonRepo.findById(lesson.id).orElseThrow().status)
+        assertNull(lessonRepo.findById(lesson.id).orElseThrow().actualStart)
     }
 
     @Test
@@ -1146,9 +1385,16 @@ class ScheduledLessonControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        listOf(tooEarly, justOpen, stillOpenAfterEnd, tooLate).forEach { lesson -> scheduleController.start(teacher, lesson.id) }
+        assertFailsWith<ResponseStatusException> { scheduleController.start(teacher, tooEarly.id) }
+            .also { error -> assertEquals(HttpStatus.CONFLICT, error.statusCode) }
+        scheduleController.start(teacher, justOpen.id)
+        scheduleController.start(teacher, stillOpenAfterEnd.id)
+        assertFailsWith<ResponseStatusException> { scheduleController.start(teacher, tooLate.id) }
+            .also { error -> assertEquals(HttpStatus.CONFLICT, error.statusCode) }
 
-        assertEquals("lesson-${tooEarly.id}", liveKitRoomController.createToken(teacher, tooEarly.id).roomName)
+        assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(teacher, tooEarly.id)
+        }.also { error -> assertEquals(HttpStatus.CONFLICT, error.statusCode) }
         assertFailsWith<ResponseStatusException> {
             liveKitRoomController.createToken(student, tooEarly.id)
         }.also { error -> assertEquals(HttpStatus.NOT_FOUND, error.statusCode) }
@@ -1169,8 +1415,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
-                scheduledStart = futureStart(60),
-                scheduledEnd = futureEnd(60),
+                scheduledStart = Instant.now().plusSeconds(5 * 60),
+                scheduledEnd = Instant.now().plusSeconds(50 * 60),
                 participantSubjects = listOf("student-1"),
             ),
         ).body!!
@@ -1198,12 +1444,14 @@ class ScheduledLessonControllerTest @Autowired constructor(
             ),
         ).body!!
 
-        val teacherToken = liveKitRoomController.createToken(teacher, lesson.id)
+        val teacherError = assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(teacher, lesson.id)
+        }
         val studentError = assertFailsWith<ResponseStatusException> {
             liveKitRoomController.createToken(student, lesson.id)
         }
 
-        assertEquals("lesson-${lesson.id}", teacherToken.roomName)
+        assertEquals(HttpStatus.CONFLICT, teacherError.statusCode)
         assertEquals(HttpStatus.NOT_FOUND, studentError.statusCode)
     }
 
@@ -1213,8 +1461,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(
-                scheduledStart = Instant.now().plusSeconds(24 * 60 * 60),
-                scheduledEnd = Instant.now().plusSeconds(25 * 60 * 60),
+                scheduledStart = Instant.now().plusSeconds(5 * 60),
+                scheduledEnd = Instant.now().plusSeconds(50 * 60),
             ),
         ).body!!
 
@@ -1352,8 +1600,12 @@ class ScheduledLessonControllerTest @Autowired constructor(
 
 private object RecordingLessonReminderEmailClient : LessonReminderEmailClient {
     val sent = mutableListOf<LessonReminderEmailCommand>()
+    var failFor: String? = null
 
     override fun send(command: LessonReminderEmailCommand) {
+        if (command.to == failFor) {
+            error("simulated email provider failure")
+        }
         sent += command
     }
 }

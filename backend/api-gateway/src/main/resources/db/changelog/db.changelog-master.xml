@@ -21,4 +21,5 @@
     <include file="2026-07-16-001-add-explicit-lesson-material-and-schedule-delegations.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-18-001-add-lesson-translation-permission.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-18-002-create-material-html-game-enrichment.xml" relativeToChangelogFile="true"/>
+    <include file="2026-07-18-003-add-lesson-reschedule-notifications.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

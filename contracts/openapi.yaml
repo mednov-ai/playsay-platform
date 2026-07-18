@@ -2413,6 +2413,46 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeacherDelegationResponse"
+  /schedule/lessons/{lessonId}/schedule:
+    patch:
+      tags:
+      - Schedule
+      summary: Reschedule one scheduled lesson
+      description: Changes the date and time of only the selected lesson occurrence.
+        Requires TEACHER or ADMIN role.
+      operationId: rescheduleScheduledLesson
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledLessonScheduleUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: Scheduled lesson rescheduled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledLessonResponse"
+        "400":
+          description: Invalid scheduled interval
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot manage schedule
+        "404":
+          description: Scheduled lesson not found
+        "409":
+          description: Closed lesson cannot be rescheduled
+      security:
+      - bearerAuth: []
   /materials/{materialId}/assets/{assetId}:
     patch:
       tags:
@@ -5266,6 +5306,18 @@ components:
       - firstName
       - roles
       - username
+    ScheduledLessonScheduleUpdateRequest:
+      type: object
+      properties:
+        scheduledStart:
+          type: string
+          format: date-time
+        scheduledEnd:
+          type: string
+          format: date-time
+      required:
+      - scheduledEnd
+      - scheduledStart
     MaterialAssetUpdateRequest:
       type: object
       properties:

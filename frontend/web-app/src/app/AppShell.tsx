@@ -31,6 +31,7 @@ import {
   type PaymentInvoiceCreated,
   type ScheduledLesson,
   type ScheduledLessonInput,
+  type ScheduledLessonScheduleInput,
   type UpdateUserProfileInput,
 } from "../shared/api/playsay";
 import { BrandMark } from "../shared/ui/BrandMark";
@@ -126,6 +127,7 @@ export type AppShellProps = {
   refreshMaterials: () => Promise<void>;
   refreshPaymentInvoices: () => Promise<void>;
   refreshSchedule: () => Promise<void>;
+  rescheduleScheduledLesson?: (lessonId: string, input: ScheduledLessonScheduleInput) => Promise<ScheduledLesson | null>;
   resetProfile: () => Promise<void>;
   roomLoadingLessonId: string | null;
   roomMessage: string | null;
@@ -213,6 +215,7 @@ export function AppShell(props: AppShellProps) {
     refreshMaterials,
     refreshPaymentInvoices,
     refreshSchedule,
+    rescheduleScheduledLesson = async () => null,
     resetProfile,
     roomLoadingLessonId,
     roomMessage,
@@ -453,6 +456,7 @@ export function AppShell(props: AppShellProps) {
                   onPrepare={openLessonPreparation}
                   onStart={(lesson) => void startScheduledLesson(lesson)}
                   onRefresh={() => void refreshSchedule()}
+                  onReschedule={rescheduleScheduledLesson}
                   profile={profile}
                   roomLoadingLessonId={roomLoadingLessonId}
                   roomMessage={roomMessage}

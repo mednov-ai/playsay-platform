@@ -6,7 +6,9 @@ import {
   deleteScheduledLesson,
   getScheduledLesson,
   listScheduledLessons,
+  rescheduleScheduledLesson as rescheduleScheduledLessonGenerated,
   updateScheduledLesson,
+  type ScheduledLessonScheduleUpdateRequest,
   type ScheduledLessonRequest,
 } from "../../generated/playsay-api";
 import { authConfig, clearTokens } from "./auth";
@@ -75,6 +77,24 @@ export async function editScheduledLesson(
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson update failed with HTTP ${response.status}.`);
+  }
+
+  return response.data;
+}
+
+export async function rescheduleScheduledLesson(
+  lessonId: string,
+  input: ScheduledLessonScheduleUpdateRequest,
+  config = authConfig,
+): Promise<ScheduledLesson> {
+  const response = await rescheduleScheduledLessonGenerated(lessonId, input, await authorizedOptions(config));
+
+  if (response.status === 401) {
+    clearTokens();
+  }
+
+  if (response.status !== 200) {
+    throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson reschedule failed with HTTP ${response.status}.`);
   }
 
   return response.data;

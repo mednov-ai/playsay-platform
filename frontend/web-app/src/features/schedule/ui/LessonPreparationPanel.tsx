@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, BookOpen, CalendarClock, Check, CircleAlert, Copy, Loader2, Play, Users } from "lucide-react";
 import { Button } from "../../../components/ui/button";
-import { formatDateTime } from "../../../entities/schedule/model";
+import { formatDateTime, isJoinableScheduledLesson, isScheduledLessonReadyToStart, lessonAccessOpensAt } from "../../../entities/schedule/model";
 import type { LessonMaterial, ScheduledLesson } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 
@@ -38,6 +38,10 @@ export function LessonPreparationPanel({
   const selectedMaterial = activeMaterials.find((material) => material.id === currentLesson.materialId) ?? null;
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
   const isClosed = currentLesson.status === "COMPLETED" || currentLesson.status === "CANCELLED";
+  const nowMs = Date.now();
+  const joinable = isJoinableScheduledLesson(currentLesson, nowMs);
+  const readyToStart = isScheduledLessonReadyToStart(currentLesson, nowMs);
+  const accessOpensAt = lessonAccessOpensAt(currentLesson);
 
   useEffect(() => setCurrentLesson(lesson), [lesson]);
 
@@ -66,10 +70,18 @@ export function LessonPreparationPanel({
           <h1>{currentLesson.lessonTitle ?? currentLesson.courseTitle ?? t("schedule.lessonFallbackTitle")}</h1>
           <p>{t("schedule.preparation.subtitle")}</p>
         </div>
-        <Button disabled={disabled || isClosed} onClick={() => void onStart(currentLesson)} type="button">
-          {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          {currentLesson.status === "IN_PROGRESS" ? t("schedule.preparation.enterLesson") : t("schedule.preparation.startLesson")}
-        </Button>
+        {readyToStart || joinable ? (
+          <Button disabled={disabled || isClosed} onClick={() => void onStart(currentLesson)} type="button">
+            {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            {joinable ? t("schedule.preparation.enterLesson") : t("schedule.preparation.startLesson")}
+          </Button>
+        ) : (
+          <div className="playsay-schedule-join-note" data-schedule-join-status="early">
+            {accessOpensAt
+              ? t("schedule.preparation.opensAt", { time: formatDateTime(accessOpensAt, translate) })
+              : t("schedule.actions.joinUnavailable")}
+          </div>
+        )}
       </header>
 
       {message ? <div className="playsay-schedule-message">{message}</div> : null}

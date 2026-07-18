@@ -85,6 +85,36 @@ describe("ScheduledLessonCard", () => {
     expect(markup).toContain("Подготовить");
     expect(markup).toContain("Пора начинать");
   });
+
+  it("does not present a future in-progress lesson as live or joinable", () => {
+    const markup = renderToStaticMarkup(
+      <AppProviders>
+        <ScheduledLessonCard
+          canManage
+          disabled={false}
+          lesson={lesson({
+            status: "IN_PROGRESS",
+            scheduledStart: "2026-05-29T10:00:00.000Z",
+            scheduledEnd: "2026-05-29T10:45:00.000Z",
+          })}
+          linkCopied={false}
+          nowMs={Date.parse("2026-05-28T10:00:00.000Z")}
+          onCancel={() => undefined}
+          onComplete={() => undefined}
+          onCopyLink={() => undefined}
+          onDelete={() => undefined}
+          onJoin={() => undefined}
+          onStart={() => undefined}
+          roomLoading={false}
+        />
+      </AppProviders>,
+    );
+
+    expect(markup).toContain("Запланирован");
+    expect(markup).toContain("Подготовить урок");
+    expect(markup).not.toContain("В эфире");
+    expect(markup).not.toContain("Войти в урок");
+  });
 });
 
 function lesson(patch: Partial<ScheduledLesson>): ScheduledLesson {

@@ -21,6 +21,11 @@ data class ScheduledLessonRequest(
     val recurrence: ScheduledLessonRecurrenceRequest? = null,
 )
 
+data class ScheduledLessonScheduleUpdateRequest(
+    val scheduledStart: Instant,
+    val scheduledEnd: Instant,
+)
+
 data class ScheduledLessonMaterialAssignmentRequest(
     val materialId: UUID,
     val participantSubjects: List<String> = emptyList(),

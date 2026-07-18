@@ -10,6 +10,7 @@ import {
   isTeacherLessonActionable,
   isWeeklyRecurrenceValid,
   nextTeacherActionLesson,
+  rescheduleInputFromLocalValues,
   splitScheduleLessonsForDashboard,
   scheduleStateLabel,
   scheduleRecurrenceInput,
@@ -49,6 +50,7 @@ describe("schedule model", () => {
     expect(scheduleStateLabel(lesson({ scheduledStart: "2026-05-28T11:00:00.000Z" }), nowMs, t)).toBe("schedule.state.planned");
     expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-28T10:08:00.000Z", scheduledEnd: "2026-05-28T10:53:00.000Z" }), nowMs, t)).toBe("schedule.state.opensSoon");
     expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-28T09:07:00.000Z", scheduledEnd: "2026-05-28T09:52:00.000Z" }), nowMs, t)).toBe("schedule.state.closingSoon");
+    expect(scheduleStateLabel(lesson({ status: "IN_PROGRESS", scheduledStart: "2026-05-29T10:00:00.000Z", scheduledEnd: "2026-05-29T10:45:00.000Z" }), nowMs, t)).toBe("schedule.state.planned");
   });
 
   it("opens live lesson access only from ten minutes before start until ten minutes after end", () => {
@@ -101,6 +103,7 @@ describe("schedule model", () => {
     expect(isTeacherLessonActionable(ready, nowMs)).toBe(true);
     expect(isTeacherLessonActionable(stillRecoverable, nowMs)).toBe(true);
     expect(isTeacherLessonActionable(lesson({ ...ready, status: "IN_PROGRESS" }), nowMs)).toBe(true);
+    expect(isTeacherLessonActionable(lesson({ ...tooEarly, status: "IN_PROGRESS" }), nowMs)).toBe(false);
     expect(isTeacherLessonActionable(lesson({ ...ready, status: "COMPLETED" }), nowMs)).toBe(false);
   });
 
@@ -160,6 +163,14 @@ describe("schedule model", () => {
     expect(formatParticipantCount(3, t)).toBe("schedule.participants.count:3");
     expect(formatParticipantCount(8, t)).toBe("schedule.participants.count:8");
     expect(selectedParticipantSubjects(" one, two ,, three ")).toEqual(["one", "two", "three"]);
+  });
+
+  it("builds reschedule ISO timestamps from local date, time, and duration", () => {
+    const result = rescheduleInputFromLocalValues("2026-07-19", "10:00", "45");
+
+    expect(result?.scheduledStart).toBe(new Date("2026-07-19T10:00:00").toISOString());
+    expect(result?.scheduledEnd).toBe(new Date("2026-07-19T10:45:00").toISOString());
+    expect(rescheduleInputFromLocalValues("", "10:00", "45")).toBeNull();
   });
 
   it("builds weekly recurrence payload for scheduled lesson create", () => {

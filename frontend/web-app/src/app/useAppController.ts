@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { workspaceTabsForProfile } from "../entities/workspace/model";
-import { compareJoinableLessons, isJoinableScheduledLesson } from "../entities/schedule/model";
+import { compareJoinableLessons, isArchivedScheduleLesson, isJoinableScheduledLesson } from "../entities/schedule/model";
 import {
   ApiError,
   buildLogoutUrl,
@@ -284,6 +284,7 @@ export function useAppController(): AppShellProps {
     joinScheduledLesson,
     leaveScheduledLessonRoom,
     refreshSchedule,
+    rescheduleScheduledLesson,
     startScheduledLesson,
   } = useScheduleActions({
     applySessionError,
@@ -335,11 +336,13 @@ export function useAppController(): AppShellProps {
       return;
     }
 
-    if (!routeLesson || (!canManagePeople && !isJoinableScheduledLesson(routeLesson, nowMs))) {
-      setRoomMessage(t("schedule.messages.alreadyClosed"));
+    if (!routeLesson || !canAccessClassroomPreJoin(routeLesson, profile, nowMs)) {
+      setRoomMessage(routeLesson && !isArchivedScheduleLesson(routeLesson, nowMs)
+        ? t("schedule.messages.entryNotOpen")
+        : t("schedule.messages.alreadyClosed"));
       navigateToPath("/");
     }
-  }, [canManagePeople, nowMs, routeLesson, routeLessonId, roomLoadingLessonId, roomSession, status, t]);
+  }, [nowMs, profile, routeLesson, routeLessonId, roomLoadingLessonId, roomSession, status, t]);
 
   function openLessonPreparation(lessonId: string) {
     navigateToPath(lessonPreparationPath(lessonId));
@@ -475,6 +478,7 @@ export function useAppController(): AppShellProps {
     refreshMaterials,
     refreshPaymentInvoices,
     refreshSchedule,
+    rescheduleScheduledLesson,
     resetProfile,
     roomLoadingLessonId,
     roomMessage,
@@ -505,8 +509,8 @@ export function useAppController(): AppShellProps {
 }
 
 function canAccessClassroomPreJoin(lesson: ScheduledLesson, profile: MeProfile | null, nowMs: number): boolean {
-  const canManagePeople = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
-  return canManagePeople || isJoinableScheduledLesson(lesson, nowMs);
+  const isAuthenticatedClassroomRole = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN" || role === "STUDENT") ?? false;
+  return isAuthenticatedClassroomRole && isJoinableScheduledLesson(lesson, nowMs);
 }
 
 function userProfileInputWithLanguage(profile: AppUserProfile, language: SupportedLanguage): UpdateUserProfileInput {

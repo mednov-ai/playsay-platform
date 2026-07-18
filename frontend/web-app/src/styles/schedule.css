@@ -253,6 +253,86 @@
   box-shadow: 0 2rem 6rem rgb(17 17 17 / 0.24);
 }
 
+.playsay-reschedule-dialog {
+  display: grid;
+  width: min(100%, 40rem);
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.5rem;
+  background: hsl(var(--background));
+  box-shadow: 0 2rem 6rem rgb(17 17 17 / 0.24);
+}
+
+.playsay-reschedule-body {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.playsay-reschedule-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.8fr;
+  gap: 0.75rem;
+}
+
+.playsay-reschedule-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.playsay-reschedule-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.playsay-reschedule-presets button {
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 0.45rem 0.75rem;
+}
+
+.playsay-reschedule-presets button[data-selected="true"] {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
+}
+
+.playsay-reschedule-note {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  background: hsl(var(--muted) / 0.55);
+  padding: 0.85rem;
+}
+
+.playsay-reschedule-note span,
+.playsay-reschedule-email-note,
+.playsay-reschedule-series-note {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.playsay-reschedule-email-note,
+.playsay-reschedule-series-note {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .playsay-reschedule-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .playsay-schedule-wizard-head,
 .playsay-schedule-wizard-footer {
   display: flex;

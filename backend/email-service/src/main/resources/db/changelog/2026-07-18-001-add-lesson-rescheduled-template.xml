@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-18-001-add-lesson-rescheduled-template" author="codex">
+        <sql><![CDATA[
+INSERT INTO email_templates (id, template_key, locale, subject_template, text_template, html_template, version, enabled, created_at, updated_at) VALUES
+('10000000-0000-0000-0000-000000000401', 'lesson-rescheduled', 'ru', 'Урок Play&Say перенесён',
+'Здравствуйте, ${displayName!"ученик Play&Say"}!
+
+Урок "${lessonTitle!"Play&Say"}" перенесён.
+Было: ${previousStartsAt!"время не указано"} — ${previousEndsAt!"время не указано"}
+Стало: ${startsAt!"время не указано"} — ${endsAt!"время не указано"}
+Преподаватель: ${teacherName!"Play&Say"}
+
+Открыть урок:
+${lessonUrl}',
+'<p>Здравствуйте, ${displayName!"ученик Play&Say"}!</p><p>Урок <strong>${lessonTitle!"Play&Say"}</strong> перенесён.</p><p>Было: ${previousStartsAt!"время не указано"} — ${previousEndsAt!"время не указано"}<br/>Стало: ${startsAt!"время не указано"} — ${endsAt!"время не указано"}<br/>Преподаватель: ${teacherName!"Play&Say"}</p><p><a href="${lessonUrl}">Открыть урок</a></p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000402', 'lesson-rescheduled', 'en', 'Your Play&Say lesson has been rescheduled',
+'Hello, ${displayName!"Play&Say learner"}!
+
+The lesson "${lessonTitle!"Play&Say lesson"}" has been rescheduled.
+Previous time: ${previousStartsAt!"not specified"} — ${previousEndsAt!"not specified"}
+New time: ${startsAt!"not specified"} — ${endsAt!"not specified"}
+Teacher: ${teacherName!"Play&Say"}
+
+Open the lesson:
+${lessonUrl}',
+'<p>Hello, ${displayName!"Play&Say learner"}!</p><p>The lesson <strong>${lessonTitle!"Play&Say lesson"}</strong> has been rescheduled.</p><p>Previous time: ${previousStartsAt!"not specified"} — ${previousEndsAt!"not specified"}<br/>New time: ${startsAt!"not specified"} — ${endsAt!"not specified"}<br/>Teacher: ${teacherName!"Play&Say"}</p><p><a href="${lessonUrl}">Open the lesson</a></p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000403', 'lesson-rescheduled', 'de', 'Ihre Play&Say Stunde wurde verschoben',
+'Hallo, ${displayName!"Play&Say Lernende/r"}!
+
+Die Stunde "${lessonTitle!"Play&Say Stunde"}" wurde verschoben.
+Bisher: ${previousStartsAt!"nicht angegeben"} — ${previousEndsAt!"nicht angegeben"}
+Neu: ${startsAt!"nicht angegeben"} — ${endsAt!"nicht angegeben"}
+Lehrkraft: ${teacherName!"Play&Say"}
+
+Stunde öffnen:
+${lessonUrl}',
+'<p>Hallo, ${displayName!"Play&Say Lernende/r"}!</p><p>Die Stunde <strong>${lessonTitle!"Play&Say Stunde"}</strong> wurde verschoben.</p><p>Bisher: ${previousStartsAt!"nicht angegeben"} — ${previousEndsAt!"nicht angegeben"}<br/>Neu: ${startsAt!"nicht angegeben"} — ${endsAt!"nicht angegeben"}<br/>Lehrkraft: ${teacherName!"Play&Say"}</p><p><a href="${lessonUrl}">Stunde öffnen</a></p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000404', 'lesson-rescheduled', 'fr', 'Votre cours Play&Say a été reporté',
+'Bonjour, ${displayName!"apprenant Play&Say"} !
+
+Le cours "${lessonTitle!"cours Play&Say"}" a été reporté.
+Ancien horaire : ${previousStartsAt!"non indiqué"} — ${previousEndsAt!"non indiqué"}
+Nouvel horaire : ${startsAt!"non indiqué"} — ${endsAt!"non indiqué"}
+Enseignant : ${teacherName!"Play&Say"}
+
+Ouvrir le cours :
+${lessonUrl}',
+'<p>Bonjour, ${displayName!"apprenant Play&Say"} !</p><p>Le cours <strong>${lessonTitle!"cours Play&Say"}</strong> a été reporté.</p><p>Ancien horaire : ${previousStartsAt!"non indiqué"} — ${previousEndsAt!"non indiqué"}<br/>Nouvel horaire : ${startsAt!"non indiqué"} — ${endsAt!"non indiqué"}<br/>Enseignant : ${teacherName!"Play&Say"}</p><p><a href="${lessonUrl}">Ouvrir le cours</a></p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

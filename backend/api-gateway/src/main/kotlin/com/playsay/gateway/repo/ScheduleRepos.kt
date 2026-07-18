@@ -525,7 +525,7 @@ interface LessonParticipantRepo : JpaRepository<LessonParticipantEntity, UUID> {
 }
 
 interface LessonEmailReminderRepo : JpaRepository<LessonEmailReminderEntity, UUID> {
-    fun deleteByLessonIdAndStatusIn(lessonId: UUID, statuses: Collection<String>): Long
+    fun deleteByLessonIdAndReminderTypeAndStatusIn(lessonId: UUID, reminderType: String, statuses: Collection<String>): Long
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from LessonEmailReminderEntity r where r.lessonId = :lessonId")
@@ -534,6 +534,12 @@ interface LessonEmailReminderRepo : JpaRepository<LessonEmailReminderEntity, UUI
     fun existsByIdempotencyKey(idempotencyKey: String): Boolean
 
     fun findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lessonId: UUID): List<LessonEmailReminderEntity>
+
+    fun findByLessonIdAndReminderTypeAndStatusIn(
+        lessonId: UUID,
+        reminderType: String,
+        statuses: Collection<String>,
+    ): List<LessonEmailReminderEntity>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(

@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -35,6 +36,7 @@ import com.playsay.gateway.service.*
 class ScheduledLessonController(
     private val store: ScheduledLessonStore,
     private val lifecycleService: ScheduledLessonLifecycleService,
+    private val rescheduleService: ScheduledLessonRescheduleService,
 ) {
     @GetMapping("/schedule/lessons", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
@@ -123,6 +125,34 @@ class ScheduledLessonController(
         @RequestBody request: ScheduledLessonRequest,
     ): ScheduledLessonResponse =
         store.update(authentication, lessonId, request)
+
+    @PatchMapping(
+        "/schedule/lessons/{lessonId}/schedule",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "rescheduleScheduledLesson",
+        summary = "Reschedule one scheduled lesson",
+        description = "Changes the date and time of only the selected lesson occurrence. Requires TEACHER or ADMIN role.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Scheduled lesson rescheduled"),
+            ApiResponse(responseCode = "400", description = "Invalid scheduled interval", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot manage schedule", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Scheduled lesson not found", content = [Content()]),
+            ApiResponse(responseCode = "409", description = "Closed lesson cannot be rescheduled", content = [Content()]),
+        ],
+    )
+    fun reschedule(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @RequestBody request: ScheduledLessonScheduleUpdateRequest,
+    ): ScheduledLessonResponse =
+        rescheduleService.reschedule(authentication, lessonId, request)
 
     @DeleteMapping("/schedule/lessons/{lessonId}")
     @Operation(

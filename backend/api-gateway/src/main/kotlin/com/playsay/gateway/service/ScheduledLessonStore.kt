@@ -1,21 +1,10 @@
 package com.playsay.gateway.service
 
-import com.playsay.gateway.dto.ScheduledLessonParticipantLinksResponse
-import com.playsay.gateway.dto.ScheduledLessonRequest
-import com.playsay.gateway.dto.ScheduledLessonResponse
-import com.playsay.gateway.entity.LessonEntity
-import com.playsay.gateway.entity.LessonParticipantEntity
+import com.playsay.gateway.dto.*
+import com.playsay.gateway.entity.*
 import com.playsay.gateway.error.ProjectResponseException
-import com.playsay.gateway.realtime.LessonChangedEvent
-import com.playsay.gateway.realtime.LessonDeletedEvent
-import com.playsay.gateway.repo.AppUserRepo
-import com.playsay.gateway.repo.LessonEmailReminderRepo
-import com.playsay.gateway.repo.LessonMaterialRepo
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonParticipantRow
-import com.playsay.gateway.repo.LessonRepo
-import com.playsay.gateway.repo.LessonTemplateRepo
-import com.playsay.gateway.repo.ScheduledLessonRow
+import com.playsay.gateway.realtime.*
+import com.playsay.gateway.repo.*
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant
 import java.util.UUID
@@ -65,6 +54,7 @@ class ScheduledLessonStore(
         authentication.requireScheduleManager()
         val teacherUserId = userProfileStore.currentUserId(authentication)
         val values = request.validated()
+        requireCreateStatus(values.status)
         validateLessonTemplate(values.lessonTemplateId)
         validateMaterialId(authentication, values.materialId)
         values.participantAssignments.forEach { assignment -> validateMaterialId(authentication, assignment.materialId) }
@@ -145,6 +135,7 @@ class ScheduledLessonStore(
         requireLessonManagement(authentication, lessonId)
         val actorUserId = userProfileStore.currentUserId(authentication)
         val values = request.validated(allowRecurrence = false)
+        requireUpdateStatus(lesson.status, values.status)
         validateLessonTemplate(values.lessonTemplateId)
         validateMaterialId(authentication, values.materialId)
         values.participantAssignments.forEach { assignment -> validateMaterialId(authentication, assignment.materialId) }
@@ -434,4 +425,19 @@ class ScheduledLessonStore(
         }
     }
 
+    private fun requireCreateStatus(status: String) {
+        if (status != MetaData.LessonStatuses.SCHEDULED) {
+            throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_INVALID_STATUS_TRANSITION)
+        }
+    }
+
+    private fun requireUpdateStatus(currentStatus: String, requestedStatus: String) {
+        val allowed = requestedStatus == currentStatus ||
+            (requestedStatus == MetaData.LessonStatuses.CANCELLED && currentStatus !in closedScheduleStatuses)
+        if (!allowed) {
+            throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_INVALID_STATUS_TRANSITION)
+        }
+    }
+
 }
+private val closedScheduleStatuses = setOf(MetaData.LessonStatuses.COMPLETED, MetaData.LessonStatuses.CANCELLED)

@@ -1,4 +1,4 @@
-import { BookOpen, CheckCircle2, Copy, EllipsisVertical, Loader2, Play, RotateCcw, Trash2, Video } from "lucide-react";
+import { BookOpen, CalendarClock, CheckCircle2, Copy, EllipsisVertical, Loader2, Play, RotateCcw, Trash2, Video } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   formatDateTime,
@@ -24,6 +24,7 @@ export function ScheduledLessonCard({
   onJoin,
   onStart,
   onPrepare = () => undefined,
+  onReschedule = () => undefined,
   roomLoading,
 }: {
   canManage: boolean;
@@ -38,6 +39,7 @@ export function ScheduledLessonCard({
   onJoin: () => void;
   onStart: () => void;
   onPrepare?: () => void;
+  onReschedule?: () => void;
   roomLoading: boolean;
 }) {
   const { t } = useAppTranslation();
@@ -45,7 +47,7 @@ export function ScheduledLessonCard({
   const joinable = isJoinableScheduledLesson(lesson, nowMs);
   const archived = isArchivedScheduleLesson(lesson, nowMs);
   const readyToStart = canManage && isScheduledLessonReadyToStart(lesson, nowMs);
-  const teacherLessonLive = canManage && !archived && lesson.status === "IN_PROGRESS";
+  const teacherLessonLive = canManage && joinable;
   const stateLabel = scheduleStateLabel(lesson, nowMs, translate);
 
   return (
@@ -113,7 +115,7 @@ export function ScheduledLessonCard({
                 {t("schedule.actions.prepareShort")}
               </Button>
             </>
-          ) : canManage && !archived && lesson.status !== "IN_PROGRESS" ? (
+          ) : canManage && !archived && !teacherLessonLive ? (
             <Button disabled={disabled} onClick={onPrepare} type="button">
               <BookOpen className="h-4 w-4" />
               {t("schedule.actions.prepare")}
@@ -143,6 +145,7 @@ export function ScheduledLessonCard({
               <summary aria-label={t("schedule.actions.more")}><EllipsisVertical className="h-4 w-4" /></summary>
               <div>
                 <button disabled={disabled} onClick={onCopyLink} type="button"><Copy />{linkCopied ? t("schedule.clipboard.copied") : t("schedule.actions.copyLinks")}</button>
+                {!archived ? <button disabled={disabled} onClick={onReschedule} type="button"><CalendarClock />{t("schedule.actions.reschedule")}</button> : null}
                 {!archived ? <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.complete")) && onComplete()} type="button"><CheckCircle2 />{t("schedule.actions.complete")}</button> : null}
                 {!archived ? <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.cancel")) && onCancel()} type="button"><RotateCcw />{t("schedule.actions.cancel")}</button> : null}
                 <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.delete")) && onDelete()} type="button"><Trash2 />{t("schedule.actions.delete")}</button>

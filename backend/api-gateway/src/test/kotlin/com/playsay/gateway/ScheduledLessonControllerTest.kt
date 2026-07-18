@@ -698,7 +698,10 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val notifications = lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
             .filter { it.reminderType == "LESSON_RESCHEDULED" }
         assertEquals(setOf("FAILED", "SKIPPED"), notifications.map { it.status }.toSet())
-        assertEquals(movedStart, lessonRepo.findById(lesson.id).orElseThrow().scheduledStart)
+        assertEquals(
+            movedStart.truncatedTo(ChronoUnit.MICROS),
+            lessonRepo.findById(lesson.id).orElseThrow().scheduledStart?.truncatedTo(ChronoUnit.MICROS),
+        )
     }
 
     @Test

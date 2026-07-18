@@ -560,6 +560,7 @@ async function createCompletedLesson(token, materialId, participantSubjects) {
     participantSubjects,
     scheduledEnd: new Date(now - 5 * 60 * 1000).toISOString(),
     scheduledStart: new Date(now - 65 * 60 * 1000).toISOString(),
+    status: "SCHEDULED",
     type: "GROUP",
   });
   await apiRequest(token, "POST", `/schedule/lessons/${lesson.id}/start`, 200);

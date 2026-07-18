@@ -502,6 +502,7 @@ async function createSmokeLesson(token, materialId, participantSubjects) {
     participantSubjects,
     scheduledEnd: new Date(now + 75 * 60 * 1000).toISOString(),
     scheduledStart: new Date(now - 5 * 60 * 1000).toISOString(),
+    status: "SCHEDULED",
     type: "GROUP",
     workMode: "SHARED",
   });

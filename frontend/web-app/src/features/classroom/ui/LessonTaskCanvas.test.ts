@@ -350,6 +350,7 @@ describe("LessonTaskCanvas", () => {
       teacherName: "Teacher Demo",
     }));
     const layer = await annotationLayer(container);
+    expect(layer.querySelectorAll("path")).toHaveLength(0);
 
     fireEvent.click(container.querySelectorAll<HTMLButtonElement>(".playsay-line-width")[2]!);
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-pen']")!);

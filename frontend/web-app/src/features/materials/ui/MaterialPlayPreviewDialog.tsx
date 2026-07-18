@@ -4,11 +4,15 @@ import type { LessonMaterial } from "../../../shared/api/playsay";
 import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
 import {
+  editorDocumentFromJson,
   materialLiveScore,
+  materialPageAcceptsAnswers,
   type MaterialAnswerBlock,
   type MaterialAnswerState,
 } from "../model/materialDocument";
 import { LessonMaterialDocumentView } from "./LessonMaterialDocumentView";
+
+type MaterialPreviewPresentationMode = "default" | "html-game-focus" | "image-focus";
 
 export function MaterialPlayPreviewDialog({
   material,
@@ -21,6 +25,9 @@ export function MaterialPlayPreviewDialog({
 }) {
   const { t } = useAppTranslation();
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
+  const [presentationMode, setPresentationMode] = useState<MaterialPreviewPresentationMode>("default");
+  const document = editorDocumentFromJson(material.document, material.title);
+  const hasAnswerableBlocks = document.pages.some(materialPageAcceptsAnswers);
 
   useEffect(() => {
     if (!open) {
@@ -41,6 +48,7 @@ export function MaterialPlayPreviewDialog({
   useEffect(() => {
     if (open) {
       setAnswers({});
+      setPresentationMode("default");
     }
   }, [material.id, open]);
 
@@ -62,7 +70,7 @@ export function MaterialPlayPreviewDialog({
       className="playsay-material-play-backdrop"
       role="dialog"
     >
-      <div className="playsay-material-play-dialog">
+      <div className="playsay-material-play-dialog" data-presentation-mode={presentationMode}>
         <div className="playsay-material-play-toolbar">
           <div className="min-w-0">
             <div className="text-xs font-black uppercase text-primary">{t("materials.playPreview.eyebrow")}</div>
@@ -72,10 +80,12 @@ export function MaterialPlayPreviewDialog({
             </div>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            <Button onClick={() => setAnswers({})} type="button" variant="outline">
-              <RotateCcw className="h-4 w-4" />
-              {t("materials.playPreview.reset")}
-            </Button>
+            {hasAnswerableBlocks ? (
+              <Button data-testid="material-preview-reset" onClick={() => setAnswers({})} type="button" variant="outline">
+                <RotateCcw className="h-4 w-4" />
+                {t("materials.playPreview.reset")}
+              </Button>
+            ) : null}
             <Button onClick={onClose} type="button" variant="outline">
               <X className="h-4 w-4" />
               {t("materials.playPreview.close")}
@@ -89,6 +99,7 @@ export function MaterialPlayPreviewDialog({
             material={material}
             mode="classroom"
             onAnswerChange={updateAnswer}
+            onPresentationModeChange={setPresentationMode}
             score={materialLiveScore(material, answers)}
           />
         </div>

@@ -706,6 +706,26 @@
   padding: clamp(0.85rem, 1.6vw, 1.25rem);
 }
 
+.playsay-material-play-dialog[data-presentation-mode="html-game-focus"] .playsay-material-play-surface {
+  overflow: hidden;
+  padding: 0;
+}
+
+.playsay-material-play-dialog[data-presentation-mode="html-game-focus"] .playsay-rendered-material {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  margin: 0;
+}
+
+.playsay-material-play-dialog[data-presentation-mode="html-game-focus"] .playsay-material-focus-stack,
+.playsay-material-play-dialog[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"],
+.playsay-material-play-dialog[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"] .playsay-html-game,
+.playsay-material-play-dialog[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"] iframe {
+  min-height: 0;
+  height: 100%;
+}
+
 .playsay-material-preview .playsay-rendered-material h3 {
   margin: 0.75rem 0 0;
   color: #77b84e;

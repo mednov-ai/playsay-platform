@@ -676,7 +676,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
             user.email = null
             appUserRepo.saveAndFlush(user)
         }
-        val originalStart = futureStart(120)
+        val originalStart = futureStart(120).truncatedTo(ChronoUnit.MICROS)
         val lesson = scheduleController.create(
             teacher,
             ScheduledLessonRequest(

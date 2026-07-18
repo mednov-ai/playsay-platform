@@ -1,3 +1,5 @@
+import { i18n } from "../i18n";
+
 type ProjectErrorBody = {
   status?: number;
   errorCode?: string;
@@ -15,7 +17,8 @@ export class ApiError extends Error {
   }
 }
 
-export function apiErrorFromData(status: number, data: unknown, fallbackMessage: string): ApiError {
+export function apiErrorFromData(status: number, data: unknown, _fallbackMessage?: string): ApiError {
+  const fallbackMessage = i18n.t("errors.requestFailed", { status });
   if (isProjectErrorBody(data)) {
     return new ApiError(
       status,
@@ -33,6 +36,18 @@ export async function apiErrorFromResponse(response: Response, fallbackMessage: 
   return apiErrorFromData(response.status, data, fallbackMessage);
 }
 
+export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    throw new ApiError(0, "NETWORK_ERROR", i18n.t("errors.network"));
+  }
+}
+
+export function notAuthenticatedError(): ApiError {
+  return new ApiError(401, "NOT_AUTHENTICATED", i18n.t("errors.notAuthenticated"));
+}
+
 export function isApiStatus(caught: unknown, status: number): boolean {
   if (caught instanceof ApiError) {
     return caught.status === status;
@@ -42,7 +57,7 @@ export function isApiStatus(caught: unknown, status: number): boolean {
 }
 
 function isProjectErrorBody(value: unknown): value is ProjectErrorBody {
-  return typeof value === "object" && value !== null && "message" in value;
+  return typeof value === "object" && value !== null && ("message" in value || "errorCode" in value);
 }
 
 function safeJsonParse(value: string): unknown {

@@ -11,8 +11,11 @@ import java.time.Instant
 @Entity
 @Table(name = "keyboard_technique_advice_cache")
 class TechniqueAdviceCacheEntity(
-    @Column(name = "fingerprint", nullable = false, length = 512, unique = true)
+    @Column(name = "fingerprint", nullable = false, length = 512)
     var fingerprint: String,
+
+    @Column(name = "locale", nullable = false, length = 2)
+    var locale: String = "ru",
 
     @Column(name = "training_result_id")
     var trainingResultId: Long? = null,

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import java.util.Locale
 
 @RestController
 @RequestMapping("/api/anonymous")
@@ -47,6 +48,7 @@ class AnonymousController(
     fun submit(
         @Valid @RequestBody request: SubmitAnonymousResultRequest,
         servletRequest: HttpServletRequest,
+        locale: Locale = Locale.forLanguageTag("ru"),
     ): SubmitTrainingResultResponse =
-        trainingService.submitAnonymous(request, servletRequest)
+        trainingService.submitAnonymous(request, servletRequest, locale)
 }

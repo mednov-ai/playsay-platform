@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import java.util.Locale
 
 @RestController
 @RequestMapping("/api/training")
@@ -26,8 +27,9 @@ class TrainingController(
     fun submit(
         authentication: JwtAuthenticationToken,
         @Valid @RequestBody request: SubmitResultRequest,
+        locale: Locale = Locale.forLanguageTag("ru"),
     ): SubmitTrainingResultResponse =
-        trainingService.submit(authentication.token.subject, request)
+        trainingService.submit(authentication.token.subject, request, locale)
 
     @GetMapping("/progress")
     fun progress(authentication: JwtAuthenticationToken): ProgressResponse =

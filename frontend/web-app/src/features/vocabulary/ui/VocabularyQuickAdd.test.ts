@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { createElement } from "react";
+import { fireEvent, render } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { TranslationSuggestion } from "../../../shared/api/playsay";
-import { normalizedVariants } from "./VocabularyQuickAdd";
+import { normalizedVariants, VocabularyQuickAdd } from "./VocabularyQuickAdd";
+
+vi.mock("../../../shared/i18n", () => ({
+  useAppTranslation: () => ({ t: (key: string) => key }),
+}));
 
 describe("normalizedVariants", () => {
   it("keeps all translation and usage variants returned by the current API", () => {
@@ -27,5 +34,19 @@ describe("normalizedVariants", () => {
       example: "Read a book.",
       exampleTranslation: "Прочитай книгу.",
     }]);
+  });
+});
+
+describe("VocabularyQuickAdd accessibility", () => {
+  it("uses existing localized keys for the dialog and close action names", () => {
+    const { getByRole } = render(createElement(VocabularyQuickAdd, {
+      children: createElement("span", null, "Selection"),
+      source: { sourceType: "MANUAL" },
+    }));
+
+    fireEvent.click(getByRole("button", { name: "vocabulary.actions.add" }));
+
+    expect(getByRole("dialog", { name: "vocabulary.quickAdd.title" })).toBeTruthy();
+    expect(getByRole("button", { name: "common.actions.close" })).toBeTruthy();
   });
 });

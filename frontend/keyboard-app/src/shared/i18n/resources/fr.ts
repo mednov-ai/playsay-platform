@@ -105,7 +105,7 @@ export const fr: TranslationResource = {
     nextRepeat: "Répéter : stabiliser le rythme",
     signInForProgress: "Connectez-vous pour sauvegarder",
     countdown: "Compte à rebours",
-    countdownReady: "Round",
+    countdownReady: "Manche",
     countdownFight: "Go",
     countdownShortcut: "Espace démarre maintenant",
     resultStats: "Résultat",
@@ -245,6 +245,11 @@ export const fr: TranslationResource = {
     control: "Ctrl",
     alt: "Alt",
     space: "Espace",
+  },
+  errors: {
+    notAuthenticated: "Connectez-vous pour continuer.",
+    network: "Impossible de joindre le serveur. Vérifiez la connexion et réessayez.",
+    requestFailed: "La requête a échoué (code {{status}}).",
   },
   finger: {
     leftPinky: "Auriculaire gauche",

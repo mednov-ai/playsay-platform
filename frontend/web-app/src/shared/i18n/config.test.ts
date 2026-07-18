@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { i18nStorageKey } from "./languages";
+import { resources } from "./resources";
 
 describe("i18n config", () => {
   afterEach(() => {
@@ -23,6 +24,10 @@ describe("i18n config", () => {
 
     expect(document.documentElement.lang).toBe("fr");
     expect(localStorage.getItem(i18nStorageKey)).toBe("fr");
+  });
+
+  it("does not leave English labels in the German theme control", () => {
+    expect(resources.de.translation.shell.theme.toggleAria).toBe("Darstellung: {{theme}}");
   });
 });
 

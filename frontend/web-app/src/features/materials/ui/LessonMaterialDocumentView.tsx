@@ -297,41 +297,6 @@ export function LessonMaterialDocumentView({
   );
 }
 
-export function FallbackLessonDocument() {
-  return (
-    <>
-      <div className="playsay-task-kicker">
-        <FileText className="h-4 w-4 text-primary" />
-        2. Let's chat
-      </div>
-      <h3>Make a guess and complete the descriptions below the pictures</h3>
-      <p className="playsay-task-subtitle">The importance of food for travellers</p>
-
-      <div className="playsay-task-cards">
-        <TaskPictureCard caption="Travellers who think food is important" tone="mint" />
-        <TaskPictureCard caption="Travellers who think food is not important" tone="yellow" />
-      </div>
-
-      <div className="playsay-fill-exercise">
-        <label>
-          I am in the
-          <input aria-label="gap 1" defaultValue="" />
-        </label>
-        <label>
-          I see a lot of
-          <input aria-label="gap 2" defaultValue="" />
-          around.
-        </label>
-        <label>
-          I feel
-          <input aria-label="gap 3" defaultValue="" />
-          because the trip is exciting.
-        </label>
-      </div>
-    </>
-  );
-}
-
 export function AssignmentStub({
   active = false,
   tag,
@@ -348,27 +313,6 @@ export function AssignmentStub({
         {tag}
       </div>
     </article>
-  );
-}
-
-function TaskPictureCard({
-  caption,
-  tone,
-}: {
-  caption: string;
-  tone: "mint" | "yellow";
-}) {
-  const toneClass = tone === "mint" ? "playsay-picture-card-mint" : "playsay-picture-card-yellow";
-
-  return (
-    <figure className={`playsay-picture-card ${toneClass}`}>
-      <div className="playsay-picture-illustration">
-        <div className="playsay-picture-face" />
-        <div className="playsay-picture-plate" />
-        <div className="playsay-picture-tower" />
-      </div>
-      <figcaption>{caption}</figcaption>
-    </figure>
   );
 }
 

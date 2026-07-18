@@ -731,7 +731,7 @@ export const ru = {
       duplicate: "Дублировать",
       generate: "Сгенерировать",
       generateWithCount: "Сгенерировать ({{count}})",
-      play: "Play",
+      play: "Запустить",
       preview: "Просмотр",
       save: "Сохранить",
     },
@@ -1270,6 +1270,7 @@ export const ru = {
       pickerEmpty: "Материал не выбран",
       assignedAria: "Назначенные задания",
       unassignedTitle: "Материал не назначен",
+      unassignedBody: "Преподаватель может назначить материал при подготовке или прямо во время занятия.",
       loading: "Материал загружается",
       selectForLesson: "Выберите материал для урока",
     },
@@ -1516,5 +1517,8 @@ export const ru = {
   errors: {
     authFailed: "Ошибка авторизации.",
     sessionExpired: "Сессия истекла, войдите снова",
+    notAuthenticated: "Войдите, чтобы продолжить.",
+    network: "Не удалось связаться с сервером. Проверьте подключение и попробуйте снова.",
+    requestFailed: "Не удалось выполнить запрос (код {{status}}).",
   },
 } as const;

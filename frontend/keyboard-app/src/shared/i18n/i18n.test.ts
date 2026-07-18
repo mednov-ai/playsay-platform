@@ -15,4 +15,9 @@ describe("keyboard i18n resources", () => {
 
     expect(i18n.t("units.errors")).toBe("раз");
   });
+
+  it("uses the French trainer term for a countdown round", () => {
+    expect(resources.fr.translation.trainer.countdownReady).toContain("Manche");
+    expect(resources.fr.translation.trainer.countdownReady).not.toContain("Round");
+  });
 });

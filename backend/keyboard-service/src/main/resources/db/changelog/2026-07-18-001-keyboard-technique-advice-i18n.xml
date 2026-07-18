@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-18-001-localize-keyboard-technique-advice-cache" author="codex">
+        <addColumn tableName="keyboard_technique_advice_cache">
+            <column name="locale" type="VARCHAR(2)" defaultValue="ru">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <dropUniqueConstraint
+            tableName="keyboard_technique_advice_cache"
+            constraintName="uk_keyboard_technique_advice_cache_fingerprint"/>
+        <addUniqueConstraint
+            tableName="keyboard_technique_advice_cache"
+            columnNames="fingerprint, locale"
+            constraintName="uk_keyboard_technique_advice_cache_fingerprint_locale"/>
+    </changeSet>
+</databaseChangeLog>

@@ -1,5 +1,5 @@
 import { normalizeLanguage, rememberPendingLoginLanguage } from "../i18n";
-import { apiErrorFromResponse } from "./errors";
+import { apiErrorFromResponse, apiFetch } from "./errors";
 import { currentApiLanguage } from "./locale";
 
 export type AuthConfig = {
@@ -202,7 +202,7 @@ export async function getValidAccessToken(config = authConfig): Promise<string |
     return null;
   }
 
-  const response = await fetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
+  const response = await apiFetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -306,7 +306,7 @@ async function exchangeLoginCode(config: AuthConfig, code: string, state: string
     throw new Error("Auth callback state is invalid.");
   }
 
-  const response = await fetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
+  const response = await apiFetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({

@@ -244,6 +244,11 @@ export const ru = {
     alt: "Alt",
     space: "Space",
   },
+  errors: {
+    notAuthenticated: "Войдите, чтобы продолжить.",
+    network: "Не удалось связаться с сервером. Проверьте подключение и попробуйте снова.",
+    requestFailed: "Не удалось выполнить запрос (код {{status}}).",
+  },
   finger: {
     leftPinky: "Левый мизинец",
     leftRing: "Левый безымянный",

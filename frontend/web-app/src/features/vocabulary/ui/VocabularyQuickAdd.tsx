@@ -140,7 +140,7 @@ export function VocabularyQuickAdd({ children, recipientSubjects = [], source }:
     <Button className="mt-2" onClick={() => setOpen(true)} type="button" variant="outline"><BookPlus className="h-4 w-4" />{t("vocabulary.actions.add")}</Button>
     {open ? <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-black/40 p-4" role="dialog" aria-label={t("vocabulary.quickAdd.title")} aria-modal="true">
       <div className="my-auto w-full max-w-xl rounded-2xl border border-border bg-background p-5 shadow-xl">
-        <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-extrabold">{t("vocabulary.quickAdd.title")}</h2><Button aria-label={t("common.close")} onClick={close} type="button" variant="outline"><X className="h-4 w-4" /></Button></div>
+        <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-extrabold">{t("vocabulary.quickAdd.title")}</h2><Button aria-label={t("common.actions.close")} onClick={close} type="button" variant="outline"><X className="h-4 w-4" /></Button></div>
         <label className="grid gap-1 text-sm font-bold">{t("vocabulary.fields.word")}<input className="playsay-input" maxLength={240} onChange={(event) => changeSourceText(event.target.value)} value={sourceText} /></label>
         {translating ? <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground" role="status"><Loader2 className="h-4 w-4 animate-spin text-primary" />{t("vocabulary.messages.translating")}</p> : null}
         {suggestion?.variants.length ? <div className="mt-4">

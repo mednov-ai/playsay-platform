@@ -1,11 +1,11 @@
 import { clearTokens, getValidAccessToken, type AuthConfig } from "./auth";
-import { apiErrorFromResponse } from "./errors";
+import { apiErrorFromResponse, apiFetch, notAuthenticatedError } from "./errors";
 import { currentApiLanguage } from "./locale";
 
 export async function authorizedOptions(config: AuthConfig): Promise<RequestInit> {
   const accessToken = await getValidAccessToken(config);
   if (!accessToken) {
-    throw new Error("Not authenticated.");
+    throw notAuthenticatedError();
   }
 
   return {
@@ -23,7 +23,7 @@ export async function apiJson<T>(
   expectedStatus = 200,
 ): Promise<T> {
   const authorized = await authorizedOptions(config);
-  const response = await fetch(path, {
+  const response = await apiFetch(path, {
     ...init,
     headers: {
       ...authorized.headers,
@@ -37,7 +37,7 @@ export async function apiJson<T>(
   }
 
   if (response.status !== expectedStatus) {
-    throw await apiErrorFromResponse(response, `API request ${path} failed with HTTP ${response.status}.`);
+    throw await apiErrorFromResponse(response, "");
   }
 
   if (expectedStatus === 204) {
@@ -52,7 +52,7 @@ export async function publicApiJson<T>(
   init: RequestInit,
   expectedStatus = 200,
 ): Promise<T> {
-  const response = await fetch(path, {
+  const response = await apiFetch(path, {
     ...init,
     headers: {
       "Accept-Language": currentApiLanguage(),
@@ -62,7 +62,7 @@ export async function publicApiJson<T>(
   });
 
   if (response.status !== expectedStatus) {
-    throw await apiErrorFromResponse(response, `API request ${path} failed with HTTP ${response.status}.`);
+    throw await apiErrorFromResponse(response, "");
   }
 
   if (expectedStatus === 204) {

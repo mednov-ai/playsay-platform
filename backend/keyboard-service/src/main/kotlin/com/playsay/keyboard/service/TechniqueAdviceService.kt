@@ -8,14 +8,17 @@ import com.playsay.keyboard.entity.TechniqueAdviceCacheEntity
 import com.playsay.keyboard.entity.TrainingResultEntity
 import com.playsay.keyboard.repo.TechniqueAdviceCacheRepo
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.MessageSource
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
+import java.util.Locale
 
 @Service
 class TechniqueAdviceService(
     private val adviceCacheRepo: TechniqueAdviceCacheRepo,
+    private val messageSource: MessageSource,
     @param:Value("\${playsay.keyboard.ai.provider:}") private val aiProvider: String,
     @param:Value("\${playsay.keyboard.ai.model:}") private val aiModel: String,
     @param:Value("\${playsay.keyboard.ai.api-key:}") private val aiApiKey: String,
@@ -23,14 +26,19 @@ class TechniqueAdviceService(
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
-    fun advice(result: TrainingResultEntity, recent: List<TrainingResultEntity>): TechniqueAdviceResponse {
-        val rules = ruleAdvice(result, recent)
+    fun advice(
+        result: TrainingResultEntity,
+        recent: List<TrainingResultEntity>,
+        requestedLocale: Locale,
+    ): TechniqueAdviceResponse {
+        val locale = normalizeLocale(requestedLocale)
+        val rules = ruleAdvice(result, recent, locale)
         if (!aiEnabled(result, recent)) {
             return rules
         }
 
         val fingerprint = adviceFingerprint(result, recent)
-        adviceCacheRepo.findByFingerprint(fingerprint)?.let { cached ->
+        adviceCacheRepo.findByFingerprintAndLocale(fingerprint, locale.language)?.let { cached ->
             return TechniqueAdviceResponse(
                 primaryAdvice = cached.primaryAdvice,
                 drillSuggestion = cached.drillSuggestion,
@@ -38,10 +46,11 @@ class TechniqueAdviceService(
                 source = cached.source,
             )
         }
-        val aiAdvice = aiAdvice(result, recent, rules) ?: return rules
+        val aiAdvice = aiAdvice(result, recent, rules, locale) ?: return rules
         adviceCacheRepo.save(
             TechniqueAdviceCacheEntity(
                 fingerprint = fingerprint,
+                locale = locale.language,
                 trainingResultId = result.id,
                 source = aiAdvice.source,
                 primaryAdvice = aiAdvice.primaryAdvice,
@@ -59,48 +68,52 @@ class TechniqueAdviceService(
             result.id > 0 &&
             recent.size >= 3
 
-    private fun ruleAdvice(result: TrainingResultEntity, recent: List<TrainingResultEntity>): TechniqueAdviceResponse {
+    private fun ruleAdvice(
+        result: TrainingResultEntity,
+        recent: List<TrainingResultEntity>,
+        locale: Locale,
+    ): TechniqueAdviceResponse {
         val problemChord = topProblem(result.perChord, threshold = 2)
         if (problemChord != null) {
             return TechniqueAdviceResponse(
-                primaryAdvice = "Повторите сочетание $problemChord медленнее и ровнее: оно чаще всего сбивало точность.",
-                drillSuggestion = "Сделайте короткий фокус-урок на $problemChord.",
+                primaryAdvice = message("techniqueAdvice.chord.primary", locale, problemChord),
+                drillSuggestion = message("techniqueAdvice.chord.drill", locale, problemChord),
                 tone = "ACCURACY",
             )
         }
         val problemChar = topProblem(result.perChar, threshold = 3)
         if (problemChar != null) {
             return TechniqueAdviceResponse(
-                primaryAdvice = "Проверьте движение к клавише $problemChar: держите кисть спокойно и не ускоряйте удар.",
-                drillSuggestion = "Потренируйте $problemChar в связках с домашним рядом.",
+                primaryAdvice = message("techniqueAdvice.character.primary", locale, problemChar),
+                drillSuggestion = message("techniqueAdvice.character.drill", locale, problemChar),
                 tone = "ACCURACY",
             )
         }
         if (result.cadence < 0.65) {
             return TechniqueAdviceResponse(
-                primaryAdvice = "Ритм сейчас важнее скорости: выровняйте интервалы между нажатиями.",
-                drillSuggestion = "Включите метроном и снизьте темп на один шаг.",
+                primaryAdvice = message("techniqueAdvice.rhythm.primary", locale),
+                drillSuggestion = message("techniqueAdvice.rhythm.drill", locale),
                 tone = "RHYTHM",
             )
         }
         val previousAccuracy = recent.drop(1).take(2).map { it.accuracy }.average().takeIf { it.isFinite() }
         if (previousAccuracy != null && result.accuracy + 0.02 < previousAccuracy) {
             return TechniqueAdviceResponse(
-                primaryAdvice = "Мастерство растет, но точность просела: закрепите набор без ускорения.",
-                drillSuggestion = "Повторите тот же набор и цельтесь в 97%+ точности.",
+                primaryAdvice = message("techniqueAdvice.accuracyTrend.primary", locale),
+                drillSuggestion = message("techniqueAdvice.accuracyTrend.drill", locale),
                 tone = "ACCURACY",
             )
         }
         if (result.accuracy < 0.96 || result.errors > 0) {
             return TechniqueAdviceResponse(
-                primaryAdvice = "Снизьте темп на один шаг и доберите чистоту попаданий.",
-                drillSuggestion = "Повторите набор до серии без частых ошибок.",
+                primaryAdvice = message("techniqueAdvice.accuracy.primary", locale),
+                drillSuggestion = message("techniqueAdvice.accuracy.drill", locale),
                 tone = "ACCURACY",
             )
         }
         return TechniqueAdviceResponse(
-            primaryAdvice = "Техника ровная: можно мягко прибавить темп и сохранить тот же ритм.",
-            drillSuggestion = "Добавьте 5-10 BPM или переходите к следующему набору.",
+            primaryAdvice = message("techniqueAdvice.steady.primary", locale),
+            drillSuggestion = message("techniqueAdvice.steady.drill", locale),
             tone = "STEADY",
         )
     }
@@ -109,6 +122,7 @@ class TechniqueAdviceService(
         result: TrainingResultEntity,
         recent: List<TrainingResultEntity>,
         rules: TechniqueAdviceResponse,
+        locale: Locale,
     ): TechniqueAdviceResponse? =
         try {
             val response = RestClient.builder()
@@ -119,7 +133,7 @@ class TechniqueAdviceService(
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer $aiApiKey")
-                .body(aiRequest(result, recent, rules))
+                .body(aiRequest(result, recent, rules, locale))
                 .retrieve()
                 .body(JsonNode::class.java)
             parseAdvice(response)
@@ -129,11 +143,12 @@ class TechniqueAdviceService(
             null
         }
 
-    private fun aiRequest(
+    internal fun aiRequest(
         result: TrainingResultEntity,
         recent: List<TrainingResultEntity>,
         rules: TechniqueAdviceResponse,
-    ): Map<String, Any> =
+        requestedLocale: Locale,
+    ): Map<String, Any> = normalizeLocale(requestedLocale).let { locale ->
         mapOf(
             "model" to aiModel,
             "store" to false,
@@ -142,21 +157,25 @@ class TechniqueAdviceService(
             "input" to listOf(
                 mapOf(
                     "role" to "system",
-                    "content" to "Return only compact JSON with primaryAdvice, drillSuggestion, tone. No PII, no raw typing stream.",
+                    "content" to "Return only compact JSON with primaryAdvice, drillSuggestion, tone. " +
+                        "Write advice in ${languageName(locale)}. No PII, no raw typing stream.",
                 ),
                 mapOf(
                     "role" to "user",
-                    "content" to objectMapper.writeValueAsString(adviceInput(result, recent, rules)),
+                    "content" to objectMapper.writeValueAsString(adviceInput(result, recent, rules, locale)),
                 ),
             ),
         )
+    }
 
     private fun adviceInput(
         result: TrainingResultEntity,
         recent: List<TrainingResultEntity>,
         rules: TechniqueAdviceResponse,
+        locale: Locale,
     ): Map<String, Any?> =
         mapOf(
+            "responseLanguage" to locale.language,
             "current" to mapOf(
                 "averageCpm" to result.averageCpm,
                 "masteryCpm" to result.masteryCpm,
@@ -184,6 +203,24 @@ class TechniqueAdviceService(
                 "tone" to rules.tone,
             ),
         )
+
+    private fun message(code: String, locale: Locale, vararg args: Any): String =
+        messageSource.getMessage(code, args, locale)
+
+    private fun normalizeLocale(locale: Locale): Locale =
+        if (locale.language.lowercase() in supportedLanguages) {
+            Locale.forLanguageTag(locale.language.lowercase())
+        } else {
+            defaultLocale
+        }
+
+    private fun languageName(locale: Locale): String =
+        when (locale.language) {
+            "en" -> "English"
+            "de" -> "German"
+            "fr" -> "French"
+            else -> "Russian"
+        }
 
     private fun parseAdvice(response: JsonNode?): TechniqueAdviceResponse? {
         val text = response?.path("output_text")?.asText(null)
@@ -234,5 +271,7 @@ class TechniqueAdviceService(
 
     private companion object {
         val allowedTones = setOf("ACCURACY", "RHYTHM", "STEADY")
+        val defaultLocale: Locale = Locale.forLanguageTag("ru")
+        val supportedLanguages = setOf("ru", "en", "de", "fr")
     }
 }

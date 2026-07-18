@@ -124,7 +124,7 @@ export const de = {
       system: "System",
       light: "Hell",
       dark: "Dunkel",
-      toggleAria: "Theme: {{theme}}",
+      toggleAria: "Darstellung: {{theme}}",
     },
   },
   profile: {
@@ -707,7 +707,7 @@ export const de = {
       duplicate: "Duplizieren",
       generate: "Generieren",
       generateWithCount: "Generieren ({{count}})",
-      play: "Play",
+      play: "Starten",
       preview: "Vorschau",
       save: "Speichern",
     },
@@ -1242,6 +1242,7 @@ export const de = {
       pickerEmpty: "Kein Material ausgewählt",
       assignedAria: "Zugewiesene Aufgaben",
       unassignedTitle: "Kein Material zugewiesen",
+      unassignedBody: "Die Lehrkraft kann das Material bei der Vorbereitung oder direkt im Unterricht zuweisen.",
       loading: "Material wird geladen",
       selectForLesson: "Material für die Stunde auswählen",
     },
@@ -1484,5 +1485,8 @@ export const de = {
   errors: {
     authFailed: "Anmeldung fehlgeschlagen.",
     sessionExpired: "Die Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+    notAuthenticated: "Melden Sie sich an, um fortzufahren.",
+    network: "Der Server ist nicht erreichbar. Prüfen Sie die Verbindung und versuchen Sie es erneut.",
+    requestFailed: "Die Anfrage ist fehlgeschlagen (Code {{status}}).",
   },
 } as const;

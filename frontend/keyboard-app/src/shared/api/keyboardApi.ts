@@ -4,7 +4,7 @@ import {
   authConfig,
   type AuthConfig,
 } from "../auth/oidc";
-import { apiErrorFromResponse } from "./errors";
+import { apiErrorFromResponse, apiFetch, notAuthenticatedError } from "./errors";
 import { currentApiLanguage } from "./locale";
 import type {
   AnonymousProfile,
@@ -39,10 +39,10 @@ async function apiJson<T>(
 ): Promise<T> {
   const accessToken = await getValidAccessToken(config);
   if (!accessToken) {
-    throw new Error("Not authenticated.");
+    throw notAuthenticatedError();
   }
 
-  const response = await fetch(path, {
+  const response = await apiFetch(path, {
     ...init,
     headers: {
       "Accept-Language": currentApiLanguage(),
@@ -57,7 +57,7 @@ async function apiJson<T>(
   }
 
   if (response.status !== expectedStatus) {
-    throw await apiErrorFromResponse(response, `API request ${path} failed with HTTP ${response.status}.`);
+    throw await apiErrorFromResponse(response);
   }
 
   if (expectedStatus === 204) {
@@ -68,7 +68,7 @@ async function apiJson<T>(
 }
 
 async function publicApiJson<T>(path: string, init: RequestInit, expectedStatus = 200): Promise<T> {
-  const response = await fetch(path, {
+  const response = await apiFetch(path, {
     ...init,
     headers: {
       "Accept-Language": currentApiLanguage(),
@@ -78,7 +78,7 @@ async function publicApiJson<T>(path: string, init: RequestInit, expectedStatus 
   });
 
   if (response.status !== expectedStatus) {
-    throw await apiErrorFromResponse(response, `API request ${path} failed with HTTP ${response.status}.`);
+    throw await apiErrorFromResponse(response);
   }
 
   if (expectedStatus === 204) {

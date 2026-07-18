@@ -246,6 +246,11 @@ export const en: TranslationResource = {
     alt: "Alt",
     space: "Space",
   },
+  errors: {
+    notAuthenticated: "Sign in to continue.",
+    network: "Could not reach the server. Check your connection and try again.",
+    requestFailed: "The request failed (code {{status}}).",
+  },
   finger: {
     leftPinky: "Left pinky",
     leftRing: "Left ring",

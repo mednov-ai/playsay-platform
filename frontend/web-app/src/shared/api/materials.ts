@@ -1,5 +1,5 @@
 import { authConfig, clearTokens } from "./auth";
-import { apiErrorFromResponse, isApiStatus } from "./errors";
+import { apiErrorFromResponse, apiFetch, isApiStatus } from "./errors";
 import { apiJson, authorizedOptions } from "./http";
 import type {
   LessonMaterial,
@@ -139,7 +139,7 @@ export async function fetchMaterialAssetObjectUrl(
   config = authConfig,
 ): Promise<string> {
   const authorized = await authorizedOptions(config);
-  const response = await fetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
+  const response = await apiFetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
     headers: authorized.headers,
   });
 
@@ -222,7 +222,7 @@ export async function fetchMaterialAssetText(
   config = authConfig,
 ): Promise<string> {
   const authorized = await authorizedOptions(config);
-  const response = await fetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
+  const response = await apiFetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
     headers: authorized.headers,
   });
   if (response.status === 401) {
@@ -287,7 +287,7 @@ async function uploadImagePage<T>(
   }
 
   const authorized = await authorizedOptions(config);
-  const response = await fetch(path, {
+  const response = await apiFetch(path, {
     body: formData,
     headers: authorized.headers,
     method: "POST",
@@ -312,7 +312,7 @@ async function uploadMaterialAsset(
   const formData = new FormData();
   formData.append("file", file);
   const authorized = await authorizedOptions(config);
-  const response = await fetch(path, {
+  const response = await apiFetch(path, {
     body: formData,
     headers: authorized.headers,
     method: "POST",

@@ -1242,6 +1242,7 @@ export const en = {
       pickerEmpty: "No material selected",
       assignedAria: "Assigned tasks",
       unassignedTitle: "No material assigned",
+      unassignedBody: "The teacher can assign material during preparation or directly in the lesson.",
       loading: "Material is loading",
       selectForLesson: "Choose material for the lesson",
     },
@@ -1484,5 +1485,8 @@ export const en = {
   errors: {
     authFailed: "Auth failed.",
     sessionExpired: "Your session has expired. Please sign in again.",
+    notAuthenticated: "Sign in to continue.",
+    network: "Could not reach the server. Check your connection and try again.",
+    requestFailed: "The request failed (code {{status}}).",
   },
 } as const;

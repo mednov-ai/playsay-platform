@@ -40,6 +40,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
+import java.util.Locale
 import kotlin.math.round
 
 @Service
@@ -56,12 +57,16 @@ class TrainingService(
     private val techniqueAdviceService: TechniqueAdviceService,
 ) {
     @Transactional
-    fun submit(subject: String, request: SubmitResultRequest): SubmitTrainingResultResponse {
+    fun submit(
+        subject: String,
+        request: SubmitResultRequest,
+        locale: Locale = Locale.forLanguageTag("ru"),
+    ): SubmitTrainingResultResponse {
         val chordSet = requireChordSet(request.chordSetId)
         cleanClientResultId(request.clientResultId)?.let { clientResultId ->
             val existing = trainingResultRepo.findByKeycloakSubjectAndClientResultId(subject, clientResultId)
             if (existing != null) {
-                return submitResponse(existing, subject, null, emptyList(), chordSet)
+                return submitResponse(existing, subject, null, emptyList(), chordSet, locale = locale)
             }
         }
         val profile = profileForSubject(subject)
@@ -98,7 +103,7 @@ class TrainingService(
         )
         val events = gamificationService.eventsAfterSave(profile, layoutProfile, saved)
         val recent = trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc(subject)
-        return submitResponse(saved, subject, null, events, chordSet, recent)
+        return submitResponse(saved, subject, null, events, chordSet, recent, locale)
     }
 
     @Transactional
@@ -133,13 +138,17 @@ class TrainingService(
     }
 
     @Transactional
-    fun submitAnonymous(request: SubmitAnonymousResultRequest, servletRequest: HttpServletRequest): SubmitTrainingResultResponse {
+    fun submitAnonymous(
+        request: SubmitAnonymousResultRequest,
+        servletRequest: HttpServletRequest,
+        locale: Locale = Locale.forLanguageTag("ru"),
+    ): SubmitTrainingResultResponse {
         val chordSet = requireChordSet(request.chordSetId)
         val profile = upsertAnonymousProfile(request.deviceId, servletRequest, cleanDisplayName(request.displayName))
         cleanClientResultId(request.clientResultId)?.let { clientResultId ->
             val existing = trainingResultRepo.findByAnonymousProfileIdAndClientResultId(profile.id, clientResultId)
             if (existing != null) {
-                return submitResponse(existing, null, profile.id, emptyList(), chordSet)
+                return submitResponse(existing, null, profile.id, emptyList(), chordSet, locale = locale)
             }
         }
         val gamificationProfile = profileForAnonymous(profile.id)
@@ -176,7 +185,7 @@ class TrainingService(
         )
         val events = gamificationService.eventsAfterSave(gamificationProfile, layoutProfile, saved)
         val recent = trainingResultRepo.findByAnonymousProfileIdOrderByCreatedAtDesc(profile.id)
-        return submitResponse(saved, null, profile.id, events, chordSet, recent)
+        return submitResponse(saved, null, profile.id, events, chordSet, recent, locale)
     }
 
     @Transactional
@@ -241,6 +250,7 @@ class TrainingService(
         events: List<GamificationEventEntity>,
         chordSet: ChordSetEntity,
         recentOverride: List<TrainingResultEntity>? = null,
+        locale: Locale = Locale.forLanguageTag("ru"),
     ): SubmitTrainingResultResponse {
         val recent = recentOverride
             ?: subject?.let { trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc(it) }
@@ -259,7 +269,7 @@ class TrainingService(
             progress = progress,
             gamification = gamificationService.toResponse(profile ?: gamificationService.emptyProfile(), layoutProfiles, chordSet.layout),
             events = events.map { event -> gamificationService.eventToResponse(event) },
-            techniqueAdvice = techniqueAdviceService.advice(saved, recent),
+            techniqueAdvice = techniqueAdviceService.advice(saved, recent, locale),
         )
     }
 

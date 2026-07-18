@@ -9,12 +9,16 @@ import com.playsay.keyboard.dto.ResolveAnonymousProfileRequest
 import com.playsay.keyboard.dto.ResetAnonymousProfileRequest
 import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitResultRequest
+import com.playsay.keyboard.dto.TechniqueAdviceResponse
+import com.playsay.keyboard.entity.TechniqueAdviceCacheEntity
 import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
 import com.playsay.keyboard.repo.AnonymousProfileRepo
 import com.playsay.keyboard.repo.GamificationEventRepo
 import com.playsay.keyboard.repo.GamificationProfileRepo
 import com.playsay.keyboard.repo.LayoutMasteryProfileRepo
 import com.playsay.keyboard.repo.TrainingResultRepo
+import com.playsay.keyboard.repo.TechniqueAdviceCacheRepo
+import com.playsay.keyboard.service.TechniqueAdviceService
 import liquibase.integration.spring.SpringLiquibase
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
@@ -25,6 +29,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import javax.sql.DataSource
+import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -52,6 +57,8 @@ class KeyboardApiTest @Autowired constructor(
     private val gamificationProfileRepo: GamificationProfileRepo,
     private val layoutMasteryProfileRepo: LayoutMasteryProfileRepo,
     private val trainingResultRepo: TrainingResultRepo,
+    private val techniqueAdviceCacheRepo: TechniqueAdviceCacheRepo,
+    private val techniqueAdviceService: TechniqueAdviceService,
     private val dataSource: DataSource,
 ) {
     @BeforeAll
@@ -234,6 +241,102 @@ class KeyboardApiTest @Autowired constructor(
         assertEquals(1, first.progress.sessions)
         assertEquals(1, repeated.progress.sessions)
         assertEquals(first.gamification.masteryCpm, repeated.gamification.masteryCpm)
+    }
+
+    @Test
+    fun `rules advice follows all supported locales and falls back to russian`() {
+        trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val expectedStarts = mapOf(
+            "ru" to "Ритм",
+            "en" to "Rhythm",
+            "de" to "Rhythmus",
+            "fr" to "Le rythme",
+        )
+
+        expectedStarts.forEach { (language, expectedStart) ->
+            val response = trainingController.submit(
+                keyboardAuthentication(subject = "localized-advice-$language"),
+                calibrationRequest(chordSetId, "localized-advice-$language", 180.0).copy(cadence = 0.5),
+                Locale.forLanguageTag(language),
+            )
+            assertTrue(response.techniqueAdvice.primaryAdvice.startsWith(expectedStart))
+            assertEquals("RULES", response.techniqueAdvice.source)
+        }
+
+        val fallback = trainingController.submit(
+            keyboardAuthentication(subject = "localized-advice-fallback"),
+            calibrationRequest(chordSetId, "localized-advice-fallback", 180.0).copy(cadence = 0.5),
+            Locale.ITALIAN,
+        )
+        assertTrue(fallback.techniqueAdvice.primaryAdvice.startsWith("Ритм"))
+    }
+
+    @Test
+    fun `idempotent result returns advice in the locale requested for each response`() {
+        trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
+        val auth = keyboardAuthentication(subject = "localized-idempotent-subject")
+        val chordSetId = chordSetController.list(layout = "EN", difficulty = null)[0].id
+        val request = calibrationRequest(chordSetId, "localized-idempotent-result", 180.0).copy(cadence = 0.5)
+
+        val english = trainingController.submit(auth, request, Locale.ENGLISH)
+        val german = trainingController.submit(auth, request, Locale.GERMAN)
+
+        assertEquals(english.trainingResult.id, german.trainingResult.id)
+        assertTrue(english.techniqueAdvice.primaryAdvice.startsWith("Rhythm"))
+        assertTrue(german.techniqueAdvice.primaryAdvice.startsWith("Rhythmus"))
+        assertEquals(1, trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc("localized-idempotent-subject").size)
+    }
+
+    @Test
+    fun `advice cache allows the same fingerprint once per locale`() {
+        techniqueAdviceCacheRepo.deleteAllInBatch()
+        val base = TechniqueAdviceCacheEntity(
+            fingerprint = "same-fingerprint",
+            locale = "ru",
+            source = "AI",
+            primaryAdvice = "Совет",
+            drillSuggestion = "Упражнение",
+            tone = "STEADY",
+        )
+        techniqueAdviceCacheRepo.saveAndFlush(base)
+        techniqueAdviceCacheRepo.saveAndFlush(
+            TechniqueAdviceCacheEntity(
+                fingerprint = "same-fingerprint",
+                locale = "en",
+                source = "AI",
+                primaryAdvice = "Advice",
+                drillSuggestion = "Drill",
+                tone = "STEADY",
+            ),
+        )
+
+        assertEquals("Совет", techniqueAdviceCacheRepo.findByFingerprintAndLocale("same-fingerprint", "ru")?.primaryAdvice)
+        assertEquals("Advice", techniqueAdviceCacheRepo.findByFingerprintAndLocale("same-fingerprint", "en")?.primaryAdvice)
+    }
+
+    @Test
+    fun `ai request explicitly carries the target response language`() {
+        val result = com.playsay.keyboard.entity.TrainingResultEntity(
+            chordSetId = 1,
+            speedCpm = 180.0,
+            cadence = 0.8,
+            accuracy = 0.98,
+            errors = 0,
+            durationMs = 60_000,
+        )
+        val request = techniqueAdviceService.aiRequest(
+            result,
+            listOf(result),
+            TechniqueAdviceResponse("Conseil", "Exercice", "STEADY"),
+            Locale.FRENCH,
+        ).toString()
+
+        assertTrue(request.contains("Write advice in French"))
+        assertTrue(request.contains("responseLanguage"))
+        assertTrue(request.contains("fr"))
     }
 
     @Test

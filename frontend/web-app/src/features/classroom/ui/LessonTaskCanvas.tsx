@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Circle,
   Eraser,
+  FileText,
   Loader2,
   Minus,
   MousePointer2,
@@ -33,7 +34,6 @@ import {
 import { useLessonAnnotation } from "../hooks/useLessonAnnotation";
 import {
   AnnotationToolButton,
-  FallbackLessonDocument,
   LessonMaterialDocumentView,
   editorDocumentFromJson,
   materialAnswersFromSubmission,
@@ -360,7 +360,7 @@ export function LessonTaskCanvas({
                 score={displayScore}
               />
             ) : (
-              <FallbackLessonDocument />
+              <UnassignedLessonMaterial />
             )}
             <AnnotationLayer
               anchorBounds={activePage?.layout === "STATIC_IMAGE" ? annotationAnchorBounds : undefined}
@@ -396,6 +396,27 @@ export function LessonTaskCanvas({
         {footerControls}
         <span className="playsay-task-teacher">{teacherName}</span>
       </footer>
+    </div>
+  );
+}
+
+function UnassignedLessonMaterial() {
+  const { t } = useAppTranslation();
+
+  return (
+    <div
+      className="grid min-h-80 place-content-center justify-items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center"
+      data-testid="lesson-material-empty"
+    >
+      <span className="grid size-12 place-items-center rounded-2xl bg-white text-primary shadow-sm">
+        <FileText aria-hidden="true" className="h-6 w-6" />
+      </span>
+      <div aria-level={3} className="text-xl font-extrabold text-foreground" role="heading">
+        {t("classroom.material.unassignedTitle")}
+      </div>
+      <p className="max-w-md text-sm font-semibold leading-6 text-muted-foreground">
+        {t("classroom.material.unassignedBody")}
+      </p>
     </div>
   );
 }

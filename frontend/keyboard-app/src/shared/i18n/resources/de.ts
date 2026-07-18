@@ -246,6 +246,11 @@ export const de: TranslationResource = {
     alt: "Alt",
     space: "Space",
   },
+  errors: {
+    notAuthenticated: "Melden Sie sich an, um fortzufahren.",
+    network: "Der Server ist nicht erreichbar. Prüfen Sie die Verbindung und versuchen Sie es erneut.",
+    requestFailed: "Die Anfrage ist fehlgeschlagen (Code {{status}}).",
+  },
   finger: {
     leftPinky: "Linker kleiner Finger",
     leftRing: "Linker Ringfinger",

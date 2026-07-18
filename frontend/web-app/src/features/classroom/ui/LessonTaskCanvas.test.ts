@@ -163,6 +163,25 @@ beforeEach(() => {
 });
 
 describe("LessonTaskCanvas", () => {
+  it("shows a localized empty state instead of an English exercise when no material is assigned", () => {
+    const markup = renderToStaticMarkup(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-empty",
+      material: null,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+
+    expect(markup).toContain("lesson-material-empty");
+    expect(markup).toContain("classroom.material.unassignedTitle");
+    expect(markup).toContain("classroom.material.unassignedBody");
+    expect(markup).not.toContain("Let&#x27;s chat");
+    expect(markup).not.toContain("The importance of food for travellers");
+  });
+
   it("applies a live upload page once and then keeps a manual page selection", async () => {
     const { container } = render(createElement(LessonTaskCanvas, {
       canControlPages: true,

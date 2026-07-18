@@ -1,3 +1,162 @@
+.playsay-workspace-switcher {
+  position: relative;
+  z-index: 38;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.playsay-workspace-switcher[data-variant="bar"] {
+  min-height: 3.5rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: hsl(var(--surface) / 0.88);
+  box-shadow: 0 0.4rem 1.4rem rgb(68 42 23 / 0.045);
+  padding: 0.45rem 0.55rem 0.45rem 0.8rem;
+  backdrop-filter: blur(14px);
+}
+
+.playsay-workspace-switcher[data-variant="editor"] {
+  flex: 0 0 auto;
+}
+
+.playsay-workspace-current {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.playsay-workspace-current-icon {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+.playsay-workspace-current-copy {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.playsay-workspace-current-copy strong {
+  overflow: hidden;
+  color: hsl(var(--foreground));
+  font-size: 0.9rem;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-workspace-current-copy small {
+  overflow: hidden;
+  margin-top: 0.15rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.7rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-workspace-switcher-trigger {
+  display: inline-flex;
+  min-height: 2.55rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid rgb(255 92 0 / 0.3);
+  border-radius: 0.75rem;
+  background: hsl(var(--surface));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.playsay-workspace-switcher-trigger:hover,
+.playsay-workspace-switcher-trigger:focus-visible,
+.playsay-workspace-switcher-trigger[aria-expanded="true"] {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.08);
+  color: hsl(var(--primary));
+  outline: none;
+}
+
+.playsay-workspace-switcher-chevron {
+  transition: transform 0.15s ease;
+}
+
+.playsay-workspace-switcher-trigger[aria-expanded="true"] .playsay-workspace-switcher-chevron {
+  transform: rotate(180deg);
+}
+
+.playsay-workspace-menu-backdrop {
+  display: none;
+}
+
+.playsay-workspace-menu {
+  position: fixed;
+  z-index: 65;
+  top: var(--playsay-workspace-menu-top);
+  right: var(--playsay-workspace-menu-right);
+  width: min(var(--playsay-workspace-menu-width), calc(100vw - 2rem));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.15rem;
+  background: hsl(var(--surface) / 0.985);
+  box-shadow: 0 1.5rem 4rem rgb(45 28 17 / 0.18);
+  padding: 0.75rem;
+}
+
+.playsay-workspace-menu-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0.25rem 0.7rem;
+}
+
+.playsay-workspace-menu-header > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.playsay-workspace-menu-header strong {
+  color: hsl(var(--foreground));
+  font-size: 0.98rem;
+  font-weight: 950;
+}
+
+.playsay-workspace-menu-header small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.playsay-workspace-menu-header button {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.65rem;
+  background: hsl(var(--muted) / 0.65);
+  color: hsl(var(--foreground));
+  cursor: pointer;
+}
+
 .playsay-workspace-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5,6 +164,7 @@
 }
 
 .playsay-workspace-tab {
+  position: relative;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -17,6 +177,11 @@
   padding: 0.875rem 1rem;
   text-align: left;
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.playsay-workspace-tab-check {
+  margin-left: auto;
+  color: hsl(var(--primary));
 }
 
 .playsay-workspace-tab svg {
@@ -52,4 +217,62 @@
   border-color: rgb(255 92 0 / 0.45);
   background: hsl(var(--surface-muted));
   box-shadow: inset 0 0 0 1px rgb(255 92 0 / 0.08);
+}
+
+@media (max-width: 640px) {
+  .playsay-workspace-switcher[data-variant="bar"] {
+    min-height: 3.25rem;
+    border-radius: 0.85rem;
+    padding: 0.4rem 0.45rem 0.4rem 0.65rem;
+  }
+
+  .playsay-workspace-current-copy small,
+  .playsay-workspace-switcher[data-variant="editor"] .playsay-workspace-switcher-chevron {
+    display: none;
+  }
+
+  .playsay-workspace-switcher[data-variant="editor"] .playsay-workspace-switcher-trigger span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .playsay-workspace-switcher[data-variant="editor"] .playsay-workspace-switcher-trigger {
+    width: 2.5rem;
+    padding: 0;
+  }
+
+  .playsay-workspace-menu-backdrop {
+    position: fixed;
+    z-index: 64;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgb(17 17 17 / 0.38);
+    cursor: default;
+  }
+
+  .playsay-workspace-menu {
+    position: fixed;
+    z-index: 65;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-height: min(86dvh, 44rem);
+    overflow-y: auto;
+    border-radius: 1.25rem 1.25rem 0 0;
+    box-shadow: 0 -1rem 3rem rgb(17 17 17 / 0.22);
+    padding: 0.85rem;
+  }
+
+  .playsay-workspace-tabs {
+    grid-template-columns: 1fr;
+  }
 }

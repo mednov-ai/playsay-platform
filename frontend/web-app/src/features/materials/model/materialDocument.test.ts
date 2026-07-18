@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanMaterialBlock,
+  defaultMaterialForm,
   editorDocumentFromJson,
   FILL_GAP_MARKER,
   materialAcceptedAnswersWithCandidate,
@@ -22,6 +23,10 @@ import {
 import type { MaterialEditorBlock } from "./types";
 
 describe("material document accepted answers", () => {
+  it("starts a new material with an intentionally empty canvas", () => {
+    expect(defaultMaterialForm().document.pages[0]?.blocks).toEqual([]);
+  });
+
   it("keeps uploaded static image page layout and contain metadata through serde", () => {
     const document = editorDocumentFromJson({
       schemaVersion: 1,

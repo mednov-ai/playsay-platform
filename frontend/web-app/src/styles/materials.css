@@ -1,6 +1,368 @@
+.playsay-material-author-shell {
+  min-width: 0;
+  overflow: visible;
+}
+
+.playsay-material-library-workspace {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.playsay-material-focused-editor {
+  min-width: 0;
+  min-height: calc(100dvh - 1rem);
+}
+
+.playsay-material-editor-header {
+  position: sticky;
+  z-index: 35;
+  top: 0;
+  display: grid;
+  grid-template-columns: auto minmax(12rem, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 4.25rem;
+  border-bottom: 1px solid hsl(var(--border));
+  border-radius: 1.2rem 1.2rem 0 0;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 0.45rem 1.5rem rgb(68 42 23 / 0.06);
+  padding: 0.65rem 0.75rem;
+  backdrop-filter: blur(16px);
+}
+
+.playsay-material-editor-title-wrap {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.playsay-material-editor-title {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  font-weight: 950;
+  line-height: 1.2;
+  outline: none;
+}
+
+.playsay-material-editor-title::placeholder {
+  color: hsl(var(--muted-foreground) / 0.72);
+}
+
+.playsay-material-editor-title:focus-visible {
+  border-radius: 0.4rem;
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.35);
+}
+
+.playsay-material-save-state {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.25rem;
+  color: #4f8a35;
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.playsay-material-save-state[data-dirty="true"] {
+  color: hsl(var(--muted-foreground));
+}
+
+.playsay-material-editor-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.playsay-material-more {
+  position: relative;
+}
+
+.playsay-material-more-menu {
+  position: absolute;
+  z-index: 45;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  display: grid;
+  min-width: 14rem;
+  gap: 0.2rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  background: #ffffff;
+  box-shadow: 0 1rem 2.5rem rgb(17 17 17 / 0.16);
+  padding: 0.35rem;
+}
+
+.playsay-material-more-menu button {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.55rem;
+  border: 0;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-align: left;
+}
+
+.playsay-material-more-menu button:hover,
+.playsay-material-more-menu button:focus-visible {
+  background: hsl(var(--muted) / 0.72);
+  outline: none;
+}
+
+.playsay-material-more-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.playsay-material-editor-workspace {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 14.5rem minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.playsay-material-palette {
+  position: sticky;
+  top: 5.25rem;
+  max-height: calc(100dvh - 6.5rem);
+  overflow: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: #fffdfb;
+  padding: 0.75rem;
+}
+
+.playsay-material-palette-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.playsay-material-palette-head p,
+.playsay-material-canvas-head p {
+  margin: 0.2rem 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.playsay-material-palette-close {
+  display: none;
+}
+
+.playsay-material-palette-groups {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.8rem;
+}
+
+.playsay-material-palette-group {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.playsay-material-palette-group h3 {
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.63rem;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.playsay-material-palette-items {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.playsay-material-palette-item {
+  display: grid;
+  min-height: 2.55rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 0.7rem;
+  background: #ffffff;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 850;
+  text-align: left;
+}
+
+.playsay-material-palette-item:hover,
+.playsay-material-palette-item:focus-visible {
+  border-color: rgb(255 92 0 / 0.32);
+  background: #fff6ef;
+  outline: none;
+}
+
+.playsay-material-palette-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.playsay-material-palette-icon {
+  display: inline-flex;
+  width: 1.8rem;
+  height: 1.8rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.55rem;
+  background: #fff0e6;
+  color: hsl(var(--primary));
+}
+
+.playsay-material-canvas {
+  min-width: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 94% 4%, rgb(255 235 170 / 0.35), transparent 18rem),
+    linear-gradient(180deg, #fffdfb 0%, #fffaf6 100%);
+  padding: 0.85rem;
+}
+
+.playsay-material-canvas-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0.15rem 0.15rem 0.75rem;
+}
+
+.playsay-material-mobile-add {
+  display: none;
+}
+
+.playsay-material-empty-canvas {
+  display: grid;
+  min-height: min(27rem, 58dvh);
+  align-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.playsay-material-empty-canvas h2,
+.playsay-material-empty-canvas p {
+  margin: 0;
+}
+
+.playsay-material-empty-canvas h2 {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  font-weight: 950;
+}
+
+.playsay-material-empty-canvas p {
+  max-width: 30rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.playsay-material-empty-icon {
+  display: inline-flex;
+  width: 3.4rem;
+  height: 3.4rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 92 0 / 0.28);
+  border-radius: 1rem;
+  background: #fff0e6;
+  color: hsl(var(--primary));
+}
+
+.playsay-material-editor-block {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.playsay-material-editor-block[data-active="true"] {
+  border-color: rgb(255 92 0 / 0.55);
+  box-shadow: 0 0 0 2px rgb(255 92 0 / 0.1);
+}
+
+.playsay-material-preview-workspace {
+  padding: 1rem;
+}
+
+.playsay-material-details-backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(17 17 17 / 0.3);
+}
+
+.playsay-material-details {
+  display: grid;
+  width: min(31rem, 100%);
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-left: 1px solid hsl(var(--border));
+  background: #fffdfb;
+  box-shadow: -1rem 0 3rem rgb(17 17 17 / 0.15);
+}
+
+.playsay-material-details-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 1rem;
+}
+
+.playsay-material-details-head h2,
+.playsay-material-details-head p {
+  margin: 0;
+}
+
+.playsay-material-details-head h2 {
+  font-size: 1.1rem;
+  font-weight: 950;
+}
+
+.playsay-material-details-head p {
+  margin-top: 0.2rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.playsay-material-details-fields {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  overflow: auto;
+  padding: 1rem;
+}
+
 .playsay-material-editor {
   display: grid;
   gap: 0.875rem;
+  margin-top: 0.875rem;
 }
 
 .playsay-inline-upload {
@@ -2159,4 +2521,139 @@
 
 .dark .playsay-picture-tower {
   background: repeating-linear-gradient(180deg, hsl(var(--surface)) 0 0.625rem, hsl(var(--border)) 0.625rem 0.875rem);
+}
+
+.dark .playsay-material-editor-header,
+.dark .playsay-material-palette,
+.dark .playsay-material-palette-item,
+.dark .playsay-material-more-menu,
+.dark .playsay-material-details {
+  background: hsl(var(--surface));
+}
+
+.dark .playsay-material-canvas {
+  background:
+    radial-gradient(circle at 94% 4%, rgb(255 193 87 / 0.08), transparent 18rem),
+    linear-gradient(180deg, hsl(var(--surface)) 0%, hsl(var(--background)) 100%);
+}
+
+.dark .playsay-material-palette-icon,
+.dark .playsay-material-empty-icon,
+.dark .playsay-material-palette-item:hover,
+.dark .playsay-material-palette-item:focus-visible {
+  background: rgb(255 92 0 / 0.14);
+}
+
+@media (min-width: 1100px) {
+  .playsay-material-library-workspace {
+    grid-template-columns: minmax(21rem, 0.92fr) minmax(0, 1.08fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .playsay-material-editor-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+
+  .playsay-material-editor-header-actions {
+    gap: 0.35rem;
+  }
+
+  .playsay-material-action-label {
+    display: none;
+  }
+
+  .playsay-material-editor-workspace {
+    display: block;
+    padding: 0.75rem;
+  }
+
+  .playsay-material-palette {
+    position: fixed;
+    z-index: 75;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: none;
+    max-height: min(82dvh, 42rem);
+    border-radius: 1.2rem 1.2rem 0 0;
+    box-shadow: 0 -1rem 3rem rgb(17 17 17 / 0.2);
+    padding: 1rem;
+  }
+
+  .playsay-material-palette[data-mobile-open="true"] {
+    display: block;
+  }
+
+  .playsay-material-palette-close,
+  .playsay-material-mobile-add {
+    display: inline-flex;
+  }
+
+  .playsay-material-palette-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .playsay-material-author-shell {
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+  }
+
+  .playsay-material-editor-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    border-radius: 0;
+    padding: 0.55rem;
+  }
+
+  .playsay-material-editor-header-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .playsay-material-editor-header-actions > button {
+    min-width: 2.5rem;
+    padding-right: 0.65rem;
+    padding-left: 0.65rem;
+  }
+
+  .playsay-material-more {
+    flex: 0 0 auto;
+  }
+
+  .playsay-material-editor-workspace,
+  .playsay-material-preview-workspace {
+    padding: 0.55rem;
+  }
+
+  .playsay-material-canvas {
+    border-radius: 0.85rem;
+    padding: 0.6rem;
+  }
+
+  .playsay-material-canvas-head {
+    align-items: center;
+  }
+
+  .playsay-material-canvas-head p {
+    display: none;
+  }
+
+  .playsay-material-empty-canvas {
+    min-height: 22rem;
+    padding: 1.25rem 0.75rem;
+  }
+
+  .playsay-material-palette-items {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playsay-material-details {
+    width: 100%;
+    border-left: 0;
+  }
 }

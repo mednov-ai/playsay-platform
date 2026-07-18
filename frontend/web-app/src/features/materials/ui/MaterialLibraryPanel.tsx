@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type CourseLessonMap } from "../../../entities/schedule/model";
 import {
   fetchMaterialAssets,
@@ -20,7 +20,6 @@ import {
 } from "../../../shared/api/playsay";
 
 import {
-  MaterialAuthorMode,
   MaterialBlockType,
   MaterialDraftSourceImage,
   MaterialEditorBlock,
@@ -42,9 +41,14 @@ import {
 import { useMaterialAssets } from "../hooks/useMaterialAssets";
 import { useMaterialLibraryState } from "../hooks/useMaterialLibraryState";
 import { MaterialAccessMessage } from "./MaterialAccessMessage";
-import { MaterialAuthorSidebar } from "./MaterialAuthorSidebar";
+import { MaterialBlockPalette } from "./MaterialBlockPalette";
+import { MaterialDetailsDrawer } from "./MaterialDetailsDrawer";
+import { MaterialDraftPanel } from "./MaterialDraftPanel";
+import { MaterialEditorHeader } from "./MaterialEditorHeader";
 import { MaterialEditorForm } from "./MaterialEditorForm";
+import { MaterialLessonLinkPanel } from "./MaterialLessonLinkPanel";
 import { MaterialLibraryHeader } from "./MaterialLibraryHeader";
+import { MaterialLibraryList } from "./MaterialLibraryList";
 import { MaterialPlayPreviewDialog } from "./MaterialPlayPreviewDialog";
 import { MaterialReaderPreview } from "./MaterialReaderPreview";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -65,7 +69,9 @@ export function MaterialLibraryPanel({
   onLinkLesson,
   onRefresh,
   onSave,
+  onAuthoringStateChange,
   profile,
+  workspaceNavigation,
 }: {
   courses: Course[];
   disabled: boolean;
@@ -82,18 +88,24 @@ export function MaterialLibraryPanel({
   onLinkLesson: (courseId: string, lesson: CourseLesson, materialId: string | null) => void;
   onRefresh: () => void;
   onSave: (input: LessonMaterialInput, materialId?: string) => Promise<LessonMaterial | null>;
+  onAuthoringStateChange?: (state: { dirty: boolean; focused: boolean }) => void;
   profile: MeProfile | null;
+  workspaceNavigation?: ReactNode;
 }) {
   const { t } = useAppTranslation();
+  const authorShellRef = useRef<HTMLElement>(null);
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const { lessonOptions, selectedLessonKey, setSelectedLessonKey } = useMaterialLibraryState({ courses, lessons });
   const [form, setForm] = useState<MaterialFormState>(() => defaultMaterialForm());
-  const [autoSelectedMaterialId, setAutoSelectedMaterialId] = useState<string | null>(null);
   const [draftPrompt, setDraftPrompt] = useState("");
   const [draftUrl, setDraftUrl] = useState("");
   const [draftImage, setDraftImage] = useState<MaterialDraftSourceImage | null>(null);
   const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
-  const [authorMode, setAuthorMode] = useState<MaterialAuthorMode>("preview");
+  const [workspaceMode, setWorkspaceMode] = useState<"library" | "edit" | "preview">("library");
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [savedFormFingerprint, setSavedFormFingerprint] = useState(() => materialFormFingerprint(form));
   const [playPreviewOpen, setPlayPreviewOpen] = useState(false);
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
   const [assetUploadMessage, setAssetUploadMessage] = useState<string | null>(null);
@@ -106,55 +118,75 @@ export function MaterialLibraryPanel({
   const canGenerateUrlDraft = draftUrl.trim().length > 0;
   const pendingImageTargetsCount = countPendingMaterialImageTargets(form.document, currentMaterialAssets);
   const canGenerateImages = pendingImageTargetsCount > 0;
+  const blocks = form.document.pages[0]?.blocks ?? [];
+  const canSave = form.title.trim().length > 0 && blocks.length > 0;
+  const isDirty = materialFormFingerprint(form) !== savedFormFingerprint;
+  const authoringFocused = workspaceMode !== "library";
 
   useEffect(() => {
-    const firstMaterial = materials[0];
-    if (!firstMaterial || autoSelectedMaterialId === firstMaterial.id || form.id || form.title.trim()) {
-      return;
-    }
+    onAuthoringStateChange?.({ dirty: authoringFocused && isDirty, focused: authoringFocused });
+  }, [authoringFocused, isDirty, onAuthoringStateChange]);
 
-    setForm(materialToForm(firstMaterial));
-    setDraftPrompt(readPromptFromSourceMeta(firstMaterial.sourceMeta));
-    setDraftUrl(readUrlFromSourceMeta(firstMaterial.sourceMeta));
-    setAuthorMode("preview");
-    setAutoSelectedMaterialId(firstMaterial.id);
-  }, [autoSelectedMaterialId, form.id, form.title, materials]);
+  useEffect(() => () => {
+    onAuthoringStateChange?.({ dirty: false, focused: false });
+  }, [onAuthoringStateChange]);
 
   function updateForm<Key extends keyof MaterialFormState>(field: Key, value: MaterialFormState[Key]) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
   function resetForm() {
-    setForm(defaultMaterialForm());
+    const nextForm = defaultMaterialForm();
+    setForm(nextForm);
+    setSavedFormFingerprint(materialFormFingerprint(nextForm));
     setDraftPrompt("");
     setDraftUrl("");
     setDraftImage(null);
     setDraftImageMessage(null);
-    setAuthorMode("edit");
+    setActiveBlockId(null);
+    setDetailsOpen(false);
+    setWorkspaceMode("edit");
   }
 
   function selectMaterial(material: LessonMaterial) {
-    setForm(materialToForm(material));
+    const nextForm = materialToForm(material);
+    setForm(nextForm);
+    setSavedFormFingerprint(materialFormFingerprint(nextForm));
     setDraftPrompt(readPromptFromSourceMeta(material.sourceMeta));
     setDraftUrl(readUrlFromSourceMeta(material.sourceMeta));
     setDraftImage(null);
     setDraftImageMessage(null);
-    setAuthorMode("preview");
+    setActiveBlockId(nextForm.document.pages[0]?.blocks[0]?.id ?? null);
+    setDetailsOpen(false);
+    setWorkspaceMode("preview");
   }
 
   function addBlock(type: MaterialBlockType) {
-    setAuthorMode("edit");
+    const nextBlock = newMaterialBlock(type);
+    setWorkspaceMode("edit");
     setForm((current) => ({
       ...current,
       document: {
         ...current.document,
-        pages: current.document.pages.map((page, index) => (
-          index === 0
-            ? { ...page, blocks: [...page.blocks, newMaterialBlock(type)] }
-            : page
-        )),
+        pages: current.document.pages.map((page, index) => {
+          if (index !== 0) {
+            return page;
+          }
+          const activeIndex = page.blocks.findIndex((block) => block.id === activeBlockId);
+          const insertionIndex = activeIndex >= 0 ? activeIndex + 1 : page.blocks.length;
+          return {
+            ...page,
+            blocks: [
+              ...page.blocks.slice(0, insertionIndex),
+              nextBlock,
+              ...page.blocks.slice(insertionIndex),
+            ],
+          };
+        }),
       },
     }));
+    setActiveBlockId(nextBlock.id);
+    setPaletteOpen(false);
   }
 
   function updateBlock(blockId: string, patch: Partial<MaterialEditorBlock>) {
@@ -172,14 +204,46 @@ export function MaterialLibraryPanel({
         })),
       },
     }));
+    if (activeBlockId === blockId) {
+      const blockIndex = blocks.findIndex((block) => block.id === blockId);
+      setActiveBlockId(blocks[blockIndex + 1]?.id ?? blocks[blockIndex - 1]?.id ?? null);
+    }
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function moveBlock(blockId: string, direction: -1 | 1) {
+    setForm((current) => ({
+      ...current,
+      document: {
+        ...current.document,
+        pages: current.document.pages.map((page, pageIndex) => {
+          if (pageIndex !== 0) {
+            return page;
+          }
+          const currentIndex = page.blocks.findIndex((block) => block.id === blockId);
+          const targetIndex = currentIndex + direction;
+          if (currentIndex < 0 || targetIndex < 0 || targetIndex >= page.blocks.length) {
+            return page;
+          }
+          const nextBlocks = [...page.blocks];
+          const [movedBlock] = nextBlocks.splice(currentIndex, 1);
+          nextBlocks.splice(targetIndex, 0, movedBlock);
+          return { ...page, blocks: nextBlocks };
+        }),
+      },
+    }));
+    setActiveBlockId(blockId);
+  }
+
+  async function saveCurrentMaterial() {
+    if (!canSave || disabled) {
+      return;
+    }
     const saved = await saveMaterialAndMaybeGenerate({ generateMissing: true });
     if (saved) {
-      setForm(materialToForm(saved));
-      setAuthorMode("preview");
+      const nextForm = materialToForm(saved);
+      setForm(nextForm);
+      setSavedFormFingerprint(materialFormFingerprint(nextForm));
+      setWorkspaceMode("preview");
     }
   }
 
@@ -194,9 +258,12 @@ export function MaterialLibraryPanel({
       sourceFileName: draftImage?.fileName ?? null,
     });
     if (draft) {
-      setForm(materialDraftToForm(draft));
+      const nextForm = materialDraftToForm(draft);
+      setForm(nextForm);
+      setSavedFormFingerprint("");
       setDraftPrompt(readPromptFromSourceMeta(draft.sourceMeta) || prompt);
-      setAuthorMode("edit");
+      setActiveBlockId(nextForm.document.pages[0]?.blocks[0]?.id ?? null);
+      setWorkspaceMode("edit");
     }
   }
 
@@ -213,10 +280,13 @@ export function MaterialLibraryPanel({
       cefrLevel: form.cefrLevel,
     });
     if (draft) {
-      setForm(materialDraftToForm(draft));
+      const nextForm = materialDraftToForm(draft);
+      setForm(nextForm);
+      setSavedFormFingerprint("");
       setDraftPrompt(readPromptFromSourceMeta(draft.sourceMeta));
       setDraftUrl(readUrlFromSourceMeta(draft.sourceMeta) || url);
-      setAuthorMode("edit");
+      setActiveBlockId(nextForm.document.pages[0]?.blocks[0]?.id ?? null);
+      setWorkspaceMode("edit");
     }
   }
 
@@ -228,7 +298,7 @@ export function MaterialLibraryPanel({
     if (!result) {
       return;
     }
-    setAuthorMode("edit");
+    setWorkspaceMode("edit");
     setForm((current) => ({
       ...current,
       document: {
@@ -297,8 +367,11 @@ export function MaterialLibraryPanel({
   }
 
   function duplicateCurrentMaterial() {
-    setForm((current) => duplicateMaterialForm(current));
-    setAuthorMode("edit");
+    const nextForm = duplicateMaterialForm(form);
+    setForm(nextForm);
+    setSavedFormFingerprint("");
+    setActiveBlockId(nextForm.document.pages[0]?.blocks[0]?.id ?? null);
+    setWorkspaceMode("edit");
   }
 
   async function saveMaterialAndMaybeGenerate({
@@ -356,8 +429,10 @@ export function MaterialLibraryPanel({
   async function generateCurrentImages() {
     const saved = await saveMaterialAndMaybeGenerate({ generateMissing: true });
     if (saved) {
-      setForm(materialToForm(saved));
-      setAuthorMode("preview");
+      const nextForm = materialToForm(saved);
+      setForm(nextForm);
+      setSavedFormFingerprint(materialFormFingerprint(nextForm));
+      setWorkspaceMode("preview");
     }
   }
 
@@ -375,7 +450,12 @@ export function MaterialLibraryPanel({
   async function persistMaterialBlockPatch(blockId: string, patch: Partial<MaterialEditorBlock>) {
     const nextForm = materialFormWithBlockPatch(form, blockId, patch);
     setForm(nextForm);
-    await onSave(materialFormToInput(nextForm), nextForm.id ?? undefined);
+    const saved = await onSave(materialFormToInput(nextForm), nextForm.id ?? undefined);
+    if (saved) {
+      const savedForm = materialToForm(saved);
+      setForm(savedForm);
+      setSavedFormFingerprint(materialFormFingerprint(savedForm));
+    }
   }
 
   async function uploadBlockAsset(blockId: string, kind: "image" | "htmlGame", file: File) {
@@ -392,6 +472,7 @@ export function MaterialLibraryPanel({
       workingForm = materialToForm(saved);
       materialId = saved.id;
       setForm(workingForm);
+      setSavedFormFingerprint(materialFormFingerprint(workingForm));
     }
 
     try {
@@ -408,7 +489,9 @@ export function MaterialLibraryPanel({
         setAssetUploadMessage(t("materials.messages.assetLinkSaveFailed"));
         return;
       }
-      setForm(materialToForm(saved));
+      const savedForm = materialToForm(saved);
+      setForm(savedForm);
+      setSavedFormFingerprint(materialFormFingerprint(savedForm));
       const assets = await fetchMaterialAssets(materialId);
       syncMaterialAssets(saved, assets);
       setAssetUploadMessage(kind === "image" ? t("materials.messages.imageUploaded") : t("materials.messages.htmlGameUploaded"));
@@ -416,6 +499,72 @@ export function MaterialLibraryPanel({
       setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.assetUploadFailed"));
     }
   }
+
+  function requestPalette() {
+    setPaletteOpen(true);
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>("[data-material-palette-first='true']")?.focus();
+    });
+  }
+
+  function backToLibrary() {
+    if (isDirty && !window.confirm(t("materials.editor.unsavedConfirm"))) {
+      return;
+    }
+    setDetailsOpen(false);
+    setPaletteOpen(false);
+    setWorkspaceMode("library");
+  }
+
+  function archiveCurrentMaterial() {
+    if (!form.id) {
+      return;
+    }
+    onArchive(form.id);
+    setDetailsOpen(false);
+    setPaletteOpen(false);
+    setWorkspaceMode("library");
+  }
+
+  useEffect(() => {
+    if (workspaceMode === "library" || !isDirty) {
+      return undefined;
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty, workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode === "library") {
+      return undefined;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      authorShellRef.current?.scrollIntoView?.({ block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode === "library") {
+      return undefined;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDetailsOpen(false);
+        setPaletteOpen(false);
+        return;
+      }
+      if (event.key.toLowerCase() === "s" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        void saveCurrentMaterial();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [canSave, disabled, form, workspaceMode]);
 
   if (!profile) {
     return (
@@ -427,93 +576,146 @@ export function MaterialLibraryPanel({
   }
 
   return (
-    <section className="rounded-[1.25rem] border border-border bg-white/80 p-4">
+    <section
+      className="playsay-material-author-shell rounded-[1.25rem] border border-border bg-white/80"
+      data-workspace-mode={workspaceMode}
+      ref={authorShellRef}
+    >
       <MaterialPlayPreviewDialog
         material={materialPreviewFromForm(form)}
         onClose={() => setPlayPreviewOpen(false)}
         open={playPreviewOpen && Boolean(form.title.trim())}
       />
-      <MaterialLibraryHeader
-        disabled={disabled}
-        loading={loading}
-        onRefresh={onRefresh}
-        withBorder
-      />
-
       {!canManage ? (
-        <MaterialAccessMessage message={t("materials.studentAvailability")} />
-      ) : (
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(18rem,0.72fr)_minmax(0,1.28fr)]">
-          <MaterialAuthorSidebar
-            canGenerateDraft={canGenerateDraft}
-            canGenerateUrlDraft={canGenerateUrlDraft}
+        <div className="p-4">
+          <MaterialLibraryHeader />
+          <MaterialAccessMessage message={t("materials.studentAvailability")} />
+        </div>
+      ) : workspaceMode === "library" ? (
+        <div className="p-4">
+          <MaterialLibraryHeader
             disabled={disabled}
-            draftImage={draftImage}
-            draftImageMessage={draftImageMessage}
-            draftPrompt={draftPrompt}
-            draftUrl={draftUrl}
-            formMaterialId={form.id}
-            lessonOptions={lessonOptions}
-            materials={materials}
-            onCreateNew={resetForm}
-            onDraftFromUrl={() => void generateDraftFromUrl()}
-            onDraftImageChange={(file) => void handleDraftImageChange(file)}
-            onGenerateDraft={() => void generateDraft()}
-            onLinkSelectedLesson={linkSelectedLesson}
-            onRemoveDraftImage={() => setDraftImage(null)}
-            onSelectLessonKey={setSelectedLessonKey}
-            onSelectMaterial={selectMaterial}
-            onUnlinkSelectedLesson={() => {
-              const option = lessonOptions.find((item) => item.key === selectedLessonKey);
-              if (option) {
-                onLinkLesson(option.courseId, option.lesson, null);
-              }
-            }}
-            onUpdateDraftPrompt={setDraftPrompt}
-            onUpdateDraftUrl={setDraftUrl}
-            selectedLessonKey={selectedLessonKey}
+            loading={loading}
+            onRefresh={onRefresh}
+            withBorder
+          />
+          <div className="playsay-material-library-workspace">
+            <MaterialLibraryList
+              activeMaterialId={form.id}
+              disabled={disabled}
+              materials={materials}
+              onCreateNew={resetForm}
+              onSelectMaterial={selectMaterial}
+            />
+            <div className="grid content-start gap-3">
+              <MaterialDraftPanel
+                canGenerateDraft={canGenerateDraft}
+                canGenerateUrlDraft={canGenerateUrlDraft}
+                disabled={disabled}
+                draftImage={draftImage}
+                draftImageMessage={draftImageMessage}
+                draftPrompt={draftPrompt}
+                draftUrl={draftUrl}
+                onDraftFromUrl={() => void generateDraftFromUrl()}
+                onDraftImageChange={(file) => void handleDraftImageChange(file)}
+                onGenerateDraft={() => void generateDraft()}
+                onRemoveDraftImage={() => setDraftImage(null)}
+                onUpdateDraftPrompt={setDraftPrompt}
+                onUpdateDraftUrl={setDraftUrl}
+              />
+              <MaterialLessonLinkPanel
+                disabled={disabled}
+                formMaterialId={form.id}
+                lessonOptions={lessonOptions}
+                onLinkSelectedLesson={linkSelectedLesson}
+                onSelectLessonKey={setSelectedLessonKey}
+                onUnlinkSelectedLesson={() => {
+                  const option = lessonOptions.find((item) => item.key === selectedLessonKey);
+                  if (option) {
+                    onLinkLesson(option.courseId, option.lesson, null);
+                  }
+                }}
+                selectedLessonKey={selectedLessonKey}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="playsay-material-focused-editor">
+          <MaterialEditorHeader
+            canGenerateImages={canGenerateImages}
+            canSave={canSave}
+            disabled={disabled}
+            dirty={isDirty}
+            hasMaterial={Boolean(form.id)}
+            mode={workspaceMode}
+            onArchive={archiveCurrentMaterial}
+            onBack={backToLibrary}
+            onDuplicate={duplicateCurrentMaterial}
+            onGenerateImages={() => void generateCurrentImages()}
+            onOpenDetails={() => setDetailsOpen(true)}
+            onPlay={() => setPlayPreviewOpen(true)}
+            onSave={() => void saveCurrentMaterial()}
+            onToggleMode={() => setWorkspaceMode((current) => current === "edit" ? "preview" : "edit")}
+            onUpdateTitle={(value) => updateForm("title", value)}
+            pendingImageTargetsCount={pendingImageTargetsCount}
+            title={form.title}
+            workspaceNavigation={workspaceNavigation}
           />
 
-          <form className="grid gap-4" onSubmit={submit}>
-            {authorMode === "preview" && form.title.trim() ? (
+          {workspaceMode === "preview" ? (
+            <div className="playsay-material-preview-workspace">
               <MaterialReaderPreview
-                disabled={disabled}
                 form={form}
                 imageGenerationProgress={imageGenerationProgress}
                 message={assetUploadMessage ?? message}
-                onArchive={onArchive}
                 onBlockPatch={updateMaterialBlock}
                 onBlockPatchCommit={(blockId, patch) => void persistMaterialBlockPatch(blockId, patch)}
-                onDuplicate={duplicateCurrentMaterial}
-                onEdit={() => setAuthorMode("edit")}
-                onPlay={() => setPlayPreviewOpen(true)}
                 onUpdateAssetTags={updatePreviewAssetTags}
               />
-            ) : (
-              <MaterialEditorForm
-                assetLibrary={assetLibrary}
-                canSuggestAcceptedAnswers={Boolean(form.id)}
-                canGenerateImages={canGenerateImages}
+            </div>
+          ) : (
+            <div className="playsay-material-editor-workspace">
+              <MaterialBlockPalette
                 disabled={disabled}
-                form={form}
-                imageGenerationProgress={imageGenerationProgress}
-                message={assetUploadMessage ?? message}
+                mobileOpen={paletteOpen}
                 onAddBlock={addBlock}
-                onArchive={onArchive}
-                onDuplicate={duplicateCurrentMaterial}
-                onGenerateCurrentImages={() => void generateCurrentImages()}
-                onSuggestAcceptedAnswers={(blockId, itemIds) => void suggestAcceptedAnswers(blockId, itemIds)}
-                onPreview={() => setAuthorMode("preview")}
-                onRemoveBlock={removeBlock}
-                onUpdateBlock={updateBlock}
-                onUploadBlockAsset={(blockId, kind, file) => uploadBlockAsset(blockId, kind, file)}
-                onUpdateForm={updateForm}
-                pendingImageTargetsCount={pendingImageTargetsCount}
+                onClose={() => setPaletteOpen(false)}
               />
-            )}
-          </form>
+              <div className="grid min-w-0 gap-4">
+                <MaterialEditorForm
+                  activeBlockId={activeBlockId}
+                  assetLibrary={assetLibrary}
+                  canSuggestAcceptedAnswers={Boolean(form.id)}
+                  disabled={disabled}
+                  form={form}
+                  imageGenerationProgress={imageGenerationProgress}
+                  message={assetUploadMessage ?? message}
+                  onActivateBlock={setActiveBlockId}
+                  onMoveBlock={moveBlock}
+                  onRemoveBlock={removeBlock}
+                  onRequestPalette={requestPalette}
+                  onSuggestAcceptedAnswers={(blockId, itemIds) => void suggestAcceptedAnswers(blockId, itemIds)}
+                  onUpdateBlock={updateBlock}
+                  onUploadBlockAsset={(blockId, kind, file) => uploadBlockAsset(blockId, kind, file)}
+                />
+              </div>
+            </div>
+          )}
+
+          <MaterialDetailsDrawer
+            disabled={disabled}
+            form={form}
+            onClose={() => setDetailsOpen(false)}
+            onUpdateForm={updateForm}
+            open={detailsOpen}
+          />
         </div>
       )}
     </section>
   );
+}
+
+function materialFormFingerprint(form: MaterialFormState): string {
+  return JSON.stringify(materialFormToInput(form));
 }

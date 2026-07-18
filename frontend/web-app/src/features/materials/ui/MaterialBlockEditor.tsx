@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -20,26 +20,38 @@ import { MatchingPairsEditor } from "./MatchingPairsEditor";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialBlockEditor({
+  active,
   assetLibrary,
   block,
+  canMoveDown,
+  canMoveUp,
   canSuggestAcceptedAnswers,
   collapsed,
   currentMaterialId,
   disabled,
   index,
+  onActivate,
+  onMoveDown,
+  onMoveUp,
   onRemove,
   onSuggestAcceptedAnswers,
   onToggleCollapsed,
   onUpdate,
   onUploadAsset,
 }: {
+  active: boolean;
   assetLibrary: MaterialAssetLibraryItem[];
   block: MaterialEditorBlock;
+  canMoveDown: boolean;
+  canMoveUp: boolean;
   canSuggestAcceptedAnswers: boolean;
   collapsed: boolean;
   currentMaterialId: string | null;
   disabled: boolean;
   index: number;
+  onActivate: () => void;
+  onMoveDown: () => void;
+  onMoveUp: () => void;
   onRemove: () => void;
   onSuggestAcceptedAnswers?: (blockId: string, itemIds: string[]) => void;
   onToggleCollapsed: () => void;
@@ -89,7 +101,13 @@ export function MaterialBlockEditor({
   }
 
   return (
-    <article className="rounded-xl border border-border bg-white p-3" data-collapsed={collapsed ? "true" : "false"}>
+    <article
+      className="playsay-material-editor-block rounded-xl border border-border bg-white p-3"
+      data-active={active ? "true" : "false"}
+      data-collapsed={collapsed ? "true" : "false"}
+      onClick={onActivate}
+      onFocusCapture={onActivate}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -110,6 +128,28 @@ export function MaterialBlockEditor({
           />
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            aria-label={t("materials.editor.moveBlockUp", { index: index + 1 })}
+            className="h-8 w-8 px-0"
+            disabled={disabled || !canMoveUp}
+            onClick={onMoveUp}
+            title={t("materials.editor.moveBlockUp", { index: index + 1 })}
+            type="button"
+            variant="outline"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </Button>
+          <Button
+            aria-label={t("materials.editor.moveBlockDown", { index: index + 1 })}
+            className="h-8 w-8 px-0"
+            disabled={disabled || !canMoveDown}
+            onClick={onMoveDown}
+            title={t("materials.editor.moveBlockDown", { index: index + 1 })}
+            type="button"
+            variant="outline"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
           <Button
             aria-expanded={!collapsed}
             aria-label={collapseLabel}

@@ -47,14 +47,7 @@ export function defaultMaterialPage(title = i18n.t("materials.defaults.pageTitle
     id: createClientId("page"),
     title,
     layout: "FLOW",
-    blocks: [
-      {
-        id: createClientId("block"),
-        type: "text",
-        title: i18n.t("materials.defaults.lessonGoalTitle"),
-        body: i18n.t("materials.defaults.lessonGoalBody"),
-      },
-    ],
+    blocks: [],
   };
 }
 

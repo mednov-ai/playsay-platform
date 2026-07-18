@@ -1,4 +1,4 @@
-import { lazy, Suspense, type Dispatch, type MouseEvent, type SetStateAction } from "react";
+import { lazy, Suspense, useCallback, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { publicSiteUrl } from "@playsay/shared-ui";
 import { CalendarPlus, Loader2, LogIn, LogOut, Play, User, UserPlus, Video } from "lucide-react";
 import { type WorkspaceTab, type WorkspaceTabDefinition } from "../entities/workspace/model";
@@ -155,6 +155,7 @@ export type AppShellProps = {
 export function AppShell(props: AppShellProps) {
   const { t } = useAppTranslation();
   const theme = useAppTheme();
+  const [materialAuthoringState, setMaterialAuthoringState] = useState({ dirty: false, focused: false });
   const {
     adminLoading,
     adminMessage,
@@ -245,6 +246,24 @@ export function AppShell(props: AppShellProps) {
     ? nextTeacherActionLesson(scheduledLessons, nowMs)
     : null;
   const headerTeacherActionLesson = preparationLessonId === teacherActionLesson?.id ? null : teacherActionLesson;
+
+  const handleMaterialAuthoringStateChange = useCallback((state: { dirty: boolean; focused: boolean }) => {
+    setMaterialAuthoringState((current) => (
+      current.dirty === state.dirty && current.focused === state.focused ? current : state
+    ));
+  }, []);
+
+  function selectWorkspaceTab(nextTab: WorkspaceTab) {
+    if (nextTab === workspaceTab) {
+      return;
+    }
+    if (materialAuthoringState.dirty && !window.confirm(t("materials.editor.unsavedConfirm"))) {
+      return;
+    }
+    setMaterialAuthoringState({ dirty: false, focused: false });
+    setWorkspaceTab(nextTab);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+  }
 
   function focusScheduleCreateForm() {
     setWorkspaceTab("schedule");
@@ -410,8 +429,8 @@ export function AppShell(props: AppShellProps) {
         ) : (
           <div className="grid flex-1 gap-5">
             <Suspense fallback={<PanelFallback />}>
-              {workspaceTabs.length > 1 ? (
-                <WorkspaceTabs activeTab={workspaceTab} onSelect={setWorkspaceTab} tabs={workspaceTabs} />
+              {workspaceTabs.length > 1 && !materialAuthoringState.focused ? (
+                <WorkspaceTabs activeTab={workspaceTab} onSelect={selectWorkspaceTab} tabs={workspaceTabs} />
               ) : null}
 
               {workspaceTab === "schedule" ? (
@@ -479,7 +498,16 @@ export function AppShell(props: AppShellProps) {
                   onLinkLesson={(courseId, lesson, materialId) => void linkMaterialToCourseLesson(courseId, lesson, materialId)}
                   onRefresh={() => void refreshMaterials()}
                   onSave={(input, materialId) => upsertMaterial(input, materialId)}
+                  onAuthoringStateChange={handleMaterialAuthoringStateChange}
                   profile={profile}
+                  workspaceNavigation={workspaceTabs.length > 1 ? (
+                    <WorkspaceTabs
+                      activeTab={workspaceTab}
+                      onSelect={selectWorkspaceTab}
+                      tabs={workspaceTabs}
+                      variant="editor"
+                    />
+                  ) : null}
                 />
               ) : null}
 

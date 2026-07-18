@@ -14,8 +14,8 @@
     min-height: min(42dvh, 25rem);
   }
 
-  .playsay-workspace-tabs {
-    grid-template-columns: 1fr;
+  .playsay-workspace-menu .playsay-workspace-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .playsay-classroom-shell {
@@ -51,6 +51,12 @@
   }
 
   .playsay-task-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .playsay-workspace-menu .playsay-workspace-tabs {
     grid-template-columns: 1fr;
   }
 }

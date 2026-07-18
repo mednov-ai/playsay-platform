@@ -1111,6 +1111,7 @@ export const de = {
         LESSON_TRANSLATION_PARTICIPANTS_INVALID: "Übersetzung erfordert eine Lehrkraft und einen Schüler",
         LESSON_TRANSLATION_LANGUAGE_UNAVAILABLE: "Wählen Sie die Oberflächensprache im Schülerprofil",
         LESSON_TRANSLATION_NOT_REQUIRED: "Im Profil ist bereits Englisch ausgewählt",
+        LESSON_TRANSLATION_PERMISSION_REQUIRED: "Die Sprachübersetzung ist im Schülerprofil nicht freigegeben",
         LESSON_TRANSLATION_PROVIDER_UNAVAILABLE: "Übersetzung ist vorübergehend nicht verfügbar",
         LESSON_TRANSLATION_CONNECTION_FAILED: "Die Verbindung zur Übersetzung wurde unterbrochen",
       },
@@ -1247,6 +1248,11 @@ export const de = {
     },
   },
   userManagement: {
+    translationPermission: {
+      label: "Sprachübersetzung",
+      hint: "Die Übersetzungsschaltfläche im Einzelunterricht für Schüler und Lehrkraft anzeigen.",
+      aria: "Sprachübersetzung für {{name}} erlauben",
+    },
     teacher: {
       eyebrow: "Arbeitsbereich für Lehrkräfte",
       title: "Schüler",
@@ -1321,6 +1327,8 @@ export const de = {
       teacherUpdated: "Hauptlehrkraft aktualisiert.",
       rolesUpdated: "Rollen aktualisiert. Ein neues Token übernimmt sie ohne Überschreiben durch ein veraltetes JWT.",
       delegationCreated: "Delegierung erstellt.",
+      translationPermissionSaved: "Einstellung für die Sprachübersetzung gespeichert.",
+      translationPermissionFailed: "Die Einstellung für die Sprachübersetzung konnte nicht geändert werden.",
     },
     empty: {
       teachers: "Keine Lehrkräfte verfügbar.",

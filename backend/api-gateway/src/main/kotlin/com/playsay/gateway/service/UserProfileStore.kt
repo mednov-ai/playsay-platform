@@ -301,6 +301,7 @@ private fun AppUserEntity.toResponse(studentProfile: StudentProfileEntity? = nul
         updatedAt = updatedAt,
         managedByTeacher = managedByTeacher,
         birthDate = studentProfile?.birthDate,
+        lessonTranslationAllowed = studentProfile?.lessonTranslationAllowed ?: false,
     )
 
 private fun CurrentIdentity.defaultDisplayName(): String? =

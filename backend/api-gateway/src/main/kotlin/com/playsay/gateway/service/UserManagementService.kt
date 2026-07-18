@@ -14,6 +14,7 @@ import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.mapper.toResponse
 import com.playsay.gateway.mapper.toUserManagementUser
 import com.playsay.gateway.repo.AppUserRepo
+import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.repo.UserDeletionOperationRepo
 import com.playsay.gateway.repo.UserManagementAuditRepo
@@ -37,6 +38,7 @@ class UserManagementService(
     private val appUserRepo: AppUserRepo,
     private val delegationRepo: TeacherDelegationRepo,
     private val operationRepo: UserDeletionOperationRepo,
+    private val studentProfileRepo: StudentProfileRepo,
     private val auditRepo: UserManagementAuditRepo,
     private val registrationGateway: RegistrationGateway,
     private val userProfileStore: UserProfileStore,
@@ -135,6 +137,13 @@ class UserManagementService(
         if (MetaData.Roles.TEACHER in previousRoles && MetaData.Roles.TEACHER !in roles) {
             removeTeacherRole(target, request.replacementTeacherSubject, actorId)
         }
+        if (MetaData.Roles.STUDENT in previousRoles && MetaData.Roles.STUDENT !in roles) {
+            studentProfileRepo.findByUserId(target.id)?.also { profile ->
+                profile.lessonTranslationAllowed = false
+                profile.updatedAt = Instant.now(clock)
+                studentProfileRepo.save(profile)
+            }
+        }
         registrationGateway.updateRoles(subject, RegistrationRolesRequest(roles))
         target.roles = roles.toStoredRoles()
         target.rolesChangedAt = Instant.now(clock)
@@ -218,7 +227,11 @@ class UserManagementService(
         val primary = user.managedByTeacherUserId?.let { appUserRepo.findById(it).orElse(null) }
         val delegates = delegationRepo.findActiveForStudent(user.id, Instant.now(clock))
             .mapNotNull { delegation -> appUserRepo.findById(delegation.delegateTeacherUserId).orElse(null) }
-        return user.toUserManagementUser(primary, delegates)
+        return user.toUserManagementUser(
+            primaryTeacher = primary,
+            activeDelegates = delegates,
+            lessonTranslationAllowed = studentProfileRepo.findByUserId(user.id)?.lessonTranslationAllowed ?: false,
+        )
     }
 
     private fun validatedRoles(requested: Set<String>): Set<String> {

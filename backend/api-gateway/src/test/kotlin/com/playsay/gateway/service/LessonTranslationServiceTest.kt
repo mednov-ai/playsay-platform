@@ -2,11 +2,13 @@ package com.playsay.gateway.service
 
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.LessonEntity
+import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.LessonParticipantRepo
 import com.playsay.gateway.repo.LessonParticipantRow
 import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.utils.MetaData
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -19,6 +21,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.jwt.Jwt
@@ -27,9 +30,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 class LessonTranslationServiceTest {
     private val lessonRepo = mock(LessonRepo::class.java)
     private val participantRepo = mock(LessonParticipantRepo::class.java)
+    private val studentProfileRepo = mock(StudentProfileRepo::class.java)
     private val userRepo = mock(AppUserRepo::class.java)
     private val credentials = mock(LessonTranslationCredentialProvider::class.java)
-    private val service = LessonTranslationService(lessonRepo, participantRepo, userRepo, credentials)
+    private val service = LessonTranslationService(lessonRepo, participantRepo, studentProfileRepo, userRepo, credentials)
 
     @Test
     fun `teacher receives English translation credential for the student track`() {
@@ -88,7 +92,20 @@ class LessonTranslationServiceTest {
         assertEquals(MetaData.ErrorCodes.LESSON_TRANSLATION_ACCESS_DENIED, error.errorCode)
     }
 
-    private fun individualLesson(studentLocale: String): Fixture {
+    @Test
+    fun `profile permission is required before provider credentials are requested`() {
+        val fixture = individualLesson(studentLocale = "en", translationAllowed = false)
+
+        val error = assertFailsWith<ProjectResponseException> {
+            service.createSession(authentication(fixture.student.keycloakSubject), fixture.lesson.id)
+        }
+
+        assertEquals(HttpStatus.CONFLICT, error.statusCode)
+        assertEquals(MetaData.ErrorCodes.LESSON_TRANSLATION_PERMISSION_REQUIRED, error.errorCode)
+        verifyNoInteractions(credentials)
+    }
+
+    private fun individualLesson(studentLocale: String, translationAllowed: Boolean = true): Fixture {
         val teacher = AppUserEntity(keycloakSubject = "teacher-1", roles = MetaData.Roles.TEACHER)
         val student = AppUserEntity(keycloakSubject = "student-1", roles = MetaData.Roles.STUDENT, locale = studentLocale)
         val lesson = LessonEntity(
@@ -110,6 +127,9 @@ class LessonTranslationServiceTest {
         `when`(participantRepo.findParticipantRowsByLessonIds(listOf(lesson.id))).thenReturn(listOf(row))
         `when`(userRepo.findById(teacher.id)).thenReturn(Optional.of(teacher))
         `when`(userRepo.findById(student.id)).thenReturn(Optional.of(student))
+        `when`(studentProfileRepo.findByUserId(student.id)).thenReturn(
+            StudentProfileEntity(userId = student.id, lessonTranslationAllowed = translationAllowed),
+        )
         return Fixture(lesson, teacher, student)
     }
 

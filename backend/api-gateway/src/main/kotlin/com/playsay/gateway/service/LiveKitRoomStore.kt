@@ -10,6 +10,8 @@ import com.playsay.gateway.dto.LiveKitRoomTokenResponse
 import com.playsay.gateway.entity.LessonEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.LessonParticipantRepo
+import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.utils.MetaData
 import java.nio.charset.StandardCharsets
 import java.time.Instant
@@ -28,7 +30,11 @@ class LiveKitTokenService(
     @param:Value("\${playsay.livekit.api-secret:}") private val apiSecret: String,
     @param:Value("\${playsay.livekit.token-ttl-seconds:3600}") private val tokenTtlSeconds: Long,
 ) {
-    fun createToken(authentication: JwtAuthenticationToken, roomName: String): LiveKitRoomTokenResponse {
+    fun createToken(
+        authentication: JwtAuthenticationToken,
+        roomName: String,
+        lessonTranslationAllowed: Boolean = false,
+    ): LiveKitRoomTokenResponse {
         val cleanServerUrl = serverUrl.trim()
         val cleanApiKey = apiKey.trim()
         val cleanApiSecret = apiSecret.trim()
@@ -74,6 +80,7 @@ class LiveKitTokenService(
             roomName = roomName,
             identity = identity,
             expiresAt = expiresAt,
+            lessonTranslationAllowed = lessonTranslationAllowed,
         )
     }
 }
@@ -81,6 +88,8 @@ class LiveKitTokenService(
 @Component
 class LiveKitRoomStore(
     private val lessonRepo: LessonRepo,
+    private val lessonParticipantRepo: LessonParticipantRepo,
+    private val studentProfileRepo: StudentProfileRepo,
     private val tokenService: LiveKitTokenService,
 ) {
     @Transactional
@@ -90,7 +99,14 @@ class LiveKitRoomStore(
         val roomName = lesson.livekitRoomName?.trim()?.takeIf { room -> room.isNotEmpty() }
             ?: ensureRoomName(lesson)
 
-        return tokenService.createToken(authentication, roomName)
+        return tokenService.createToken(authentication, roomName, lessonTranslationAllowed(lesson))
+    }
+
+    private fun lessonTranslationAllowed(lesson: LessonEntity): Boolean {
+        if (lesson.type != MetaData.LessonTypes.INDIVIDUAL) return false
+        val participant = lessonParticipantRepo.findParticipantRowsByLessonIds(listOf(lesson.id)).singleOrNull()
+            ?: return false
+        return studentProfileRepo.findByUserId(participant.userId)?.lessonTranslationAllowed == true
     }
 
     private fun findJoinableLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LessonEntity? {

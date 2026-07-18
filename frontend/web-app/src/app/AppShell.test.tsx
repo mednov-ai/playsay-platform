@@ -54,6 +54,7 @@ function appShellProps(): AppShellProps {
       countryCode: "RU",
       timezone: "Europe/Moscow",
       learningGoal: null,
+      lessonTranslationAllowed: false,
       managedByTeacher: false,
       updatedAt: "2026-06-27T09:00:00.000Z",
     },

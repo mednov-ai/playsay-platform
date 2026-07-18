@@ -3,6 +3,7 @@ package com.playsay.gateway
 import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.entity.AppUserEntity
+import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.entity.TeacherDelegationEntity
 import com.playsay.gateway.entity.TeacherDelegationStudentEntity
 import com.playsay.gateway.repo.*
@@ -78,6 +79,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
     private val courseRepo: CourseRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val appUserRepo: AppUserRepo,
+    private val studentProfileRepo: StudentProfileRepo,
     private val teacherDelegationRepo: TeacherDelegationRepo,
     private val teacherDelegationStudentRepo: TeacherDelegationStudentRepo,
     private val userManagementAuditRepo: UserManagementAuditRepo,
@@ -115,6 +117,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         teacherDelegationStudentRepo.deleteAllInBatch()
         teacherDelegationRepo.deleteAllInBatch()
         userManagementAuditRepo.deleteAllInBatch()
+        studentProfileRepo.deleteAllInBatch()
         appUserRepo.deleteAllInBatch()
         appUserRepo.seedPrimaryTeacherWithStudents()
     }
@@ -1060,6 +1063,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals("wss://online.play-and-say.ru/livekit", teacherToken.serverUrl)
         assertEquals("lesson-${lesson.id}", teacherToken.roomName)
         assertEquals("teacher-1", teacherToken.identity)
+        assertFalse(teacherToken.lessonTranslationAllowed)
+        assertFalse(studentToken.lessonTranslationAllowed)
         assertEquals("lesson-${lesson.id}", studentToken.roomName)
         assertEquals("IN_PROGRESS", started.status)
         assertEquals("test-key", claims.issuer)
@@ -1068,6 +1073,38 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(true, videoGrant["roomJoin"])
         assertEquals(true, videoGrant["canPublish"])
         assertEquals(true, videoGrant["canSubscribe"])
+    }
+
+    @Test
+    fun `individual room token exposes explicit student translation permission to both participants`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentId = userProfileStore.currentUserId(student)
+        val now = Instant.now()
+        studentProfileRepo.saveAndFlush(
+            StudentProfileEntity(
+                userId = studentId,
+                lessonTranslationAllowed = true,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = now.plusSeconds(5 * 60),
+                scheduledEnd = now.plusSeconds(50 * 60),
+                participantSubjects = listOf("student-1"),
+                type = "INDIVIDUAL",
+            ),
+        ).body!!
+        scheduleController.start(teacher, lesson.id)
+
+        val teacherToken = liveKitRoomController.createToken(teacher, lesson.id)
+        val studentToken = liveKitRoomController.createToken(student, lesson.id)
+
+        assertTrue(teacherToken.lessonTranslationAllowed)
+        assertTrue(studentToken.lessonTranslationAllowed)
     }
 
     @Test

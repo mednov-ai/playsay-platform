@@ -2,6 +2,20 @@ import type { LessonTranslationSession } from "../../../shared/api/playsay";
 
 export type TranslationRole = "teacher" | "student";
 
+export function lessonTranslationEligible({
+  allowed,
+  lessonType,
+  remoteParticipantCount,
+  role,
+}: {
+  allowed: boolean;
+  lessonType: string;
+  remoteParticipantCount: number;
+  role: TranslationRole | null;
+}): boolean {
+  return allowed && lessonType === "INDIVIDUAL" && remoteParticipantCount <= 1 && role !== null;
+}
+
 export type RealtimeTranslationSidecar = {
   close: () => void;
   start: () => Promise<void>;

@@ -6,6 +6,7 @@ import { useAdminManagementData } from "../api/useUserManagementData";
 import type { CreateUserInput, TeacherDirectoryEntry, UserManagementUser } from "../api/userManagement";
 import { DelegationWizard } from "./DelegationWizard";
 import { DelegationList } from "./TeacherStudentsPanel";
+import { LessonTranslationPermissionControl } from "./LessonTranslationPermissionControl";
 
 const roleNames = ["STUDENT", "TEACHER", "ADMIN"] as const;
 
@@ -96,6 +97,9 @@ export function AdminUsersPanel() {
               () => data.changeRoles.mutateAsync({ replacementTeacherSubject, roles, subject: user.subject }),
               t("userManagement.messages.rolesUpdated"),
             )}
+            onTranslationPermission={(allowed) => data.translationPermission.mutateAsync({ allowed, subject: user.subject })}
+            onTranslationPermissionError={() => setMessage(t("userManagement.messages.translationPermissionFailed"))}
+            onTranslationPermissionSaved={() => setMessage(t("userManagement.messages.translationPermissionSaved"))}
             teachers={teachers}
             user={user}
           />
@@ -125,10 +129,22 @@ export function AdminUsersPanel() {
   );
 }
 
-function UserCard({ onDelete, onPrimaryTeacher, onRoles, teachers, user }: {
+function UserCard({
+  onDelete,
+  onPrimaryTeacher,
+  onRoles,
+  onTranslationPermission,
+  onTranslationPermissionError,
+  onTranslationPermissionSaved,
+  teachers,
+  user,
+}: {
   onDelete: (replacementTeacherSubject?: string) => Promise<unknown>;
   onPrimaryTeacher: (teacherSubject: string) => Promise<unknown>;
   onRoles: (roles: string[], replacementTeacherSubject?: string) => Promise<unknown>;
+  onTranslationPermission: (allowed: boolean) => Promise<unknown>;
+  onTranslationPermissionError: () => void;
+  onTranslationPermissionSaved: () => void;
   teachers: TeacherDirectoryEntry[];
   user: UserManagementUser;
 }) {
@@ -136,6 +152,7 @@ function UserCard({ onDelete, onPrimaryTeacher, onRoles, teachers, user }: {
   const [roles, setRoles] = useState(user.roles);
   const [replacement, setReplacement] = useState("");
   const student = roles.includes("STUDENT");
+  const storedStudent = user.roles.includes("STUDENT");
   const active = user.status === "ACTIVE";
 
   function toggleRole(role: string) {
@@ -183,6 +200,16 @@ function UserCard({ onDelete, onPrimaryTeacher, onRoles, teachers, user }: {
             </select>
           </label>
         )}
+        {storedStudent ? (
+          <LessonTranslationPermissionControl
+            allowed={user.lessonTranslationAllowed}
+            disabled={!active}
+            onChange={onTranslationPermission}
+            onError={onTranslationPermissionError}
+            onSaved={onTranslationPermissionSaved}
+            studentName={user.displayName ?? user.username ?? user.subject}
+          />
+        ) : null}
       </div>
       <div className="flex items-end gap-2 lg:flex-col lg:justify-end">
         <Button className="h-9" disabled={!active || roles.length === 0} onClick={() => void onRoles(roles, replacement || undefined)} type="button">

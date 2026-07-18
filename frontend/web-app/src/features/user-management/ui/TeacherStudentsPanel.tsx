@@ -5,6 +5,7 @@ import { useAppTranslation } from "../../../shared/i18n";
 import { useTeacherManagementData } from "../api/useUserManagementData";
 import type { TeacherDelegation, TeacherStudent } from "../api/userManagement";
 import { DelegationWizard } from "./DelegationWizard";
+import { LessonTranslationPermissionControl } from "./LessonTranslationPermissionControl";
 
 type Section = "mine" | "received" | "granted";
 
@@ -81,6 +82,9 @@ export function TeacherStudentsPanel() {
               onDetach={async (student) => {
                 await data.detach.mutateAsync(student.student.subject);
               }}
+              onTranslationPermission={(student, allowed) => data.translationPermission.mutateAsync({ allowed, subject: student.student.subject })}
+              onTranslationPermissionError={() => setMessage(t("userManagement.messages.translationPermissionFailed"))}
+              onTranslationPermissionSaved={() => setMessage(t("userManagement.messages.translationPermissionSaved"))}
               students={mine}
             />
           </div>
@@ -94,7 +98,15 @@ export function TeacherStudentsPanel() {
         </div>
       ) : null}
 
-      {section === "received" ? <StudentList empty={t("userManagement.empty.receivedStudents")} students={receivedStudents} /> : null}
+      {section === "received" ? (
+        <StudentList
+          empty={t("userManagement.empty.receivedStudents")}
+          onTranslationPermission={(student, allowed) => data.translationPermission.mutateAsync({ allowed, subject: student.student.subject })}
+          onTranslationPermissionError={() => setMessage(t("userManagement.messages.translationPermissionFailed"))}
+          onTranslationPermissionSaved={() => setMessage(t("userManagement.messages.translationPermissionSaved"))}
+          students={receivedStudents}
+        />
+      ) : null}
 
       {section === "granted" ? (
         <DelegationList
@@ -108,9 +120,19 @@ export function TeacherStudentsPanel() {
   );
 }
 
-function StudentList({ empty, onDetach, students }: {
+function StudentList({
+  empty,
+  onDetach,
+  onTranslationPermission,
+  onTranslationPermissionError,
+  onTranslationPermissionSaved,
+  students,
+}: {
   empty: string;
   onDetach?: (student: TeacherStudent) => Promise<unknown>;
+  onTranslationPermission: (student: TeacherStudent, allowed: boolean) => Promise<unknown>;
+  onTranslationPermissionError: () => void;
+  onTranslationPermissionSaved: () => void;
   students: TeacherStudent[];
 }) {
   const { t } = useAppTranslation();
@@ -118,12 +140,19 @@ function StudentList({ empty, onDetach, students }: {
   return (
     <div className="grid gap-2">
       {students.map((item) => (
-        <article className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm" key={item.student.subject}>
+        <article className="grid items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(16rem,.9fr)_auto]" key={item.student.subject}>
           <div className="min-w-0">
             <h3 className="truncate font-extrabold">{item.student.displayName ?? item.student.username ?? item.student.subject}</h3>
             <p className="truncate text-sm text-muted-foreground">{item.student.email ?? item.student.username ?? item.student.subject}</p>
             {item.student.activeDelegates.length > 0 ? <p className="mt-1 text-xs font-bold text-primary">{t("userManagement.student.delegateCount", { count: item.student.activeDelegates.length })}</p> : null}
           </div>
+          <LessonTranslationPermissionControl
+            allowed={item.student.lessonTranslationAllowed}
+            onChange={(allowed) => onTranslationPermission(item, allowed)}
+            onError={onTranslationPermissionError}
+            onSaved={onTranslationPermissionSaved}
+            studentName={item.student.displayName ?? item.student.username ?? item.student.subject}
+          />
           {onDetach ? (
             <Button aria-label={t("userManagement.actions.detachStudent", { name: item.student.displayName ?? item.student.username })} className="h-9" onClick={() => void onDetach(item)} type="button" variant="outline">
               <UserMinus className="h-4 w-4" />{t("userManagement.actions.detach")}

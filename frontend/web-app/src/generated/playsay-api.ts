@@ -59,6 +59,37 @@ export interface UserProfileResponse {
   managedByTeacher: boolean;
   /** @nullable */
   birthDate?: string | null;
+  readonly lessonTranslationAllowed: boolean;
+}
+
+export interface UpdateStudentLessonTranslationPermissionRequest {
+  allowed: boolean;
+}
+
+export interface TeacherDirectoryEntry {
+  subject: string;
+  displayName: string;
+}
+
+export interface UserManagementUser {
+  id: string;
+  subject: string;
+  /** @nullable */
+  username?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  displayName?: string | null;
+  roles: string[];
+  status: string;
+  primaryTeacher?: TeacherDirectoryEntry | null;
+  activeDelegates: TeacherDirectoryEntry[];
+  readonly lessonTranslationAllowed: boolean;
+}
+
+export interface TeacherStudentResponse {
+  student: UserManagementUser;
+  access: string;
 }
 
 export interface ScheduledLessonMaterialAssignmentRequest {
@@ -492,34 +523,9 @@ export interface UpdateUserRolesRequest {
   replacementTeacherSubject?: string | null;
 }
 
-export interface TeacherDirectoryEntry {
-  subject: string;
-  displayName: string;
-}
-
-export interface UserManagementUser {
-  id: string;
-  subject: string;
-  /** @nullable */
-  username?: string | null;
-  /** @nullable */
-  email?: string | null;
-  /** @nullable */
-  displayName?: string | null;
-  roles: string[];
-  status: string;
-  primaryTeacher?: TeacherDirectoryEntry | null;
-  activeDelegates: TeacherDirectoryEntry[];
-}
-
 export interface AssignPrimaryTeacherRequest {
   /** @minLength 1 */
   teacherSubject: string;
-}
-
-export interface TeacherStudentResponse {
-  student: UserManagementUser;
-  access: string;
 }
 
 export interface AttachStudentRequest {
@@ -597,6 +603,7 @@ export interface LiveKitRoomTokenResponse {
   roomName: string;
   identity: string;
   expiresAt: string;
+  lessonTranslationAllowed: boolean;
 }
 
 export type ScheduledLessonParticipantLinkResponseMode = typeof ScheduledLessonParticipantLinkResponseMode[keyof typeof ScheduledLessonParticipantLinkResponseMode];
@@ -1524,6 +1531,47 @@ export const deleteMyUserProfile = async ( options?: RequestInit): Promise<delet
 
   const data: deleteMyUserProfileResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteMyUserProfileResponse
+}
+
+
+
+export type updateLessonTranslationPermissionResponse200 = {
+  data: TeacherStudentResponse
+  status: 200
+}
+
+export type updateLessonTranslationPermissionResponseSuccess = (updateLessonTranslationPermissionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateLessonTranslationPermissionResponse = (updateLessonTranslationPermissionResponseSuccess)
+
+export const getUpdateLessonTranslationPermissionUrl = (subject: string,) => {
+
+
+
+
+  return `/api/teacher/students/${subject}/lesson-translation-permission`
+}
+
+export const updateLessonTranslationPermission = async (subject: string,
+    updateStudentLessonTranslationPermissionRequest: UpdateStudentLessonTranslationPermissionRequest, options?: RequestInit): Promise<updateLessonTranslationPermissionResponse> => {
+
+  const res = await fetch(getUpdateLessonTranslationPermissionUrl(subject),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateStudentLessonTranslationPermissionRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateLessonTranslationPermissionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateLessonTranslationPermissionResponse
 }
 
 

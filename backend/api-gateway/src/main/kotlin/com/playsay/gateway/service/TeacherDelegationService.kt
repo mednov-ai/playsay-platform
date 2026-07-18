@@ -6,7 +6,9 @@ import com.playsay.gateway.dto.CreateDelegationRequest
 import com.playsay.gateway.dto.TeacherDelegationResponse
 import com.playsay.gateway.dto.TeacherDirectoryEntry
 import com.playsay.gateway.dto.TeacherStudentResponse
+import com.playsay.gateway.dto.UpdateStudentLessonTranslationPermissionRequest
 import com.playsay.gateway.entity.AppUserEntity
+import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.entity.TeacherDelegationEntity
 import com.playsay.gateway.entity.TeacherDelegationStudentEntity
 import com.playsay.gateway.entity.UserManagementAuditEntity
@@ -14,6 +16,7 @@ import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.mapper.toTeacherDirectoryEntry
 import com.playsay.gateway.mapper.toUserManagementUser
 import com.playsay.gateway.repo.AppUserRepo
+import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.repo.TeacherDelegationStudentRepo
 import com.playsay.gateway.repo.UserManagementAuditRepo
@@ -35,6 +38,8 @@ class TeacherDelegationService(
     private val delegationRepo: TeacherDelegationRepo,
     private val delegationStudentRepo: TeacherDelegationStudentRepo,
     private val auditRepo: UserManagementAuditRepo,
+    private val studentProfileRepo: StudentProfileRepo,
+    private val studentAccessPolicy: StudentAccessPolicy,
     private val userProfileStore: UserProfileStore,
     private val registrationGateway: RegistrationGateway,
     private val objectMapper: ObjectMapper,
@@ -103,6 +108,40 @@ class TeacherDelegationService(
         appUserRepo.saveAndFlush(student)
         audit(actorId, "STUDENT_ATTACHED", student.keycloakSubject, mapOf("primaryTeacherUserId" to actorId))
         return TeacherStudentResponse(studentView(student), StudentAccessDecision.PRIMARY_TEACHER.name)
+    }
+
+    @Transactional
+    fun updateLessonTranslationPermission(
+        authentication: JwtAuthenticationToken,
+        studentSubject: String,
+        request: UpdateStudentLessonTranslationPermissionRequest,
+    ): TeacherStudentResponse {
+        requireTeacherOrAdmin(authentication)
+        val access = studentAccessPolicy.evaluate(authentication, studentSubject)
+        if (access == StudentAccessDecision.DENIED) {
+            fail(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.STUDENT_ACCESS_DENIED)
+        }
+        val student = user(studentSubject).also(::requireStudent)
+        val existing = studentProfileRepo.findByUserId(student.id)
+        val previous = existing?.lessonTranslationAllowed ?: false
+        if (previous != request.allowed) {
+            val now = Instant.now(clock)
+            val profile = existing ?: StudentProfileEntity(
+                id = UUID.randomUUID(),
+                userId = student.id,
+                createdAt = now,
+            )
+            profile.lessonTranslationAllowed = request.allowed
+            profile.updatedAt = now
+            studentProfileRepo.saveAndFlush(profile)
+            audit(
+                actorId = userProfileStore.currentUserId(authentication),
+                action = "STUDENT_LESSON_TRANSLATION_PERMISSION_CHANGED",
+                targetSubject = studentSubject,
+                details = mapOf("before" to previous, "after" to request.allowed, "access" to access.name),
+            )
+        }
+        return TeacherStudentResponse(studentView(student), access.name)
     }
 
     @Transactional
@@ -293,6 +332,7 @@ class TeacherDelegationService(
             primaryTeacher = student.managedByTeacherUserId?.let { appUserRepo.findById(it).orElse(null) },
             activeDelegates = delegationRepo.findActiveForStudent(student.id, Instant.now(clock))
                 .mapNotNull { appUserRepo.findById(it.delegateTeacherUserId).orElse(null) },
+            lessonTranslationAllowed = studentProfileRepo.findByUserId(student.id)?.lessonTranslationAllowed ?: false,
         )
 
     private fun delegationStatus(delegation: TeacherDelegationEntity): String {

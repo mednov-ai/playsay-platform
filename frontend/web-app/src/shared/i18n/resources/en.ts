@@ -1111,6 +1111,7 @@ export const en = {
         LESSON_TRANSLATION_PARTICIPANTS_INVALID: "Translation requires one teacher and one student",
         LESSON_TRANSLATION_LANGUAGE_UNAVAILABLE: "Choose the student's interface language in their profile",
         LESSON_TRANSLATION_NOT_REQUIRED: "The profile language is already English",
+        LESSON_TRANSLATION_PERMISSION_REQUIRED: "Voice translation is not allowed in the student's profile",
         LESSON_TRANSLATION_PROVIDER_UNAVAILABLE: "Translation is temporarily unavailable",
         LESSON_TRANSLATION_CONNECTION_FAILED: "The translation connection was lost",
       },
@@ -1247,6 +1248,11 @@ export const en = {
     },
   },
   userManagement: {
+    translationPermission: {
+      label: "Voice translation",
+      hint: "Show the translation control to the student and teacher in individual lessons.",
+      aria: "Allow voice translation for {{name}}",
+    },
     teacher: {
       eyebrow: "Teacher workspace",
       title: "Students",
@@ -1321,6 +1327,8 @@ export const en = {
       teacherUpdated: "Primary teacher updated.",
       rolesUpdated: "Roles updated. A fresh token will apply them without stale JWT overwrites.",
       delegationCreated: "Delegation created.",
+      translationPermissionSaved: "Voice translation setting saved.",
+      translationPermissionFailed: "The voice translation setting could not be changed.",
     },
     empty: {
       teachers: "No teachers are available.",

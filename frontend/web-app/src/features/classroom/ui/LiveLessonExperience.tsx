@@ -201,6 +201,7 @@ export function LiveLessonExperience({
               lessonId={session.lessonId}
               lessonType={session.lessonType}
               mode={classroomVideoMode}
+              translationAllowed={session.lessonTranslationAllowed}
               translationRole={translationRole}
             />
           </LiveKitRoom>

@@ -30,6 +30,8 @@ class StudentProfileEntity(
     var parentContact: String? = null,
     @Column(name = "notes", columnDefinition = "TEXT")
     var notes: String? = null,
+    @Column(name = "lesson_translation_allowed", nullable = false)
+    var lessonTranslationAllowed: Boolean = false,
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)

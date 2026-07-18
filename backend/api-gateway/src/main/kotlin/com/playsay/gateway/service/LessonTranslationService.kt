@@ -6,6 +6,7 @@ import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.LessonParticipantRepo
 import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.utils.MetaData
 import java.net.URI
 import java.net.http.HttpClient
@@ -109,6 +110,7 @@ class OpenAiLessonTranslationCredentialProvider(
 class LessonTranslationService(
     private val lessonRepo: LessonRepo,
     private val participantRepo: LessonParticipantRepo,
+    private val studentProfileRepo: StudentProfileRepo,
     private val userRepo: AppUserRepo,
     private val credentials: LessonTranslationCredentialProvider,
 ) {
@@ -134,7 +136,18 @@ class LessonTranslationService(
         val participant = participants.single()
         val teacher = lesson.teacherUserId?.let(userRepo::findById)?.orElse(null)
             ?: conflict(MetaData.ErrorCodes.LESSON_TRANSLATION_PARTICIPANTS_INVALID)
+        val student = userRepo.findById(participant.userId).orElse(null)
+            ?: conflict(MetaData.ErrorCodes.LESSON_TRANSLATION_PARTICIPANTS_INVALID)
         val actorSubject = authentication.token.subject
+        if (actorSubject != teacher.keycloakSubject && actorSubject != participant.subject) {
+            throw ProjectResponseException.localized(
+                HttpStatus.FORBIDDEN,
+                MetaData.ErrorCodes.LESSON_TRANSLATION_ACCESS_DENIED,
+            )
+        }
+        if (studentProfileRepo.findByUserId(student.id)?.lessonTranslationAllowed != true) {
+            conflict(MetaData.ErrorCodes.LESSON_TRANSLATION_PERMISSION_REQUIRED)
+        }
 
         val targetLanguage: String
         val sourceIdentity: String
@@ -144,13 +157,10 @@ class LessonTranslationService(
                 sourceIdentity = participant.subject
             }
             participant.subject -> {
-                targetLanguage = normalizeStudentLanguage(userRepo.findById(participant.userId).orElse(null)?.locale)
+                targetLanguage = normalizeStudentLanguage(student.locale)
                 sourceIdentity = teacher.keycloakSubject
             }
-            else -> throw ProjectResponseException.localized(
-                HttpStatus.FORBIDDEN,
-                MetaData.ErrorCodes.LESSON_TRANSLATION_ACCESS_DENIED,
-            )
+            else -> error("Translation participant access was validated before direction resolution")
         }
 
         val credential = credentials.create(targetLanguage, safetyIdentifier(actorSubject))

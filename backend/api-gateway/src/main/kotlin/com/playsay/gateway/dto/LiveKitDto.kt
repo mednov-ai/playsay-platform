@@ -8,6 +8,7 @@ data class LiveKitRoomTokenResponse(
     val roomName: String,
     val identity: String,
     val expiresAt: Instant,
+    val lessonTranslationAllowed: Boolean = false,
 )
 
 data class LessonTranslationSessionResponse(

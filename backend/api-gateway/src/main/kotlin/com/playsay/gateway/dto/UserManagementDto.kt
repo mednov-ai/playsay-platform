@@ -20,6 +20,8 @@ data class UserManagementUser(
     val status: String,
     val primaryTeacher: TeacherDirectoryEntry? = null,
     val activeDelegates: List<TeacherDirectoryEntry> = emptyList(),
+    @field:Schema(accessMode = Schema.AccessMode.READ_ONLY)
+    val lessonTranslationAllowed: Boolean = false,
 )
 
 data class TeacherDirectoryEntry(
@@ -61,6 +63,10 @@ data class AssignPrimaryTeacherRequest(
 data class AttachStudentRequest(
     @field:NotBlank @field:Size(max = 320)
     val usernameOrEmail: String,
+)
+
+data class UpdateStudentLessonTranslationPermissionRequest(
+    val allowed: Boolean,
 )
 
 data class CreateDelegationRequest(

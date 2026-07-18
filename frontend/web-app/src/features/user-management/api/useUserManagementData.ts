@@ -13,6 +13,7 @@ import {
   removePrimaryTeacher,
   revokeDelegation,
   updateUserRoles,
+  updateStudentLessonTranslationPermission,
   userManagementKeys,
   type CreateDelegationInput,
   type CreateUserInput,
@@ -30,8 +31,13 @@ export function useTeacherManagementData() {
   const detach = useMutation({ mutationFn: detachStudent, onSuccess: refresh });
   const delegate = useMutation({ mutationFn: (input: CreateDelegationInput) => createDelegation("teacher", input), onSuccess: refresh });
   const revoke = useMutation({ mutationFn: (id: string) => revokeDelegation("teacher", id), onSuccess: refresh });
+  const translationPermission = useMutation({
+    mutationFn: ({ allowed, subject }: { allowed: boolean; subject: string }) =>
+      updateStudentLessonTranslationPermission(subject, allowed),
+    onSuccess: refresh,
+  });
 
-  return { attach, delegate, detach, directory, granted, received, revoke, students };
+  return { attach, delegate, detach, directory, granted, received, revoke, students, translationPermission };
 }
 
 export function useAdminManagementData(filters: { search: string; role: string; status: string }) {
@@ -70,5 +76,10 @@ export function useAdminManagementData(filters: { search: string; role: string; 
   });
   const delegate = useMutation({ mutationFn: (input: CreateDelegationInput) => createDelegation("admin", input), onSuccess: refresh });
   const revoke = useMutation({ mutationFn: (id: string) => revokeDelegation("admin", id), onSuccess: refresh });
-  return { addUser, assignTeacher, changeRoles, delegate, delegations, directory, removeUser, revoke, students, users };
+  const translationPermission = useMutation({
+    mutationFn: ({ allowed, subject }: { allowed: boolean; subject: string }) =>
+      updateStudentLessonTranslationPermission(subject, allowed),
+    onSuccess: refresh,
+  });
+  return { addUser, assignTeacher, changeRoles, delegate, delegations, directory, removeUser, revoke, students, translationPermission, users };
 }

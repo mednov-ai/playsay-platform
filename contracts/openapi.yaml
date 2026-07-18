@@ -64,6 +64,30 @@ paths:
           description: Missing or invalid bearer token
       security:
       - bearerAuth: []
+  /teacher/students/{subject}/lesson-translation-permission:
+    put:
+      tags:
+      - teacher-management-controller
+      operationId: updateLessonTranslationPermission
+      parameters:
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStudentLessonTranslationPermissionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherStudentResponse"
   /schedule/lessons/{lessonId}:
     get:
       tags:
@@ -2925,11 +2949,86 @@ components:
           - string
           - "null"
           format: date
+        lessonTranslationAllowed:
+          type: boolean
+          readOnly: true
       required:
+      - lessonTranslationAllowed
       - managedByTeacher
       - roles
       - subject
       - updatedAt
+    UpdateStudentLessonTranslationPermissionRequest:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+      required:
+      - allowed
+    TeacherDirectoryEntry:
+      type: object
+      properties:
+        subject:
+          type: string
+        displayName:
+          type: string
+      required:
+      - displayName
+      - subject
+    TeacherStudentResponse:
+      type: object
+      properties:
+        student:
+          $ref: "#/components/schemas/UserManagementUser"
+        access:
+          type: string
+      required:
+      - access
+      - student
+    UserManagementUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+        username:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+        displayName:
+          type:
+          - string
+          - "null"
+        roles:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        primaryTeacher:
+          oneOf:
+          - $ref: "#/components/schemas/TeacherDirectoryEntry"
+          - type: "null"
+        activeDelegates:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeacherDirectoryEntry"
+        lessonTranslationAllowed:
+          type: boolean
+          readOnly: true
+      required:
+      - activeDelegates
+      - id
+      - lessonTranslationAllowed
+      - roles
+      - status
+      - subject
     ScheduledLessonMaterialAssignmentRequest:
       type: object
       properties:
@@ -3850,56 +3949,6 @@ components:
           - "null"
       required:
       - roles
-    TeacherDirectoryEntry:
-      type: object
-      properties:
-        subject:
-          type: string
-        displayName:
-          type: string
-      required:
-      - displayName
-      - subject
-    UserManagementUser:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        subject:
-          type: string
-        username:
-          type:
-          - string
-          - "null"
-        email:
-          type:
-          - string
-          - "null"
-        displayName:
-          type:
-          - string
-          - "null"
-        roles:
-          type: array
-          items:
-            type: string
-        status:
-          type: string
-        primaryTeacher:
-          oneOf:
-          - $ref: "#/components/schemas/TeacherDirectoryEntry"
-          - type: "null"
-        activeDelegates:
-          type: array
-          items:
-            $ref: "#/components/schemas/TeacherDirectoryEntry"
-      required:
-      - activeDelegates
-      - id
-      - roles
-      - status
-      - subject
     AssignPrimaryTeacherRequest:
       type: object
       properties:
@@ -3908,16 +3957,6 @@ components:
           minLength: 1
       required:
       - teacherSubject
-    TeacherStudentResponse:
-      type: object
-      properties:
-        student:
-          $ref: "#/components/schemas/UserManagementUser"
-        access:
-          type: string
-      required:
-      - access
-      - student
     AttachStudentRequest:
       type: object
       properties:
@@ -4065,9 +4104,12 @@ components:
         expiresAt:
           type: string
           format: date-time
+        lessonTranslationAllowed:
+          type: boolean
       required:
       - expiresAt
       - identity
+      - lessonTranslationAllowed
       - roomName
       - serverUrl
       - token

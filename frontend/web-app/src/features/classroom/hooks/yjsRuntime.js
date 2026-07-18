@@ -12,6 +12,7 @@ const annotationElementKinds = new Set([
   "arrow",
   "ellipse",
   "line",
+  "mindMapNode",
   "rectangle",
   "stickyNote",
   "stroke",
@@ -253,10 +254,34 @@ function normalizeAnnotationElement(value, index) {
   if (x === null || y === null || width === null || height === null) {
     return null;
   }
+  if (kind === "mindMapNode") {
+    const parentId = asString(element?.parentId) || null;
+    const mapId = asString(element?.mapId) || (parentId ? "" : id);
+    if (!mapId) return null;
+    const fontSize = normalizeFontSize(element?.fontSize, parentId === null ? 24 : 18);
+    const text = asString(element?.text).slice(0, 500);
+    const size = normalizeMindMapSize(fontSize, text);
+    return {
+      ...base,
+      fill: asString(element?.fill) || "#ffffff",
+      fontSize,
+      height: size.height,
+      kind,
+      mapId,
+      order: finiteNumberOr(element?.order, index),
+      parentId,
+      side: parentId === null ? "root" : element?.side === "left" ? "left" : "right",
+      text,
+      width: size.width,
+      x: clampCoordinate(x),
+      y: clampCoordinate(y),
+    };
+  }
   if (kind === "text" || kind === "stickyNote") {
     return {
       ...base,
       fill: asString(element?.fill) || (kind === "stickyNote" ? "#fff0a8" : "transparent"),
+      fontSize: normalizeFontSize(element?.fontSize, 30),
       height: Math.max(36, height),
       kind,
       text: asString(element?.text),
@@ -302,6 +327,33 @@ function annotationElementKind(kind, legacyPoints) {
 function normalizeStrokeWidth(value) {
   const width = finiteNumberOr(value, 8);
   return width === 4 || width === 16 ? width : 8;
+}
+
+function normalizeFontSize(value, fallback) {
+  const fontSize = asFiniteNumber(value);
+  return fontSize === 14 || fontSize === 18 || fontSize === 24 || fontSize === 30 || fontSize === 32
+    ? fontSize
+    : fallback;
+}
+
+function normalizeMindMapSize(fontSize, text) {
+  const presets = {
+    14: { height: 46, width: 132 },
+    18: { height: 56, width: 148 },
+    24: { height: 68, width: 180 },
+    30: { height: 86, width: 208 },
+    32: { height: 92, width: 220 },
+  };
+  const preset = presets[fontSize] ?? presets[24];
+  const usableWidth = Math.max(40, preset.width - (fontSize >= 24 ? 24 : 20));
+  const charactersPerLine = Math.max(8, Math.floor(usableWidth / (fontSize * 0.58)));
+  const lineCount = (text || " ").split("\n").reduce((total, line) => (
+    total + Math.max(1, Math.ceil(Math.max(1, line.length) / charactersPerLine))
+  ), 0);
+  return {
+    height: Math.min(180, Math.max(preset.height, Math.ceil(lineCount * fontSize * 1.15 + (fontSize >= 24 ? 20 : 14)))),
+    width: preset.width,
+  };
 }
 
 function finiteNumberOr(value, fallback) {

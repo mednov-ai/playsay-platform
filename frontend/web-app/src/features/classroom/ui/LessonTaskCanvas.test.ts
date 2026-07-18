@@ -433,6 +433,59 @@ describe("LessonTaskCanvas", () => {
     fireEvent.blur(editor!);
     expect(container.querySelector(".playsay-annotation-text-stickyNote")?.textContent).toContain("New idea");
   });
+
+  it("changes the default and selected Text font size from the toolbar", async () => {
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+    const layer = await annotationLayer(container);
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-text']")!);
+    expect(container.querySelector(".playsay-font-size-controls output")?.textContent).toBe("24");
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-font-size-decrease']")!);
+    fireEvent.pointerDown(layer, { button: 0, clientX: 250, clientY: 260, pointerId: 1 });
+
+    expect(container.querySelector<HTMLElement>(".playsay-annotation-text-text")?.style.fontSize).toBe("18px");
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-font-size-increase']")!);
+    expect(container.querySelector<HTMLElement>(".playsay-annotation-text-text")?.style.fontSize).toBe("24px");
+  });
+
+  it("creates a mind map root and adds an automatically connected child with Tab", async () => {
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+    const layer = await annotationLayer(container);
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-mind-map']")!);
+    fireEvent.pointerDown(layer, { button: 0, clientX: 500, clientY: 420, pointerId: 1 });
+    const rootEditor = container.querySelector<HTMLTextAreaElement>(".playsay-annotation-text-mindMapNode textarea");
+    expect(rootEditor).toBeTruthy();
+    fireEvent.change(rootEditor!, { target: { value: "Present Simple" } });
+    fireEvent.keyDown(rootEditor!, { key: "Tab" });
+
+    expect(container.querySelectorAll(".playsay-annotation-text-mindMapNode")).toHaveLength(2);
+    expect(container.querySelector(".playsay-annotation-text-mindMapNode")?.textContent).toContain("Present Simple");
+    expect(container.querySelector(".playsay-mind-map-connector")).toBeTruthy();
+    expect(container.querySelectorAll(".playsay-annotation-text-mindMapNode textarea")).toHaveLength(1);
+    const childNode = container.querySelector<HTMLElement>(".playsay-annotation-text-mindMapNode textarea")?.parentElement;
+    expect(childNode?.style.fontSize).toBe("18px");
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-font-size-increase']")!);
+    expect(childNode?.style.fontSize).toBe("24px");
+  });
 });
 
 async function annotationLayer(container: HTMLElement): Promise<SVGSVGElement> {

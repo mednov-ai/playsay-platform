@@ -3,14 +3,19 @@ import {
   annotationContentFromElements,
   annotationContentFromJson,
   annotationElementsForPage,
+  canReparentMindMapNode,
+  deleteMindMapSubtree,
   eraseAnnotationElementsAt,
+  layoutMindMap,
   pointsToSvgPath,
+  resizeMindMapNodeForText,
   type AnnotationElement,
+  type AnnotationMindMapNode,
   type AnnotationStroke,
 } from "./annotation";
 
 describe("annotation model", () => {
-  it("stores mixed board elements in schema v3 material-page coordinates", () => {
+  it("stores mixed board elements in schema v5 material-page coordinates", () => {
     const elements: AnnotationElement[] = [
       stroke(),
       {
@@ -27,6 +32,7 @@ describe("annotation model", () => {
         color: "#111111",
         createdAt: 3,
         fill: "#fff0a8",
+        fontSize: 30,
         height: 160,
         id: "sticky-1",
         kind: "stickyNote",
@@ -46,7 +52,7 @@ describe("annotation model", () => {
         expect.objectContaining({ id: "arrow-1", kind: "arrow", strokeWidth: 16 }),
         expect.objectContaining({ id: "sticky-1", kind: "stickyNote", text: "Remember this" }),
       ]),
-      schemaVersion: 3,
+      schemaVersion: 5,
     });
   });
 
@@ -130,7 +136,78 @@ describe("annotation model", () => {
       { pageId: "material", x: 3.45, y: 4.56 },
     ])).toBe("M 1.0 2.0 L 3.5 4.6");
   });
+
+  it("serializes mind map nodes and lays branches out on both sides", () => {
+    const root = mindMapNode({ id: "map-1", mapId: "map-1", parentId: null, side: "root", x: 390, y: 450 });
+    const left = mindMapNode({ id: "left", mapId: "map-1", parentId: root.id, side: "left", order: 0 });
+    const right = mindMapNode({ id: "right", mapId: "map-1", parentId: root.id, side: "right", order: 0 });
+    const laidOut = layoutMindMap([root, left, right], root.mapId).filter((element): element is AnnotationMindMapNode => element.kind === "mindMapNode");
+
+    expect(laidOut.find((node) => node.id === "left")!.x).toBeLessThan(root.x);
+    expect(laidOut.find((node) => node.id === "right")!.x).toBeGreaterThan(root.x);
+    expect(annotationContentFromElements(laidOut, "page-1")).toEqual(expect.objectContaining({
+      schemaVersion: 5,
+      elements: expect.arrayContaining([expect.objectContaining({ kind: "mindMapNode", mapId: "map-1", parentId: "map-1" })]),
+    }));
+  });
+
+  it("adds font-size defaults to legacy text and compacts legacy mind map nodes", () => {
+    const content = annotationContentFromJson({
+      schemaVersion: 4,
+      elements: [
+        { color: "#111111", createdAt: 1, fill: "transparent", height: 90, id: "text", kind: "text", pageId: "page-1", text: "Legacy", width: 260, x: 10, y: 20 },
+        { color: "#ffffff", createdAt: 2, fill: "#ff5c00", height: 82, id: "map", kind: "mindMapNode", mapId: "map", order: 0, pageId: "page-1", parentId: null, side: "root", text: "Rule", width: 220, x: 300, y: 300 },
+      ],
+    });
+
+    expect(content.schemaVersion).toBe(5);
+    expect(content.elements.find((element) => element.id === "text")).toEqual(expect.objectContaining({ fontSize: 30 }));
+    expect(content.elements.find((element) => element.id === "map")).toEqual(expect.objectContaining({ fontSize: 24, height: 68, width: 180 }));
+  });
+
+  it("grows compact mind map nodes for wrapped text", () => {
+    const compact = resizeMindMapNodeForText(mindMapNode(), 18, "Short");
+    const wrapped = resizeMindMapNodeForText(mindMapNode(), 18, "A long grammar explanation that wraps across several lines in the node");
+
+    expect(compact).toEqual(expect.objectContaining({ fontSize: 18, height: 56, width: 148 }));
+    expect(wrapped.height).toBeGreaterThan(compact.height);
+    expect(wrapped.height).toBeLessThanOrEqual(180);
+  });
+
+  it("deletes a mind map subtree and prevents cyclic reparenting", () => {
+    const root = mindMapNode({ id: "map-1", mapId: "map-1", parentId: null, side: "root" });
+    const child = mindMapNode({ id: "child", mapId: "map-1", parentId: root.id });
+    const grandchild = mindMapNode({ id: "grandchild", mapId: "map-1", parentId: child.id });
+    const unrelated = stroke();
+    const elements: AnnotationElement[] = [root, child, grandchild, unrelated];
+
+    expect(deleteMindMapSubtree(elements, child.id).map((element) => element.id)).toEqual([root.id, unrelated.id]);
+    expect(canReparentMindMapNode(elements, child.id, grandchild.id)).toBe(false);
+    expect(canReparentMindMapNode(elements, grandchild.id, root.id)).toBe(true);
+  });
 });
+
+function mindMapNode(overrides: Partial<AnnotationMindMapNode> = {}): AnnotationMindMapNode {
+  return {
+    color: "#ff5c00",
+    createdAt: 1,
+    fill: "#ffffff",
+    fontSize: 18,
+    height: 66,
+    id: "node-1",
+    kind: "mindMapNode",
+    mapId: "map-1",
+    order: 0,
+    pageId: "page-1",
+    parentId: "map-1",
+    side: "right",
+    text: "Rule",
+    width: 184,
+    x: 0,
+    y: 0,
+    ...overrides,
+  };
+}
 
 function stroke(overrides: Partial<AnnotationStroke> = {}): AnnotationStroke {
   return {

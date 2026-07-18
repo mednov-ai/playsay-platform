@@ -17,6 +17,7 @@ import {
   Minimize2,
   Minus,
   MousePointer2,
+  Network,
   PenLine,
   RectangleHorizontal,
   Redo2,
@@ -45,8 +46,10 @@ import {
   type MaterialHtmlGameSync,
 } from "../../materials";
 import {
+  annotationFontSizePresets,
   annotationElementsForPage,
   type AnnotationElement,
+  type AnnotationFontSize,
   type AnnotationStrokeWidth,
 } from "../model/annotation";
 import type { CollaborationCursor, CollaborationParticipant } from "../hooks/useYjsWorkspace";
@@ -103,8 +106,10 @@ export function LessonTaskCanvas({
   const firstPageId = document?.pages[0]?.id ?? null;
   const {
     activePageId,
+    addMindMapNode,
     annotationColor,
     annotationElements,
+    annotationFontSize,
     annotationStrokeWidth,
     annotationTool,
     beginAnnotation,
@@ -118,6 +123,8 @@ export function LessonTaskCanvas({
     endAnnotation,
     extendAnnotation,
     finishTextEditing,
+    handleMindMapKey,
+    mindMapLimitReached,
     redo,
     selectedElementId,
     setActivePageId,
@@ -126,6 +133,7 @@ export function LessonTaskCanvas({
     undo,
     updateAnnotationText,
     updateSelectedColor,
+    updateSelectedFontSize,
     updateSelectedStrokeWidth,
   } = useLessonAnnotation({ initialPageId: firstPageId, lessonId, liveAnnotation: annotationSync, materialId: material?.id });
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
@@ -139,6 +147,15 @@ export function LessonTaskCanvas({
     presentationMode,
   );
   const visibleAnnotationElements = annotationElementsForPage(annotationElements, activePage?.id ?? activePageId);
+  const selectedAnnotationElement = selectedElementId
+    ? visibleAnnotationElements.find((element) => element.id === selectedElementId) ?? null
+    : null;
+  const showFontSizeControls = annotationTool === "text"
+    || annotationTool === "mindMap"
+    || selectedAnnotationElement?.kind === "text"
+    || selectedAnnotationElement?.kind === "mindMapNode";
+  const smallerFontSize = [...annotationFontSizePresets].reverse().find((fontSize) => fontSize < annotationFontSize);
+  const largerFontSize = annotationFontSizePresets.find((fontSize) => fontSize > annotationFontSize);
   const activePageAcceptsAnswers = materialPageAcceptsAnswers(activePage);
 
   useEffect(() => {
@@ -241,11 +258,14 @@ export function LessonTaskCanvas({
         <AnnotationToolButton active={annotationTool === "ellipse"} label={t("classroom.annotation.ellipse")} onClick={() => setAnnotationTool("ellipse")} testId="annotation-tool-ellipse">
           <Circle className="h-4 w-4" />
         </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "text"} label={t("classroom.annotation.text")} onClick={() => setAnnotationTool("text")} testId="annotation-tool-text">
+        <AnnotationToolButton active={annotationTool === "text"} label={t("classroom.annotation.text")} onClick={() => { setSelectedElementId(null); setAnnotationTool("text"); }} testId="annotation-tool-text">
           <TypeIcon className="h-4 w-4" />
         </AnnotationToolButton>
         <AnnotationToolButton active={annotationTool === "stickyNote"} label={t("classroom.annotation.stickyNote")} onClick={() => setAnnotationTool("stickyNote")} testId="annotation-tool-sticky-note">
           <StickyNote className="h-4 w-4" />
+        </AnnotationToolButton>
+        <AnnotationToolButton active={annotationTool === "mindMap"} label={t("classroom.annotation.mindMap")} onClick={() => { setSelectedElementId(null); setAnnotationTool("mindMap"); }} testId="annotation-tool-mind-map">
+          <Network className="h-4 w-4" />
         </AnnotationToolButton>
         <AnnotationToolButton
           active={false}
@@ -279,6 +299,33 @@ export function LessonTaskCanvas({
             </button>
           ))}
         </div>
+        {showFontSizeControls ? (
+          <div className="playsay-font-size-controls" aria-label={t("classroom.annotation.fontSize")}>
+            <button
+              aria-label={t("classroom.annotation.fontSizeDecrease")}
+              className="playsay-font-size-button"
+              data-testid="annotation-font-size-decrease"
+              disabled={!smallerFontSize}
+              onClick={() => smallerFontSize && updateSelectedFontSize(smallerFontSize as AnnotationFontSize)}
+              title={t("classroom.annotation.fontSizeDecrease")}
+              type="button"
+            >
+              A−
+            </button>
+            <output aria-label={t("classroom.annotation.fontSizeValue", { value: annotationFontSize })}>{annotationFontSize}</output>
+            <button
+              aria-label={t("classroom.annotation.fontSizeIncrease")}
+              className="playsay-font-size-button"
+              data-testid="annotation-font-size-increase"
+              disabled={!largerFontSize}
+              onClick={() => largerFontSize && updateSelectedFontSize(largerFontSize as AnnotationFontSize)}
+              title={t("classroom.annotation.fontSizeIncrease")}
+              type="button"
+            >
+              A+
+            </button>
+          </div>
+        ) : null}
         <div className="playsay-color-swatches" aria-label={t("classroom.annotation.color")}>
           {["#ff5c00", "#00a878", "#2574ff"].map((color) => (
             <button
@@ -354,6 +401,7 @@ export function LessonTaskCanvas({
               anchorBounds={activePage?.layout === "STATIC_IMAGE" ? annotationAnchorBounds : undefined}
               editingElementId={editingElementId}
               elements={visibleAnnotationElements}
+              onAddMindMapNode={addMindMapNode}
               onBegin={beginAnnotation}
               onDeleteSelected={deleteSelectedElement}
               onDeselect={() => setSelectedElementId(null)}
@@ -362,6 +410,7 @@ export function LessonTaskCanvas({
               onFinishTextEditing={finishTextEditing}
               onMove={extendAnnotation}
               onMoveElement={beginElementMove}
+              onMindMapKey={handleMindMapKey}
               onRedo={redo}
               onResizeElement={beginElementResize}
               onSelectElement={setSelectedElementId}
@@ -370,6 +419,9 @@ export function LessonTaskCanvas({
               selectedElementId={selectedElementId}
               tool={annotationTool}
             />
+            {mindMapLimitReached ? (
+              <div className="playsay-mind-map-limit" role="status">{t("classroom.annotation.mindMapLimit")}</div>
+            ) : null}
             <PresenceCursorLayer participants={annotationSync?.participants ?? []} />
           </div>
         </div>

@@ -2379,6 +2379,10 @@
   cursor: text;
 }
 
+.playsay-annotation-layer[data-tool="mindMap"] {
+  cursor: copy;
+}
+
 .playsay-annotation-element {
   outline: none;
 }
@@ -2410,7 +2414,6 @@
   overflow: hidden;
   padding: 12px;
   font-family: Manrope, sans-serif;
-  font-size: 30px;
   font-weight: 800;
   line-height: 1.2;
   text-align: center;
@@ -2423,6 +2426,82 @@
   justify-content: flex-start;
   box-shadow: 0 10px 28px rgb(17 17 17 / 0.14);
   text-align: left;
+}
+
+.playsay-annotation-text-mindMapNode {
+  border-color: currentColor;
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgb(17 17 17 / 0.12);
+  line-height: 1.1;
+  padding: 6px 10px;
+}
+
+.playsay-annotation-text-mindMapNode[data-mind-map-root="true"] {
+  border-color: transparent;
+  box-shadow: 0 12px 30px rgb(17 17 17 / 0.18);
+}
+
+.playsay-annotation-text-mindMapNode[data-text-clamped="true"] > span {
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+}
+
+.playsay-mind-map-connector {
+  opacity: 0.78;
+  pointer-events: none;
+  stroke-linecap: round;
+}
+
+.playsay-mind-map-actions,
+.playsay-mind-map-add {
+  pointer-events: all;
+}
+
+.playsay-mind-map-add {
+  cursor: pointer;
+  outline: none;
+}
+
+.playsay-mind-map-add circle {
+  fill: #ffffff;
+  stroke: #ff5c00;
+  stroke-width: 4;
+}
+
+.playsay-mind-map-add path {
+  fill: none;
+  pointer-events: none;
+  stroke: #ff5c00;
+  stroke-linecap: round;
+  stroke-width: 4;
+}
+
+.playsay-mind-map-add:focus-visible circle {
+  filter: drop-shadow(0 0 7px rgb(255 92 0 / 0.75));
+}
+
+.playsay-mind-map-delete circle {
+  stroke: #d83b2d;
+}
+
+.playsay-mind-map-delete path {
+  stroke: #d83b2d;
+}
+
+.playsay-mind-map-limit {
+  position: absolute;
+  z-index: 7;
+  top: 0.75rem;
+  left: 50%;
+  max-width: min(24rem, calc(100% - 2rem));
+  transform: translateX(-50%);
+  border: 1px solid rgb(255 92 0 / 0.28);
+  border-radius: 0.75rem;
+  background: #fff7f1;
+  box-shadow: 0 0.5rem 1.5rem rgb(17 17 17 / 0.12);
+  color: #111111;
+  font-size: 0.8rem;
+  font-weight: 850;
+  padding: 0.65rem 0.85rem;
 }
 
 .playsay-annotation-text[data-empty="true"] span {

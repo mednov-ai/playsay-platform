@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile
 class MaterialAssetUploadService(
     private val materialAssetRepo: MaterialAssetRepo,
     private val materialObjectStorage: MaterialObjectStorage,
+    private val materialHtmlGameMetadataService: MaterialHtmlGameMetadataService,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) {
     fun validateImageFile(file: MultipartFile): ValidatedMaterialAssetFile {
@@ -142,6 +143,7 @@ class MaterialAssetUploadService(
     ): UUID {
         val id = UUID.randomUUID()
         val storageKey = "material-assets/$materialId/$id.html"
+        val gameMetadata = materialHtmlGameMetadataService.extract(bytes, originalFileName)
         try {
             materialObjectStorage.putObject(storageKey, bytes, "text/html")
             materialAssetRepo.saveAndFlush(
@@ -159,6 +161,10 @@ class MaterialAssetUploadService(
                             put("byteSize", bytes.size)
                             put("storageKey", storageKey)
                             put("selfContained", true)
+                            put("gameTitle", gameMetadata.displayTitle)
+                            put("gameTitleSource", gameMetadata.titleSource)
+                            put("gameTitleNeedsAi", gameMetadata.titleNeedsAi)
+                            put("enrichmentStatus", "IDLE")
                         },
                     ),
                     createdAt = Instant.now(),

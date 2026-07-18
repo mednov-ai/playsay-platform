@@ -6,7 +6,9 @@ import com.playsay.gateway.entity.MaterialAssetEntity
 import java.time.Instant
 import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
+import jakarta.persistence.LockModeType
 
 data class LessonMaterialRow(
     val id: UUID,
@@ -31,6 +33,10 @@ data class LessonMaterialRow(
 )
 
 interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select material from LessonMaterialEntity material where material.id = :materialId")
+    fun lockById(materialId: UUID): LessonMaterialEntity?
+
     fun findByOwnerTeacherUserId(ownerTeacherUserId: UUID): List<LessonMaterialEntity>
     fun existsByIdAndStatusNot(id: UUID, status: String): Boolean
 

@@ -4,6 +4,8 @@ import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.repo.*
 import com.playsay.gateway.service.*
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.utils.MetaData
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
@@ -42,6 +44,7 @@ import liquibase.integration.spring.SpringLiquibase
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=true",
         "playsay.storage.provider=memory",
+        "playsay.ai.html-game-enrichment.enabled=false",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -56,6 +59,8 @@ class MaterialControllerTest @Autowired constructor(
     private val userProfileStore: UserProfileStore,
     private val lessonMaterialAnnotationRepo: LessonMaterialAnnotationRepo,
     private val materialAssetRepo: MaterialAssetRepo,
+    private val materialHtmlGameEnrichmentRepo: MaterialHtmlGameEnrichmentRepo,
+    private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
     private val submissionRepo: SubmissionRepo,
     private val assignmentRepo: AssignmentRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
@@ -83,6 +88,7 @@ class MaterialControllerTest @Autowired constructor(
     @BeforeEach
     fun cleanDatabase() {
         lessonMaterialAnnotationRepo.deleteAllInBatch()
+        materialHtmlGameEnrichmentRepo.deleteAllInBatch()
         materialAssetRepo.deleteAllInBatch()
         submissionRepo.deleteAllInBatch()
         assignmentRepo.deleteAllInBatch()
@@ -628,15 +634,119 @@ class MaterialControllerTest @Autowired constructor(
         assertEquals("HTML_GAME", gameResponse.body!!.kind)
         assertEquals("text/html", gameResponse.body!!.metadata["mimeType"].asText())
         assertTrue(gameResponse.body!!.metadata["selfContained"].asBoolean())
+        assertEquals("Memory game", gameResponse.body!!.metadata["gameTitle"].asText())
+        assertEquals("HTML", gameResponse.body!!.metadata["gameTitleSource"].asText())
         assertEquals(1, materialCrudController.get(teacher, material.id).document["pages"].size())
         val gameContent = materialAssetController.assetContent(teacher, material.id, gameResponse.body!!.id)
         assertEquals("text/html", gameContent.headers.contentType?.toString())
         assertTrue(assertNotNull(gameContent.body).decodeToString().contains("Memory game"))
 
+        val nonEnglishGame = materialAssetController.uploadHtmlGameAsset(
+            teacher,
+            material.id,
+            htmlFile(name = "rhyme.html", content = "<html><head><title>Найди рифму</title></head><body><h1>Найди рифму</h1></body></html>"),
+        ).body!!
+        assertEquals("New game", nonEnglishGame.metadata["gameTitle"].asText())
+        assertTrue(nonEnglishGame.metadata["gameTitleNeedsAi"].asBoolean())
+
         val studentError = assertFailsWith<ResponseStatusException> {
             materialAssetController.uploadHtmlGameAsset(student, material.id, htmlFile(name = "student.html"))
         }
         assertEquals(HttpStatus.FORBIDDEN, studentError.statusCode)
+    }
+
+    @Test
+    fun `html game enrichment generates icon and updates linked block`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val created = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Game enrichment", status = "DRAFT"),
+        ).body!!
+        val gameAsset = materialAssetController.uploadHtmlGameAsset(
+            teacher,
+            created.id,
+            htmlFile(name = "memory.html"),
+        ).body!!
+        materialCrudController.update(
+            teacher,
+            created.id,
+            LessonMaterialRequest(
+                title = created.title,
+                status = "DRAFT",
+                document = objectMapper.readTree(
+                    """
+                    {"schemaVersion":1,"pages":[{"id":"page-1","title":"Game","layout":"FLOW","blocks":[{"id":"game-1","type":"htmlGame","title":"Memory game","gameTitleSource":"HTML","url":"material-asset:${gameAsset.id}","height":640}]}]}
+                    """.trimIndent(),
+                ),
+            ),
+        )
+
+        val queued = materialAssetController.requestHtmlGameEnrichment(
+            teacher,
+            created.id,
+            gameAsset.id,
+            MaterialHtmlGameEnrichmentRequest(blockId = "game-1"),
+        )
+        assertEquals(HttpStatus.ACCEPTED, queued.statusCode)
+        assertEquals("PENDING", queued.body!!.status)
+
+        val jobId = assertNotNull(materialHtmlGameEnrichmentService.claimNext())
+        materialHtmlGameEnrichmentService.process(jobId)
+
+        val ready = materialAssetController.htmlGameEnrichmentStatus(teacher, created.id, gameAsset.id, "game-1")
+        assertEquals("READY", ready.status)
+        assertEquals("Memory game", ready.title)
+        assertTrue(ready.gameIconUrl!!.startsWith("material-asset:"))
+        val updatedBlock = materialCrudController.get(teacher, created.id).document["pages"][0]["blocks"][0]
+        assertEquals(ready.gameIconUrl, updatedBlock["gameIconUrl"].asText())
+        assertEquals("HTML", updatedBlock["gameTitleSource"].asText())
+        assertEquals(1, materialAssetController.listAssets(teacher, created.id).count { it.kind == "GAME_ICON" })
+
+        val invalidPreferredTitle = assertFailsWith<ProjectResponseException> {
+            materialAssetController.requestHtmlGameEnrichment(
+                teacher,
+                created.id,
+                gameAsset.id,
+                MaterialHtmlGameEnrichmentRequest(blockId = "game-1", preferredTitle = "Моя игра", regenerateIcon = true),
+            )
+        }
+        assertEquals(MetaData.ErrorCodes.MATERIAL_HTML_GAME_TITLE_NOT_ENGLISH, invalidPreferredTitle.errorCode)
+
+        val invalidManualDocument = materialCrudController.get(teacher, created.id).document.deepCopy<ObjectNode>()
+        invalidManualDocument["pages"][0]["blocks"][0].let { node ->
+            (node as ObjectNode).put("title", "Моя игра")
+            node.put("gameTitleSource", "USER")
+        }
+        val invalidManualTitle = assertFailsWith<ProjectResponseException> {
+            materialCrudController.update(
+                teacher,
+                created.id,
+                LessonMaterialRequest(title = created.title, status = "DRAFT", document = invalidManualDocument),
+            )
+        }
+        assertEquals(MetaData.ErrorCodes.MATERIAL_HTML_GAME_TITLE_NOT_ENGLISH, invalidManualTitle.errorCode)
+
+        val manualDocument = materialCrudController.get(teacher, created.id).document.deepCopy<ObjectNode>()
+        manualDocument["pages"][0]["blocks"][0].let { node ->
+            (node as ObjectNode).put("title", "My custom race")
+            node.put("gameTitleSource", "USER")
+        }
+        materialCrudController.update(
+            teacher,
+            created.id,
+            LessonMaterialRequest(title = created.title, status = "DRAFT", document = manualDocument),
+        )
+        materialAssetController.requestHtmlGameEnrichment(
+            teacher,
+            created.id,
+            gameAsset.id,
+            MaterialHtmlGameEnrichmentRequest(blockId = "game-1", preferredTitle = "My custom race", regenerateIcon = true),
+        )
+        materialHtmlGameEnrichmentService.process(assertNotNull(materialHtmlGameEnrichmentService.claimNext()))
+        val regeneratedBlock = materialCrudController.get(teacher, created.id).document["pages"][0]["blocks"][0]
+        assertEquals("My custom race", regeneratedBlock["title"].asText())
+        assertEquals("USER", regeneratedBlock["gameTitleSource"].asText())
+        assertEquals(1, materialAssetController.listAssets(teacher, created.id).count { it.kind == "GAME_ICON" })
     }
 
     @Test

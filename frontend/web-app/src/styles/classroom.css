@@ -1246,6 +1246,10 @@
   padding: 0;
 }
 
+.playsay-task-board[data-presentation-mode="image-focus"] .playsay-material-focus-stack {
+  z-index: auto;
+}
+
 .playsay-task-document-surface .playsay-presence-layer {
   z-index: 5;
 }

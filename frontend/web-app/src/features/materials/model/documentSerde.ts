@@ -195,6 +195,8 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   const objectFit = normalizeMaterialObjectFit(asString(block.objectFit));
   const imageSize = normalizeMaterialImageSize(asString(block.imageSize));
   const height = asNumber(block.height);
+  const gameIconUrl = asString(block.gameIconUrl);
+  const gameTitleSource = normalizeGameTitleSource(asString(block.gameTitleSource));
   const videoClip = normalizeMaterialVideoClip(block.videoClip);
 
   if (body) {
@@ -226,6 +228,10 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   }
   if (height !== null) {
     result.height = Math.min(800, Math.max(120, height));
+  }
+  if (type === "htmlGame") {
+    result.gameIconUrl = gameIconUrl || undefined;
+    result.gameTitleSource = gameTitleSource;
   }
 
   if (Array.isArray(block.cards)) {
@@ -300,6 +306,12 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   }
   if (block.height) {
     clean.height = Math.min(800, Math.max(120, block.height));
+  }
+  if (block.type === "htmlGame") {
+    if (block.gameIconUrl?.trim()) {
+      clean.gameIconUrl = block.gameIconUrl.trim();
+    }
+    clean.gameTitleSource = normalizeGameTitleSource(block.gameTitleSource) ?? "USER";
   }
   if (block.cards?.length) {
     clean.cards = block.cards
@@ -394,6 +406,10 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   }
 
   return clean;
+}
+
+function normalizeGameTitleSource(value: string | undefined): MaterialEditorBlock["gameTitleSource"] {
+  return value === "FILE" || value === "HTML" || value === "AI" || value === "USER" ? value : undefined;
 }
 
 export function materialAssessmentFromJson(value: unknown): MaterialAssessmentPolicy | undefined {

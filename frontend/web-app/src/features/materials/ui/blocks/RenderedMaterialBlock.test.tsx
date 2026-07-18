@@ -49,8 +49,59 @@ describe("RenderedMaterialBlock video playback", () => {
     expect(markup).toContain("playsay-rendered-image-static");
     expect(markup).toContain('data-playsay-annotation-anchor="true"');
     expect(markup).toContain('data-image-size="FULL"');
+    expect(markup).toContain('data-testid="material-image-focus-image-1"');
     expect(markup).not.toContain("<h4>");
     expect(markup).not.toContain("<figcaption>");
+  });
+
+  it("keeps medium images free from focus chrome", () => {
+    const markup = renderToStaticMarkup(
+      <RenderedMaterialBlock
+        assetTags={{}}
+        assetUrls={{}}
+        block={{ id: "image-medium", imageSize: "MEDIUM", title: "Medium", type: "image", url: "https://example.com/medium.png" }}
+        mode="classroom"
+        pageLayout="FLOW"
+      />,
+    );
+
+    expect(markup).not.toContain("material-image-focus-image-medium");
+  });
+
+  it("renders an HTML game as an application launcher without mounting an iframe", () => {
+    const markup = renderToStaticMarkup(
+      <RenderedMaterialBlock
+        assetTags={{}}
+        assetUrls={{}}
+        block={{ id: "game-1", title: "Word race", type: "htmlGame", url: "material-asset:game-asset" }}
+        mode="classroom"
+      />,
+    );
+
+    expect(markup).toContain('data-testid="html-game-launch-game-1"');
+    expect(markup).toContain("playsay-html-game-app");
+    expect(markup).not.toContain("<iframe");
+  });
+
+  it("renders a generated app icon for an enriched HTML game", () => {
+    const markup = renderToStaticMarkup(
+      <RenderedMaterialBlock
+        assetTags={{}}
+        assetUrls={{ "icon-asset": "blob:game-icon" }}
+        block={{
+          gameIconUrl: "material-asset:icon-asset",
+          gameTitleSource: "AI",
+          id: "game-icon",
+          title: "Animal match",
+          type: "htmlGame",
+          url: "material-asset:game-asset",
+        }}
+        mode="classroom"
+      />,
+    );
+
+    expect(markup).toContain('src="blob:game-icon"');
+    expect(markup).toContain("Animal match");
   });
 
   it("shows a link to the original video source in playback surfaces", () => {

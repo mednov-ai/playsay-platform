@@ -52,6 +52,7 @@ class MaterialRequestValidator(
         val scoringRubric = request.scoringRubric ?: defaultScoringRubric(objectMapper, messageProvider)
 
         validateJsonSize("document", document, 6_000_000)
+        validateManualHtmlGameTitles(document)
         validateJsonSize("sourceMeta", sourceMeta, 40_000)
         validateJsonSize("scoringRubric", scoringRubric, 40_000)
 
@@ -131,6 +132,22 @@ class MaterialRequestValidator(
         val byteSize = objectMapper.writeValueAsBytes(value).size
         if (byteSize > maxBytes) {
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.JSON_FIELD_TOO_LARGE, fieldName, maxBytes)
+        }
+    }
+
+    private fun validateManualHtmlGameTitles(document: JsonNode) {
+        document.path("pages").forEach { page ->
+            page.path("blocks").forEach { block ->
+                if (block.path("type").asText() == "htmlGame" && block.path("gameTitleSource").asText() == "USER") {
+                    val title = block.path("title").asText().trim()
+                    if (!MaterialHtmlGameTitlePolicy.isEnglish(title)) {
+                        throw ProjectResponseException.localized(
+                            HttpStatus.BAD_REQUEST,
+                            MetaData.ErrorCodes.MATERIAL_HTML_GAME_TITLE_NOT_ENGLISH,
+                        )
+                    }
+                }
+            }
         }
     }
 

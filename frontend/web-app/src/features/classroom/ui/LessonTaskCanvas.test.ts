@@ -106,10 +106,16 @@ const htmlGameMaterial = {
         title: "Pair up",
         url: "material-asset:asset-game",
         height: 640,
+      }, {
+        id: "game-2",
+        type: "htmlGame",
+        title: "Word race",
+        url: "material-asset:asset-game-2",
+        height: 640,
       }],
     }],
   },
-  blockCount: 1,
+  blockCount: 2,
 } satisfies LessonMaterial;
 
 const gameAndWorksheetMaterial = {
@@ -148,6 +154,10 @@ beforeEach(() => {
     id: "asset-game",
     kind: "HTML_GAME",
     contentUrl: "/api/materials/material-game/assets/asset-game/content",
+  }, {
+    id: "asset-game-2",
+    kind: "HTML_GAME",
+    contentUrl: "/api/materials/material-game/assets/asset-game-2/content",
   }]);
   apiMocks.fetchMaterialAssetText.mockResolvedValue("<!doctype html><html><body><button>Start</button></body></html>");
 });
@@ -262,7 +272,7 @@ describe("LessonTaskCanvas", () => {
     rectSpy.mockRestore();
   });
 
-  it("automatically focuses an HTML game and preserves its iframe while minimized", async () => {
+  it("launches an HTML game explicitly and preserves its iframe while minimized", async () => {
     const onPresentationModeChange = vi.fn();
     const { container } = render(createElement(LessonTaskCanvas, {
       lessonId: "lesson-1",
@@ -276,26 +286,38 @@ describe("LessonTaskCanvas", () => {
       teacherName: "Teacher Demo",
     }));
 
+    expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
+    expect(container.querySelector(".playsay-html-game iframe")).toBeNull();
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
     await waitFor(() => expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus"));
     await waitFor(() => expect(container.querySelector(".playsay-html-game iframe")).not.toBeNull());
     const iframe = container.querySelector(".playsay-html-game iframe");
     expect(container.querySelector(".playsay-html-game")?.getAttribute("data-fill-available")).toBe("true");
 
-    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-minimize']")!);
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
 
-    expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-minimized");
-    expect(container.querySelector("[data-testid='html-game-restore']")).toBeTruthy();
+    expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
     expect(container.querySelector(".playsay-html-game iframe")).toBe(iframe);
-    expect(container.querySelector(".playsay-material-blocks-html-game")?.getAttribute("aria-hidden")).toBe("true");
-    expect(onPresentationModeChange).toHaveBeenLastCalledWith("html-game-minimized");
+    expect(container.querySelector(".playsay-material-focused-game")?.getAttribute("data-active")).toBe("false");
+    expect(onPresentationModeChange).toHaveBeenLastCalledWith("default");
 
-    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-restore']")!);
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
 
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
     expect(container.querySelector(".playsay-html-game iframe")).toBe(iframe);
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-2']")!);
+
+    const frames = container.querySelectorAll(".playsay-html-game iframe");
+    expect(frames).toHaveLength(2);
+    expect(frames[0]).toBe(iframe);
+    expect(container.querySelectorAll(".playsay-material-focused-game")[0]?.getAttribute("data-active")).toBe("false");
+    expect(container.querySelectorAll(".playsay-material-focused-game")[1]?.getAttribute("data-active")).toBe("true");
   });
 
-  it("focuses the HTML game again after leaving and returning to its page", async () => {
+  it("does not auto-launch a legacy HTML game after returning to its page", async () => {
     const { container } = render(createElement(LessonTaskCanvas, {
       canControlPages: true,
       lessonId: "lesson-1",
@@ -308,14 +330,14 @@ describe("LessonTaskCanvas", () => {
       teacherName: "Teacher Demo",
     }));
 
-    await waitFor(() => expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus"));
-    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-minimize']")!);
+    expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
     const pageButtons = container.querySelectorAll<HTMLButtonElement>(".playsay-page-picker-button");
     fireEvent.click(pageButtons[1]!);
     await waitFor(() => expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default"));
     fireEvent.click(container.querySelectorAll<HTMLButtonElement>(".playsay-page-picker-button")[0]!);
 
-    await waitFor(() => expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus"));
+    expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
+    expect(container.querySelector("[data-testid='html-game-launch-game-1']")).toBeTruthy();
   });
 
   it("expands a static image only after the user presses the focus button", () => {
@@ -331,10 +353,10 @@ describe("LessonTaskCanvas", () => {
     }));
 
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
-    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='static-image-focus-toggle']")!);
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-image-focus-image-1']")!);
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("image-focus");
     expect(container.querySelector("[data-testid='annotation-tool-pen']")).toBeTruthy();
-    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='static-image-focus-toggle']")!);
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
   });
 

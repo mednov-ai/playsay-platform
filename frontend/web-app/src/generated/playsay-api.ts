@@ -921,6 +921,34 @@ export interface MaterialGenerateImagesRequest {
   regenerate?: boolean | null;
 }
 
+export interface MaterialHtmlGameEnrichmentRequest {
+  /** @maxLength 120 */
+  blockId: string;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  preferredTitle?: string | null;
+  /** @nullable */
+  regenerateIcon?: boolean | null;
+}
+
+export interface MaterialHtmlGameEnrichmentResponse {
+  assetId: string;
+  blockId: string;
+  status: string;
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  titleSource?: string | null;
+  /** @nullable */
+  iconAssetId?: string | null;
+  /** @nullable */
+  gameIconUrl?: string | null;
+  /** @nullable */
+  errorCode?: string | null;
+}
+
 export interface MaterialAssetResponse {
   id: string;
   materialId: string;
@@ -1349,6 +1377,10 @@ title?: string;
 
 export type AppendMaterialImagePageBody = {
   file: Blob;
+};
+
+export type GetMaterialHtmlGameEnrichmentParams = {
+blockId: string;
 };
 
 export type UploadMaterialImageAssetBody = {
@@ -4550,6 +4582,107 @@ export const generateMaterialImages = async (materialId: string,
 
   const data: generateMaterialImagesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as generateMaterialImagesResponse
+}
+
+
+
+export type getMaterialHtmlGameEnrichmentResponse200 = {
+  data: MaterialHtmlGameEnrichmentResponse
+  status: 200
+}
+
+export type getMaterialHtmlGameEnrichmentResponseSuccess = (getMaterialHtmlGameEnrichmentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMaterialHtmlGameEnrichmentResponse = (getMaterialHtmlGameEnrichmentResponseSuccess)
+
+export const getGetMaterialHtmlGameEnrichmentUrl = (materialId: string,
+    assetId: string,
+    params: GetMaterialHtmlGameEnrichmentParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/materials/${materialId}/assets/${assetId}/html-game-enrichment?${stringifiedParams}` : `/api/materials/${materialId}/assets/${assetId}/html-game-enrichment`
+}
+
+/**
+ * @summary Get HTML game enrichment status
+ */
+export const getMaterialHtmlGameEnrichment = async (materialId: string,
+    assetId: string,
+    params: GetMaterialHtmlGameEnrichmentParams, options?: RequestInit): Promise<getMaterialHtmlGameEnrichmentResponse> => {
+
+  const res = await fetch(getGetMaterialHtmlGameEnrichmentUrl(materialId,assetId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMaterialHtmlGameEnrichmentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMaterialHtmlGameEnrichmentResponse
+}
+
+
+
+export type requestMaterialHtmlGameEnrichmentResponse200 = {
+  data: MaterialHtmlGameEnrichmentResponse
+  status: 200
+}
+
+export type requestMaterialHtmlGameEnrichmentResponseSuccess = (requestMaterialHtmlGameEnrichmentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type requestMaterialHtmlGameEnrichmentResponse = (requestMaterialHtmlGameEnrichmentResponseSuccess)
+
+export const getRequestMaterialHtmlGameEnrichmentUrl = (materialId: string,
+    assetId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}/html-game-enrichment`
+}
+
+/**
+ * Queues background title analysis and app-icon generation for a linked HTML game block.
+ * @summary Generate HTML game metadata and icon
+ */
+export const requestMaterialHtmlGameEnrichment = async (materialId: string,
+    assetId: string,
+    materialHtmlGameEnrichmentRequest: MaterialHtmlGameEnrichmentRequest, options?: RequestInit): Promise<requestMaterialHtmlGameEnrichmentResponse> => {
+
+  const res = await fetch(getRequestMaterialHtmlGameEnrichmentUrl(materialId,assetId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialHtmlGameEnrichmentRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: requestMaterialHtmlGameEnrichmentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as requestMaterialHtmlGameEnrichmentResponse
 }
 
 

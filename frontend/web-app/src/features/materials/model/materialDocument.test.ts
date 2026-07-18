@@ -78,7 +78,7 @@ describe("material document accepted answers", () => {
           id: "page-game",
           title: "Race",
           layout: "HTML_GAME",
-          blocks: [{ id: "game-1", type: "htmlGame", title: "Race", height: 640, url: "material-asset:game-1" }],
+          blocks: [{ id: "game-1", type: "htmlGame", title: "Race", height: 640, url: "material-asset:game-1", gameIconUrl: "material-asset:icon-1", gameTitleSource: "AI" }],
         },
       ],
     });
@@ -86,12 +86,14 @@ describe("material document accepted answers", () => {
     expect(document.pages[0].blocks[0].imageSize).toBe("FULL");
     expect(document.pages[1]).toMatchObject({
       layout: "HTML_GAME",
-      blocks: [{ id: "game-1", type: "htmlGame", height: 640, url: "material-asset:game-1" }],
+      blocks: [{ id: "game-1", type: "htmlGame", height: 640, url: "material-asset:game-1", gameIconUrl: "material-asset:icon-1", gameTitleSource: "AI" }],
     });
     expect(cleanMaterialBlock(document.pages[1].blocks[0])).toMatchObject({
       type: "htmlGame",
       height: 640,
       url: "material-asset:game-1",
+      gameIconUrl: "material-asset:icon-1",
+      gameTitleSource: "AI",
     });
   });
 

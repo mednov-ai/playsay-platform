@@ -115,6 +115,22 @@ class MaterialAssetService(
         return requireNotNull(findAsset(assetId)).toResponse(objectMapper)
     }
 
+    fun storedAssetBytes(materialId: UUID, assetId: UUID): ByteArray {
+        val asset = findAsset(assetId)?.takeIf { found -> found.materialId == materialId }
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
+        val storageKey = asset.storageKey?.takeIf { it.isNotBlank() }
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_CONTENT_NOT_FOUND)
+        return try {
+            materialObjectStorage.getObject(storageKey).bytes
+        } catch (exception: MaterialObjectStorageException) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
+        }
+    }
+
+    fun requireHtmlGameAsset(materialId: UUID, assetId: UUID): MaterialAssetEntity =
+        findAsset(assetId)?.takeIf { asset -> asset.materialId == materialId && asset.kind == "HTML_GAME" }
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
+
     fun copyAssets(sourceMaterialId: UUID, targetMaterialId: UUID, assetIds: Set<UUID>): Map<UUID, UUID> {
         if (assetIds.isEmpty()) {
             return emptyMap()

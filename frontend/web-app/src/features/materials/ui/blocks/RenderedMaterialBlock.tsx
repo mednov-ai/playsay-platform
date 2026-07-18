@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
-import { CircleAlert, ImageIcon, Video } from "lucide-react";
+import { CircleAlert, Gamepad2, ImageIcon, Maximize2, Play, Video } from "lucide-react";
 import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
 import {
   clampNumber,
@@ -11,7 +11,6 @@ import {
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
   type MaterialEditorPage,
-  type MaterialHtmlGameSync,
   type MaterialRenderMode,
 } from "../../model/materialDocument";
 import { RenderedMarkdown, MarkdownInline } from "../markdown/RenderedMarkdown";
@@ -22,7 +21,6 @@ import { RenderedChoiceExercise } from "./RenderedChoiceExercise";
 import { RenderedFillGapExercise } from "./RenderedFillGapExercise";
 import { RenderedMatchingPairsExercise } from "./RenderedMatchingPairsExercise";
 import { useAppTranslation } from "../../../../shared/i18n";
-import { HtmlGameFrame } from "./HtmlGameFrame";
 
 type MaterialVideoQuality = "LOW" | "MEDIUM" | "HIGH";
 
@@ -32,14 +30,12 @@ export function RenderedMaterialBlock({
   assetTags,
   assetUrls,
   block,
-  htmlAssets = {},
-  htmlGameSync,
-  htmlGameFillAvailable = false,
   mode,
   onAnswerChange,
   onAssetTagsChange,
   onBlockPatchCommit,
   onBlockPatch,
+  onRequestFocus,
   pageLayout,
   materialId,
 }: {
@@ -48,15 +44,13 @@ export function RenderedMaterialBlock({
   assetTags: Record<string, string[]>;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
-  htmlAssets?: Record<string, string>;
-  htmlGameSync?: MaterialHtmlGameSync;
-  htmlGameFillAvailable?: boolean;
   materialId?: string;
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
   onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
+  onRequestFocus?: (kind: "htmlGame" | "image", blockId: string) => void;
   pageLayout?: MaterialEditorPage["layout"];
 }) {
   const { t } = useAppTranslation();
@@ -252,6 +246,7 @@ export function RenderedMaterialBlock({
         const imageHeight = block.height ? `${block.height}px` : undefined;
         const imageSize = block.imageSize ?? "MEDIUM";
         const objectFit = block.objectFit ?? (pageLayout === "STATIC_IMAGE" ? "contain" : undefined);
+        const canFocusImage = pageLayout === "STATIC_IMAGE" || imageSize === "LARGE" || imageSize === "FULL";
         return blockSection(
           <>
             {pageLayout === "STATIC_IMAGE" ? null : <h4>{block.title}</h4>}
@@ -264,6 +259,18 @@ export function RenderedMaterialBlock({
                 style={{ "--playsay-image-height": imageHeight, "--playsay-image-fit": objectFit } as CSSProperties}
               >
                 <img alt={block.alt || block.caption || block.prompt || block.title} src={imageUrl} />
+                {canFocusImage ? (
+                  <button
+                    aria-label={t("materials.renderer.expandImage", { title: block.title })}
+                    className="playsay-material-focus-trigger"
+                    data-testid={`material-image-focus-${block.id}`}
+                    onClick={() => onRequestFocus?.("image", block.id)}
+                    title={t("materials.renderer.expandImage", { title: block.title })}
+                    type="button"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+                ) : null}
                 {mode === "teacherPreview" ? (
                   <MaterialImageInlineTools
                     assetId={assetId}
@@ -290,20 +297,27 @@ export function RenderedMaterialBlock({
       }
     case "htmlGame":
       {
-        const assetId = materialAssetIdFromUrl(block.url);
-        const html = assetId ? htmlAssets[assetId] : undefined;
+        const gameIconUrl = resolveMaterialImageUrl(block.gameIconUrl, assetUrls);
         return blockSection(
-          <>
-            {pageLayout === "HTML_GAME" ? null : <h4>{block.title}</h4>}
-            <HtmlGameFrame
-              blockId={block.id}
-              fillAvailable={htmlGameFillAvailable}
-              height={block.height ?? 640}
-              html={html}
-              sync={htmlGameSync}
-              title={block.title}
-            />
-          </>,
+          <button
+            aria-label={t("materials.renderer.launchGame", { title: block.title })}
+            className="playsay-html-game-app"
+            data-playsay-launcher-for={block.id}
+            data-testid={`html-game-launch-${block.id}`}
+            onClick={() => onRequestFocus?.("htmlGame", block.id)}
+            type="button"
+          >
+            <span className="playsay-html-game-app-icon">
+              {gameIconUrl
+                ? <img alt="" src={gameIconUrl} />
+                : <Gamepad2 className="h-7 w-7" />}
+            </span>
+            <span className="playsay-html-game-app-copy">
+              <strong>{block.title}</strong>
+              <small>{t("materials.renderer.gameApplication")}</small>
+            </span>
+            <span className="playsay-html-game-app-launch"><Play className="h-4 w-4 fill-current" /></span>
+          </button>,
           "playsay-render-block playsay-render-block-html-game",
         );
       }

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type CourseLessonMap } from "../../../entities/schedule/model";
 import {
   fetchMaterialAssets,
+  fetchMaterialHtmlGameEnrichment,
+  requestMaterialHtmlGameEnrichment,
   uploadMaterialHtmlGameAsset,
   uploadMaterialImageAsset,
   type Course,
@@ -15,6 +17,7 @@ import {
   type LessonMaterialDraftInput,
   type LessonMaterialGenerateImagesInput,
   type LessonMaterialInput,
+  type MaterialHtmlGameEnrichment,
   type LessonMaterialUrlDraftInput,
   type MeProfile,
 } from "../../../shared/api/playsay";
@@ -29,6 +32,7 @@ import {
   defaultMaterialForm,
   duplicateMaterialForm,
   materialDraftToForm,
+  materialAssetIdFromUrl,
   materialFormToInput,
   materialFormWithBlockPatch,
   materialPreviewFromForm,
@@ -38,6 +42,7 @@ import {
   readPromptFromSourceMeta,
   readUrlFromSourceMeta,
 } from "../model/materialDocument";
+import { hasInvalidManualHtmlGameTitle, isEnglishHtmlGameTitle } from "../model/htmlGameTitle";
 import { useMaterialAssets } from "../hooks/useMaterialAssets";
 import { useMaterialLibraryState } from "../hooks/useMaterialLibraryState";
 import { MaterialAccessMessage } from "./MaterialAccessMessage";
@@ -109,6 +114,11 @@ export function MaterialLibraryPanel({
   const [playPreviewOpen, setPlayPreviewOpen] = useState(false);
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
   const [assetUploadMessage, setAssetUploadMessage] = useState<string | null>(null);
+  const [htmlGameEnrichments, setHtmlGameEnrichments] = useState<Record<string, MaterialHtmlGameEnrichment>>({});
+  const enrichmentPollTokensRef = useRef<Record<string, number>>({});
+  const mountedRef = useRef(true);
+  const formRef = useRef(form);
+  const savedFormFingerprintRef = useRef(savedFormFingerprint);
   const { assetLibrary, currentMaterialAssets, syncMaterialAssets } = useMaterialAssets({
     canManage,
     formMaterialId: form.id,
@@ -119,17 +129,83 @@ export function MaterialLibraryPanel({
   const pendingImageTargetsCount = countPendingMaterialImageTargets(form.document, currentMaterialAssets);
   const canGenerateImages = pendingImageTargetsCount > 0;
   const blocks = form.document.pages[0]?.blocks ?? [];
-  const canSave = form.title.trim().length > 0 && blocks.length > 0;
+  const hasInvalidGameTitle = hasInvalidManualHtmlGameTitle(form.document);
+  const canSave = form.title.trim().length > 0 && blocks.length > 0 && !hasInvalidGameTitle;
   const isDirty = materialFormFingerprint(form) !== savedFormFingerprint;
   const authoringFocused = workspaceMode !== "library";
+
+  formRef.current = form;
+  savedFormFingerprintRef.current = savedFormFingerprint;
 
   useEffect(() => {
     onAuthoringStateChange?.({ dirty: authoringFocused && isDirty, focused: authoringFocused });
   }, [authoringFocused, isDirty, onAuthoringStateChange]);
 
-  useEffect(() => () => {
-    onAuthoringStateChange?.({ dirty: false, focused: false });
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      onAuthoringStateChange?.({ dirty: false, focused: false });
+    };
   }, [onAuthoringStateChange]);
+
+  async function pollHtmlGameEnrichment(materialId: string, assetId: string, blockId: string) {
+    const token = (enrichmentPollTokensRef.current[blockId] ?? 0) + 1;
+    enrichmentPollTokensRef.current[blockId] = token;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, attempt < 5 ? 2_000 : 5_000));
+      if (!mountedRef.current || enrichmentPollTokensRef.current[blockId] !== token) return;
+      try {
+        const status = await fetchMaterialHtmlGameEnrichment(materialId, assetId, blockId);
+        setHtmlGameEnrichments((current) => ({ ...current, [blockId]: status }));
+        if (status.status === "READY") {
+          const currentForm = formRef.current;
+          if (currentForm.id === materialId && status.gameIconUrl) {
+            const currentBlock = currentForm.document.pages.flatMap((page) => page.blocks).find((block) => block.id === blockId);
+            const nextForm = materialFormWithBlockPatch(currentForm, blockId, {
+              gameIconUrl: status.gameIconUrl,
+              ...(currentBlock?.gameTitleSource === "USER" ? {} : {
+                title: status.title ?? currentBlock?.title,
+                gameTitleSource: normalizeGameTitleSource(status.titleSource),
+              }),
+            });
+            const wasClean = materialFormFingerprint(currentForm) === savedFormFingerprintRef.current;
+            formRef.current = nextForm;
+            setForm(nextForm);
+            if (wasClean) {
+              const fingerprint = materialFormFingerprint(nextForm);
+              savedFormFingerprintRef.current = fingerprint;
+              setSavedFormFingerprint(fingerprint);
+            }
+          }
+          const assets = await fetchMaterialAssets(materialId);
+          const material = materials.find((item) => item.id === materialId);
+          if (material) syncMaterialAssets(material, assets);
+          onRefresh();
+          return;
+        }
+        if (status.status === "FAILED") return;
+      } catch {
+        if (attempt >= 59) return;
+      }
+    }
+  }
+
+  async function startHtmlGameEnrichment(
+    materialId: string,
+    assetId: string,
+    blockId: string,
+    preferredTitle?: string,
+    regenerateIcon = false,
+  ) {
+    const status = await requestMaterialHtmlGameEnrichment(materialId, assetId, {
+      blockId,
+      preferredTitle,
+      regenerateIcon,
+    });
+    setHtmlGameEnrichments((current) => ({ ...current, [blockId]: status }));
+    void pollHtmlGameEnrichment(materialId, assetId, blockId);
+  }
 
   function updateForm<Key extends keyof MaterialFormState>(field: Key, value: MaterialFormState[Key]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -145,6 +221,8 @@ export function MaterialLibraryPanel({
     setDraftImageMessage(null);
     setActiveBlockId(null);
     setDetailsOpen(false);
+    setHtmlGameEnrichments({});
+    enrichmentPollTokensRef.current = {};
     setWorkspaceMode("edit");
   }
 
@@ -158,6 +236,8 @@ export function MaterialLibraryPanel({
     setDraftImageMessage(null);
     setActiveBlockId(nextForm.document.pages[0]?.blocks[0]?.id ?? null);
     setDetailsOpen(false);
+    setHtmlGameEnrichments({});
+    enrichmentPollTokensRef.current = {};
     setWorkspaceMode("preview");
   }
 
@@ -235,6 +315,10 @@ export function MaterialLibraryPanel({
   }
 
   async function saveCurrentMaterial() {
+    if (hasInvalidGameTitle) {
+      setAssetUploadMessage(t("materials.messages.gameTitleEnglishOnly"));
+      return;
+    }
     if (!canSave || disabled) {
       return;
     }
@@ -479,9 +563,13 @@ export function MaterialLibraryPanel({
       const asset = kind === "image"
         ? await uploadMaterialImageAsset(materialId, file)
         : await uploadMaterialHtmlGameAsset(materialId, file);
+      const gameTitle = typeof asset.metadata.gameTitle === "string" ? asset.metadata.gameTitle.trim() : fallbackTitle;
+      const gameTitleSource = normalizeGameTitleSource(typeof asset.metadata.gameTitleSource === "string" ? asset.metadata.gameTitleSource : undefined);
       const nextForm = materialFormWithBlockPatch(workingForm, blockId, {
         url: `material-asset:${asset.id}`,
-        ...(kind === "image" ? { alt: fallbackTitle, imageSize: workingForm.document.pages.flatMap((page) => page.blocks).find((block) => block.id === blockId)?.imageSize ?? "MEDIUM" } : { height: 640 }),
+        ...(kind === "image"
+          ? { alt: fallbackTitle, imageSize: workingForm.document.pages.flatMap((page) => page.blocks).find((block) => block.id === blockId)?.imageSize ?? "MEDIUM" }
+          : { height: 640, title: gameTitle || fallbackTitle, gameTitleSource: gameTitleSource ?? "FILE" }),
       });
       const saved = await onSave(materialFormToInput(nextForm), materialId);
       if (!saved) {
@@ -494,9 +582,44 @@ export function MaterialLibraryPanel({
       setSavedFormFingerprint(materialFormFingerprint(savedForm));
       const assets = await fetchMaterialAssets(materialId);
       syncMaterialAssets(saved, assets);
+      if (kind === "htmlGame") {
+        try {
+          await startHtmlGameEnrichment(materialId, asset.id, blockId);
+        } catch {
+          setAssetUploadMessage(t("materials.messages.htmlGameUploadedIconFailed"));
+          return;
+        }
+      }
       setAssetUploadMessage(kind === "image" ? t("materials.messages.imageUploaded") : t("materials.messages.htmlGameUploaded"));
     } catch (caught) {
       setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.assetUploadFailed"));
+    }
+  }
+
+  async function regenerateHtmlGameIcon(blockId: string) {
+    const currentForm = formRef.current;
+    const block = currentForm.document.pages.flatMap((page) => page.blocks).find((item) => item.id === blockId);
+    const materialId = currentForm.id;
+    const assetId = materialAssetIdFromUrl(block?.url);
+    if (!block || !materialId || !assetId) return;
+    if (!isEnglishHtmlGameTitle(block.title)) {
+      setAssetUploadMessage(t("materials.messages.gameTitleEnglishOnly"));
+      return;
+    }
+    const nextForm = materialFormWithBlockPatch(currentForm, blockId, { gameTitleSource: "USER" });
+    const saved = await onSave(materialFormToInput(nextForm), materialId);
+    if (!saved) {
+      setAssetUploadMessage(t("materials.messages.gameIconRegenerationFailed"));
+      return;
+    }
+    const savedForm = materialToForm(saved);
+    setForm(savedForm);
+    setSavedFormFingerprint(materialFormFingerprint(savedForm));
+    try {
+      await startHtmlGameEnrichment(materialId, assetId, blockId, block.title, true);
+      setAssetUploadMessage(t("materials.messages.gameIconRegenerationStarted"));
+    } catch {
+      setAssetUploadMessage(t("materials.messages.gameIconRegenerationFailed"));
     }
   }
 
@@ -513,6 +636,7 @@ export function MaterialLibraryPanel({
     }
     setDetailsOpen(false);
     setPaletteOpen(false);
+    enrichmentPollTokensRef.current = {};
     setWorkspaceMode("library");
   }
 
@@ -691,8 +815,10 @@ export function MaterialLibraryPanel({
                   form={form}
                   imageGenerationProgress={imageGenerationProgress}
                   message={assetUploadMessage ?? message}
+                  htmlGameEnrichments={htmlGameEnrichments}
                   onActivateBlock={setActiveBlockId}
                   onMoveBlock={moveBlock}
+                  onRegenerateHtmlGameIcon={(blockId) => void regenerateHtmlGameIcon(blockId)}
                   onRemoveBlock={removeBlock}
                   onRequestPalette={requestPalette}
                   onSuggestAcceptedAnswers={(blockId, itemIds) => void suggestAcceptedAnswers(blockId, itemIds)}
@@ -714,6 +840,10 @@ export function MaterialLibraryPanel({
       )}
     </section>
   );
+}
+
+function normalizeGameTitleSource(value: string | null | undefined): MaterialEditorBlock["gameTitleSource"] {
+  return value === "FILE" || value === "HTML" || value === "AI" || value === "USER" ? value : undefined;
 }
 
 function materialFormFingerprint(form: MaterialFormState): string {

@@ -17,6 +17,10 @@ export function materialDocumentAssetIds(document: MaterialEditorDocument): stri
       if (blockAssetId) {
         ids.add(blockAssetId);
       }
+      const gameIconAssetId = materialAssetIdFromUrl(block.gameIconUrl);
+      if (gameIconAssetId) {
+        ids.add(gameIconAssetId);
+      }
     });
   });
   return [...ids].sort();

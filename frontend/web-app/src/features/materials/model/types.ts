@@ -185,6 +185,8 @@ export type MaterialEditorBlock = {
   pairs?: MaterialMatchingPair[];
   wordBankOptions?: MaterialWordBankOption[];
   height?: number;
+  gameIconUrl?: string;
+  gameTitleSource?: "FILE" | "HTML" | "AI" | "USER";
 };
 
 export const MIN_MANUAL_INPUT_HINTS = 3;

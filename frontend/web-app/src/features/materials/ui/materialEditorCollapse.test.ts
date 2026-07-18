@@ -1,27 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
-  resetMaterialBlockCollapse,
-  toggleMaterialBlockCollapse,
+  resetExpandedMaterialBlock,
+  toggleExpandedMaterialBlock,
 } from "./materialEditorCollapse";
 
 describe("material editor block collapse state", () => {
-  it("collapses and expands a block without mutating the previous state", () => {
-    const initial = new Set(["other-block"]);
-    const collapsed = toggleMaterialBlockCollapse(initial, "target-block");
-
-    expect(Array.from(initial)).toEqual(["other-block"]);
-    expect(collapsed.has("other-block")).toBe(true);
-    expect(collapsed.has("target-block")).toBe(true);
-
-    const expanded = toggleMaterialBlockCollapse(collapsed, "target-block");
-
-    expect(expanded.has("other-block")).toBe(true);
-    expect(expanded.has("target-block")).toBe(false);
+  it("keeps at most one block expanded", () => {
+    expect(toggleExpandedMaterialBlock(null, "first-block")).toBe("first-block");
+    expect(toggleExpandedMaterialBlock("first-block", "second-block")).toBe("second-block");
+    expect(toggleExpandedMaterialBlock("second-block", "second-block")).toBeNull();
   });
 
-  it("resets to fully expanded state", () => {
-    const reset = resetMaterialBlockCollapse();
-
-    expect(reset.size).toBe(0);
+  it("resets to fully collapsed state", () => {
+    expect(resetExpandedMaterialBlock()).toBeNull();
   });
 });

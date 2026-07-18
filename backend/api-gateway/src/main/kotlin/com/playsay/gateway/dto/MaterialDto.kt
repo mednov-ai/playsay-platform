@@ -88,6 +88,25 @@ data class MaterialAssetUpdateRequest(
     val tags: List<String>? = null,
 )
 
+data class MaterialHtmlGameEnrichmentRequest(
+    @field:Schema(maxLength = 120)
+    val blockId: String,
+    @field:Schema(maxLength = 160, nullable = true)
+    val preferredTitle: String? = null,
+    val regenerateIcon: Boolean? = null,
+)
+
+data class MaterialHtmlGameEnrichmentResponse(
+    val assetId: UUID,
+    val blockId: String,
+    val status: String,
+    val title: String?,
+    val titleSource: String?,
+    val iconAssetId: UUID?,
+    val gameIconUrl: String?,
+    val errorCode: String?,
+)
+
 data class MaterialAiDraftRequest(
     @field:Schema(maxLength = 160, nullable = true)
     val title: String? = null,

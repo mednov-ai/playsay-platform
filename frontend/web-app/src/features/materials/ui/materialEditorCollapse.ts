@@ -1,13 +1,7 @@
-export function resetMaterialBlockCollapse(): Set<string> {
-  return new Set();
+export function resetExpandedMaterialBlock(): string | null {
+  return null;
 }
 
-export function toggleMaterialBlockCollapse(current: ReadonlySet<string>, blockId: string): Set<string> {
-  const next = new Set(current);
-  if (next.has(blockId)) {
-    next.delete(blockId);
-  } else {
-    next.add(blockId);
-  }
-  return next;
+export function toggleExpandedMaterialBlock(current: string | null, blockId: string): string | null {
+  return current === blockId ? null : blockId;
 }

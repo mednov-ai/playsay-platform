@@ -9,6 +9,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.LiveLessonImagePageResponse
 import com.playsay.gateway.dto.LiveLessonHtmlGamePageResponse
 import com.playsay.gateway.dto.MaterialImagePageResponse
+import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentRequest
 import com.playsay.gateway.dto.MaterialAnnotationRequest
 import com.playsay.gateway.entity.LessonMaterialEntity
 import com.playsay.gateway.error.ProjectResponseException
@@ -32,6 +33,8 @@ class MaterialImagePageService(
     private val scheduledLessonStore: ScheduledLessonStore,
     private val materialAssetService: MaterialAssetService,
     private val materialAssetUploadService: MaterialAssetUploadService,
+    private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
+    private val materialHtmlGameMetadataService: MaterialHtmlGameMetadataService,
     private val materialAnnotationService: MaterialAnnotationService,
     private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
     private val messageProvider: MessageProvider,
@@ -102,7 +105,13 @@ class MaterialImagePageService(
             title = null,
             fallbackTitle = messageProvider[MetaData.Messages.MATERIAL_HTML_GAME_PAGE_TITLE],
         )
-        val activePageId = appendHtmlGamePage(targetMaterial, upload)
+        val appendedGame = appendHtmlGamePage(targetMaterial, upload)
+        val activePageId = appendedGame.pageId
+        materialHtmlGameEnrichmentService.request(
+            targetMaterial.id,
+            appendedGame.assetId,
+            MaterialHtmlGameEnrichmentRequest(blockId = appendedGame.blockId),
+        )
         saveActiveLessonPage(lessonId, targetMaterial.id, activePageId)
         val updatedLesson = scheduledLessonStore.assignSharedMaterial(authentication, lessonId, targetMaterial.id)
         return LiveLessonHtmlGamePageResponse(
@@ -239,25 +248,22 @@ class MaterialImagePageService(
         return pageId
     }
 
-    private fun appendHtmlGamePage(material: LessonMaterialEntity, upload: ValidatedMaterialAssetFile): String {
+    private fun appendHtmlGamePage(material: LessonMaterialEntity, upload: ValidatedMaterialAssetFile): AppendedHtmlGame {
         val document = readMaterialDocument(material)
         val pages = materialPages(document)
         val pageId = "page-${UUID.randomUUID()}"
-        val pageTitle = cleanPageTitle(
-            title = null,
-            originalFileName = upload.originalFileName,
-            fallbackTitle = messageProvider[MetaData.Messages.MATERIAL_HTML_GAME_PAGE_TITLE],
-        )
+        val gameMetadata = materialHtmlGameMetadataService.extract(upload.bytes, upload.originalFileName)
+        val pageTitle = gameMetadata.displayTitle
         val assetId = materialAssetUploadService.insertHtmlGameAsset(
             materialId = material.id,
             originalFileName = upload.originalFileName,
             bytes = upload.bytes,
         )
-        pages.add(htmlGamePage(pageId, pageTitle, assetId))
+        pages.add(htmlGamePage(pageId, pageTitle, gameMetadata.titleSource, assetId))
         material.document = objectMapper.writeValueAsString(document)
         material.updatedAt = Instant.now()
         lessonMaterialRepo.saveAndFlush(material)
-        return pageId
+        return AppendedHtmlGame(pageId = pageId, blockId = "block-$pageId", assetId = assetId)
     }
 
     private fun staticImagePage(pageId: String, title: String, assetId: UUID): ObjectNode =
@@ -279,7 +285,7 @@ class MaterialImagePageService(
             )
         }
 
-    private fun htmlGamePage(pageId: String, title: String, assetId: UUID): ObjectNode =
+    private fun htmlGamePage(pageId: String, title: String, titleSource: String, assetId: UUID): ObjectNode =
         objectMapper.createObjectNode().apply {
             put("id", pageId)
             put("title", title)
@@ -289,11 +295,14 @@ class MaterialImagePageService(
                     put("id", "block-$pageId")
                     put("type", "htmlGame")
                     put("title", title)
+                    put("gameTitleSource", titleSource)
                     put("url", "material-asset:$assetId")
                     put("height", 640)
                 },
             )
         }
+
+    private data class AppendedHtmlGame(val pageId: String, val blockId: String, val assetId: UUID)
 
     private fun readMaterialDocument(material: LessonMaterialEntity): ObjectNode =
         runCatching { objectMapper.readTree(material.document).deepCopy<ObjectNode>() }

@@ -365,6 +365,101 @@
   margin-top: 0.875rem;
 }
 
+.playsay-material-author-stage {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(22rem, 1fr) minmax(18rem, 22rem);
+  align-items: start;
+  gap: 1rem;
+}
+
+.playsay-material-block-summary {
+  display: grid;
+  max-width: min(42rem, 100%);
+  gap: 0.15rem;
+  margin-top: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.playsay-material-block-summary strong,
+.playsay-material-block-summary span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-material-block-summary strong {
+  font-size: 0.94rem;
+  font-weight: 950;
+}
+
+.playsay-material-block-summary span {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.playsay-material-block-preview {
+  position: sticky;
+  top: 5.25rem;
+  display: grid;
+  min-width: 0;
+  max-height: calc(100dvh - 6.5rem);
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: #fffdfb;
+  box-shadow: 0 0.75rem 2rem rgb(35 25 15 / 0.08);
+}
+
+.playsay-material-block-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0.7rem 0.8rem;
+  font-size: 0.75rem;
+}
+
+.playsay-material-block-preview-surface {
+  max-height: calc(100dvh - 10rem);
+  overflow: hidden;
+  padding: 0.8rem;
+  pointer-events: none;
+}
+
+.playsay-material-block-preview-surface .playsay-task-kicker,
+.playsay-material-block-preview-surface .playsay-task-subtitle,
+.playsay-material-block-preview-surface .playsay-rendered-material > h3 {
+  display: none;
+}
+
+.playsay-material-block-preview-empty {
+  place-items: center;
+  gap: 0.35rem;
+  min-height: 13rem;
+  color: hsl(var(--muted-foreground));
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.playsay-material-block-preview-empty strong {
+  color: hsl(var(--foreground));
+  font-size: 0.85rem;
+}
+
+.playsay-material-block-preview-empty p {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .playsay-inline-upload {
   display: inline-flex;
   min-height: 2.5rem;
@@ -757,42 +852,23 @@
   margin-top: 0;
 }
 
-.playsay-rendered-material[data-html-game-presentation="focus"] .playsay-material-blocks-html-game {
-  height: 100%;
-}
-
-.playsay-rendered-material[data-html-game-presentation="minimized"] .playsay-material-blocks-html-game {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  pointer-events: none;
-}
-
-.playsay-html-game-launcher {
-  position: relative;
-  z-index: 4;
+.playsay-html-game-app {
   display: grid;
-  width: min(100%, 22rem);
+  width: min(100%, 24rem);
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
-  margin: clamp(1rem, 4vw, 3rem) auto;
   border: 1px solid rgb(255 92 0 / 0.28);
   border-radius: 1rem;
   background: #ffffff;
-  box-shadow: 0 0.75rem 2rem rgb(35 25 15 / 0.12);
+  box-shadow: 0 0.55rem 1.4rem rgb(35 25 15 / 0.09);
   color: hsl(var(--foreground));
   cursor: pointer;
   padding: 0.75rem;
   text-align: left;
 }
 
-.playsay-html-game-launcher > span {
+.playsay-html-game-app-icon {
   display: inline-grid;
   width: 3rem;
   height: 3rem;
@@ -802,18 +878,171 @@
   color: hsl(var(--primary-foreground));
 }
 
-.playsay-html-game-launcher strong {
+.playsay-html-game-app-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.playsay-game-icon-enrichment {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--muted) / 0.28);
+}
+
+.playsay-game-icon-enrichment-symbol {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.65rem;
+  color: hsl(var(--primary));
+  background: #fff3eb;
+}
+
+.playsay-game-icon-enrichment div {
+  display: grid;
   min-width: 0;
+}
+
+.playsay-game-icon-enrichment small {
+  color: hsl(var(--muted-foreground));
+}
+
+.playsay-game-icon-enrichment[data-status="FAILED"] {
+  border-color: hsl(var(--destructive) / 0.35);
+}
+
+@media (max-width: 640px) {
+  .playsay-game-icon-enrichment {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .playsay-game-icon-enrichment button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+.playsay-html-game-app-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.playsay-html-game-app-copy strong,
+.playsay-html-game-app-copy small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.playsay-html-game-launcher:hover,
-.playsay-html-game-launcher:focus-visible {
+.playsay-html-game-app-copy small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.playsay-html-game-app-launch {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 999px;
+  background: #fff0e6;
+  color: hsl(var(--primary));
+}
+
+.playsay-html-game-app:hover,
+.playsay-html-game-app:focus-visible {
   border-color: hsl(var(--primary));
   outline: 2px solid rgb(255 92 0 / 0.2);
   outline-offset: 2px;
+}
+
+.playsay-material-focus-stack {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #fffdfb;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.playsay-material-focus-stack[data-active="true"] {
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.playsay-material-focus-close {
+  position: absolute;
+  z-index: 8;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.78);
+  border-radius: 0.8rem;
+  background: rgb(17 17 17 / 0.8);
+  box-shadow: 0 0.5rem 1.5rem rgb(17 17 17 / 0.2);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.playsay-material-focus-close:hover,
+.playsay-material-focus-close:focus-visible {
+  background: hsl(var(--primary));
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.playsay-material-focused-game {
+  position: absolute;
+  inset: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.playsay-material-focused-game[data-active="true"] {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+}
+
+.playsay-material-focused-game[data-active="true"],
+.playsay-material-focused-game[data-active="true"] .playsay-html-game,
+.playsay-material-focused-game[data-active="true"] iframe {
+  min-height: 0;
+  height: 100%;
+}
+
+.playsay-material-focused-image {
+  min-width: 0;
+  min-height: 100%;
+  margin: 0;
+  overflow: auto;
+}
+
+.playsay-material-focused-image img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .playsay-render-block {
@@ -1224,6 +1453,44 @@
   display: grid;
   gap: 0.5rem;
   margin: 0;
+}
+
+.playsay-material-focus-trigger {
+  position: absolute;
+  z-index: 3;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: inline-grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.75);
+  border-radius: 0.7rem;
+  background: rgb(17 17 17 / 0.72);
+  box-shadow: 0 0.4rem 1.2rem rgb(17 17 17 / 0.18);
+  color: #ffffff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease, background 150ms ease;
+}
+
+.playsay-rendered-image:hover .playsay-material-focus-trigger,
+.playsay-rendered-image:focus-within .playsay-material-focus-trigger,
+.playsay-material-focus-trigger:focus-visible {
+  opacity: 1;
+}
+
+.playsay-material-focus-trigger:hover,
+.playsay-material-focus-trigger:focus-visible {
+  background: hsl(var(--primary));
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+@media (hover: none) {
+  .playsay-material-focus-trigger {
+    opacity: 1;
+  }
 }
 
 .playsay-rendered-image img {
@@ -2646,6 +2913,14 @@
   .playsay-material-editor-workspace {
     display: block;
     padding: 0.75rem;
+  }
+
+  .playsay-material-author-stage {
+    display: block;
+  }
+
+  .playsay-material-block-preview {
+    display: none;
   }
 
   .playsay-material-palette {

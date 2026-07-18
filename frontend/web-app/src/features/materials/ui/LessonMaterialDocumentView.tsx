@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { FileText, Gamepad2, Maximize2 } from "lucide-react";
+import { FileText, Minimize2 } from "lucide-react";
 import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, fetchMaterialAssetText, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
 import {
   MaterialAnswerBlock,
@@ -11,9 +11,12 @@ import {
   editorDocumentFromJson,
   formatMaterialScore,
   materialAssetTagsMap,
+  materialAssetIdFromUrl,
   materialDocumentAssetIds,
+  resolveMaterialImageUrl,
 } from "../model/materialDocument";
 import { RenderedMaterialBlock } from "./blocks/RenderedMaterialBlock";
+import { HtmlGameFrame } from "./blocks/HtmlGameFrame";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function LessonMaterialDocumentView({
@@ -31,8 +34,7 @@ export function LessonMaterialDocumentView({
   score,
   showScoreBadge = true,
   htmlGameSync,
-  htmlGamePresentation = "normal",
-  onHtmlGameRestore,
+  onPresentationModeChange,
 }: {
   activePageId?: string | null;
   allowVideoFullscreen?: boolean;
@@ -48,8 +50,7 @@ export function LessonMaterialDocumentView({
   score?: number | null;
   showScoreBadge?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
-  htmlGamePresentation?: "focus" | "minimized" | "normal";
-  onHtmlGameRestore?: () => void;
+  onPresentationModeChange?: (mode: "default" | "html-game-focus" | "image-focus") => void;
 }) {
   const { t } = useAppTranslation();
   const document = editorDocumentFromJson(material.document);
@@ -61,16 +62,38 @@ export function LessonMaterialDocumentView({
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [htmlAssets, setHtmlAssets] = useState<Record<string, string>>({});
   const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
+  const [focusedBlock, setFocusedBlock] = useState<{ kind: "htmlGame" | "image"; blockId: string } | null>(null);
+  const [launchedGameIds, setLaunchedGameIds] = useState<Set<string>>(() => new Set());
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
   const videoFullscreenAllowed = allowVideoFullscreen ?? mode === "teacherPreview";
   const pagePickerVisible = document.pages.length > 1;
   const pagePickerEnabled = canControlPages || activePageId === undefined;
   const isStaticImagePage = page.layout === "STATIC_IMAGE";
   const isHtmlGamePage = page.layout === "HTML_GAME";
+  const allBlocks = document.pages.flatMap((item) => item.blocks);
+  const focusedBlockValue = focusedBlock ? allBlocks.find((block) => block.id === focusedBlock.blockId) ?? null : null;
 
   useEffect(() => {
     setInternalActivePageId(null);
+    setFocusedBlock(null);
+    setLaunchedGameIds(new Set());
   }, [material.id]);
+
+  useEffect(() => {
+    if (focusedBlock && !page.blocks.some((block) => block.id === focusedBlock.blockId)) {
+      setFocusedBlock(null);
+    }
+  }, [focusedBlock, page.blocks]);
+
+  useEffect(() => {
+    onPresentationModeChange?.(focusedBlock === null
+      ? "default"
+      : focusedBlock.kind === "htmlGame"
+        ? "html-game-focus"
+        : "image-focus");
+  }, [focusedBlock, onPresentationModeChange]);
+
+  useEffect(() => () => onPresentationModeChange?.("default"), [onPresentationModeChange]);
 
   useEffect(() => {
     let active = true;
@@ -136,12 +159,31 @@ export function LessonMaterialDocumentView({
     };
   }, [assetKey, material.id, material.updatedAt]);
 
+  function requestBlockFocus(kind: "htmlGame" | "image", blockId: string) {
+    if (kind === "htmlGame") {
+      setLaunchedGameIds((current) => new Set(current).add(blockId));
+    }
+    setFocusedBlock({ kind, blockId });
+  }
+
+  function closeBlockFocus() {
+    const blockId = focusedBlock?.blockId;
+    setFocusedBlock(null);
+    if (blockId) {
+      window.requestAnimationFrame(() => {
+        Array.from(globalThis.document.querySelectorAll<HTMLElement>("[data-playsay-launcher-for]"))
+          .find((element) => element.dataset.playsayLauncherFor === blockId)
+          ?.focus();
+      });
+    }
+  }
+
   return (
     <div
       className={`playsay-rendered-material${isStaticImagePage ? " playsay-static-image-page" : ""}`}
       data-playsay-layout={page.layout}
       data-playsay-page-id={page.id}
-      data-html-game-presentation={isHtmlGamePage ? htmlGamePresentation : undefined}
+      data-presentation-kind={focusedBlock?.kind}
     >
       {showScoreBadge && numericScore !== null ? (
         <div className="playsay-material-score-badge">
@@ -182,7 +224,6 @@ export function LessonMaterialDocumentView({
       {!isStaticImagePage && !isHtmlGamePage ? <h3>{page.title}</h3> : null}
       {!isStaticImagePage && !isHtmlGamePage && material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
       <div
-        aria-hidden={isHtmlGamePage && htmlGamePresentation === "minimized" ? "true" : undefined}
         className={`playsay-material-blocks${isStaticImagePage ? " playsay-material-blocks-static-image" : ""}${isHtmlGamePage ? " playsay-material-blocks-html-game" : ""}`}
       >
         {page.blocks.map((block) => (
@@ -192,9 +233,6 @@ export function LessonMaterialDocumentView({
             assetTags={assetTags}
             assetUrls={assetUrls}
             block={block}
-            htmlAssets={htmlAssets}
-            htmlGameSync={htmlGameSync}
-            htmlGameFillAvailable={isHtmlGamePage && htmlGamePresentation === "focus"}
             key={block.id}
             materialId={material.id}
             mode={mode}
@@ -205,23 +243,56 @@ export function LessonMaterialDocumentView({
             }}
             onBlockPatchCommit={onBlockPatchCommit}
             onBlockPatch={onBlockPatch}
+            onRequestFocus={requestBlockFocus}
             pageLayout={page.layout}
           />
         ))}
       </div>
-      {isHtmlGamePage && htmlGamePresentation === "minimized" ? (
+      <div
+        aria-hidden={focusedBlock === null ? "true" : undefined}
+        className="playsay-material-focus-stack"
+        data-active={focusedBlock === null ? "false" : "true"}
+        data-kind={focusedBlock?.kind}
+      >
+        {focusedBlock ? (
         <button
-          aria-label={t("classroom.presentation.restoreGame")}
-          className="playsay-html-game-launcher"
-          data-testid="html-game-restore"
-          onClick={onHtmlGameRestore}
+          aria-label={focusedBlock.kind === "htmlGame" ? t("materials.renderer.closeGame") : t("materials.renderer.closeImage")}
+          className="playsay-material-focus-close"
+          data-testid="material-focus-close"
+          onClick={closeBlockFocus}
+          title={focusedBlock.kind === "htmlGame" ? t("materials.renderer.closeGame") : t("materials.renderer.closeImage")}
           type="button"
         >
-          <span><Gamepad2 className="h-6 w-6" /></span>
-          <strong>{page.title}</strong>
-          <Maximize2 className="h-4 w-4" />
+          <Minimize2 className="h-5 w-5" />
         </button>
-      ) : null}
+        ) : null}
+        {allBlocks.filter((block) => block.type === "htmlGame" && launchedGameIds.has(block.id)).map((block) => {
+          const assetId = materialAssetIdFromUrl(block.url);
+          const active = focusedBlock?.kind === "htmlGame" && focusedBlock.blockId === block.id;
+          return (
+            <div className="playsay-material-focused-game" data-active={active ? "true" : "false"} key={block.id}>
+              <HtmlGameFrame
+                blockId={block.id}
+                fillAvailable={active}
+                height={block.height ?? 640}
+                html={assetId ? htmlAssets[assetId] : undefined}
+                sync={htmlGameSync}
+                title={block.title}
+              />
+            </div>
+          );
+        })}
+        {focusedBlock?.kind === "image" && focusedBlockValue && (focusedBlockValue.type === "image" || focusedBlockValue.type === "generatedImage") ? (
+          <figure className="playsay-material-focused-image" data-playsay-annotation-anchor="true">
+            {resolveMaterialImageUrl(focusedBlockValue.url, assetUrls) ? (
+              <img
+                alt={focusedBlockValue.alt || focusedBlockValue.caption || focusedBlockValue.prompt || focusedBlockValue.title}
+                src={resolveMaterialImageUrl(focusedBlockValue.url, assetUrls)}
+              />
+            ) : null}
+          </figure>
+        ) : null}
+      </div>
     </div>
   );
 }

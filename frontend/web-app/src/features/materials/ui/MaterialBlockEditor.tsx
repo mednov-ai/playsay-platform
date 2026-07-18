@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Loader2, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -18,6 +18,8 @@ import { ExerciseItemsEditor } from "./ExerciseItemsEditor";
 import { materialBlockIcon } from "./materialBlockIcon";
 import { MatchingPairsEditor } from "./MatchingPairsEditor";
 import { useAppTranslation } from "../../../shared/i18n";
+import type { MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
+import { isEnglishHtmlGameTitle } from "../model/htmlGameTitle";
 
 export function MaterialBlockEditor({
   active,
@@ -30,9 +32,13 @@ export function MaterialBlockEditor({
   currentMaterialId,
   disabled,
   index,
+  htmlGameEnrichment,
   onActivate,
   onMoveDown,
   onMoveUp,
+  onRegenerateHtmlGameIcon,
+  onPreview,
+  onPreviewEnd,
   onRemove,
   onSuggestAcceptedAnswers,
   onToggleCollapsed,
@@ -49,9 +55,13 @@ export function MaterialBlockEditor({
   currentMaterialId: string | null;
   disabled: boolean;
   index: number;
+  htmlGameEnrichment?: MaterialHtmlGameEnrichment;
   onActivate: () => void;
   onMoveDown: () => void;
   onMoveUp: () => void;
+  onRegenerateHtmlGameIcon: () => void;
+  onPreview: () => void;
+  onPreviewEnd: () => void;
   onRemove: () => void;
   onSuggestAcceptedAnswers?: (blockId: string, itemIds: string[]) => void;
   onToggleCollapsed: () => void;
@@ -64,6 +74,10 @@ export function MaterialBlockEditor({
   const [videoClipEndSource, setVideoClipEndSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.endSeconds));
   const [uploading, setUploading] = useState(false);
   const collapseLabel = collapsed ? t("materials.blockEditor.expandBlock") : t("materials.blockEditor.collapseBlock");
+  const summary = materialBlockSummary(block, t);
+  const invalidHtmlGameTitle = block.type === "htmlGame"
+    && block.gameTitleSource === "USER"
+    && !isEnglishHtmlGameTitle(block.title);
 
   useEffect(() => {
     setFlashcardsSource(formatFlashcards(block.cards));
@@ -106,7 +120,17 @@ export function MaterialBlockEditor({
       data-active={active ? "true" : "false"}
       data-collapsed={collapsed ? "true" : "false"}
       onClick={onActivate}
-      onFocusCapture={onActivate}
+      onFocusCapture={() => {
+        onActivate();
+        onPreview();
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          onPreviewEnd();
+        }
+      }}
+      onMouseEnter={onPreview}
+      onMouseLeave={onPreviewEnd}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
@@ -119,13 +143,30 @@ export function MaterialBlockEditor({
               {materialBlockLabel(block.type)}
             </span>
           </div>
-          <input
-            className="mt-2 w-full border-0 bg-transparent p-0 text-base font-black outline-none"
-            disabled={disabled}
-            maxLength={160}
-            onChange={(event) => onUpdate({ title: event.target.value })}
-            value={block.title}
-          />
+          {collapsed ? (
+            <button className="playsay-material-block-summary" onClick={onToggleCollapsed} type="button">
+              <strong>{block.title}</strong>
+              <span>{summary}</span>
+            </button>
+          ) : (
+            <input
+              aria-label={t("materials.blockEditor.blockTitle")}
+              aria-invalid={invalidHtmlGameTitle}
+              className="mt-2 w-full border-0 bg-transparent p-0 text-base font-black outline-none"
+              disabled={disabled}
+              maxLength={160}
+              onChange={(event) => onUpdate({
+                title: event.target.value,
+                ...(block.type === "htmlGame" ? { gameTitleSource: "USER" as const } : {}),
+              })}
+              value={block.title}
+            />
+          )}
+          {!collapsed && invalidHtmlGameTitle ? (
+            <p className="mt-1 text-xs font-bold text-destructive" role="alert">
+              {t("materials.blockEditor.gameTitleEnglishOnly")}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -299,7 +340,7 @@ export function MaterialBlockEditor({
         ) : null}
 
         {block.type === "htmlGame" ? (
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
             <FormField label={t("materials.blockEditor.htmlGameFile")}>
               <div className="grid gap-2">
                 <div className="playsay-asset-reference">{block.url || t("materials.blockEditor.htmlGameEmpty")}</div>
@@ -331,6 +372,32 @@ export function MaterialBlockEditor({
                 value={block.height ?? 640}
               />
             </FormField>
+            <div className="playsay-game-icon-enrichment sm:col-span-2" data-status={htmlGameEnrichment?.status ?? "IDLE"}>
+              <span className="playsay-game-icon-enrichment-symbol">
+                {htmlGameEnrichment && ["PENDING", "RUNNING", "RETRY"].includes(htmlGameEnrichment.status)
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Sparkles className="h-4 w-4" />}
+              </span>
+              <div>
+                <strong>{t("materials.blockEditor.gameIconTitle")}</strong>
+                <small>{htmlGameEnrichment?.status === "FAILED"
+                  ? t("materials.blockEditor.gameIconFailed")
+                  : htmlGameEnrichment && ["PENDING", "RUNNING", "RETRY"].includes(htmlGameEnrichment.status)
+                    ? t("materials.blockEditor.gameIconGenerating")
+                    : block.gameIconUrl
+                      ? t("materials.blockEditor.gameIconReady")
+                      : t("materials.blockEditor.gameIconHint")}</small>
+              </div>
+              <Button
+                disabled={disabled || uploading || !block.url || Boolean(htmlGameEnrichment && ["PENDING", "RUNNING"].includes(htmlGameEnrichment.status))}
+                onClick={onRegenerateHtmlGameIcon}
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t("materials.blockEditor.regenerateGameIcon")}
+              </Button>
+            </div>
           </div>
         ) : null}
 
@@ -443,4 +510,32 @@ export function MaterialBlockEditor({
       </div>
     </article>
   );
+}
+
+function materialBlockSummary(block: MaterialEditorBlock, t: (key: string, values?: Record<string, unknown>) => string): string {
+  switch (block.type) {
+    case "text":
+      return compactSummary(block.body) || t("materials.blockEditor.summaryEmpty");
+    case "image":
+    case "generatedImage":
+      return compactSummary(block.caption || block.prompt || block.url) || t("materials.blockEditor.summaryImage");
+    case "videoEmbed":
+      return compactSummary(block.url) || t("materials.blockEditor.summaryVideo");
+    case "htmlGame":
+      return block.url ? t("materials.blockEditor.summaryGameReady") : t("materials.blockEditor.summaryGameEmpty");
+    case "flashcards":
+      return t("materials.blockEditor.summaryCards", { count: block.cards?.length ?? 0 });
+    case "matchingPairs":
+      return t("materials.blockEditor.summaryPairs", { count: block.pairs?.length ?? 0 });
+    case "fillGaps":
+    case "multipleChoice":
+      return t("materials.blockEditor.summaryItems", { count: block.items?.length ?? 0 });
+    default:
+      return compactSummary(block.prompt || block.body) || t("materials.blockEditor.summaryOpen");
+  }
+}
+
+function compactSummary(value: string | undefined): string {
+  const clean = value?.replace(/\s+/g, " ").trim() ?? "";
+  return clean.length > 96 ? `${clean.slice(0, 93)}…` : clean;
 }

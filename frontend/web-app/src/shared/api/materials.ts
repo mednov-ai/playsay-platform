@@ -19,12 +19,18 @@ import type {
   LiveLessonImagePageResult,
   LiveLessonHtmlGamePageResult,
   MaterialImagePageResult,
+  MaterialHtmlGameEnrichment,
+  MaterialHtmlGameEnrichmentInput,
   MaterialVideoPlayback,
   MaterialVideoPlaybackInput,
 } from "./types";
 
 export async function fetchMaterials(config = authConfig): Promise<LessonMaterial[]> {
   return apiJson<LessonMaterial[]>("/api/materials", { method: "GET" }, config);
+}
+
+export async function fetchMaterial(materialId: string, config = authConfig): Promise<LessonMaterial> {
+  return apiJson<LessonMaterial>(`/api/materials/${materialId}`, { method: "GET" }, config);
 }
 
 export async function saveMaterial(
@@ -181,6 +187,33 @@ export async function uploadMaterialHtmlGameAsset(
   config = authConfig,
 ): Promise<LessonMaterialAsset> {
   return uploadMaterialAsset(`/api/materials/${materialId}/assets/html-games`, file, config);
+}
+
+export async function requestMaterialHtmlGameEnrichment(
+  materialId: string,
+  assetId: string,
+  input: MaterialHtmlGameEnrichmentInput,
+  config = authConfig,
+): Promise<MaterialHtmlGameEnrichment> {
+  return apiJson<MaterialHtmlGameEnrichment>(
+    `/api/materials/${materialId}/assets/${assetId}/html-game-enrichment`,
+    { method: "POST", body: JSON.stringify(input) },
+    config,
+    202,
+  );
+}
+
+export async function fetchMaterialHtmlGameEnrichment(
+  materialId: string,
+  assetId: string,
+  blockId: string,
+  config = authConfig,
+): Promise<MaterialHtmlGameEnrichment> {
+  return apiJson<MaterialHtmlGameEnrichment>(
+    `/api/materials/${materialId}/assets/${assetId}/html-game-enrichment?blockId=${encodeURIComponent(blockId)}`,
+    { method: "GET" },
+    config,
+  );
 }
 
 export async function fetchMaterialAssetText(

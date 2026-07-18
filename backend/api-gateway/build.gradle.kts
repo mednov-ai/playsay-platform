@@ -25,6 +25,7 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.networknt:json-schema-validator:1.5.9")
     implementation("com.nimbusds:nimbus-jose-jwt")
+    implementation("org.jsoup:jsoup:1.18.3")
     implementation("org.liquibase:liquibase-core")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.3")
     implementation(platform("software.amazon.awssdk:bom:2.44.12"))

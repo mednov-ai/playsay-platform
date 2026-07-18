@@ -214,6 +214,21 @@ export type MaterialVideoPlayback = {
 export type LessonMaterialAssetUpdateInput = {
   tags?: string[] | null;
 };
+export type MaterialHtmlGameEnrichment = {
+  assetId: string;
+  blockId: string;
+  status: "IDLE" | "PENDING" | "RUNNING" | "RETRY" | "READY" | "FAILED" | string;
+  title?: string | null;
+  titleSource?: "FILE" | "HTML" | "AI" | "USER" | string | null;
+  iconAssetId?: string | null;
+  gameIconUrl?: string | null;
+  errorCode?: string | null;
+};
+export type MaterialHtmlGameEnrichmentInput = {
+  blockId: string;
+  preferredTitle?: string | null;
+  regenerateIcon?: boolean | null;
+};
 export type LessonMaterialDraft = Omit<LessonMaterialInput, "title"> & {
   title: string;
   description?: string | null;

@@ -2,6 +2,8 @@ package com.playsay.gateway.controller
 
 import com.playsay.gateway.dto.MaterialAssetResponse
 import com.playsay.gateway.dto.MaterialAssetUpdateRequest
+import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentRequest
+import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentResponse
 import com.playsay.gateway.service.LessonMaterialStore
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestPart
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 
@@ -67,6 +70,42 @@ class MaterialAssetController(
         ResponseEntity
             .status(HttpStatus.CREATED)
             .body(store.uploadHtmlGameAsset(authentication, materialId, file))
+
+    @PostMapping(
+        "/materials/{materialId}/assets/{assetId}/html-game-enrichment",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "requestMaterialHtmlGameEnrichment",
+        summary = "Generate HTML game metadata and icon",
+        description = "Queues background title analysis and app-icon generation for a linked HTML game block.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun requestHtmlGameEnrichment(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @PathVariable assetId: UUID,
+        @RequestBody request: MaterialHtmlGameEnrichmentRequest,
+    ): ResponseEntity<MaterialHtmlGameEnrichmentResponse> =
+        ResponseEntity.accepted().body(store.requestHtmlGameEnrichment(authentication, materialId, assetId, request))
+
+    @GetMapping(
+        "/materials/{materialId}/assets/{assetId}/html-game-enrichment",
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "getMaterialHtmlGameEnrichment",
+        summary = "Get HTML game enrichment status",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun htmlGameEnrichmentStatus(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @PathVariable assetId: UUID,
+        @RequestParam blockId: String,
+    ): MaterialHtmlGameEnrichmentResponse =
+        store.htmlGameEnrichmentStatus(authentication, materialId, assetId, blockId)
 
     @GetMapping("/materials/{materialId}/assets", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(

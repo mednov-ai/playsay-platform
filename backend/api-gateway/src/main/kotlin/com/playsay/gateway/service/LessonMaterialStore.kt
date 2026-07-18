@@ -11,6 +11,8 @@ import com.playsay.gateway.dto.MaterialAnswerSuggestionsRequest
 import com.playsay.gateway.dto.MaterialAnswerSuggestionsResponse
 import com.playsay.gateway.dto.MaterialAssetResponse
 import com.playsay.gateway.dto.MaterialAssetUpdateRequest
+import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentRequest
+import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentResponse
 import com.playsay.gateway.dto.MaterialGenerateImagesRequest
 import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.MaterialSubmissionResponse
@@ -40,6 +42,7 @@ class LessonMaterialStore(
     private val lessonMaterialCatalogService: LessonMaterialCatalogService,
     private val lessonMaterialAuthoringService: LessonMaterialAuthoringService,
     private val materialAssetService: MaterialAssetService,
+    private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
     private val materialSubmissionService: MaterialSubmissionService,
     private val materialAnnotationService: MaterialAnnotationService,
 ) {
@@ -266,6 +269,28 @@ class LessonMaterialStore(
             MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
         )
         return materialAssetService.uploadHtmlGameAsset(materialId, file)
+    }
+
+    @Transactional
+    fun requestHtmlGameEnrichment(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        assetId: UUID,
+        request: MaterialHtmlGameEnrichmentRequest,
+    ): MaterialHtmlGameEnrichmentResponse {
+        lessonMaterialCatalogService.requireEditable(authentication, materialId, MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN)
+        return materialHtmlGameEnrichmentService.request(materialId, assetId, request)
+    }
+
+    @Transactional(readOnly = true)
+    fun htmlGameEnrichmentStatus(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        assetId: UUID,
+        blockId: String,
+    ): MaterialHtmlGameEnrichmentResponse {
+        requireReadableMaterialOrActiveParticipant(authentication, materialId)
+        return materialHtmlGameEnrichmentService.status(materialId, assetId, blockId)
     }
 
     private fun materialForAccessibleScheduledLesson(

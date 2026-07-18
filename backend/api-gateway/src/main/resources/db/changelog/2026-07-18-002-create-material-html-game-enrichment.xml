@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-18-002-create-material-html-game-enrichment" author="codex">
+        <createTable tableName="material_html_game_enrichment">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_material_html_game_enrichment"/>
+            </column>
+            <column name="material_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="asset_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="block_id" type="VARCHAR(120)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="preferred_title" type="VARCHAR(160)"/>
+            <column name="resolved_title" type="VARCHAR(160)"/>
+            <column name="title_source" type="VARCHAR(16)"/>
+            <column name="icon_asset_id" type="UUID"/>
+            <column name="attempts" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="lease_until" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_error_code" type="VARCHAR(120)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="material_html_game_enrichment" baseColumnNames="material_id" constraintName="fk_game_enrichment_material" referencedTableName="lesson_material" referencedColumnNames="id" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="material_html_game_enrichment" baseColumnNames="asset_id" constraintName="fk_game_enrichment_asset" referencedTableName="material_asset" referencedColumnNames="id" onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="material_html_game_enrichment" columnNames="material_id,asset_id,block_id" constraintName="uk_game_enrichment_target"/>
+        <createIndex tableName="material_html_game_enrichment" indexName="idx_game_enrichment_work">
+            <column name="status"/><column name="next_attempt_at"/><column name="lease_until"/>
+        </createIndex>
+        <rollback><dropTable tableName="material_html_game_enrichment"/></rollback>
+    </changeSet>
+</databaseChangeLog>

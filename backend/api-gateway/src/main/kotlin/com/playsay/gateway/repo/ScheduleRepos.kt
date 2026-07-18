@@ -533,6 +533,8 @@ interface LessonEmailReminderRepo : JpaRepository<LessonEmailReminderEntity, UUI
 
     fun existsByIdempotencyKey(idempotencyKey: String): Boolean
 
+    fun findByIdempotencyKey(idempotencyKey: String): LessonEmailReminderEntity?
+
     fun findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lessonId: UUID): List<LessonEmailReminderEntity>
 
     fun findByLessonIdAndReminderTypeAndStatusIn(

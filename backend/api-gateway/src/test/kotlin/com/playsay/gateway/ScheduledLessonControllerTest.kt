@@ -592,6 +592,9 @@ class ScheduledLessonControllerTest @Autowired constructor(
             stored.actualStart = Instant.now()
             lessonRepo.saveAndFlush(stored)
         }
+        lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
+            .onEach { reminder -> reminder.status = "CANCELLED" }
+            .also(lessonEmailReminderRepo::saveAllAndFlush)
 
         val repaired = scheduleController.reschedule(
             teacher,
@@ -603,8 +606,9 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals("SCHEDULED", repaired.status)
         assertNull(stored.actualStart)
         assertNull(stored.actualEnd)
-        assertTrue(lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
-            .none { it.reminderType == "LESSON_RESCHEDULED" })
+        val reminders = lessonEmailReminderRepo.findByLessonIdOrderByRecipientRoleAscRecipientUserIdAsc(lesson.id)
+        assertTrue(reminders.none { it.reminderType == "LESSON_RESCHEDULED" })
+        assertEquals(2, reminders.count { it.reminderType == "LESSON_START_30M" && it.status == "PENDING" })
     }
 
     @Test

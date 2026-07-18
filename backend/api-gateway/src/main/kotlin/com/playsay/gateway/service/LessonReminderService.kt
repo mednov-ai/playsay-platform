@@ -42,7 +42,7 @@ class LessonReminderService(
             return
         }
 
-        val dueAt = scheduledStart.minus(REMINDER_OFFSET).let { reminderAt ->
+        val rebuiltDueAt = scheduledStart.minus(REMINDER_OFFSET).let { reminderAt ->
             if (reminderAt.isBefore(now)) now else reminderAt
         }
         val recipients = buildList {
@@ -55,22 +55,30 @@ class LessonReminderService(
         val createdAt = now
         val reminders = recipients.mapNotNull { recipient ->
             val idempotencyKey = idempotencyKey(lessonId, recipient.userId, scheduledStart)
-            if (lessonEmailReminderRepo.existsByIdempotencyKey(idempotencyKey)) {
-                null
-            } else {
-                LessonEmailReminderEntity(
+            val existing = lessonEmailReminderRepo.findByIdempotencyKey(idempotencyKey)
+            when {
+                existing == null -> LessonEmailReminderEntity(
                     id = UUID.randomUUID(),
                     lessonId = lessonId,
                     recipientUserId = recipient.userId,
                     recipientRole = recipient.role,
                     reminderType = MetaData.LessonReminderTypes.LESSON_START_30M,
-                    dueAt = dueAt,
+                    dueAt = rebuiltDueAt,
                     status = MetaData.LessonReminderStatuses.PENDING,
                     attempts = 0,
                     idempotencyKey = idempotencyKey,
                     createdAt = createdAt,
                     updatedAt = createdAt,
                 )
+                existing.status == MetaData.LessonReminderStatuses.CANCELLED -> existing.apply {
+                    dueAt = rebuiltDueAt
+                    this.status = MetaData.LessonReminderStatuses.PENDING
+                    attempts = 0
+                    lastError = null
+                    sentAt = null
+                    updatedAt = createdAt
+                }
+                else -> null
             }
         }
         if (reminders.isNotEmpty()) {

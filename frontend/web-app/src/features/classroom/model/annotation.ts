@@ -14,6 +14,9 @@ export type AnnotationTool =
   | "mindMap";
 
 export type AnnotationStrokeWidth = 4 | 8 | 16;
+export type AnnotationFontSize = 14 | 18 | 24 | 30 | 32;
+
+export const annotationFontSizePresets = [14, 18, 24, 32] as const satisfies readonly AnnotationFontSize[];
 
 export type AnnotationPoint = {
   pageId: string;
@@ -58,6 +61,7 @@ export type AnnotationBoxElement = {
 export type AnnotationTextElement = {
   [Kind in "stickyNote" | "text"]: AnnotationElementBase & {
     fill: string;
+    fontSize: AnnotationFontSize;
     height: number;
     kind: Kind;
     text: string;
@@ -69,6 +73,7 @@ export type AnnotationTextElement = {
 
 export type AnnotationMindMapNode = AnnotationElementBase & {
   fill: string;
+  fontSize: AnnotationFontSize;
   height: number;
   kind: "mindMapNode";
   mapId: string;
@@ -92,7 +97,7 @@ export type AnnotationContent = {
   activePageId: string;
   coordinateSpace: "material-page";
   elements: AnnotationElement[];
-  schemaVersion: 4;
+  schemaVersion: 5;
 };
 
 export function svgPointFromEvent(
@@ -136,7 +141,7 @@ export function emptyAnnotationContent(activePageId = defaultAnnotationPageId): 
     activePageId,
     coordinateSpace: "material-page",
     elements: [],
-    schemaVersion: 4,
+    schemaVersion: 5,
   };
 }
 
@@ -148,7 +153,7 @@ export function annotationContentFromElements(
     activePageId,
     coordinateSpace: "material-page",
     elements: elements.map((element) => serializeAnnotationElement(element)),
-    schemaVersion: 4,
+    schemaVersion: 5,
   };
 }
 
@@ -172,7 +177,7 @@ export function annotationContentFromJson(
     activePageId,
     coordinateSpace: "material-page",
     elements,
-    schemaVersion: 4,
+    schemaVersion: 5,
   };
 }
 
@@ -286,6 +291,28 @@ export function layoutMindMap(elements: AnnotationElement[], mapId: string): Ann
   return elements.map((element) => element.kind === "mindMapNode" && element.mapId === mapId
     ? laidOut.get(element.id) ?? element
     : element);
+}
+
+export function resizeMindMapNodeForText(
+  node: AnnotationMindMapNode,
+  fontSize: AnnotationFontSize,
+  text = node.text,
+): AnnotationMindMapNode {
+  const preset = mindMapSizeByFont[fontSize] ?? mindMapSizeByFont[24];
+  const horizontalPadding = fontSize >= 24 ? 24 : 20;
+  const usableWidth = Math.max(40, preset.width - horizontalPadding);
+  const charactersPerLine = Math.max(8, Math.floor(usableWidth / (fontSize * 0.58)));
+  const lineCount = (text || " ").split("\n").reduce((total, line) => (
+    total + Math.max(1, Math.ceil(Math.max(1, line.length) / charactersPerLine))
+  ), 0);
+  const contentHeight = Math.ceil(lineCount * fontSize * 1.15 + (fontSize >= 24 ? 20 : 14));
+  return {
+    ...node,
+    fontSize,
+    height: Math.min(mindMapMaximumHeight, Math.max(preset.height, contentHeight)),
+    text,
+    width: preset.width,
+  };
 }
 
 export function pointsToSvgPath(points: AnnotationPoint[]): string {
@@ -432,6 +459,7 @@ function serializeAnnotationElement(element: AnnotationElement): Record<string, 
     return {
       ...base,
       fill: element.fill,
+      fontSize: element.fontSize,
       height: roundCoordinate(element.height),
       mapId: element.mapId,
       order: element.order,
@@ -446,6 +474,7 @@ function serializeAnnotationElement(element: AnnotationElement): Record<string, 
   return {
     ...base,
     fill: element.fill,
+    ...(element.kind === "text" || element.kind === "stickyNote" ? { fontSize: element.fontSize } : {}),
     height: roundCoordinate(element.height),
     ...(element.kind === "text" || element.kind === "stickyNote" ? { text: element.text } : { strokeWidth: element.strokeWidth }),
     width: roundCoordinate(element.width),
@@ -499,9 +528,11 @@ function annotationElementFromJson(value: unknown, index: number): AnnotationEle
     const mapId = asString(element.mapId).trim() || (parentId ? "" : id);
     if (!mapId) return null;
     const sideValue = asString(element.side);
-    return {
+    const fontSize = annotationFontSize(element.fontSize, parentId === null ? 24 : 18);
+    return resizeMindMapNodeForText({
       ...base,
       fill: asString(element.fill) || defaultMindMapFill,
+      fontSize,
       height: Math.max(minimumElementSize, height),
       kind,
       mapId,
@@ -512,12 +543,13 @@ function annotationElementFromJson(value: unknown, index: number): AnnotationEle
       width: Math.max(minimumElementSize, width),
       x: clampCoordinate(x),
       y: clampCoordinate(y),
-    };
+    }, fontSize, asString(element.text).slice(0, mindMapTextLimit));
   }
   if (kind === "text" || kind === "stickyNote") {
     return {
       ...base,
       fill: asString(element.fill) || (kind === "stickyNote" ? defaultStickyFill : "transparent"),
+      fontSize: annotationFontSize(element.fontSize, 30),
       height: Math.max(minimumElementSize, height),
       kind,
       text: asString(element.text),
@@ -562,6 +594,13 @@ function annotationPointFromJson(value: unknown, fallbackPageId: string): Annota
 function annotationStrokeWidth(value: unknown): AnnotationStrokeWidth {
   const width = asNumber(value);
   return width === 4 || width === 16 ? width : 8;
+}
+
+function annotationFontSize(value: unknown, fallback: AnnotationFontSize): AnnotationFontSize {
+  const fontSize = asNumber(value);
+  return fontSize === 14 || fontSize === 18 || fontSize === 24 || fontSize === 30 || fontSize === 32
+    ? fontSize
+    : fallback;
 }
 
 function distanceToStroke(point: AnnotationPoint, stroke: AnnotationStroke): number {
@@ -643,8 +682,16 @@ const defaultStickyFill = "#fff0a8";
 const defaultMindMapFill = "#ffffff";
 const eraserRadius = 28;
 const minimumElementSize = 36;
-const mindMapLevelGap = 64;
+const mindMapLevelGap = 52;
 const mindMapPagePadding = 20;
-const mindMapSiblingGap = 24;
+const mindMapSiblingGap = 16;
+const mindMapMaximumHeight = 180;
+const mindMapSizeByFont: Record<AnnotationFontSize, { height: number; width: number }> = {
+  14: { height: 46, width: 132 },
+  18: { height: 56, width: 148 },
+  24: { height: 68, width: 180 },
+  30: { height: 86, width: 208 },
+  32: { height: 92, width: 220 },
+};
 export const mindMapNodeLimit = 50;
 export const mindMapTextLimit = 500;

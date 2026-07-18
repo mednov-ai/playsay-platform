@@ -17,8 +17,10 @@ import {
   mindMapNodes,
   moveAnnotationElement,
   resizeAnnotationElement,
+  resizeMindMapNodeForText,
   svgPointFromEvent,
   type AnnotationElement,
+  type AnnotationFontSize,
   type AnnotationMindMapNode,
   type AnnotationPoint,
   type AnnotationStroke,
@@ -63,6 +65,7 @@ export function useLessonAnnotation({
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pointer");
   const [annotationColor, setAnnotationColor] = useState("#ff5c00");
   const [annotationStrokeWidth, setAnnotationStrokeWidth] = useState<AnnotationStrokeWidth>(8);
+  const [defaultAnnotationFontSize, setDefaultAnnotationFontSize] = useState<AnnotationFontSize>(24);
   const [activePageId, setActivePageId] = useState(initialPageId?.trim() || defaultAnnotationPageId);
   const [localAnnotationElements, setLocalAnnotationElements] = useState<AnnotationElement[]>([]);
   const [annotationReady, setAnnotationReady] = useState(false);
@@ -82,6 +85,12 @@ export function useLessonAnnotation({
   const annotationElements = liveAnnotation?.elements ?? localAnnotationElements;
   const setAnnotationElements = liveAnnotation?.setElements ?? setLocalAnnotationElements;
   const normalizedInitialPageId = initialPageId?.trim() || defaultAnnotationPageId;
+  const selectedFontElement = selectedElementId
+    ? annotationElements.find((element): element is Extract<AnnotationElement, { kind: "mindMapNode" | "text" }> => (
+        element.id === selectedElementId && (element.kind === "text" || element.kind === "mindMapNode")
+      ))
+    : null;
+  const annotationFontSize = selectedFontElement?.fontSize ?? defaultAnnotationFontSize;
 
   useEffect(() => {
     liveAnnotationRef.current = liveAnnotation ?? null;
@@ -432,6 +441,25 @@ export function useLessonAnnotation({
     recordHistory([selected], [next]);
   }
 
+  function updateSelectedFontSize(fontSize: AnnotationFontSize) {
+    setDefaultAnnotationFontSize(fontSize);
+    const selected = selectedElementId
+      ? elementsRef.current.find((element) => element.id === selectedElementId)
+      : null;
+    if (!selected || (selected.kind !== "text" && selected.kind !== "mindMapNode")) return;
+    if (selected.kind === "text") {
+      const next = { ...selected, fontSize };
+      updateElementWithoutHistory(selected.id, next);
+      recordHistory([selected], [next]);
+      return;
+    }
+    const before = mindMapNodes(elementsRef.current, selected.mapId);
+    const resized = resizeMindMapNodeForText(selected, fontSize);
+    const afterElements = layoutMindMap(elementsRef.current.map((element) => element.id === selected.id ? resized : element), selected.mapId);
+    updateElements(() => afterElements);
+    recordHistory(before, mindMapNodes(afterElements, selected.mapId));
+  }
+
   function beginTextEditing(elementId: string) {
     const element = elementsRef.current.find((candidate) => candidate.id === elementId);
     if (!element || (element.kind !== "text" && element.kind !== "stickyNote" && element.kind !== "mindMapNode")) {
@@ -443,11 +471,16 @@ export function useLessonAnnotation({
   }
 
   function updateAnnotationText(elementId: string, text: string) {
-    updateElements((current) => current.map((element) => (
-      element.id === elementId && (element.kind === "text" || element.kind === "stickyNote" || element.kind === "mindMapNode")
-        ? { ...element, text: text.slice(0, element.kind === "mindMapNode" ? 500 : 3_000) }
-        : element
-    )));
+    updateElements((current) => {
+      const selected = current.find((element) => element.id === elementId);
+      if (!selected || (selected.kind !== "text" && selected.kind !== "stickyNote" && selected.kind !== "mindMapNode")) return current;
+      const nextText = text.slice(0, selected.kind === "mindMapNode" ? 500 : 3_000);
+      if (selected.kind !== "mindMapNode") {
+        return current.map((element) => element.id === elementId ? { ...selected, text: nextText } : element);
+      }
+      const resized = resizeMindMapNodeForText(selected, selected.fontSize, nextText);
+      return layoutMindMap(current.map((element) => element.id === elementId ? resized : element), selected.mapId);
+    });
   }
 
   function finishTextEditing() {
@@ -527,6 +560,7 @@ export function useLessonAnnotation({
       color: tool === "stickyNote" ? "#111111" : annotationColor,
       createdAt: Date.now(),
       fill: tool === "stickyNote" ? "#fff0a8" : "transparent",
+      fontSize: tool === "stickyNote" ? 30 : defaultAnnotationFontSize,
       height,
       id: annotationElementId(tool),
       kind: tool,
@@ -546,11 +580,12 @@ export function useLessonAnnotation({
 
   function createMindMapRoot(point: AnnotationPoint) {
     const id = annotationElementId("mindMap");
-    const element: AnnotationMindMapNode = {
+    const element = resizeMindMapNodeForText({
       color: "#ffffff",
       createdAt: Date.now(),
       fill: annotationColor,
-      height: 82,
+      fontSize: defaultAnnotationFontSize,
+      height: 68,
       id,
       kind: "mindMapNode",
       mapId: id,
@@ -559,10 +594,10 @@ export function useLessonAnnotation({
       parentId: null,
       side: "root",
       text: "",
-      width: 220,
-      x: Math.max(20, Math.min(760, point.x - 110)),
-      y: Math.max(20, Math.min(898, point.y - 41)),
-    };
+      width: 180,
+      x: Math.max(20, Math.min(800, point.x - 90)),
+      y: Math.max(20, Math.min(912, point.y - 34)),
+    }, defaultAnnotationFontSize);
     updateElements((current) => [...current, element]);
     recordHistory([], [element]);
     textEditBeforeRef.current = element;
@@ -595,7 +630,8 @@ export function useLessonAnnotation({
       color: annotationColor,
       createdAt: Date.now(),
       fill: "#ffffff",
-      height: 78,
+      fontSize: 18,
+      height: 56,
       id,
       kind: "mindMapNode",
       mapId: selected.mapId,
@@ -604,7 +640,7 @@ export function useLessonAnnotation({
       parentId: actualParent.id,
       side,
       text: "",
-      width: 184,
+      width: 148,
       x: actualParent.x,
       y: actualParent.y,
     };
@@ -745,6 +781,7 @@ export function useLessonAnnotation({
     addMindMapNode,
     annotationColor,
     annotationElements,
+    annotationFontSize,
     annotationStrokeWidth,
     annotationTool,
     beginAnnotation,
@@ -767,6 +804,7 @@ export function useLessonAnnotation({
     undo,
     updateAnnotationText,
     updateSelectedColor,
+    updateSelectedFontSize,
     updateSelectedStrokeWidth,
     extendAnnotation,
   };

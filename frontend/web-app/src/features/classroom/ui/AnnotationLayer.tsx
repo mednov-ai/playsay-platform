@@ -301,7 +301,8 @@ const AnnotationElementView = memo(function AnnotationElementView({
         className={`playsay-annotation-text playsay-annotation-text-${element.kind}`}
         data-empty={element.text ? "false" : "true"}
         data-mind-map-root={element.kind === "mindMapNode" && element.parentId === null ? "true" : undefined}
-        style={{ backgroundColor: element.fill, color: element.color }}
+        data-text-clamped={element.kind === "mindMapNode" && element.height >= 180 ? "true" : undefined}
+        style={{ backgroundColor: element.fill, color: element.color, fontSize: `${element.fontSize}px` }}
       >
         {editing ? (
           <textarea
@@ -441,10 +442,10 @@ function MindMapAddHandles({
   const { t } = useAppTranslation();
   const childHandles = element.parentId === null
     ? [
-        { side: "left" as const, x: element.x - 18, y: element.y + element.height / 2 },
-        { side: "right" as const, x: element.x + element.width + 18, y: element.y + element.height / 2 },
+        { side: "left" as const, x: element.x - 14, y: element.y + element.height / 2 },
+        { side: "right" as const, x: element.x + element.width + 14, y: element.y + element.height / 2 },
       ]
-    : [{ side: element.side === "left" ? "left" as const : "right" as const, x: element.side === "left" ? element.x - 18 : element.x + element.width + 18, y: element.y + element.height / 2 }];
+    : [{ side: element.side === "left" ? "left" as const : "right" as const, x: element.side === "left" ? element.x - 14 : element.x + element.width + 14, y: element.y + element.height / 2 }];
   return (
     <g className="playsay-mind-map-actions">
       {childHandles.map((handle) => (
@@ -461,8 +462,8 @@ function MindMapAddHandles({
           tabIndex={0}
           transform={`translate(${handle.x} ${handle.y})`}
         >
-          <circle r="16" />
-          <path d="M -7 0 H 7 M 0 -7 V 7" />
+          <circle r="13" />
+          <path d="M -6 0 H 6 M 0 -6 V 6" />
         </g>
       ))}
       {element.parentId ? (
@@ -476,10 +477,10 @@ function MindMapAddHandles({
           }}
           role="button"
           tabIndex={0}
-          transform={`translate(${element.x + element.width / 2} ${element.y + element.height + 18})`}
+          transform={`translate(${element.x + element.width / 2} ${element.y + element.height + 14})`}
         >
-          <circle r="14" />
-          <path d="M -6 0 H 6 M 0 -6 V 6" />
+          <circle r="12" />
+          <path d="M -5 0 H 5 M 0 -5 V 5" />
         </g>
       ) : null}
       <g
@@ -494,8 +495,8 @@ function MindMapAddHandles({
         tabIndex={0}
         transform={`translate(${element.x + element.width - 4} ${element.y + 4})`}
       >
-        <circle r="13" />
-        <path d="M -5 -5 L 5 5 M 5 -5 L -5 5" />
+        <circle r="11" />
+        <path d="M -4 -4 L 4 4 M 4 -4 L -4 4" />
       </g>
     </g>
   );

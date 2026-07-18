@@ -2052,7 +2052,6 @@
   overflow: hidden;
   padding: 12px;
   font-family: Manrope, sans-serif;
-  font-size: 30px;
   font-weight: 800;
   line-height: 1.2;
   text-align: center;
@@ -2069,9 +2068,8 @@
 
 .playsay-annotation-text-mindMapNode {
   border-color: currentColor;
-  border-radius: 18px;
+  border-radius: 14px;
   box-shadow: 0 8px 22px rgb(17 17 17 / 0.12);
-  font-size: 20px;
   line-height: 1.1;
   padding: 6px 10px;
 }
@@ -2079,7 +2077,10 @@
 .playsay-annotation-text-mindMapNode[data-mind-map-root="true"] {
   border-color: transparent;
   box-shadow: 0 12px 30px rgb(17 17 17 / 0.18);
-  font-size: 27px;
+}
+
+.playsay-annotation-text-mindMapNode[data-text-clamped="true"] > span {
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
 }
 
 .playsay-mind-map-connector {

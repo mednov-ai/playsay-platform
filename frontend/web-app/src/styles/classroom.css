@@ -1102,6 +1102,44 @@
   background: rgb(255 92 0 / 0.1);
 }
 
+.playsay-font-size-controls {
+  display: grid;
+  place-items: center;
+  gap: 0.125rem;
+  margin-top: 0.125rem;
+}
+
+.playsay-font-size-controls output {
+  min-width: 1.75rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.playsay-font-size-button {
+  width: 1.75rem;
+  height: 1.4rem;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 950;
+}
+
+.playsay-font-size-button:hover:not(:disabled) {
+  border-color: rgb(255 92 0 / 0.38);
+  background: rgb(255 92 0 / 0.1);
+  color: hsl(var(--primary));
+}
+
+.playsay-font-size-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
 .playsay-color-swatch {
   width: 1.375rem;
   height: 1.375rem;

@@ -186,6 +186,7 @@ describe("yjs workspace runtime annotations", () => {
         color: "#ffffff",
         createdAt: 1,
         fill: "#ff5c00",
+        fontSize: 24,
         height: 82,
         id: "map-1",
         kind: "mindMapNode",

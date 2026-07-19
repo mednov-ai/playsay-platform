@@ -516,6 +516,17 @@ export interface LessonTemplateCardsRequest {
   cards: LessonTemplateCardRequest[];
 }
 
+export interface MarkChatReadRequest {
+  lastReadMessageId: string;
+}
+
+export interface ChatReadReceiptResponse {
+  conversationId: string;
+  readerSubject: string;
+  lastReadMessageId: string;
+  readAt: string;
+}
+
 export interface UpdateUserRolesRequest {
   /** @minItems 1 */
   roles: string[];
@@ -1081,6 +1092,44 @@ export interface MaterialAiDraftRequest {
   sourceFileName?: string | null;
 }
 
+export interface CreateChatConversationRequest {
+  /** @minLength 1 */
+  participantSubject: string;
+}
+
+export interface ChatContactResponse {
+  subject: string;
+  displayName: string;
+  role: string;
+}
+
+export interface ChatMessageResponse {
+  id: string;
+  conversationId: string;
+  senderSubject: string;
+  clientMessageId: string;
+  text: string;
+  createdAt: string;
+  /** @nullable */
+  deliveredAt?: string | null;
+  /** @nullable */
+  readAt?: string | null;
+}
+
+export interface ChatConversationResponse {
+  id: string;
+  counterpart: ChatContactResponse;
+  lastMessage?: ChatMessageResponse | null;
+  unreadCount: number;
+  createdAt: string;
+}
+
+export interface ChatMessageRequest {
+  clientMessageId: string;
+  /** @maxLength 4000 */
+  text: string;
+}
+
 export interface HomeworkAssignmentRequest {
   materialId: string;
   /**
@@ -1339,6 +1388,12 @@ export interface HelloResponse {
   timestamp: string;
 }
 
+export interface ChatMessagePageResponse {
+  items: ChatMessageResponse[];
+  /** @nullable */
+  nextCursor?: string | null;
+}
+
 export interface UserDeletionOperationResponse {
   operationId: string;
   targetSubject: string;
@@ -1394,6 +1449,11 @@ export type UploadMaterialImageAssetBody = {
 
 export type UploadMaterialHtmlGameAssetBody = {
   file: Blob;
+};
+
+export type MessagesParams = {
+cursor?: string;
+limit?: number;
 };
 
 export type UsersParams = {
@@ -2827,6 +2887,47 @@ export const replaceCourseLessonCards = async (courseId: string,
 
   const data: replaceCourseLessonCardsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as replaceCourseLessonCardsResponse
+}
+
+
+
+export type markReadResponse200 = {
+  data: ChatReadReceiptResponse
+  status: 200
+}
+
+export type markReadResponseSuccess = (markReadResponse200) & {
+  headers: Headers;
+};
+;
+
+export type markReadResponse = (markReadResponseSuccess)
+
+export const getMarkReadUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/chat/conversations/${conversationId}/read`
+}
+
+export const markRead = async (conversationId: string,
+    markChatReadRequest: MarkChatReadRequest, options?: RequestInit): Promise<markReadResponse> => {
+
+  const res = await fetch(getMarkReadUrl(conversationId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(markChatReadRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: markReadResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as markReadResponse
 }
 
 
@@ -5303,6 +5404,176 @@ export const createCourseLesson = async (courseId: string,
 
 
 
+export type conversationsResponse200 = {
+  data: ChatConversationResponse[]
+  status: 200
+}
+
+export type conversationsResponseSuccess = (conversationsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type conversationsResponse = (conversationsResponseSuccess)
+
+export const getConversationsUrl = () => {
+
+
+
+
+  return `/api/chat/conversations`
+}
+
+export const conversations = async ( options?: RequestInit): Promise<conversationsResponse> => {
+
+  const res = await fetch(getConversationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: conversationsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as conversationsResponse
+}
+
+
+
+export type createConversationResponse201 = {
+  data: ChatConversationResponse
+  status: 201
+}
+
+export type createConversationResponseSuccess = (createConversationResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createConversationResponse = (createConversationResponseSuccess)
+
+export const getCreateConversationUrl = () => {
+
+
+
+
+  return `/api/chat/conversations`
+}
+
+export const createConversation = async (createChatConversationRequest: CreateChatConversationRequest, options?: RequestInit): Promise<createConversationResponse> => {
+
+  const res = await fetch(getCreateConversationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createChatConversationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createConversationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createConversationResponse
+}
+
+
+
+export type messagesResponse200 = {
+  data: ChatMessagePageResponse
+  status: 200
+}
+
+export type messagesResponseSuccess = (messagesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type messagesResponse = (messagesResponseSuccess)
+
+export const getMessagesUrl = (conversationId: string,
+    params?: MessagesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/chat/conversations/${conversationId}/messages?${stringifiedParams}` : `/api/chat/conversations/${conversationId}/messages`
+}
+
+export const messages = async (conversationId: string,
+    params?: MessagesParams, options?: RequestInit): Promise<messagesResponse> => {
+
+  const res = await fetch(getMessagesUrl(conversationId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: messagesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as messagesResponse
+}
+
+
+
+export type sendMessageResponse201 = {
+  data: ChatMessageResponse
+  status: 201
+}
+
+export type sendMessageResponseSuccess = (sendMessageResponse201) & {
+  headers: Headers;
+};
+;
+
+export type sendMessageResponse = (sendMessageResponseSuccess)
+
+export const getSendMessageUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/chat/conversations/${conversationId}/messages`
+}
+
+export const sendMessage = async (conversationId: string,
+    chatMessageRequest: ChatMessageRequest, options?: RequestInit): Promise<sendMessageResponse> => {
+
+  const res = await fetch(getSendMessageUrl(conversationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(chatMessageRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: sendMessageResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as sendMessageResponse
+}
+
+
+
 export type listHomeworkAssignmentsResponse200 = {
   data: AssignmentSummaryResponse[]
   status: 200
@@ -6930,6 +7201,46 @@ export const getHello = async ( options?: RequestInit): Promise<getHelloResponse
 
   const data: getHelloResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getHelloResponse
+}
+
+
+
+export type contactsResponse200 = {
+  data: ChatContactResponse[]
+  status: 200
+}
+
+export type contactsResponseSuccess = (contactsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type contactsResponse = (contactsResponseSuccess)
+
+export const getContactsUrl = () => {
+
+
+
+
+  return `/api/chat/contacts`
+}
+
+export const contacts = async ( options?: RequestInit): Promise<contactsResponse> => {
+
+  const res = await fetch(getContactsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: contactsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as contactsResponse
 }
 
 

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-19-002-add-chat-delivery-email-digests" author="codex">
+        <addColumn tableName="chat_message">
+            <column name="delivered_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+        <createIndex tableName="chat_message" indexName="idx_chat_message_pending_delivery">
+            <column name="delivered_at"/>
+            <column name="conversation_id"/>
+        </createIndex>
+
+        <createTable tableName="chat_email_digest">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_chat_email_digest"/>
+            </column>
+            <column name="recipient_user_id" type="UUID">
+                <constraints nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_chat_email_digest_recipient"/>
+            </column>
+            <column name="due_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="attempts" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="idempotency_key" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_chat_email_digest_idempotency"/>
+            </column>
+            <column name="last_error" type="VARCHAR(1024)"/>
+            <column name="sent_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="chat_email_digest" indexName="idx_chat_email_digest_due">
+            <column name="status"/>
+            <column name="due_at"/>
+        </createIndex>
+        <createIndex tableName="chat_email_digest" indexName="idx_chat_email_digest_recipient_latest">
+            <column name="recipient_user_id"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+
+        <createTable tableName="chat_email_digest_message">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_chat_email_digest_message"/>
+            </column>
+            <column name="digest_id" type="UUID">
+                <constraints nullable="false" referencedTableName="chat_email_digest" referencedColumnNames="id" foreignKeyName="fk_chat_digest_message_digest" deleteCascade="true"/>
+            </column>
+            <column name="message_id" type="UUID">
+                <constraints nullable="false" referencedTableName="chat_message" referencedColumnNames="id" foreignKeyName="fk_chat_digest_message_message"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="chat_email_digest_message"
+            columnNames="message_id"
+            constraintName="uq_chat_email_digest_message_message"/>
+        <createIndex tableName="chat_email_digest_message" indexName="idx_chat_email_digest_message_digest">
+            <column name="digest_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

@@ -3,6 +3,7 @@ export const translationDomains = [
   "auth",
   "registration",
   "shell",
+  "chat",
   "profile",
   "workspace",
   "schedule",

@@ -1,26 +1,43 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { ConnectionStateToast, ParticipantTile, RoomAudioRenderer, useTracks } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { ScreenShare, Video } from "lucide-react";
+import { ScreenShare, UserRound, Video } from "lucide-react";
 import { ClassroomControlBar } from "./ClassroomControlBar";
 import { useAppTranslation } from "../../../shared/i18n";
 import { useLessonTranslation } from "../hooks/useLessonTranslation";
 import type { TranslationRole } from "../model/realtimeTranslation";
+import type { LessonParticipantPresenceMap, LessonParticipantPresenceState } from "../model/session";
+import type { ScheduledLesson } from "../../../shared/api/playsay";
 
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
+type ExpectedParticipant = ScheduledLesson["participants"][number];
+export type ClassroomVideoSlot =
+  | { kind: "track"; trackRef: ClassroomTrackReference }
+  | {
+      kind: "placeholder";
+      displayName: string;
+      state: LessonParticipantPresenceState;
+      subject: string;
+    };
 type ClassroomStripLayout = "single" | "row";
 export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly";
 
 export function ClassroomVideoStage({
+  expectedParticipants,
   lessonId,
   lessonType,
   mode,
+  participantPresence,
+  showExpectedParticipants,
   translationAllowed,
   translationRole,
 }: {
+  expectedParticipants: ScheduledLesson["participants"];
   lessonId: string;
   lessonType: string;
   mode: ClassroomVideoMode;
+  participantPresence: LessonParticipantPresenceMap;
+  showExpectedParticipants: boolean;
   translationAllowed: boolean;
   translationRole: TranslationRole | null;
 }) {
@@ -40,12 +57,17 @@ export function ClassroomVideoStage({
     [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false },
   );
-  const orderedCameraTracks = [...cameraTracks].sort((left, right) => Number(left.participant.isLocal) - Number(right.participant.isLocal));
+  const cameraSlots = classroomCameraSlots(
+    cameraTracks,
+    expectedParticipants,
+    participantPresence,
+    showExpectedParticipants,
+  );
   const remoteScreenShareTrack = screenShareTracks.find((trackRef) => !trackRef.participant.isLocal);
-  const featuredTrack = remoteScreenShareTrack ?? orderedCameraTracks[0];
-  const stripTracks = remoteScreenShareTrack ? orderedCameraTracks : orderedCameraTracks.slice(1);
-  const hasStrip = stripTracks.length > 0;
-  const stripLayout = stripTracks.length > 1 ? "row" : "single";
+  const featuredSlot = cameraSlots[0];
+  const stripSlots = remoteScreenShareTrack ? cameraSlots : cameraSlots.slice(1);
+  const hasStrip = stripSlots.length > 0;
+  const stripLayout = stripSlots.length > 1 ? "row" : "single";
   const canDragStrip = hasStrip && stripLayout === "single";
   const pipStyle = {
     "--playsay-pip-x": `${pipPosition.x}px`,
@@ -173,15 +195,15 @@ export function ClassroomVideoStage({
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", keepPipInBounds);
     };
-  }, [hasStrip, mode, stripLayout, stripTracks.length]);
+  }, [hasStrip, mode, stripLayout, stripSlots.length]);
 
   if (mode === "videoOnly" && !remoteScreenShareTrack) {
     return (
       <div className="playsay-classroom-conference" data-layout="grid" data-mode="video-only">
-        <div className="playsay-video-grid" data-count={orderedCameraTracks.length || 1}>
-          {orderedCameraTracks.length > 0
-            ? orderedCameraTracks.map((trackRef) => (
-              <ClassroomGridVideoTile key={classroomTrackKey(trackRef)} trackRef={trackRef} />
+        <div className="playsay-video-grid" data-count={cameraSlots.length || 1}>
+          {cameraSlots.length > 0
+            ? cameraSlots.map((slot) => (
+              <ClassroomGridVideoSlot key={classroomSlotKey(slot)} slot={slot} />
             ))
             : (
               <div className="playsay-video-grid-empty">
@@ -206,7 +228,7 @@ export function ClassroomVideoStage({
       data-screen-share={remoteScreenShareTrack ? "true" : "false"}
     >
       <div className="playsay-video-focus" ref={focusRef}>
-        {featuredTrack ? <ParticipantTile trackRef={featuredTrack} /> : null}
+        {remoteScreenShareTrack ? <ParticipantTile trackRef={remoteScreenShareTrack} /> : featuredSlot ? <ClassroomVideoSlotView slot={featuredSlot} /> : null}
         {remoteScreenShareTrack ? (
           <div className="playsay-screen-share-label">
             <ScreenShare className="h-4 w-4" />
@@ -226,11 +248,11 @@ export function ClassroomVideoStage({
           style={pipStyle}
         >
           {hasStrip
-            ? stripTracks.map((trackRef) => (
+            ? stripSlots.map((slot) => (
               <ClassroomMiniVideoTile
-                key={classroomTrackKey(trackRef)}
+                key={classroomSlotKey(slot)}
                 layout={stripLayout}
-                trackRef={trackRef}
+                slot={slot}
               />
             ))
             : null}
@@ -292,38 +314,86 @@ function translationStatusText(
   return t("classroom.translation.waiting");
 }
 
-function ClassroomGridVideoTile({ trackRef }: { trackRef: ClassroomTrackReference }) {
+function ClassroomGridVideoSlot({ slot }: { slot: ClassroomVideoSlot }) {
   const { t } = useAppTranslation();
-  const label = participantDisplayName(trackRef, t("classroom.participantFallback"));
+  const label = slot.kind === "track"
+    ? participantDisplayName(slot.trackRef, t("classroom.participantFallback"))
+    : slot.displayName;
 
   return (
     <div className="playsay-video-grid-card">
-      <ParticipantTile trackRef={trackRef} />
-      <div className="playsay-video-card-label" title={label}>
-        {label}
-      </div>
+      <ClassroomVideoSlotView slot={slot} />
+      {slot.kind === "track" ? <div className="playsay-video-card-label" title={label}>{label}</div> : null}
     </div>
   );
 }
 
 function ClassroomMiniVideoTile({
   layout,
-  trackRef,
+  slot,
 }: {
   layout: ClassroomStripLayout;
-  trackRef: ClassroomTrackReference;
+  slot: ClassroomVideoSlot;
 }) {
   const { t } = useAppTranslation();
-  const label = participantDisplayName(trackRef, t("classroom.participantFallback"));
+  const label = slot.kind === "track"
+    ? participantDisplayName(slot.trackRef, t("classroom.participantFallback"))
+    : slot.displayName;
 
   return (
     <div className="playsay-video-card" data-layout={layout}>
-      <ParticipantTile trackRef={trackRef} />
-      <div className="playsay-video-card-label" title={label}>
-        {label}
-      </div>
+      <ClassroomVideoSlotView slot={slot} />
+      {slot.kind === "track" ? <div className="playsay-video-card-label" title={label}>{label}</div> : null}
     </div>
   );
+}
+
+function ClassroomVideoSlotView({ slot }: { slot: ClassroomVideoSlot }) {
+  const { t } = useAppTranslation();
+  if (slot.kind === "track") return <ParticipantTile trackRef={slot.trackRef} />;
+  const statusKey = slot.state === "CHECKING_DEVICES"
+    ? "checkingDevices"
+    : slot.state === "ONLINE"
+      ? "online"
+      : "offline";
+  return (
+    <div aria-live="polite" className="playsay-video-presence" data-presence-state={slot.state}>
+      <span className="playsay-video-presence-icon"><UserRound aria-hidden="true" /></span>
+      <strong title={slot.displayName}>{slot.displayName}</strong>
+      <span>{t(`classroom.presence.${statusKey}`)}</span>
+    </div>
+  );
+}
+
+export function classroomCameraSlots(
+  cameraTracks: ClassroomTrackReference[],
+  expectedParticipants: ExpectedParticipant[],
+  participantPresence: LessonParticipantPresenceMap,
+  showExpectedParticipants: boolean,
+): ClassroomVideoSlot[] {
+  const orderedTracks = [...cameraTracks].sort(
+    (left, right) => Number(left.participant.isLocal) - Number(right.participant.isLocal),
+  );
+  const connectedIdentities = new Set(
+    orderedTracks.map((trackRef) => trackRef.participant.identity).filter(Boolean),
+  );
+  const remoteTracks = orderedTracks.filter((trackRef) => !trackRef.participant.isLocal);
+  const localTracks = orderedTracks.filter((trackRef) => trackRef.participant.isLocal);
+  const placeholders = showExpectedParticipants
+    ? expectedParticipants
+      .filter((participant) => !connectedIdentities.has(participant.subject))
+      .map<ClassroomVideoSlot>((participant) => ({
+        kind: "placeholder",
+        displayName: participant.displayName?.trim() || participant.username?.trim() || participant.subject,
+        state: participantPresence[participant.subject] ?? "OFFLINE",
+        subject: participant.subject,
+      }))
+    : [];
+  return [
+    ...remoteTracks.map<ClassroomVideoSlot>((trackRef) => ({ kind: "track", trackRef })),
+    ...placeholders,
+    ...localTracks.map<ClassroomVideoSlot>((trackRef) => ({ kind: "track", trackRef })),
+  ];
 }
 
 function participantDisplayName(trackRef: ClassroomTrackReference, fallback: string): string {
@@ -336,4 +406,8 @@ function participantDisplayName(trackRef: ClassroomTrackReference, fallback: str
 
 function classroomTrackKey(trackRef: ClassroomTrackReference): string {
   return `${trackRef.participant.sid || trackRef.participant.identity}-${trackRef.source ?? "camera"}`;
+}
+
+function classroomSlotKey(slot: ClassroomVideoSlot): string {
+  return slot.kind === "track" ? classroomTrackKey(slot.trackRef) : `expected-${slot.subject}`;
 }

@@ -9,6 +9,9 @@ export type ClassroomMediaChoices = {
   videoEnabled: boolean;
 };
 
+export type LessonParticipantPresenceState = "OFFLINE" | "ONLINE" | "CHECKING_DEVICES";
+export type LessonParticipantPresenceMap = Record<string, LessonParticipantPresenceState>;
+
 export type LessonRoomSession = LiveKitRoomToken & {
   courseTitle: string | null;
   lessonId: string;
@@ -22,6 +25,7 @@ export type LessonRoomSession = LiveKitRoomToken & {
   workMode: string;
   materialId: string | null;
   participants: ScheduledLesson["participants"];
+  participantPresence: LessonParticipantPresenceMap;
   teacherSubject: string | null;
   teacherName: string | null;
   mediaChoices: ClassroomMediaChoices;

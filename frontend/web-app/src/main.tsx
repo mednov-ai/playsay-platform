@@ -8,6 +8,7 @@ import "./styles.css";
 import "./styles/workspace.css";
 import "./styles/schedule.css";
 import "./styles/classroom.css";
+import "./styles/chat.css";
 import "./styles/materials.css";
 import "./styles/responsive.css";
 

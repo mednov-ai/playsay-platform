@@ -746,6 +746,31 @@ paths:
                 $ref: "#/components/schemas/CourseLessonResponse"
       security:
       - bearerAuth: []
+  /chat/conversations/{conversationId}/read:
+    put:
+      tags:
+      - chat-controller
+      operationId: markRead
+      parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkChatReadRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatReadReceiptResponse"
   /admin/user-management/users/{subject}/roles:
     put:
       tags:
@@ -2063,6 +2088,92 @@ paths:
           description: Course not found
       security:
       - bearerAuth: []
+  /chat/conversations:
+    get:
+      tags:
+      - chat-controller
+      operationId: conversations
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatConversationResponse"
+    post:
+      tags:
+      - chat-controller
+      operationId: createConversation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChatConversationRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversationResponse"
+  /chat/conversations/{conversationId}/messages:
+    get:
+      tags:
+      - chat-controller
+      operationId: messages
+      parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessagePageResponse"
+    post:
+      tags:
+      - chat-controller
+      operationId: sendMessage
+      parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageResponse"
   /assignments:
     get:
       tags:
@@ -2838,6 +2949,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HelloResponse"
+  /chat/contacts:
+    get:
+      tags:
+      - chat-controller
+      operationId: contacts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatContactResponse"
   /assignments/{assignmentId}:
     get:
       tags:
@@ -4042,6 +4167,33 @@ components:
             $ref: "#/components/schemas/LessonTemplateCardRequest"
       required:
       - cards
+    MarkChatReadRequest:
+      type: object
+      properties:
+        lastReadMessageId:
+          type: string
+          format: uuid
+      required:
+      - lastReadMessageId
+    ChatReadReceiptResponse:
+      type: object
+      properties:
+        conversationId:
+          type: string
+          format: uuid
+        readerSubject:
+          type: string
+        lastReadMessageId:
+          type: string
+          format: uuid
+        readAt:
+          type: string
+          format: date-time
+      required:
+      - conversationId
+      - lastReadMessageId
+      - readAt
+      - readerSubject
     UpdateUserRolesRequest:
       type: object
       properties:
@@ -5062,6 +5214,98 @@ components:
       required:
       - language
       - prompt
+    CreateChatConversationRequest:
+      type: object
+      properties:
+        participantSubject:
+          type: string
+          minLength: 1
+      required:
+      - participantSubject
+    ChatContactResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+      required:
+      - displayName
+      - role
+      - subject
+    ChatConversationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        counterpart:
+          $ref: "#/components/schemas/ChatContactResponse"
+        lastMessage:
+          oneOf:
+          - $ref: "#/components/schemas/ChatMessageResponse"
+          - type: "null"
+        unreadCount:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - counterpart
+      - createdAt
+      - id
+      - unreadCount
+    ChatMessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversationId:
+          type: string
+          format: uuid
+        senderSubject:
+          type: string
+        clientMessageId:
+          type: string
+          format: uuid
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        readAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - clientMessageId
+      - conversationId
+      - createdAt
+      - id
+      - senderSubject
+      - text
+    ChatMessageRequest:
+      type: object
+      properties:
+        clientMessageId:
+          type: string
+          format: uuid
+        text:
+          type: string
+          maxLength: 4000
+      required:
+      - clientMessageId
+      - text
     HomeworkAssignmentRequest:
       type: object
       properties:
@@ -5472,6 +5716,19 @@ components:
       - message
       - service
       - timestamp
+    ChatMessagePageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessageResponse"
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - items
     UserDeletionOperationResponse:
       type: object
       properties:

@@ -10,6 +10,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.springframework.http.HttpHeaders
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
@@ -27,13 +28,69 @@ class LessonRealtimeHubTest {
         val studentSession = RecordingWebSocketSession()
 
         hub.register(studentSession, LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT")))
-        hub.subscribe(studentSession, lessonId)
+        hub.subscribe(studentSession, lesson(id = lessonId, status = "SCHEDULED", participantSubjects = listOf("student-1")))
 
         hub.publishLessonUpdated(lesson(id = lessonId, status = "COMPLETED", participantSubjects = listOf("student-1")))
 
         val lastMessage = objectMapper.readTree(studentSession.sentMessages.last())
         assertEquals("lesson.deleted", lastMessage["type"].asText())
         assertEquals(lessonId.toString(), lastMessage["lessonId"].asText())
+    }
+
+    @Test
+    fun `teacher receives offline online and checking device presence snapshots`() {
+        val hub = LessonRealtimeHub(objectMapper)
+        val activeLesson = lesson(id = UUID.randomUUID(), status = "IN_PROGRESS", participantSubjects = listOf("student-1"))
+        val teacherSession = RecordingWebSocketSession()
+        val firstStudentSession = RecordingWebSocketSession()
+        val secondStudentSession = RecordingWebSocketSession()
+
+        hub.register(teacherSession, LessonRealtimePrincipal(subject = "teacher-1", roles = setOf("TEACHER")))
+        hub.subscribe(teacherSession, activeLesson)
+        assertPresence(teacherSession, LessonPresenceStates.OFFLINE)
+
+        hub.register(firstStudentSession, LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT")))
+        assertPresence(teacherSession, LessonPresenceStates.ONLINE)
+
+        hub.register(secondStudentSession, LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT")))
+        hub.updatePresence(firstStudentSession, activeLesson, LessonPresenceStates.CHECKING_DEVICES)
+        assertPresence(teacherSession, LessonPresenceStates.CHECKING_DEVICES)
+
+        hub.updatePresence(firstStudentSession, activeLesson, LessonPresenceStates.ONLINE)
+        assertPresence(teacherSession, LessonPresenceStates.ONLINE)
+
+        hub.unregister(firstStudentSession)
+        assertPresence(teacherSession, LessonPresenceStates.ONLINE)
+        hub.unregister(secondStudentSession)
+        assertPresence(teacherSession, LessonPresenceStates.OFFLINE)
+
+        val reconnectedStudentSession = RecordingWebSocketSession()
+        hub.register(reconnectedStudentSession, LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT")))
+        assertPresence(teacherSession, LessonPresenceStates.ONLINE)
+        hub.updatePresence(reconnectedStudentSession, activeLesson, LessonPresenceStates.CHECKING_DEVICES)
+        assertPresence(teacherSession, LessonPresenceStates.CHECKING_DEVICES)
+    }
+
+    @Test
+    fun `student subscribers never receive participant presence`() {
+        val hub = LessonRealtimeHub(objectMapper)
+        val activeLesson = lesson(id = UUID.randomUUID(), status = "IN_PROGRESS", participantSubjects = listOf("student-1"))
+        val studentSession = RecordingWebSocketSession()
+
+        hub.register(studentSession, LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT")))
+        hub.subscribe(studentSession, activeLesson)
+
+        assertTrue(studentSession.sentMessages.none { payload ->
+            objectMapper.readTree(payload)["type"].asText() == "lesson.presence"
+        })
+    }
+
+    private fun assertPresence(session: RecordingWebSocketSession, expectedState: String) {
+        val message = session.sentMessages
+            .map(objectMapper::readTree)
+            .last { payload -> payload["type"].asText() == "lesson.presence" }
+        assertEquals("student-1", message["participants"][0]["subject"].asText())
+        assertEquals(expectedState, message["participants"][0]["state"].asText())
     }
 
     private fun lesson(

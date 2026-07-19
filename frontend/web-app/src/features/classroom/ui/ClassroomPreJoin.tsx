@@ -13,8 +13,6 @@ import {
   Loader2,
   Mic,
   MicOff,
-  Play,
-  Speaker,
 } from "lucide-react";
 import {
   Track,
@@ -22,18 +20,28 @@ import {
   type LocalAudioTrack,
   type LocalVideoTrack,
 } from "livekit-client";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import { BrandMark } from "../../../shared/ui/BrandMark";
 import { Button } from "../../../components/ui/button";
 import type { ClassroomMediaChoices } from "../model/session";
 
-type SpeakerTestState = "idle" | "playing" | "confirm" | "passed" | "failed";
+type AudioCheckState = "idle" | "recording" | "playing" | "confirm" | "passed" | "failed" | "tooShort";
 export type PreJoinWarning = "camera" | "microphone" | "speaker";
 
 const speakerDeviceStorageKey = "playsay.classroom.audio-output.v1";
-const microphoneSignalThreshold = 0.035;
+const minimumRecordingDurationMs = 300;
+const maximumRecordingDurationMs = 5_000;
 
 export function ClassroomPreJoin({
   joining,
@@ -62,10 +70,18 @@ export function ClassroomPreJoin({
   const [videoDeviceId, setVideoDeviceId] = useState(userChoices.videoDeviceId || "default");
   const [audioOutputDeviceId, setAudioOutputDeviceId] = useState(loadSpeakerDeviceId);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [microphoneDetected, setMicrophoneDetected] = useState(false);
-  const [speakerTest, setSpeakerTest] = useState<SpeakerTestState>("idle");
+  const [microphoneRecorded, setMicrophoneRecorded] = useState(false);
+  const [speakerConfirmed, setSpeakerConfirmed] = useState(false);
+  const [audioCheckState, setAudioCheckState] = useState<AudioCheckState>("idle");
   const [showWarning, setShowWarning] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingStartedAtRef = useRef(0);
+  const recordingGenerationRef = useRef(0);
+  const recordingTimerRef = useRef<number | null>(null);
+  const playbackRef = useRef<HTMLAudioElement | null>(null);
+  const playbackUrlRef = useRef<string | null>(null);
 
   const handlePreviewError = useCallback((error: Error) => {
     setPreviewError(error.name || error.message);
@@ -108,22 +124,36 @@ export function ClassroomPreJoin({
     return () => { videoTrack.detach(videoElement); };
   }, [videoTrack]);
 
-  useEffect(() => {
-    if (audioEnabled && microphoneVolume >= microphoneSignalThreshold) {
-      setMicrophoneDetected(true);
-    }
-  }, [audioEnabled, microphoneVolume]);
+  useEffect(() => () => {
+    recordingGenerationRef.current += 1;
+    disposeAudioCheckResources();
+  }, []);
 
   const warnings = preJoinWarnings({
     cameraReady: !videoEnabled || Boolean(videoTrack),
-    microphoneReady: audioEnabled && microphoneDetected,
-    speakerReady: speakerTest === "passed",
+    microphoneReady: audioEnabled && microphoneRecorded,
+    speakerReady: speakerConfirmed,
   });
+  const microphoneLevel = normalizedMicrophoneLevel(microphoneVolume);
+  const audioCheckReady = audioEnabled && microphoneRecorded && speakerConfirmed;
+  const audioCheckMessage = !audioEnabled
+    ? t("classroom.preJoin.microphoneOff")
+    : audioCheckState === "recording"
+      ? t("classroom.preJoin.recording")
+      : audioCheckState === "playing"
+        ? t("classroom.preJoin.playingRecording")
+        : audioCheckState === "tooShort"
+          ? t("classroom.preJoin.recordingTooShort")
+          : audioCheckState === "failed"
+            ? t("classroom.preJoin.recordingFailed")
+            : audioCheckState === "passed"
+              ? t("classroom.preJoin.speakerReady")
+              : t("classroom.preJoin.recordingPrompt");
 
   function changeAudioEnabled(enabled: boolean) {
+    resetAudioCheck();
     setAudioEnabled(enabled);
     saveAudioInputEnabled(enabled);
-    setMicrophoneDetected(false);
     setPreviewError(null);
     setShowWarning(false);
   }
@@ -136,9 +166,9 @@ export function ClassroomPreJoin({
   }
 
   function changeAudioDevice(deviceId: string) {
+    resetAudioCheck();
     setAudioDeviceId(deviceId);
     saveAudioInputDeviceId(deviceId);
-    setMicrophoneDetected(false);
     setPreviewError(null);
     setShowWarning(false);
   }
@@ -151,20 +181,160 @@ export function ClassroomPreJoin({
   }
 
   function changeAudioOutputDevice(deviceId: string) {
+    resetAudioCheck();
     setAudioOutputDeviceId(deviceId);
     saveSpeakerDeviceId(deviceId);
-    setSpeakerTest("idle");
     setShowWarning(false);
   }
 
-  async function testSpeaker() {
-    setSpeakerTest("playing");
-    try {
-      await playSpeakerTest(audioOutputDeviceId);
-      setSpeakerTest("confirm");
-    } catch {
-      setSpeakerTest("failed");
+  function resetAudioCheck() {
+    recordingGenerationRef.current += 1;
+    disposeAudioCheckResources();
+    setMicrophoneRecorded(false);
+    setSpeakerConfirmed(false);
+    setAudioCheckState("idle");
+  }
+
+  function disposeAudioCheckResources() {
+    if (recordingTimerRef.current !== null) {
+      window.clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    if (recorder?.state === "recording") recorder.stop();
+    const playback = playbackRef.current;
+    playbackRef.current = null;
+    if (playback) {
+      playback.pause();
+      playback.removeAttribute("src");
+      playback.load();
+    }
+    if (playbackUrlRef.current) {
+      URL.revokeObjectURL(playbackUrlRef.current);
+      playbackUrlRef.current = null;
+    }
+  }
+
+  function startAudioRecording() {
+    if (!audioEnabled || !audioTrack || audioCheckState === "playing" || typeof MediaRecorder === "undefined") {
+      setAudioCheckState("failed");
+      return;
+    }
+
+    recordingGenerationRef.current += 1;
+    const generation = recordingGenerationRef.current;
+    disposeAudioCheckResources();
+    setSpeakerConfirmed(false);
+    setAudioCheckState("recording");
+    recordingChunksRef.current = [];
+    recordingStartedAtRef.current = performance.now();
+
+    try {
+      const stream = new MediaStream([audioTrack.mediaStreamTrack]);
+      const recorder = new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (generation === recordingGenerationRef.current && event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onerror = () => {
+        if (generation === recordingGenerationRef.current) setAudioCheckState("failed");
+      };
+      recorder.onstop = () => {
+        if (recordingTimerRef.current !== null) {
+          window.clearTimeout(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        recorderRef.current = null;
+        if (generation !== recordingGenerationRef.current) return;
+        const durationMs = performance.now() - recordingStartedAtRef.current;
+        if (durationMs < minimumRecordingDurationMs) {
+          setMicrophoneRecorded(false);
+          setAudioCheckState("tooShort");
+          return;
+        }
+        const recording = new Blob(recordingChunksRef.current, { type: recorder.mimeType || undefined });
+        if (recording.size === 0) {
+          setMicrophoneRecorded(false);
+          setAudioCheckState("failed");
+          return;
+        }
+        setMicrophoneRecorded(true);
+        void playAudioRecording(recording, audioOutputDeviceId, generation);
+      };
+      recorder.start();
+      recordingTimerRef.current = window.setTimeout(() => stopAudioRecording(), maximumRecordingDurationMs);
+    } catch {
+      setMicrophoneRecorded(false);
+      setAudioCheckState("failed");
+    }
+  }
+
+  function stopAudioRecording(cancelled = false) {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state !== "recording") return;
+    if (cancelled) recordingGenerationRef.current += 1;
+    recorder.stop();
+    if (cancelled) setAudioCheckState("idle");
+  }
+
+  async function playAudioRecording(recording: Blob, deviceId: string, generation: number) {
+    setAudioCheckState("playing");
+    try {
+      const url = URL.createObjectURL(recording);
+      playbackUrlRef.current = url;
+      const audio = new Audio(url) as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> };
+      playbackRef.current = audio;
+      if (deviceId && deviceId !== "default" && audio.setSinkId) await audio.setSinkId(deviceId);
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => resolve();
+        audio.onerror = () => reject(new Error("Audio playback failed."));
+        void audio.play().catch(reject);
+      });
+      if (generation === recordingGenerationRef.current) setAudioCheckState("confirm");
+    } catch {
+      if (generation === recordingGenerationRef.current) setAudioCheckState("failed");
+    } finally {
+      const playback = playbackRef.current;
+      playbackRef.current = null;
+      if (playback) {
+        playback.removeAttribute("src");
+        playback.load();
+      }
+      if (playbackUrlRef.current) {
+        URL.revokeObjectURL(playbackUrlRef.current);
+        playbackUrlRef.current = null;
+      }
+    }
+  }
+
+  function startRecordingFromPointer(event: PointerEvent<HTMLButtonElement>) {
+    if (event.button > 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    startAudioRecording();
+  }
+
+  function stopRecordingFromPointer(event: PointerEvent<HTMLButtonElement>, cancelled = false) {
+    event.preventDefault();
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    stopAudioRecording(cancelled);
+  }
+
+  function startRecordingFromKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
+    if ((event.key !== " " && event.key !== "Enter") || event.repeat) return;
+    event.preventDefault();
+    startAudioRecording();
+  }
+
+  function stopRecordingFromKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== " " && event.key !== "Enter") return;
+    event.preventDefault();
+    stopAudioRecording();
   }
 
   async function submit() {
@@ -216,25 +386,79 @@ export function ClassroomPreJoin({
         <div className="playsay-prejoin-checks">
           <DeviceCheckCard
             icon={audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-            ready={audioEnabled && microphoneDetected}
-            title={t("classroom.preJoin.microphoneTitle")}
+            ready={audioCheckReady}
+            title={t("classroom.preJoin.soundTitle")}
           >
-            <DeviceSelect
-              devices={audioDevices}
-              fallbackLabel={t("classroom.preJoin.microphoneFallback")}
-              label={t("classroom.preJoin.microphoneSelect")}
-              onChange={changeAudioDevice}
-              value={audioDeviceId}
-            />
-            <div className="playsay-prejoin-meter" aria-label={t("classroom.preJoin.microphoneLevel")}>
-              <span style={{ width: `${Math.max(3, Math.min(100, microphoneVolume * 360))}%` }} />
+            <div className="playsay-prejoin-audio-devices">
+              <DeviceSelect
+                devices={audioDevices}
+                fallbackLabel={t("classroom.preJoin.microphoneFallback")}
+                label={t("classroom.preJoin.microphoneSelect")}
+                onChange={changeAudioDevice}
+                value={audioDeviceId}
+              />
+              {canSelectAudioOutput ? (
+                <DeviceSelect
+                  devices={audioOutputDevices}
+                  fallbackLabel={t("classroom.preJoin.speakerFallback")}
+                  label={t("classroom.preJoin.speakerSelect")}
+                  onChange={changeAudioOutputDevice}
+                  value={audioOutputDeviceId}
+                />
+              ) : (
+                <div className="playsay-prejoin-system-output">
+                  <span>{t("classroom.preJoin.speakerSelect")}</span>
+                  <strong>{t("classroom.preJoin.speakerSystemDefaultShort")}</strong>
+                </div>
+              )}
             </div>
-            <p>{audioEnabled
-              ? microphoneDetected ? t("classroom.preJoin.microphoneReady") : t("classroom.preJoin.microphonePrompt")
-              : t("classroom.preJoin.microphoneOff")}</p>
-            <Button onClick={() => changeAudioEnabled(!audioEnabled)} type="button" variant="outline">
-              {audioEnabled ? t("classroom.preJoin.turnOff") : t("classroom.preJoin.turnOn")}
-            </Button>
+            <div
+              aria-label={t("classroom.preJoin.microphoneLevel")}
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={microphoneLevel}
+              className="playsay-prejoin-meter"
+              role="progressbar"
+            >
+              <span style={{ width: `${microphoneLevel}%` }} />
+            </div>
+            <div aria-live="polite" className="playsay-prejoin-audio-result" data-state={audioCheckState}>
+              <p>{audioCheckState === "confirm" ? t("classroom.preJoin.didYouHearRecording") : audioCheckMessage}</p>
+              {audioCheckState === "confirm" ? (
+                <div className="playsay-prejoin-audio-confirm">
+                  <Button onClick={() => { setSpeakerConfirmed(true); setAudioCheckState("passed"); setShowWarning(false); }} type="button">
+                    {t("classroom.preJoin.heardYes")}
+                  </Button>
+                  <Button onClick={() => { setSpeakerConfirmed(false); setAudioCheckState("failed"); }} type="button" variant="outline">
+                    {t("classroom.preJoin.heardNo")}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+            <div className="playsay-prejoin-audio-actions">
+              <Button
+                data-recording={audioCheckState === "recording" ? "true" : "false"}
+                disabled={!audioEnabled || !audioTrack || audioCheckState === "playing" || joining}
+                onBlur={() => stopAudioRecording(true)}
+                onKeyDown={startRecordingFromKeyboard}
+                onKeyUp={stopRecordingFromKeyboard}
+                onPointerCancel={(event) => stopRecordingFromPointer(event, true)}
+                onPointerDown={startRecordingFromPointer}
+                onPointerUp={stopRecordingFromPointer}
+                type="button"
+                variant={audioCheckState === "recording" ? "default" : "outline"}
+              >
+                {audioCheckState === "playing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+                {audioCheckState === "recording"
+                  ? t("classroom.preJoin.recording")
+                  : audioCheckState === "playing"
+                    ? t("classroom.preJoin.playingRecording")
+                    : t("classroom.preJoin.holdToRecord")}
+              </Button>
+              <Button onClick={() => changeAudioEnabled(!audioEnabled)} type="button" variant="outline">
+                {audioEnabled ? t("classroom.preJoin.turnOff") : t("classroom.preJoin.turnOn")}
+              </Button>
+            </div>
           </DeviceCheckCard>
 
           <DeviceCheckCard
@@ -257,36 +481,6 @@ export function ClassroomPreJoin({
             </Button>
           </DeviceCheckCard>
 
-          <DeviceCheckCard
-            icon={<Speaker className="h-5 w-5" />}
-            ready={speakerTest === "passed"}
-            title={t("classroom.preJoin.speakerTitle")}
-          >
-            {canSelectAudioOutput ? (
-              <DeviceSelect
-                devices={audioOutputDevices}
-                fallbackLabel={t("classroom.preJoin.speakerFallback")}
-                label={t("classroom.preJoin.speakerSelect")}
-                onChange={changeAudioOutputDevice}
-                value={audioOutputDeviceId}
-              />
-            ) : <p>{t("classroom.preJoin.speakerSystemDefault")}</p>}
-            <Button disabled={speakerTest === "playing"} onClick={() => void testSpeaker()} type="button" variant="outline">
-              {speakerTest === "playing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {t("classroom.preJoin.testSound")}
-            </Button>
-            {speakerTest === "confirm" || speakerTest === "failed" ? (
-              <div className="playsay-prejoin-heard">
-                <span>{t("classroom.preJoin.didYouHear")}</span>
-                <Button onClick={() => { setSpeakerTest("passed"); setShowWarning(false); }} type="button">
-                  {t("classroom.preJoin.heardYes")}
-                </Button>
-                <Button onClick={() => setSpeakerTest("failed")} type="button" variant="outline">
-                  {t("classroom.preJoin.heardNo")}
-                </Button>
-              </div>
-            ) : speakerTest === "passed" ? <p>{t("classroom.preJoin.speakerReady")}</p> : null}
-          </DeviceCheckCard>
         </div>
       </div>
 
@@ -393,30 +587,12 @@ export function preJoinWarnings(input: {
 }
 
 export function supportsAudioOutputSelection(): boolean {
-  if (typeof AudioContext === "undefined") return false;
-  return "setSinkId" in AudioContext.prototype;
+  return typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
 }
 
-export async function playSpeakerTest(deviceId: string): Promise<void> {
-  const context = new AudioContext() as AudioContext & { setSinkId?: (id: string) => Promise<void> };
-  try {
-    if (deviceId && context.setSinkId) await context.setSinkId(deviceId);
-    await context.resume();
-    const gain = context.createGain();
-    const oscillator = context.createOscillator();
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(660, context.currentTime);
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.14, context.currentTime + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.55);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.58);
-    await new Promise<void>((resolve) => { oscillator.onended = () => resolve(); });
-  } finally {
-    await context.close();
-  }
+export function normalizedMicrophoneLevel(volume: number): number {
+  if (!Number.isFinite(volume) || volume <= 0) return 0;
+  return Math.round(Math.min(100, Math.pow(volume, 1.35) * 125));
 }
 
 function loadSpeakerDeviceId(): string {

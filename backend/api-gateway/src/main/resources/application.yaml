@@ -86,6 +86,11 @@ playsay:
   public-app-url: ${PLAYSAY_PUBLIC_APP_URL:https://online.play-and-say.ru}
   lesson-reminders:
     poll-delay-ms: ${PLAYSAY_LESSON_REMINDERS_POLL_DELAY_MS:60000}
+  chat-email:
+    initial-delay: ${PLAYSAY_CHAT_EMAIL_INITIAL_DELAY:PT2M}
+    cooldown: ${PLAYSAY_CHAT_EMAIL_COOLDOWN:PT10M}
+    poll-delay-ms: ${PLAYSAY_CHAT_EMAIL_POLL_DELAY_MS:30000}
+    retry-delays: ${PLAYSAY_CHAT_EMAIL_RETRY_DELAYS:PT1M,PT5M,PT15M}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
     s3:

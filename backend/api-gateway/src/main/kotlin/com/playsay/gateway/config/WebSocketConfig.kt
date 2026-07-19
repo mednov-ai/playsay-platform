@@ -1,6 +1,7 @@
 package com.playsay.gateway.config
 
 import com.playsay.gateway.realtime.LessonRealtimeWebSocketHandler
+import com.playsay.gateway.realtime.ChatRealtimeWebSocketHandler
 import com.playsay.gateway.realtime.PLAY_SAY_WEBSOCKET_PROTOCOL
 import com.playsay.gateway.realtime.authenticationAttribute
 import org.springframework.context.annotation.Configuration
@@ -21,10 +22,18 @@ import org.springframework.web.socket.server.HandshakeInterceptor
 @EnableWebSocket
 class WebSocketConfig(
     private val lessonRealtimeWebSocketHandler: LessonRealtimeWebSocketHandler,
+    private val chatRealtimeWebSocketHandler: ChatRealtimeWebSocketHandler,
     private val lessonWebSocketAuthInterceptor: LessonWebSocketAuthInterceptor,
 ) : WebSocketConfigurer {
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
         registry.addHandler(lessonRealtimeWebSocketHandler, "/ws/lessons")
+            .addInterceptors(lessonWebSocketAuthInterceptor)
+            .setAllowedOriginPatterns(
+                "https://online.play-and-say.ru",
+                "http://localhost:[*]",
+                "http://127.0.0.1:[*]",
+            )
+        registry.addHandler(chatRealtimeWebSocketHandler, "/ws/chat")
             .addInterceptors(lessonWebSocketAuthInterceptor)
             .setAllowedOriginPatterns(
                 "https://online.play-and-say.ru",

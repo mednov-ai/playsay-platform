@@ -16,26 +16,56 @@ class LessonRealtimeHub(
     private val principals = ConcurrentHashMap<String, LessonRealtimePrincipal>()
     private val lessonSubscriptions = ConcurrentHashMap<UUID, MutableSet<String>>()
     private val subscriptionsBySession = ConcurrentHashMap<String, MutableSet<UUID>>()
+    private val lessonSnapshots = ConcurrentHashMap<UUID, ScheduledLessonResponse>()
+    private val presenceBySession = ConcurrentHashMap<String, MutableMap<UUID, String>>()
     private val sessionLocks = ConcurrentHashMap<String, Any>()
 
     fun register(session: WebSocketSession, principal: LessonRealtimePrincipal) {
         sessions[session.id] = session
         principals[session.id] = principal
         sessionLocks.computeIfAbsent(session.id) { Any() }
+        affectedPresenceLessons(principal.subject).forEach(::publishLessonPresence)
     }
 
     fun unregister(session: WebSocketSession) {
+        val principal = principals[session.id]
+        val affectedPresenceLessonIds = buildSet {
+            addAll(presenceBySession[session.id].orEmpty().keys)
+            if (principal != null) addAll(affectedPresenceLessons(principal.subject))
+        }
         sessions.remove(session.id)
         principals.remove(session.id)
+        presenceBySession.remove(session.id)
         sessionLocks.remove(session.id)
         subscriptionsBySession.remove(session.id).orEmpty().forEach { lessonId ->
-            lessonSubscriptions[lessonId]?.remove(session.id)
+            lessonSubscriptions[lessonId]?.let { subscribers ->
+                subscribers.remove(session.id)
+                if (subscribers.isEmpty()) {
+                    lessonSubscriptions.remove(lessonId, subscribers)
+                    lessonSnapshots.remove(lessonId)
+                }
+            }
         }
+        affectedPresenceLessonIds.forEach(::publishLessonPresence)
     }
 
-    fun subscribe(session: WebSocketSession, lessonId: UUID) {
-        lessonSubscriptions.computeIfAbsent(lessonId) { ConcurrentHashMap.newKeySet() }.add(session.id)
-        subscriptionsBySession.computeIfAbsent(session.id) { ConcurrentHashMap.newKeySet() }.add(lessonId)
+    fun subscribe(session: WebSocketSession, lesson: ScheduledLessonResponse) {
+        lessonSnapshots[lesson.id] = lesson
+        lessonSubscriptions.computeIfAbsent(lesson.id) { ConcurrentHashMap.newKeySet() }.add(session.id)
+        subscriptionsBySession.computeIfAbsent(session.id) { ConcurrentHashMap.newKeySet() }.add(lesson.id)
+        sendLessonPresence(session, lesson)
+    }
+
+    fun updatePresence(session: WebSocketSession, lesson: ScheduledLessonResponse, state: String) {
+        lessonSnapshots[lesson.id] = lesson
+        val sessionPresence = presenceBySession.computeIfAbsent(session.id) { ConcurrentHashMap() }
+        if (state == LessonPresenceStates.CHECKING_DEVICES) {
+            sessionPresence[lesson.id] = state
+        } else {
+            sessionPresence.remove(lesson.id)
+            if (sessionPresence.isEmpty()) presenceBySession.remove(session.id, sessionPresence)
+        }
+        publishLessonPresence(lesson.id)
     }
 
     fun sendConnected(session: WebSocketSession) {
@@ -52,6 +82,7 @@ class LessonRealtimeHub(
 
     fun publishLessonUpdated(lesson: ScheduledLessonResponse) {
         broadcastScheduleChanged()
+        if (lessonSubscriptions.containsKey(lesson.id)) lessonSnapshots[lesson.id] = lesson
         lessonSubscriptions[lesson.id].orEmpty().forEach { sessionId ->
             val session = sessions[sessionId] ?: return@forEach
             val principal = principals[sessionId] ?: return@forEach
@@ -62,6 +93,7 @@ class LessonRealtimeHub(
             }
             sendToSession(session, message)
         }
+        publishLessonPresence(lesson.id)
     }
 
     fun publishLessonDeleted(lessonId: UUID) {
@@ -71,6 +103,8 @@ class LessonRealtimeHub(
                 sendToSession(session, LessonRealtimeOutboundMessage(type = "lesson.deleted", lessonId = lessonId))
             }
         }
+        lessonSnapshots.remove(lessonId)
+        presenceBySession.values.forEach { presence -> presence.remove(lessonId) }
     }
 
     fun broadcastScheduleChanged() {
@@ -78,6 +112,52 @@ class LessonRealtimeHub(
             sendToSession(session, LessonRealtimeOutboundMessage(type = "schedule.changed"))
         }
     }
+
+    private fun publishLessonPresence(lessonId: UUID) {
+        val lesson = lessonSnapshots[lessonId] ?: return
+        lessonSubscriptions[lessonId].orEmpty().forEach { sessionId ->
+            val session = sessions[sessionId] ?: return@forEach
+            sendLessonPresence(session, lesson)
+        }
+    }
+
+    private fun sendLessonPresence(session: WebSocketSession, lesson: ScheduledLessonResponse) {
+        val principal = principals[session.id] ?: return
+        if (!principal.canManagePresence()) return
+        sendToSession(
+            session,
+            LessonRealtimeOutboundMessage(
+                type = "lesson.presence",
+                lessonId = lesson.id,
+                participants = lesson.participants.map { participant ->
+                    LessonParticipantPresence(
+                        subject = participant.subject,
+                        state = participantPresenceState(lesson.id, participant.subject),
+                    )
+                },
+            ),
+        )
+    }
+
+    private fun participantPresenceState(lessonId: UUID, subject: String): String {
+        val subjectSessionIds = principals.entries
+            .filter { (_, principal) -> principal.subject == subject }
+            .map { (sessionId) -> sessionId }
+        if (subjectSessionIds.isEmpty()) return LessonPresenceStates.OFFLINE
+        return if (subjectSessionIds.any { sessionId ->
+                presenceBySession[sessionId]?.get(lessonId) == LessonPresenceStates.CHECKING_DEVICES
+            }
+        ) {
+            LessonPresenceStates.CHECKING_DEVICES
+        } else {
+            LessonPresenceStates.ONLINE
+        }
+    }
+
+    private fun affectedPresenceLessons(subject: String): Set<UUID> =
+        lessonSnapshots.values
+            .filter { lesson -> lesson.participants.any { participant -> participant.subject == subject } }
+            .mapTo(mutableSetOf()) { lesson -> lesson.id }
 
     private fun sendToSession(session: WebSocketSession, message: LessonRealtimeOutboundMessage) {
         if (!session.isOpen) {

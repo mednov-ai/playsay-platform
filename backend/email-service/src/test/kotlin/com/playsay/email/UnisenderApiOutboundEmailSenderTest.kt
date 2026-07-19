@@ -7,6 +7,7 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.springframework.web.client.RestClient
 
@@ -41,7 +42,7 @@ class UnisenderApiOutboundEmailSenderTest {
             fromName = "Play&Say",
         )
 
-        sender.send(
+        val result = sender.send(
             OutboundEmail(
                 from = "no-reply@play-and-say.ru",
                 to = "student@example.com",
@@ -62,5 +63,7 @@ class UnisenderApiOutboundEmailSenderTest {
         assertTrue(body.contains(""""template_engine":"velocity""""))
         assertTrue(body.contains(""""plaintext":"Hello!\nConfirm here: https://online.play-and-say.ru/register/confirm?token=token-1""""))
         assertTrue(body.contains(""""html":"<p>Hello!</p><p><a href=\"https://online.play-and-say.ru/register/confirm?token=token-1\">Confirm email</a></p>""""))
+        assertEquals("job-1", result.providerJobId)
+        assertEquals("ACCEPTED", result.providerStatus)
     }
 }

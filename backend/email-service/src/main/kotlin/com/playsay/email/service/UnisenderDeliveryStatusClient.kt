@@ -1,11 +1,11 @@
 package com.playsay.email.service
 
-import com.fasterxml.jackson.databind.JsonNode
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
+import tools.jackson.databind.JsonNode
 
 data class UnisenderEventDump(val id: String, val status: String, val files: List<String>)
 

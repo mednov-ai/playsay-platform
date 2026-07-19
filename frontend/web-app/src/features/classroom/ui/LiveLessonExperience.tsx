@@ -65,6 +65,7 @@ export function LiveLessonExperience({
   const shellRef = useRef<HTMLDivElement>(null);
   const [fullscreenActive, setFullscreenActive] = useState(() => classroomFullscreenActive());
   const [fullscreenPending, setFullscreenPending] = useState(false);
+  const [screenShareActive, setScreenShareActive] = useState(false);
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
   const displayName = profile?.name ?? profile?.username ?? t("classroom.participantFallback");
   const lessonTypeLabel = formatLessonType(session.lessonType, translate);
@@ -77,13 +78,13 @@ export function LiveLessonExperience({
   const videoOnly = !session.materialId && !canManageLesson;
   const rawViewportMode = useClassroomViewportMode();
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
-  const videoExpanded = viewportMode === "mobileLandscape";
+  const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive);
   const classroomVideoMode: ClassroomVideoMode = videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
     ? "focusOnly"
     : videoOnly
       ? "videoOnly"
       : "lesson";
-  const showWorkspace = shouldShowLessonWorkspace({ canManageLesson, videoOnly, viewportMode });
+  const showWorkspace = shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
 
   useEffect(() => {
     document.body.classList.toggle("playsay-classroom-video-expanded", videoExpanded);
@@ -131,6 +132,7 @@ export function LiveLessonExperience({
   return (
     <div
       className="playsay-classroom-shell"
+      data-screen-share-active={screenShareActive ? "true" : "false"}
       data-video-expanded={videoExpanded ? "true" : "false"}
       data-video-only={videoOnly ? "true" : "false"}
       data-viewport-mode={viewportMode}
@@ -202,6 +204,7 @@ export function LiveLessonExperience({
               lessonId={session.lessonId}
               lessonType={session.lessonType}
               mode={classroomVideoMode}
+              onScreenShareActiveChange={setScreenShareActive}
               participantPresence={session.participantPresence}
               showExpectedParticipants={canManageLesson}
               translationAllowed={session.lessonTranslationAllowed}
@@ -268,18 +271,24 @@ export function effectiveClassroomViewportMode(
 
 export function shouldShowLessonWorkspace({
   canManageLesson: _canManageLesson,
+  screenShareActive,
   videoOnly,
   viewportMode,
 }: {
   canManageLesson: boolean;
+  screenShareActive: boolean;
   videoOnly: boolean;
   viewportMode: ClassroomViewportMode;
 }): boolean {
-  if (videoOnly || viewportMode === "mobileLandscape") {
+  if (screenShareActive || videoOnly || viewportMode === "mobileLandscape") {
     return false;
   }
 
   return true;
+}
+
+export function classroomVideoExpanded(viewportMode: ClassroomViewportMode, screenShareActive: boolean): boolean {
+  return screenShareActive || viewportMode === "mobileLandscape";
 }
 
 export function classroomFullscreenActive(shell?: HTMLElement | null): boolean {

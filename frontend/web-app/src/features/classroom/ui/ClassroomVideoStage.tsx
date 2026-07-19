@@ -27,6 +27,7 @@ export function ClassroomVideoStage({
   lessonId,
   lessonType,
   mode,
+  onScreenShareActiveChange,
   participantPresence,
   showExpectedParticipants,
   translationAllowed,
@@ -36,6 +37,7 @@ export function ClassroomVideoStage({
   lessonId: string;
   lessonType: string;
   mode: ClassroomVideoMode;
+  onScreenShareActiveChange: (active: boolean) => void;
   participantPresence: LessonParticipantPresenceMap;
   showExpectedParticipants: boolean;
   translationAllowed: boolean;
@@ -63,9 +65,10 @@ export function ClassroomVideoStage({
     participantPresence,
     showExpectedParticipants,
   );
-  const remoteScreenShareTrack = screenShareTracks.find((trackRef) => !trackRef.participant.isLocal);
+  const activeScreenShareTrack = classroomScreenShareTrack(screenShareTracks);
+  const screenShareActive = Boolean(activeScreenShareTrack);
   const featuredSlot = cameraSlots[0];
-  const stripSlots = remoteScreenShareTrack ? cameraSlots : cameraSlots.slice(1);
+  const stripSlots = activeScreenShareTrack ? cameraSlots : cameraSlots.slice(1);
   const hasStrip = stripSlots.length > 0;
   const stripLayout = stripSlots.length > 1 ? "row" : "single";
   const canDragStrip = hasStrip && stripLayout === "single";
@@ -164,6 +167,16 @@ export function ClassroomVideoStage({
   }
 
   useEffect(() => {
+    onScreenShareActiveChange(screenShareActive);
+
+    return () => {
+      if (screenShareActive) {
+        onScreenShareActiveChange(false);
+      }
+    };
+  }, [onScreenShareActiveChange, screenShareActive]);
+
+  useEffect(() => {
     if (mode === "videoOnly") {
       singlePipInitializedRef.current = false;
       return undefined;
@@ -197,7 +210,7 @@ export function ClassroomVideoStage({
     };
   }, [hasStrip, mode, stripLayout, stripSlots.length]);
 
-  if (mode === "videoOnly" && !remoteScreenShareTrack) {
+  if (mode === "videoOnly" && !activeScreenShareTrack) {
     return (
       <div className="playsay-classroom-conference" data-layout="grid" data-mode="video-only">
         <div className="playsay-video-grid" data-count={cameraSlots.length || 1}>
@@ -225,14 +238,14 @@ export function ClassroomVideoStage({
       className="playsay-classroom-conference"
       data-layout={stripLayout}
       data-mode={mode === "focusOnly" ? "focus-only" : "lesson"}
-      data-screen-share={remoteScreenShareTrack ? "true" : "false"}
+      data-screen-share={activeScreenShareTrack ? "true" : "false"}
     >
       <div className="playsay-video-focus" ref={focusRef}>
-        {remoteScreenShareTrack ? <ParticipantTile trackRef={remoteScreenShareTrack} /> : featuredSlot ? <ClassroomVideoSlotView slot={featuredSlot} /> : null}
-        {remoteScreenShareTrack ? (
+        {activeScreenShareTrack ? <ParticipantTile trackRef={activeScreenShareTrack} /> : featuredSlot ? <ClassroomVideoSlotView slot={featuredSlot} /> : null}
+        {activeScreenShareTrack ? (
           <div className="playsay-screen-share-label">
             <ScreenShare className="h-4 w-4" />
-            {participantDisplayName(remoteScreenShareTrack, t("classroom.participantFallback"))}
+            {participantDisplayName(activeScreenShareTrack, t("classroom.participantFallback"))}
           </div>
         ) : null}
         <div
@@ -264,6 +277,10 @@ export function ClassroomVideoStage({
       <ConnectionStateToast />
     </div>
   );
+}
+
+export function classroomScreenShareTrack(screenShareTracks: ClassroomTrackReference[]) {
+  return screenShareTracks.find((trackRef) => !trackRef.participant.isLocal) ?? screenShareTracks[0];
 }
 
 function ClassroomTranslationOverlay({ translation }: { translation: ReturnType<typeof useLessonTranslation> }) {

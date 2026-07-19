@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   classroomViewportModeFromSnapshot,
+  classroomVideoExpanded,
   effectiveClassroomViewportMode,
   requestClassroomFullscreen,
   shouldShowLessonWorkspace,
@@ -46,31 +47,55 @@ describe("classroomViewportMode", () => {
   it("keeps lesson work visible in mobile portrait and reserves mobile landscape for video", () => {
     expect(shouldShowLessonWorkspace({
       canManageLesson: false,
+      screenShareActive: false,
       videoOnly: false,
       viewportMode: "mobilePortrait",
     })).toBe(true);
     expect(shouldShowLessonWorkspace({
       canManageLesson: false,
+      screenShareActive: false,
       videoOnly: false,
       viewportMode: "mobileLandscape",
     })).toBe(false);
     expect(shouldShowLessonWorkspace({
       canManageLesson: false,
+      screenShareActive: false,
       videoOnly: false,
       viewportMode: "desktop",
     })).toBe(true);
     expect(shouldShowLessonWorkspace({
       canManageLesson: true,
+      screenShareActive: false,
       videoOnly: false,
       viewportMode: "mobilePortrait",
     })).toBe(true);
     expect(shouldShowLessonWorkspace({
       canManageLesson: true,
+      screenShareActive: false,
       videoOnly: false,
       viewportMode: "mobileLandscape",
     })).toBe(false);
     expect(shouldShowLessonWorkspace({
       canManageLesson: true,
+      screenShareActive: false,
+      videoOnly: false,
+      viewportMode: "desktop",
+    })).toBe(true);
+  });
+
+  it("expands the classroom while screen sharing and restores the desktop workspace afterwards", () => {
+    expect(classroomVideoExpanded("desktop", true)).toBe(true);
+    expect(shouldShowLessonWorkspace({
+      canManageLesson: true,
+      screenShareActive: true,
+      videoOnly: false,
+      viewportMode: "desktop",
+    })).toBe(false);
+
+    expect(classroomVideoExpanded("desktop", false)).toBe(false);
+    expect(shouldShowLessonWorkspace({
+      canManageLesson: true,
+      screenShareActive: false,
       videoOnly: false,
       viewportMode: "desktop",
     })).toBe(true);

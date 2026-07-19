@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
-import { classroomCameraSlots } from "./ClassroomVideoStage";
+import { classroomCameraSlots, classroomScreenShareTrack } from "./ClassroomVideoStage";
 
 describe("classroomCameraSlots", () => {
   const participants = [
@@ -40,11 +40,24 @@ describe("classroomCameraSlots", () => {
     expect(slots).toHaveLength(1);
     expect(slots[0].kind).toBe("track");
   });
+
+  it("uses the local teacher screen share when it is the active presentation", () => {
+    const localScreenShare = track("teacher-1", true, "screen_share");
+
+    expect(classroomScreenShareTrack([localScreenShare])).toBe(localScreenShare);
+  });
+
+  it("prefers a remote screen share when local and remote shares are both published", () => {
+    const localScreenShare = track("teacher-1", true, "screen_share");
+    const remoteScreenShare = track("student-1", false, "screen_share");
+
+    expect(classroomScreenShareTrack([localScreenShare, remoteScreenShare])).toBe(remoteScreenShare);
+  });
 });
 
-function track(identity: string, isLocal: boolean) {
+function track(identity: string, isLocal: boolean, source = "camera") {
   return {
     participant: { identity, isLocal, sid: `${identity}-sid` },
-    source: "camera",
+    source,
   } as Parameters<typeof classroomCameraSlots>[0][number];
 }

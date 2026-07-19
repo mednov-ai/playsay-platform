@@ -39,18 +39,29 @@ interface ChatMessageRepo : JpaRepository<ChatMessageEntity, UUID> {
         """
         select m from ChatMessageEntity m
          where m.conversationId = :conversationId
-           and (
-             :beforeCreatedAt is null
-             or m.createdAt < :beforeCreatedAt
-             or (m.createdAt = :beforeCreatedAt and m.id < :beforeId)
-           )
          order by m.createdAt desc, m.id desc
         """,
     )
     fun findPage(
         conversationId: UUID,
-        beforeCreatedAt: Instant?,
-        beforeId: UUID?,
+        pageable: Pageable,
+    ): List<ChatMessageEntity>
+
+    @Query(
+        """
+        select m from ChatMessageEntity m
+         where m.conversationId = :conversationId
+           and (
+             m.createdAt < :beforeCreatedAt
+             or (m.createdAt = :beforeCreatedAt and m.id < :beforeId)
+           )
+         order by m.createdAt desc, m.id desc
+        """,
+    )
+    fun findPageBefore(
+        conversationId: UUID,
+        beforeCreatedAt: Instant,
+        beforeId: UUID,
         pageable: Pageable,
     ): List<ChatMessageEntity>
 

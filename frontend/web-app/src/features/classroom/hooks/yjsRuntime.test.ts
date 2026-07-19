@@ -159,8 +159,8 @@ describe("yjs workspace runtime annotations", () => {
       student.setAnnotationElements([studentStroke]);
 
       const mergedDocument = new Y.Doc();
-      Y.applyUpdate(mergedDocument, Buffer.from(teacher.snapshot().yjsUpdateBase64, "base64"));
-      Y.applyUpdate(mergedDocument, Buffer.from(student.snapshot().yjsUpdateBase64, "base64"));
+      Y.applyUpdate(mergedDocument, Buffer.from(String(teacher.snapshot().yjsUpdateBase64), "base64"));
+      Y.applyUpdate(mergedDocument, Buffer.from(String(student.snapshot().yjsUpdateBase64), "base64"));
       teacher.destroy();
       student.destroy();
 

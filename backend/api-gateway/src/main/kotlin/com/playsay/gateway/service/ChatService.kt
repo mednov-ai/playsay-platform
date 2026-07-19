@@ -95,11 +95,17 @@ class ChatService(
         val conversation = conversation(conversationId, actor)
         val decodedCursor = cursor?.let(::decodeCursor)
         val limit = requestedLimit.coerceIn(1, 100)
-        val page = messageRepo.findPage(
+        val pageable = PageRequest.of(0, limit + 1)
+        val page = decodedCursor?.let { (beforeCreatedAt, beforeId) ->
+            messageRepo.findPageBefore(
+                conversationId = conversation.id,
+                beforeCreatedAt = beforeCreatedAt,
+                beforeId = beforeId,
+                pageable = pageable,
+            )
+        } ?: messageRepo.findPage(
             conversationId = conversation.id,
-            beforeCreatedAt = decodedCursor?.first,
-            beforeId = decodedCursor?.second,
-            pageable = PageRequest.of(0, limit + 1),
+            pageable = pageable,
         )
         val hasMore = page.size > limit
         val visible = page.take(limit)

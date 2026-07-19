@@ -23,6 +23,15 @@ class LessonRealtimePrincipalTest {
 
         assertTrue(principal.canSee(lesson(participantSubjects = listOf("student-1")), now))
         assertFalse(principal.canSee(lesson(participantSubjects = listOf("student-2")), now))
+        assertTrue(principal.canReportPresence(lesson(participantSubjects = listOf("student-1"))))
+        assertFalse(principal.canReportPresence(lesson(participantSubjects = listOf("student-2"))))
+    }
+
+    @Test
+    fun `only managers can receive participant presence`() {
+        assertTrue(LessonRealtimePrincipal(subject = "teacher-1", roles = setOf("TEACHER")).canManagePresence())
+        assertTrue(LessonRealtimePrincipal(subject = "admin-1", roles = setOf("ADMIN")).canManagePresence())
+        assertFalse(LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT")).canManagePresence())
     }
 
     @Test

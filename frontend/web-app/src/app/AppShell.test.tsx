@@ -24,6 +24,7 @@ describe("AppShell", () => {
 
     expect(markup).toContain("Назначить урок");
     expect(markup).not.toContain("Войти в урок");
+    expect(markup).toContain('data-playsay-tools-layout="true"');
   });
 
   it("renders profile as a dedicated route instead of stacking it above the workspace", () => {

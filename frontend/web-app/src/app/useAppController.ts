@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { workspaceTabsForProfile } from "../entities/workspace/model";
 import { compareJoinableLessons, isArchivedScheduleLesson, isJoinableScheduledLesson } from "../entities/schedule/model";
+import { rememberChatTargetFromLocation } from "../features/chat/model/chatDeepLink";
 import {
   ApiError,
   buildLogoutUrl,
@@ -92,6 +93,7 @@ export function useAppController(): AppShellProps {
 
     async function boot() {
       try {
+        rememberChatTargetFromLocation();
         const currentUrl = new URL(window.location.href);
         if (isAuthCallback(currentUrl)) {
           await completeLogin(currentUrl);
@@ -303,6 +305,7 @@ export function useAppController(): AppShellProps {
   });
   useLessonRealtime({
     applySessionError,
+    classroomLessonId: classroomLesson?.id ?? null,
     closeClassroom,
     nowMs,
     profile,

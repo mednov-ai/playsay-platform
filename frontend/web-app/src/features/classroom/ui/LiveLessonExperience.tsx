@@ -198,9 +198,12 @@ export function LiveLessonExperience({
             video={session.mediaChoices.videoEnabled ? { deviceId: session.mediaChoices.videoDeviceId } : false}
           >
             <ClassroomVideoStage
+              expectedParticipants={session.participants}
               lessonId={session.lessonId}
               lessonType={session.lessonType}
               mode={classroomVideoMode}
+              participantPresence={session.participantPresence}
+              showExpectedParticipants={canManageLesson}
               translationAllowed={session.lessonTranslationAllowed}
               translationRole={translationRole}
             />
@@ -282,7 +285,13 @@ export function shouldShowLessonWorkspace({
 export function classroomFullscreenActive(shell?: HTMLElement | null): boolean {
   const fullscreenElement = document.fullscreenElement ?? (document as FullscreenCapableDocument).webkitFullscreenElement ?? null;
 
-  return fullscreenElement !== null && (shell === undefined || shell === null || fullscreenElement === shell || shell.contains(fullscreenElement));
+  return fullscreenElement !== null && (
+    shell === undefined ||
+    shell === null ||
+    fullscreenElement === shell ||
+    shell.contains(fullscreenElement) ||
+    fullscreenElement.contains(shell)
+  );
 }
 
 export async function requestClassroomFullscreen(shell: HTMLElement | null): Promise<boolean> {
@@ -290,7 +299,10 @@ export async function requestClassroomFullscreen(shell: HTMLElement | null): Pro
     return false;
   }
 
-  const fullscreenShell = shell as FullscreenCapableElement;
+  const toolsLayout = typeof shell.closest === "function"
+    ? shell.closest<HTMLElement>("[data-playsay-tools-layout]")
+    : null;
+  const fullscreenShell = (toolsLayout ?? shell) as FullscreenCapableElement;
   if (fullscreenShell.requestFullscreen) {
     await fullscreenShell.requestFullscreen({ navigationUI: "hide" });
     return true;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ScheduledLesson } from "../../shared/api/playsay";
-import { realtimeClassroomClosureMessageKey } from "./useLessonRealtime";
+import { lessonPresenceMap, realtimeClassroomClosureMessageKey } from "./useLessonRealtime";
 
 describe("lesson realtime classroom closure", () => {
   it("uses the reschedule explanation when an in-progress room returns to scheduled", () => {
@@ -8,6 +8,22 @@ describe("lesson realtime classroom closure", () => {
       .toBe("schedule.messages.rescheduledClassroomClosed");
     expect(realtimeClassroomClosureMessageKey(lesson("COMPLETED"), "IN_PROGRESS"))
       .toBe("schedule.messages.finishedOrCancelled");
+  });
+});
+
+describe("lessonPresenceMap", () => {
+  it("keeps only known participant presence states", () => {
+    expect(lessonPresenceMap([
+      { subject: "student-offline", state: "OFFLINE" },
+      { subject: "student-online", state: "ONLINE" },
+      { subject: "student-checking", state: "CHECKING_DEVICES" },
+      { subject: "student-invalid", state: "IN_ROOM" },
+      { state: "ONLINE" },
+    ])).toEqual({
+      "student-checking": "CHECKING_DEVICES",
+      "student-offline": "OFFLINE",
+      "student-online": "ONLINE",
+    });
   });
 });
 

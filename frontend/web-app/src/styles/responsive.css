@@ -85,6 +85,21 @@
     min-height: 14rem;
   }
 
+  .playsay-prejoin-audio-devices,
+  .playsay-prejoin-audio-result {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playsay-prejoin-audio-result {
+    height: 5.25rem;
+    align-content: center;
+  }
+
+  .playsay-prejoin-audio-confirm,
+  .playsay-prejoin-audio-actions {
+    flex-wrap: wrap;
+  }
+
   .playsay-prejoin-footer {
     align-items: stretch;
     flex-direction: column;

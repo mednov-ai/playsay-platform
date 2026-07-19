@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-19-001-create-chat" author="codex">
+        <createTable tableName="chat_conversation">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_chat_conversation"/>
+            </column>
+            <column name="teacher_user_id" type="UUID">
+                <constraints nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_chat_conversation_teacher"/>
+            </column>
+            <column name="student_user_id" type="UUID">
+                <constraints nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_chat_conversation_student"/>
+            </column>
+            <column name="last_message_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="chat_conversation"
+            columnNames="teacher_user_id,student_user_id"
+            constraintName="uq_chat_conversation_participants"/>
+        <createIndex tableName="chat_conversation" indexName="idx_chat_conversation_teacher_latest">
+            <column name="teacher_user_id"/>
+            <column name="last_message_at" descending="true"/>
+        </createIndex>
+        <createIndex tableName="chat_conversation" indexName="idx_chat_conversation_student_latest">
+            <column name="student_user_id"/>
+            <column name="last_message_at" descending="true"/>
+        </createIndex>
+
+        <createTable tableName="chat_message">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_chat_message"/>
+            </column>
+            <column name="conversation_id" type="UUID">
+                <constraints nullable="false" referencedTableName="chat_conversation" referencedColumnNames="id" foreignKeyName="fk_chat_message_conversation"/>
+            </column>
+            <column name="sender_user_id" type="UUID">
+                <constraints nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_chat_message_sender"/>
+            </column>
+            <column name="client_message_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="body" type="VARCHAR(4000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="chat_message"
+            columnNames="sender_user_id,client_message_id"
+            constraintName="uq_chat_message_sender_client"/>
+        <createIndex tableName="chat_message" indexName="idx_chat_message_conversation_page">
+            <column name="conversation_id"/>
+            <column name="created_at" descending="true"/>
+            <column name="id" descending="true"/>
+        </createIndex>
+
+        <createTable tableName="chat_participant_state">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_chat_participant_state"/>
+            </column>
+            <column name="conversation_id" type="UUID">
+                <constraints nullable="false" referencedTableName="chat_conversation" referencedColumnNames="id" foreignKeyName="fk_chat_state_conversation"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_chat_state_user"/>
+            </column>
+            <column name="last_read_message_id" type="UUID">
+                <constraints referencedTableName="chat_message" referencedColumnNames="id" foreignKeyName="fk_chat_state_last_message"/>
+            </column>
+            <column name="read_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint
+            tableName="chat_participant_state"
+            columnNames="conversation_id,user_id"
+            constraintName="uq_chat_state_conversation_user"/>
+    </changeSet>
+</databaseChangeLog>

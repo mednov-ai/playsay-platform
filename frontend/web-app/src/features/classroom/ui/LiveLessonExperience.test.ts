@@ -88,6 +88,18 @@ describe("classroomViewportMode", () => {
     expect(requestFullscreen).toHaveBeenCalledWith({ navigationUI: "hide" });
   });
 
+  it("includes the global tools layout in classroom fullscreen", async () => {
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    const toolsLayout = { requestFullscreen };
+    const shell = {
+      closest: vi.fn(() => toolsLayout),
+    } as unknown as HTMLElement;
+
+    await expect(requestClassroomFullscreen(shell)).resolves.toBe(true);
+
+    expect(requestFullscreen).toHaveBeenCalledWith({ navigationUI: "hide" });
+  });
+
   it("requests webkit fullscreen for the classroom shell when standard fullscreen is unavailable", async () => {
     const webkitRequestFullscreen = vi.fn();
     const shell = {

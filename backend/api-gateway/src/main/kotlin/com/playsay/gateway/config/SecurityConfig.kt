@@ -36,6 +36,7 @@ class SecurityConfig {
                         "/payment-webhooks/yookassa",
                         "/schedule/lessons/*/collaboration-documents/*/snapshot",
                         "/ws/lessons",
+                        "/ws/chat",
                     ).permitAll()
                     .requestMatchers(
                         pathPattern(HttpMethod.POST, "/api/registration/start"),

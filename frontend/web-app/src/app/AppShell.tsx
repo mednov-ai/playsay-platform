@@ -69,6 +69,7 @@ const AiTutorPanel = lazy(() => import("../features/ai-tutor/ui/AiTutorPanel").t
 const VocabularyPanel = lazy(() => import("../features/vocabulary/ui/VocabularyPanel").then((module) => ({ default: module.VocabularyPanel })));
 const TeacherStudentsPanel = lazy(() => import("../features/user-management/ui/TeacherStudentsPanel").then((module) => ({ default: module.TeacherStudentsPanel })));
 const AdminUsersPanel = lazy(() => import("../features/user-management/ui/AdminUsersPanel").then((module) => ({ default: module.AdminUsersPanel })));
+const GlobalToolsRail = lazy(() => import("../features/chat/ui/GlobalToolsRail").then((module) => ({ default: module.GlobalToolsRail })));
 
 export type AppShellProps = {
   adminLoading: boolean;
@@ -249,6 +250,12 @@ export function AppShell(props: AppShellProps) {
     ? nextTeacherActionLesson(scheduledLessons, nowMs)
     : null;
   const headerTeacherActionLesson = preparationLessonId === teacherActionLesson?.id ? null : teacherActionLesson;
+  const hasGlobalTools = Boolean(
+    isAuthenticated &&
+    profile &&
+    !profile.roles.includes("ADMIN") &&
+    profile.roles.some((role) => role === "TEACHER" || role === "STUDENT"),
+  );
 
   const handleMaterialAuthoringStateChange = useCallback((state: { dirty: boolean; focused: boolean }) => {
     setMaterialAuthoringState((current) => (
@@ -290,7 +297,15 @@ export function AppShell(props: AppShellProps) {
   }
 
   return (
-    <main className={`${isClassroomOpen ? "h-dvh overflow-hidden" : "min-h-screen overflow-hidden"} bg-background text-foreground`}>
+    <main
+      className={`${isClassroomOpen ? "h-dvh overflow-hidden" : "min-h-screen overflow-hidden"} bg-background text-foreground`}
+      data-playsay-tools-layout={hasGlobalTools ? "true" : undefined}
+    >
+      {hasGlobalTools && profile ? (
+        <Suspense fallback={null}>
+          <GlobalToolsRail profile={profile} />
+        </Suspense>
+      ) : null}
       <section
         className={`mx-auto flex w-full flex-col ${
           isClassroomOpen

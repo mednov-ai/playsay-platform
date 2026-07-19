@@ -4,6 +4,8 @@ import {
   buildLessonRealtimeUrl,
   isRoomSessionExpired,
   roomSessionFromScheduledLesson,
+  type LessonParticipantPresenceMap,
+  type LessonParticipantPresenceState,
   type LessonRoomSession,
   upsertScheduledLesson,
 } from "../../features/classroom";
@@ -21,11 +23,13 @@ type LessonRealtimeMessage = {
   type?: string;
   lesson?: ScheduledLesson;
   lessonId?: string;
+  participants?: Array<{ subject?: string; state?: string }>;
   message?: string;
 };
 
 export function useLessonRealtime({
   applySessionError,
+  classroomLessonId,
   closeClassroom,
   nowMs,
   profile,
@@ -36,6 +40,7 @@ export function useLessonRealtime({
   status,
 }: {
   applySessionError: SessionErrorHandler;
+  classroomLessonId: string | null;
   closeClassroom: (message: string | null) => void;
   nowMs: number;
   profile: MeProfile | null;
@@ -49,7 +54,17 @@ export function useLessonRealtime({
   const realtimeSocketRef = useRef<WebSocket | null>(null);
   const realtimeReconnectTimerRef = useRef<number | null>(null);
   const roomSessionRef = useRef<LessonRoomSession | null>(null);
+  const activeLessonIdRef = useRef<string | null>(null);
+  const checkingDevicesRef = useRef(false);
+  const reportedCheckingLessonIdRef = useRef<string | null>(null);
   const scheduleSyncInFlightRef = useRef(false);
+  const roomSessionLessonId = roomSession?.lessonId ?? null;
+  const activeLessonId = roomSessionLessonId ?? classroomLessonId;
+  const checkingDevices = Boolean(
+    classroomLessonId &&
+    !roomSessionLessonId &&
+    profile?.roles.includes("STUDENT"),
+  );
 
   useEffect(() => {
     roomSessionRef.current = roomSession;
@@ -93,9 +108,10 @@ export function useLessonRealtime({
       realtimeSocketRef.current = socket;
 
       socket.onopen = () => {
-        const activeLessonId = roomSessionRef.current?.lessonId;
-        if (activeLessonId) {
-          sendLessonRealtimeSubscribe(activeLessonId);
+        const lessonId = activeLessonIdRef.current;
+        if (lessonId) {
+          sendLessonRealtimeSubscribe(lessonId);
+          if (checkingDevicesRef.current) sendLessonPresenceUpdate(lessonId, "CHECKING_DEVICES");
         }
       };
 
@@ -134,10 +150,18 @@ export function useLessonRealtime({
   }, [status]);
 
   useEffect(() => {
-    if (roomSession?.lessonId) {
-      sendLessonRealtimeSubscribe(roomSession.lessonId);
+    const previouslyCheckingLessonId = reportedCheckingLessonIdRef.current;
+    if (previouslyCheckingLessonId && (!checkingDevices || previouslyCheckingLessonId !== classroomLessonId)) {
+      sendLessonPresenceUpdate(previouslyCheckingLessonId, "ONLINE");
     }
-  }, [roomSession?.lessonId]);
+
+    activeLessonIdRef.current = activeLessonId;
+    checkingDevicesRef.current = checkingDevices;
+    reportedCheckingLessonIdRef.current = checkingDevices ? classroomLessonId : null;
+
+    if (activeLessonId) sendLessonRealtimeSubscribe(activeLessonId);
+    if (checkingDevices && classroomLessonId) sendLessonPresenceUpdate(classroomLessonId, "CHECKING_DEVICES");
+  }, [activeLessonId, checkingDevices, classroomLessonId, roomSessionLessonId]);
 
   async function syncScheduleFromServer(options: { message?: string } = {}) {
     if (scheduleSyncInFlightRef.current) {
@@ -178,7 +202,20 @@ export function useLessonRealtime({
 
     if (message.type === "lesson.deleted" && message.lessonId) {
       removeRealtimeLesson(message.lessonId, t("schedule.messages.unavailable"));
+      return;
     }
+
+    if (message.type === "lesson.presence" && message.lessonId && message.participants) {
+      applyLessonPresence(message.lessonId, lessonPresenceMap(message.participants));
+    }
+  }
+
+  function applyLessonPresence(lessonId: string, participantPresence: LessonParticipantPresenceMap) {
+    setRoomSession((current) => (
+      current?.lessonId === lessonId
+        ? { ...current, participantPresence }
+        : current
+    ));
   }
 
   function applyRealtimeLessonSnapshot(lesson: ScheduledLesson) {
@@ -217,17 +254,37 @@ export function useLessonRealtime({
   }
 
   function sendLessonRealtimeSubscribe(lessonId: string) {
+    sendLessonRealtimeMessage({ type: "subscribe.lesson", lessonId });
+  }
+
+  function sendLessonPresenceUpdate(lessonId: string, state: Exclude<LessonParticipantPresenceState, "OFFLINE">) {
+    sendLessonRealtimeMessage({ type: "presence.update", lessonId, state });
+  }
+
+  function sendLessonRealtimeMessage(message: Record<string, string>) {
     const socket = realtimeSocketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
     try {
-      socket.send(JSON.stringify({ type: "subscribe.lesson", lessonId }));
+      socket.send(JSON.stringify(message));
     } catch {
       socket.close();
     }
   }
+}
+
+export function lessonPresenceMap(
+  participants: Array<{ subject?: string; state?: string }>,
+): LessonParticipantPresenceMap {
+  const allowedStates = new Set<LessonParticipantPresenceState>(["OFFLINE", "ONLINE", "CHECKING_DEVICES"]);
+  return participants.reduce<LessonParticipantPresenceMap>((result, participant) => {
+    if (participant.subject && allowedStates.has(participant.state as LessonParticipantPresenceState)) {
+      result[participant.subject] = participant.state as LessonParticipantPresenceState;
+    }
+    return result;
+  }, {});
 }
 
 export function realtimeClassroomClosureMessageKey(

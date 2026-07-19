@@ -22,4 +22,6 @@
     <include file="2026-07-18-001-add-lesson-translation-permission.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-18-002-create-material-html-game-enrichment.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-18-003-add-lesson-reschedule-notifications.xml" relativeToChangelogFile="true"/>
+    <include file="2026-07-19-001-create-chat.xml" relativeToChangelogFile="true"/>
+    <include file="2026-07-19-002-add-chat-delivery-email-digests.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

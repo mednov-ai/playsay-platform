@@ -17,7 +17,7 @@ class TransactionalEmailService(
     private val clock: Clock,
     @param:Value("\${playsay.email-service.from-address}") private val fromAddress: String,
 ) {
-    @Transactional
+    @Transactional(noRollbackFor = [EmailDeliveryProviderException::class])
     fun send(command: TransactionalEmailCommand): String {
         val existing = repo.findLockedByIdempotencyKey(command.idempotencyKey)
         if (existing != null && existing.status != emailStatusFailed) {
@@ -69,7 +69,7 @@ class TransactionalEmailService(
             attempt.errorMessage = caught.message?.take(1024)
             attempt.updatedAt = Instant.now(clock)
             repo.saveAndFlush(attempt)
-            throw caught
+            throw EmailDeliveryProviderException(caught)
         }
     }
 
@@ -87,3 +87,6 @@ class TransactionalEmailService(
         const val emailStatusFailed = "FAILED"
     }
 }
+
+internal class EmailDeliveryProviderException(cause: RuntimeException) :
+    RuntimeException(cause.message, cause)

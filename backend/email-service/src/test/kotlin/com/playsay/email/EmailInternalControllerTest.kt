@@ -1,5 +1,6 @@
 package com.playsay.email
 
+import com.playsay.email.repo.EmailDeliveryAttemptRepo
 import com.playsay.email.service.OutboundEmail
 import com.playsay.email.service.OutboundEmailSender
 import java.net.URI
@@ -37,6 +38,7 @@ import org.springframework.http.HttpStatus
 class EmailInternalControllerTest @Autowired constructor(
     @param:LocalServerPort private val port: Int,
     private val dataSource: DataSource,
+    private val deliveryAttempts: EmailDeliveryAttemptRepo,
 ) {
     @TestConfiguration
     class EmailSenderTestConfig {
@@ -161,6 +163,10 @@ class EmailInternalControllerTest @Autowired constructor(
         val before = RecordingOutboundEmailSender.sent.size
         RecordingOutboundEmailSender.failNext = true
         val first = sendTransactionalEmail(chatDigestEmailBody("retry", "en"))
+        assertEquals(
+            "FAILED",
+            deliveryAttempts.findByIdempotencyKey("chat-unread-digest:retry")?.status,
+        )
         val second = sendTransactionalEmail(chatDigestEmailBody("retry", "en"))
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), first.statusCode())

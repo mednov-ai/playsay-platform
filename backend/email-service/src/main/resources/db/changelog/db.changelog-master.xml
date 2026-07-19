@@ -8,4 +8,5 @@
     <include file="2026-06-06-002-create-email-templates.xml" relativeToChangelogFile="true"/>
     <include file="2026-06-27-001-add-lesson-reminder-template.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-18-001-add-lesson-rescheduled-template.xml" relativeToChangelogFile="true"/>
+    <include file="2026-07-19-001-add-chat-unread-digest-template.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

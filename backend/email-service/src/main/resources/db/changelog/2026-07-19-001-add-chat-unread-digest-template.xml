@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-19-001-add-chat-unread-digest-template" author="codex">
+        <sql><![CDATA[
+INSERT INTO email_templates (id, template_key, locale, subject_template, text_template, html_template, version, enabled, created_at, updated_at) VALUES
+('10000000-0000-0000-0000-000000000501', 'chat-unread-digest', 'ru', 'Новые сообщения в Play&Say',
+'Здравствуйте, ${displayName!"пользователь Play&Say"}!
+
+Новых сообщений: ${messageCount}. Отправители: ${senderNames}.<#if additionalSenderCount != "0"> И ещё: ${additionalSenderCount}.</#if>
+
+Открыть чат: ${chatUrl}
+
+Текст переписки не включён в письмо для вашей конфиденциальности.',
+'<p>Здравствуйте, ${(displayName!"пользователь Play&Say")?html}!</p><p><strong>Новых сообщений: ${messageCount}</strong></p><p>Отправители: ${senderNames?html}.<#if additionalSenderCount != "0"> И ещё: ${additionalSenderCount}.</#if></p><p><a href="${chatUrl?html}">Открыть чат</a></p><p>Текст переписки не включён в письмо для вашей конфиденциальности.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000502', 'chat-unread-digest', 'en', 'New messages in Play&Say',
+'Hello, ${displayName!"Play&Say user"}!
+
+New messages: ${messageCount}. Senders: ${senderNames}.<#if additionalSenderCount != "0"> Plus ${additionalSenderCount} more.</#if>
+
+Open chat: ${chatUrl}
+
+Message text is not included in this email for your privacy.',
+'<p>Hello, ${(displayName!"Play&Say user")?html}!</p><p><strong>New messages: ${messageCount}</strong></p><p>Senders: ${senderNames?html}.<#if additionalSenderCount != "0"> Plus ${additionalSenderCount} more.</#if></p><p><a href="${chatUrl?html}">Open chat</a></p><p>Message text is not included in this email for your privacy.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000503', 'chat-unread-digest', 'de', 'Neue Nachrichten in Play&Say',
+'Hallo, ${displayName!"Play&Say Nutzer"}!
+
+Neue Nachrichten: ${messageCount}. Absender: ${senderNames}.<#if additionalSenderCount != "0"> Sowie ${additionalSenderCount} weitere.</#if>
+
+Chat öffnen: ${chatUrl}
+
+Zum Schutz Ihrer Privatsphäre enthält diese E-Mail keinen Nachrichtentext.',
+'<p>Hallo, ${(displayName!"Play&Say Nutzer")?html}!</p><p><strong>Neue Nachrichten: ${messageCount}</strong></p><p>Absender: ${senderNames?html}.<#if additionalSenderCount != "0"> Sowie ${additionalSenderCount} weitere.</#if></p><p><a href="${chatUrl?html}">Chat öffnen</a></p><p>Zum Schutz Ihrer Privatsphäre enthält diese E-Mail keinen Nachrichtentext.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('10000000-0000-0000-0000-000000000504', 'chat-unread-digest', 'fr', 'Nouveaux messages dans Play&Say',
+'Bonjour, ${displayName!"utilisateur Play&Say"} !
+
+Nouveaux messages : ${messageCount}. Expéditeurs : ${senderNames}.<#if additionalSenderCount != "0"> Et ${additionalSenderCount} autres.</#if>
+
+Ouvrir le chat : ${chatUrl}
+
+Le texte des messages n''est pas inclus dans cet e-mail afin de protéger votre confidentialité.',
+'<p>Bonjour, ${(displayName!"utilisateur Play&Say")?html} !</p><p><strong>Nouveaux messages : ${messageCount}</strong></p><p>Expéditeurs : ${senderNames?html}.<#if additionalSenderCount != "0"> Et ${additionalSenderCount} autres.</#if></p><p><a href="${chatUrl?html}">Ouvrir le chat</a></p><p>Le texte des messages n''est pas inclus dans cet e-mail afin de protéger votre confidentialité.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

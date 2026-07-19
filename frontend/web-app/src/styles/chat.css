@@ -16,6 +16,7 @@ main[data-playsay-tools-layout="true"] {
   border-right: 1px solid hsl(var(--border));
   background: color-mix(in srgb, hsl(var(--surface)) 94%, transparent);
   padding-top: max(1rem, env(safe-area-inset-top));
+  pointer-events: none;
   box-shadow: 8px 0 30px rgb(63 36 18 / 0.06);
   backdrop-filter: blur(18px);
 }
@@ -31,6 +32,7 @@ main[data-playsay-tools-layout="true"] {
   background: transparent;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
+  pointer-events: auto;
   transition: 160ms ease;
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import {
   fetchScheduledLessonMaterialAnnotation,
   saveScheduledLessonMaterialAnnotation,
@@ -65,7 +65,7 @@ export function useLessonAnnotation({
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pointer");
   const [annotationColor, setAnnotationColor] = useState("#ff5c00");
   const [annotationStrokeWidth, setAnnotationStrokeWidth] = useState<AnnotationStrokeWidth>(8);
-  const [defaultAnnotationFontSize, setDefaultAnnotationFontSize] = useState<AnnotationFontSize>(24);
+  const [defaultAnnotationFontSize, setDefaultAnnotationFontSize] = useState<AnnotationFontSize>(18);
   const [activePageId, setActivePageId] = useState(initialPageId?.trim() || defaultAnnotationPageId);
   const [localAnnotationElements, setLocalAnnotationElements] = useState<AnnotationElement[]>([]);
   const [annotationReady, setAnnotationReady] = useState(false);
@@ -524,6 +524,27 @@ export function useLessonAnnotation({
     });
   }
 
+  const updateAnnotationElementSize = useCallback((elementId: string, width: number, height: number) => {
+    updateElements((current) => {
+      const selected = current.find((element) => element.id === elementId);
+      if (!selected || (selected.kind !== "text" && selected.kind !== "mindMapNode")) return current;
+      const nextWidth = Math.max(1, Math.min(1000, Number(width.toFixed(1))));
+      const nextHeight = Math.max(1, Math.min(1000, Number(height.toFixed(1))));
+      if (Math.abs(selected.width - nextWidth) < 0.5 && Math.abs(selected.height - nextHeight) < 0.5) {
+        return current;
+      }
+      const resized = {
+        ...selected,
+        height: nextHeight,
+        width: nextWidth,
+        x: Math.min(selected.x, 1000 - nextWidth),
+        y: Math.min(selected.y, 1000 - nextHeight),
+      };
+      const next = current.map((element) => element.id === elementId ? resized : element);
+      return selected.kind === "mindMapNode" ? layoutMindMap(next, selected.mapId) : next;
+    });
+  }, [updateElements]);
+
   function finishTextEditing() {
     const before = textEditBeforeRef.current;
     const after = before ? elementsRef.current.find((element) => element.id === before.id) : null;
@@ -603,9 +624,10 @@ export function useLessonAnnotation({
   }
 
   function createTextElement(tool: "stickyNote" | "text", point: AnnotationPoint) {
-    const width = tool === "stickyNote" ? 220 : 260;
-    const height = tool === "stickyNote" ? 160 : 90;
+    const width = tool === "stickyNote" ? 220 : 72;
+    const height = tool === "stickyNote" ? 160 : 34;
     const element: AnnotationElement = {
+      autoWidth: tool === "text",
       color: tool === "stickyNote" ? "#111111" : annotationColor,
       createdAt: Date.now(),
       fill: tool === "stickyNote" ? "#fff0a8" : "transparent",
@@ -634,7 +656,7 @@ export function useLessonAnnotation({
       createdAt: Date.now(),
       fill: annotationColor,
       fontSize: defaultAnnotationFontSize,
-      height: 68,
+      height: 40,
       id,
       kind: "mindMapNode",
       mapId: id,
@@ -643,9 +665,9 @@ export function useLessonAnnotation({
       parentId: null,
       side: "root",
       text: "",
-      width: 180,
-      x: Math.max(20, Math.min(800, point.x - 90)),
-      y: Math.max(20, Math.min(912, point.y - 34)),
+      width: 96,
+      x: Math.max(20, Math.min(884, point.x - 48)),
+      y: Math.max(20, Math.min(940, point.y - 20)),
     }, defaultAnnotationFontSize);
     updateElements((current) => [...current, element]);
     recordHistory([], [element]);
@@ -679,8 +701,8 @@ export function useLessonAnnotation({
       color: annotationColor,
       createdAt: Date.now(),
       fill: "#ffffff",
-      fontSize: 18,
-      height: 56,
+      fontSize: 14,
+      height: 34,
       id,
       kind: "mindMapNode",
       mapId: selected.mapId,
@@ -689,7 +711,7 @@ export function useLessonAnnotation({
       parentId: actualParent.id,
       side,
       text: "",
-      width: 148,
+      width: 72,
       x: actualParent.x,
       y: actualParent.y,
     };
@@ -852,6 +874,7 @@ export function useLessonAnnotation({
     setSelectedElementId,
     undo,
     updateAnnotationText,
+    updateAnnotationElementSize,
     updateSelectedColor,
     updateSelectedFontSize,
     updateSelectedStrokeWidth,

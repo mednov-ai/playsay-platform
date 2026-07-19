@@ -69,11 +69,11 @@ export function LessonWorkspace({
     assignedParticipants.length === session.participants.length;
   const teacherWorkParticipants = isParallelWork ? assignedParticipants : session.participants;
   const teacherWorkParticipantKey = teacherWorkParticipants.map((participant) => participant.subject).join("|");
-  const studentSharedPresenceEnabled = !canMonitorSubmissions &&
-    !isParallelWork &&
-    session.lessonType === "GROUP" &&
-    session.workMode === "SHARED" &&
-    session.participants.length > 1;
+  const studentSharedPresenceEnabled = shouldEnableSharedMaterialPresence({
+    canMonitorSubmissions,
+    isParallelWork,
+    workMode: session.workMode,
+  });
   const canManageMaterial = canAssignLessons(profile) && !isParallelWork;
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
   const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
@@ -440,4 +440,16 @@ export function teacherTaskVisibilityAfterSharedGame(
   presentedBlockId: string | null,
 ): boolean {
   return current || (canMonitorSubmissions && Boolean(presentedBlockId));
+}
+
+export function shouldEnableSharedMaterialPresence({
+  canMonitorSubmissions,
+  isParallelWork,
+  workMode,
+}: {
+  canMonitorSubmissions: boolean;
+  isParallelWork: boolean;
+  workMode: ScheduledLesson["workMode"];
+}): boolean {
+  return !canMonitorSubmissions && !isParallelWork && workMode === "SHARED";
 }

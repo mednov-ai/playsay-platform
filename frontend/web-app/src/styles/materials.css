@@ -2690,6 +2690,7 @@
 }
 
 .playsay-annotation-text {
+  position: relative;
   display: flex;
   width: 100%;
   height: 100%;
@@ -2708,6 +2709,16 @@
   word-break: break-word;
 }
 
+.playsay-annotation-text-text,
+.playsay-annotation-text-mindMapNode {
+  font-family: "Fredoka Variable", Fredoka, "Comic Sans MS", "Trebuchet MS", sans-serif;
+  font-weight: 650;
+}
+
+.playsay-annotation-text-text {
+  padding: 8px 12px;
+}
+
 .playsay-annotation-text-stickyNote {
   align-items: flex-start;
   justify-content: flex-start;
@@ -2716,16 +2727,17 @@
 }
 
 .playsay-annotation-text-mindMapNode {
+  border-width: 1px;
   border-color: currentColor;
   border-radius: 14px;
-  box-shadow: 0 8px 22px rgb(17 17 17 / 0.12);
-  line-height: 1.1;
+  box-shadow: 0 4px 12px rgb(17 17 17 / 0.08);
+  line-height: 1.2;
   padding: 6px 10px;
 }
 
 .playsay-annotation-text-mindMapNode[data-mind-map-root="true"] {
   border-color: transparent;
-  box-shadow: 0 12px 30px rgb(17 17 17 / 0.18);
+  box-shadow: 0 6px 16px rgb(17 17 17 / 0.12);
 }
 
 .playsay-annotation-text-mindMapNode[data-text-clamped="true"] > span {
@@ -2805,7 +2817,24 @@
   color: inherit;
   font: inherit;
   line-height: inherit;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 0;
   text-align: inherit;
+}
+
+.playsay-annotation-text-measure {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: -10000px;
+  display: block;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  visibility: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .playsay-task-footer {

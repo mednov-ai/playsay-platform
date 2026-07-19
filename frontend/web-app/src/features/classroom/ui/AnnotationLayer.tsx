@@ -1,7 +1,9 @@
-import { memo, useEffect, useId, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { useAppTranslation } from "../../../shared/i18n";
 import {
   annotationElementBounds,
+  annotationTextSizingConstraints,
+  estimateAnnotationTextSize,
   pointsToSvgPath,
   type AnnotationElement,
   type AnnotationTool,
@@ -17,6 +19,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   onDeselect,
   onEditText,
   onEnd,
+  onElementSizeChange,
   onFinishTextEditing,
   onMove,
   onMoveElement,
@@ -38,6 +41,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   onDeselect: () => void;
   onEditText: (elementId: string) => void;
   onEnd: (event: PointerEvent<SVGSVGElement>) => void;
+  onElementSizeChange: (elementId: string, width: number, height: number) => void;
   onFinishTextEditing: () => void;
   onMove: (event: PointerEvent<SVGSVGElement>) => void;
   onMoveElement: (event: PointerEvent<SVGElement>, elementId: string) => void;
@@ -151,6 +155,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
           markerId={markerId}
           onEditText={onEditText}
           onFinishTextEditing={onFinishTextEditing}
+          onElementSizeChange={onElementSizeChange}
           onMoveElement={onMoveElement}
           onMindMapKey={onMindMapKey}
           onSelectElement={onSelectElement}
@@ -179,6 +184,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
   markerId,
   onEditText,
   onFinishTextEditing,
+  onElementSizeChange,
   onMoveElement,
   onMindMapKey,
   onSelectElement,
@@ -191,6 +197,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
   markerId: string;
   onEditText: (elementId: string) => void;
   onFinishTextEditing: () => void;
+  onElementSizeChange: (elementId: string, width: number, height: number) => void;
   onMoveElement: (event: PointerEvent<SVGElement>, elementId: string) => void;
   onMindMapKey: (elementId: string, key: "ArrowDown" | "ArrowLeft" | "ArrowRight" | "ArrowUp" | "Enter" | "Tab") => void;
   onSelectElement: (elementId: string | null) => void;
@@ -199,7 +206,69 @@ const AnnotationElementView = memo(function AnnotationElementView({
   tool: AnnotationTool;
 }) {
   const { t } = useAppTranslation();
+  const measurementRef = useRef<HTMLSpanElement>(null);
+  const onElementSizeChangeRef = useRef(onElementSizeChange);
   const label = t(`classroom.annotation.element.${element.kind}`);
+  const sizeableTextElement = element.kind === "text" || element.kind === "mindMapNode" ? element : null;
+  const sizeableAutoWidth = sizeableTextElement?.kind === "text" ? sizeableTextElement.autoWidth : undefined;
+  const sizeableParentId = sizeableTextElement?.kind === "mindMapNode" ? sizeableTextElement.parentId : undefined;
+
+  useEffect(() => {
+    onElementSizeChangeRef.current = onElementSizeChange;
+  }, [onElementSizeChange]);
+
+  useLayoutEffect(() => {
+    if (!sizeableTextElement) return undefined;
+    let cancelled = false;
+    const measure = () => {
+      const measurement = measurementRef.current;
+      if (!measurement || cancelled) return;
+      const constraints = annotationTextSizingConstraints(sizeableTextElement);
+      const fallback = estimateAnnotationTextSize(sizeableTextElement);
+      const autoWidth = sizeableTextElement.kind === "mindMapNode" || sizeableTextElement.autoWidth !== false;
+      const availableWidth = Math.max(
+        1,
+        (autoWidth ? constraints.maxWidth : sizeableTextElement.width) - constraints.horizontalPadding * 2,
+      );
+      measurement.style.width = autoWidth ? "max-content" : `${availableWidth}px`;
+      measurement.style.maxWidth = `${availableWidth}px`;
+      const naturalBounds = measurement.getBoundingClientRect();
+      const measurementScale = annotationMeasurementScale(measurement);
+      const naturalWidth = naturalBounds.width / measurementScale.x;
+      const nextWidth = autoWidth && naturalWidth > 0
+        ? clampMeasurement(
+          Math.ceil(naturalWidth * 1.2 + constraints.horizontalPadding * 2),
+          constraints.minWidth,
+          constraints.maxWidth,
+        )
+        : autoWidth ? fallback.width : sizeableTextElement.width;
+      measurement.style.width = `${Math.max(1, nextWidth - constraints.horizontalPadding * 2)}px`;
+      measurement.style.maxWidth = measurement.style.width;
+      const wrappedBounds = measurement.getBoundingClientRect();
+      const wrappedHeight = wrappedBounds.height / measurementScale.y;
+      const nextHeight = wrappedHeight > 0
+        ? clampMeasurement(
+          Math.ceil(wrappedHeight + constraints.verticalPadding * 2),
+          constraints.minHeight,
+          constraints.maxHeight,
+        )
+        : fallback.height;
+      onElementSizeChangeRef.current(sizeableTextElement.id, nextWidth, nextHeight);
+    };
+    measure();
+    void document.fonts?.ready.then(measure);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    sizeableAutoWidth,
+    sizeableTextElement?.fontSize,
+    sizeableTextElement?.id,
+    sizeableTextElement?.kind,
+    sizeableParentId,
+    sizeableTextElement?.text,
+    sizeableTextElement?.width,
+  ]);
   const commonProps = {
     "aria-label": label,
     className: "playsay-annotation-element",
@@ -301,9 +370,14 @@ const AnnotationElementView = memo(function AnnotationElementView({
         className={`playsay-annotation-text playsay-annotation-text-${element.kind}`}
         data-empty={element.text ? "false" : "true"}
         data-mind-map-root={element.kind === "mindMapNode" && element.parentId === null ? "true" : undefined}
-        data-text-clamped={element.kind === "mindMapNode" && element.height >= 180 ? "true" : undefined}
+        data-text-clamped={element.kind === "mindMapNode" && element.height >= 160 ? "true" : undefined}
         style={{ backgroundColor: element.fill, color: element.color, fontSize: `${element.fontSize}px` }}
       >
+        {sizeableTextElement ? (
+          <span aria-hidden="true" className="playsay-annotation-text-measure" ref={measurementRef}>
+            {sizeableTextElement.text || " "}
+          </span>
+        ) : null}
         {editing ? (
           <textarea
             aria-label={label}
@@ -364,7 +438,7 @@ function MindMapConnector({
   const path = child.side === "left"
     ? `M ${fromX} ${fromY} C ${fromX - control} ${fromY}, ${toX + control} ${toY}, ${toX} ${toY}`
     : `M ${fromX} ${fromY} C ${fromX + control} ${fromY}, ${toX - control} ${toY}, ${toX} ${toY}`;
-  return <path className="playsay-mind-map-connector" d={path} fill="none" stroke={child.color} strokeWidth="6" />;
+  return <path className="playsay-mind-map-connector" d={path} fill="none" stroke={child.color} strokeWidth="3" />;
 }
 
 function SelectionOutline({
@@ -401,29 +475,36 @@ function SelectionOutline({
   }
 
   const bounds = annotationElementBounds(element);
+  const outlinePadding = element.kind === "text" || element.kind === "mindMapNode" ? 4 : 0;
+  const outline = {
+    height: bounds.height + outlinePadding * 2,
+    width: bounds.width + outlinePadding * 2,
+    x: bounds.x - outlinePadding,
+    y: bounds.y - outlinePadding,
+  };
   const canResize = element.kind !== "stroke" && element.kind !== "mindMapNode";
   return (
     <g className="playsay-annotation-selection">
       <rect
         fill="none"
-        height={bounds.height}
+        height={outline.height}
         pointerEvents="none"
         stroke="#ff5c00"
         strokeDasharray="10 8"
         strokeWidth="3"
-        width={bounds.width}
-        x={bounds.x}
-        y={bounds.y}
+        width={outline.width}
+        x={outline.x}
+        y={outline.y}
       />
       {element.kind === "mindMapNode" ? (
         <MindMapAddHandles element={element} onAdd={onAddMindMapNode} onDelete={onDeleteSelected} />
       ) : null}
       {canResize ? (
         <>
-          <ResizeHandle elementId={element.id} handle="nw" onResize={onResizeElement} x={bounds.x} y={bounds.y} />
-          <ResizeHandle elementId={element.id} handle="ne" onResize={onResizeElement} x={bounds.x + bounds.width} y={bounds.y} />
-          <ResizeHandle elementId={element.id} handle="sw" onResize={onResizeElement} x={bounds.x} y={bounds.y + bounds.height} />
-          <ResizeHandle elementId={element.id} handle="se" onResize={onResizeElement} x={bounds.x + bounds.width} y={bounds.y + bounds.height} />
+          <ResizeHandle elementId={element.id} handle="nw" onResize={onResizeElement} x={outline.x} y={outline.y} />
+          <ResizeHandle elementId={element.id} handle="ne" onResize={onResizeElement} x={outline.x + outline.width} y={outline.y} />
+          <ResizeHandle elementId={element.id} handle="sw" onResize={onResizeElement} x={outline.x} y={outline.y + outline.height} />
+          <ResizeHandle elementId={element.id} handle="se" onResize={onResizeElement} x={outline.x + outline.width} y={outline.y + outline.height} />
         </>
       ) : null}
     </g>
@@ -537,4 +618,19 @@ function isEditableTarget(target: EventTarget | null): boolean {
     || target.tagName === "TEXTAREA"
     || target.tagName === "SELECT"
   );
+}
+
+function clampMeasurement(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function annotationMeasurementScale(measurement: HTMLElement): { x: number; y: number } {
+  const foreignObject = measurement.closest("foreignObject");
+  const svg = foreignObject instanceof SVGElement ? foreignObject.ownerSVGElement : null;
+  const bounds = svg?.getBoundingClientRect();
+  const viewBox = svg?.viewBox.baseVal;
+  return {
+    x: bounds && viewBox && bounds.width > 0 && viewBox.width > 0 ? bounds.width / viewBox.width : 1,
+    y: bounds && viewBox && bounds.height > 0 && viewBox.height > 0 ? bounds.height / viewBox.height : 1,
+  };
 }

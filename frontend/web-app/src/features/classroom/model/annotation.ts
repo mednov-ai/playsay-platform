@@ -60,6 +60,7 @@ export type AnnotationBoxElement = {
 
 export type AnnotationTextElement = {
   [Kind in "stickyNote" | "text"]: AnnotationElementBase & {
+    autoWidth?: boolean;
     fill: string;
     fontSize: AnnotationFontSize;
     height: number;
@@ -84,6 +85,15 @@ export type AnnotationMindMapNode = AnnotationElementBase & {
   width: number;
   x: number;
   y: number;
+};
+
+export type AnnotationTextSizingConstraints = {
+  horizontalPadding: number;
+  maxHeight: number;
+  maxWidth: number;
+  minHeight: number;
+  minWidth: number;
+  verticalPadding: number;
 };
 
 export type AnnotationElement =
@@ -298,21 +308,55 @@ export function resizeMindMapNodeForText(
   fontSize: AnnotationFontSize,
   text = node.text,
 ): AnnotationMindMapNode {
-  const preset = mindMapSizeByFont[fontSize] ?? mindMapSizeByFont[24];
-  const horizontalPadding = fontSize >= 24 ? 24 : 20;
-  const usableWidth = Math.max(40, preset.width - horizontalPadding);
-  const charactersPerLine = Math.max(8, Math.floor(usableWidth / (fontSize * 0.58)));
-  const lineCount = (text || " ").split("\n").reduce((total, line) => (
-    total + Math.max(1, Math.ceil(Math.max(1, line.length) / charactersPerLine))
-  ), 0);
-  const contentHeight = Math.ceil(lineCount * fontSize * 1.15 + (fontSize >= 24 ? 20 : 14));
+  const candidate = { ...node, fontSize, text };
+  const size = estimateAnnotationTextSize(candidate);
   return {
-    ...node,
-    fontSize,
-    height: Math.min(mindMapMaximumHeight, Math.max(preset.height, contentHeight)),
-    text,
-    width: preset.width,
+    ...candidate,
+    ...size,
   };
+}
+
+export function annotationTextSizingConstraints(
+  element: AnnotationTextElement | AnnotationMindMapNode,
+): AnnotationTextSizingConstraints {
+  if (element.kind === "text") {
+    return textSizingConstraints;
+  }
+  if (element.kind === "mindMapNode" && element.parentId === null) {
+    return mindMapRootSizingConstraints;
+  }
+  if (element.kind === "mindMapNode") {
+    return mindMapChildSizingConstraints;
+  }
+  return stickyNoteSizingConstraints;
+}
+
+export function estimateAnnotationTextSize(
+  element: AnnotationTextElement | AnnotationMindMapNode,
+  text = element.text,
+): { height: number; width: number } {
+  const constraints = annotationTextSizingConstraints(element);
+  const autoWidth = element.kind === "mindMapNode" || (element.kind === "text" && element.autoWidth !== false);
+  const widestLine = Math.max(...(text || " ").split("\n").map((line) => Math.max(1, Array.from(line).length)));
+  const estimatedCharacterWidth = element.fontSize * 0.56;
+  const width = autoWidth
+    ? clampSize(
+      Math.ceil(widestLine * estimatedCharacterWidth + constraints.horizontalPadding * 2),
+      constraints.minWidth,
+      constraints.maxWidth,
+    )
+    : Math.max(constraints.minWidth, element.width);
+  const usableWidth = Math.max(1, width - constraints.horizontalPadding * 2);
+  const charactersPerLine = Math.max(1, Math.floor(usableWidth / estimatedCharacterWidth));
+  const lineCount = (text || " ").split("\n").reduce((total, line) => (
+    total + Math.max(1, Math.ceil(Math.max(1, Array.from(line).length) / charactersPerLine))
+  ), 0);
+  const height = clampSize(
+    Math.ceil(lineCount * element.fontSize * 1.2 + constraints.verticalPadding * 2),
+    constraints.minHeight,
+    constraints.maxHeight,
+  );
+  return { height, width };
 }
 
 export function pointsToSvgPath(points: AnnotationPoint[]): string {
@@ -399,22 +443,25 @@ export function resizeAnnotationElement(
     return element;
   }
 
+  const minimumWidth = element.kind === "text" ? textSizingConstraints.minWidth : minimumElementSize;
+  const minimumHeight = element.kind === "text" ? textSizingConstraints.minHeight : minimumElementSize;
   const right = element.x + element.width;
   const bottom = element.y + element.height;
   const nextX = handle === "nw" || handle === "sw"
-    ? Math.min(point.x, right - minimumElementSize)
+    ? Math.min(point.x, right - minimumWidth)
     : element.x;
   const nextY = handle === "nw" || handle === "ne"
-    ? Math.min(point.y, bottom - minimumElementSize)
+    ? Math.min(point.y, bottom - minimumHeight)
     : element.y;
   const nextRight = handle === "ne" || handle === "se"
-    ? Math.max(point.x, element.x + minimumElementSize)
+    ? Math.max(point.x, element.x + minimumWidth)
     : right;
   const nextBottom = handle === "sw" || handle === "se"
-    ? Math.max(point.y, element.y + minimumElementSize)
+    ? Math.max(point.y, element.y + minimumHeight)
     : bottom;
   return {
     ...element,
+    ...(element.kind === "text" ? { autoWidth: false } : {}),
     height: Math.min(annotationCoordinateMax - nextY, nextBottom - nextY),
     width: Math.min(annotationCoordinateMax - nextX, nextRight - nextX),
     x: clampCoordinate(nextX),
@@ -475,6 +522,7 @@ function serializeAnnotationElement(element: AnnotationElement): Record<string, 
     ...base,
     fill: element.fill,
     ...(element.kind === "text" || element.kind === "stickyNote" ? { fontSize: element.fontSize } : {}),
+    ...(element.kind === "text" ? { autoWidth: element.autoWidth !== false } : {}),
     height: roundCoordinate(element.height),
     ...(element.kind === "text" || element.kind === "stickyNote" ? { text: element.text } : { strokeWidth: element.strokeWidth }),
     width: roundCoordinate(element.width),
@@ -528,32 +576,40 @@ function annotationElementFromJson(value: unknown, index: number): AnnotationEle
     const mapId = asString(element.mapId).trim() || (parentId ? "" : id);
     if (!mapId) return null;
     const sideValue = asString(element.side);
-    const fontSize = annotationFontSize(element.fontSize, parentId === null ? 24 : 18);
-    return resizeMindMapNodeForText({
+    const fontSize = annotationFontSize(element.fontSize, parentId === null ? 18 : 14);
+    const constraints = parentId === null ? mindMapRootSizingConstraints : mindMapChildSizingConstraints;
+    return {
       ...base,
       fill: asString(element.fill) || defaultMindMapFill,
       fontSize,
-      height: Math.max(minimumElementSize, height),
+      height: clampSize(height, constraints.minHeight, constraints.maxHeight),
       kind,
       mapId,
       order: asNumber(element.order) ?? index,
       parentId,
       side: parentId === null ? "root" : sideValue === "left" ? "left" : "right",
       text: asString(element.text).slice(0, mindMapTextLimit),
-      width: Math.max(minimumElementSize, width),
+      width: clampSize(width, constraints.minWidth, constraints.maxWidth),
       x: clampCoordinate(x),
       y: clampCoordinate(y),
-    }, fontSize, asString(element.text).slice(0, mindMapTextLimit));
+    };
   }
   if (kind === "text" || kind === "stickyNote") {
+    const autoWidth = kind === "text" ? element.autoWidth !== false : false;
+    const constraints = kind === "text" ? textSizingConstraints : stickyNoteSizingConstraints;
     return {
       ...base,
+      autoWidth,
       fill: asString(element.fill) || (kind === "stickyNote" ? defaultStickyFill : "transparent"),
       fontSize: annotationFontSize(element.fontSize, 30),
-      height: Math.max(minimumElementSize, height),
+      height: kind === "text"
+        ? clampSize(height, constraints.minHeight, constraints.maxHeight)
+        : Math.max(minimumElementSize, height),
       kind,
       text: asString(element.text),
-      width: Math.max(minimumElementSize, width),
+      width: kind === "text" && autoWidth
+        ? clampSize(width, constraints.minWidth, constraints.maxWidth)
+        : Math.max(minimumElementSize, width),
       x: clampCoordinate(x),
       y: clampCoordinate(y),
     };
@@ -642,6 +698,10 @@ function clampCoordinate(value: number, max = annotationCoordinateMax): number {
   return Math.max(0, Math.min(max, value));
 }
 
+function clampSize(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function roundCoordinate(value: number): number {
   return Number(value.toFixed(1));
 }
@@ -685,13 +745,37 @@ const minimumElementSize = 36;
 const mindMapLevelGap = 52;
 const mindMapPagePadding = 20;
 const mindMapSiblingGap = 16;
-const mindMapMaximumHeight = 180;
-const mindMapSizeByFont: Record<AnnotationFontSize, { height: number; width: number }> = {
-  14: { height: 46, width: 132 },
-  18: { height: 56, width: 148 },
-  24: { height: 68, width: 180 },
-  30: { height: 86, width: 208 },
-  32: { height: 92, width: 220 },
+const textSizingConstraints: AnnotationTextSizingConstraints = {
+  horizontalPadding: 12,
+  maxHeight: 320,
+  maxWidth: 360,
+  minHeight: 34,
+  minWidth: 72,
+  verticalPadding: 8,
+};
+const mindMapRootSizingConstraints: AnnotationTextSizingConstraints = {
+  horizontalPadding: 10,
+  maxHeight: 160,
+  maxWidth: 260,
+  minHeight: 40,
+  minWidth: 96,
+  verticalPadding: 6,
+};
+const mindMapChildSizingConstraints: AnnotationTextSizingConstraints = {
+  horizontalPadding: 10,
+  maxHeight: 160,
+  maxWidth: 220,
+  minHeight: 34,
+  minWidth: 72,
+  verticalPadding: 6,
+};
+const stickyNoteSizingConstraints: AnnotationTextSizingConstraints = {
+  horizontalPadding: 12,
+  maxHeight: 1000,
+  maxWidth: 1000,
+  minHeight: 36,
+  minWidth: 36,
+  verticalPadding: 12,
 };
 export const mindMapNodeLimit = 50;
 export const mindMapTextLimit = 500;

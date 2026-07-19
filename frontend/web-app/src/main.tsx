@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./app/App";
 import { AppProviders } from "./app/AppProviders";
+import "@fontsource-variable/fredoka";
 import "@livekit/components-styles";
 import "./shared/i18n/config";
 import "./styles.css";

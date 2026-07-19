@@ -130,6 +130,7 @@ export function LessonTaskCanvas({
     setSelectedElementId,
     undo,
     updateAnnotationText,
+    updateAnnotationElementSize,
     updateSelectedColor,
     updateSelectedFontSize,
     updateSelectedStrokeWidth,
@@ -372,6 +373,7 @@ export function LessonTaskCanvas({
               onDeselect={() => setSelectedElementId(null)}
               onEditText={beginTextEditing}
               onEnd={endAnnotation}
+              onElementSizeChange={updateAnnotationElementSize}
               onFinishTextEditing={finishTextEditing}
               onMove={extendAnnotation}
               onMoveElement={beginElementMove}

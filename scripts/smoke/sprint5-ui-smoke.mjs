@@ -2,6 +2,7 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
@@ -13,6 +14,8 @@ const playwrightPackageDir = process.env.PLAYWRIGHT_PACKAGE_DIR ?? "/Users/evgen
 const sshHost = process.env.PLAY_SAY_SMOKE_SSH_HOST ?? "root@146.103.126.15";
 const headless = process.env.PLAY_SAY_SMOKE_HEADLESS !== "false";
 const timeoutMs = Number(process.env.PLAY_SAY_SMOKE_TIMEOUT_MS ?? 45_000);
+const annotationScreenshotPath = process.env.PLAY_SAY_SMOKE_ANNOTATION_SCREENSHOT_PATH?.trim() || null;
+const annotationOnly = process.env.PLAY_SAY_SMOKE_ANNOTATION_ONLY === "true";
 const runId = `sprint5-ui-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
 const tokenStorageKey = "playsay.auth.tokens";
 
@@ -71,8 +74,10 @@ try {
   const studentAProfile = await ensureStudentBirthDate(studentA.tokens.accessToken, rawStudentAProfile);
   addCheck("keycloak-login-and-profiles");
 
-  await verifyAiTutorPersonaSwitching(teacher.page);
-  addCheck("ai-tutor-personas-switch-animated-avatar");
+  if (!annotationOnly) {
+    await verifyAiTutorPersonaSwitching(teacher.page);
+    addCheck("ai-tutor-personas-switch-animated-avatar");
+  }
 
   const material = await createSmokeMaterial(teacher.tokens.accessToken);
   created.materialId = material.id;
@@ -87,8 +92,10 @@ try {
   summary.lessonId = lesson.id;
   addCheck("temporary-group-lesson-created");
 
-  await verifyAiDialogAllowanceGrantAndDebit(teacher, studentA, studentAProfile.subject);
-  addCheck("ai-dialog-allowance-grant-and-net-zero-debit");
+  if (!annotationOnly) {
+    await verifyAiDialogAllowanceGrantAndDebit(teacher, studentA, studentAProfile.subject);
+    addCheck("ai-dialog-allowance-grant-and-net-zero-debit");
+  }
 
   await Promise.all([
     ensureCollaborationDocument(studentA.tokens.accessToken, lesson.id, material.id, "GROUP"),
@@ -108,32 +115,41 @@ try {
   ]);
   addCheck("student-workspace-hides-document-tabs-and-side-editor");
 
-  await waitForSharedPresenceReady(teacher.page, studentA.page, studentB.page);
-  await verifyMaterialCursor(studentA.page, studentB.page);
-  await verifyMaterialCursorAlignment(studentA.page, studentB.page, 0.34, 0.38, "student A cursor on student B");
-  await verifyMaterialCursorAlignment(studentB.page, studentA.page, 0.62, 0.32, "student B cursor on student A");
-  await verifyMaterialCursorAlignment(teacher.page, studentA.page, 0.49, 0.46, "teacher cursor on student A");
-  await verifyMaterialCursorAlignment(teacher.page, studentB.page, 0.49, 0.46, "teacher cursor on student B");
-  addCheck("material-presence-cursors-are-aligned-and-clipped");
+  if (annotationOnly) {
+    await drawTextAndMindMap(teacher.page);
+    await captureAnnotationScreenshot(teacher.page);
+    addCheck("text-and-mind-map-use-compact-content-bounds");
+  } else {
+    await waitForSharedPresenceReady(teacher.page, studentA.page, studentB.page);
+    await drawTextAndMindMap(teacher.page);
+    await captureAnnotationScreenshot(teacher.page);
+    addCheck("text-and-mind-map-use-compact-content-bounds");
+    await verifyMaterialCursor(studentA.page, studentB.page);
+    await verifyMaterialCursorAlignment(studentA.page, studentB.page, 0.34, 0.38, "student A cursor on student B");
+    await verifyMaterialCursorAlignment(studentB.page, studentA.page, 0.62, 0.32, "student B cursor on student A");
+    await verifyMaterialCursorAlignment(teacher.page, studentA.page, 0.49, 0.46, "teacher cursor on student A");
+    await verifyMaterialCursorAlignment(teacher.page, studentB.page, 0.49, 0.46, "teacher cursor on student B");
+    addCheck("material-presence-cursors-are-aligned-and-clipped");
 
-  await drawAnnotation(studentA.page);
-  await waitForLocatorCount(studentB.page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path", 1, "student B annotation path");
-  await assertAnnotationInsideSurface(studentB.page);
-  await scrollMaterialDocument(studentB.page, 120);
-  await assertAnnotationInsideSurface(studentB.page);
-  await studentB.page.setViewportSize({ width: 920, height: 820 });
-  await assertAnnotationInsideSurface(studentB.page);
-  addCheck("annotation-sync-stays-inside-material-after-scroll-and-resize");
+    await drawAnnotation(studentA.page);
+    await waitForLocatorCount(studentB.page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path.playsay-annotation-element", 1, "student B annotation path");
+    await assertAnnotationInsideSurface(studentB.page);
+    await scrollMaterialDocument(studentB.page, 120);
+    await assertAnnotationInsideSurface(studentB.page);
+    await studentB.page.setViewportSize({ width: 920, height: 820 });
+    await assertAnnotationInsideSurface(studentB.page);
+    addCheck("annotation-sync-stays-inside-material-after-scroll-and-resize");
 
-  await studentB.page.reload({ waitUntil: "domcontentloaded" });
-  await completeClassroomPreJoin(studentB.page);
-  await studentB.page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
-  await waitForSharedPresenceReady(studentB.page);
-  await waitForLocatorCount(studentB.page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path", 1, "student B annotation path after reload");
-  addCheck("reconnect-restores-annotations");
+    await studentB.page.reload({ waitUntil: "domcontentloaded" });
+    await completeClassroomPreJoin(studentB.page);
+    await studentB.page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
+    await waitForSharedPresenceReady(studentB.page);
+    await waitForLocatorCount(studentB.page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path.playsay-annotation-element", 1, "student B annotation path after reload");
+    addCheck("reconnect-restores-annotations");
 
-  await submitStudentMaterialWork(studentA.page, studentA.tokens.accessToken, lesson.id);
-  addCheck("student-material-submit-creates-submission");
+    await submitStudentMaterialWork(studentA.page, studentA.tokens.accessToken, lesson.id);
+    addCheck("student-material-submit-creates-submission");
+  }
 
   await cleanup(teacher.tokens.accessToken);
   addCheck("cleanup-completed");
@@ -644,14 +660,91 @@ async function drawAnnotation(page) {
   await page.mouse.move(mid.x, mid.y, { steps: 8 });
   await page.mouse.move(end.x, end.y, { steps: 8 });
   await page.mouse.up();
-  await waitForLocatorCount(page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path", 1, "student A annotation path");
+  await waitForLocatorCount(page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path.playsay-annotation-element", 1, "student A annotation path");
   await page.locator("[data-testid='annotation-tool-pointer']").click();
+}
+
+async function drawTextAndMindMap(page) {
+  const layer = page.locator(".playsay-annotation-layer");
+  const bounds = await layer.boundingBox();
+  if (!bounds) {
+    throw new Error("Annotation layer is not visible for Text/Mind Map smoke.");
+  }
+
+  await page.locator("[data-testid='annotation-tool-text']").click();
+  await page.mouse.click(bounds.x + bounds.width * 0.56, bounds.y + bounds.height * 0.34);
+  const textEditor = page.locator(".playsay-annotation-text-text textarea");
+  await textEditor.waitFor({ timeout: timeoutMs });
+  await textEditor.fill("Small friendly text");
+  await textEditor.press("Control+Enter");
+
+  await page.locator("[data-testid='annotation-tool-mind-map']").click();
+  await page.mouse.click(bounds.x + bounds.width * 0.48, bounds.y + bounds.height * 0.46);
+  const mindMapEditor = page.locator(".playsay-annotation-text-mindMapNode textarea");
+  await mindMapEditor.waitFor({ timeout: timeoutMs });
+  await mindMapEditor.fill("Present Simple");
+  await mindMapEditor.press("Tab");
+  await mindMapEditor.waitFor({ timeout: timeoutMs });
+  await mindMapEditor.fill("Habits and routines");
+  await mindMapEditor.press("Escape");
+  await waitForLocatorCount(page, ".playsay-annotation-text-mindMapNode", 2, "compact mind map nodes");
+
+  const sizes = await page.locator("foreignObject.playsay-annotation-element").evaluateAll((elements) => elements
+    .map((element) => {
+      const content = element.querySelector(".playsay-annotation-text-text, .playsay-annotation-text-mindMapNode");
+      const visibleText = content?.querySelector("span:not(.playsay-annotation-text-measure)");
+      const textRange = visibleText ? document.createRange() : null;
+      if (textRange && visibleText) textRange.selectNodeContents(visibleText);
+      return content ? {
+        height: Number(element.getAttribute("height")),
+        kind: content.classList.contains("playsay-annotation-text-text") ? "text" : "mindMapNode",
+        lineCount: textRange ? textRange.getClientRects().length : null,
+        width: Number(element.getAttribute("width")),
+      } : null;
+    })
+    .filter(Boolean));
+  const textSize = sizes.find((size) => size.kind === "text");
+  const mindMapSizes = sizes.filter((size) => size.kind === "mindMapNode");
+  if (!textSize || textSize.width >= 220 || textSize.height >= 90 || textSize.lineCount !== 1) {
+    throw new Error(`Text did not compact to its content: ${JSON.stringify(textSize)}`);
+  }
+  if (mindMapSizes.length !== 2 || mindMapSizes.some((size) => size.width > 220 || size.height > 160)) {
+    throw new Error(`Mind map nodes exceeded compact bounds: ${JSON.stringify(mindMapSizes)}`);
+  }
+  if (await page.locator(".playsay-mind-map-connector").count() !== 1) {
+    throw new Error("Mind map connector was not rendered exactly once.");
+  }
+}
+
+async function captureAnnotationScreenshot(page) {
+  if (!annotationScreenshotPath) return;
+  mkdirSync(path.dirname(annotationScreenshotPath), { recursive: true });
+  const originalViewport = page.viewportSize();
+  await page.screenshot({ path: annotationScreenshotPath });
+  const textAnnotation = page.locator(".playsay-annotation-text-text");
+  if (await textAnnotation.count() === 1) {
+    await textAnnotation.click();
+    const extension = path.extname(annotationScreenshotPath);
+    const selectedTextPath = `${annotationScreenshotPath.slice(0, -extension.length)}-text-selected${extension}`;
+    await page.screenshot({ path: selectedTextPath });
+
+    const screenshotStem = annotationScreenshotPath.slice(0, -extension.length);
+    const mobileStem = screenshotStem.endsWith("-desktop")
+      ? `${screenshotStem.slice(0, -"-desktop".length)}-mobile`
+      : `${screenshotStem}-mobile`;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await textAnnotation.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${mobileStem}${extension}` });
+    if (originalViewport) {
+      await page.setViewportSize(originalViewport);
+    }
+  }
 }
 
 async function assertAnnotationInsideSurface(page) {
   await page.waitForFunction(() => {
     const surface = document.querySelector("[data-testid='lesson-material-surface']");
-    const path = surface?.querySelector(".playsay-annotation-layer path");
+    const path = surface?.querySelector(".playsay-annotation-layer path.playsay-annotation-element");
     if (!surface || !path) {
       return false;
     }

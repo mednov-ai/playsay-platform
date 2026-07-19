@@ -5,6 +5,7 @@ import {
   annotationElementsForPage,
   canReparentMindMapNode,
   deleteMindMapSubtree,
+  estimateAnnotationTextSize,
   eraseAnnotationElementsAt,
   layoutMindMap,
   pointsToSvgPath,
@@ -151,7 +152,7 @@ describe("annotation model", () => {
     }));
   });
 
-  it("adds font-size defaults to legacy text and compacts legacy mind map nodes", () => {
+  it("adds compact font defaults while preserving safe legacy element bounds", () => {
     const content = annotationContentFromJson({
       schemaVersion: 4,
       elements: [
@@ -161,17 +162,39 @@ describe("annotation model", () => {
     });
 
     expect(content.schemaVersion).toBe(5);
-    expect(content.elements.find((element) => element.id === "text")).toEqual(expect.objectContaining({ fontSize: 30 }));
-    expect(content.elements.find((element) => element.id === "map")).toEqual(expect.objectContaining({ fontSize: 24, height: 68, width: 180 }));
+    expect(content.elements.find((element) => element.id === "text")).toEqual(expect.objectContaining({ autoWidth: true, fontSize: 30 }));
+    expect(content.elements.find((element) => element.id === "map")).toEqual(expect.objectContaining({ fontSize: 18, height: 82, width: 220 }));
   });
 
   it("grows compact mind map nodes for wrapped text", () => {
     const compact = resizeMindMapNodeForText(mindMapNode(), 18, "Short");
     const wrapped = resizeMindMapNodeForText(mindMapNode(), 18, "A long grammar explanation that wraps across several lines in the node");
 
-    expect(compact).toEqual(expect.objectContaining({ fontSize: 18, height: 56, width: 148 }));
+    expect(compact).toEqual(expect.objectContaining({ fontSize: 18, height: 34, width: 72 }));
     expect(wrapped.height).toBeGreaterThan(compact.height);
-    expect(wrapped.height).toBeLessThanOrEqual(180);
+    expect(wrapped.height).toBeLessThanOrEqual(160);
+    expect(wrapped.width).toBe(220);
+  });
+
+  it("fits plain text compactly and wraps it at the automatic width limit", () => {
+    const text: AnnotationElement = {
+      autoWidth: true,
+      color: "#111111",
+      createdAt: 1,
+      fill: "transparent",
+      fontSize: 18,
+      height: 34,
+      id: "text-1",
+      kind: "text",
+      pageId: "page-1",
+      text: "Hi!",
+      width: 72,
+      x: 0,
+      y: 0,
+    };
+
+    expect(estimateAnnotationTextSize(text)).toEqual({ height: 38, width: 72 });
+    expect(estimateAnnotationTextSize({ ...text, text: "A very long classroom note ".repeat(20) })).toEqual(expect.objectContaining({ width: 360 }));
   });
 
   it("deletes a mind map subtree and prevents cyclic reparenting", () => {

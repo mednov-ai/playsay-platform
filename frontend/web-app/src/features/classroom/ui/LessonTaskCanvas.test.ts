@@ -561,13 +561,13 @@ describe("LessonTaskCanvas", () => {
     const layer = await annotationLayer(container);
 
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-text']")!);
-    expect(container.querySelector(".playsay-font-size-controls output")?.textContent).toBe("24");
+    expect(container.querySelector(".playsay-font-size-controls output")?.textContent).toBe("18");
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-font-size-decrease']")!);
     fireEvent.pointerDown(layer, { button: 0, clientX: 250, clientY: 260, pointerId: 1 });
 
-    expect(container.querySelector<HTMLElement>(".playsay-annotation-text-text")?.style.fontSize).toBe("18px");
+    expect(container.querySelector<HTMLElement>(".playsay-annotation-text-text")?.style.fontSize).toBe("14px");
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-font-size-increase']")!);
-    expect(container.querySelector<HTMLElement>(".playsay-annotation-text-text")?.style.fontSize).toBe("24px");
+    expect(container.querySelector<HTMLElement>(".playsay-annotation-text-text")?.style.fontSize).toBe("18px");
   });
 
   it("creates a mind map root and adds an automatically connected child with Tab", async () => {
@@ -595,9 +595,9 @@ describe("LessonTaskCanvas", () => {
     expect(container.querySelector(".playsay-mind-map-connector")).toBeTruthy();
     expect(container.querySelectorAll(".playsay-annotation-text-mindMapNode textarea")).toHaveLength(1);
     const childNode = container.querySelector<HTMLElement>(".playsay-annotation-text-mindMapNode textarea")?.parentElement;
-    expect(childNode?.style.fontSize).toBe("18px");
+    expect(childNode?.style.fontSize).toBe("14px");
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-font-size-increase']")!);
-    expect(childNode?.style.fontSize).toBe("24px");
+    expect(childNode?.style.fontSize).toBe("18px");
   });
 });
 

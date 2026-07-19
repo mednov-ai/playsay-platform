@@ -356,7 +356,13 @@ describe("yjs workspace runtime annotations", () => {
       }],
     });
 
-    expect(annotationChanges.at(-1)).toEqual([expect.objectContaining({ id: "map-1", kind: "mindMapNode", text: "Present Simple" })]);
+    expect(annotationChanges.at(-1)).toEqual([expect.objectContaining({
+      height: 82,
+      id: "map-1",
+      kind: "mindMapNode",
+      text: "Present Simple",
+      width: 220,
+    })]);
     runtime.destroy();
   });
 

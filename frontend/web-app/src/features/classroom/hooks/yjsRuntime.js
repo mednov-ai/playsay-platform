@@ -351,9 +351,9 @@ function normalizeAnnotationElement(value, index) {
     const parentId = asString(element?.parentId) || null;
     const mapId = asString(element?.mapId) || (parentId ? "" : id);
     if (!mapId) return null;
-    const fontSize = normalizeFontSize(element?.fontSize, parentId === null ? 24 : 18);
+    const fontSize = normalizeFontSize(element?.fontSize, parentId === null ? 18 : 14);
     const text = asString(element?.text).slice(0, 500);
-    const size = normalizeMindMapSize(fontSize, text);
+    const size = normalizeMindMapSize(parentId, width, height);
     return {
       ...base,
       fill: asString(element?.fill) || "#ffffff",
@@ -371,14 +371,16 @@ function normalizeAnnotationElement(value, index) {
     };
   }
   if (kind === "text" || kind === "stickyNote") {
+    const autoWidth = kind === "text" ? element?.autoWidth !== false : false;
     return {
       ...base,
+      autoWidth,
       fill: asString(element?.fill) || (kind === "stickyNote" ? "#fff0a8" : "transparent"),
       fontSize: normalizeFontSize(element?.fontSize, 30),
-      height: Math.max(36, height),
+      height: kind === "text" ? clampSize(height, 34, 320) : Math.max(36, height),
       kind,
       text: asString(element?.text),
-      width: Math.max(36, width),
+      width: kind === "text" && autoWidth ? clampSize(width, 72, 360) : Math.max(36, width),
       x: clampCoordinate(x),
       y: clampCoordinate(y),
     };
@@ -429,24 +431,16 @@ function normalizeFontSize(value, fallback) {
     : fallback;
 }
 
-function normalizeMindMapSize(fontSize, text) {
-  const presets = {
-    14: { height: 46, width: 132 },
-    18: { height: 56, width: 148 },
-    24: { height: 68, width: 180 },
-    30: { height: 86, width: 208 },
-    32: { height: 92, width: 220 },
-  };
-  const preset = presets[fontSize] ?? presets[24];
-  const usableWidth = Math.max(40, preset.width - (fontSize >= 24 ? 24 : 20));
-  const charactersPerLine = Math.max(8, Math.floor(usableWidth / (fontSize * 0.58)));
-  const lineCount = (text || " ").split("\n").reduce((total, line) => (
-    total + Math.max(1, Math.ceil(Math.max(1, line.length) / charactersPerLine))
-  ), 0);
+function normalizeMindMapSize(parentId, width, height) {
+  const root = parentId === null;
   return {
-    height: Math.min(180, Math.max(preset.height, Math.ceil(lineCount * fontSize * 1.15 + (fontSize >= 24 ? 20 : 14)))),
-    width: preset.width,
+    height: clampSize(height, root ? 40 : 34, 160),
+    width: clampSize(width, root ? 96 : 72, root ? 260 : 220),
   };
+}
+
+function clampSize(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function finiteNumberOr(value, fallback) {

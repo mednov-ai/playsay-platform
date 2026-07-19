@@ -19,14 +19,15 @@ class TransactionalEmailService(
 ) {
     @Transactional
     fun send(command: TransactionalEmailCommand): String {
-        repo.findByIdempotencyKey(command.idempotencyKey)?.let { existing ->
+        val existing = repo.findLockedByIdempotencyKey(command.idempotencyKey)
+        if (existing != null && existing.status != emailStatusFailed) {
             return existing.status
         }
 
         val now = Instant.now(clock)
         val rendered = renderer.render(command)
-        val attempt = repo.saveAndFlush(
-            EmailDeliveryAttemptEntity(
+        val attempt = if (existing == null) {
+            repo.saveAndFlush(EmailDeliveryAttemptEntity(
                 id = UUID.randomUUID(),
                 idempotencyKey = command.idempotencyKey,
                 toEmail = command.to,
@@ -36,8 +37,18 @@ class TransactionalEmailService(
                 subject = rendered.subject,
                 createdAt = now,
                 updatedAt = now,
-            ),
-        )
+            ))
+        } else {
+            existing.apply {
+                toEmail = command.to
+                templateKey = command.templateKey
+                locale = command.locale.normalizedLocale()
+                status = emailStatusPending
+                subject = rendered.subject
+                errorMessage = null
+                updatedAt = now
+            }.also(repo::saveAndFlush)
+        }
 
         try {
             sender.send(

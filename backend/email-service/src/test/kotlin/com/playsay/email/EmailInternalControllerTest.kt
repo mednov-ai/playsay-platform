@@ -50,6 +50,7 @@ class EmailInternalControllerTest @Autowired constructor(
     @BeforeAll
     fun migrateDatabase() {
         RecordingOutboundEmailSender.sent.clear()
+        RecordingOutboundEmailSender.failNext = false
         SpringLiquibase().apply {
             this.dataSource = this@EmailInternalControllerTest.dataSource
             changeLog = "classpath:db/changelog/db.changelog-master.xml"
@@ -135,6 +136,38 @@ class EmailInternalControllerTest @Autowired constructor(
         }
     }
 
+    @Test
+    fun `renders chat digest in every locale without exposing message text`() {
+        val before = RecordingOutboundEmailSender.sent.size
+        listOf("ru", "en", "de", "fr").forEach { locale ->
+            val response = sendTransactionalEmail(chatDigestEmailBody(locale, locale))
+            assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+        }
+
+        val sent = RecordingOutboundEmailSender.sent.drop(before)
+        assertEquals(4, sent.size)
+        sent.forEach { email ->
+            assertTrue(email.subject.contains("Play&Say"))
+            assertTrue(email.textBody.contains("3"))
+            assertTrue(email.textBody.contains("Teacher Demo"))
+            assertTrue(email.htmlBody.contains("https://online.play-and-say.ru/?chat=open"))
+            assertTrue(!email.textBody.contains("Private message body"))
+            assertTrue(!email.htmlBody.contains("Private message body"))
+        }
+    }
+
+    @Test
+    fun `failed idempotent delivery can be retried with the same key`() {
+        val before = RecordingOutboundEmailSender.sent.size
+        RecordingOutboundEmailSender.failNext = true
+        val first = sendTransactionalEmail(chatDigestEmailBody("retry", "en"))
+        val second = sendTransactionalEmail(chatDigestEmailBody("retry", "en"))
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), first.statusCode())
+        assertEquals(HttpStatus.ACCEPTED.value(), second.statusCode(), second.body())
+        assertEquals(before + 1, RecordingOutboundEmailSender.sent.size)
+    }
+
     private fun sendTransactionalEmail(body: String = transactionalEmailBody()): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/internal/emails/transactional"))
@@ -211,12 +244,34 @@ class EmailInternalControllerTest @Autowired constructor(
           }
         }
         """.trimIndent()
+
+    private fun chatDigestEmailBody(suffix: String = "default", locale: String = "en"): String =
+        """
+        {
+          "to": "student-chat-$suffix@example.com",
+          "templateKey": "chat-unread-digest",
+          "locale": "$locale",
+          "idempotencyKey": "chat-unread-digest:$suffix",
+          "model": {
+            "displayName": "Student",
+            "messageCount": "3",
+            "senderNames": "Teacher Demo",
+            "additionalSenderCount": "0",
+            "chatUrl": "https://online.play-and-say.ru/?chat=open"
+          }
+        }
+        """.trimIndent()
 }
 
 private object RecordingOutboundEmailSender : OutboundEmailSender {
     val sent = mutableListOf<OutboundEmail>()
+    var failNext = false
 
     override fun send(email: OutboundEmail) {
+        if (failNext) {
+            failNext = false
+            throw IllegalStateException("simulated provider failure")
+        }
         sent += email
     }
 }

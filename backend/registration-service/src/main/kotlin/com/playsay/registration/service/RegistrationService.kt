@@ -314,6 +314,7 @@ class RegistrationService(
             locale = locale,
             confirmationUrl = "${publicBaseUrl.trimEnd('/')}/register/confirm?token=$token",
             idempotencyKey = "registration:$id:$tokenHash",
+            replayUntil = expiresAt,
         )
 
     private fun PasswordResetCodeEntity.toEmailCommand(code: String): PasswordResetEmailCommand =
@@ -325,6 +326,7 @@ class RegistrationService(
             expiresMinutes = passwordResetCodeTtlMinutes,
             resetUrl = "${publicBaseUrl.trimEnd('/')}/reset-password?email=${URLEncoder.encode(emailNormalized, StandardCharsets.UTF_8)}",
             idempotencyKey = "password-reset:$id:$codeHash",
+            replayUntil = expiresAt,
         )
 
     private fun newPasswordResetCode(): String =

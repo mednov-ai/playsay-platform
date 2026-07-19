@@ -7,6 +7,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.time.Instant
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
@@ -22,6 +23,7 @@ data class ChatEmailCommand(
     val locale: String?,
     val idempotencyKey: String,
     val model: Map<String, String?>,
+    val replayUntil: Instant,
 )
 
 private data class ChatEmailResponse(

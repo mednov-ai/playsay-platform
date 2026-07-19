@@ -48,6 +48,8 @@ class UnisenderApiOutboundEmailSenderTest {
                 subject = "Confirm your Play&Say account",
                 textBody = "Hello!\nConfirm here: https://online.play-and-say.ru/register/confirm?token=token-1",
                 htmlBody = "<p>Hello!</p><p><a href=\"https://online.play-and-say.ru/register/confirm?token=token-1\">Confirm email</a></p>",
+                deliveryId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                attemptNumber = 1,
             ),
         )
 

@@ -21,6 +21,7 @@ class EmailServiceRegistrationEmailClient(
             "templateKey" to "registration-confirmation",
             "locale" to command.locale,
             "idempotencyKey" to command.idempotencyKey,
+            "replayUntil" to command.replayUntil.toString(),
             "model" to mapOf(
                 "displayName" to command.displayName,
                 "confirmationUrl" to command.confirmationUrl,
@@ -43,6 +44,7 @@ class EmailServiceRegistrationEmailClient(
             "templateKey" to "password-reset-code",
             "locale" to command.locale,
             "idempotencyKey" to command.idempotencyKey,
+            "replayUntil" to command.replayUntil.toString(),
             "model" to mapOf(
                 "displayName" to command.displayName,
                 "code" to command.code,

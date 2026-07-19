@@ -243,6 +243,7 @@ class LessonReminderScheduler(
             locale = recipient.locale,
             idempotencyKey = reminder.idempotencyKey,
             model = model,
+            replayUntil = reminder.scheduledStartSnapshot ?: scheduleRow?.scheduledStart ?: now,
         )
 
         reminder.attempts += 1

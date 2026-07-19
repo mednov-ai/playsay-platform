@@ -3,6 +3,9 @@ package com.playsay.email.config
 import com.playsay.email.service.OutboundEmailSender
 import com.playsay.email.service.SmtpOutboundEmailSender
 import com.playsay.email.service.UnisenderApiOutboundEmailSender
+import com.playsay.email.service.UnisenderDeliveryStatusClient
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Clock
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -14,6 +17,10 @@ import org.springframework.web.client.RestClient
 
 @Configuration
 class EmailServiceConfiguration {
+    @Bean
+    @ConditionalOnMissingBean(ObjectMapper::class)
+    fun emailObjectMapper(): ObjectMapper = jacksonObjectMapper().findAndRegisterModules()
+
     @Bean
     fun emailClock(): Clock = Clock.systemUTC()
 
@@ -42,4 +49,16 @@ class EmailServiceConfiguration {
             userId = userId,
             fromName = fromName,
         )
+
+    @Bean
+    fun unisenderDeliveryStatusClient(
+        @Value("\${playsay.email-service.unisender.api-base-url}") apiBaseUrl: String,
+        @Value("\${playsay.email-service.unisender.api-key}") apiKey: String,
+    ): UnisenderDeliveryStatusClient = UnisenderDeliveryStatusClient(
+        restClient = RestClient.builder()
+            .baseUrl(apiBaseUrl)
+            .defaultHeader("X-API-KEY", apiKey)
+            .build(),
+        downloadClient = RestClient.create(),
+    )
 }

@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Grid2X2,
   Layers3,
+  Mail,
   MessagesSquare,
   UsersRound,
   X,
@@ -206,6 +207,8 @@ function workspaceTabIcon(tab: WorkspaceTab): ReactNode {
       return <CreditCard className="h-4 w-4" />;
     case "homework":
       return <ClipboardList className="h-4 w-4" />;
+    case "emails":
+      return <Mail className="h-4 w-4" />;
     case "materials":
       return <BookOpen className="h-4 w-4" />;
     case "students":

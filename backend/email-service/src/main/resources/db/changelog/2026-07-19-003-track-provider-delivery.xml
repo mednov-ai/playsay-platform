@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-19-003-track-provider-delivery" author="codex">
+        <addColumn tableName="email_delivery_attempts">
+            <column name="provider" type="VARCHAR(32)"/>
+            <column name="provider_job_id" type="VARCHAR(160)"/>
+            <column name="provider_status" type="VARCHAR(32)"/>
+            <column name="provider_delivery_status" type="VARCHAR(96)"/>
+            <column name="provider_destination_response" type="VARCHAR(1024)"/>
+            <column name="provider_event_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="provider_checked_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="provider_tracking_until" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="provider_attempt_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="replay_ciphertext" type="TEXT"/>
+            <column name="replay_nonce" type="VARCHAR(64)"/>
+            <column name="replay_until" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+
+        <createTable tableName="email_provider_attempt">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_email_provider_attempt"/>
+            </column>
+            <column name="email_delivery_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_email_provider_attempt_delivery"
+                             references="email_delivery_attempts(id)"/>
+            </column>
+            <column name="attempt_number" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_job_id" type="VARCHAR(160)"/>
+            <column name="provider_status" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_delivery_status" type="VARCHAR(96)"/>
+            <column name="provider_destination_response" type="VARCHAR(1024)"/>
+            <column name="provider_event_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="provider_checked_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="tracking_until" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="error_message" type="VARCHAR(1024)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="email_provider_attempt"
+                             columnNames="email_delivery_id,attempt_number"
+                             constraintName="uq_email_provider_attempt_number"/>
+        <createIndex tableName="email_provider_attempt" indexName="idx_email_provider_attempt_job">
+            <column name="provider"/>
+            <column name="provider_job_id"/>
+        </createIndex>
+        <createIndex tableName="email_provider_attempt" indexName="idx_email_provider_attempt_tracking">
+            <column name="provider_status"/>
+            <column name="tracking_until"/>
+        </createIndex>
+
+        <createTable tableName="email_provider_sync_state">
+            <column name="provider" type="VARCHAR(32)">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_email_provider_sync_state"/>
+            </column>
+            <column name="watermark" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="active_dump_id" type="VARCHAR(160)"/>
+            <column name="window_start" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="window_end" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="dump_created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

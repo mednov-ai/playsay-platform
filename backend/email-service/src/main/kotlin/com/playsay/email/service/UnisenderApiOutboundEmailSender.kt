@@ -13,7 +13,7 @@ class UnisenderApiOutboundEmailSender(
     private val userId: Long,
     private val fromName: String,
 ) : OutboundEmailSender {
-    override fun send(email: OutboundEmail) {
+    override fun send(email: OutboundEmail): OutboundEmailResult {
         if (apiKey.isBlank()) {
             throw MailSendException("Unisender API key is not configured")
         }
@@ -34,6 +34,19 @@ class UnisenderApiOutboundEmailSender(
                 "Unisender API send failed: status=${response?.status}, code=${response?.code}, message=${response?.message}",
             )
         }
+        val normalizedRecipient = email.to.trim().lowercase()
+        val recipientFailure = response.failedEmails.orEmpty().entries
+            .firstOrNull { (address, _) -> address.trim().lowercase() == normalizedRecipient }
+            ?.value
+        if (recipientFailure != null || response.emails.orEmpty().none { address -> address.trim().lowercase() == normalizedRecipient }) {
+            throw MailSendException("Unisender API rejected recipient: ${recipientFailure ?: "not_accepted"}")
+        }
+        return OutboundEmailResult(
+            provider = "UNISENDER_API",
+            providerStatus = "ACCEPTED",
+            providerJobId = response.jobId,
+            providerDeliveryStatus = "ok_accepted",
+        )
     }
 
     private fun OutboundEmail.toUnisenderRequest(): UnisenderEmailSendRequest =
@@ -48,7 +61,16 @@ class UnisenderApiOutboundEmailSender(
                 subject = subject,
                 fromEmail = from,
                 fromName = fromName,
-                recipients = listOf(UnisenderRecipient(email = to)),
+                recipients = listOf(
+                    UnisenderRecipient(
+                        email = to,
+                        metadata = mapOf(
+                            "playsay_delivery_id" to deliveryId.toString(),
+                            "playsay_attempt" to attemptNumber.toString(),
+                        ),
+                    ),
+                ),
+                idempotenceKey = "$deliveryId:$attemptNumber",
             ),
         )
 
@@ -71,6 +93,8 @@ class UnisenderApiOutboundEmailSender(
         @param:JsonProperty("from_name")
         val fromName: String,
         val recipients: List<UnisenderRecipient>,
+        @param:JsonProperty("idempotence_key")
+        val idempotenceKey: String,
     )
 
     private data class UnisenderBody(
@@ -80,11 +104,17 @@ class UnisenderApiOutboundEmailSender(
 
     private data class UnisenderRecipient(
         val email: String,
+        val metadata: Map<String, String>,
     )
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private data class UnisenderEmailSendResponse(
         val status: String?,
+        @param:JsonProperty("job_id")
+        val jobId: String? = null,
+        val emails: List<String>? = null,
+        @param:JsonProperty("failed_emails")
+        val failedEmails: Map<String, String>? = null,
         val code: Int? = null,
         val message: String? = null,
     )

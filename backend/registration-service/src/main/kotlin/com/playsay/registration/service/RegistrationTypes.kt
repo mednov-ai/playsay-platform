@@ -149,6 +149,7 @@ data class RegistrationEmailCommand(
     val locale: String,
     val confirmationUrl: String,
     val idempotencyKey: String,
+    val replayUntil: java.time.Instant,
 )
 
 data class PasswordResetEmailCommand(
@@ -159,6 +160,7 @@ data class PasswordResetEmailCommand(
     val expiresMinutes: Long,
     val resetUrl: String,
     val idempotencyKey: String,
+    val replayUntil: java.time.Instant,
 )
 
 interface RegistrationEmailClient {

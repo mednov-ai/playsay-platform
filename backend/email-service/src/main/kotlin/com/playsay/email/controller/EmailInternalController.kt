@@ -42,8 +42,14 @@ class EmailInternalController(
                 locale = request.locale,
                 idempotencyKey = request.idempotencyKey.trim(),
                 model = request.model,
+                replayUntil = request.replayUntil,
             ),
         )
-        return TransactionalEmailResponse(status = status)
+        return TransactionalEmailResponse(
+            status = status.status,
+            deliveryAttemptId = status.deliveryAttemptId,
+            provider = status.provider,
+            providerStatus = status.providerStatus,
+        )
     }
 }

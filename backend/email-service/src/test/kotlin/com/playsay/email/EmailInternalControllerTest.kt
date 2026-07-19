@@ -1,16 +1,22 @@
 package com.playsay.email
 
 import com.playsay.email.repo.EmailDeliveryAttemptRepo
+import com.playsay.email.repo.EmailProviderAttemptRepo
 import com.playsay.email.service.OutboundEmail
 import com.playsay.email.service.OutboundEmailSender
+import com.playsay.email.service.EmailProviderStatusService
+import com.playsay.email.service.ProviderDeliveryEvent
+import com.playsay.email.service.TransactionalEmailService
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.Instant
 import javax.sql.DataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
 import liquibase.integration.spring.SpringLiquibase
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
@@ -32,6 +38,9 @@ import org.springframework.http.HttpStatus
         "spring.liquibase.enabled=true",
         "playsay.email-service.service-token=test-email-token-0123456789",
         "playsay.email-service.from-address=no-reply@play-and-say.ru",
+        "playsay.email-service.replay-encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "playsay.email-service.provider-reconcile-initial-delay-ms=3600000",
+        "playsay.email-service.webhook-check-initial-delay-ms=3600000",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -39,6 +48,8 @@ class EmailInternalControllerTest @Autowired constructor(
     @param:LocalServerPort private val port: Int,
     private val dataSource: DataSource,
     private val deliveryAttempts: EmailDeliveryAttemptRepo,
+    private val providerAttempts: EmailProviderAttemptRepo,
+    private val providerStatusService: EmailProviderStatusService,
 ) {
     @TestConfiguration
     class EmailSenderTestConfig {
@@ -80,7 +91,7 @@ class EmailInternalControllerTest @Autowired constructor(
         assertEquals(HttpStatus.ACCEPTED.value(), first.statusCode(), first.body())
         assertEquals(HttpStatus.ACCEPTED.value(), second.statusCode(), second.body())
         assertEquals(1, RecordingOutboundEmailSender.sent.size)
-        val sent = RecordingOutboundEmailSender.sent.single()
+        val sent = RecordingOutboundEmailSender.sent.last()
         assertEquals("student@example.com", sent.to)
         assertEquals("no-reply@play-and-say.ru", sent.from)
         assertTrue(sent.subject.contains("Play&Say"))
@@ -174,6 +185,99 @@ class EmailInternalControllerTest @Autowired constructor(
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), first.statusCode())
         assertEquals(HttpStatus.ACCEPTED.value(), second.statusCode(), second.body())
         assertEquals(before + 1, RecordingOutboundEmailSender.sent.size)
+    }
+
+    @Test
+    fun `admin journal exposes delivery metadata without replay payload`() {
+        val response = sendTransactionalEmail(chatDigestEmailBody("admin-journal", "en"))
+        assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+
+        val journal = httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/internal/admin/email-deliveries?search=student-chat-admin-journal%40example.com"))
+                .header("X-PlaySay-Email-Service-Token", "test-email-token-0123456789")
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(HttpStatus.OK.value(), journal.statusCode(), journal.body())
+        assertTrue(journal.body().contains("student-chat-admin-journal@example.com"))
+        assertTrue(journal.body().contains("\"providerStatus\":\"NOT_TRACKED\""))
+        assertTrue(!journal.body().contains("replayCiphertext"))
+        assertTrue(!journal.body().contains("Private message body"))
+    }
+
+    @Test
+    fun `failed delivery is persisted and can be resent from encrypted snapshot`() {
+        RecordingOutboundEmailSender.failNext = true
+        val first = sendTransactionalEmail(chatDigestEmailBody("manual-resend", "en"))
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), first.statusCode())
+        val failed = assertNotNull(deliveryAttempts.findByIdempotencyKey("chat-unread-digest:manual-resend"))
+        assertEquals("FAILED", failed.status)
+        assertNotNull(failed.replayCiphertext)
+        assertTrue(!failed.replayCiphertext!!.contains("student-chat-manual-resend@example.com"))
+
+        val resent = httpClient.send(
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/internal/admin/email-deliveries/${failed.id}/resend"))
+                .header("content-type", "application/json")
+                .header("X-PlaySay-Email-Service-Token", "test-email-token-0123456789")
+                .POST(HttpRequest.BodyPublishers.ofString("{}"))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(HttpStatus.OK.value(), resent.statusCode(), resent.body())
+        assertEquals("SENT", deliveryAttempts.findById(failed.id).orElseThrow().status)
+        assertEquals(2, providerAttempts.findAllByEmailDeliveryIdOrderByAttemptNumberDesc(failed.id).size)
+    }
+
+    @Test
+    fun `provider delivery events keep factual terminal status and ignore older events`() {
+        val response = sendTransactionalEmail(chatDigestEmailBody("provider-status", "en"))
+        assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+        val delivery = deliveryAttempts.findByIdempotencyKey("chat-unread-digest:provider-status")!!
+        val attempt = providerAttempts.findAllByEmailDeliveryIdOrderByAttemptNumberDesc(delivery.id).single()
+        attempt.provider = TransactionalEmailService.PROVIDER_UNISENDER
+        attempt.providerJobId = "job-provider-status"
+        attempt.providerStatus = "ACCEPTED"
+        attempt.trackingUntil = Instant.parse("2026-07-22T12:00:00Z")
+        providerAttempts.saveAndFlush(attempt)
+        delivery.provider = TransactionalEmailService.PROVIDER_UNISENDER
+        delivery.providerJobId = attempt.providerJobId
+        delivery.providerStatus = "ACCEPTED"
+        delivery.providerTrackingUntil = attempt.trackingUntil
+        deliveryAttempts.saveAndFlush(delivery)
+
+        providerStatusService.apply(
+            TransactionalEmailService.PROVIDER_UNISENDER,
+            ProviderDeliveryEvent(
+                jobId = "job-provider-status",
+                status = "delivered",
+                deliveryStatus = "ok_delivered",
+                destinationResponse = "250 accepted",
+                eventAt = Instant.parse("2026-07-20T12:05:00Z"),
+            ),
+        )
+        providerStatusService.apply(
+            TransactionalEmailService.PROVIDER_UNISENDER,
+            ProviderDeliveryEvent(
+                jobId = "job-provider-status",
+                status = "sent",
+                eventAt = Instant.parse("2026-07-20T12:04:00Z"),
+            ),
+        )
+        assertEquals("DELIVERED", deliveryAttempts.findById(delivery.id).orElseThrow().providerStatus)
+        assertEquals(null, deliveryAttempts.findById(delivery.id).orElseThrow().providerTrackingUntil)
+
+        providerStatusService.apply(
+            TransactionalEmailService.PROVIDER_UNISENDER,
+            ProviderDeliveryEvent(
+                jobId = "job-provider-status",
+                status = "opened",
+                eventAt = Instant.parse("2026-07-20T12:06:00Z"),
+            ),
+        )
+        assertEquals("OPENED", deliveryAttempts.findById(delivery.id).orElseThrow().providerStatus)
     }
 
     private fun sendTransactionalEmail(body: String = transactionalEmailBody()): HttpResponse<String> =
@@ -276,11 +380,15 @@ private object RecordingOutboundEmailSender : OutboundEmailSender {
     val sent = mutableListOf<OutboundEmail>()
     var failNext = false
 
-    override fun send(email: OutboundEmail) {
+    override fun send(email: OutboundEmail): com.playsay.email.service.OutboundEmailResult {
         if (failNext) {
             failNext = false
             throw IllegalStateException("simulated provider failure")
         }
         sent += email
+        return com.playsay.email.service.OutboundEmailResult(
+            provider = "TEST",
+            providerStatus = "NOT_TRACKED",
+        )
     }
 }

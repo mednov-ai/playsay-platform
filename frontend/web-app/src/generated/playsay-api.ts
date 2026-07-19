@@ -1315,6 +1315,15 @@ export interface CreateUserManagementUserRequest {
   primaryTeacherSubject?: string | null;
 }
 
+export interface EmailDeliveryResendResponse {
+  deliveryAttemptId: string;
+  status: string;
+  /** @nullable */
+  provider?: string | null;
+  /** @nullable */
+  providerStatus?: string | null;
+}
+
 export interface ScheduledLessonScheduleUpdateRequest {
   scheduledStart: string;
   scheduledEnd: string;
@@ -1406,6 +1415,71 @@ export interface UserDeletionOperationResponse {
   completedAt?: string | null;
 }
 
+export interface EmailDeliverySummaryResponse {
+  id: string;
+  toEmail: string;
+  templateKey: string;
+  locale: string;
+  /** @nullable */
+  subject?: string | null;
+  status: string;
+  /** @nullable */
+  provider?: string | null;
+  /** @nullable */
+  providerStatus?: string | null;
+  /** @nullable */
+  providerDeliveryStatus?: string | null;
+  /** @nullable */
+  providerDestinationResponse?: string | null;
+  providerAttemptCount: number;
+  /** @nullable */
+  providerEventAt?: string | null;
+  /** @nullable */
+  providerCheckedAt?: string | null;
+  /** @nullable */
+  providerTrackingUntil?: string | null;
+  resendAllowed: boolean;
+  resendReason: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailDeliveryPageResponse {
+  items: EmailDeliverySummaryResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface EmailProviderAttemptResponse {
+  id: string;
+  attemptNumber: number;
+  provider: string;
+  /** @nullable */
+  providerJobId?: string | null;
+  providerStatus: string;
+  /** @nullable */
+  providerDeliveryStatus?: string | null;
+  /** @nullable */
+  providerDestinationResponse?: string | null;
+  /** @nullable */
+  providerEventAt?: string | null;
+  /** @nullable */
+  providerCheckedAt?: string | null;
+  /** @nullable */
+  trackingUntil?: string | null;
+  /** @nullable */
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailDeliveryDetailResponse {
+  delivery: EmailDeliverySummaryResponse;
+  attempts: EmailProviderAttemptResponse[];
+}
+
 export type DelegationsParams = {
 direction?: string;
 status?: string;
@@ -1468,6 +1542,17 @@ status?: string;
 
 export type ListCollaborationDocumentsParams = {
 materialId: string;
+};
+
+export type ListEmailDeliveriesParams = {
+page?: number;
+size?: number;
+search?: string;
+status?: string;
+providerStatus?: string;
+templateKey?: string;
+createdFrom?: string;
+createdTo?: string;
 };
 
 export type _DeleteParams = {
@@ -3050,6 +3135,86 @@ export const removeTeacher = async (subject: string, options?: RequestInit): Pro
 
   const data: removeTeacherResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as removeTeacherResponse
+}
+
+
+
+export type readinessResponse200 = {
+  data: void
+  status: 200
+}
+
+export type readinessResponseSuccess = (readinessResponse200) & {
+  headers: Headers;
+};
+;
+
+export type readinessResponse = (readinessResponseSuccess)
+
+export const getReadinessUrl = () => {
+
+
+
+
+  return `/api/webhooks/unisender`
+}
+
+export const readiness = async ( options?: RequestInit): Promise<readinessResponse> => {
+
+  const res = await fetch(getReadinessUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: readinessResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as readinessResponse
+}
+
+
+
+export type webhookResponse200 = {
+  data: void
+  status: 200
+}
+
+export type webhookResponseSuccess = (webhookResponse200) & {
+  headers: Headers;
+};
+;
+
+export type webhookResponse = (webhookResponseSuccess)
+
+export const getWebhookUrl = () => {
+
+
+
+
+  return `/api/webhooks/unisender`
+}
+
+export const webhook = async ( options?: RequestInit): Promise<webhookResponse> => {
+
+  const res = await fetch(getWebhookUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: webhookResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as webhookResponse
 }
 
 
@@ -6338,6 +6503,49 @@ export const createDelegation1 = async (createDelegationRequest: CreateDelegatio
 
 
 
+export type resendEmailDeliveryResponse200 = {
+  data: EmailDeliveryResendResponse
+  status: 200
+}
+
+export type resendEmailDeliveryResponseSuccess = (resendEmailDeliveryResponse200) & {
+  headers: Headers;
+};
+;
+
+export type resendEmailDeliveryResponse = (resendEmailDeliveryResponseSuccess)
+
+export const getResendEmailDeliveryUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/email-deliveries/${id}/resend`
+}
+
+/**
+ * @summary Resend an eligible transactional email
+ */
+export const resendEmailDelivery = async (id: string, options?: RequestInit): Promise<resendEmailDeliveryResponse> => {
+
+  const res = await fetch(getResendEmailDeliveryUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resendEmailDeliveryResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resendEmailDeliveryResponse
+}
+
+
+
 export type rescheduleScheduledLessonResponse200 = {
   data: ScheduledLessonResponse
   status: 200
@@ -7381,6 +7589,99 @@ export const operation = async (operationId: string, options?: RequestInit): Pro
 
   const data: operationResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as operationResponse
+}
+
+
+
+export type listEmailDeliveriesResponse200 = {
+  data: EmailDeliveryPageResponse
+  status: 200
+}
+
+export type listEmailDeliveriesResponseSuccess = (listEmailDeliveriesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listEmailDeliveriesResponse = (listEmailDeliveriesResponseSuccess)
+
+export const getListEmailDeliveriesUrl = (params?: ListEmailDeliveriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/email-deliveries?${stringifiedParams}` : `/api/admin/email-deliveries`
+}
+
+/**
+ * @summary List transactional email deliveries
+ */
+export const listEmailDeliveries = async (params?: ListEmailDeliveriesParams, options?: RequestInit): Promise<listEmailDeliveriesResponse> => {
+
+  const res = await fetch(getListEmailDeliveriesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listEmailDeliveriesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listEmailDeliveriesResponse
+}
+
+
+
+export type getEmailDeliveryResponse200 = {
+  data: EmailDeliveryDetailResponse
+  status: 200
+}
+
+export type getEmailDeliveryResponseSuccess = (getEmailDeliveryResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getEmailDeliveryResponse = (getEmailDeliveryResponseSuccess)
+
+export const getGetEmailDeliveryUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/email-deliveries/${id}`
+}
+
+/**
+ * @summary Get transactional email delivery details
+ */
+export const getEmailDelivery = async (id: string, options?: RequestInit): Promise<getEmailDeliveryResponse> => {
+
+  const res = await fetch(getGetEmailDeliveryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getEmailDeliveryResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getEmailDeliveryResponse
 }
 
 

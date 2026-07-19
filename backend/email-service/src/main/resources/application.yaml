@@ -50,7 +50,17 @@ playsay:
     service-token: ${PLAYSAY_EMAIL_SERVICE_TOKEN:}
     from-address: ${PLAYSAY_EMAIL_FROM_ADDRESS:no-reply@play-and-say.ru}
     from-name: ${PLAYSAY_EMAIL_FROM_NAME:Play&Say}
+    replay-encryption-key: ${PLAYSAY_EMAIL_REPLAY_ENCRYPTION_KEY:}
+    default-replay-ttl: ${PLAYSAY_EMAIL_DEFAULT_REPLAY_TTL:PT72H}
+    provider-tracking-ttl: ${PLAYSAY_EMAIL_PROVIDER_TRACKING_TTL:PT72H}
+    provider-reconcile-window: ${PLAYSAY_EMAIL_PROVIDER_RECONCILE_WINDOW:PT5M}
+    provider-reconcile-overlap: ${PLAYSAY_EMAIL_PROVIDER_RECONCILE_OVERLAP:PT1M}
+    provider-reconcile-poll-ms: ${PLAYSAY_EMAIL_PROVIDER_RECONCILE_POLL_MS:30000}
+    provider-reconcile-initial-delay-ms: ${PLAYSAY_EMAIL_PROVIDER_RECONCILE_INITIAL_DELAY_MS:30000}
+    webhook-check-ms: ${PLAYSAY_EMAIL_WEBHOOK_CHECK_MS:3600000}
+    webhook-check-initial-delay-ms: ${PLAYSAY_EMAIL_WEBHOOK_CHECK_INITIAL_DELAY_MS:45000}
     unisender:
       api-base-url: ${PLAYSAY_EMAIL_UNISENDER_API_BASE_URL:https://goapi.unisender.ru/ru/transactional/api/v1}
       user-id: ${PLAYSAY_EMAIL_UNISENDER_USER_ID:0}
       api-key: ${PLAYSAY_EMAIL_UNISENDER_API_KEY:}
+      webhook-url: ${PLAYSAY_EMAIL_UNISENDER_WEBHOOK_URL:}

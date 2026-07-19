@@ -34,6 +34,7 @@ class SecurityConfig {
                         "/livekit/webhook",
                         "/public/payment-invoices/**",
                         "/payment-webhooks/yookassa",
+                        "/webhooks/unisender",
                         "/schedule/lessons/*/collaboration-documents/*/snapshot",
                         "/ws/lessons",
                         "/ws/chat",

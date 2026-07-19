@@ -154,6 +154,7 @@ class ChatEmailDigestScheduler(
                 "additionalSenderCount" to (senders.size - MAX_VISIBLE_SENDERS).coerceAtLeast(0).toString(),
                 "chatUrl" to "${publicAppUrl.trimEnd('/')}/?chat=$chatTarget",
             ),
+            replayUntil = now.plus(Duration.ofHours(24)),
         )
 
         digest.attempts += 1

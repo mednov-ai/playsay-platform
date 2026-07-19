@@ -124,9 +124,12 @@ try {
     await drawTextAndMindMap(teacher.page);
     await captureAnnotationScreenshot(teacher.page);
     addCheck("text-and-mind-map-use-compact-content-bounds");
+    await clearMaterialCursors(teacher.page, studentA.page, studentB.page);
     await verifyMaterialCursor(studentA.page, studentB.page);
     await verifyMaterialCursorAlignment(studentA.page, studentB.page, 0.34, 0.38, "student A cursor on student B");
+    await clearMaterialCursors(teacher.page, studentA.page, studentB.page);
     await verifyMaterialCursorAlignment(studentB.page, studentA.page, 0.62, 0.32, "student B cursor on student A");
+    await clearMaterialCursors(teacher.page, studentA.page, studentB.page);
     await verifyMaterialCursorAlignment(teacher.page, studentA.page, 0.49, 0.46, "teacher cursor on student A");
     await verifyMaterialCursorAlignment(teacher.page, studentB.page, 0.49, 0.46, "teacher cursor on student B");
     addCheck("material-presence-cursors-are-aligned-and-clipped");
@@ -575,6 +578,13 @@ async function waitForSharedPresenceReady(...pages) {
     const surface = document.querySelector("[data-testid='lesson-material-surface']");
     return surface?.getAttribute("data-live-presence-ready") === "true";
   }, null, { timeout: timeoutMs })));
+}
+
+async function clearMaterialCursors(...pages) {
+  await Promise.all(pages.map((page) => page.mouse.move(0, 0)));
+  await Promise.all(pages.map((page) => page.waitForFunction(() => (
+    document.querySelectorAll("[data-testid='lesson-material-surface'] .playsay-presence-cursor").length === 0
+  ), null, { timeout: timeoutMs })));
 }
 
 async function verifyMaterialCursor(sourcePage, targetPage) {

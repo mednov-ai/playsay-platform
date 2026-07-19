@@ -33,22 +33,73 @@ export function isProfilePath(pathname: string): boolean {
   return /^\/profile\/?$/.test(pathname);
 }
 
+type PathnameHistoryMutation = (data: unknown, unused: string, url?: string | URL | null) => void;
+
 type PathnameHistorySource = {
   location: { pathname: string };
+  history?: {
+    pushState: PathnameHistoryMutation;
+    replaceState: PathnameHistoryMutation;
+  };
   addEventListener(type: "popstate", listener: () => void): void;
   removeEventListener(type: "popstate", listener: () => void): void;
 };
+
+type PathnameHistorySubscription = {
+  callbacks: Set<(pathname: string) => void>;
+  notify: () => void;
+  originalPushState?: PathnameHistoryMutation;
+  originalReplaceState?: PathnameHistoryMutation;
+};
+
+const pathnameHistorySubscriptions = new WeakMap<object, PathnameHistorySubscription>();
 
 export function subscribeToPathnameHistory(
   source: PathnameHistorySource,
   onPathnameChange: (pathname: string) => void,
 ): () => void {
-  function updatePathname() {
-    onPathnameChange(source.location.pathname);
+  let subscription = pathnameHistorySubscriptions.get(source);
+  if (!subscription) {
+    const callbacks = new Set<(pathname: string) => void>();
+    const notify = () => callbacks.forEach((callback) => callback(source.location.pathname));
+    subscription = { callbacks, notify };
+    source.addEventListener("popstate", notify);
+
+    if (source.history) {
+      const history = source.history;
+      const originalPushState = history.pushState;
+      const originalReplaceState = history.replaceState;
+      subscription.originalPushState = originalPushState;
+      subscription.originalReplaceState = originalReplaceState;
+      history.pushState = (data, unused, url) => {
+        originalPushState.call(history, data, unused, url);
+        notify();
+      };
+      history.replaceState = (data, unused, url) => {
+        originalReplaceState.call(history, data, unused, url);
+        notify();
+      };
+    }
+    pathnameHistorySubscriptions.set(source, subscription);
   }
 
-  source.addEventListener("popstate", updatePathname);
-  return () => source.removeEventListener("popstate", updatePathname);
+  subscription.callbacks.add(onPathnameChange);
+  return () => {
+    const current = pathnameHistorySubscriptions.get(source);
+    if (!current) {
+      return;
+    }
+    current.callbacks.delete(onPathnameChange);
+    if (current.callbacks.size > 0) {
+      return;
+    }
+    source.removeEventListener("popstate", current.notify);
+    if (source.history && current.originalPushState && current.originalReplaceState) {
+      source.history.pushState = current.originalPushState;
+      source.history.replaceState = current.originalReplaceState;
+    }
+    pathnameHistorySubscriptions.delete(source);
+  };
 }
 
 const profileReturnPathKey = "playsayProfileReturnPath";

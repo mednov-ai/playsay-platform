@@ -25,7 +25,7 @@ class LiveKitWebhookVerifier(
     @param:Value("\${playsay.livekit.api-key:}") private val apiKey: String,
     @param:Value("\${playsay.livekit.api-secret:}") private val apiSecret: String,
 ) {
-    fun verify(rawBody: String, authorizationHeader: String?) {
+    fun verify(rawBody: ByteArray, authorizationHeader: String?) {
         val cleanApiKey = apiKey.trim()
         val secretBytes = apiSecret.trim().toByteArray(StandardCharsets.UTF_8)
         if (cleanApiKey.isEmpty() || secretBytes.size < 32) {
@@ -57,7 +57,7 @@ class LiveKitWebhookVerifier(
 
         val expectedHash = claims.getStringClaim("sha256")
             ?: throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_PAYLOAD_HASH_MISSING)
-        val actualHash = MessageDigest.getInstance("SHA-256").digest(rawBody.toByteArray(StandardCharsets.UTF_8))
+        val actualHash = MessageDigest.getInstance("SHA-256").digest(rawBody)
         val expectedHashBytes = runCatching { Base64.getDecoder().decode(expectedHash) }
             .getOrElse { throw ProjectResponseException.localized(HttpStatus.UNAUTHORIZED, MetaData.ErrorCodes.LIVEKIT_WEBHOOK_PAYLOAD_HASH_INVALID) }
 
@@ -72,7 +72,7 @@ class LiveKitWebhookEventParser {
     private val objectMapper = jacksonObjectMapper()
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
-    fun parse(rawBody: String): LiveKitWebhookEvent =
+    fun parse(rawBody: ByteArray): LiveKitWebhookEvent =
         objectMapper.readValue(rawBody, LiveKitWebhookEvent::class.java)
 }
 

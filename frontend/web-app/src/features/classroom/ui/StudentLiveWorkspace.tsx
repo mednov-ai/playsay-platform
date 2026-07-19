@@ -52,15 +52,15 @@ export function StudentLiveWorkspace({
     participantName: displayName,
   });
   const annotationSync = useMemo(() => {
-    if (!sharedPresenceEnabled || !groupAnnotationDocumentState.document) {
+    if (!groupAnnotationDocumentState.document) {
       return null;
     }
     return {
-      participants: groupAnnotationWorkspace.participants,
+      participants: sharedPresenceEnabled ? groupAnnotationWorkspace.participants : [],
       ready: groupAnnotationWorkspace.connected,
       elements: groupAnnotationWorkspace.annotationElements,
       setElements: groupAnnotationWorkspace.setAnnotationElements,
-      updateCursor: groupAnnotationWorkspace.updateCursor,
+      updateCursor: sharedPresenceEnabled ? groupAnnotationWorkspace.updateCursor : () => undefined,
     };
   }, [
     groupAnnotationDocumentState.document?.id,

@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
+import * as Y from "yjs";
 import { createYjsWorkspaceRuntime, type AnnotationElement, updateHtmlGameAuthorityRuns } from "./yjsRuntime";
 
 describe("yjs workspace runtime annotations", () => {
@@ -71,7 +72,7 @@ describe("yjs workspace runtime annotations", () => {
     runtime.destroy();
   });
 
-  it("persists text and annotations in one Yjs snapshot", () => {
+  it("restores text and annotations from the Yjs snapshot after reconnect", () => {
     withWindowBase64(() => {
       const stroke: AnnotationElement = {
         color: "#ff5c00",
@@ -121,6 +122,72 @@ describe("yjs workspace runtime annotations", () => {
     });
   });
 
+  it("merges simultaneous strokes from teacher and student without losing either", () => {
+    withWindowBase64(() => {
+      const teacherStroke: AnnotationElement = {
+        color: "#ff5c00",
+        createdAt: 1,
+        id: "teacher-stroke",
+        kind: "stroke",
+        pageId: "page-1",
+        points: [{ pageId: "page-1", x: 10, y: 20 }],
+        strokeWidth: 8,
+      };
+      const studentStroke: AnnotationElement = {
+        color: "#2574ff",
+        createdAt: 2,
+        id: "student-stroke",
+        kind: "stroke",
+        pageId: "page-1",
+        points: [{ pageId: "page-1", x: 30, y: 40 }],
+        strokeWidth: 8,
+      };
+      const createRuntime = (participantName: string) => createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName,
+        snapshot: null,
+      });
+      const teacher = createRuntime("Teacher");
+      const student = createRuntime("Student");
+      teacher.setAnnotationElements([teacherStroke]);
+      student.setAnnotationElements([studentStroke]);
+
+      const mergedDocument = new Y.Doc();
+      Y.applyUpdate(mergedDocument, Buffer.from(teacher.snapshot().yjsUpdateBase64, "base64"));
+      Y.applyUpdate(mergedDocument, Buffer.from(student.snapshot().yjsUpdateBase64, "base64"));
+      teacher.destroy();
+      student.destroy();
+
+      const mergedAnnotations: AnnotationElement[][] = [];
+      const merged = createYjsWorkspaceRuntime({
+        color: "#00a878",
+        onAnnotationChange: (elements) => mergedAnnotations.push(elements),
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Reconnected teacher",
+        snapshot: {
+          encoding: "yjs-update-v1",
+          savedAt: new Date(0).toISOString(),
+          schemaVersion: 1,
+          yjsUpdateBase64: Buffer.from(Y.encodeStateAsUpdate(mergedDocument)).toString("base64"),
+        },
+      });
+
+      expect(mergedAnnotations.at(-1)).toEqual([teacherStroke, studentStroke]);
+      merged.destroy();
+      mergedDocument.destroy();
+    });
+  });
+
   it("applies element changes by id without replacing unrelated collaborative objects", () => {
     const annotationChanges: AnnotationElement[][] = [];
     const runtime = createYjsWorkspaceRuntime({
@@ -163,6 +230,93 @@ describe("yjs workspace runtime annotations", () => {
     runtime.applyAnnotationChanges({ deleteIds: [first.id], upserts: [] });
     expect(annotationChanges.at(-1)).toEqual([second]);
 
+    runtime.destroy();
+  });
+
+  it("reads legacy plain-object annotations and converts them when touched", () => {
+    withWindowBase64(() => {
+      const legacyStroke: AnnotationElement = {
+        color: "#ff5c00",
+        createdAt: 1,
+        id: "legacy-stroke",
+        kind: "stroke",
+        pageId: "page-1",
+        points: [{ pageId: "page-1", x: 10, y: 20 }],
+        strokeWidth: 8,
+      };
+      const legacyDocument = new Y.Doc();
+      legacyDocument.getMap("annotations").set(legacyStroke.id, legacyStroke);
+      const annotationChanges: AnnotationElement[][] = [];
+      const runtime = createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange: (elements) => annotationChanges.push(elements),
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Student",
+        snapshot: {
+          encoding: "yjs-update-v1",
+          savedAt: new Date(0).toISOString(),
+          schemaVersion: 1,
+          yjsUpdateBase64: Buffer.from(Y.encodeStateAsUpdate(legacyDocument)).toString("base64"),
+        },
+      });
+
+      expect(annotationChanges.at(-1)).toEqual([legacyStroke]);
+      runtime.applyAnnotationChanges({
+        deleteIds: [],
+        upserts: [{ ...legacyStroke, points: [...legacyStroke.points, { pageId: "page-1", x: 30, y: 40 }] }],
+      });
+      expect(annotationChanges.at(-1)?.[0]).toEqual(expect.objectContaining({
+        id: legacyStroke.id,
+        points: [
+          { pageId: "page-1", x: 10, y: 20 },
+          { pageId: "page-1", x: 30, y: 40 },
+        ],
+      }));
+
+      runtime.destroy();
+      legacyDocument.destroy();
+    });
+  });
+
+  it("publishes a growing stroke as linear incremental updates", () => {
+    let updateBytes = 0;
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: () => undefined,
+      onDocumentUpdate: (update) => {
+        updateBytes += update.byteLength;
+      },
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      participantName: "Student",
+      snapshot: null,
+    });
+    const points: Array<{ pageId: string; x: number; y: number }> = [];
+
+    for (let index = 0; index < 1_000; index += 1) {
+      points.push({ pageId: "page-1", x: index % 1_000, y: (index * 2) % 1_000 });
+      runtime.applyAnnotationChanges({
+        deleteIds: [],
+        upserts: [{
+          color: "#ff5c00",
+          createdAt: 1,
+          id: "stroke-1",
+          kind: "stroke",
+          pageId: "page-1",
+          points: [...points],
+          strokeWidth: 8,
+        }],
+      });
+    }
+
+    expect(updateBytes).toBeLessThan(250_000);
     runtime.destroy();
   });
 
@@ -236,6 +390,48 @@ describe("yjs workspace runtime annotations", () => {
       expect(effects.at(-1)?.at(-1)?.id).toBe("effect-1");
 
       runtime.destroy();
+    });
+  });
+
+  it("persists the presented HTML game block in the shared document", () => {
+    withWindowBase64(() => {
+      const presentations: Array<string | null> = [];
+      const runtime = createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGamePresentationChange: (blockId) => presentations.push(blockId),
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Teacher",
+        snapshot: null,
+      });
+
+      runtime.setHtmlGamePresentedBlock("game-a");
+      const snapshot = runtime.snapshot();
+      runtime.destroy();
+
+      const restoredPresentations: Array<string | null> = [];
+      const restored = createYjsWorkspaceRuntime({
+        color: "#2574ff",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGamePresentationChange: (blockId) => restoredPresentations.push(blockId),
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Student",
+        snapshot,
+      });
+
+      expect(presentations).toContain("game-a");
+      expect(restoredPresentations.at(-1)).toBe("game-a");
+      restored.setHtmlGamePresentedBlock(null);
+      expect(restoredPresentations.at(-1)).toBeNull();
+      restored.destroy();
     });
   });
 

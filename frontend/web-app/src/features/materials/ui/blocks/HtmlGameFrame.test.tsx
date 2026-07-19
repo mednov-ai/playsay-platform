@@ -35,6 +35,10 @@ describe("HTML game sandbox", () => {
     expect(mirror).toContain("type: 'drop'");
     expect(mirror).toContain('type="application/playsay-disabled"');
     expect(mirror).toContain("data-playsay-game-bridge");
+    expect(authority).toContain("lastSnapshotHtml");
+    expect(authority).toContain("Math.max(250, minimumIntervalRemaining)");
+    expect(authority).toContain("Math.max(500, minimumIntervalRemaining)");
+    expect(authority).not.toContain("}, 120)");
   });
 
   it("renders srcdoc in a sandbox without same-origin or navigation permissions", () => {
@@ -54,11 +58,13 @@ describe("HTML game sandbox", () => {
       effects: [],
       inputs: [],
       isAuthority: true,
+      presentedBlockId: null,
       publishEffect: vi.fn(),
       publishInput: vi.fn(),
       publishSnapshot: vi.fn(),
       ready,
       setAuthorityRun,
+      setPresentedBlock: vi.fn(),
       snapshots: {},
     });
     const { rerender, unmount } = render(
@@ -84,11 +90,13 @@ describe("HTML game sandbox", () => {
       effects: [],
       inputs,
       isAuthority: true,
+      presentedBlockId: null,
       publishEffect: vi.fn(),
       publishInput: vi.fn(),
       publishSnapshot: vi.fn(),
       ready: true,
       setAuthorityRun,
+      setPresentedBlock: vi.fn(),
       snapshots: {},
     });
     const { container, rerender } = render(

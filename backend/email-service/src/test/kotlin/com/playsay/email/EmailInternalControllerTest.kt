@@ -99,7 +99,9 @@ class EmailInternalControllerTest @Autowired constructor(
         assertTrue(sent.subject.contains("Play&Say"))
         assertTrue(sent.textBody.contains("123456"))
         assertTrue(sent.textBody.contains("15"))
+        assertTrue(sent.textBody.contains("https://online.play-and-say.ru/reset-password?email=student%40example.com"))
         assertTrue(sent.htmlBody.contains("123456"))
+        assertTrue(sent.htmlBody.contains("href=\"https://online.play-and-say.ru/reset-password?email=student%40example.com\""))
     }
 
     @Test
@@ -208,7 +210,8 @@ class EmailInternalControllerTest @Autowired constructor(
           "model": {
             "displayName": "Student",
             "code": "123456",
-            "expiresMinutes": "15"
+            "expiresMinutes": "15",
+            "resetUrl": "https://online.play-and-say.ru/reset-password?email=student%40example.com"
           }
         }
         """.trimIndent()

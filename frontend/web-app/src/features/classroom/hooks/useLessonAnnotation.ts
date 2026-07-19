@@ -79,6 +79,10 @@ export function useLessonAnnotation({
   const lastSyncedAnnotationRef = useRef("");
   const liveAnnotationRef = useRef<LiveAnnotationSync | null>(liveAnnotation ?? null);
   const liveElementCountRef = useRef(0);
+  const liveSeedAttemptedRef = useRef(false);
+  const localLiveMutationRef = useRef(false);
+  const pendingInteractionPointRef = useRef<AnnotationPoint | null>(null);
+  const pointerFrameRef = useRef<number | null>(null);
   const redoHistoryRef = useRef<AnnotationHistoryEntry[]>([]);
   const textEditBeforeRef = useRef<AnnotationElement | null>(null);
   const undoHistoryRef = useRef<AnnotationHistoryEntry[]>([]);
@@ -104,6 +108,13 @@ export function useLessonAnnotation({
     liveElementCountRef.current = liveAnnotation?.elements.length ?? 0;
   }, [liveAnnotation?.elements.length]);
 
+  useEffect(() => () => {
+    if (pointerFrameRef.current !== null) {
+      cancelScheduledPointerFrame(pointerFrameRef.current);
+      pointerFrameRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!materialId) {
       setAnnotationReady(false);
@@ -125,9 +136,15 @@ export function useLessonAnnotation({
           setActivePageId(content.activePageId);
           const currentLiveAnnotation = liveAnnotationRef.current;
           if (currentLiveAnnotation) {
-            if (liveElementCountRef.current === 0 && content.elements.length > 0) {
+            if (
+              !liveSeedAttemptedRef.current &&
+              !localLiveMutationRef.current &&
+              liveElementCountRef.current === 0 &&
+              content.elements.length > 0
+            ) {
               currentLiveAnnotation.setElements(() => content.elements);
             }
+            liveSeedAttemptedRef.current = true;
           } else {
             replaceLocalElements(content.elements);
           }
@@ -149,6 +166,10 @@ export function useLessonAnnotation({
     setAnnotationReady(false);
     setActivePageId(normalizedInitialPageId);
     lastSyncedAnnotationRef.current = "";
+    liveSeedAttemptedRef.current = false;
+    localLiveMutationRef.current = false;
+    pendingInteractionPointRef.current = null;
+    cancelPointerFrame();
     replaceLocalElements([]);
     resetHistory();
     setSelectedElementId(null);
@@ -195,6 +216,9 @@ export function useLessonAnnotation({
   }
 
   function updateElements(updater: (current: AnnotationElement[]) => AnnotationElement[]) {
+    if (liveAnnotationRef.current) {
+      localLiveMutationRef.current = true;
+    }
     setAnnotationElements((current) => {
       const next = [...updater(current)].sort(compareAnnotationElements);
       elementsRef.current = next;
@@ -239,12 +263,26 @@ export function useLessonAnnotation({
   }
 
   function extendAnnotation(event: PointerEvent<SVGSVGElement>) {
-    const interaction = activeInteractionRef.current;
-    if (!interaction) {
+    if (!activeInteractionRef.current) {
       return;
     }
     event.preventDefault();
-    const point = svgPointFromEvent(event, activePageId);
+    pendingInteractionPointRef.current = svgPointFromEvent(event, activePageId);
+    if (pointerFrameRef.current === null) {
+      pointerFrameRef.current = requestPointerFrame(() => {
+        pointerFrameRef.current = null;
+        flushPendingInteraction();
+      });
+    }
+  }
+
+  function flushPendingInteraction() {
+    const interaction = activeInteractionRef.current;
+    const point = pendingInteractionPointRef.current;
+    pendingInteractionPointRef.current = null;
+    if (!interaction || !point) {
+      return;
+    }
 
     if (interaction.mode === "erase") {
       eraseAt(point);
@@ -313,6 +351,9 @@ export function useLessonAnnotation({
       releasePointer(event.pointerId);
       return;
     }
+    pendingInteractionPointRef.current = svgPointFromEvent(event, activePageId);
+    cancelPointerFrame();
+    flushPendingInteraction();
     activeInteractionRef.current = null;
     releasePointer(event.pointerId);
 
@@ -551,6 +592,14 @@ export function useLessonAnnotation({
       };
     }
     return null;
+  }
+
+  function cancelPointerFrame() {
+    if (pointerFrameRef.current === null) {
+      return;
+    }
+    cancelScheduledPointerFrame(pointerFrameRef.current);
+    pointerFrameRef.current = null;
   }
 
   function createTextElement(tool: "stickyNote" | "text", point: AnnotationPoint) {
@@ -846,6 +895,20 @@ function normalizeCreatedElement(element: AnnotationElement): AnnotationElement 
 
 function annotationElementId(tool: AnnotationTool): string {
   return `${tool}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function requestPointerFrame(callback: FrameRequestCallback): number {
+  return typeof window.requestAnimationFrame === "function"
+    ? window.requestAnimationFrame(callback)
+    : window.setTimeout(() => callback(performance.now()), 16);
+}
+
+function cancelScheduledPointerFrame(frameId: number) {
+  if (typeof window.cancelAnimationFrame === "function") {
+    window.cancelAnimationFrame(frameId);
+  } else {
+    window.clearTimeout(frameId);
+  }
 }
 
 const defaultAnnotationPageId = "material";

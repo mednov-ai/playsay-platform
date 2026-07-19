@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { FileText, Minimize2 } from "lucide-react";
 import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, fetchMaterialAssetText, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
 import {
@@ -53,7 +53,10 @@ export function LessonMaterialDocumentView({
   onPresentationModeChange?: (mode: "default" | "html-game-focus" | "image-focus") => void;
 }) {
   const { t } = useAppTranslation();
-  const document = editorDocumentFromJson(material.document);
+  const document = useMemo(
+    () => editorDocumentFromJson(material.document),
+    [material.document],
+  );
   const [internalActivePageId, setInternalActivePageId] = useState<string | null>(null);
   const selectedPageId = activePageId ?? internalActivePageId;
   const page = document.pages.find((item) => item.id === selectedPageId) ?? document.pages[0] ?? defaultMaterialPage(material.title);
@@ -70,8 +73,9 @@ export function LessonMaterialDocumentView({
   const pagePickerEnabled = canControlPages || activePageId === undefined;
   const isStaticImagePage = page.layout === "STATIC_IMAGE";
   const isHtmlGamePage = page.layout === "HTML_GAME";
-  const allBlocks = document.pages.flatMap((item) => item.blocks);
+  const allBlocks = useMemo(() => document.pages.flatMap((item) => item.blocks), [document.pages]);
   const focusedBlockValue = focusedBlock ? allBlocks.find((block) => block.id === focusedBlock.blockId) ?? null : null;
+  const presentedHtmlGameBlockId = htmlGameSync?.presentedBlockId ?? null;
 
   useEffect(() => {
     setInternalActivePageId(null);
@@ -84,6 +88,26 @@ export function LessonMaterialDocumentView({
       setFocusedBlock(null);
     }
   }, [focusedBlock, page.blocks]);
+
+  useEffect(() => {
+    if (!htmlGameSync) {
+      return;
+    }
+    if (!presentedHtmlGameBlockId) {
+      setFocusedBlock((current) => current?.kind === "htmlGame" ? null : current);
+      return;
+    }
+    const presentedBlock = allBlocks.find((block) => block.id === presentedHtmlGameBlockId && block.type === "htmlGame");
+    if (!presentedBlock) {
+      return;
+    }
+    setLaunchedGameIds((current) => current.has(presentedHtmlGameBlockId)
+      ? current
+      : new Set(current).add(presentedHtmlGameBlockId));
+    setFocusedBlock((current) => current?.kind === "htmlGame" && current.blockId === presentedHtmlGameBlockId
+      ? current
+      : { kind: "htmlGame", blockId: presentedHtmlGameBlockId });
+  }, [allBlocks, htmlGameSync, presentedHtmlGameBlockId]);
 
   useEffect(() => {
     onPresentationModeChange?.(focusedBlock === null
@@ -162,12 +186,16 @@ export function LessonMaterialDocumentView({
   function requestBlockFocus(kind: "htmlGame" | "image", blockId: string) {
     if (kind === "htmlGame") {
       setLaunchedGameIds((current) => new Set(current).add(blockId));
+      htmlGameSync?.setPresentedBlock(blockId);
     }
     setFocusedBlock({ kind, blockId });
   }
 
   function closeBlockFocus() {
     const blockId = focusedBlock?.blockId;
+    if (focusedBlock?.kind === "htmlGame") {
+      htmlGameSync?.setPresentedBlock(null);
+    }
     setFocusedBlock(null);
     if (blockId) {
       window.requestAnimationFrame(() => {

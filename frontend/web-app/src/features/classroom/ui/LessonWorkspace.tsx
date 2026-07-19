@@ -151,6 +151,14 @@ export function LessonWorkspace({
   );
 
   useEffect(() => {
+    setTeacherTaskVisible((current) => teacherTaskVisibilityAfterSharedGame(
+      current,
+      canMonitorSubmissions,
+      teacherHtmlGameSync.presentedBlockId,
+    ));
+  }, [canMonitorSubmissions, teacherHtmlGameSync.presentedBlockId]);
+
+  useEffect(() => {
     if (!canMonitorSubmissions || teacherWorkParticipants.length === 0) {
       setActiveStudentSubject(null);
       setTeacherTaskVisible(false);
@@ -424,4 +432,12 @@ export function teacherTaskVisibilityAfterLiveUpload(
   liveActivePageId: string | null,
 ): boolean {
   return current || (canMonitorSubmissions && Boolean(liveActivePageId));
+}
+
+export function teacherTaskVisibilityAfterSharedGame(
+  current: boolean,
+  canMonitorSubmissions: boolean,
+  presentedBlockId: string | null,
+): boolean {
+  return current || (canMonitorSubmissions && Boolean(presentedBlockId));
 }

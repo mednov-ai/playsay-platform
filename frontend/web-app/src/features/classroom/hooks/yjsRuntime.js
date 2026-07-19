@@ -24,7 +24,9 @@ export function createYjsWorkspaceRuntime({
   onAnnotationChange,
   onHtmlGameEffectsChange,
   onHtmlGameInputsChange,
+  onHtmlGamePresentationChange = () => undefined,
   onHtmlGameSnapshotsChange,
+  onDocumentUpdate,
   onParticipantsChange,
   onTextChange,
   participantName,
@@ -37,6 +39,7 @@ export function createYjsWorkspaceRuntime({
   const yhtmlGameSnapshots = ydoc.getMap("htmlGameSnapshots");
   const yhtmlGameInputs = ydoc.getArray("htmlGameInputs");
   const yhtmlGameEffects = ydoc.getArray("htmlGameEffects");
+  const yhtmlGamePresentation = ydoc.getMap("htmlGamePresentation");
   const awareness = new awarenessProtocol.Awareness(ydoc);
   let socket = null;
   let disposed = false;
@@ -60,7 +63,11 @@ export function createYjsWorkspaceRuntime({
   const updateHtmlGameEffects = () => {
     if (!disposed) onHtmlGameEffectsChange(yhtmlGameEffects.toArray());
   };
+  const updateHtmlGamePresentation = () => {
+    if (!disposed) onHtmlGamePresentationChange(asString(yhtmlGamePresentation.get("activeBlockId")) || null);
+  };
   const syncUpdateHandler = (update, origin) => {
+    onDocumentUpdate?.(update);
     if (origin !== socket) {
       sendSyncUpdate(socket, update);
     }
@@ -77,10 +84,11 @@ export function createYjsWorkspaceRuntime({
   };
 
   ytext.observe(updateLocalText);
-  yannotations.observe(updateLocalAnnotations);
+  yannotations.observeDeep(updateLocalAnnotations);
   yhtmlGameSnapshots.observe(updateHtmlGameSnapshots);
   yhtmlGameInputs.observe(updateHtmlGameInputs);
   yhtmlGameEffects.observe(updateHtmlGameEffects);
+  yhtmlGamePresentation.observe(updateHtmlGamePresentation);
   ydoc.on("update", syncUpdateHandler);
   awareness.on("update", awarenessUpdateHandler);
   awareness.setLocalState({
@@ -93,13 +101,14 @@ export function createYjsWorkspaceRuntime({
   updateHtmlGameSnapshots();
   updateHtmlGameInputs();
   updateHtmlGameEffects();
+  updateHtmlGamePresentation();
 
   return {
     applyAnnotationChanges({ deleteIds, upserts }) {
       const nextElements = normalizeAnnotationElements(upserts);
       ydoc.transact(() => {
         deleteIds.forEach((id) => yannotations.delete(id));
-        nextElements.forEach((element) => yannotations.set(element.id, element));
+        nextElements.forEach((element) => writeAnnotationElement(yannotations, element));
       });
     },
     destroy() {
@@ -107,10 +116,11 @@ export function createYjsWorkspaceRuntime({
       socket = null;
       awareness.destroy();
       ytext.unobserve(updateLocalText);
-      yannotations.unobserve(updateLocalAnnotations);
+      yannotations.unobserveDeep(updateLocalAnnotations);
       yhtmlGameSnapshots.unobserve(updateHtmlGameSnapshots);
       yhtmlGameInputs.unobserve(updateHtmlGameInputs);
       yhtmlGameEffects.unobserve(updateHtmlGameEffects);
+      yhtmlGamePresentation.unobserve(updateHtmlGamePresentation);
       ydoc.off("update", syncUpdateHandler);
       ydoc.destroy();
       onParticipantsChange([]);
@@ -140,12 +150,20 @@ export function createYjsWorkspaceRuntime({
           }
         });
         nextElements.forEach((element) => {
-          yannotations.set(element.id, element);
+          writeAnnotationElement(yannotations, element);
         });
       });
     },
     setHtmlGameSnapshot(blockId, snapshot) {
       yhtmlGameSnapshots.set(blockId, snapshot);
+    },
+    setHtmlGamePresentedBlock(blockId) {
+      const cleanBlockId = asString(blockId);
+      if (cleanBlockId) {
+        yhtmlGamePresentation.set("activeBlockId", cleanBlockId);
+      } else {
+        yhtmlGamePresentation.delete("activeBlockId");
+      }
     },
     snapshot() {
       return {
@@ -204,8 +222,83 @@ export function updateHtmlGameAuthorityRuns(current, blockId, runId) {
 }
 
 function annotationElementsFromMap(yannotations) {
-  return normalizeAnnotationElements([...yannotations.values()])
+  return normalizeAnnotationElements([...yannotations.values()].map(annotationElementFromYjs))
     .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
+}
+
+function annotationElementFromYjs(value) {
+  return value instanceof Y.Map ? value.toJSON() : value;
+}
+
+function writeAnnotationElement(yannotations, element) {
+  let yElement = yannotations.get(element.id);
+  if (!(yElement instanceof Y.Map)) {
+    yElement = new Y.Map();
+    yannotations.set(element.id, yElement);
+  }
+
+  const nextKeys = new Set(Object.keys(element));
+  yElement.forEach((_value, key) => {
+    if (!nextKeys.has(key)) {
+      yElement.delete(key);
+    }
+  });
+
+  Object.entries(element).forEach(([key, value]) => {
+    if (key === "points" && Array.isArray(value)) {
+      writeAnnotationPoints(yElement, value);
+      return;
+    }
+    const current = yElement.get(key);
+    if (!valuesEqual(current, value)) {
+      yElement.set(key, value);
+    }
+  });
+}
+
+function writeAnnotationPoints(yElement, points) {
+  let yPoints = yElement.get("points");
+  if (!(yPoints instanceof Y.Array)) {
+    yPoints = new Y.Array();
+    yElement.set("points", yPoints);
+  }
+
+  const currentPoints = yPoints.toArray();
+  if (
+    currentPoints.length <= points.length &&
+    (currentPoints.length === 0 || valuesEqual(currentPoints.at(-1), points[currentPoints.length - 1]))
+  ) {
+    if (currentPoints.length < points.length) {
+      yPoints.push(points.slice(currentPoints.length));
+    }
+    return;
+  }
+
+  let sharedPrefixLength = 0;
+  while (
+    sharedPrefixLength < currentPoints.length &&
+    sharedPrefixLength < points.length &&
+    valuesEqual(currentPoints[sharedPrefixLength], points[sharedPrefixLength])
+  ) {
+    sharedPrefixLength += 1;
+  }
+
+  if (sharedPrefixLength < currentPoints.length) {
+    yPoints.delete(sharedPrefixLength, currentPoints.length - sharedPrefixLength);
+  }
+  if (sharedPrefixLength < points.length) {
+    yPoints.push(points.slice(sharedPrefixLength));
+  }
+}
+
+function valuesEqual(left, right) {
+  if (left === right) {
+    return true;
+  }
+  if (left instanceof Y.Map || left instanceof Y.Array || right instanceof Y.Map || right instanceof Y.Array) {
+    return false;
+  }
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function normalizeAnnotationElements(elements) {

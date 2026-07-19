@@ -200,7 +200,10 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
     try { Object.defineProperty(window, 'localStorage', { configurable: false, value: storage }); } catch (_) {}
     let nextNodeId = 1;
     let snapshotSequence = 0;
-    let snapshotTimer = 0;
+    let snapshotDebounceTimer = 0;
+    let snapshotMaxTimer = 0;
+    let lastSnapshotHtml = '';
+    let lastSnapshotAt = 0;
     let dragTransfer = null;
     let pointerDragSourceId = null;
     let pointerDragStartX = 0;
@@ -215,13 +218,27 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       });
     };
     const send = (value) => nativePostMessage({ channel, ...value }, '*');
+    const flushSnapshot = () => {
+      window.clearTimeout(snapshotDebounceTimer);
+      window.clearTimeout(snapshotMaxTimer);
+      snapshotDebounceTimer = 0;
+      snapshotMaxTimer = 0;
+      identify();
+      const html = document.body?.outerHTML ?? '<body></body>';
+      if (html === lastSnapshotHtml) return;
+      lastSnapshotHtml = html;
+      lastSnapshotAt = Date.now();
+      send({ type: 'snapshot', html, sequence: ++snapshotSequence });
+    };
     const scheduleSnapshot = () => {
-      if (mirror || snapshotTimer) return;
-      snapshotTimer = window.setTimeout(() => {
-        snapshotTimer = 0;
-        identify();
-        send({ type: 'snapshot', html: document.body?.outerHTML ?? '<body></body>', sequence: ++snapshotSequence });
-      }, 120);
+      if (mirror) return;
+      window.clearTimeout(snapshotDebounceTimer);
+      const now = Date.now();
+      const minimumIntervalRemaining = lastSnapshotAt ? Math.max(0, 500 - (now - lastSnapshotAt)) : 0;
+      snapshotDebounceTimer = window.setTimeout(flushSnapshot, Math.max(250, minimumIntervalRemaining));
+      if (!snapshotMaxTimer) {
+        snapshotMaxTimer = window.setTimeout(flushSnapshot, Math.max(500, minimumIntervalRemaining));
+      }
     };
     const targetId = (target) => {
       if (target === document || target === window || !target?.closest) return '__document__';
@@ -265,6 +282,7 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         metaKey: Boolean(event.metaKey),
         shiftKey: Boolean(event.shiftKey)
       }});
+      if (!mirror) scheduleSnapshot();
     }, true));
     document.addEventListener('pointermove', (event) => {
       if (!mirror || !pointerDragSourceId) return;
@@ -390,6 +408,7 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         const input = message.event;
         const target = input.targetId === '__document__' ? document : document.querySelector('[data-playsay-node-id="' + CSS.escape(input.targetId) + '"]');
         target?.dispatchEvent(makeEvent(input));
+        scheduleSnapshot();
       } else if (message.type === 'applyEffect' && mirror) {
         playEffect(message.effect);
       }

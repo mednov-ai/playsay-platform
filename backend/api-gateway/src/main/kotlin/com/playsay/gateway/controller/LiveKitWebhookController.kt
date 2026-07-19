@@ -24,7 +24,7 @@ class LiveKitWebhookController(
         consumes = ["application/webhook+json", MediaType.APPLICATION_JSON_VALUE],
     )
     fun receive(
-        @RequestBody rawBody: String,
+        @RequestBody rawBody: ByteArray,
         @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorizationHeader: String?,
     ): ResponseEntity<Void> {
         verifier.verify(rawBody, authorizationHeader)

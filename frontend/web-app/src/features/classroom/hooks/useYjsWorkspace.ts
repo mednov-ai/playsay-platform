@@ -36,6 +36,7 @@ export function useYjsWorkspace({
   const [htmlGameSnapshots, setHtmlGameSnapshots] = useState<Record<string, MaterialHtmlGameSnapshot>>({});
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
   const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
+  const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -48,6 +49,7 @@ export function useYjsWorkspace({
       setHtmlGameSnapshots({});
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
+      setPresentedHtmlGameBlockId(null);
       return undefined;
     }
 
@@ -57,6 +59,7 @@ export function useYjsWorkspace({
       onAnnotationChange: setAnnotationElementsState,
       onHtmlGameEffectsChange: setHtmlGameEffects,
       onHtmlGameInputsChange: setHtmlGameInputs,
+      onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onParticipantsChange: setParticipants,
       onTextChange: setText,
@@ -109,6 +112,7 @@ export function useYjsWorkspace({
       setHtmlGameSnapshots({});
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
+      setPresentedHtmlGameBlockId(null);
     };
   }, [color, document?.id, enabled, participantName]);
 
@@ -163,19 +167,25 @@ export function useYjsWorkspace({
     runtimeRef.current?.updateHtmlGameAuthority(blockId, runId);
   }, []);
 
+  const setPresentedHtmlGameBlock = useCallback((blockId: string | null) => {
+    runtimeRef.current?.setHtmlGamePresentedBlock(blockId);
+  }, []);
+
   const htmlGameSync = useCallback((isAuthority: boolean): MaterialHtmlGameSync => ({
     authorityRuns: Object.fromEntries(participants
       .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))),
     effects: htmlGameEffects,
     inputs: htmlGameInputs,
     isAuthority,
+    presentedBlockId: presentedHtmlGameBlockId,
     ready: status === "connected",
     publishEffect: publishHtmlGameEffect,
     publishInput: publishHtmlGameInput,
     publishSnapshot: publishHtmlGameSnapshot,
     setAuthorityRun: setHtmlGameAuthorityRun,
+    setPresentedBlock: setPresentedHtmlGameBlock,
     snapshots: htmlGameSnapshots,
-  }), [htmlGameEffects, htmlGameInputs, htmlGameSnapshots, participants, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, status]);
+  }), [htmlGameEffects, htmlGameInputs, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status]);
 
   return {
     annotationElements,

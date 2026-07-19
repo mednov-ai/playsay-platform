@@ -47,6 +47,7 @@ class EmailServiceRegistrationEmailClient(
                 "displayName" to command.displayName,
                 "code" to command.code,
                 "expiresMinutes" to command.expiresMinutes.toString(),
+                "resetUrl" to command.resetUrl,
             ),
         )
         val request = HttpRequest.newBuilder(URI.create("${emailServiceBaseUrl.trimEnd('/')}/internal/emails/transactional"))

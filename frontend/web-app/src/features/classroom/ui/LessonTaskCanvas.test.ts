@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
+import type { MaterialHtmlGameSync } from "../../materials/model/materialDocument";
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
 
 const apiMocks = vi.hoisted(() => ({
@@ -291,6 +292,48 @@ describe("LessonTaskCanvas", () => {
     rectSpy.mockRestore();
   });
 
+  it("does not let a stale REST annotation replace connected live elements", async () => {
+    const setElements = vi.fn();
+    apiMocks.fetchAnnotation.mockResolvedValueOnce({
+      content: {
+        activePageId: "page-1",
+        coordinateSpace: "material-page",
+        elements: [],
+        schemaVersion: 5,
+      },
+    });
+
+    const { container } = render(createElement(LessonTaskCanvas, {
+      annotationSync: {
+        elements: [{
+          color: "#ff5c00",
+          createdAt: 1,
+          id: "active-stroke",
+          kind: "stroke" as const,
+          pageId: "page-1",
+          points: [{ pageId: "page-1", x: 10, y: 20 }, { pageId: "page-1", x: 30, y: 40 }],
+          strokeWidth: 8 as const,
+        }],
+        participants: [],
+        ready: true,
+        setElements,
+        updateCursor: vi.fn(),
+      },
+      lessonId: "lesson-1",
+      material,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+
+    await waitFor(() => expect(apiMocks.fetchAnnotation).toHaveBeenCalled());
+    expect(setElements).not.toHaveBeenCalled();
+    expect(container.querySelector("path.playsay-annotation-element")?.getAttribute("d")).toContain("30.0 40.0");
+  });
+
   it("launches an HTML game explicitly and preserves its iframe while minimized", async () => {
     const onPresentationModeChange = vi.fn();
     const { container } = render(createElement(LessonTaskCanvas, {
@@ -334,6 +377,35 @@ describe("LessonTaskCanvas", () => {
     expect(frames[0]).toBe(iframe);
     expect(container.querySelectorAll(".playsay-material-focused-game")[0]?.getAttribute("data-active")).toBe("false");
     expect(container.querySelectorAll(".playsay-material-focused-game")[1]?.getAttribute("data-active")).toBe("true");
+  });
+
+  it("opens and closes an HTML game from shared presentation state without echoing open", async () => {
+    const setPresentedBlock = vi.fn();
+    const sync = htmlGameSync({ presentedBlockId: null, setPresentedBlock });
+    const props = {
+      htmlGameSync: sync,
+      lessonId: "lesson-1",
+      material: htmlGameMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    };
+    const { container, rerender } = render(createElement(LessonTaskCanvas, props));
+
+    rerender(createElement(LessonTaskCanvas, {
+      ...props,
+      htmlGameSync: htmlGameSync({ presentedBlockId: "game-1", setPresentedBlock }),
+    }));
+
+    await waitFor(() => expect(container.querySelector(".playsay-html-game iframe")).not.toBeNull());
+    expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
+    expect(setPresentedBlock).not.toHaveBeenCalledWith("game-1");
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
+    expect(setPresentedBlock).toHaveBeenCalledWith(null);
   });
 
   it("does not auto-launch a legacy HTML game after returning to its page", async () => {
@@ -528,6 +600,24 @@ describe("LessonTaskCanvas", () => {
     expect(childNode?.style.fontSize).toBe("24px");
   });
 });
+
+function htmlGameSync(overrides: Partial<MaterialHtmlGameSync> = {}): MaterialHtmlGameSync {
+  return {
+    authorityRuns: {},
+    effects: [],
+    inputs: [],
+    isAuthority: false,
+    presentedBlockId: null,
+    publishEffect: vi.fn(),
+    publishInput: vi.fn(),
+    publishSnapshot: vi.fn(),
+    ready: true,
+    setAuthorityRun: vi.fn(),
+    setPresentedBlock: vi.fn(),
+    snapshots: {},
+    ...overrides,
+  };
+}
 
 async function annotationLayer(container: HTMLElement): Promise<SVGSVGElement> {
   const layer = await waitFor(() => {

@@ -124,7 +124,6 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
       }
       setMessage(t("registration.messages.resetCodeSent"));
       window.history.pushState({}, document.title, next.pathname + next.search);
-      window.dispatchEvent(new Event("popstate"));
     } catch (caught) {
       handleRegistrationError(caught, t("registration.messages.resetStartFailed"));
     } finally {

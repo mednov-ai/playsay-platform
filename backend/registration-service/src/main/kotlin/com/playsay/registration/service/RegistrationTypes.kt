@@ -157,6 +157,7 @@ data class PasswordResetEmailCommand(
     val locale: String,
     val code: String,
     val expiresMinutes: Long,
+    val resetUrl: String,
     val idempotencyKey: String,
 )
 

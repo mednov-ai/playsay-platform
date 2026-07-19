@@ -27,6 +27,7 @@ export type YjsWorkspaceRuntime = {
   publishHtmlGameEffect: (effect: MaterialHtmlGameEffect) => void;
   publishHtmlGameInput: (event: MaterialHtmlGameInputEvent) => void;
   setHtmlGameSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
+  setHtmlGamePresentedBlock: (blockId: string | null) => void;
   updateHtmlGameAuthority: (blockId: string, runId: string | null) => void;
   snapshot: () => LessonMaterialJson;
   startSocketSync: (socket: WebSocket) => void;
@@ -39,7 +40,9 @@ export function createYjsWorkspaceRuntime(options: {
   onAnnotationChange: (elements: AnnotationElement[]) => void;
   onHtmlGameEffectsChange: (effects: MaterialHtmlGameEffect[]) => void;
   onHtmlGameInputsChange: (events: MaterialHtmlGameInputEvent[]) => void;
+  onHtmlGamePresentationChange?: (blockId: string | null) => void;
   onHtmlGameSnapshotsChange: (snapshots: Record<string, MaterialHtmlGameSnapshot>) => void;
+  onDocumentUpdate?: (update: Uint8Array) => void;
   onParticipantsChange: (participants: CollaborationParticipant[]) => void;
   onTextChange: (text: string) => void;
   participantName: string;

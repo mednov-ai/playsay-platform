@@ -4,9 +4,11 @@ import com.playsay.registration.entity.PasswordResetCodeEntity
 import com.playsay.registration.entity.PendingRegistrationEntity
 import com.playsay.registration.repo.PasswordResetCodeRepo
 import com.playsay.registration.repo.PendingRegistrationRepo
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.security.SecureRandom
 import java.time.Clock
 import java.time.Instant
-import java.security.SecureRandom
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -321,6 +323,7 @@ class RegistrationService(
             locale = locale,
             code = code,
             expiresMinutes = passwordResetCodeTtlMinutes,
+            resetUrl = "${publicBaseUrl.trimEnd('/')}/reset-password?email=${URLEncoder.encode(emailNormalized, StandardCharsets.UTF_8)}",
             idempotencyKey = "password-reset:$id:$codeHash",
         )
 

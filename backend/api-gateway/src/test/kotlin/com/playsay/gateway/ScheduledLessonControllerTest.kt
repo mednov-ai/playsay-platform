@@ -42,10 +42,14 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import javax.sql.DataSource
 import liquibase.integration.spring.SpringLiquibase
 
@@ -1504,8 +1508,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val joinedBody = webhookBody("participant_joined", lesson.livekitRoomName!!, "student-1", joinedAt)
         val leftBody = webhookBody("participant_left", lesson.livekitRoomName!!, "student-1", leftAt)
 
-        assertEquals(HttpStatus.NO_CONTENT, liveKitWebhookController.receive(joinedBody, webhookAuthorization(joinedBody)).statusCode)
-        assertEquals(HttpStatus.NO_CONTENT, liveKitWebhookController.receive(leftBody, webhookAuthorization(leftBody)).statusCode)
+        assertEquals(HttpStatus.NO_CONTENT, liveKitWebhookController.receive(joinedBody.toByteArray(), webhookAuthorization(joinedBody)).statusCode)
+        assertEquals(HttpStatus.NO_CONTENT, liveKitWebhookController.receive(leftBody.toByteArray(), webhookAuthorization(leftBody)).statusCode)
 
         val attendance = attendanceRow(lesson.id)
         assertEquals("IN_PROGRESS", attendance.status)
@@ -1520,10 +1524,25 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val body = webhookBody("participant_joined", "lesson-1", "student-1", Instant.parse("2026-05-25T10:05:00Z"))
 
         val error = assertFailsWith<ResponseStatusException> {
-            liveKitWebhookController.receive(body, "Bearer invalid")
+            liveKitWebhookController.receive(body.toByteArray(), "Bearer invalid")
         }
 
         assertEquals(HttpStatus.UNAUTHORIZED, error.statusCode)
+    }
+
+    @Test
+    fun `LiveKit webhook accepts JSON object bodies through MVC byte conversion`() {
+        val body = webhookBody("participant_joined", "unknown-room", "student-1", Instant.parse("2026-05-25T10:05:00Z"))
+        val mockMvc = MockMvcBuilders.standaloneSetup(liveKitWebhookController).build()
+
+        listOf(MediaType.APPLICATION_JSON, MediaType.parseMediaType("application/webhook+json")).forEach { contentType ->
+            mockMvc.perform(
+                post("/livekit/webhook")
+                    .contentType(contentType)
+                    .header("Authorization", webhookAuthorization(body))
+                    .content(body.toByteArray()),
+            ).andExpect(status().isNoContent)
+        }
     }
 
     private fun courseLessonId(teacher: JwtAuthenticationToken): UUID {

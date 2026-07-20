@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../materials/model/materialDocument";
 import {
   externalActivityCaptureErrorCode,
+  externalActivityCaptureConstraints,
   externalActivityCursorTopic,
   externalActivityExtensionChannel,
   externalActivityHostTopic,
@@ -121,7 +122,7 @@ export function useExternalActivitySession({
     broadcastState(next);
     postExtensionCommand({ version: 1, type: "PREPARE", sessionId, nonce, url: block.url });
     extensionTimerRef.current = window.setTimeout(() => {
-      if (activeRef.current?.sessionId === sessionId && activeRef.current.phase !== "ACTIVE") {
+      if (activeRef.current?.sessionId === sessionId && activeRef.current.phase === "AWAITING_EXTENSION") {
         broadcastState({ ...next, phase: "ERROR", errorCode: "EXTENSION_NOT_AVAILABLE" });
       }
     }, 10_000);
@@ -213,6 +214,8 @@ export function useExternalActivitySession({
       const extensionEvent = parseExtensionEvent(event.data.event, current.sessionId);
       if (!extensionEvent) return;
       if (extensionEvent.type === "CAPTURE_READY") {
+        if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);
+        extensionTimerRef.current = null;
         const next = { ...current, phase: "STARTING" as const };
         broadcastState(next);
         void consumeCapture(String(extensionEvent.streamId), current.sessionId)
@@ -335,11 +338,7 @@ export function useExternalActivitySession({
 }
 
 async function consumeCapture(streamId: string, sessionId: string): Promise<MediaStream> {
-  const mandatory = { chromeMediaSource: "tab", chromeMediaSourceId: streamId };
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { mandatory } as unknown as MediaTrackConstraints,
-    video: { mandatory, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 20, max: 24 } } as unknown as MediaTrackConstraints,
-  });
+  const stream = await navigator.mediaDevices.getUserMedia(externalActivityCaptureConstraints(streamId));
   if (!stream.getVideoTracks().length) throw new Error(`CAPTURE_WITHOUT_VIDEO:${sessionId}`);
   return stream;
 }

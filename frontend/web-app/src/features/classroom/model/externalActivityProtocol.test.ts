@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  externalActivityCaptureConstraints,
   externalActivityCaptureErrorCode,
   externalActivityTrackName,
   parseExternalActivityMessage,
@@ -13,6 +14,13 @@ describe("external activity classroom protocol", () => {
       .toBe("CAPTURE_FAILED_NOT_READABLE_ERROR");
     expect(externalActivityCaptureErrorCode("unexpected"))
       .toBe("CAPTURE_FAILED_UNKNOWN_ERROR");
+  });
+
+  it("uses Chrome tab-capture constraints without incompatible camera constraints", () => {
+    expect(externalActivityCaptureConstraints("stream-1")).toEqual({
+      audio: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: "stream-1" } },
+      video: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: "stream-1" } },
+    });
   });
 
   it("accepts versioned requests and rejects untrusted shapes", () => {

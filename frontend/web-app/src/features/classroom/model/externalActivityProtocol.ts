@@ -78,6 +78,14 @@ export function externalActivityCaptureErrorCode(error: unknown): string {
   return `CAPTURE_FAILED_${normalized || "UNKNOWN_ERROR"}`;
 }
 
+export function externalActivityCaptureConstraints(streamId: string): MediaStreamConstraints {
+  const mandatory = { chromeMediaSource: "tab", chromeMediaSourceId: streamId };
+  return {
+    audio: { mandatory } as unknown as MediaTrackConstraints,
+    video: { mandatory } as unknown as MediaTrackConstraints,
+  };
+}
+
 function validInput(input: ExternalActivityInput | undefined): input is ExternalActivityInput {
   if (!input || typeof input !== "object") return false;
   if (input.type === "pointer") return ["move", "down", "up"].includes(input.action) && coordinate(input.x) && coordinate(input.y);

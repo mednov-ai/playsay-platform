@@ -214,7 +214,12 @@ spec:
             sh 'npm --workspace web-app run generate'
             sh 'npm --workspace web-app run lint'
             sh 'npm --workspace web-app run test'
-            sh 'npm --workspace web-app run build'
+            sh '''
+              if [ "$DEPLOY_TO_DEV" = "true" ]; then
+                export VITE_EXTERNAL_ACTIVITY_ENABLED=true
+              fi
+              npm --workspace web-app run build
+            '''
           }
         }
       }

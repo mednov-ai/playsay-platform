@@ -1,4 +1,5 @@
 import { cdpCommandForInput, parsePageCommand, type PageCommand } from "./protocol";
+import { applyCaptureHardening } from "./capture-hardening";
 
 type HostSession = {
   sessionId: string;
@@ -113,8 +114,9 @@ async function activateCapture(session: HostSession) {
     session.debuggerAttached = true;
     await persistSessions();
     await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.enable");
-    await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.setDownloadBehavior", { behavior: "deny" });
-    await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.setInterceptFileChooserDialog", { enabled: true });
+    await applyCaptureHardening((method, params) => (
+      chrome.debugger.sendCommand({ tabId: session.targetTabId }, method, params)
+    ));
     sendStatus(session.consumerTabId, session.sessionId, "CAPTURE_READY", undefined, { streamId });
     await chrome.tabs.update(session.consumerTabId, { active: true });
   } catch (error) {

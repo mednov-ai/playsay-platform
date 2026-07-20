@@ -240,11 +240,13 @@ class EmailInternalControllerTest @Autowired constructor(
         attempt.provider = TransactionalEmailService.PROVIDER_UNISENDER
         attempt.providerJobId = "job-provider-status"
         attempt.providerStatus = "ACCEPTED"
+        attempt.providerEventAt = null
         attempt.trackingUntil = Instant.parse("2026-07-22T12:00:00Z")
         providerAttempts.saveAndFlush(attempt)
         delivery.provider = TransactionalEmailService.PROVIDER_UNISENDER
         delivery.providerJobId = attempt.providerJobId
         delivery.providerStatus = "ACCEPTED"
+        delivery.providerEventAt = null
         delivery.providerTrackingUntil = attempt.trackingUntil
         deliveryAttempts.saveAndFlush(delivery)
 

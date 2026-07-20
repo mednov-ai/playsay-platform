@@ -6,7 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AppProviders } from "../../../app/AppProviders";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
 import { i18n } from "../../../shared/i18n";
-import { ClassroomPreJoin, normalizedMicrophoneLevel, preJoinWarnings } from "./ClassroomPreJoin";
+import { ClassroomPreJoin, normalizedMicrophoneLevel } from "./ClassroomPreJoin";
 
 const livekitState = vi.hoisted(() => ({
   devices: {
@@ -65,24 +65,6 @@ afterEach(() => {
 });
 beforeAll(async () => i18n.changeLanguage("ru"));
 
-describe("preJoinWarnings", () => {
-  it("allows a fully checked setup without warnings", () => {
-    expect(preJoinWarnings({ cameraReady: true, microphoneReady: true, speakerReady: true })).toEqual([]);
-  });
-
-  it("reports every incomplete device check in priority order", () => {
-    expect(preJoinWarnings({ cameraReady: false, microphoneReady: false, speakerReady: false })).toEqual([
-      "microphone",
-      "speaker",
-      "camera",
-    ]);
-  });
-
-  it("does not require the camera when the caller marks it optional", () => {
-    expect(preJoinWarnings({ cameraReady: true, microphoneReady: false, speakerReady: true })).toEqual(["microphone"]);
-  });
-});
-
 describe("normalizedMicrophoneLevel", () => {
   it("keeps ordinary speech below the maximum and clamps loud input", () => {
     expect(normalizedMicrophoneLevel(0)).toBe(0);
@@ -94,7 +76,7 @@ describe("normalizedMicrophoneLevel", () => {
 });
 
 describe("ClassroomPreJoin", () => {
-  it("requires a second explicit click when device checks are incomplete", async () => {
+  it("keeps lesson entry unavailable until the sound check is complete", () => {
     const onJoin = vi.fn().mockResolvedValue(undefined);
     render(
       <AppProviders>
@@ -119,15 +101,10 @@ describe("ClassroomPreJoin", () => {
       </AppProviders>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Войти в урок" }));
-    expect(await screen.findByText("Не все проверки завершены")).toBeInTheDocument();
+    expect(screen.getByText("Шаг 1 из 2")).toBeInTheDocument();
+    expect(screen.getByText("Сначала завершите проверку звука")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Войти в урок" })).toBeDisabled();
     expect(onJoin).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Всё равно войти" }));
-    expect(onJoin).toHaveBeenCalledWith(expect.objectContaining({
-      audioDeviceId: "default",
-      videoDeviceId: "default",
-    }));
   });
 
   it("records while held, plays on release, and confirms microphone plus speakers", async () => {
@@ -146,6 +123,7 @@ describe("ClassroomPreJoin", () => {
     let now = 0;
     vi.spyOn(performance, "now").mockImplementation(() => now);
 
+    const onJoin = vi.fn().mockResolvedValue(undefined);
     render(
       <AppProviders>
         <ClassroomPreJoin
@@ -164,11 +142,12 @@ describe("ClassroomPreJoin", () => {
           } as ScheduledLesson}
           message={null}
           onBack={vi.fn()}
-          onJoin={vi.fn().mockResolvedValue(undefined)}
+          onJoin={onJoin}
         />
       </AppProviders>,
     );
 
+    expect(screen.getByText("Необязательно")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Устройство вывода"), { target: { value: "headphones" } });
     const recordButton = screen.getByRole("button", { name: "Удерживайте и говорите" });
     fireEvent.pointerDown(recordButton, { button: 0, pointerId: 1 });
@@ -178,11 +157,19 @@ describe("ClassroomPreJoin", () => {
 
     expect(await screen.findByText("Слышно ли вас в записи?")).toBeInTheDocument();
     expect(audioMocks.setSinkId).toHaveBeenCalledWith("headphones");
-    fireEvent.click(screen.getByRole("button", { name: "Да, слышу" }));
-    expect(screen.getByText("Звук работает")).toBeInTheDocument();
+    expect(screen.getByText("Шаг 2 из 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Да, всё слышно" }));
+    expect(screen.getByText("Звук проверен. Можно входить в урок.")).toBeInTheDocument();
+
+    const joinButton = screen.getByRole("button", { name: "Войти в урок" });
+    expect(joinButton).toBeEnabled();
+    fireEvent.click(joinButton);
+    expect(onJoin).toHaveBeenCalledTimes(1);
+    expect(onJoin).toHaveBeenCalledWith(expect.objectContaining({ audioEnabled: true }));
 
     fireEvent.change(screen.getByLabelText("Микрофон"), { target: { value: "default" } });
     expect(screen.getByText("Удерживайте кнопку, скажите несколько слов и отпустите.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Войти в урок" })).toBeDisabled();
 
     if (originalSinkDescriptor) {
       Object.defineProperty(HTMLMediaElement.prototype, "setSinkId", originalSinkDescriptor);
@@ -227,6 +214,43 @@ describe("ClassroomPreJoin", () => {
 
     expect(await screen.findByText("Удерживайте кнопку чуть дольше")).toBeInTheDocument();
     expect(audioMocks.play).not.toHaveBeenCalled();
+  });
+
+  it("offers a one-click entry without sound only after a technical failure", async () => {
+    const onJoin = vi.fn().mockResolvedValue(undefined);
+    livekitState.tracks = [{ kind: "audio", mediaStreamTrack: {} as MediaStreamTrack }];
+
+    render(
+      <AppProviders>
+        <ClassroomPreJoin
+          joining={false}
+          lesson={{
+            courseTitle: "Starter",
+            createdAt: "2026-07-17T09:00:00Z",
+            id: "lesson-audio-error",
+            inheritTemplateMaterial: false,
+            lessonTitle: "Speaking",
+            participants: [],
+            status: "IN_PROGRESS",
+            type: "INDIVIDUAL",
+            updatedAt: "2026-07-17T09:00:00Z",
+            workMode: "SHARED",
+          } as ScheduledLesson}
+          message={null}
+          onBack={vi.fn()}
+          onJoin={onJoin}
+        />
+      </AppProviders>,
+    );
+
+    expect(screen.queryByRole("button", { name: "Войти без звука" })).not.toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Удерживайте и говорите" }), { button: 0, pointerId: 1 });
+
+    expect(await screen.findByText("Не удалось проверить звук")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Войти без звука" }));
+
+    expect(onJoin).toHaveBeenCalledTimes(1);
+    expect(onJoin).toHaveBeenCalledWith(expect.objectContaining({ audioEnabled: false }));
   });
 });
 

@@ -243,21 +243,52 @@
 
 .playsay-prejoin-audio-result {
   display: grid;
-  height: 2.65rem;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.5rem;
+  min-height: 5.5rem;
+  align-content: center;
+  gap: 0.25rem;
+  border: 1px solid rgb(255 92 0 / 0.2);
+  border-radius: 0.85rem;
+  background: rgb(255 244 235 / 0.72);
+  padding: 0.7rem 0.8rem;
+}
+
+.playsay-prejoin-audio-result > span {
+  color: hsl(var(--primary));
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.playsay-prejoin-audio-result > p {
+  color: hsl(var(--foreground));
+  font-size: 0.9rem;
+  font-weight: 850;
 }
 
 .playsay-prejoin-audio-result[data-state="recording"] p {
   color: hsl(var(--primary));
 }
 
+.playsay-prejoin-audio-result[data-state="passed"] {
+  border-color: rgb(62 168 122 / 0.35);
+  background: rgb(236 251 244 / 0.9);
+}
+
+.playsay-prejoin-audio-result[data-state="passed"] > span {
+  color: #27835c;
+}
+
 .playsay-prejoin-audio-confirm,
 .playsay-prejoin-audio-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
+}
+
+.playsay-prejoin-audio-confirm {
+  margin-top: 0.35rem;
 }
 
 .playsay-prejoin-audio-confirm button {
@@ -275,18 +306,22 @@
   box-shadow: 0 0 0 4px rgb(255 92 0 / 0.16);
 }
 
-.playsay-prejoin-heard {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem;
+.playsay-prejoin-device-settings {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 0.45rem;
 }
 
-.playsay-prejoin-heard > span {
-  width: 100%;
-  color: hsl(var(--foreground));
-  font-size: 0.8rem;
+.playsay-prejoin-device-settings summary {
+  width: fit-content;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.78rem;
   font-weight: 850;
+}
+
+.playsay-prejoin-device-settings[open] summary {
+  margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
 }
 
 .playsay-prejoin-notice,
@@ -319,7 +354,7 @@
   padding-bottom: 0.15rem;
 }
 
-.playsay-prejoin-footer > div {
+.playsay-prejoin-footer-status {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -328,12 +363,69 @@
   font-weight: 800;
 }
 
-.playsay-prejoin-footer > div svg {
+.playsay-prejoin-footer-status svg {
   color: #27835c;
+}
+
+.playsay-prejoin-footer-status[data-ready="false"] svg {
+  color: hsl(var(--primary));
+}
+
+.playsay-prejoin-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .playsay-prejoin-join {
   min-width: 12rem;
+}
+
+@media (max-width: 980px) {
+  .playsay-prejoin {
+    overflow-x: hidden;
+    padding-inline: 0.8rem;
+  }
+
+  .playsay-prejoin-header {
+    align-items: flex-start;
+  }
+
+  .playsay-prejoin-intro h1 {
+    font-size: clamp(1.55rem, 7vw, 2.1rem);
+  }
+
+  .playsay-prejoin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playsay-prejoin-checks {
+    order: -1;
+  }
+
+  .playsay-prejoin-preview,
+  .playsay-prejoin-camera-off {
+    min-height: 14rem;
+  }
+
+  .playsay-prejoin-audio-devices {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playsay-prejoin-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .playsay-prejoin-footer-actions,
+  .playsay-prejoin-footer-actions > button {
+    width: 100%;
+  }
+
+  .playsay-prejoin-join {
+    min-width: 0;
+  }
 }
 
 .playsay-live-room [data-lk-theme="default"] {

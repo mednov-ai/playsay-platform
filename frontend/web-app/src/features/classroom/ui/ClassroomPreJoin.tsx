@@ -37,7 +37,6 @@ import { Button } from "../../../components/ui/button";
 import type { ClassroomMediaChoices } from "../model/session";
 
 type AudioCheckState = "idle" | "recording" | "playing" | "confirm" | "passed" | "failed" | "tooShort";
-export type PreJoinWarning = "camera" | "microphone" | "speaker";
 
 const speakerDeviceStorageKey = "playsay.classroom.audio-output.v1";
 const minimumRecordingDurationMs = 300;
@@ -73,7 +72,6 @@ export function ClassroomPreJoin({
   const [microphoneRecorded, setMicrophoneRecorded] = useState(false);
   const [speakerConfirmed, setSpeakerConfirmed] = useState(false);
   const [audioCheckState, setAudioCheckState] = useState<AudioCheckState>("idle");
-  const [showWarning, setShowWarning] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
@@ -129,13 +127,9 @@ export function ClassroomPreJoin({
     disposeAudioCheckResources();
   }, []);
 
-  const warnings = preJoinWarnings({
-    cameraReady: !videoEnabled || Boolean(videoTrack),
-    microphoneReady: audioEnabled && microphoneRecorded,
-    speakerReady: speakerConfirmed,
-  });
   const microphoneLevel = normalizedMicrophoneLevel(microphoneVolume);
   const audioCheckReady = audioEnabled && microphoneRecorded && speakerConfirmed;
+  const audioUnavailable = audioCheckState === "failed" || (Boolean(previewError) && !audioTrack);
   const audioCheckMessage = !audioEnabled
     ? t("classroom.preJoin.microphoneOff")
     : audioCheckState === "recording"
@@ -155,14 +149,12 @@ export function ClassroomPreJoin({
     setAudioEnabled(enabled);
     saveAudioInputEnabled(enabled);
     setPreviewError(null);
-    setShowWarning(false);
   }
 
   function changeVideoEnabled(enabled: boolean) {
     setVideoEnabled(enabled);
     saveVideoInputEnabled(enabled);
     setPreviewError(null);
-    setShowWarning(false);
   }
 
   function changeAudioDevice(deviceId: string) {
@@ -170,21 +162,18 @@ export function ClassroomPreJoin({
     setAudioDeviceId(deviceId);
     saveAudioInputDeviceId(deviceId);
     setPreviewError(null);
-    setShowWarning(false);
   }
 
   function changeVideoDevice(deviceId: string) {
     setVideoDeviceId(deviceId);
     saveVideoInputDeviceId(deviceId);
     setPreviewError(null);
-    setShowWarning(false);
   }
 
   function changeAudioOutputDevice(deviceId: string) {
     resetAudioCheck();
     setAudioOutputDeviceId(deviceId);
     saveSpeakerDeviceId(deviceId);
-    setShowWarning(false);
   }
 
   function resetAudioCheck() {
@@ -338,13 +327,20 @@ export function ClassroomPreJoin({
   }
 
   async function submit() {
-    if (warnings.length > 0 && !showWarning) {
-      setShowWarning(true);
-      return;
-    }
+    if (!audioCheckReady) return;
     await onJoin({
       audioDeviceId,
       audioEnabled,
+      audioOutputDeviceId,
+      videoDeviceId,
+      videoEnabled,
+    });
+  }
+
+  async function joinWithoutAudio() {
+    await onJoin({
+      audioDeviceId,
+      audioEnabled: false,
       audioOutputDeviceId,
       videoDeviceId,
       videoEnabled,
@@ -389,28 +385,31 @@ export function ClassroomPreJoin({
             ready={audioCheckReady}
             title={t("classroom.preJoin.soundTitle")}
           >
-            <div className="playsay-prejoin-audio-devices">
-              <DeviceSelect
-                devices={audioDevices}
-                fallbackLabel={t("classroom.preJoin.microphoneFallback")}
-                label={t("classroom.preJoin.microphoneSelect")}
-                onChange={changeAudioDevice}
-                value={audioDeviceId}
-              />
-              {canSelectAudioOutput ? (
-                <DeviceSelect
-                  devices={audioOutputDevices}
-                  fallbackLabel={t("classroom.preJoin.speakerFallback")}
-                  label={t("classroom.preJoin.speakerSelect")}
-                  onChange={changeAudioOutputDevice}
-                  value={audioOutputDeviceId}
-                />
-              ) : (
-                <div className="playsay-prejoin-system-output">
-                  <span>{t("classroom.preJoin.speakerSelect")}</span>
-                  <strong>{t("classroom.preJoin.speakerSystemDefaultShort")}</strong>
+            <div aria-live="polite" className="playsay-prejoin-audio-result" data-state={audioCheckState}>
+              <span>
+                {audioCheckReady
+                  ? t("classroom.preJoin.checkComplete")
+                  : audioCheckState === "confirm"
+                    ? t("classroom.preJoin.stepTwo")
+                    : t("classroom.preJoin.stepOne")}
+              </span>
+              <p>
+                {audioCheckReady
+                  ? t("classroom.preJoin.soundReadyToJoin")
+                  : audioCheckState === "confirm"
+                    ? t("classroom.preJoin.didYouHearRecording")
+                    : audioCheckMessage}
+              </p>
+              {audioCheckState === "confirm" ? (
+                <div className="playsay-prejoin-audio-confirm">
+                  <Button onClick={() => { setSpeakerConfirmed(true); setAudioCheckState("passed"); }} type="button">
+                    {t("classroom.preJoin.heardYes")}
+                  </Button>
+                  <Button onClick={resetAudioCheck} type="button" variant="outline">
+                    {t("classroom.preJoin.heardNo")}
+                  </Button>
                 </div>
-              )}
+              ) : null}
             </div>
             <div
               aria-label={t("classroom.preJoin.microphoneLevel")}
@@ -422,48 +421,69 @@ export function ClassroomPreJoin({
             >
               <span style={{ width: `${microphoneLevel}%` }} />
             </div>
-            <div aria-live="polite" className="playsay-prejoin-audio-result" data-state={audioCheckState}>
-              <p>{audioCheckState === "confirm" ? t("classroom.preJoin.didYouHearRecording") : audioCheckMessage}</p>
-              {audioCheckState === "confirm" ? (
-                <div className="playsay-prejoin-audio-confirm">
-                  <Button onClick={() => { setSpeakerConfirmed(true); setAudioCheckState("passed"); setShowWarning(false); }} type="button">
-                    {t("classroom.preJoin.heardYes")}
-                  </Button>
-                  <Button onClick={() => { setSpeakerConfirmed(false); setAudioCheckState("failed"); }} type="button" variant="outline">
-                    {t("classroom.preJoin.heardNo")}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
             <div className="playsay-prejoin-audio-actions">
-              <Button
-                data-recording={audioCheckState === "recording" ? "true" : "false"}
-                disabled={!audioEnabled || !audioTrack || audioCheckState === "playing" || joining}
-                onBlur={() => stopAudioRecording(true)}
-                onKeyDown={startRecordingFromKeyboard}
-                onKeyUp={stopRecordingFromKeyboard}
-                onPointerCancel={(event) => stopRecordingFromPointer(event, true)}
-                onPointerDown={startRecordingFromPointer}
-                onPointerUp={stopRecordingFromPointer}
-                type="button"
-                variant={audioCheckState === "recording" ? "default" : "outline"}
-              >
-                {audioCheckState === "playing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-                {audioCheckState === "recording"
-                  ? t("classroom.preJoin.recording")
-                  : audioCheckState === "playing"
-                    ? t("classroom.preJoin.playingRecording")
-                    : t("classroom.preJoin.holdToRecord")}
-              </Button>
-              <Button onClick={() => changeAudioEnabled(!audioEnabled)} type="button" variant="outline">
-                {audioEnabled ? t("classroom.preJoin.turnOff") : t("classroom.preJoin.turnOn")}
-              </Button>
+              {!audioEnabled ? (
+                <Button onClick={() => changeAudioEnabled(true)} type="button">
+                  <Mic className="h-4 w-4" />
+                  {t("classroom.preJoin.enableMicrophone")}
+                </Button>
+              ) : audioCheckReady ? (
+                <Button onClick={resetAudioCheck} type="button" variant="outline">
+                  {t("classroom.preJoin.checkAgain")}
+                </Button>
+              ) : (
+                <Button
+                  data-recording={audioCheckState === "recording" ? "true" : "false"}
+                  disabled={!audioTrack || audioCheckState === "playing" || audioCheckState === "confirm" || joining}
+                  onBlur={() => stopAudioRecording(true)}
+                  onKeyDown={startRecordingFromKeyboard}
+                  onKeyUp={stopRecordingFromKeyboard}
+                  onPointerCancel={(event) => stopRecordingFromPointer(event, true)}
+                  onPointerDown={startRecordingFromPointer}
+                  onPointerUp={stopRecordingFromPointer}
+                  type="button"
+                >
+                  {audioCheckState === "playing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+                  {audioCheckState === "recording"
+                    ? t("classroom.preJoin.recording")
+                    : audioCheckState === "playing"
+                      ? t("classroom.preJoin.playingRecording")
+                      : t("classroom.preJoin.holdToRecord")}
+                </Button>
+              )}
             </div>
+            <details className="playsay-prejoin-device-settings">
+              <summary>{t("classroom.preJoin.deviceSettings")}</summary>
+              <div className="playsay-prejoin-audio-devices">
+                <DeviceSelect
+                  devices={audioDevices}
+                  fallbackLabel={t("classroom.preJoin.microphoneFallback")}
+                  label={t("classroom.preJoin.microphoneSelect")}
+                  onChange={changeAudioDevice}
+                  value={audioDeviceId}
+                />
+                {canSelectAudioOutput ? (
+                  <DeviceSelect
+                    devices={audioOutputDevices}
+                    fallbackLabel={t("classroom.preJoin.speakerFallback")}
+                    label={t("classroom.preJoin.speakerSelect")}
+                    onChange={changeAudioOutputDevice}
+                    value={audioOutputDeviceId}
+                  />
+                ) : (
+                  <div className="playsay-prejoin-system-output">
+                    <span>{t("classroom.preJoin.speakerSelect")}</span>
+                    <strong>{t("classroom.preJoin.speakerSystemDefaultShort")}</strong>
+                  </div>
+                )}
+              </div>
+            </details>
           </DeviceCheckCard>
 
           <DeviceCheckCard
             icon={<Camera className="h-5 w-5" />}
             ready={!videoEnabled || Boolean(videoTrack)}
+            status={t("classroom.preJoin.statusOptional")}
             title={t("classroom.preJoin.cameraTitle")}
           >
             <DeviceSelect
@@ -491,31 +511,44 @@ export function ClassroomPreJoin({
         </div>
       ) : null}
       {message ? <div className="playsay-prejoin-notice" role="status">{message}</div> : null}
-      {showWarning && warnings.length > 0 ? (
+      {audioUnavailable ? (
         <div className="playsay-prejoin-warning" role="alert">
           <CircleAlert className="h-5 w-5" />
           <div>
-            <strong>{t("classroom.preJoin.warningTitle")}</strong>
-            <p>{warnings.map((warning) => t(`classroom.preJoin.warning.${warning}`)).join(" · ")}</p>
+            <strong>{t("classroom.preJoin.audioUnavailableTitle")}</strong>
+            <p>{t("classroom.preJoin.audioUnavailable")}</p>
           </div>
         </div>
       ) : null}
 
       <footer className="playsay-prejoin-footer">
-        <div>
-          <CheckCircle2 className="h-5 w-5" />
-          <span>{warnings.length === 0 ? t("classroom.preJoin.allReady") : t("classroom.preJoin.canContinue")}</span>
+        <div className="playsay-prejoin-footer-status" data-ready={audioCheckReady ? "true" : "false"}>
+          {audioCheckReady ? <CheckCircle2 className="h-5 w-5" /> : <CircleAlert className="h-5 w-5" />}
+          <span>{audioCheckReady ? t("classroom.preJoin.allReady") : t("classroom.preJoin.finishSoundCheck")}</span>
         </div>
-        <Button
-          className="playsay-prejoin-join"
-          data-testid="classroom-prejoin-join"
-          disabled={joining}
-          onClick={() => void submit()}
-          type="button"
-        >
-          {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {showWarning && warnings.length > 0 ? t("classroom.preJoin.continueAnyway") : t("classroom.preJoin.join")}
-        </Button>
+        <div className="playsay-prejoin-footer-actions">
+          {audioUnavailable ? (
+            <Button
+              data-testid="classroom-prejoin-join-without-audio"
+              disabled={joining}
+              onClick={() => void joinWithoutAudio()}
+              type="button"
+              variant="outline"
+            >
+              {t("classroom.preJoin.joinWithoutSound")}
+            </Button>
+          ) : null}
+          <Button
+            className="playsay-prejoin-join"
+            data-testid="classroom-prejoin-join"
+            disabled={!audioCheckReady || joining}
+            onClick={() => void submit()}
+            type="button"
+          >
+            {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {t("classroom.preJoin.join")}
+          </Button>
+        </div>
       </footer>
     </section>
   );
@@ -525,11 +558,13 @@ function DeviceCheckCard({
   children,
   icon,
   ready,
+  status,
   title,
 }: {
   children: ReactNode;
   icon: ReactNode;
   ready: boolean;
+  status?: string;
   title: string;
 }) {
   const { t } = useAppTranslation();
@@ -538,7 +573,7 @@ function DeviceCheckCard({
       <header>
         <span>{icon}</span>
         <strong>{title}</strong>
-        <small>{ready ? t("classroom.preJoin.statusReady") : t("classroom.preJoin.statusCheck")}</small>
+        <small>{status ?? (ready ? t("classroom.preJoin.statusReady") : t("classroom.preJoin.statusCheck"))}</small>
       </header>
       {children}
     </article>
@@ -572,18 +607,6 @@ function DeviceSelect({
       </select>
     </label>
   );
-}
-
-export function preJoinWarnings(input: {
-  cameraReady: boolean;
-  microphoneReady: boolean;
-  speakerReady: boolean;
-}): PreJoinWarning[] {
-  const warnings: PreJoinWarning[] = [];
-  if (!input.microphoneReady) warnings.push("microphone");
-  if (!input.speakerReady) warnings.push("speaker");
-  if (!input.cameraReady) warnings.push("camera");
-  return warnings;
 }
 
 export function supportsAudioOutputSelection(): boolean {

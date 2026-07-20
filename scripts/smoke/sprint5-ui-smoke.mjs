@@ -552,14 +552,19 @@ async function openClassroom(page, lessonId, readySelector, options = {}) {
 }
 
 async function completeClassroomPreJoin(page) {
-  const preJoinButton = page.locator("[data-testid='classroom-prejoin-join']");
-  await preJoinButton.waitFor({ timeout: timeoutMs });
-  await preJoinButton.click();
-  const continueAnywayButton = preJoinButton.filter({
-    hasText: /Всё равно войти|Join anyway|Trotzdem teilnehmen|Entrer quand même/i,
-  });
-  if (await continueAnywayButton.isVisible()) {
-    await continueAnywayButton.click();
+  const checkedJoinButton = page.locator("[data-testid='classroom-prejoin-join']");
+  const joinWithoutAudioButton = page.locator("[data-testid='classroom-prejoin-join-without-audio']");
+  await checkedJoinButton.waitFor({ timeout: timeoutMs });
+  await page.waitForFunction(() => {
+    const checkedJoin = document.querySelector("[data-testid='classroom-prejoin-join']");
+    const fallbackJoin = document.querySelector("[data-testid='classroom-prejoin-join-without-audio']");
+    return (checkedJoin instanceof HTMLButtonElement && !checkedJoin.disabled) ||
+      (fallbackJoin instanceof HTMLButtonElement && !fallbackJoin.disabled);
+  }, null, { timeout: timeoutMs });
+  if (await joinWithoutAudioButton.isVisible()) {
+    await joinWithoutAudioButton.click();
+  } else {
+    await checkedJoinButton.click();
   }
 }
 

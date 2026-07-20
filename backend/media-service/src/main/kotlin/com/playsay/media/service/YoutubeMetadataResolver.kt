@@ -23,19 +23,26 @@ data class YoutubeResolvedVideo(
 class YoutubeMetadataResolver(
     @param:Value("\${playsay.media-service.ytdlp-path:yt-dlp}")
     private val ytdlpPath: String,
+    private val ytDlpArguments: YoutubeYtDlpArguments = YoutubeYtDlpArguments(),
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) {
     fun resolve(videoId: String): YoutubeResolvedVideo? {
         val startedAt = System.nanoTime()
         val process = runCatching {
-            ProcessBuilder(
-                ytdlpPath,
-                "--no-playlist",
-                "--skip-download",
-                "--no-warnings",
-                "--dump-single-json",
-                "https://www.youtube.com/watch?v=$videoId",
-            )
+            val command = buildList {
+                add(ytdlpPath)
+                addAll(ytDlpArguments.forVideo(videoId))
+                addAll(
+                    listOf(
+                        "--no-playlist",
+                        "--skip-download",
+                        "--no-warnings",
+                        "--dump-single-json",
+                        "https://www.youtube.com/watch?v=$videoId",
+                    ),
+                )
+            }
+            ProcessBuilder(command)
                 .start()
         }.getOrElse {
             logger.warn("media-service yt-dlp start failed videoId={} ytdlpPath={}", videoId, ytdlpPath, it)
@@ -56,8 +63,10 @@ class YoutubeMetadataResolver(
         val stderr = readCompletedText(stderrFuture, "stderr", videoId) ?: return null
         if (process.exitValue() != 0) {
             logger.warn(
-                "media-service yt-dlp failed videoId={} exitCode={} durationMs={} stdoutLines={} stderrLines={}",
+                "media-service yt-dlp failed videoId={} potEnabled={} failureKind={} exitCode={} durationMs={} stdoutLines={} stderrLines={}",
                 videoId,
+                ytDlpArguments.isEnabledFor(videoId),
+                YoutubeYtDlpFailureClassifier.classify(stderr),
                 process.exitValue(),
                 durationMs,
                 stdout.lineSequence().count(),
@@ -82,8 +91,9 @@ class YoutubeMetadataResolver(
             .orEmpty()
 
         logger.info(
-            "media-service yt-dlp resolved metadata videoId={} durationSeconds={} language={} thumbnailPresent={} formats={} durationMs={}",
+            "media-service yt-dlp resolved metadata videoId={} potEnabled={} durationSeconds={} language={} thumbnailPresent={} formats={} durationMs={}",
             videoId,
+            ytDlpArguments.isEnabledFor(videoId),
             root.path("duration").takeIf { node -> node.isNumber }?.asInt(),
             nullableText(root.path("language")),
             nullableText(root.path("thumbnail")) != null,

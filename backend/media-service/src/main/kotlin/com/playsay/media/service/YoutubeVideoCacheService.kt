@@ -47,6 +47,7 @@ class YoutubeVideoCacheService(
     private val ffmpegPath: String,
     @param:Value("\${playsay.media-service.ytdlp-path:yt-dlp}")
     private val ytdlpPath: String,
+    private val ytDlpArguments: YoutubeYtDlpArguments = YoutubeYtDlpArguments(),
 ) {
     private val locks = ConcurrentHashMap<String, Any>()
 
@@ -146,11 +147,13 @@ class YoutubeVideoCacheService(
                 throw cacheFailure(videoId, "timeout", "YOUTUBE_CACHE_TIMEOUT")
             }
             readCompletedText(stdoutFuture)
-            readCompletedText(stderrFuture)
+            val stderr = readCompletedText(stderrFuture)
             if (process.exitValue() != 0) {
                 logger.warn(
-                    "media-service cache download failed videoId={} state=download-failed",
+                    "media-service cache download failed videoId={} state=download-failed potEnabled={} failureKind={}",
                     videoId,
+                    ytDlpArguments.isEnabledFor(videoId),
+                    YoutubeYtDlpFailureClassifier.classify(stderr),
                 )
                 throw cacheFailure(videoId, "download", "YOUTUBE_CACHE_UNAVAILABLE")
             }
@@ -204,23 +207,29 @@ class YoutubeVideoCacheService(
 
     private fun startDownload(videoId: String, outputTemplate: String): Process =
         runCatching {
-            ProcessBuilder(
-                ytdlpPath,
-                "--no-playlist",
-                "--no-warnings",
-                "--no-progress",
-                "--max-filesize",
-                maxVideoBytes.coerceAtLeast(1).toString(),
-                "--ffmpeg-location",
-                ffmpegPath,
-                "--format",
-                CACHE_FORMAT_SELECTOR,
-                "--merge-output-format",
-                "mp4",
-                "--output",
-                outputTemplate,
-                "https://www.youtube.com/watch?v=$videoId",
-            ).start()
+            val command = buildList {
+                add(ytdlpPath)
+                addAll(ytDlpArguments.forVideo(videoId))
+                addAll(
+                    listOf(
+                        "--no-playlist",
+                        "--no-warnings",
+                        "--no-progress",
+                        "--max-filesize",
+                        maxVideoBytes.coerceAtLeast(1).toString(),
+                        "--ffmpeg-location",
+                        ffmpegPath,
+                        "--format",
+                        CACHE_FORMAT_SELECTOR,
+                        "--merge-output-format",
+                        "mp4",
+                        "--output",
+                        outputTemplate,
+                        "https://www.youtube.com/watch?v=$videoId",
+                    ),
+                )
+            }
+            ProcessBuilder(command).start()
         }.getOrElse {
             logger.warn("media-service cache download failed videoId={} state=start-failed", videoId, it)
             throw MediaServiceException(HttpStatus.SERVICE_UNAVAILABLE, "YOUTUBE_CACHE_UNAVAILABLE")

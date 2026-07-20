@@ -311,7 +311,7 @@ export function AppShell(props: AppShellProps) {
         className={`mx-auto flex w-full flex-col ${
           isClassroomOpen
             ? "h-full max-w-[92rem] gap-3 px-3 py-3 sm:px-4"
-            : "min-h-screen max-w-6xl gap-7 px-5 py-6 sm:px-8"
+            : `min-h-screen ${materialAuthoringState.focused ? "max-w-[92rem]" : "max-w-6xl"} gap-7 px-5 py-6 sm:px-8`
         }`}
       >
         {isClassroomOpen || !isAuthenticated ? null : (

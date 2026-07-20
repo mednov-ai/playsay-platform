@@ -232,7 +232,7 @@ export function MaterialBlockEditor({
       <div aria-hidden={collapsed} className={collapsed ? "hidden" : "mt-2 grid gap-2"}>
         {block.type === "videoEmbed" ? (
           <>
-            <div className="grid gap-2 sm:grid-cols-[8rem_1fr]">
+            <div className="playsay-material-field-grid" data-layout="video-source">
               <FormField label={t("materials.blockEditor.platform")}>
                 <select
                   className="playsay-input"
@@ -255,7 +255,7 @@ export function MaterialBlockEditor({
                 />
               </FormField>
             </div>
-            <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-2 sm:grid-cols-2">
+            <div className="playsay-material-field-grid rounded-lg border border-border bg-muted/20 p-2" data-layout="video-clip">
               <FormField label={t("materials.blockEditor.videoClipStart")}>
                 <input
                   className="playsay-input"
@@ -290,7 +290,7 @@ export function MaterialBlockEditor({
                   value={videoClipEndSource}
                 />
               </FormField>
-              <small className="text-xs font-bold text-muted-foreground sm:col-span-2">
+              <small className="playsay-material-field-grid-span text-xs font-bold text-muted-foreground">
                 {t("materials.blockEditor.videoClipHint")}
               </small>
             </div>
@@ -298,7 +298,7 @@ export function MaterialBlockEditor({
         ) : null}
 
         {block.type === "image" || block.type === "generatedImage" ? (
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="playsay-material-field-grid" data-layout="image">
             <FormField label={block.type === "generatedImage" ? t("materials.blockEditor.prompt") : t("materials.blockEditor.imageUrl")}>
               {block.type === "generatedImage" ? (
                 <textarea
@@ -362,7 +362,7 @@ export function MaterialBlockEditor({
         {block.type === "externalActivity" ? (
           <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3">
             <FormField label={t("materials.blockEditor.externalActivityUrl")}>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="playsay-material-external-row">
                 <input
                   className="playsay-input min-w-0 flex-1"
                   disabled={disabled || resolvingExternalActivity}
@@ -413,7 +413,7 @@ export function MaterialBlockEditor({
         ) : null}
 
         {block.type === "htmlGame" ? (
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
+          <div className="playsay-material-field-grid gap-3" data-layout="html-game">
             <FormField label={t("materials.blockEditor.htmlGameFile")}>
               <div className="grid gap-2">
                 <div className="playsay-asset-reference">{block.url || t("materials.blockEditor.htmlGameEmpty")}</div>
@@ -445,7 +445,7 @@ export function MaterialBlockEditor({
                 value={block.height ?? 640}
               />
             </FormField>
-            <div className="playsay-game-icon-enrichment sm:col-span-2" data-status={htmlGameEnrichment?.status ?? "IDLE"}>
+            <div className="playsay-game-icon-enrichment playsay-material-field-grid-span" data-status={htmlGameEnrichment?.status ?? "IDLE"}>
               <span className="playsay-game-icon-enrichment-symbol">
                 {htmlGameEnrichment && ["PENDING", "RUNNING", "RETRY"].includes(htmlGameEnrichment.status)
                   ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -508,7 +508,7 @@ export function MaterialBlockEditor({
         ) : null}
 
         {isObjectiveMaterialBlockType(block.type) && block.type !== "fillGaps" && block.type !== "matchingPairs" ? (
-          <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-2 sm:grid-cols-4">
+          <div className="playsay-material-field-grid rounded-lg border border-border bg-muted/20 p-2" data-layout="assessment">
             <FormField label={t("materials.blockEditor.weight")}>
               <input
                 className="playsay-input"

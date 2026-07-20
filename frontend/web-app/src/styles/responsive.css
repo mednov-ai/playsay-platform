@@ -109,19 +109,6 @@
     width: 100%;
   }
 
-  .playsay-matching-editor-head {
-    display: none;
-  }
-
-  .playsay-matching-editor-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.45rem;
-  }
-
-  .playsay-matching-row-tools {
-    justify-content: space-between;
-  }
-
   .playsay-matching-error-limit {
     min-width: 4.4rem;
   }

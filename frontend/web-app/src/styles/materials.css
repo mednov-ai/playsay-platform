@@ -231,6 +231,8 @@
 }
 
 .playsay-material-canvas {
+  container-name: material-canvas;
+  container-type: inline-size;
   min-width: 0;
   border: 1px solid hsl(var(--border));
   border-radius: 1rem;
@@ -363,6 +365,98 @@
   display: grid;
   gap: 0.875rem;
   margin-top: 0.875rem;
+}
+
+.playsay-exercise-item-fields {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.playsay-material-field-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.playsay-material-field-grid-span {
+  grid-column: 1 / -1;
+}
+
+.playsay-material-external-row {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@container material-canvas (min-width: 34rem) {
+  .playsay-exercise-item-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .playsay-material-field-grid[data-layout="video-source"] {
+    grid-template-columns: 8rem minmax(0, 1fr);
+  }
+
+  .playsay-material-field-grid[data-layout="video-clip"],
+  .playsay-material-field-grid[data-layout="assessment"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .playsay-material-field-grid[data-layout="html-game"] {
+    grid-template-columns: minmax(0, 1fr) 10rem;
+  }
+
+  .playsay-material-external-row {
+    flex-direction: row;
+  }
+
+  .playsay-material-editor .playsay-matching-editor-head,
+  .playsay-material-editor .playsay-matching-editor-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) max-content;
+  }
+
+  .playsay-material-editor .playsay-matching-editor-head {
+    display: grid;
+  }
+
+  .playsay-material-editor .playsay-matching-row-tools {
+    justify-content: flex-start;
+  }
+}
+
+@container material-canvas (min-width: 42rem) {
+  .playsay-material-field-grid[data-layout="image"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .playsay-material-editor .playsay-game-icon-enrichment {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .playsay-material-editor .playsay-game-icon-enrichment button {
+    grid-column: auto;
+    width: auto;
+  }
+}
+
+@container material-canvas (min-width: 46rem) {
+  .playsay-material-field-grid[data-layout="assessment"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container material-canvas (min-width: 48rem) {
+  .playsay-exercise-item-fields[data-block-type="fillGaps"] {
+    grid-template-columns: 7rem minmax(16rem, 2fr) minmax(8rem, 0.8fr) minmax(8rem, 0.9fr) 2.25rem;
+  }
+
+  .playsay-exercise-item-fields:not([data-block-type="fillGaps"]) {
+    grid-template-columns: minmax(0, 1.6fr) minmax(8rem, 0.7fr) minmax(8rem, 0.8fr) 4.5rem 2.25rem;
+  }
 }
 
 .playsay-material-author-stage {
@@ -509,12 +603,13 @@
 .playsay-matching-editor-head,
 .playsay-matching-editor-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
   align-items: center;
 }
 
 .playsay-matching-editor-head {
+  display: none;
   padding: 0 0.2rem;
   color: hsl(var(--muted-foreground));
   font-size: 0.7rem;
@@ -532,6 +627,7 @@
 .playsay-matching-row-tools {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.4rem;
 }
 
@@ -922,7 +1018,7 @@
 
 .playsay-game-icon-enrichment {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
@@ -954,15 +1050,9 @@
   border-color: hsl(var(--destructive) / 0.35);
 }
 
-@media (max-width: 640px) {
-  .playsay-game-icon-enrichment {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .playsay-game-icon-enrichment button {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
+.playsay-game-icon-enrichment button {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .playsay-html-game-app-copy {
@@ -3113,31 +3203,10 @@
   }
 }
 
-@media (max-width: 900px) {
-  .playsay-material-editor-header {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 0.5rem;
-  }
-
-  .playsay-material-editor-header-actions {
-    gap: 0.35rem;
-  }
-
-  .playsay-material-action-label {
-    display: none;
-  }
-
+@media (max-width: 1280px) {
   .playsay-material-editor-workspace {
     display: block;
     padding: 0.75rem;
-  }
-
-  .playsay-material-author-stage {
-    display: block;
-  }
-
-  .playsay-material-block-preview {
-    display: none;
   }
 
   .playsay-material-palette {
@@ -3165,6 +3234,29 @@
 
   .playsay-material-palette-items {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .playsay-material-editor-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+
+  .playsay-material-editor-header-actions {
+    gap: 0.35rem;
+  }
+
+  .playsay-material-action-label {
+    display: none;
+  }
+
+  .playsay-material-author-stage {
+    display: block;
+  }
+
+  .playsay-material-block-preview {
+    display: none;
   }
 }
 

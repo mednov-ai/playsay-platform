@@ -269,7 +269,7 @@ export function ExerciseItemsEditor({
           <div className={isContinuation ? "grid grid-cols-[1.5rem_minmax(0,1fr)] gap-1.5" : ""}>
             {isContinuation ? <ThreadConnector /> : null}
             <div className="grid gap-1.5 rounded-lg border border-border bg-muted/20 p-2">
-          <div className={block.type === "fillGaps" ? "grid gap-2 lg:grid-cols-[7rem_minmax(16rem,2fr)_minmax(8rem,0.8fr)_minmax(8rem,0.9fr)_2.25rem]" : "grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(8rem,0.7fr)_minmax(8rem,0.8fr)_4.5rem_2.25rem]"}>
+          <div className="playsay-exercise-item-fields" data-block-type={block.type}>
             {block.type === "fillGaps" ? (
               <FormField label={t("materials.blockEditor.gapMode")}>
                 <select

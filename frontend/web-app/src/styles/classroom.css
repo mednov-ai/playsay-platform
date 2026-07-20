@@ -434,7 +434,7 @@
   background: #171717;
 }
 
-.playsay-classroom-room [data-lk-theme="default"] {
+.playsay-livekit-context[data-lk-theme="default"] {
   height: 100%;
   min-height: 0;
   --lk-bg: var(--playsay-video-chrome-muted);
@@ -473,6 +473,10 @@
 
 .playsay-classroom-shell[data-video-only="true"] {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.playsay-livekit-context {
+  display: contents;
 }
 
 .playsay-video-rail {
@@ -1947,7 +1951,7 @@
   --playsay-video-tile: #202020;
 }
 
-.dark .playsay-classroom-room [data-lk-theme="default"] {
+.dark .playsay-livekit-context[data-lk-theme="default"] {
   color-scheme: dark;
 }
 

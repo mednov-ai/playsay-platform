@@ -757,7 +757,7 @@ body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expand
 }
 
 body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-room,
-body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-room [data-lk-theme="default"] {
+body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-livekit-context[data-lk-theme="default"] {
   height: 100%;
   min-height: 0;
 }

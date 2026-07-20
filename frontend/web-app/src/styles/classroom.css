@@ -437,7 +437,26 @@
 .playsay-classroom-room [data-lk-theme="default"] {
   height: 100%;
   min-height: 0;
-  background: #111111;
+  --lk-bg: var(--playsay-video-chrome-muted);
+  --lk-bg2: var(--playsay-video-tile);
+  --lk-bg3: var(--playsay-video-hover);
+  --lk-bg4: var(--playsay-video-active);
+  --lk-bg5: var(--playsay-video-active);
+  --lk-fg: var(--playsay-video-text);
+  --lk-fg2: var(--playsay-video-text);
+  --lk-fg3: var(--playsay-video-muted-text);
+  --lk-fg4: var(--playsay-video-muted-text);
+  --lk-fg5: var(--playsay-video-muted-text);
+  --lk-border-color: var(--playsay-video-border);
+  --lk-control-fg: var(--playsay-video-text);
+  --lk-control-bg: var(--playsay-video-chrome);
+  --lk-control-hover-bg: var(--playsay-video-hover);
+  --lk-control-active-bg: var(--playsay-video-active);
+  --lk-control-active-hover-bg: var(--playsay-video-active);
+  --lk-accent-bg: var(--playsay-video-accent);
+  --lk-accent-fg: #ffffff;
+  background: var(--playsay-video-chrome-muted);
+  color-scheme: light;
 }
 
 .playsay-classroom-shell {
@@ -457,12 +476,23 @@
 }
 
 .playsay-video-rail {
+  --playsay-video-active: #ffe8d8;
+  --playsay-video-accent: hsl(var(--primary));
+  --playsay-video-border: hsl(var(--border));
+  --playsay-video-chrome: hsl(var(--surface));
+  --playsay-video-chrome-muted: hsl(var(--surface-muted));
+  --playsay-video-header: hsl(var(--surface));
+  --playsay-video-hover: hsl(var(--muted));
+  --playsay-video-muted-text: hsl(var(--muted-foreground));
+  --playsay-video-shadow: 0 0.75rem 1.75rem rgb(68 42 23 / 0.12);
+  --playsay-video-text: hsl(var(--foreground));
+  --playsay-video-tile: hsl(var(--surface));
   display: flex;
   min-height: 0;
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  background: #111111;
+  background: var(--playsay-video-chrome-muted);
 }
 
 .playsay-video-header {
@@ -471,15 +501,24 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 0.75rem;
-  border-bottom: 1px solid rgb(255 255 255 / 0.1);
-  background: #0f0f0f;
-  color: #ffffff;
+  border-bottom: 1px solid var(--playsay-video-border);
+  background: var(--playsay-video-header);
+  color: var(--playsay-video-text);
   padding: 1rem 1.125rem;
 }
 
 .playsay-video-header h1 {
   font-size: 1.5rem;
   line-height: 1.15;
+}
+
+.playsay-video-header p {
+  color: var(--playsay-video-muted-text);
+}
+
+.playsay-video-type-badge {
+  border-color: var(--playsay-video-border);
+  color: var(--playsay-video-muted-text);
 }
 
 .playsay-video-actions {
@@ -494,8 +533,15 @@
   width: 2.6rem;
   min-width: 2.6rem;
   min-height: 2.4rem;
+  border-color: var(--playsay-video-border);
   border-radius: 0.75rem;
+  background: var(--playsay-video-chrome);
+  color: var(--playsay-video-text);
   padding-inline: 0;
+}
+
+.playsay-classroom-fullscreen:hover {
+  background: var(--playsay-video-hover);
 }
 
 .playsay-classroom-conference {
@@ -504,7 +550,7 @@
   height: 100%;
   min-height: 0;
   grid-template-rows: minmax(0, 1fr) auto;
-  background: #111111;
+  background: var(--playsay-video-chrome-muted);
 }
 
 .playsay-classroom-conference[data-mode="video-only"] {
@@ -526,9 +572,10 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.18);
+  border: 1px solid var(--playsay-video-border);
   border-radius: 1rem;
-  background: #202020;
+  background: var(--playsay-video-tile);
+  box-shadow: var(--playsay-video-shadow);
 }
 
 .playsay-video-grid-card .lk-participant-tile {
@@ -545,7 +592,7 @@
   place-items: center;
   align-content: center;
   gap: 0.5rem;
-  color: rgb(255 255 255 / 0.72);
+  color: var(--playsay-video-muted-text);
   font-weight: 900;
 }
 
@@ -564,7 +611,7 @@
 .playsay-video-strip .lk-participant-tile {
   height: 100%;
   border-radius: 0.875rem;
-  background: #202020;
+  background: var(--playsay-video-tile);
 }
 
 .playsay-video-focus > .lk-participant-tile {
@@ -584,6 +631,7 @@
 
 .playsay-video-focus > .lk-participant-tile .lk-participant-media-video[data-lk-source="screen_share"] {
   object-fit: contain;
+  background: #111111;
 }
 
 .playsay-video-strip {
@@ -671,17 +719,17 @@
   height: auto;
   min-height: 5rem;
   width: 100%;
-  border: 1px solid rgb(255 255 255 / 0.3);
-  box-shadow: 0 0.75rem 1.75rem rgb(0 0 0 / 0.32);
+  border: 1px solid var(--playsay-video-border);
+  box-shadow: var(--playsay-video-shadow);
 }
 
 .playsay-video-card > .playsay-video-presence {
   width: 100%;
   min-height: 5rem;
   aspect-ratio: 16 / 10;
-  border: 1px solid rgb(255 255 255 / 0.3);
+  border: 1px solid var(--playsay-video-border);
   border-radius: 0.875rem;
-  box-shadow: 0 0.75rem 1.75rem rgb(0 0 0 / 0.32);
+  box-shadow: var(--playsay-video-shadow);
 }
 
 .playsay-video-presence {
@@ -692,9 +740,9 @@
   gap: 0.45rem;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 25%, rgb(255 92 0 / 0.16), transparent 55%),
-    #202020;
-  color: #ffffff;
+    radial-gradient(circle at 50% 25%, rgb(255 92 0 / 0.12), transparent 55%),
+    var(--playsay-video-tile);
+  color: var(--playsay-video-text);
   padding: 0.75rem;
   text-align: center;
 }
@@ -704,10 +752,10 @@
   width: clamp(2.25rem, 7vw, 4rem);
   height: clamp(2.25rem, 7vw, 4rem);
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 0.15);
+  border: 1px solid var(--playsay-video-border);
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.08);
-  color: rgb(255 255 255 / 0.72);
+  background: var(--playsay-video-hover);
+  color: var(--playsay-video-muted-text);
 }
 
 .playsay-video-presence-icon svg {
@@ -724,17 +772,17 @@
 }
 
 .playsay-video-presence > span:last-child {
-  color: rgb(255 255 255 / 0.6);
+  color: var(--playsay-video-muted-text);
   font-size: clamp(0.65rem, 1.5vw, 0.78rem);
   font-weight: 800;
 }
 
 .playsay-video-presence[data-presence-state="ONLINE"] > span:last-child {
-  color: #7be0b4;
+  color: #167953;
 }
 
 .playsay-video-presence[data-presence-state="CHECKING_DEVICES"] > span:last-child {
-  color: #ffac73;
+  color: #b54708;
 }
 
 @media (min-width: 981px) and (max-height: 800px) {
@@ -791,13 +839,12 @@
 .playsay-video-card-label {
   min-width: 0;
   overflow: hidden;
-  color: rgb(255 255 255 / 0.92);
+  color: var(--playsay-video-text);
   font-size: 0.7rem;
   font-weight: 800;
   line-height: 1.1;
   text-align: center;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
   white-space: nowrap;
 }
 
@@ -808,14 +855,16 @@
   left: 0.375rem;
   border-radius: 0.5rem;
   background: rgb(0 0 0 / 0.62);
+  color: #ffffff;
   padding: 0.1875rem 0.375rem;
   text-align: left;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
 }
 
 .playsay-classroom-conference .lk-control-bar {
   min-height: 4rem;
-  border-top: 1px solid rgb(255 255 255 / 0.08);
-  background: #111111;
+  border-top: 1px solid var(--playsay-video-border);
+  background: var(--playsay-video-chrome);
 }
 
 .playsay-classroom-controls {
@@ -836,7 +885,7 @@
 .playsay-translation-button {
   border-color: rgb(255 92 0 / 0.55);
   background: rgb(255 92 0 / 0.18);
-  color: #ffffff;
+  color: hsl(var(--primary));
   touch-action: none;
   user-select: none;
 }
@@ -897,13 +946,13 @@
 }
 
 .playsay-lesson-exit {
-  border-color: rgb(255 255 255 / 0.2);
-  background: rgb(255 255 255 / 0.1);
-  color: #ffffff;
+  border-color: var(--playsay-video-border);
+  background: var(--playsay-video-chrome);
+  color: var(--playsay-video-text);
 }
 
 .playsay-lesson-exit:hover {
-  background: rgb(255 255 255 / 0.16);
+  background: var(--playsay-video-hover);
 }
 
 .playsay-workbench {
@@ -1874,12 +1923,59 @@
   background: hsl(var(--surface-strong));
 }
 
-.playsay-classroom-theme-toggle {
-  border-color: rgb(255 255 255 / 0.2);
-  background: rgb(255 255 255 / 0.1);
+.dark .playsay-video-rail {
+  --playsay-video-active: #373737;
+  --playsay-video-accent: #1f8cf9;
+  --playsay-video-border: rgb(255 255 255 / 0.14);
+  --playsay-video-chrome: #111111;
+  --playsay-video-chrome-muted: #111111;
+  --playsay-video-header: #0f0f0f;
+  --playsay-video-hover: #202020;
+  --playsay-video-muted-text: rgb(255 255 255 / 0.72);
+  --playsay-video-shadow: 0 0.75rem 1.75rem rgb(0 0 0 / 0.32);
+  --playsay-video-text: #ffffff;
+  --playsay-video-tile: #202020;
+}
+
+.dark .playsay-classroom-room [data-lk-theme="default"] {
+  color-scheme: dark;
+}
+
+.dark .playsay-video-presence {
+  background:
+    radial-gradient(circle at 50% 25%, rgb(255 92 0 / 0.16), transparent 55%),
+    #202020;
+}
+
+.dark .playsay-video-presence-icon {
+  border-color: rgb(255 255 255 / 0.15);
+  background: rgb(255 255 255 / 0.08);
+}
+
+.dark .playsay-video-presence[data-presence-state="ONLINE"] > span:last-child {
+  color: #7be0b4;
+}
+
+.dark .playsay-video-presence[data-presence-state="CHECKING_DEVICES"] > span:last-child {
+  color: #ffac73;
+}
+
+.dark .playsay-translation-button {
   color: #ffffff;
 }
 
+.playsay-classroom-theme-toggle {
+  border-color: var(--playsay-video-border);
+  background: var(--playsay-video-chrome);
+  color: var(--playsay-video-text);
+}
+
 .playsay-classroom-theme-toggle:hover {
-  background: rgb(255 255 255 / 0.16);
+  background: var(--playsay-video-hover);
+}
+
+.dark .playsay-classroom-theme-toggle {
+  border-color: var(--playsay-video-border);
+  background: var(--playsay-video-chrome);
+  color: var(--playsay-video-text);
 }

@@ -42,6 +42,7 @@ import {
   type MaterialAnswerBlock,
   type MaterialAnswerState,
   type MaterialHtmlGameSync,
+  type MaterialExternalActivitySync,
 } from "../../materials";
 import {
   annotationFontSizePresets,
@@ -63,7 +64,7 @@ type LiveAnnotationSync = {
   updateCursor: (cursor: CollaborationCursor | null) => void;
 };
 
-export type LessonPresentationMode = "default" | "html-game-focus" | "image-focus";
+export type LessonPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus";
 
 export function LessonTaskCanvas({
   annotationSync,
@@ -78,12 +79,14 @@ export function LessonTaskCanvas({
   teacherName,
   canControlPages = false,
   htmlGameSync,
+  externalActivitySync,
   liveActivePageId,
   onPresentationModeChange,
 }: {
   annotationSync?: LiveAnnotationSync | null;
   canControlPages?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
+  externalActivitySync?: MaterialExternalActivitySync;
   liveActivePageId?: string | null;
   onPresentationModeChange?: (mode: LessonPresentationMode) => void;
   collaborationControls?: ReactNode;
@@ -394,6 +397,7 @@ export function LessonTaskCanvas({
                 canControlPages={canControlPages}
                 material={material}
                 htmlGameSync={htmlGameSync}
+                externalActivitySync={externalActivitySync}
                 mode="classroom"
                 onActivePageIdChange={setActivePageId}
                 onAnswerChange={updateAnswer}

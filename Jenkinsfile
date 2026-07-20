@@ -460,8 +460,12 @@ spec:
                 sh 'npm --workspace web-app run build'
                 echo "Running frontend tests for ${env.BUILD_LABEL}"
                 sh 'npm --workspace web-app run test'
+                echo "Building and testing the Play&Say browser extension for ${env.BUILD_LABEL}"
+                sh 'npm --workspace browser-extension run test'
+                sh 'npm --workspace browser-extension run package'
               }
             }
+            archiveArtifacts artifacts: 'frontend/browser-extension/playsay-browser-extension.zip', fingerprint: true
           }
         }
 

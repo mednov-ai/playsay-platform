@@ -49,11 +49,17 @@ class LiveKitTokenService(
         val displayName = authentication.token.getClaimAsString("name")
             ?: authentication.token.getClaimAsString("preferred_username")
             ?: identity
+        val playsayRole = when {
+            authentication.authorities.any { it.authority == MetaData.Authorities.ADMIN } -> MetaData.Roles.ADMIN
+            authentication.authorities.any { it.authority == MetaData.Authorities.TEACHER } -> MetaData.Roles.TEACHER
+            else -> MetaData.Roles.STUDENT
+        }
 
         val claims = JWTClaimsSet.Builder()
             .issuer(cleanApiKey)
             .subject(identity)
             .claim("name", displayName)
+            .claim("metadata", """{"playsayRole":"$playsayRole"}""")
             .claim(
                 "video",
                 mapOf(

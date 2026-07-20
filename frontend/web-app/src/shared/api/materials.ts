@@ -23,6 +23,7 @@ import type {
   MaterialHtmlGameEnrichmentInput,
   MaterialVideoPlayback,
   MaterialVideoPlaybackInput,
+  MaterialExternalActivityResolution,
 } from "./types";
 
 export async function fetchMaterials(config = authConfig): Promise<LessonMaterial[]> {
@@ -122,6 +123,17 @@ export async function createMaterialVideoPlayback(
       method: "POST",
       body: JSON.stringify(input),
     },
+    config,
+  );
+}
+
+export async function resolveMaterialExternalActivity(
+  url: string,
+  config = authConfig,
+): Promise<MaterialExternalActivityResolution> {
+  return apiJson<MaterialExternalActivityResolution>(
+    "/api/materials/external-activities/resolve",
+    { method: "POST", body: JSON.stringify({ url }) },
     config,
   );
 }

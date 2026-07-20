@@ -14,7 +14,7 @@ const paletteGroups: Array<{
   { key: "content", types: ["text", "image", "videoEmbed"] },
   { key: "exercises", types: ["flashcards", "fillGaps", "multipleChoice", "matchingPairs"] },
   { key: "openTasks", types: ["freeWriting", "speakingPrompt", "drawingArea"] },
-  { key: "advanced", types: ["generatedImage", "htmlGame"] },
+  { key: "advanced", types: ["generatedImage", "htmlGame", "externalActivity"] },
 ];
 
 export function MaterialBlockPalette({

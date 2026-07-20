@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Play&Say Shared Activities",
+  "description": "Shares an external classroom activity with lesson participants after an explicit teacher action.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "permissions": ["activeTab", "debugger", "storage", "tabCapture", "tabs"],
+  "host_permissions": [
+    "https://online.play-and-say.ru/*",
+    "https://play-and-say.ru/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Share this activity with Play&Say"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://online.play-and-say.ru/*",
+        "https://play-and-say.ru/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["content-script.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

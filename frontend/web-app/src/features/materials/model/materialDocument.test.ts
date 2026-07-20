@@ -10,6 +10,7 @@ import {
   appendMaterialAttempt,
   materialAssessmentForItem,
   materialBlockFromJson,
+  newMaterialBlock,
   materialExerciseItemKey,
   materialItemAnswerMatches,
   materialLiveScore,
@@ -23,6 +24,34 @@ import {
 import type { MaterialEditorBlock } from "./types";
 
 describe("material document accepted answers", () => {
+  it("creates and serializes a shared external activity block", () => {
+    const block = newMaterialBlock("externalActivity");
+    expect(block).toMatchObject({
+      type: "externalActivity",
+      url: "",
+      provider: "EXPERIMENTAL",
+      externalActivitySupportLevel: "EXPERIMENTAL",
+    });
+
+    const restored = materialBlockFromJson({
+      id: "external-1",
+      type: "externalActivity",
+      title: "Ordering food",
+      url: "https://en.islcollective.com/english-esl-video-lessons/ordering-food/617641",
+      provider: "ISLCOLLECTIVE",
+      externalActivitySupportLevel: "GUARANTEED",
+    });
+
+    expect(cleanMaterialBlock(restored!)).toEqual({
+      id: "external-1",
+      type: "externalActivity",
+      title: "Ordering food",
+      url: "https://en.islcollective.com/english-esl-video-lessons/ordering-food/617641",
+      provider: "ISLCOLLECTIVE",
+      externalActivitySupportLevel: "GUARANTEED",
+    });
+  });
+
   it("starts a new material with an intentionally empty canvas", () => {
     expect(defaultMaterialForm().document.pages[0]?.blocks).toEqual([]);
   });

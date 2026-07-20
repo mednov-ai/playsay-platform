@@ -12,6 +12,28 @@ const rutubeBlock: MaterialEditorBlock = {
 };
 
 describe("RenderedMaterialBlock video playback", () => {
+  it("renders an external activity as a Play&Say launcher instead of an iframe", () => {
+    const markup = renderToStaticMarkup(
+      <RenderedMaterialBlock
+        assetTags={{}}
+        assetUrls={{}}
+        block={{
+          id: "external-1",
+          type: "externalActivity",
+          title: "There is / there are",
+          url: "https://www.liveworksheets.com/worksheet/en/example/1",
+          provider: "LIVEWORKSHEETS",
+          externalActivitySupportLevel: "GUARANTEED",
+        }}
+        mode="classroom"
+      />,
+    );
+
+    expect(markup).toContain("data-testid=\"external-activity-launch-external-1\"");
+    expect(markup).toContain("There is / there are");
+    expect(markup).not.toContain("<iframe");
+  });
+
   it("removes iframe fullscreen capability when playback is learner-facing", () => {
     const markup = renderToStaticMarkup(
       <RenderedMaterialBlock

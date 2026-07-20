@@ -12,6 +12,7 @@ import { useCollaborationDocument } from "../hooks/useCollaborationDocument";
 import { useLessonMaterial } from "../hooks/useLessonMaterial";
 import { useLessonSubmission } from "../hooks/useLessonSubmission";
 import { useYjsWorkspace } from "../hooks/useYjsWorkspace";
+import { useExternalActivitySession } from "../hooks/useExternalActivitySession";
 import { collaborationParticipantColor } from "../model/collaboration";
 import type { LessonRoomSession } from "../model/session";
 import {
@@ -149,6 +150,18 @@ export function LessonWorkspace({
     () => teacherAnnotationWorkspace.htmlGameSync(true),
     [teacherAnnotationWorkspace.htmlGameSync],
   );
+  const externalActivityBlocks = useMemo(
+    () => visibleMaterial ? materialDocumentBlocks(visibleMaterial) : [],
+    [visibleMaterial?.document, visibleMaterial?.id, visibleMaterial?.title],
+  );
+  const externalActivitiesEnabled = externalActivityFeatureEnabled();
+  const teacherExternalActivitySync = useExternalActivitySession({
+    blocks: externalActivityBlocks,
+    enabled: canMonitorSubmissions && !isParallelWork && externalActivitiesEnabled,
+    isHost: canMonitorSubmissions,
+    participantColor: collaborationParticipantColor(profile?.subject ?? displayName),
+    participantName: displayName,
+  });
 
   useEffect(() => {
     setTeacherTaskVisible((current) => teacherTaskVisibilityAfterSharedGame(
@@ -157,6 +170,10 @@ export function LessonWorkspace({
       teacherHtmlGameSync.presentedBlockId,
     ));
   }, [canMonitorSubmissions, teacherHtmlGameSync.presentedBlockId]);
+
+  useEffect(() => {
+    if (canMonitorSubmissions && teacherExternalActivitySync.active?.visible) setTeacherTaskVisible(true);
+  }, [canMonitorSubmissions, teacherExternalActivitySync.active?.visible]);
 
   useEffect(() => {
     if (!canMonitorSubmissions || teacherWorkParticipants.length === 0) {
@@ -332,6 +349,10 @@ export function LessonWorkspace({
           />
         ) : null}
 
+        {isParallelWork && externalActivityBlocks.some((block) => block.type === "externalActivity") ? (
+          <div className="playsay-lesson-inline-message" role="status">{t("materials.externalActivity.parallelUnsupported")}</div>
+        ) : null}
+
         {materialLoading ? (
           <div className="playsay-task-board playsay-material-loading">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -347,6 +368,7 @@ export function LessonWorkspace({
                 material={visibleMaterial}
                 annotationSync={isParallelWork ? null : teacherAnnotationSync}
                 htmlGameSync={isParallelWork ? undefined : teacherHtmlGameSync}
+                externalActivitySync={isParallelWork || !externalActivitiesEnabled ? undefined : teacherExternalActivitySync}
                 liveActivePageId={liveActivePageId}
                 onSaveAnswers={(content) => void saveMaterialAnswers(content, activeParticipant?.subject)}
                 onPresentationModeChange={setPresentationMode}
@@ -424,6 +446,10 @@ export function LessonWorkspace({
       </div>
     </section>
   );
+}
+
+function externalActivityFeatureEnabled(): boolean {
+  return import.meta.env.DEV || import.meta.env.VITE_EXTERNAL_ACTIVITY_ENABLED === "true";
 }
 
 export function teacherTaskVisibilityAfterLiveUpload(

@@ -1905,6 +1905,40 @@ paths:
           description: External URL or AI provider failed
       security:
       - bearerAuth: []
+  /materials/external-activities/resolve:
+    post:
+      tags:
+      - Materials
+      summary: Validate and classify an external classroom activity URL
+      description: Normalizes the URL without requesting the remote website.
+      operationId: resolveMaterialExternalActivity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialExternalActivityResolveRequest"
+        required: true
+      responses:
+        "200":
+          description: Resolved external activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialExternalActivityResolveResponse"
+        "400":
+          description: Invalid or blocked URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialExternalActivityResolveResponse"
+        "401":
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialExternalActivityResolveResponse"
+      security:
+      - bearerAuth: []
   /materials/ai-draft:
     post:
       tags:
@@ -5289,6 +5323,34 @@ components:
       - status
       - title
       - visibility
+    MaterialExternalActivityResolveRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+      required:
+      - url
+    MaterialExternalActivityResolveResponse:
+      type: object
+      properties:
+        normalizedUrl:
+          type: string
+        provider:
+          type: string
+        supportLevel:
+          type: string
+        host:
+          type: string
+        warningCode:
+          type:
+          - string
+          - "null"
+      required:
+      - host
+      - normalizedUrl
+      - provider
+      - supportLevel
     MaterialAiDraftRequest:
       type: object
       properties:

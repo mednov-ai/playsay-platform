@@ -197,6 +197,7 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   const height = asNumber(block.height);
   const gameIconUrl = asString(block.gameIconUrl);
   const gameTitleSource = normalizeGameTitleSource(asString(block.gameTitleSource));
+  const externalActivitySupportLevel = normalizeExternalActivitySupportLevel(asString(block.externalActivitySupportLevel));
   const videoClip = normalizeMaterialVideoClip(block.videoClip);
 
   if (body) {
@@ -232,6 +233,10 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   if (type === "htmlGame") {
     result.gameIconUrl = gameIconUrl || undefined;
     result.gameTitleSource = gameTitleSource;
+  }
+  if (type === "externalActivity") {
+    result.provider = provider || "EXPERIMENTAL";
+    result.externalActivitySupportLevel = externalActivitySupportLevel;
   }
 
   if (Array.isArray(block.cards)) {
@@ -312,6 +317,10 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
       clean.gameIconUrl = block.gameIconUrl.trim();
     }
     clean.gameTitleSource = normalizeGameTitleSource(block.gameTitleSource) ?? "USER";
+  }
+  if (block.type === "externalActivity") {
+    clean.provider = block.provider?.trim() || "EXPERIMENTAL";
+    clean.externalActivitySupportLevel = normalizeExternalActivitySupportLevel(block.externalActivitySupportLevel) ?? "EXPERIMENTAL";
   }
   if (block.cards?.length) {
     clean.cards = block.cards
@@ -410,6 +419,10 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
 
 function normalizeGameTitleSource(value: string | undefined): MaterialEditorBlock["gameTitleSource"] {
   return value === "FILE" || value === "HTML" || value === "AI" || value === "USER" ? value : undefined;
+}
+
+function normalizeExternalActivitySupportLevel(value: string | undefined): MaterialEditorBlock["externalActivitySupportLevel"] {
+  return value === "GUARANTEED" || value === "EXPERIMENTAL" ? value : undefined;
 }
 
 export function materialAssessmentFromJson(value: unknown): MaterialAssessmentPolicy | undefined {

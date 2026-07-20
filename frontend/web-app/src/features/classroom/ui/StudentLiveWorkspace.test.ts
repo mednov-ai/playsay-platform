@@ -1,8 +1,25 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
+
+vi.mock("../hooks/useExternalActivitySession", () => ({
+  useExternalActivitySession: () => ({
+    active: null,
+    back: vi.fn(),
+    collapse: vi.fn(),
+    cursors: [],
+    isHost: false,
+    mediaStream: null,
+    open: vi.fn(),
+    reload: vi.fn(),
+    sendCursor: vi.fn(),
+    sendInput: vi.fn(),
+    setStudentsLocked: vi.fn(),
+    stop: vi.fn(),
+  }),
+}));
 
 const material = {
   id: "material-1",

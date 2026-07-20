@@ -3,11 +3,12 @@
   "workspaces": [
     "web-app",
     "keyboard-app",
-    "shared-ui"
+    "shared-ui",
+    "browser-extension"
   ],
   "scripts": {
     "build": "npm --workspace web-app run generate && npm --workspace web-app run build",
     "generate": "npm --workspace web-app run generate",
-    "test": "npm --workspace web-app run generate && npm --workspace web-app run test"
+    "test": "npm --workspace web-app run generate && npm --workspace web-app run test && npm --workspace browser-extension run test"
   }
 }

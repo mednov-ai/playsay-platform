@@ -12,7 +12,7 @@ import {
 } from "../model/materialDocument";
 import { LessonMaterialDocumentView } from "./LessonMaterialDocumentView";
 
-type MaterialPreviewPresentationMode = "default" | "html-game-focus" | "image-focus";
+type MaterialPreviewPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus";
 
 export function MaterialPlayPreviewDialog({
   material,

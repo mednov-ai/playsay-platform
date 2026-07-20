@@ -6,6 +6,7 @@ import {
   MaterialAnswerState,
   MaterialEditorBlock,
   MaterialHtmlGameSync,
+  MaterialExternalActivitySync,
   MaterialRenderMode,
   defaultMaterialPage,
   editorDocumentFromJson,
@@ -17,6 +18,7 @@ import {
 } from "../model/materialDocument";
 import { RenderedMaterialBlock } from "./blocks/RenderedMaterialBlock";
 import { HtmlGameFrame } from "./blocks/HtmlGameFrame";
+import { ExternalActivityFrame } from "./blocks/ExternalActivityFrame";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function LessonMaterialDocumentView({
@@ -34,6 +36,7 @@ export function LessonMaterialDocumentView({
   score,
   showScoreBadge = true,
   htmlGameSync,
+  externalActivitySync,
   onPresentationModeChange,
 }: {
   activePageId?: string | null;
@@ -50,7 +53,8 @@ export function LessonMaterialDocumentView({
   score?: number | null;
   showScoreBadge?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
-  onPresentationModeChange?: (mode: "default" | "html-game-focus" | "image-focus") => void;
+  externalActivitySync?: MaterialExternalActivitySync;
+  onPresentationModeChange?: (mode: "default" | "html-game-focus" | "image-focus" | "external-activity-focus") => void;
 }) {
   const { t } = useAppTranslation();
   const document = useMemo(
@@ -65,7 +69,7 @@ export function LessonMaterialDocumentView({
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [htmlAssets, setHtmlAssets] = useState<Record<string, string>>({});
   const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
-  const [focusedBlock, setFocusedBlock] = useState<{ kind: "htmlGame" | "image"; blockId: string } | null>(null);
+  const [focusedBlock, setFocusedBlock] = useState<{ kind: "htmlGame" | "image" | "externalActivity"; blockId: string } | null>(null);
   const [launchedGameIds, setLaunchedGameIds] = useState<Set<string>>(() => new Set());
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
   const videoFullscreenAllowed = allowVideoFullscreen ?? mode === "teacherPreview";
@@ -76,6 +80,7 @@ export function LessonMaterialDocumentView({
   const allBlocks = useMemo(() => document.pages.flatMap((item) => item.blocks), [document.pages]);
   const focusedBlockValue = focusedBlock ? allBlocks.find((block) => block.id === focusedBlock.blockId) ?? null : null;
   const presentedHtmlGameBlockId = htmlGameSync?.presentedBlockId ?? null;
+  const presentedExternalActivityBlockId = externalActivitySync?.active?.visible ? externalActivitySync.active.blockId : null;
 
   useEffect(() => {
     setInternalActivePageId(null);
@@ -110,11 +115,22 @@ export function LessonMaterialDocumentView({
   }, [allBlocks, htmlGameSync, presentedHtmlGameBlockId]);
 
   useEffect(() => {
+    if (!presentedExternalActivityBlockId) {
+      setFocusedBlock((current) => current?.kind === "externalActivity" ? null : current);
+      return;
+    }
+    const block = allBlocks.find((candidate) => candidate.id === presentedExternalActivityBlockId && candidate.type === "externalActivity");
+    if (block) setFocusedBlock({ kind: "externalActivity", blockId: block.id });
+  }, [allBlocks, presentedExternalActivityBlockId]);
+
+  useEffect(() => {
     onPresentationModeChange?.(focusedBlock === null
       ? "default"
       : focusedBlock.kind === "htmlGame"
         ? "html-game-focus"
-        : "image-focus");
+        : focusedBlock.kind === "externalActivity"
+          ? "external-activity-focus"
+          : "image-focus");
   }, [focusedBlock, onPresentationModeChange]);
 
   useEffect(() => () => onPresentationModeChange?.("default"), [onPresentationModeChange]);
@@ -183,10 +199,19 @@ export function LessonMaterialDocumentView({
     };
   }, [assetKey, material.id, material.updatedAt]);
 
-  function requestBlockFocus(kind: "htmlGame" | "image", blockId: string) {
+  function requestBlockFocus(kind: "htmlGame" | "image" | "externalActivity", blockId: string) {
     if (kind === "htmlGame") {
       setLaunchedGameIds((current) => new Set(current).add(blockId));
       htmlGameSync?.setPresentedBlock(blockId);
+    }
+    if (kind === "externalActivity") {
+      const block = allBlocks.find((candidate) => candidate.id === blockId && candidate.type === "externalActivity");
+      if (!block) return;
+      if (!externalActivitySync) {
+        if (block.url) window.open(block.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      externalActivitySync.open(block);
     }
     setFocusedBlock({ kind, blockId });
   }
@@ -195,6 +220,9 @@ export function LessonMaterialDocumentView({
     const blockId = focusedBlock?.blockId;
     if (focusedBlock?.kind === "htmlGame") {
       htmlGameSync?.setPresentedBlock(null);
+    }
+    if (focusedBlock?.kind === "externalActivity") {
+      externalActivitySync?.collapse();
     }
     setFocusedBlock(null);
     if (blockId) {
@@ -284,11 +312,19 @@ export function LessonMaterialDocumentView({
       >
         {focusedBlock ? (
         <button
-          aria-label={focusedBlock.kind === "htmlGame" ? t("materials.renderer.closeGame") : t("materials.renderer.closeImage")}
+          aria-label={focusedBlock.kind === "htmlGame"
+            ? t("materials.renderer.closeGame")
+            : focusedBlock.kind === "externalActivity"
+              ? t("materials.renderer.closeExternalActivity")
+              : t("materials.renderer.closeImage")}
           className="playsay-material-focus-close"
           data-testid="material-focus-close"
           onClick={closeBlockFocus}
-          title={focusedBlock.kind === "htmlGame" ? t("materials.renderer.closeGame") : t("materials.renderer.closeImage")}
+          title={focusedBlock.kind === "htmlGame"
+            ? t("materials.renderer.closeGame")
+            : focusedBlock.kind === "externalActivity"
+              ? t("materials.renderer.closeExternalActivity")
+              : t("materials.renderer.closeImage")}
           type="button"
         >
           <Minimize2 className="h-5 w-5" />
@@ -310,6 +346,9 @@ export function LessonMaterialDocumentView({
             </div>
           );
         })}
+        {focusedBlock?.kind === "externalActivity" && focusedBlockValue?.type === "externalActivity" && externalActivitySync ? (
+          <ExternalActivityFrame block={focusedBlockValue} sync={externalActivitySync} />
+        ) : null}
         {focusedBlock?.kind === "image" && focusedBlockValue && (focusedBlockValue.type === "image" || focusedBlockValue.type === "generatedImage") ? (
           <figure className="playsay-material-focused-image" data-playsay-annotation-anchor="true">
             {resolveMaterialImageUrl(focusedBlockValue.url, assetUrls) ? (

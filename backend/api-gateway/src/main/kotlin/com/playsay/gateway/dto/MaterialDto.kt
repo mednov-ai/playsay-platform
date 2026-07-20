@@ -107,6 +107,19 @@ data class MaterialHtmlGameEnrichmentResponse(
     val errorCode: String?,
 )
 
+data class MaterialExternalActivityResolveRequest(
+    @field:Schema(maxLength = 2_048)
+    val url: String,
+)
+
+data class MaterialExternalActivityResolveResponse(
+    val normalizedUrl: String,
+    val provider: String,
+    val supportLevel: String,
+    val host: String,
+    val warningCode: String?,
+)
+
 data class MaterialAiDraftRequest(
     @field:Schema(maxLength = 160, nullable = true)
     val title: String? = null,

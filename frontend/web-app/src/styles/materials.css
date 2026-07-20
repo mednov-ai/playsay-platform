@@ -711,6 +711,21 @@
   padding: 0;
 }
 
+.playsay-material-play-dialog[data-presentation-mode="external-activity-focus"] .playsay-material-play-surface {
+  overflow: hidden;
+  padding: 0;
+}
+
+.playsay-material-play-dialog[data-presentation-mode="external-activity-focus"] .playsay-rendered-material,
+.playsay-material-play-dialog[data-presentation-mode="external-activity-focus"] .playsay-material-focus-stack,
+.playsay-material-play-dialog[data-presentation-mode="external-activity-focus"] .playsay-external-activity-frame {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+}
+
 .playsay-material-play-dialog[data-presentation-mode="html-game-focus"] .playsay-rendered-material {
   width: 100%;
   max-width: none;
@@ -984,6 +999,159 @@
   border-color: hsl(var(--primary));
   outline: 2px solid rgb(255 92 0 / 0.2);
   outline-offset: 2px;
+}
+
+.playsay-external-activity-app .playsay-html-game-app-icon {
+  background: linear-gradient(145deg, #ff5c00, #df4100);
+}
+
+.playsay-external-activity-frame {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 24rem;
+  flex-direction: column;
+  overflow: hidden;
+  background: #171717;
+}
+
+.playsay-external-activity-toolbar {
+  display: flex;
+  min-height: 4.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 4.25rem 0.65rem 0.85rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.14);
+  background: #fffdfb;
+}
+
+.playsay-external-activity-toolbar > div:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.playsay-external-activity-toolbar strong,
+.playsay-external-activity-toolbar small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-external-activity-toolbar small {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.playsay-external-activity-surface {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #111111;
+  outline: none;
+  touch-action: none;
+}
+
+.playsay-external-activity-surface:focus-visible {
+  box-shadow: inset 0 0 0 3px hsl(var(--primary));
+}
+
+.playsay-external-activity-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  background: #111111;
+}
+
+.playsay-external-activity-mobile-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  left: 0;
+  bottom: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.playsay-external-activity-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.65rem;
+  padding: 2rem;
+  background: radial-gradient(circle at 50% 20%, #fff1e8, #fffdfb 62%);
+  color: hsl(var(--foreground));
+  text-align: center;
+}
+
+.playsay-external-activity-state span {
+  max-width: 34rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.playsay-external-activity-cursor {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  pointer-events: none;
+  transform: translate(-0.15rem, -0.15rem);
+}
+
+.playsay-external-activity-cursor i {
+  width: 0;
+  height: 0;
+  border-top: 1rem solid var(--playsay-cursor-color, #ff5c00);
+  border-right: 0.7rem solid transparent;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.45));
+}
+
+.playsay-external-activity-cursor b {
+  width: max-content;
+  max-width: 9rem;
+  overflow: hidden;
+  border-radius: 0.35rem;
+  background: var(--playsay-cursor-color, #ff5c00);
+  color: #ffffff;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.35rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playsay-external-activity-lock {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgb(17 17 17 / 0.38);
+  color: #ffffff;
+  font-weight: 900;
+  pointer-events: auto;
+}
+
+@media (max-width: 700px) {
+  .playsay-external-activity-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-right: 4rem;
+  }
+
+  .playsay-external-activity-toolbar > div:last-child {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
 }
 
 .playsay-material-focus-stack {

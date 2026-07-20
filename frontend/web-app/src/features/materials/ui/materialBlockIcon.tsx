@@ -25,6 +25,8 @@ export function materialBlockIcon(type: MaterialBlockType): ReactNode {
       return <MousePointer2 className="h-4 w-4" />;
     case "htmlGame":
       return <Gamepad2 className="h-4 w-4" />;
+    case "externalActivity":
+      return <Link2 className="h-4 w-4" />;
     case "text":
     default:
       return <BookOpen className="h-4 w-4" />;

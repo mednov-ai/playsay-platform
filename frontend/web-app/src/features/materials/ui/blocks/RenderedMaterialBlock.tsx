@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
-import { CircleAlert, Gamepad2, ImageIcon, Maximize2, Play, Video } from "lucide-react";
+import { CircleAlert, ExternalLink, Gamepad2, ImageIcon, Maximize2, Play, Video } from "lucide-react";
 import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
 import {
   clampNumber,
@@ -50,7 +50,7 @@ export function RenderedMaterialBlock({
   onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
-  onRequestFocus?: (kind: "htmlGame" | "image", blockId: string) => void;
+  onRequestFocus?: (kind: "htmlGame" | "image" | "externalActivity", blockId: string) => void;
   pageLayout?: MaterialEditorPage["layout"];
 }) {
   const { t } = useAppTranslation();
@@ -325,6 +325,24 @@ export function RenderedMaterialBlock({
           "playsay-render-block playsay-render-block-html-game",
         );
       }
+    case "externalActivity":
+      return blockSection(
+        <button
+          aria-label={t("materials.renderer.launchExternalActivity", { title: block.title })}
+          className="playsay-html-game-app playsay-external-activity-app"
+          data-testid={`external-activity-launch-${block.id}`}
+          onClick={() => onRequestFocus?.("externalActivity", block.id)}
+          type="button"
+        >
+          <span className="playsay-html-game-app-icon"><ExternalLink className="h-7 w-7" /></span>
+          <span className="playsay-html-game-app-copy">
+            <strong>{block.title}</strong>
+            <small>{t("materials.renderer.externalActivityApplication", { provider: block.provider ?? "EXPERIMENTAL" })}</small>
+          </span>
+          <span className="playsay-html-game-app-launch"><Play className="h-4 w-4 fill-current" /></span>
+        </button>,
+        "playsay-render-block playsay-render-block-external-activity",
+      );
     case "flashcards":
       return blockSection(
         <>

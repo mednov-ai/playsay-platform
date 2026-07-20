@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ChevronDown, ChevronRight, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import {
@@ -18,7 +18,7 @@ import { ExerciseItemsEditor } from "./ExerciseItemsEditor";
 import { materialBlockIcon } from "./materialBlockIcon";
 import { MatchingPairsEditor } from "./MatchingPairsEditor";
 import { useAppTranslation } from "../../../shared/i18n";
-import type { MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
+import { resolveMaterialExternalActivity, type MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
 import { isEnglishHtmlGameTitle } from "../model/htmlGameTitle";
 
 export function MaterialBlockEditor({
@@ -73,6 +73,8 @@ export function MaterialBlockEditor({
   const [videoClipStartSource, setVideoClipStartSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.startSeconds));
   const [videoClipEndSource, setVideoClipEndSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.endSeconds));
   const [uploading, setUploading] = useState(false);
+  const [resolvingExternalActivity, setResolvingExternalActivity] = useState(false);
+  const [externalActivityError, setExternalActivityError] = useState(false);
   const collapseLabel = collapsed ? t("materials.blockEditor.expandBlock") : t("materials.blockEditor.collapseBlock");
   const summary = materialBlockSummary(block, t);
   const invalidHtmlGameTitle = block.type === "htmlGame"
@@ -111,6 +113,24 @@ export function MaterialBlockEditor({
       await onUploadAsset(kind, file);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function resolveExternalActivity() {
+    if (!block.url?.trim()) return;
+    setResolvingExternalActivity(true);
+    setExternalActivityError(false);
+    try {
+      const resolved = await resolveMaterialExternalActivity(block.url);
+      onUpdate({
+        url: resolved.normalizedUrl,
+        provider: resolved.provider,
+        externalActivitySupportLevel: resolved.supportLevel,
+      });
+    } catch {
+      setExternalActivityError(true);
+    } finally {
+      setResolvingExternalActivity(false);
     }
   }
 
@@ -339,6 +359,59 @@ export function MaterialBlockEditor({
           </div>
         ) : null}
 
+        {block.type === "externalActivity" ? (
+          <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3">
+            <FormField label={t("materials.blockEditor.externalActivityUrl")}>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  className="playsay-input min-w-0 flex-1"
+                  disabled={disabled || resolvingExternalActivity}
+                  maxLength={2048}
+                  onChange={(event) => {
+                    setExternalActivityError(false);
+                    onUpdate({
+                      url: event.target.value,
+                      provider: "EXPERIMENTAL",
+                      externalActivitySupportLevel: "EXPERIMENTAL",
+                    });
+                  }}
+                  placeholder={t("materials.blockEditor.linkPlaceholder")}
+                  type="url"
+                  value={block.url ?? ""}
+                />
+                <Button
+                  disabled={disabled || resolvingExternalActivity || !block.url?.trim()}
+                  onClick={() => void resolveExternalActivity()}
+                  type="button"
+                  variant="outline"
+                >
+                  {resolvingExternalActivity ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  {resolvingExternalActivity
+                    ? t("materials.blockEditor.validatingExternalActivity")
+                    : t("materials.blockEditor.validateExternalActivity")}
+                </Button>
+              </div>
+            </FormField>
+            {externalActivityError ? (
+              <p className="flex items-center gap-2 text-xs font-bold text-destructive" role="alert">
+                <AlertTriangle className="h-4 w-4" />
+                {t("materials.blockEditor.externalActivityInvalid")}
+              </p>
+            ) : block.url ? (
+              <p className="text-xs font-bold text-muted-foreground">
+                {block.externalActivitySupportLevel === "GUARANTEED"
+                  ? t("materials.blockEditor.externalActivityGuaranteed", { provider: block.provider ?? "" })
+                  : t("materials.blockEditor.externalActivityExperimental")}
+              </p>
+            ) : null}
+            <p className="text-xs font-semibold text-muted-foreground">{t("materials.blockEditor.externalActivityHint")}</p>
+            <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-950">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {t("materials.blockEditor.externalActivityPrivacy")}
+            </p>
+          </div>
+        ) : null}
+
         {block.type === "htmlGame" ? (
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
             <FormField label={t("materials.blockEditor.htmlGameFile")}>
@@ -523,6 +596,8 @@ function materialBlockSummary(block: MaterialEditorBlock, t: (key: string, value
       return compactSummary(block.url) || t("materials.blockEditor.summaryVideo");
     case "htmlGame":
       return block.url ? t("materials.blockEditor.summaryGameReady") : t("materials.blockEditor.summaryGameEmpty");
+    case "externalActivity":
+      return block.url ? t("materials.blockEditor.summaryExternalReady") : t("materials.blockEditor.summaryExternalEmpty");
     case "flashcards":
       return t("materials.blockEditor.summaryCards", { count: block.cards?.length ?? 0 });
     case "matchingPairs":

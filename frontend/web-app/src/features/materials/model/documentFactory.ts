@@ -67,6 +67,8 @@ export function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
       return { ...base, caption: "", imageSize: "MEDIUM", prompt: "" };
     case "htmlGame":
       return { ...base, height: 640, url: "" };
+    case "externalActivity":
+      return { ...base, url: "", provider: "EXPERIMENTAL", externalActivitySupportLevel: "EXPERIMENTAL" };
     case "flashcards":
       return {
         ...base,

@@ -1,0 +1,30 @@
+import { describe, expect, it } from "vitest";
+import { externalActivityTrackName, parseExternalActivityMessage, parseExtensionEvent, participantCanHostExternalActivity } from "./externalActivityProtocol";
+
+describe("external activity classroom protocol", () => {
+  it("accepts versioned requests and rejects untrusted shapes", () => {
+    expect(parseExternalActivityMessage({ version: 1, type: "REQUEST_OPEN", sessionId: "session-1", blockId: "block-1" })).toMatchObject({
+      type: "REQUEST_OPEN",
+      sessionId: "session-1",
+      blockId: "block-1",
+    });
+    expect(parseExternalActivityMessage({ version: 2, type: "REQUEST_OPEN", sessionId: "session-1", blockId: "block-1" })).toBeNull();
+    expect(parseExternalActivityMessage({ version: 1, type: "INPUT", sessionId: "session-1", blockId: "block-1", input: { type: "clipboard" } })).toBeNull();
+  });
+
+  it("accepts extension capture only for the expected session", () => {
+    expect(parseExtensionEvent({ version: 1, type: "CAPTURE_READY", sessionId: "session-1", streamId: "stream-1" }, "session-1")).toMatchObject({ streamId: "stream-1" });
+    expect(parseExtensionEvent({ version: 1, type: "CAPTURE_READY", sessionId: "other", streamId: "stream-1" }, "session-1")).toBeNull();
+  });
+
+  it("uses a reserved track prefix", () => {
+    expect(externalActivityTrackName("session-1", "video")).toBe("playsay-external-activity-session-1-video");
+  });
+
+  it("trusts host state only from teacher or admin LiveKit metadata", () => {
+    expect(participantCanHostExternalActivity('{"playsayRole":"TEACHER"}')).toBe(true);
+    expect(participantCanHostExternalActivity('{"playsayRole":"ADMIN"}')).toBe(true);
+    expect(participantCanHostExternalActivity('{"playsayRole":"STUDENT"}')).toBe(false);
+    expect(participantCanHostExternalActivity("invalid")).toBe(false);
+  });
+});

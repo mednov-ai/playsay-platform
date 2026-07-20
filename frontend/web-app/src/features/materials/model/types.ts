@@ -12,7 +12,18 @@ export type MaterialBlockType =
   | "speakingPrompt"
   | "drawingArea"
   | "generatedImage"
-  | "htmlGame";
+  | "htmlGame"
+  | "externalActivity";
+
+export type ExternalActivityProvider =
+  | "LIVEWORKSHEETS"
+  | "WORDWALL"
+  | "ISLCOLLECTIVE"
+  | "TOPWORKSHEETS"
+  | "JEOPARDYLABS"
+  | "EXPERIMENTAL";
+
+export type ExternalActivitySupportLevel = "GUARANTEED" | "EXPERIMENTAL";
 
 export type MaterialImageSize = "SMALL" | "MEDIUM" | "LARGE" | "FULL";
 
@@ -59,6 +70,32 @@ export type MaterialHtmlGameSync = {
   setAuthorityRun: (blockId: string, runId: string | null) => void;
   setPresentedBlock: (blockId: string | null) => void;
   snapshots: Record<string, MaterialHtmlGameSnapshot>;
+};
+
+export type MaterialExternalActivitySync = {
+  active: {
+    blockId: string;
+    sessionId: string;
+    hostIdentity: string | null;
+    phase: "REQUESTED" | "AWAITING_EXTENSION" | "STARTING" | "ACTIVE" | "ERROR";
+    studentsLocked: boolean;
+    errorCode?: string;
+    visible: boolean;
+  } | null;
+  cursors: Array<{ identity: string; name: string; color: string; x: number; y: number }>;
+  isHost: boolean;
+  mediaStream: MediaStream | null;
+  open: (block: MaterialEditorBlock) => void;
+  collapse: () => void;
+  sendInput: (input: {
+    type: "pointer" | "scroll" | "key";
+    [key: string]: unknown;
+  }) => void;
+  sendCursor: (x: number, y: number) => void;
+  setStudentsLocked: (locked: boolean) => void;
+  reload: () => void;
+  back: () => void;
+  stop: () => void;
 };
 
 export type MaterialMatchingTargetKind = "TEXT" | "IMAGE";
@@ -161,6 +198,7 @@ export type MaterialEditorBlock = {
   prompt?: string;
   url?: string;
   provider?: string;
+  externalActivitySupportLevel?: ExternalActivitySupportLevel;
   videoClip?: MaterialVideoClip;
   caption?: string;
   alt?: string;

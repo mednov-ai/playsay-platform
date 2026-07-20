@@ -8,6 +8,7 @@ import { useLessonTranslation } from "../hooks/useLessonTranslation";
 import type { TranslationRole } from "../model/realtimeTranslation";
 import type { LessonParticipantPresenceMap, LessonParticipantPresenceState } from "../model/session";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
+import { externalActivityTrackPrefix } from "../model/externalActivityProtocol";
 
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
 type ExpectedParticipant = ScheduledLesson["participants"][number];
@@ -280,7 +281,8 @@ export function ClassroomVideoStage({
 }
 
 export function classroomScreenShareTrack(screenShareTracks: ClassroomTrackReference[]) {
-  return screenShareTracks.find((trackRef) => !trackRef.participant.isLocal) ?? screenShareTracks[0];
+  const presentationTracks = screenShareTracks.filter((trackRef) => !trackRef.publication?.trackName?.startsWith(externalActivityTrackPrefix));
+  return presentationTracks.find((trackRef) => !trackRef.participant.isLocal) ?? presentationTracks[0];
 }
 
 function ClassroomTranslationOverlay({ translation }: { translation: ReturnType<typeof useLessonTranslation> }) {

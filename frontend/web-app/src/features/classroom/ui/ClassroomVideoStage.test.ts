@@ -53,11 +53,18 @@ describe("classroomCameraSlots", () => {
 
     expect(classroomScreenShareTrack([localScreenShare, remoteScreenShare])).toBe(remoteScreenShare);
   });
+
+  it("keeps external activity capture out of the generic screen share stage", () => {
+    const external = track("teacher-1", false, "screen_share", "playsay-external-activity-session-1-video");
+
+    expect(classroomScreenShareTrack([external])).toBeUndefined();
+  });
 });
 
-function track(identity: string, isLocal: boolean, source = "camera") {
+function track(identity: string, isLocal: boolean, source = "camera", trackName?: string) {
   return {
     participant: { identity, isLocal, sid: `${identity}-sid` },
+    publication: { trackName },
     source,
   } as Parameters<typeof classroomCameraSlots>[0][number];
 }

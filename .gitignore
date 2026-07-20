@@ -3,6 +3,7 @@ build/
 **/build/
 node_modules/
 dist/
+frontend/browser-extension/playsay-browser-extension.zip
 *.tsbuildinfo
 .env
 .env.*

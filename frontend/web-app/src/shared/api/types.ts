@@ -197,6 +197,13 @@ export type MaterialVideoPlaybackInput = {
   blockId: string;
   quality?: "LOW" | "MEDIUM" | "HIGH" | string | null;
 };
+export type MaterialExternalActivityResolution = {
+  normalizedUrl: string;
+  provider: "LIVEWORKSHEETS" | "WORDWALL" | "ISLCOLLECTIVE" | "TOPWORKSHEETS" | "JEOPARDYLABS" | "EXPERIMENTAL";
+  supportLevel: "GUARANTEED" | "EXPERIMENTAL";
+  host: string;
+  warningCode?: string | null;
+};
 export type MaterialVideoPlayback = {
   materialId: string;
   blockId: string;

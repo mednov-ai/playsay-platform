@@ -7,6 +7,8 @@ import {
 import { useAppTranslation } from "../../../shared/i18n";
 import { useCollaborationDocument } from "../hooks/useCollaborationDocument";
 import { useYjsWorkspace } from "../hooks/useYjsWorkspace";
+import { useExternalActivitySession } from "../hooks/useExternalActivitySession";
+import { materialDocumentBlocks } from "../../materials";
 import { collaborationParticipantColor } from "../model/collaboration";
 import { LessonTaskCanvas, type LessonPresentationMode } from "./LessonTaskCanvas";
 
@@ -75,6 +77,18 @@ export function StudentLiveWorkspace({
     () => groupAnnotationWorkspace.htmlGameSync(false),
     [groupAnnotationWorkspace.htmlGameSync],
   );
+  const externalActivityBlocks = useMemo(
+    () => materialDocumentBlocks(material),
+    [material.document, material.id, material.title],
+  );
+  const externalActivitiesEnabled = import.meta.env.DEV || import.meta.env.VITE_EXTERNAL_ACTIVITY_ENABLED === "true";
+  const externalActivitySync = useExternalActivitySession({
+    blocks: externalActivityBlocks,
+    enabled: externalActivitiesEnabled,
+    isHost: false,
+    participantColor,
+    participantName: displayName,
+  });
 
   return (
     <section className="playsay-live-workspace" aria-label={t("classroom.collaboration.workspaceAria")}>
@@ -87,6 +101,7 @@ export function StudentLiveWorkspace({
         material={material}
         annotationSync={annotationSync}
         htmlGameSync={htmlGameSync}
+        externalActivitySync={externalActivitiesEnabled ? externalActivitySync : undefined}
         onSaveAnswers={onSaveAnswers}
         onPresentationModeChange={onPresentationModeChange}
         score={score}

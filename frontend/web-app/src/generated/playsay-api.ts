@@ -1052,6 +1052,20 @@ export interface LessonMaterialDraftResponse {
   scoringRubric: JsonNode;
 }
 
+export interface MaterialExternalActivityResolveRequest {
+  /** @maxLength 2048 */
+  url: string;
+}
+
+export interface MaterialExternalActivityResolveResponse {
+  normalizedUrl: string;
+  provider: string;
+  supportLevel: string;
+  host: string;
+  /** @nullable */
+  warningCode?: string | null;
+}
+
 /**
  * @nullable
  */
@@ -5180,6 +5194,62 @@ export const draftMaterialFromUrl = async (materialUrlImportRequest: MaterialUrl
 
   const data: draftMaterialFromUrlResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as draftMaterialFromUrlResponse
+}
+
+
+
+export type resolveMaterialExternalActivityResponse200 = {
+  data: MaterialExternalActivityResolveResponse
+  status: 200
+}
+
+export type resolveMaterialExternalActivityResponse400 = {
+  data: MaterialExternalActivityResolveResponse
+  status: 400
+}
+
+export type resolveMaterialExternalActivityResponse401 = {
+  data: MaterialExternalActivityResolveResponse
+  status: 401
+}
+
+export type resolveMaterialExternalActivityResponseSuccess = (resolveMaterialExternalActivityResponse200) & {
+  headers: Headers;
+};
+export type resolveMaterialExternalActivityResponseError = (resolveMaterialExternalActivityResponse400 | resolveMaterialExternalActivityResponse401) & {
+  headers: Headers;
+};
+
+export type resolveMaterialExternalActivityResponse = (resolveMaterialExternalActivityResponseSuccess | resolveMaterialExternalActivityResponseError)
+
+export const getResolveMaterialExternalActivityUrl = () => {
+
+
+
+
+  return `/api/materials/external-activities/resolve`
+}
+
+/**
+ * Normalizes the URL without requesting the remote website.
+ * @summary Validate and classify an external classroom activity URL
+ */
+export const resolveMaterialExternalActivity = async (materialExternalActivityResolveRequest: MaterialExternalActivityResolveRequest, options?: RequestInit): Promise<resolveMaterialExternalActivityResponse> => {
+
+  const res = await fetch(getResolveMaterialExternalActivityUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialExternalActivityResolveRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resolveMaterialExternalActivityResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resolveMaterialExternalActivityResponse
 }
 
 

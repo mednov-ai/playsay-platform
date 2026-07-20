@@ -2,6 +2,8 @@ package com.playsay.gateway.service
 
 import com.playsay.gateway.dto.LessonMaterialRequest
 import com.playsay.gateway.error.ProjectResponseException
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.playsay.gateway.utils.MetaData
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,6 +48,26 @@ class MaterialRequestValidatorTest {
         assertFailsWith<ProjectResponseException> {
             validator.validate(LessonMaterialRequest(title = "Pets", status = "READY"))
         }
+    }
+
+    @Test
+    fun `external activity urls are validated and server classified on save`() {
+        val document = jacksonObjectMapper().readTree(
+            """{"schemaVersion":1,"pages":[{"id":"p1","title":"Page","layout":"FLOW","blocks":[{"id":"e1","type":"externalActivity","title":"Game","url":"https://WORDWALL.NET/resource/1#google_vignette","provider":"FAKE"}]}]}""",
+        )
+
+        val result = validator.validate(LessonMaterialRequest(title = "External", document = document))
+        val block = result.document.path("pages").path(0).path("blocks").path(0)
+        assertEquals("https://wordwall.net/resource/1", block.path("url").asText())
+        assertEquals("WORDWALL", block.path("provider").asText())
+        assertEquals("GUARANTEED", block.path("externalActivitySupportLevel").asText())
+
+        val unsafe = document.deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>()
+        (unsafe.path("pages").path(0).path("blocks").path(0) as com.fasterxml.jackson.databind.node.ObjectNode).put("url", "https://127.0.0.1/internal")
+        val error = assertFailsWith<ProjectResponseException> {
+            validator.validate(LessonMaterialRequest(title = "Unsafe", document = unsafe))
+        }
+        assertEquals(MetaData.ErrorCodes.MATERIAL_EXTERNAL_ACTIVITY_HOST_BLOCKED, error.errorCode)
     }
 
     @Test

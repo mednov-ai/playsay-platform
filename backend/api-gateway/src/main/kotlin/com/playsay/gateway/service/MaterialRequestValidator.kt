@@ -2,6 +2,7 @@ package com.playsay.gateway.service
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.LessonMaterialRequest
 import com.playsay.gateway.error.ProjectResponseException
@@ -30,6 +31,7 @@ data class ValidatedLessonMaterialValues(
 class MaterialRequestValidator(
     private val messageProvider: MessageProvider,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
+    private val externalActivityResolver: MaterialExternalActivityResolver = MaterialExternalActivityResolver(),
 ) {
     fun validate(request: LessonMaterialRequest): ValidatedLessonMaterialValues {
         val title = requiredClean(request.title, "title", 160)
@@ -47,11 +49,12 @@ class MaterialRequestValidator(
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.UNSUPPORTED_MATERIAL_STATUS)
         }
 
-        val document = request.document ?: defaultMaterialDocument(title, objectMapper, messageProvider)
+        val document = (request.document ?: defaultMaterialDocument(title, objectMapper, messageProvider)).deepCopy<JsonNode>()
         val sourceMeta = request.sourceMeta ?: objectMapper.createObjectNode().put("kind", "MANUAL")
         val scoringRubric = request.scoringRubric ?: defaultScoringRubric(objectMapper, messageProvider)
 
         validateJsonSize("document", document, 6_000_000)
+        normalizeExternalActivities(document)
         validateManualHtmlGameTitles(document)
         validateJsonSize("sourceMeta", sourceMeta, 40_000)
         validateJsonSize("scoringRubric", scoringRubric, 40_000)
@@ -146,6 +149,21 @@ class MaterialRequestValidator(
                             MetaData.ErrorCodes.MATERIAL_HTML_GAME_TITLE_NOT_ENGLISH,
                         )
                     }
+                }
+            }
+        }
+    }
+
+    private fun normalizeExternalActivities(document: JsonNode) {
+        document.path("pages").forEach { page ->
+            page.path("blocks").forEach { block ->
+                if (block.path("type").asText() == "externalActivity") {
+                    val objectBlock = block as? ObjectNode
+                        ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_EXTERNAL_ACTIVITY_URL_INVALID)
+                    val resolved = externalActivityResolver.resolve(block.path("url").asText())
+                    objectBlock.put("url", resolved.normalizedUrl)
+                    objectBlock.put("provider", resolved.provider)
+                    objectBlock.put("externalActivitySupportLevel", resolved.supportLevel)
                 }
             }
         }

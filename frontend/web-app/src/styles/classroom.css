@@ -1562,6 +1562,11 @@
   flex-direction: column;
 }
 
+.playsay-task-board[data-presentation-mode="external-activity-focus"] .playsay-rendered-material {
+  display: flex;
+  flex-direction: column;
+}
+
 .playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-material-blocks-html-game {
   flex: 1 1 auto;
 }
@@ -1570,6 +1575,11 @@
 .playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-material-score-badge,
 .playsay-task-board[data-presentation-mode="image-focus"] .playsay-page-picker,
 .playsay-task-board[data-presentation-mode="image-focus"] .playsay-material-score-badge {
+  display: none;
+}
+
+.playsay-task-board[data-presentation-mode="external-activity-focus"] .playsay-page-picker,
+.playsay-task-board[data-presentation-mode="external-activity-focus"] .playsay-material-score-badge {
   display: none;
 }
 

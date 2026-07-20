@@ -1308,6 +1308,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         val teacherToken = liveKitRoomController.createToken(teacher, lesson.id)
         val studentToken = liveKitRoomController.createToken(student, lesson.id)
         val claims = SignedJWT.parse(teacherToken.token).jwtClaimsSet
+        val studentClaims = SignedJWT.parse(studentToken.token).jwtClaimsSet
         val videoGrant = claims.getJSONObjectClaim("video")
 
         assertEquals("wss://online.play-and-say.ru/livekit", teacherToken.serverUrl)
@@ -1323,6 +1324,8 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(true, videoGrant["roomJoin"])
         assertEquals(true, videoGrant["canPublish"])
         assertEquals(true, videoGrant["canSubscribe"])
+        assertEquals("""{"playsayRole":"TEACHER"}""", claims.getStringClaim("metadata"))
+        assertEquals("""{"playsayRole":"STUDENT"}""", studentClaims.getStringClaim("metadata"))
     }
 
     @Test

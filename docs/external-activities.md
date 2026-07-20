@@ -19,7 +19,7 @@ Other public HTTPS hosts are stored as `EXPERIMENTAL`. Localhost, `.local`, priv
 1. Run `npm --workspace browser-extension run package` from `frontend/`.
 2. Open `chrome://extensions` or `edge://extensions`, enable developer mode, and choose **Load unpacked**.
 3. Select `frontend/browser-extension/dist`.
-4. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for a production-mode web build. Development builds enable the feature automatically.
+4. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for a production-mode web build. Local development enables the feature automatically, and Jenkins sets the flag for builds deployed to the shared dev stand.
 
 The packaged artifact is `frontend/browser-extension/playsay-browser-extension.zip`. Production must keep the flag disabled until the extension is signed and distributed through the Chrome/Edge extension stores.
 

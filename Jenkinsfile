@@ -457,7 +457,12 @@ spec:
                 echo "Linting frontend for ${env.BUILD_LABEL}"
                 sh 'npm --workspace web-app run lint'
                 echo "Building frontend for ${env.BUILD_LABEL}"
-                sh 'npm --workspace web-app run build'
+                sh '''
+                  if [ "$DEPLOY_TO_DEV" = "true" ]; then
+                    export VITE_EXTERNAL_ACTIVITY_ENABLED=true
+                  fi
+                  npm --workspace web-app run build
+                '''
                 echo "Running frontend tests for ${env.BUILD_LABEL}"
                 sh 'npm --workspace web-app run test'
                 echo "Building and testing the Play&Say browser extension for ${env.BUILD_LABEL}"

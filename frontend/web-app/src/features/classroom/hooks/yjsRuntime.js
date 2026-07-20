@@ -314,13 +314,14 @@ function normalizeAnnotationElement(value, index) {
   const element = asObject(value);
   const id = asString(element?.id);
   const color = asString(element?.color) || "#ff5c00";
+  const anchorId = asString(element?.anchorId);
   const pageId = asString(element?.pageId) || "material";
   const kind = annotationElementKind(element?.kind, element?.points);
   const createdAt = finiteNumberOr(element?.createdAt, index);
   if (!id || !kind) {
     return null;
   }
-  const base = { color, createdAt, id, pageId };
+  const base = { ...(anchorId ? { anchorId } : {}), color, createdAt, id, pageId };
 
   if (kind === "stroke") {
     const points = Array.isArray(element?.points)
@@ -517,7 +518,11 @@ function updateParticipants(awareness, onParticipantsChange) {
       return {
         clientId,
         color: asString(user?.color) || "#2574ff",
-        cursor: cursor ? { x: clamp01(asNumber(cursor.x)), y: clamp01(asNumber(cursor.y)) } : null,
+        cursor: cursor ? {
+          ...(asString(cursor.anchorId) ? { anchorId: asString(cursor.anchorId) } : {}),
+          x: clamp01(asNumber(cursor.x)),
+          y: clamp01(asNumber(cursor.y)),
+        } : null,
         htmlGameAuthorityRuns,
         name: asString(user?.name) || "Play&Say",
       };

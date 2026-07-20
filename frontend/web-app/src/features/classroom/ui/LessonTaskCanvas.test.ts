@@ -75,6 +75,33 @@ const staticImageMaterial = {
   blockCount: 1,
 } satisfies LessonMaterial;
 
+const flowImageMaterial = {
+  ...material,
+  id: "material-flow-images",
+  document: {
+    schemaVersion: 1,
+    pages: [{
+      id: "page-1",
+      title: "Image worksheet",
+      layout: "FLOW",
+      blocks: [{
+        id: "image-a",
+        type: "image",
+        title: "Worksheet A",
+        url: "https://example.com/a.png",
+        imageSize: "FULL",
+      }, {
+        id: "image-b",
+        type: "generatedImage",
+        title: "Worksheet B",
+        url: "https://example.com/b.png",
+        imageSize: "FULL",
+      }],
+    }],
+  },
+  blockCount: 2,
+} satisfies LessonMaterial;
+
 const twoPageMaterial = {
   ...material,
   document: {
@@ -263,7 +290,7 @@ describe("LessonTaskCanvas", () => {
       if (this.classList.contains("playsay-task-document-surface")) {
         return domRect({ height: 900, left: 10, top: 20, width: 800 });
       }
-      if (this.getAttribute("data-playsay-annotation-anchor") === "true") {
+      if (this.getAttribute("data-playsay-annotation-anchor-id") === "image-1") {
         return domRect({ height: 1200, left: 30, top: 70, width: 760 });
       }
       return domRect({ height: 0, left: 0, top: 0, width: 0 });
@@ -281,13 +308,119 @@ describe("LessonTaskCanvas", () => {
     }));
 
     await waitFor(() => {
-      const layer = container.querySelector<SVGSVGElement>(".playsay-annotation-layer");
+      const layer = container.querySelector<SVGSVGElement>('.playsay-annotation-layer[data-anchored="true"]');
       expect(layer?.getAttribute("data-anchor-pending")).toBe("false");
       expect(layer?.style.left).toBe("20px");
       expect(layer?.style.top).toBe("50px");
       expect(layer?.style.width).toBe("760px");
       expect(layer?.style.height).toBe("1200px");
     });
+
+    rectSpy.mockRestore();
+  });
+
+  it("creates independent annotation layers for ordinary flow images", async () => {
+    const rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if (this.classList.contains("playsay-task-document-surface")) {
+        return domRect({ height: 900, left: 10, top: 20, width: 800 });
+      }
+      if (this.getAttribute("data-playsay-annotation-anchor-id") === "image-a" || this.getAttribute("data-anchor-id") === "image-a") {
+        return domRect({ height: 400, left: 30, top: 70, width: 760 });
+      }
+      if (this.getAttribute("data-playsay-annotation-anchor-id") === "image-b" || this.getAttribute("data-anchor-id") === "image-b") {
+        return domRect({ height: 300, left: 50, top: 510, width: 720 });
+      }
+      return domRect({ height: 0, left: 0, top: 0, width: 0 });
+    });
+
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: flowImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+
+    await waitFor(() => expect(container.querySelectorAll('.playsay-annotation-layer[data-anchored="true"]')).toHaveLength(2));
+    const firstLayer = container.querySelector<SVGSVGElement>('.playsay-annotation-layer[data-anchor-id="image-a"]')!;
+    const secondLayer = container.querySelector<SVGSVGElement>('.playsay-annotation-layer[data-anchor-id="image-b"]')!;
+    expect(firstLayer.style).toEqual(expect.objectContaining({ height: "400px", left: "20px", top: "50px", width: "760px" }));
+    expect(secondLayer.style).toEqual(expect.objectContaining({ height: "300px", left: "40px", top: "490px", width: "720px" }));
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('[data-testid="annotation-tool-text"]')!);
+    fireEvent.pointerDown(firstLayer, { button: 0, clientX: 410, clientY: 270, pointerId: 1 });
+    await waitFor(() => expect(apiMocks.saveAnnotation).toHaveBeenCalledWith(
+      "lesson-1",
+      expect.objectContaining({
+        content: expect.objectContaining({
+          elements: expect.arrayContaining([expect.objectContaining({ anchorId: "image-a", kind: "text" })]),
+          schemaVersion: 6,
+        }),
+      }),
+    ), { timeout: 1_500 });
+
+    rectSpy.mockRestore();
+  });
+
+  it("reanchors a legacy page element when it is selected over a flow image", async () => {
+    apiMocks.fetchAnnotation.mockResolvedValueOnce({
+      content: {
+        activePageId: "page-1",
+        coordinateSpace: "material-page",
+        elements: [{
+          color: "#ff5c00",
+          createdAt: 1,
+          fill: "transparent",
+          fontSize: 18,
+          height: 40,
+          id: "legacy-text",
+          kind: "text",
+          pageId: "page-1",
+          text: "older",
+          width: 100,
+          x: 100,
+          y: 100,
+        }],
+        schemaVersion: 5,
+      },
+    });
+    const rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if (this.classList.contains("playsay-task-document-surface") || (this.classList.contains("playsay-annotation-layer") && !this.getAttribute("data-anchor-id"))) {
+        return domRect({ height: 900, left: 10, top: 20, width: 800 });
+      }
+      if (this.getAttribute("data-playsay-annotation-anchor-id") === "image-a" || this.getAttribute("data-anchor-id") === "image-a") {
+        return domRect({ height: 400, left: 30, top: 70, width: 760 });
+      }
+      if (this.getAttribute("data-playsay-annotation-anchor-id") === "image-b" || this.getAttribute("data-anchor-id") === "image-b") {
+        return domRect({ height: 300, left: 50, top: 510, width: 720 });
+      }
+      return domRect({ height: 0, left: 0, top: 0, width: 0 });
+    });
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: flowImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+
+    await waitFor(() => expect(container.querySelector('foreignObject[aria-label="classroom.annotation.element.text"]')).toBeTruthy());
+    const legacyText = container.querySelector<SVGForeignObjectElement>('foreignObject[aria-label="classroom.annotation.element.text"]')!;
+    fireEvent.pointerDown(legacyText, { button: 0, clientX: 100, clientY: 110, pointerId: 1 });
+    await waitFor(() => expect(apiMocks.saveAnnotation).toHaveBeenCalledWith(
+      "lesson-1",
+      expect.objectContaining({
+        content: expect.objectContaining({
+          elements: expect.arrayContaining([expect.objectContaining({ anchorId: "image-a", id: "legacy-text" })]),
+        }),
+      }),
+    ), { timeout: 1_500 });
 
     rectSpy.mockRestore();
   });

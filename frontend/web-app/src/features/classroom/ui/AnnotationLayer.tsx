@@ -10,6 +10,7 @@ import {
 } from "../model/annotation";
 
 export const AnnotationLayer = memo(function AnnotationLayer({
+  anchorId,
   anchorBounds,
   editingElementId,
   elements,
@@ -32,6 +33,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   selectedElementId,
   tool,
 }: {
+  anchorId?: string;
   anchorBounds?: AnnotationLayerBounds | null;
   editingElementId: string | null;
   elements: AnnotationElement[];
@@ -117,6 +119,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
     <svg
       aria-label={t("classroom.annotation.layer")}
       className="playsay-annotation-layer"
+      data-anchor-id={anchorId}
       data-anchor-pending={anchorPending ? "true" : "false"}
       data-anchored={anchored ? "true" : "false"}
       data-editing={editingElementId ? "true" : "false"}

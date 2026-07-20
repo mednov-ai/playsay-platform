@@ -16,7 +16,7 @@ import {
 } from "./annotation";
 
 describe("annotation model", () => {
-  it("stores mixed board elements in schema v5 material-page coordinates", () => {
+  it("stores mixed board elements in schema v6 material-page coordinates", () => {
     const elements: AnnotationElement[] = [
       stroke(),
       {
@@ -53,7 +53,7 @@ describe("annotation model", () => {
         expect.objectContaining({ id: "arrow-1", kind: "arrow", strokeWidth: 16 }),
         expect.objectContaining({ id: "sticky-1", kind: "stickyNote", text: "Remember this" }),
       ]),
-      schemaVersion: 5,
+      schemaVersion: 6,
     });
   });
 
@@ -147,7 +147,7 @@ describe("annotation model", () => {
     expect(laidOut.find((node) => node.id === "left")!.x).toBeLessThan(root.x);
     expect(laidOut.find((node) => node.id === "right")!.x).toBeGreaterThan(root.x);
     expect(annotationContentFromElements(laidOut, "page-1")).toEqual(expect.objectContaining({
-      schemaVersion: 5,
+      schemaVersion: 6,
       elements: expect.arrayContaining([expect.objectContaining({ kind: "mindMapNode", mapId: "map-1", parentId: "map-1" })]),
     }));
   });
@@ -161,9 +161,26 @@ describe("annotation model", () => {
       ],
     });
 
-    expect(content.schemaVersion).toBe(5);
+    expect(content.schemaVersion).toBe(6);
     expect(content.elements.find((element) => element.id === "text")).toEqual(expect.objectContaining({ autoWidth: true, fontSize: 30 }));
     expect(content.elements.find((element) => element.id === "map")).toEqual(expect.objectContaining({ fontSize: 18, height: 82, width: 220 }));
+  });
+
+  it("preserves image anchors and isolates erasing to the active anchor", () => {
+    const anchored = stroke({ anchorId: "image-1" });
+    const otherAnchor = stroke({ anchorId: "image-2", id: "stroke-2" });
+    const content = annotationContentFromJson(annotationContentFromElements([anchored, otherAnchor], "page-1"));
+
+    expect(content.elements).toEqual(expect.arrayContaining([
+      expect.objectContaining({ anchorId: "image-1", id: "stroke-1" }),
+      expect.objectContaining({ anchorId: "image-2", id: "stroke-2" }),
+    ]));
+    expect(eraseAnnotationElementsAt(content.elements, {
+      anchorId: "image-1",
+      pageId: "page-1",
+      x: 100,
+      y: 200,
+    }).elements.map((element) => element.id)).toEqual(["stroke-2"]);
   });
 
   it("grows compact mind map nodes for wrapped text", () => {

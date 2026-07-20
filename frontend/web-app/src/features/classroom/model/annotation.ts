@@ -19,12 +19,15 @@ export type AnnotationFontSize = 14 | 18 | 24 | 30 | 32;
 export const annotationFontSizePresets = [14, 18, 24, 32] as const satisfies readonly AnnotationFontSize[];
 
 export type AnnotationPoint = {
+  acceptUnanchored?: boolean;
+  anchorId?: string;
   pageId: string;
   x: number;
   y: number;
 };
 
 type AnnotationElementBase = {
+  anchorId?: string;
   color: string;
   createdAt: number;
   id: string;
@@ -107,21 +110,23 @@ export type AnnotationContent = {
   activePageId: string;
   coordinateSpace: "material-page";
   elements: AnnotationElement[];
-  schemaVersion: 5;
+  schemaVersion: 6;
 };
 
 export function svgPointFromEvent(
   event: PointerEvent<SVGElement>,
   pageId = defaultAnnotationPageId,
+  anchorId?: string,
 ): AnnotationPoint {
   const svg = event.currentTarget instanceof SVGSVGElement
     ? event.currentTarget
     : event.currentTarget.ownerSVGElement;
   const rect = svg?.getBoundingClientRect();
   if (!rect || rect.width <= 0 || rect.height <= 0) {
-    return { pageId, x: 0, y: 0 };
+    return { ...(anchorId ? { anchorId } : {}), pageId, x: 0, y: 0 };
   }
   return {
+    ...(anchorId ? { anchorId } : {}),
     pageId,
     x: clampCoordinate(((event.clientX - rect.left) / rect.width) * annotationCoordinateMax),
     y: clampCoordinate(((event.clientY - rect.top) / rect.height) * annotationCoordinateMax),
@@ -134,7 +139,14 @@ export function eraseAnnotationElementsAt(
 ): { elements: AnnotationElement[]; erased: AnnotationStroke[] } {
   const erased: AnnotationStroke[] = [];
   const remaining = elements.filter((element) => {
-    if (element.kind !== "stroke" || element.pageId !== point.pageId) {
+    if (
+      element.kind !== "stroke" ||
+      element.pageId !== point.pageId ||
+      (
+        (element.anchorId ?? "") !== (point.anchorId ?? "") &&
+        !(point.acceptUnanchored && !element.anchorId)
+      )
+    ) {
       return true;
     }
     const hit = distanceToStroke(point, element) <= eraserRadius + element.strokeWidth / 2;
@@ -151,7 +163,7 @@ export function emptyAnnotationContent(activePageId = defaultAnnotationPageId): 
     activePageId,
     coordinateSpace: "material-page",
     elements: [],
-    schemaVersion: 5,
+    schemaVersion: 6,
   };
 }
 
@@ -163,7 +175,7 @@ export function annotationContentFromElements(
     activePageId,
     coordinateSpace: "material-page",
     elements: elements.map((element) => serializeAnnotationElement(element)),
-    schemaVersion: 5,
+    schemaVersion: 6,
   };
 }
 
@@ -187,7 +199,7 @@ export function annotationContentFromJson(
     activePageId,
     coordinateSpace: "material-page",
     elements,
-    schemaVersion: 5,
+    schemaVersion: 6,
   };
 }
 
@@ -481,6 +493,7 @@ export function compareAnnotationElements(left: AnnotationElement, right: Annota
 
 function serializeAnnotationElement(element: AnnotationElement): Record<string, unknown> {
   const base = {
+    ...(element.anchorId ? { anchorId: element.anchorId } : {}),
     color: element.color,
     createdAt: element.createdAt,
     id: element.id,
@@ -540,12 +553,13 @@ function annotationElementFromJson(value: unknown, index: number): AnnotationEle
   const id = asString(element.id).trim();
   const color = asString(element.color).trim() || defaultAnnotationColor;
   const pageId = asString(element.pageId).trim() || defaultAnnotationPageId;
+  const anchorId = asString(element.anchorId).trim();
   const kind = annotationElementKind(element.kind, element.points);
   const createdAt = asNumber(element.createdAt) ?? index;
   if (!id || !kind) {
     return null;
   }
-  const base = { color, createdAt, id, pageId };
+  const base = { ...(anchorId ? { anchorId } : {}), color, createdAt, id, pageId };
 
   if (kind === "stroke") {
     const rawPoints = Array.isArray(element.points) ? element.points : [];

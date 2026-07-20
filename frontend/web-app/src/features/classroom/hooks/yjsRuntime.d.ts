@@ -5,6 +5,7 @@ import type { MaterialHtmlGameEffect, MaterialHtmlGameInputEvent, MaterialHtmlGa
 export type { AnnotationElement } from "../model/annotation";
 
 export type CollaborationCursor = {
+  anchorId?: string;
   x: number;
   y: number;
 };

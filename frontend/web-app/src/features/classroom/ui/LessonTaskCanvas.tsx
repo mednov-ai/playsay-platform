@@ -124,6 +124,7 @@ export function LessonTaskCanvas({
     handleMindMapKey,
     mindMapLimitReached,
     redo,
+    reanchorElement,
     selectedElementId,
     setActivePageId,
     setAnnotationTool,
@@ -139,13 +140,18 @@ export function LessonTaskCanvas({
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const activePage = document?.pages.find((page) => page.id === activePageId) ?? document?.pages[0] ?? null;
   const materialSurfaceRef = useRef<HTMLDivElement>(null);
-  const annotationAnchorBounds = useAnnotationAnchorBounds(
+  const annotationAnchors = useAnnotationAnchors(
     materialSurfaceRef,
-    activePage?.layout === "STATIC_IMAGE" || presentationMode === "image-focus",
     activePage?.id ?? null,
     presentationMode,
   );
   const visibleAnnotationElements = annotationElementsForPage(annotationElements, activePage?.id ?? activePageId);
+  const legacyAnchorId = activePage?.layout === "STATIC_IMAGE"
+    ? activePage.blocks.find((block) => block.type === "image" || block.type === "generatedImage")?.id
+    : annotationAnchors.find((anchor) => anchor.focused)?.id;
+  const pageAnnotationElements = visibleAnnotationElements.filter((element) => (
+    !element.anchorId && !legacyAnchorId
+  ));
   const selectedAnnotationElement = selectedElementId
     ? visibleAnnotationElements.find((element) => element.id === selectedElementId) ?? null
     : null;
@@ -219,7 +225,17 @@ export function LessonTaskCanvas({
       return;
     }
 
-    annotationSync.updateCursor({
+    const anchor = annotationAnchors.find(({ bounds }) => (
+      event.clientX >= rect.left + bounds.left &&
+      event.clientX <= rect.left + bounds.left + bounds.width &&
+      event.clientY >= rect.top + bounds.top &&
+      event.clientY <= rect.top + bounds.top + bounds.height
+    ));
+    annotationSync.updateCursor(anchor ? {
+      anchorId: anchor.id,
+      x: clamp01((event.clientX - rect.left - anchor.bounds.left) / anchor.bounds.width),
+      y: clamp01((event.clientY - rect.top - anchor.bounds.top) / anchor.bounds.height),
+    } : {
       x: clamp01((event.clientX - rect.left) / rect.width),
       y: clamp01((event.clientY - rect.top) / rect.height),
     });
@@ -227,6 +243,30 @@ export function LessonTaskCanvas({
 
   function clearMaterialCursor() {
     annotationSync?.updateCursor(null);
+  }
+
+  function beginElementMoveOnCurrentSurface(event: PointerEvent<SVGElement>, elementId: string) {
+    const element = visibleAnnotationElements.find((candidate) => candidate.id === elementId);
+    const surface = materialSurfaceRef.current;
+    const sourceSvg = event.currentTarget.ownerSVGElement;
+    if (element && !element.anchorId && surface && sourceSvg) {
+      const surfaceRect = surface.getBoundingClientRect();
+      const anchor = annotationAnchors.find(({ bounds }) => (
+        event.clientX >= surfaceRect.left + bounds.left &&
+        event.clientX <= surfaceRect.left + bounds.left + bounds.width &&
+        event.clientY >= surfaceRect.top + bounds.top &&
+        event.clientY <= surfaceRect.top + bounds.top + bounds.height
+      ));
+      if (anchor && reanchorElement(event, elementId, anchor.id, sourceSvg.getBoundingClientRect(), {
+        height: anchor.bounds.height,
+        left: surfaceRect.left + anchor.bounds.left,
+        top: surfaceRect.top + anchor.bounds.top,
+        width: anchor.bounds.width,
+      })) {
+        return;
+      }
+    }
+    beginElementMove(event, elementId);
   }
 
   return (
@@ -364,9 +404,8 @@ export function LessonTaskCanvas({
               <UnassignedLessonMaterial />
             )}
             <AnnotationLayer
-              anchorBounds={activePage?.layout === "STATIC_IMAGE" ? annotationAnchorBounds : undefined}
               editingElementId={editingElementId}
-              elements={visibleAnnotationElements}
+              elements={pageAnnotationElements}
               onAddMindMapNode={addMindMapNode}
               onBegin={beginAnnotation}
               onDeleteSelected={deleteSelectedElement}
@@ -376,7 +415,7 @@ export function LessonTaskCanvas({
               onElementSizeChange={updateAnnotationElementSize}
               onFinishTextEditing={finishTextEditing}
               onMove={extendAnnotation}
-              onMoveElement={beginElementMove}
+              onMoveElement={beginElementMoveOnCurrentSurface}
               onMindMapKey={handleMindMapKey}
               onRedo={redo}
               onResizeElement={beginElementResize}
@@ -386,10 +425,47 @@ export function LessonTaskCanvas({
               selectedElementId={selectedElementId}
               tool={annotationTool}
             />
+            {annotationAnchors.map((anchor) => (
+              <AnnotationLayer
+                anchorId={anchor.id}
+                anchorBounds={anchor.bounds}
+                editingElementId={editingElementId}
+                elements={visibleAnnotationElements.filter((element) => (
+                  element.anchorId === anchor.id || (!element.anchorId && legacyAnchorId === anchor.id)
+                ))}
+                key={anchor.id}
+                onAddMindMapNode={addMindMapNode}
+                onBegin={(event) => beginAnnotation(event, anchor.id, legacyAnchorId === anchor.id)}
+                onDeleteSelected={deleteSelectedElement}
+                onDeselect={() => setSelectedElementId(null)}
+                onEditText={beginTextEditing}
+                onEnd={endAnnotation}
+                onElementSizeChange={updateAnnotationElementSize}
+                onFinishTextEditing={finishTextEditing}
+                onMove={extendAnnotation}
+                onMoveElement={beginElementMoveOnCurrentSurface}
+                onMindMapKey={handleMindMapKey}
+                onRedo={redo}
+                onResizeElement={beginElementResize}
+                onSelectElement={setSelectedElementId}
+                onTextChange={updateAnnotationText}
+                onUndo={undo}
+                selectedElementId={selectedElementId}
+                tool={annotationTool}
+              />
+            ))}
             {mindMapLimitReached ? (
               <div className="playsay-mind-map-limit" role="status">{t("classroom.annotation.mindMapLimit")}</div>
             ) : null}
             <PresenceCursorLayer participants={annotationSync?.participants ?? []} />
+            {annotationAnchors.map((anchor) => (
+              <PresenceCursorLayer
+                anchorBounds={anchor.bounds}
+                anchorId={anchor.id}
+                key={anchor.id}
+                participants={annotationSync?.participants ?? []}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -427,68 +503,66 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function useAnnotationAnchorBounds(
+type AnnotationAnchor = {
+  bounds: AnnotationLayerBounds;
+  focused: boolean;
+  id: string;
+};
+
+function useAnnotationAnchors(
   surfaceRef: RefObject<HTMLDivElement | null>,
-  enabled: boolean,
   pageId: string | null,
   presentationMode: LessonPresentationMode,
-): AnnotationLayerBounds | null {
-  const [bounds, setBounds] = useState<AnnotationLayerBounds | null>(null);
+): AnnotationAnchor[] {
+  const [anchors, setAnchors] = useState<AnnotationAnchor[]>([]);
 
   useLayoutEffect(() => {
-    if (!enabled) {
-      setBounds(null);
-      return;
-    }
-
     const currentSurface = surfaceRef.current;
     if (!currentSurface) {
-      setBounds(null);
+      setAnchors([]);
       return;
     }
     const surfaceElement: HTMLDivElement = currentSurface;
 
-    let anchor: HTMLElement | null = null;
     const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
       : new ResizeObserver(() => measure());
-
-    function observeCurrentAnchor() {
-      const nextAnchor = surfaceElement.querySelector<HTMLElement>('[data-playsay-annotation-anchor="true"]');
-      if (nextAnchor === anchor) {
-        return;
-      }
-      if (anchor) {
-        resizeObserver?.unobserve(anchor);
-      }
-      anchor = nextAnchor;
-      if (anchor) {
-        resizeObserver?.observe(anchor);
-      }
-    }
+    let observedElements = new Set<Element>();
 
     function measure() {
-      observeCurrentAnchor();
-      if (!anchor) {
-        setBounds(null);
-        return;
-      }
       const surfaceRect = surfaceElement.getBoundingClientRect();
-      const anchorRect = anchor.getBoundingClientRect();
-      if (anchorRect.width <= 0 || anchorRect.height <= 0) {
-        setBounds(null);
-        return;
-      }
-      const nextBounds = {
-        height: anchorRect.height,
-        left: anchorRect.left - surfaceRect.left,
-        top: anchorRect.top - surfaceRect.top,
-        width: anchorRect.width,
-      };
-      setBounds((current) => sameAnnotationBounds(current, nextBounds) ? current : nextBounds);
+      const candidates = Array.from(surfaceElement.querySelectorAll<HTMLElement>("[data-playsay-annotation-anchor-id]"));
+      const nextObservedElements = new Set<Element>([surfaceElement, ...candidates]);
+      observedElements.forEach((element) => {
+        if (!nextObservedElements.has(element)) resizeObserver?.unobserve(element);
+      });
+      nextObservedElements.forEach((element) => {
+        if (!observedElements.has(element)) resizeObserver?.observe(element);
+      });
+      observedElements = nextObservedElements;
+      const byId = new Map<string, AnnotationAnchor>();
+      candidates.forEach((element) => {
+        const id = element.dataset.playsayAnnotationAnchorId?.trim();
+        const rect = element.getBoundingClientRect();
+        if (!id || rect.width <= 0 || rect.height <= 0) return;
+        const focused = Boolean(element.closest('.playsay-material-focus-stack[data-active="true"]'));
+        const candidate = {
+          bounds: {
+            height: rect.height,
+            left: rect.left - surfaceRect.left,
+            top: rect.top - surfaceRect.top,
+            width: rect.width,
+          },
+          focused,
+          id,
+        };
+        const current = byId.get(id);
+        if (!current || focused || !current.focused) byId.set(id, candidate);
+      });
+      const nextAnchors = [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
+      setAnchors((current) => sameAnnotationAnchors(current, nextAnchors) ? current : nextAnchors);
     }
 
-    resizeObserver?.observe(surfaceElement);
     const mutationObserver = typeof MutationObserver === "undefined"
       ? null
       : new MutationObserver(measure);
@@ -501,18 +575,23 @@ function useAnnotationAnchorBounds(
       mutationObserver?.disconnect();
       resizeObserver?.disconnect();
     };
-  }, [enabled, pageId, presentationMode, surfaceRef]);
+  }, [pageId, presentationMode, surfaceRef]);
 
-  return bounds;
+  return anchors;
 }
 
-function sameAnnotationBounds(
-  current: AnnotationLayerBounds | null,
-  next: AnnotationLayerBounds,
+function sameAnnotationAnchors(
+  current: AnnotationAnchor[],
+  next: AnnotationAnchor[],
 ): boolean {
-  return current !== null &&
-    current.height === next.height &&
-    current.left === next.left &&
-    current.top === next.top &&
-    current.width === next.width;
+  return current.length === next.length && current.every((anchor, index) => {
+    const candidate = next[index];
+    return candidate !== undefined &&
+      anchor.id === candidate.id &&
+      anchor.focused === candidate.focused &&
+      anchor.bounds.height === candidate.bounds.height &&
+      anchor.bounds.left === candidate.bounds.left &&
+      anchor.bounds.top === candidate.bounds.top &&
+      anchor.bounds.width === candidate.bounds.width;
+  });
 }

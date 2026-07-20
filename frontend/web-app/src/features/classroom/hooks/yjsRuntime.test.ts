@@ -75,6 +75,7 @@ describe("yjs workspace runtime annotations", () => {
   it("restores text and annotations from the Yjs snapshot after reconnect", () => {
     withWindowBase64(() => {
       const stroke: AnnotationElement = {
+        anchorId: "image-1",
         color: "#ff5c00",
         createdAt: 1,
         id: "stroke-1",

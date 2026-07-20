@@ -315,6 +315,7 @@ export function LessonMaterialDocumentView({
             {resolveMaterialImageUrl(focusedBlockValue.url, assetUrls) ? (
               <img
                 alt={focusedBlockValue.alt || focusedBlockValue.caption || focusedBlockValue.prompt || focusedBlockValue.title}
+                data-playsay-annotation-anchor-id={focusedBlockValue.id}
                 src={resolveMaterialImageUrl(focusedBlockValue.url, assetUrls)}
               />
             ) : null}

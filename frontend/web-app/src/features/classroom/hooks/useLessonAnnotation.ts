@@ -39,8 +39,15 @@ type AnnotationHistoryEntry = {
   before: AnnotationElement[];
 };
 
+export type AnnotationReanchorBounds = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
 type ActiveInteraction =
-  | { erased: AnnotationStroke[]; mode: "erase" }
+  | { acceptUnanchored?: boolean; anchorId?: string; erased: AnnotationStroke[]; mode: "erase" }
   | { before: AnnotationElement; id: string; mode: "create" }
   | {
       before: AnnotationElement;
@@ -226,7 +233,7 @@ export function useLessonAnnotation({
     });
   }
 
-  function beginAnnotation(event: PointerEvent<SVGSVGElement>) {
+  function beginAnnotation(event: PointerEvent<SVGSVGElement>, anchorId?: string, acceptUnanchored = false) {
     if (event.button !== 0 || annotationTool === "pointer") {
       if (annotationTool === "pointer" && event.target === event.currentTarget) {
         setSelectedElementId(null);
@@ -236,7 +243,7 @@ export function useLessonAnnotation({
     }
 
     event.preventDefault();
-    const point = svgPointFromEvent(event, activePageId);
+    const point = svgPointFromEvent(event, activePageId, anchorId);
     if (annotationTool === "mindMap") {
       createMindMapRoot(point);
       return;
@@ -248,8 +255,13 @@ export function useLessonAnnotation({
 
     capturePointer(event);
     if (annotationTool === "eraser") {
-      activeInteractionRef.current = { erased: [], mode: "erase" };
-      eraseAt(point);
+      activeInteractionRef.current = {
+        ...(acceptUnanchored ? { acceptUnanchored } : {}),
+        ...(anchorId ? { anchorId } : {}),
+        erased: [],
+        mode: "erase",
+      };
+      eraseAt({ ...point, ...(acceptUnanchored ? { acceptUnanchored } : {}) });
       return;
     }
 
@@ -263,11 +275,16 @@ export function useLessonAnnotation({
   }
 
   function extendAnnotation(event: PointerEvent<SVGSVGElement>) {
-    if (!activeInteractionRef.current) {
+    const interaction = activeInteractionRef.current;
+    if (!interaction) {
       return;
     }
     event.preventDefault();
-    pendingInteractionPointRef.current = svgPointFromEvent(event, activePageId);
+    const anchorId = interaction.mode === "erase" ? interaction.anchorId : interaction.before.anchorId;
+    pendingInteractionPointRef.current = {
+      ...svgPointFromEvent(event, activePageId, anchorId),
+      ...(interaction.mode === "erase" && interaction.acceptUnanchored ? { acceptUnanchored: true } : {}),
+    };
     if (pointerFrameRef.current === null) {
       pointerFrameRef.current = requestPointerFrame(() => {
         pointerFrameRef.current = null;
@@ -351,7 +368,11 @@ export function useLessonAnnotation({
       releasePointer(event.pointerId);
       return;
     }
-    pendingInteractionPointRef.current = svgPointFromEvent(event, activePageId);
+    const anchorId = interaction.mode === "erase" ? interaction.anchorId : interaction.before.anchorId;
+    pendingInteractionPointRef.current = {
+      ...svgPointFromEvent(event, activePageId, anchorId),
+      ...(interaction.mode === "erase" && interaction.acceptUnanchored ? { acceptUnanchored: true } : {}),
+    };
     cancelPointerFrame();
     flushPendingInteraction();
     activeInteractionRef.current = null;
@@ -405,8 +426,36 @@ export function useLessonAnnotation({
       beforeGroup: element.kind === "mindMapNode" ? mindMapNodes(elementsRef.current, element.mapId) : undefined,
       id: elementId,
       mode: "move",
-      start: svgPointFromEvent(event, activePageId),
+      start: svgPointFromEvent(event, activePageId, element.anchorId),
     };
+  }
+
+  function reanchorElement(
+    event: PointerEvent<SVGElement>,
+    elementId: string,
+    anchorId: string,
+    sourceBounds: AnnotationReanchorBounds,
+    targetBounds: AnnotationReanchorBounds,
+  ) {
+    const selected = elementsRef.current.find((element) => element.id === elementId);
+    if (!selected || selected.anchorId || sourceBounds.width <= 0 || sourceBounds.height <= 0 || targetBounds.width <= 0 || targetBounds.height <= 0) {
+      return false;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const before = selected.kind === "mindMapNode"
+      ? mindMapNodes(elementsRef.current, selected.mapId)
+      : [selected];
+    const beforeIds = new Set(before.map((element) => element.id));
+    const after = before.map((element) => reanchorAnnotationElement(element, anchorId, sourceBounds, targetBounds));
+    const afterById = new Map(after.map((element) => [element.id, element]));
+    updateElements((current) => current.map((element) => (
+      beforeIds.has(element.id) ? afterById.get(element.id) ?? element : element
+    )));
+    recordHistory(before, after);
+    setSelectedElementId(elementId);
+    setEditingElementId(null);
+    return true;
   }
 
   function beginElementResize(
@@ -426,7 +475,7 @@ export function useLessonAnnotation({
       handle,
       id: elementId,
       mode: "resize",
-      start: svgPointFromEvent(event, activePageId),
+      start: svgPointFromEvent(event, activePageId, element.anchorId),
     };
   }
 
@@ -589,6 +638,7 @@ export function useLessonAnnotation({
 
   function createDrawableElement(tool: AnnotationTool, point: AnnotationPoint): AnnotationElement | null {
     const base = {
+      ...(point.anchorId ? { anchorId: point.anchorId } : {}),
       color: annotationColor,
       createdAt: Date.now(),
       id: annotationElementId(tool),
@@ -627,6 +677,7 @@ export function useLessonAnnotation({
     const width = tool === "stickyNote" ? 220 : 72;
     const height = tool === "stickyNote" ? 160 : 34;
     const element: AnnotationElement = {
+      ...(point.anchorId ? { anchorId: point.anchorId } : {}),
       autoWidth: tool === "text",
       color: tool === "stickyNote" ? "#111111" : annotationColor,
       createdAt: Date.now(),
@@ -652,6 +703,7 @@ export function useLessonAnnotation({
   function createMindMapRoot(point: AnnotationPoint) {
     const id = annotationElementId("mindMap");
     const element = resizeMindMapNodeForText({
+      ...(point.anchorId ? { anchorId: point.anchorId } : {}),
       color: "#ffffff",
       createdAt: Date.now(),
       fill: annotationColor,
@@ -698,6 +750,7 @@ export function useLessonAnnotation({
       : actualParent.side === "left" ? "left" : "right";
     const id = annotationElementId("mindMap");
     const node: AnnotationMindMapNode = {
+      ...(selected.anchorId ? { anchorId: selected.anchorId } : {}),
       color: annotationColor,
       createdAt: Date.now(),
       fill: "#ffffff",
@@ -868,6 +921,7 @@ export function useLessonAnnotation({
     handleMindMapKey,
     mindMapLimitReached,
     redo,
+    reanchorElement,
     selectedElementId,
     setActivePageId,
     setAnnotationTool,
@@ -880,6 +934,43 @@ export function useLessonAnnotation({
     updateSelectedStrokeWidth,
     extendAnnotation,
   };
+}
+
+function reanchorAnnotationElement(
+  element: AnnotationElement,
+  anchorId: string,
+  source: AnnotationReanchorBounds,
+  target: AnnotationReanchorBounds,
+): AnnotationElement {
+  const mapPoint = (point: AnnotationPoint): AnnotationPoint => ({
+    pageId: point.pageId,
+    x: clampAnnotationCoordinate(((source.left + (point.x / 1000) * source.width - target.left) / target.width) * 1000),
+    y: clampAnnotationCoordinate(((source.top + (point.y / 1000) * source.height - target.top) / target.height) * 1000),
+  });
+  if (element.kind === "stroke") {
+    return { ...element, anchorId, points: element.points.map(mapPoint) };
+  }
+  if (element.kind === "line" || element.kind === "arrow") {
+    return { ...element, anchorId, end: mapPoint(element.end), start: mapPoint(element.start) };
+  }
+  const topLeft = mapPoint({ pageId: element.pageId, x: element.x, y: element.y });
+  const bottomRight = mapPoint({
+    pageId: element.pageId,
+    x: element.x + element.width,
+    y: element.y + element.height,
+  });
+  return {
+    ...element,
+    anchorId,
+    height: Math.max(1, bottomRight.y - topLeft.y),
+    width: Math.max(1, bottomRight.x - topLeft.x),
+    x: topLeft.x,
+    y: topLeft.y,
+  };
+}
+
+function clampAnnotationCoordinate(value: number): number {
+  return Math.max(0, Math.min(1000, value));
 }
 
 function boxElementFromPoints(

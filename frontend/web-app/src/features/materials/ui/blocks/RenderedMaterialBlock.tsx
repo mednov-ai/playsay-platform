@@ -258,7 +258,11 @@ export function RenderedMaterialBlock({
                 data-image-size={imageSize}
                 style={{ "--playsay-image-height": imageHeight, "--playsay-image-fit": objectFit } as CSSProperties}
               >
-                <img alt={block.alt || block.caption || block.prompt || block.title} src={imageUrl} />
+                <img
+                  alt={block.alt || block.caption || block.prompt || block.title}
+                  data-playsay-annotation-anchor-id={block.id}
+                  src={imageUrl}
+                />
                 {canFocusImage ? (
                   <button
                     aria-label={t("materials.renderer.expandImage", { title: block.title })}

@@ -16,7 +16,7 @@ describe("classroom video theme", () => {
   it("uses light product surfaces for video chrome by default", () => {
     expect(cssRule(".playsay-video-rail")).toContain("--playsay-video-chrome: hsl(var(--surface));");
     expect(cssRule(".playsay-video-rail")).toContain("--playsay-video-text: hsl(var(--foreground));");
-    expect(cssRule('.playsay-classroom-room [data-lk-theme="default"]')).toContain("color-scheme: light;");
+    expect(cssRule('.playsay-livekit-context[data-lk-theme="default"]')).toContain("color-scheme: light;");
     expect(cssRule(".playsay-classroom-conference")).toContain("background: var(--playsay-video-chrome-muted);");
     expect(cssRule(".playsay-classroom-conference .lk-control-bar")).toContain("background: var(--playsay-video-chrome);");
   });
@@ -24,7 +24,7 @@ describe("classroom video theme", () => {
   it("preserves the established dark video palette in dark mode", () => {
     expect(cssRule(".dark .playsay-video-rail")).toContain("--playsay-video-chrome: #111111;");
     expect(cssRule(".dark .playsay-video-rail")).toContain("--playsay-video-tile: #202020;");
-    expect(cssRule('.dark .playsay-classroom-room [data-lk-theme="default"]')).toContain("color-scheme: dark;");
+    expect(cssRule('.dark .playsay-livekit-context[data-lk-theme="default"]')).toContain("color-scheme: dark;");
   });
 
   it("keeps media letterboxing dark in either theme", () => {

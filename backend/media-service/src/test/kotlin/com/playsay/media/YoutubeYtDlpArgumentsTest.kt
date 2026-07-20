@@ -32,7 +32,7 @@ class YoutubeYtDlpArgumentsTest {
         assertEquals(
             listOf(
                 "--plugin-dirs",
-                "/usr/local/lib/yt-dlp-plugins",
+                "/usr/local/lib",
                 "--js-runtimes",
                 "deno:/usr/local/bin/deno",
                 "--sleep-requests",

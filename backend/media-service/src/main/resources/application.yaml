@@ -22,7 +22,7 @@ playsay:
     max-upstream-range-bytes: ${PLAYSAY_MEDIA_SERVICE_MAX_UPSTREAM_RANGE_BYTES:1048576}
     max-thumbnail-bytes: ${PLAYSAY_MEDIA_SERVICE_MAX_THUMBNAIL_BYTES:5242880}
     ytdlp-path: ${PLAYSAY_MEDIA_SERVICE_YTDLP_PATH:yt-dlp}
-    ytdlp-plugin-directory: ${PLAYSAY_MEDIA_SERVICE_YTDLP_PLUGIN_DIRECTORY:/usr/local/lib/yt-dlp-plugins}
+    ytdlp-plugin-directory: ${PLAYSAY_MEDIA_SERVICE_YTDLP_PLUGIN_DIRECTORY:/usr/local/lib}
     ytdlp-js-runtime: ${PLAYSAY_MEDIA_SERVICE_YTDLP_JS_RUNTIME:deno:/usr/local/bin/deno}
     youtube-pot-enabled: ${PLAYSAY_YOUTUBE_POT_ENABLED:false}
     youtube-pot-provider-base-url: ${PLAYSAY_YOUTUBE_POT_PROVIDER_BASE_URL:http://127.0.0.1:4416}

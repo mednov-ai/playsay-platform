@@ -13,8 +13,8 @@ class YoutubeYtDlpArguments(
     allowedVideoIds: String = "",
     @param:Value("\${playsay.media-service.youtube-pot-player-clients:mweb}")
     private val playerClients: String = "mweb",
-    @param:Value("\${playsay.media-service.ytdlp-plugin-directory:/usr/local/lib/yt-dlp-plugins}")
-    private val pluginDirectory: String = "/usr/local/lib/yt-dlp-plugins",
+    @param:Value("\${playsay.media-service.ytdlp-plugin-directory:/usr/local/lib}")
+    private val pluginDirectory: String = "/usr/local/lib",
     @param:Value("\${playsay.media-service.ytdlp-js-runtime:deno:/usr/local/bin/deno}")
     private val jsRuntime: String = "deno:/usr/local/bin/deno",
     @param:Value("\${playsay.media-service.youtube-pot-sleep-requests-seconds:1}")

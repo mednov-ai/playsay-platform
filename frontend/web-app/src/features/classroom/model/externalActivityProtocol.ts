@@ -72,6 +72,12 @@ export function participantCanHostExternalActivity(metadata: string | undefined)
   }
 }
 
+export function externalActivityCaptureErrorCode(error: unknown): string {
+  const name = error instanceof Error ? error.name : "UnknownError";
+  const normalized = name.replace(/([a-z])([A-Z])/g, "$1_$2").replace(/[^A-Za-z0-9]+/g, "_").toUpperCase().slice(0, 48);
+  return `CAPTURE_FAILED_${normalized || "UNKNOWN_ERROR"}`;
+}
+
 function validInput(input: ExternalActivityInput | undefined): input is ExternalActivityInput {
   if (!input || typeof input !== "object") return false;
   if (input.type === "pointer") return ["move", "down", "up"].includes(input.action) && coordinate(input.x) && coordinate(input.y);

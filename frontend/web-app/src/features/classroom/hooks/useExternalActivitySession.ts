@@ -3,6 +3,7 @@ import { RoomEvent, Track, type RemoteParticipant } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../materials/model/materialDocument";
 import {
+  externalActivityCaptureErrorCode,
   externalActivityCursorTopic,
   externalActivityExtensionChannel,
   externalActivityHostTopic,
@@ -225,7 +226,7 @@ export function useExternalActivitySession({
             if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);
             broadcastState({ ...next, phase: "ACTIVE" });
           })
-          .catch(() => broadcastState({ ...next, phase: "ERROR", errorCode: "CAPTURE_FAILED" }));
+          .catch((error: unknown) => broadcastState({ ...next, phase: "ERROR", errorCode: externalActivityCaptureErrorCode(error) }));
       } else if (["TAB_CLOSED", "DEBUGGER_DETACHED", "ERROR"].includes(String(extensionEvent.type))) {
         broadcastState({ ...current, phase: "ERROR", errorCode: String(extensionEvent.type) });
       }

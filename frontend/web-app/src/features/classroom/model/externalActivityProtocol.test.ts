@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { externalActivityTrackName, parseExternalActivityMessage, parseExtensionEvent, participantCanHostExternalActivity } from "./externalActivityProtocol";
+import {
+  externalActivityCaptureErrorCode,
+  externalActivityTrackName,
+  parseExternalActivityMessage,
+  parseExtensionEvent,
+  participantCanHostExternalActivity,
+} from "./externalActivityProtocol";
 
 describe("external activity classroom protocol", () => {
+  it("reports a safe browser capture error name without exposing its message", () => {
+    expect(externalActivityCaptureErrorCode(new DOMException("private device detail", "NotReadableError")))
+      .toBe("CAPTURE_FAILED_NOT_READABLE_ERROR");
+    expect(externalActivityCaptureErrorCode("unexpected"))
+      .toBe("CAPTURE_FAILED_UNKNOWN_ERROR");
+  });
+
   it("accepts versioned requests and rejects untrusted shapes", () => {
     expect(parseExternalActivityMessage({ version: 1, type: "REQUEST_OPEN", sessionId: "session-1", blockId: "block-1" })).toMatchObject({
       type: "REQUEST_OPEN",

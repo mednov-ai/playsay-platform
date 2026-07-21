@@ -144,6 +144,8 @@ spec:
   }
 
   environment {
+    PLAYSAY_DEDICATED_CI = 'true'
+    KUBECONFIG = credentials('dev-kubeconfig')
     GITHUB_OWNER = 'mednov-ai'
     API_IMAGE_NAME = 'playsay-api-gateway'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'

@@ -1,6 +1,14 @@
 #!/bin/sh
 set -eu
 
+# Builds now run on the dedicated playsay-ci VM. Capacity shedding belongs only
+# to the retired single-node app+Jenkins topology and must never scale dev from
+# the remote kubeconfig.
+if [ "${PLAYSAY_DEDICATED_CI:-false}" = "true" ]; then
+  echo "Dedicated CI node: shared-node capacity action '${1:-status}' is not required."
+  exit 0
+fi
+
 STATE_NAMESPACE="${CI_CAPACITY_NAMESPACE:-jenkins}"
 STATE_NAME="${CI_CAPACITY_STATE_NAME:-playsay-ci-capacity-state}"
 LEASE_NAME="${CI_CAPACITY_LEASE_NAME:-playsay-ci-capacity}"

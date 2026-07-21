@@ -142,6 +142,8 @@ spec:
   }
 
   environment {
+    PLAYSAY_DEDICATED_CI = 'true'
+    KUBECONFIG = credentials('dev-kubeconfig')
     GITHUB_OWNER = 'mednov-ai'
     VOCABULARY_IMAGE_NAME = 'playsay-vocabulary-service'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'

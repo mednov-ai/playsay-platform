@@ -25,11 +25,14 @@ describe("auth helpers", () => {
     vi.unstubAllGlobals();
   });
 
-  it("selects the canonical honey issuer for production and development hosts", () => {
+  it("selects the canonical honey issuer for production, development, and legacy rollback hosts", () => {
     expect(defaultAuthIssuer("online.honey.school")).toBe(
       "https://ops.honey.school/keycloak/realms/playsay",
     );
     expect(defaultAuthIssuer("dev.online.honey.school")).toBe(
+      "https://dev.ops.honey.school/keycloak/realms/playsay",
+    );
+    expect(defaultAuthIssuer("online.play-and-say.ru")).toBe(
       "https://dev.ops.honey.school/keycloak/realms/playsay",
     );
   });

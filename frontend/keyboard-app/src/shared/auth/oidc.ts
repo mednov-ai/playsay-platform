@@ -44,6 +44,10 @@ export function defaultAuthIssuer(hostname = globalThis.location?.hostname ?? ""
   if (hostname === "dev.online.honey.school" || hostname === "dev.key.honey.school") {
     return "https://dev.ops.honey.school/keycloak/realms/playsay";
   }
+  // Transitional rollback bridge; remove with the legacy play-and-say.ru app hosts and old VPS.
+  if (hostname === "online.play-and-say.ru" || hostname === "key.play-and-say.ru") {
+    return "https://dev.ops.honey.school/keycloak/realms/playsay";
+  }
   return "https://ops.play-and-say.ru:18443/keycloak/realms/playsay";
 }
 

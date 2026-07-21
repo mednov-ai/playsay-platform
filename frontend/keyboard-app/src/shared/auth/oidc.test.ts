@@ -13,11 +13,14 @@ const config: AuthConfig = {
 };
 
 describe("keyboard auth helpers", () => {
-  it("selects the canonical honey issuer for production and development hosts", () => {
+  it("selects the canonical honey issuer for production, development, and legacy rollback hosts", () => {
     expect(defaultAuthIssuer("key.honey.school")).toBe(
       "https://ops.honey.school/keycloak/realms/playsay",
     );
     expect(defaultAuthIssuer("dev.key.honey.school")).toBe(
+      "https://dev.ops.honey.school/keycloak/realms/playsay",
+    );
+    expect(defaultAuthIssuer("key.play-and-say.ru")).toBe(
       "https://dev.ops.honey.school/keycloak/realms/playsay",
     );
   });

@@ -185,11 +185,17 @@ spec:
           }
           env.BUILD_LABEL_PREFIX = buildPrefix ?: 'web'
           env.BUILD_LABEL = "${env.BUILD_LABEL_PREFIX}-${env.BUILD_NUMBER}"
-          env.DEPLOY_TO_DEV = (
+          env.PUBLISH_IMAGE = (
             env.CI_BRANCH == 'develop' ||
             env.CI_BRANCH.startsWith('codex/') ||
             env.CI_BRANCH.startsWith('feature/') ||
             env.CI_BRANCH.startsWith('release/') ||
+            env.CI_BRANCH.startsWith('hotfix/')
+          ).toString()
+          env.DEPLOY_TO_DEV = (
+            env.CI_BRANCH == 'develop' ||
+            env.CI_BRANCH.startsWith('codex/') ||
+            env.CI_BRANCH.startsWith('feature/') ||
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
 
@@ -216,7 +222,7 @@ spec:
             sh 'npm --workspace web-app run lint'
             sh 'npm --workspace web-app run test'
             sh '''
-              if [ "$DEPLOY_TO_DEV" = "true" ]; then
+              if [ "$DEPLOY_TO_DEV" = "true" ] || echo "$CI_BRANCH" | grep -q '^release/'; then
                 export VITE_EXTERNAL_ACTIVITY_ENABLED=true
               fi
               case "$CI_BRANCH" in
@@ -231,7 +237,7 @@ spec:
 
     stage('Build and push image') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.PUBLISH_IMAGE == 'true' }
       }
       steps {
         container('kaniko') {
@@ -257,7 +263,7 @@ EOF
 
     stage('Tag source commit') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.PUBLISH_IMAGE == 'true' }
       }
       steps {
         container('tools') {

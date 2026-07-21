@@ -89,8 +89,10 @@ class OpenAiMaterialAiDraftProvider(
     @param:Value("\${playsay.ai.openai.api-key:}") private val apiKey: String,
     @param:Value("\${playsay.ai.openai.model:gpt-5.4-mini}") private val model: String,
     @param:Value("\${playsay.ai.openai.base-url:https://api.openai.com/v1}") private val baseUrl: String,
+    @param:Value("\${playsay.ai.openai.reasoning.material-draft:medium}") reasoningEffort: String = "medium",
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
+    private val reasoningEffort = validatedOpenAiReasoningEffort(reasoningEffort, "medium")
 
     fun draft(input: MaterialAiDraftInput): LessonMaterialDraftResponse {
         val cleanApiKey = apiKey.trim()
@@ -141,13 +143,14 @@ class OpenAiMaterialAiDraftProvider(
             .withNormalizedArticleAnswers()
 
         validateDraft(draft)
-        return draft.withOpenAiSourceMeta(objectMapper, input, cleanModel)
+        return draft.withOpenAiSourceMeta(objectMapper, input, cleanModel, reasoningEffort)
     }
 
     private fun openAiRequest(input: MaterialAiDraftInput, cleanModel: String): ObjectNode =
         objectMapper.createObjectNode().apply {
             put("model", cleanModel)
             put("max_output_tokens", 8_000)
+            set<JsonNode>("reasoning", objectMapper.createObjectNode().put("effort", reasoningEffort))
             putArray("input")
                 .add(openAiMessage("system", materialAiSystemPrompt))
                 .add(openAiMessage("user", materialAiUserPrompt(input), input.sourceImageDataUrl))
@@ -253,11 +256,13 @@ private fun LessonMaterialDraftResponse.withOpenAiSourceMeta(
     objectMapper: ObjectMapper,
     input: MaterialAiDraftInput,
     model: String,
+    reasoningEffort: String,
 ): LessonMaterialDraftResponse {
     val meta = if (sourceMeta is ObjectNode) sourceMeta.deepCopy<ObjectNode>() else objectMapper.createObjectNode()
     meta.put("kind", "AI_GENERATED")
     meta.put("provider", "openai")
     meta.put("model", model)
+    meta.put("reasoningEffort", reasoningEffort)
     meta.put("prompt", input.prompt)
     meta.put("sourceType", input.resolvedSourceType())
     meta.put("requestedTitle", input.title)

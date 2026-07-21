@@ -23,4 +23,5 @@ playsay.vocabulary.translation:
   api-key: ${PLAYSAY_VOCABULARY_OPENAI_API_KEY:}
   base-url: ${PLAYSAY_VOCABULARY_OPENAI_BASE_URL:https://api.openai.com/v1}
   model: ${PLAYSAY_VOCABULARY_OPENAI_MODEL:gpt-5.4-mini}
+  reasoning-effort: ${PLAYSAY_VOCABULARY_OPENAI_REASONING_EFFORT:none}
 playsay.user-data.service-token: ${PLAYSAY_USER_DATA_SERVICE_TOKEN:}

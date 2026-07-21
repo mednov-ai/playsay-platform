@@ -8,6 +8,7 @@ import com.playsay.gateway.service.OpenAiResponsesTransport
 import com.playsay.gateway.service.materialAnswerItemContexts
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class MaterialAnswerSuggestionServiceTest {
@@ -68,6 +69,7 @@ class MaterialAnswerSuggestionServiceTest {
             apiKey = "test-key",
             model = "gpt-5.4-mini",
             baseUrl = "https://api.openai.com/v1",
+            reasoningEffort = "low",
         )
 
         provider.suggest(
@@ -90,6 +92,20 @@ class MaterialAnswerSuggestionServiceTest {
         assertTrue(transport.requestBody.contains("Sentence/thread context: She looked at the menu ___ and decided to order ___."))
         assertTrue(transport.requestBody.contains("Block context: 1. She looked at the menu ___ and decided to order ___."))
         assertTrue(transport.requestBody.contains("2. They were discussing ___ schedule."))
+        assertTrue(transport.requestBody.contains("\"reasoning\":{\"effort\":\"low\"}"))
+    }
+
+    @Test
+    fun `openai answer provider rejects unsupported reasoning effort during construction`() {
+        assertFailsWith<IllegalArgumentException> {
+            OpenAiMaterialAnswerSuggestionProvider(
+                transport = RecordingOpenAiTransport(answerSuggestionResponse()),
+                apiKey = "test-key",
+                model = "gpt-5.4-mini",
+                baseUrl = "https://api.openai.com/v1",
+                reasoningEffort = "fast",
+            )
+        }
     }
 
     @Test

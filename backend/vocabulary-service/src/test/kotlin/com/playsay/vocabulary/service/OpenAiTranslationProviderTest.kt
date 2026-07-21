@@ -4,6 +4,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.vocabulary.dto.TranslationVariantResponse
 import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
@@ -20,12 +21,12 @@ class OpenAiTranslationProviderTest {
     fun `extracts all dictionary variants when a reasoning item precedes the message`() {
         val builder = RestClient.builder()
         val server = MockRestServiceServer.bindTo(builder).build()
-        val provider = OpenAiTranslationProvider(builder, jacksonObjectMapper(), "test-key", baseUrl, "gpt-5.4-mini")
+        val provider = OpenAiTranslationProvider(builder, jacksonObjectMapper(), "test-key", baseUrl, "gpt-5.4-mini", "low")
         server.expect(requestTo("$baseUrl/responses"))
             .andExpect(method(HttpMethod.POST))
             .andExpect(header("Authorization", "Bearer test-key"))
             .andExpect(content().string(containsString("vocabulary_translation_variants")))
-            .andExpect(content().string(containsString("\"effort\":\"none\"")))
+            .andExpect(content().string(containsString("\"effort\":\"low\"")))
             .andExpect(content().string(containsString("\"maxItems\":3")))
             .andExpect(content().string(containsString("travel context")))
             .andExpect(content().string(containsString("previous meaning")))
@@ -59,6 +60,13 @@ class OpenAiTranslationProviderTest {
         assertEquals("UNAVAILABLE", result.source)
         assertEquals(emptyList<TranslationVariantResponse>(), result.variants)
         server.verify()
+    }
+
+    @Test
+    fun `rejects unsupported reasoning effort during construction`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            OpenAiTranslationProvider(RestClient.builder(), jacksonObjectMapper(), "test-key", baseUrl, "gpt-5.4-mini", "quick")
+        }
     }
 
     private companion object {

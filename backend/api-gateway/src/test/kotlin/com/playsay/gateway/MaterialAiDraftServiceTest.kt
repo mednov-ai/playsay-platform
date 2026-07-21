@@ -19,6 +19,7 @@ class MaterialAiDraftServiceTest {
             apiKey = "test-key",
             model = "gpt-5.4-mini",
             baseUrl = "https://api.openai.com/v1",
+            reasoningEffort = "high",
         )
 
         val draft = provider.draft(
@@ -36,10 +37,25 @@ class MaterialAiDraftServiceTest {
         assertEquals("DRAFT", draft.status)
         assertEquals("openai", draft.sourceMeta["provider"].asText())
         assertEquals("gpt-5.4-mini", draft.sourceMeta["model"].asText())
+        assertEquals("high", draft.sourceMeta["reasoningEffort"].asText())
         assertEquals("text", draft.document["pages"][0]["blocks"][0]["type"].asText())
         assertTrue(transport.requestBody.contains("\"text\""))
         assertTrue(transport.requestBody.contains("\"json_schema\""))
         assertTrue(transport.requestBody.contains("\"strict\":true"))
+        assertTrue(transport.requestBody.contains("\"reasoning\":{\"effort\":\"high\"}"))
+    }
+
+    @Test
+    fun `openai provider rejects unsupported reasoning effort during construction`() {
+        assertFailsWith<IllegalArgumentException> {
+            OpenAiMaterialAiDraftProvider(
+                transport = RecordingOpenAiTransport(openAiResponse(openAiDraftJson())),
+                apiKey = "test-key",
+                model = "gpt-5.4-mini",
+                baseUrl = "https://api.openai.com/v1",
+                reasoningEffort = "turbo",
+            )
+        }
     }
 
     @Test

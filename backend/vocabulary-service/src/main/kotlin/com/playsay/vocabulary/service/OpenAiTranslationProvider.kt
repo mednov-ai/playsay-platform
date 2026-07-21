@@ -19,8 +19,10 @@ class OpenAiTranslationProvider(
     @param:Value("\${playsay.vocabulary.translation.api-key:}") private val apiKey: String,
     @param:Value("\${playsay.vocabulary.translation.base-url:https://api.openai.com/v1}") baseUrl: String,
     @param:Value("\${playsay.vocabulary.translation.model:gpt-5.4-mini}") private val model: String,
+    @param:Value("\${playsay.vocabulary.translation.reasoning-effort:none}") reasoningEffort: String = "none",
 ) : TranslationProvider {
     private val client = builder.baseUrl(baseUrl.trimEnd('/')).build()
+    private val reasoningEffort = validatedOpenAiReasoningEffort(reasoningEffort, "none")
 
     override fun suggest(
         sourceText: String,
@@ -72,7 +74,7 @@ class OpenAiTranslationProvider(
         "model" to cleanModel,
         "store" to false,
         "max_output_tokens" to 1_200,
-        "reasoning" to mapOf("effort" to "none"),
+        "reasoning" to mapOf("effort" to reasoningEffort),
         "input" to listOf(
             message("system", systemPrompt),
             message("user", userPrompt(sourceText, sourceLanguage, targetLanguage, context, instruction, previousTranslations)),

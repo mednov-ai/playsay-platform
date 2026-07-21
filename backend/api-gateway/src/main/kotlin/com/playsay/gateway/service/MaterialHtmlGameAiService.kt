@@ -29,8 +29,10 @@ class MaterialHtmlGameAiService(
     @param:Value("\${playsay.ai.openai.api-key:}") private val apiKey: String,
     @param:Value("\${playsay.ai.openai.model:gpt-5.4-mini}") private val model: String,
     @param:Value("\${playsay.ai.openai.base-url:https://api.openai.com/v1}") private val baseUrl: String,
+    @param:Value("\${playsay.ai.openai.reasoning.html-game-metadata:medium}") reasoningEffort: String = "medium",
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
+    private val reasoningEffort = validatedOpenAiReasoningEffort(reasoningEffort, "medium")
 
     fun analyze(input: MaterialHtmlGameAiInput): MaterialHtmlGameAiResult =
         when (provider.trim().lowercase()) {
@@ -54,6 +56,7 @@ class MaterialHtmlGameAiService(
         val request = objectMapper.createObjectNode().apply {
             put("model", model.trim().ifEmpty { "gpt-5.4-mini" })
             put("max_output_tokens", 600)
+            set<JsonNode>("reasoning", objectMapper.createObjectNode().put("effort", reasoningEffort))
             putArray("input")
                 .add(message("system", htmlGameSystemPrompt))
                 .add(message("user", htmlGameUserPrompt(input)))

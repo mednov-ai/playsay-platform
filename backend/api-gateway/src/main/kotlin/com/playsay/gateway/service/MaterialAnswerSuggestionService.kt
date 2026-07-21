@@ -78,8 +78,10 @@ class OpenAiMaterialAnswerSuggestionProvider(
     @param:Value("\${playsay.ai.openai.api-key:}") private val apiKey: String,
     @param:Value("\${playsay.ai.openai.model:gpt-5.4-mini}") private val model: String,
     @param:Value("\${playsay.ai.openai.base-url:https://api.openai.com/v1}") private val baseUrl: String,
+    @param:Value("\${playsay.ai.openai.reasoning.answer-suggestion:medium}") reasoningEffort: String = "medium",
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
+    private val reasoningEffort = validatedOpenAiReasoningEffort(reasoningEffort, "medium")
 
     fun suggest(input: MaterialAnswerSuggestionInput): List<MaterialAnswerSuggestion> {
         val cleanApiKey = apiKey.trim()
@@ -134,6 +136,7 @@ class OpenAiMaterialAnswerSuggestionProvider(
         objectMapper.createObjectNode().apply {
             put("model", cleanModel)
             put("max_output_tokens", 1_000)
+            set<JsonNode>("reasoning", objectMapper.createObjectNode().put("effort", reasoningEffort))
             putArray("input")
                 .add(openAiMessage("system", materialAnswerSuggestionSystemPrompt))
                 .add(openAiMessage("user", materialAnswerSuggestionUserPrompt(input)))

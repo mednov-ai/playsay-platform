@@ -14,13 +14,21 @@ class MaterialHtmlGameAiServiceTest {
     @Test
     fun `translates non english candidate into an english title`() {
         val transport = StaticTransport(response("Find the Rhyme"))
-        val service = MaterialHtmlGameAiService("openai", transport, "test-key", "test-model", "https://api.openai.com/v1")
+        val service = MaterialHtmlGameAiService("openai", transport, "test-key", "test-model", "https://api.openai.com/v1", "low")
 
         val result = service.analyze(MaterialHtmlGameAiInput("Найди рифму", true, "Match English rhyming words"))
 
         assertEquals("Find the Rhyme", result.title)
         assertEquals("AI", result.titleSource)
         assertTrue(transport.requestBody.contains("concise English game title"))
+        assertTrue(transport.requestBody.contains("\"reasoning\":{\"effort\":\"low\"}"))
+    }
+
+    @Test
+    fun `rejects unsupported reasoning effort during construction`() {
+        assertFailsWith<IllegalArgumentException> {
+            MaterialHtmlGameAiService("openai", StaticTransport(response("Find the Rhyme")), "test-key", "test-model", "https://api.openai.com/v1", "quick")
+        }
     }
 
     @Test

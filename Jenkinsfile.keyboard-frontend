@@ -131,6 +131,7 @@ spec:
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
+    PLAY_SAY_KEYBOARD_SMOKE_URL = 'https://dev.key.honey.school'
   }
 
   stages {

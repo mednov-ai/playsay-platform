@@ -153,6 +153,9 @@ spec:
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
+    PLAY_SAY_SMOKE_WEB_BASE_URL = 'https://dev.online.honey.school'
+    PLAY_SAY_SMOKE_API_BASE_URL = 'https://dev.online.honey.school/api'
+    PLAY_SAY_SMOKE_AUTH_ISSUER = 'https://dev.ops.honey.school/keycloak/realms/playsay'
   }
 
   stages {

@@ -117,7 +117,7 @@ describe("keyboard trainer wide frame", () => {
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.practice-workspace\s*\{[^}]*min-height:\s*calc/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice[\s\S]*grid-template-rows:\s*minmax\(58px,\s*auto\)\s+minmax\(76px,\s*auto\)\s+auto/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice[\s\S]*grid-template-rows:\s*minmax\(58px,\s*auto\)\s+minmax\(80px,\s*auto\)\s+auto/,
     );
     expect(styles).toMatch(
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.practice-cluster[\s\S]*--practice-cluster-gap:\s*8px/,
@@ -129,10 +129,10 @@ describe("keyboard trainer wide frame", () => {
       /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.virtual-keyboard[\s\S]*--key-height:\s*clamp\(53px,\s*7\.4vh,\s*58px\)/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*76px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat--metric[\s\S]*min-height:\s*80px/,
     );
     expect(styles).toMatch(
-      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat\s*\{[\s\S]*min-height:\s*76px/,
+      /\.trainer-layout--practice\s+\.trainer-surface--dismissed\s+\.stats-panel--practice\s+\.stat\s*\{[\s\S]*min-height:\s*80px/,
     );
     expect(styles).toMatch(
       /\.stat--metric[\s\S]*container-type:\s*size/,

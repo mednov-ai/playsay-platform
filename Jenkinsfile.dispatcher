@@ -14,7 +14,7 @@ pipeline {
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA.', trim: true)
     string(name: 'FORCE_TARGETS', defaultValue: '', description: 'Optional manual override: all or comma-separated deploy targets.', trim: true)
-    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1', description: 'Single-node dev capacity is fixed to one downstream module job.', trim: true)
+    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1', description: 'Dedicated 2-vCPU CI is fixed to one downstream module job.', trim: true)
   }
 
   environment {
@@ -117,7 +117,7 @@ spec:
       steps {
         script {
           if ((params.MAX_PARALLEL_MODULE_JOBS?.trim() ?: '1') != '1') {
-            error 'MAX_PARALLEL_MODULE_JOBS is fixed to 1 on the single-node dev cluster.'
+            error 'MAX_PARALLEL_MODULE_JOBS is fixed to 1 on the dedicated 2-vCPU CI VM.'
           }
           def jobs = (env.AFFECTED_JOBS ?: '').split(',').collect { it.trim() }.findAll { it }
           if (jobs.isEmpty()) {

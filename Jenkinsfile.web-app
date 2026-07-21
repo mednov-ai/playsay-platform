@@ -63,25 +63,7 @@ spec:
         limits:
           cpu: 200m
           memory: 128Mi
-    - name: capacity-guard
-      image: alpine/k8s:1.33.1
-      command: ["/bin/sh", "/scripts/guard.sh"]
-      env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-      resources:
-        requests:
-          cpu: 10m
-          memory: 24Mi
-        limits:
-          cpu: 100m
-          memory: 96Mi
-      volumeMounts:
-        - name: capacity-scripts
-          mountPath: /scripts
-          readOnly: true
+
     - name: smoke
       image: mcr.microsoft.com/playwright:v1.56.1-noble
       command: ["cat"]
@@ -117,10 +99,6 @@ spec:
           cpu: "1"
           memory: 1536Mi
   volumes:
-    - name: capacity-scripts
-      configMap:
-        name: playsay-ci-capacity-scripts
-        defaultMode: 0555
     - name: kaniko-docker-config
       emptyDir: {}
     - name: jenkins-agent-cache
@@ -146,11 +124,16 @@ spec:
   }
 
   environment {
+    PLAYSAY_DEDICATED_CI = 'true'
+    KUBECONFIG = credentials('dev-kubeconfig')
     GITHUB_OWNER = 'mednov-ai'
     WEB_IMAGE_NAME = 'playsay-web-app'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
+    PLAY_SAY_SMOKE_WEB_BASE_URL = 'https://dev.online.honey.school'
+    PLAY_SAY_SMOKE_API_BASE_URL = 'https://dev.online.honey.school/api'
+    PLAY_SAY_SMOKE_AUTH_ISSUER = 'https://dev.ops.honey.school/keycloak/realms/playsay'
   }
 
   stages {
@@ -198,13 +181,6 @@ spec:
       }
     }
 
-    stage('Reserve build capacity') {
-      steps {
-        container('tools') {
-          sh 'apk add --no-cache curl jq kubectl && CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh acquire'
-        }
-      }
-    }
 
     stage('Generate, lint, test, and build') {
       steps {
@@ -288,7 +264,7 @@ EOF
       }
     }
 
-    stage('Restore runtime for smoke') {
+    stage('Wait for smoke dependencies') {
       when {
         expression { env.DEPLOY_TO_DEV == 'true' }
       }
@@ -296,7 +272,6 @@ EOF
         container('tools') {
           sh '''
             set -eu
-            CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh restore
             for deployment in \
               ai-tutor-service \
               vocabulary-service \
@@ -328,17 +303,6 @@ EOF
 
   post {
     always {
-      script {
-        if (fileExists('scripts/ci/manage-build-capacity.sh')) {
-          try {
-            container('tools') {
-              sh 'command -v kubectl >/dev/null 2>&1 || apk add --no-cache jq kubectl; CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh restore'
-            }
-          } catch (err) {
-            echo "Capacity restore deferred to watchdog: ${err}"
-          }
-        }
-      }
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

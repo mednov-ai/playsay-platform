@@ -38,10 +38,18 @@ type CompletedLoginFlow = {
 
 type ThemeMode = "system" | "light" | "dark";
 
+export function defaultAuthIssuer(hostname = globalThis.location?.hostname ?? ""): string {
+  if (hostname === "online.honey.school" || hostname === "key.honey.school") {
+    return "https://ops.honey.school/keycloak/realms/playsay";
+  }
+  if (hostname === "dev.online.honey.school" || hostname === "dev.key.honey.school") {
+    return "https://dev.ops.honey.school/keycloak/realms/playsay";
+  }
+  return "https://ops.play-and-say.ru:18443/keycloak/realms/playsay";
+}
+
 export const authConfig: AuthConfig = {
-  issuer:
-    import.meta.env.VITE_AUTH_ISSUER ??
-    "https://ops.play-and-say.ru:18443/keycloak/realms/playsay",
+  issuer: import.meta.env.VITE_AUTH_ISSUER ?? defaultAuthIssuer(),
   clientId: import.meta.env.VITE_AUTH_CLIENT_ID ?? "playsay-web",
   redirectPath: import.meta.env.VITE_AUTH_REDIRECT_PATH ?? "/auth/callback",
 };

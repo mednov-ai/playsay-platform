@@ -63,30 +63,8 @@ spec:
         limits:
           cpu: 200m
           memory: 128Mi
-    - name: capacity-guard
-      image: alpine/k8s:1.33.1
-      command: ["/bin/sh", "/scripts/guard.sh"]
-      env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-      resources:
-        requests:
-          cpu: 10m
-          memory: 24Mi
-        limits:
-          cpu: 100m
-          memory: 96Mi
-      volumeMounts:
-        - name: capacity-scripts
-          mountPath: /scripts
-          readOnly: true
+
   volumes:
-    - name: capacity-scripts
-      configMap:
-        name: playsay-ci-capacity-scripts
-        defaultMode: 0555
     - name: kaniko-docker-config
       emptyDir: {}
     - name: jenkins-agent-cache
@@ -112,6 +90,8 @@ spec:
   }
 
   environment {
+    PLAYSAY_DEDICATED_CI = 'true'
+    KUBECONFIG = credentials('dev-kubeconfig')
     GITHUB_OWNER = 'mednov-ai'
     MEDIA_IMAGE_NAME = 'playsay-media-service'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
@@ -164,13 +144,6 @@ spec:
       }
     }
 
-    stage('Reserve build capacity') {
-      steps {
-        container('tools') {
-          sh 'apk add --no-cache curl jq kubectl && CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh acquire'
-        }
-      }
-    }
 
     stage('Test and package') {
       steps {
@@ -254,17 +227,6 @@ EOF
 
   post {
     always {
-      script {
-        if (fileExists('scripts/ci/manage-build-capacity.sh')) {
-          try {
-            container('tools') {
-              sh 'command -v kubectl >/dev/null 2>&1 || apk add --no-cache jq kubectl; CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh restore'
-            }
-          } catch (err) {
-            echo "Capacity restore deferred to watchdog: ${err}"
-          }
-        }
-      }
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

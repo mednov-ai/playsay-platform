@@ -969,7 +969,7 @@ input {
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice {
   gap: 5px;
-  grid-template-rows: minmax(58px, auto) minmax(76px, auto) auto;
+  grid-template-rows: minmax(58px, auto) minmax(80px, auto) auto;
   padding: 6px 10px 7px;
 }
 
@@ -978,7 +978,7 @@ input {
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel--practice .stat--metric {
-  min-height: 76px;
+  min-height: 80px;
   padding: 6px 8px 5px;
 }
 
@@ -988,7 +988,7 @@ input {
   --stat-unit-suffix-size: clamp(11px, 14cqh, 18px);
   --stat-value-scale-x: 0.68;
   --stat-value-scale-y: 1.28;
-  min-height: 76px;
+  min-height: 80px;
 }
 
 .trainer-layout--practice .trainer-surface--dismissed .stats-panel__mastery-value-line {

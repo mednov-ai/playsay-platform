@@ -5,6 +5,7 @@ export {
   clearTokens,
   completeLogin,
   consumeSkipSilentLogin,
+  defaultAuthIssuer,
   getValidAccessToken,
   isSilentLoginUnavailable,
   isAuthCallback,

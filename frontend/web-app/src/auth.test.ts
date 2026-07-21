@@ -3,6 +3,7 @@ import {
   buildAuthorizeUrl,
   clearTokens,
   completeLogin,
+  defaultAuthIssuer,
   isSilentLoginUnavailable,
   mapTokenResponse,
   readTokens,
@@ -22,6 +23,15 @@ describe("auth helpers", () => {
       clearTokens();
     }
     vi.unstubAllGlobals();
+  });
+
+  it("selects the canonical honey issuer for production and development hosts", () => {
+    expect(defaultAuthIssuer("online.honey.school")).toBe(
+      "https://ops.honey.school/keycloak/realms/playsay",
+    );
+    expect(defaultAuthIssuer("dev.online.honey.school")).toBe(
+      "https://dev.ops.honey.school/keycloak/realms/playsay",
+    );
   });
 
   it("builds a PKCE authorization URL for the playsay web client", () => {

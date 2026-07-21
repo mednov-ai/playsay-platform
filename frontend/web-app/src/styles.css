@@ -37,7 +37,8 @@ body {
   margin: 0;
   min-width: 320px;
   font-family:
-    Manrope, Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Manrope Variable", Manrope, Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
   background:
     radial-gradient(circle at 12% 8%, rgba(255, 224, 122, 0.24), transparent 28rem),
     radial-gradient(circle at 92% 28%, rgba(223, 248, 238, 0.7), transparent 24rem),

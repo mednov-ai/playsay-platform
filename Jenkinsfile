@@ -301,6 +301,7 @@ spec:
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
     INFRA_BRANCH = 'develop'
+    PROD_AUTH_ISSUER = 'https://key.honey.school/keycloak/realms/playsay'
   }
 
   stages {
@@ -461,6 +462,9 @@ spec:
                   if [ "$DEPLOY_TO_DEV" = "true" ]; then
                     export VITE_EXTERNAL_ACTIVITY_ENABLED=true
                   fi
+                  case "$CI_BRANCH" in
+                    release/*) export VITE_AUTH_ISSUER="$PROD_AUTH_ISSUER" ;;
+                  esac
                   npm --workspace web-app run build
                 '''
                 echo "Running frontend tests for ${env.BUILD_LABEL}"

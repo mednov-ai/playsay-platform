@@ -43,6 +43,7 @@ class MaterialAiDraftServiceTest {
         assertTrue(transport.requestBody.contains("\"json_schema\""))
         assertTrue(transport.requestBody.contains("\"strict\":true"))
         assertTrue(transport.requestBody.contains("\"reasoning\":{\"effort\":\"high\"}"))
+        assertTrue(!transport.requestBody.contains("\"anyOf\""))
     }
 
     @Test

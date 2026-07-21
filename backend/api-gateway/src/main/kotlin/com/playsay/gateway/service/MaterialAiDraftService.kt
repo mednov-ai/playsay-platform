@@ -396,9 +396,29 @@ private fun validateDraft(draft: LessonMaterialDraftResponse) {
                     MetaData.ErrorCodes.AI_GENERATED_MATERIAL_BLOCK_UNSUPPORTED,
                 )
             }
+            if (!block.isValidForMaterialBlockType(type)) {
+                throw ProjectResponseException.localized(
+                    HttpStatus.BAD_GATEWAY,
+                    MetaData.ErrorCodes.AI_MATERIAL_SCHEMA_INVALID,
+                )
+            }
         }
     }
 }
+
+private fun JsonNode.isValidForMaterialBlockType(type: String?): Boolean =
+    when (type) {
+        "text" -> get("body")?.isTextual == true
+        "flashcards" -> get("cards")?.isNonEmptyArray() == true
+        "fillGaps", "multipleChoice" -> get("items")?.isNonEmptyArray() == true
+        "matchingPairs" -> get("pairs")?.isNonEmptyArray() == true
+        "freeWriting", "speakingPrompt" -> get("prompt")?.isTextual == true
+        "drawingArea" -> get("height")?.takeIf(JsonNode::isInt)?.asInt() in 120..800
+        "videoEmbed", "image", "generatedImage" -> true
+        else -> false
+    }
+
+private fun JsonNode.isNonEmptyArray(): Boolean = isArray && size() > 0
 
 private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     """
@@ -740,64 +760,6 @@ private val materialDraftJsonSchemaJson = """
         }
       },
       "required": ["id", "type", "title", "body", "instruction", "prompt", "level", "language", "url", "provider", "caption", "imageUrl", "alt", "height", "minWords", "cards", "items", "pairs", "options"],
-      "anyOf": [
-        {
-          "properties": {
-            "type": { "type": "string", "enum": ["text"] },
-            "body": { "type": "string", "maxLength": 4000 }
-          }
-        },
-        {
-          "properties": {
-            "type": { "type": "string", "enum": ["videoEmbed", "image", "generatedImage"] }
-          }
-        },
-        {
-          "properties": {
-            "type": { "type": "string", "enum": ["flashcards"] },
-            "cards": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 12,
-              "items": { "${'$'}ref": "#/${'$'}defs/flashcard" }
-            }
-          }
-        },
-        {
-          "properties": {
-            "type": { "type": "string", "enum": ["fillGaps", "multipleChoice"] },
-            "items": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 20,
-              "items": { "${'$'}ref": "#/${'$'}defs/exerciseItem" }
-            }
-          }
-        },
-        {
-          "properties": {
-            "type": { "type": "string", "enum": ["matchingPairs"] },
-            "pairs": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 32,
-              "items": { "${'$'}ref": "#/${'$'}defs/matchingPair" }
-            }
-          }
-        },
-        {
-          "properties": {
-            "type": { "type": "string", "enum": ["freeWriting", "speakingPrompt"] },
-            "prompt": { "type": "string", "maxLength": 2000 }
-          }
-        },
-        {
-          "properties": {
-            "type": { "type": "string", "enum": ["drawingArea"] },
-            "height": { "type": "integer", "minimum": 120, "maximum": 800 }
-          }
-        }
-      ],
       "additionalProperties": false
     },
     "flashcard": {

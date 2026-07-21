@@ -177,25 +177,7 @@ spec:
         limits:
           cpu: 200m
           memory: 128Mi
-    - name: capacity-guard
-      image: alpine/k8s:1.33.1
-      command: ["/bin/sh", "/scripts/guard.sh"]
-      env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-      resources:
-        requests:
-          cpu: 10m
-          memory: 24Mi
-        limits:
-          cpu: 100m
-          memory: 96Mi
-      volumeMounts:
-        - name: capacity-scripts
-          mountPath: /scripts
-          readOnly: true
+
     - name: smoke
       image: mcr.microsoft.com/playwright:v1.56.1-noble
       command: ["cat"]
@@ -230,41 +212,8 @@ spec:
         limits:
           cpu: "1"
           memory: 1536Mi
-    - name: liquibase
-      image: liquibase/liquibase:5.0.3
-      command: ["cat"]
-      tty: true
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 0
-      env:
-        - name: PLAYSAY_DB_JDBC_URL
-          valueFrom:
-            secretKeyRef:
-              name: playsay-app-db
-              key: jdbc-uri
-        - name: PLAYSAY_DB_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: playsay-app-db
-              key: username
-        - name: PLAYSAY_DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: playsay-app-db
-              key: password
-      resources:
-        requests:
-          cpu: 100m
-          memory: 128Mi
-        limits:
-          cpu: 500m
-          memory: 512Mi
+
   volumes:
-    - name: capacity-scripts
-      configMap:
-        name: playsay-ci-capacity-scripts
-        defaultMode: 0555
     - name: kaniko-docker-config
       emptyDir: {}
     - name: jenkins-agent-cache
@@ -390,13 +339,6 @@ spec:
       }
     }
 
-    stage('Reserve build capacity') {
-      steps {
-        container('tools') {
-          sh 'apk add --no-cache curl jq kubectl && CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh acquire'
-        }
-      }
-    }
 
     stage('Build, test, and validate') {
       parallel {
@@ -499,45 +441,23 @@ spec:
         expression { env.DEPLOY_TO_DEV == 'true' && (env.RUN_API_GATEWAY == 'true' || env.RUN_PAYMENT_SERVICE == 'true' || env.RUN_REGISTRATION_SERVICE == 'true' || env.RUN_EMAIL_SERVICE == 'true') }
       }
       steps {
-        container('liquibase') {
+        container('tools') {
           echo "Applying affected database migrations for ${env.BUILD_LABEL}"
           sh '''
             set -eu
-            POSTGRES_JDBC_VERSION="42.7.8"
-            POSTGRES_JDBC_JAR="/tmp/postgresql-${POSTGRES_JDBC_VERSION}.jar"
-            if [ ! -f "$POSTGRES_JDBC_JAR" ]; then
-              curl -fsSL "https://repo1.maven.org/maven2/org/postgresql/postgresql/${POSTGRES_JDBC_VERSION}/postgresql-${POSTGRES_JDBC_VERSION}.jar" -o "$POSTGRES_JDBC_JAR"
-            fi
-            CHANGELOGS=""
+            apk add --no-cache jq kubectl
             if [ "$RUN_API_GATEWAY" = "true" ]; then
-              CHANGELOGS="$CHANGELOGS backend/api-gateway/src/main/resources/db/changelog/db.changelog-master.xml"
+              ./scripts/ci/run-dev-liquibase-job.sh api-gateway backend/api-gateway/src/main/resources/db/changelog playsay-app-db
             fi
             if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then
-              CHANGELOGS="$CHANGELOGS backend/payment-service/src/main/resources/db/changelog/db.changelog-master.xml"
+              ./scripts/ci/run-dev-liquibase-job.sh payment-service backend/payment-service/src/main/resources/db/changelog playsay-app-db
             fi
             if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then
-              CHANGELOGS="$CHANGELOGS backend/registration-service/src/main/resources/db/changelog/db.changelog-master.xml"
+              ./scripts/ci/run-dev-liquibase-job.sh registration-service backend/registration-service/src/main/resources/db/changelog playsay-app-db
             fi
             if [ "$RUN_EMAIL_SERVICE" = "true" ]; then
-              CHANGELOGS="$CHANGELOGS backend/email-service/src/main/resources/db/changelog/db.changelog-master.xml"
+              ./scripts/ci/run-dev-liquibase-job.sh email-service backend/email-service/src/main/resources/db/changelog playsay-app-db
             fi
-            for CHANGELOG in $CHANGELOGS; do
-              echo "Applying database changelog $CHANGELOG"
-              liquibase \
-                --changelog-file="$CHANGELOG" \
-                --classpath="$POSTGRES_JDBC_JAR" \
-                --url="$PLAYSAY_DB_JDBC_URL" \
-                --username="$PLAYSAY_DB_USERNAME" \
-                --password="$PLAYSAY_DB_PASSWORD" \
-                status --verbose
-              liquibase \
-                --changelog-file="$CHANGELOG" \
-                --classpath="$POSTGRES_JDBC_JAR" \
-                --url="$PLAYSAY_DB_JDBC_URL" \
-                --username="$PLAYSAY_DB_USERNAME" \
-                --password="$PLAYSAY_DB_PASSWORD" \
-                update
-            done
           '''
         }
       }
@@ -1103,17 +1023,6 @@ JSON
 
   post {
     always {
-      script {
-        if (fileExists('scripts/ci/manage-build-capacity.sh')) {
-          try {
-            container('tools') {
-              sh 'command -v kubectl >/dev/null 2>&1 || apk add --no-cache jq kubectl; CI_BUILD_ID="${JOB_NAME}-${BUILD_NUMBER}" ./scripts/ci/manage-build-capacity.sh restore'
-            }
-          } catch (err) {
-            echo "Capacity restore deferred to watchdog: ${err}"
-          }
-        }
-      }
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./app/App";
+import "@fontsource-variable/manrope";
+import "@fontsource-variable/roboto-flex/full.css";
 import "./shared/i18n/config";
 import "./styles.css";
 

@@ -3,8 +3,16 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const styles = readFileSync(resolve(__dirname, "styles.css"), "utf8");
+const mainSource = readFileSync(resolve(__dirname, "main.tsx"), "utf8");
 
 describe("keyboard trainer wide frame", () => {
+  it("bundles trainer fonts locally without Google Fonts", () => {
+    expect(styles).not.toContain("fonts.googleapis.com");
+    expect(styles).not.toContain("fonts.gstatic.com");
+    expect(mainSource).toContain('import "@fontsource-variable/manrope"');
+    expect(mainSource).toContain('import "@fontsource-variable/roboto-flex/full.css"');
+  });
+
   it("caps the desktop trainer frame at the virtual keyboard width", () => {
     expect(styles).toContain("--trainer-frame-width: 1368px");
     expect(styles).toMatch(/\.app-header[\s\S]*width:\s*min\(100%,\s*var\(--trainer-frame-width\)\)/);
@@ -159,7 +167,7 @@ describe("keyboard trainer wide frame", () => {
     expect(shell).toMatch(/<div className="trainer-footer">/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*--typing-row-count:\s*1/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*grid-template-rows:\s*minmax\(0,\s*1fr\)/);
-    expect(styles).toMatch(/\.typing-strip[\s\S]*font-family:\s*"Roboto Flex"/);
+    expect(styles).toMatch(/\.typing-strip[\s\S]*font-family:\s*"Roboto Flex Variable"/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*font-variation-settings:\s*"wdth"\s+48,\s*"opsz"\s+96,\s*"GRAD"\s+-35/);
     expect(styles).toMatch(/\.typing-strip[\s\S]*line-height:\s*1\.18/);
     expect(styles).toMatch(/\.typing-strip__line[\s\S]*overflow:\s*visible/);
@@ -224,14 +232,12 @@ describe("keyboard trainer wide frame", () => {
 
   it("stretches practice metric numerals vertically without widening them", () => {
     expect(styles).not.toContain("#ffb238");
-    expect(styles).toContain("family=Manrope");
-    expect(styles).toContain("family=Roboto+Flex");
     expect(styles).toMatch(/\.stat--metric[\s\S]*--stat-value-scale-x:\s*0\.78/);
     expect(styles).toMatch(/\.stat--metric[\s\S]*--stat-value-scale-y:\s*1/);
     expect(styles).toMatch(/\.stat--metric[\s\S]*--stat-value-slot:\s*8\.2ch/);
     expect(styles).toMatch(/\.stats-panel__mastery-card[\s\S]*--stat-number-size:\s*clamp\(30px,\s*2\.8vw,\s*40px\)/);
-    expect(styles).toMatch(/\.stat__value-line[\s\S]*font-family:\s*"Roboto Flex"/);
-    expect(styles).toMatch(/\.stats-panel__mastery-value-line[\s\S]*font-family:\s*"Roboto Flex"/);
+    expect(styles).toMatch(/\.stat__value-line[\s\S]*font-family:\s*"Roboto Flex Variable"/);
+    expect(styles).toMatch(/\.stats-panel__mastery-value-line[\s\S]*font-family:\s*"Roboto Flex Variable"/);
     expect(styles).toMatch(/\.stats-panel__mastery-value-line[\s\S]*font-variation-settings:\s*"wdth"\s+45,\s*"opsz"\s+96,\s*"GRAD"\s+-80/);
     expect(styles).toMatch(/\.stats-panel__mastery-number[\s\S]*linear-gradient\(180deg,\s*#ff9a70\s*0%,\s*#ef5a19\s*48%,\s*#dd4808\s*100%\)/);
     expect(styles).toMatch(/\.stat__value-line[\s\S]*font-variation-settings:\s*"wdth"\s+45,\s*"opsz"\s+96,\s*"GRAD"\s+-80/);

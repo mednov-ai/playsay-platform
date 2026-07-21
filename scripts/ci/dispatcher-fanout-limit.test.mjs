@@ -10,18 +10,19 @@ const projectRoot = resolve(platformRoot, "..");
 const dispatcher = readFileSync(resolve(platformRoot, "Jenkinsfile.dispatcher"), "utf8");
 const dispatchJobXmlPath = resolve(projectRoot, "playsay-infra/jenkins/jobs/playsay-platform-dispatch-develop.xml");
 
-test("dispatcher exposes a bounded downstream concurrency parameter", () => {
+test("legacy dispatcher fixes downstream concurrency to one", () => {
   assert.match(dispatcher, /string\(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1'/);
-  assert.match(dispatcher, /MAX_PARALLEL_MODULE_JOBS must be an integer from 1 to 9/);
-  assert.match(dispatcher, /maxParallelModuleJobs = maxParallelText\.toInteger\(\)/);
+  assert.match(dispatcher, /MAX_PARALLEL_MODULE_JOBS is fixed to 1 on the single-node dev cluster/);
+  assert.doesNotMatch(dispatcher, /maxParallelModuleJobs =/);
 });
 
-test("dispatcher batches downstream jobs and aggregates their results", () => {
-  assert.match(dispatcher, /collate\(maxParallelModuleJobs\)/);
-  assert.match(dispatcher, /parallel branches/);
+test("legacy dispatcher runs downstream jobs sequentially and aggregates their results", () => {
+  assert.match(dispatcher, /jobs\.eachWithIndex/);
+  assert.doesNotMatch(dispatcher, /collate\(/);
+  assert.doesNotMatch(dispatcher, /parallel branches/);
   assert.match(dispatcher, /wait: true, propagate: false/);
   assert.doesNotMatch(dispatcher, /wait: false, propagate: false/);
-  assert.match(dispatcher, /downstream-results/);
+  assert.match(dispatcher, /Downstream module job results:/);
   assert.match(dispatcher, /Downstream module job failures:/);
 });
 

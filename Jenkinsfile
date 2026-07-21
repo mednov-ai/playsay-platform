@@ -283,7 +283,6 @@ spec:
   }
 
   parameters {
-    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev, for example develop, codex/task-1, feature/task-1, release/1.001.00', trim: true)
     string(name: 'AFFECTED_TARGETS', defaultValue: 'all', description: 'Comma-separated deploy targets to build: all, api-gateway, web-app, collaboration-service, media-service, payment-service, registration-service, email-service.', trim: true)
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
@@ -300,14 +299,14 @@ spec:
     EMAIL_IMAGE_NAME = 'playsay-email-service'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
-    INFRA_BRANCH = 'develop'
+    INFRA_BRANCH = 'legacy/play-and-say-vps'
   }
 
   stages {
     stage('Checkout') {
       steps {
         script {
-          def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
+          def requestedBranch = 'legacy/play-and-say-vps'
           def requestedCommit = params.GITHUB_AFTER?.trim()
           echo "Checking out playsay-platform branch '${requestedBranch}'"
           def scmVars = checkout([
@@ -320,6 +319,7 @@ spec:
           ])
           if (requestedCommit) {
             sh "git fetch --no-tags origin +refs/heads/${requestedBranch}:refs/remotes/origin/${requestedBranch}"
+            sh "git merge-base --is-ancestor ${requestedCommit} refs/remotes/origin/${requestedBranch}"
             sh "git checkout --detach ${requestedCommit}"
           }
           env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
@@ -371,13 +371,7 @@ spec:
           }
           env.BUILD_LABEL_PREFIX = buildPrefix
           env.BUILD_LABEL = "${buildPrefix}-${env.BUILD_NUMBER}"
-          env.DEPLOY_TO_DEV = (
-            env.CI_BRANCH == 'develop' ||
-            env.CI_BRANCH.startsWith('codex/') ||
-            env.CI_BRANCH.startsWith('feature/') ||
-            env.CI_BRANCH.startsWith('release/') ||
-            env.CI_BRANCH.startsWith('hotfix/')
-          ).toString()
+          env.DEPLOY_TO_DEV = (env.CI_BRANCH == 'legacy/play-and-say-vps').toString()
 
           currentBuild.displayName = env.BUILD_LABEL
           currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"

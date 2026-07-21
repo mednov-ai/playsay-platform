@@ -10,7 +10,6 @@ pipeline {
   }
 
   parameters {
-    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch received from GitHub push event.', trim: true)
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA.', trim: true)
     string(name: 'FORCE_TARGETS', defaultValue: '', description: 'Optional manual override: all or comma-separated deploy targets.', trim: true)
@@ -57,7 +56,7 @@ spec:
       }
       steps {
         script {
-          def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
+          def requestedBranch = 'legacy/play-and-say-vps'
           def requestedCommit = params.GITHUB_AFTER?.trim()
           checkout([
             $class: 'GitSCM',
@@ -69,6 +68,7 @@ spec:
           ])
           if (requestedCommit) {
             sh "git fetch --no-tags origin +refs/heads/${requestedBranch}:refs/remotes/origin/${requestedBranch}"
+            sh "git merge-base --is-ancestor ${requestedCommit} refs/remotes/origin/${requestedBranch}"
             sh "git checkout --detach ${requestedCommit}"
           }
           env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
@@ -128,7 +128,6 @@ spec:
           def downstreamResults = []
           jobs.eachWithIndex { jobName, index ->
             def downstreamParams = [
-              string(name: 'BRANCH_NAME', value: env.CI_BRANCH),
               string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
               string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
             ]

@@ -31,17 +31,17 @@ const BACKEND_TARGETS = new Set([
 ]);
 const FRONTEND_TARGETS = new Set(["web-app", "keyboard-app"]);
 const TARGET_JOBS = Object.freeze({
-  "api-gateway": "playsay-api-gateway-develop",
-  "ai-tutor-service": "playsay-ai-tutor-service-develop",
-  "vocabulary-service": "playsay-vocabulary-service-develop",
-  "web-app": "playsay-web-app-develop",
-  "collaboration-service": "playsay-collaboration-service-develop",
-  "media-service": "playsay-media-service-develop",
-  "payment-service": "playsay-payment-service-develop",
-  "registration-service": "playsay-registration-service-develop",
-  "email-service": "playsay-email-service-develop",
-  "keyboard-service": "playsay-keyboard-backend-develop",
-  "keyboard-app": "playsay-keyboard-frontend-develop",
+  "api-gateway": "playsay-legacy-vps-api-gateway",
+  "ai-tutor-service": "playsay-legacy-vps-ai-tutor-service",
+  "vocabulary-service": "playsay-legacy-vps-vocabulary-service",
+  "web-app": "playsay-legacy-vps-web-app",
+  "collaboration-service": "playsay-legacy-vps-collaboration-service",
+  "media-service": "playsay-legacy-vps-media-service",
+  "payment-service": "playsay-legacy-vps-payment-service",
+  "registration-service": "playsay-legacy-vps-registration-service",
+  "email-service": "playsay-legacy-vps-email-service",
+  "keyboard-service": "playsay-legacy-vps-keyboard-backend",
+  "keyboard-app": "playsay-legacy-vps-keyboard-frontend",
 });
 
 function addAll(targets, source) {

@@ -77,6 +77,17 @@ class EmailDeliveryAdminGateway(
         }
     }
 
+    fun forwardMailjetWebhook(rawBody: String) {
+        val response = post("/internal/email-provider/mailjet/webhook", rawBody)
+        if (response.status !in 200..299) {
+            throw ProjectResponseException(
+                status = HttpStatus.valueOf(response.status),
+                message = "Email provider webhook was rejected",
+                errorCode = MetaData.ErrorCodes.EMAIL_SERVICE_UNAVAILABLE,
+            )
+        }
+    }
+
     private fun <T> read(response: EmailServiceResponse, responseType: Class<T>): T {
         if (response.status !in 200..299) {
             val (status, errorCode) = when (response.status) {

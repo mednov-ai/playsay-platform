@@ -64,3 +64,11 @@ playsay:
       user-id: ${PLAYSAY_EMAIL_UNISENDER_USER_ID:0}
       api-key: ${PLAYSAY_EMAIL_UNISENDER_API_KEY:}
       webhook-url: ${PLAYSAY_EMAIL_UNISENDER_WEBHOOK_URL:}
+    mailjet:
+      api-base-url: ${PLAYSAY_EMAIL_MAILJET_API_BASE_URL:https://api.mailjet.com}
+      api-key: ${PLAYSAY_EMAIL_MAILJET_API_KEY:}
+      secret-key: ${PLAYSAY_EMAIL_MAILJET_SECRET_KEY:}
+      environment: ${PLAYSAY_EMAIL_MAILJET_ENVIRONMENT:local}
+      webhook-url: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_URL:}
+      webhook-username: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_USERNAME:}
+      webhook-password: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_PASSWORD:}

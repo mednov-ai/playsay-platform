@@ -5,6 +5,7 @@ import java.time.Instant
 import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.domain.Pageable
 
 interface EmailProviderAttemptRepo : JpaRepository<EmailProviderAttemptEntity, UUID> {
     fun findAllByEmailDeliveryIdOrderByAttemptNumberDesc(emailDeliveryId: UUID): List<EmailProviderAttemptEntity>
@@ -24,6 +25,22 @@ interface EmailProviderAttemptRepo : JpaRepository<EmailProviderAttemptEntity, U
         terminalStatuses: Collection<String>,
         now: Instant,
     ): Boolean
+
+    @Query(
+        """
+        select e from EmailProviderAttemptEntity e
+        where e.provider = :provider
+          and e.providerStatus not in :terminalStatuses
+          and e.trackingUntil > :now
+        order by e.providerCheckedAt asc, e.createdAt asc
+        """,
+    )
+    fun findTrackable(
+        provider: String,
+        terminalStatuses: Collection<String>,
+        now: Instant,
+        pageable: Pageable,
+    ): List<EmailProviderAttemptEntity>
 
     @Query(
         """

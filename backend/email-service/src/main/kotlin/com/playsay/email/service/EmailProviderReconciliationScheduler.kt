@@ -8,11 +8,13 @@ import java.time.Duration
 import java.time.Instant
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
+@ConditionalOnProperty(name = ["playsay.email-service.delivery-provider"], havingValue = "unisender-api")
 class EmailProviderReconciliationScheduler(
     private val client: UnisenderDeliveryStatusClient,
     private val providerAttempts: EmailProviderAttemptRepo,

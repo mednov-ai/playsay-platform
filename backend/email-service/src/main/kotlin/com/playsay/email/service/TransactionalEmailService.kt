@@ -27,6 +27,7 @@ class TransactionalEmailService(
 ) {
     private val configuredProvider = when (deliveryProvider.trim().lowercase()) {
         "unisender-api" -> PROVIDER_UNISENDER
+        "mailjet-api" -> PROVIDER_MAILJET
         else -> "SMTP"
     }
 
@@ -122,7 +123,9 @@ class TransactionalEmailService(
                 ),
             )
             val completedAt = Instant.now(clock)
-            val trackingUntil = completedAt.plus(trackingTtl).takeIf { result.provider == PROVIDER_UNISENDER }
+            val trackingUntil = completedAt.plus(trackingTtl).takeIf {
+                result.provider == PROVIDER_UNISENDER || result.provider == PROVIDER_MAILJET
+            }
             providerAttempt.apply {
                 provider = result.provider
                 providerJobId = result.providerJobId
@@ -219,6 +222,7 @@ class TransactionalEmailService(
         const val STATUS_SENT = "SENT"
         const val STATUS_FAILED = "FAILED"
         const val PROVIDER_UNISENDER = "UNISENDER_API"
+        const val PROVIDER_MAILJET = "MAILJET_API"
         val TERMINAL_PROVIDER_STATUSES = setOf(
             "DELIVERED",
             "OPENED",
@@ -226,6 +230,7 @@ class TransactionalEmailService(
             "UNSUBSCRIBED",
             "SUBSCRIBED",
             "HARD_BOUNCED",
+            "BLOCKED",
             "SPAM",
             "TRACKING_EXPIRED",
             "NOT_TRACKED",

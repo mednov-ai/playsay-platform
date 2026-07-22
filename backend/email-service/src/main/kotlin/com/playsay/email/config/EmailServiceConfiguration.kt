@@ -1,6 +1,8 @@
 package com.playsay.email.config
 
 import com.playsay.email.service.OutboundEmailSender
+import com.playsay.email.service.MailjetApiOutboundEmailSender
+import com.playsay.email.service.MailjetDeliveryStatusClient
 import com.playsay.email.service.SmtpOutboundEmailSender
 import com.playsay.email.service.UnisenderApiOutboundEmailSender
 import com.playsay.email.service.UnisenderDeliveryStatusClient
@@ -9,6 +11,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Clock
 import java.time.Duration
 import java.net.http.HttpClient
+import java.nio.charset.StandardCharsets
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.beans.factory.annotation.Value
@@ -26,6 +29,31 @@ class EmailServiceConfiguration {
 
     @Bean
     fun emailClock(): Clock = Clock.systemUTC()
+
+    @Bean
+    @ConditionalOnMissingBean(OutboundEmailSender::class)
+    @ConditionalOnProperty(name = ["playsay.email-service.delivery-provider"], havingValue = "mailjet-api")
+    fun mailjetApiOutboundEmailSender(
+        objectMapper: ObjectMapper,
+        @Value("\${playsay.email-service.mailjet.api-base-url}") apiBaseUrl: String,
+        @Value("\${playsay.email-service.mailjet.api-key}") apiKey: String,
+        @Value("\${playsay.email-service.mailjet.secret-key}") secretKey: String,
+        @Value("\${playsay.email-service.mailjet.environment}") environment: String,
+        @Value("\${playsay.email-service.from-name}") fromName: String,
+    ): OutboundEmailSender = MailjetApiOutboundEmailSender(
+        restClient = mailjetRestClient(apiBaseUrl, apiKey, secretKey),
+        objectMapper = objectMapper,
+        fromName = fromName,
+        environment = environment,
+    )
+
+    @Bean
+    @ConditionalOnProperty(name = ["playsay.email-service.delivery-provider"], havingValue = "mailjet-api")
+    fun mailjetDeliveryStatusClient(
+        @Value("\${playsay.email-service.mailjet.api-base-url}") apiBaseUrl: String,
+        @Value("\${playsay.email-service.mailjet.api-key}") apiKey: String,
+        @Value("\${playsay.email-service.mailjet.secret-key}") secretKey: String,
+    ): MailjetDeliveryStatusClient = MailjetDeliveryStatusClient(mailjetRestClient(apiBaseUrl, apiKey, secretKey))
 
     @Bean
     @ConditionalOnMissingBean(OutboundEmailSender::class)
@@ -54,6 +82,7 @@ class EmailServiceConfiguration {
         )
 
     @Bean
+    @ConditionalOnProperty(name = ["playsay.email-service.delivery-provider"], havingValue = "unisender-api")
     fun unisenderDeliveryStatusClient(
         @Value("\${playsay.email-service.unisender.api-base-url}") apiBaseUrl: String,
         @Value("\${playsay.email-service.unisender.api-key}") apiKey: String,
@@ -64,6 +93,12 @@ class EmailServiceConfiguration {
             .build(),
         downloadClient = providerRestClientBuilder().build(),
     )
+
+    private fun mailjetRestClient(apiBaseUrl: String, apiKey: String, secretKey: String): RestClient =
+        providerRestClientBuilder()
+            .baseUrl(apiBaseUrl)
+            .defaultHeaders { headers -> headers.setBasicAuth(apiKey, secretKey, StandardCharsets.UTF_8) }
+            .build()
 
     private fun providerRestClientBuilder(): RestClient.Builder {
         val httpClient = HttpClient.newBuilder()

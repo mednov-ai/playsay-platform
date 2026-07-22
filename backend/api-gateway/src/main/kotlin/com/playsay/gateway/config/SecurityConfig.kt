@@ -35,6 +35,7 @@ class SecurityConfig {
                         "/public/payment-invoices/**",
                         "/payment-webhooks/yookassa",
                         "/webhooks/unisender",
+                        "/webhooks/mailjet",
                         "/schedule/lessons/*/collaboration-documents/*/snapshot",
                         "/ws/lessons",
                         "/ws/chat",

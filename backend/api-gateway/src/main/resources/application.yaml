@@ -87,6 +87,9 @@ playsay:
   email-service:
     base-url: ${PLAYSAY_EMAIL_SERVICE_BASE_URL:http://email-service.playsay-dev.svc.cluster.local}
     service-token: ${PLAYSAY_EMAIL_SERVICE_TOKEN:}
+    mailjet:
+      webhook-username: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_USERNAME:}
+      webhook-password: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_PASSWORD:}
   public-app-url: ${PLAYSAY_PUBLIC_APP_URL:https://online.play-and-say.ru}
   lesson-reminders:
     poll-delay-ms: ${PLAYSAY_LESSON_REMINDERS_POLL_DELAY_MS:60000}

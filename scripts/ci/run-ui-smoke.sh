@@ -16,8 +16,8 @@ if [ -n "$missing" ]; then
 fi
 
 export PLAY_SAY_SMOKE_FETCH_PASSWORDS=false
-export PLAY_SAY_SMOKE_WEB_BASE_URL="${PLAY_SAY_SMOKE_WEB_BASE_URL:-https://online.play-and-say.ru}"
-export PLAY_SAY_SMOKE_API_BASE_URL="${PLAY_SAY_SMOKE_API_BASE_URL:-https://online.play-and-say.ru/api}"
+export PLAY_SAY_SMOKE_WEB_BASE_URL="${PLAY_SAY_SMOKE_WEB_BASE_URL:-https://dev.online.honey.school}"
+export PLAY_SAY_SMOKE_API_BASE_URL="${PLAY_SAY_SMOKE_API_BASE_URL:-https://dev.online.honey.school/api}"
 export PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 

@@ -67,3 +67,11 @@ test("migration launcher is dev-only and never reads database Secret objects", (
   assert.match(script, /kubectl create -f -/);
   assert.doesNotMatch(script, /playsay-prod|kubectl[^\n]*get secret/);
 });
+
+test("migration launcher preserves nested changelog paths in the ConfigMap projection", () => {
+  const script = readFileSync(resolve(platformRoot, "scripts/ci/run-dev-liquibase-job.sh"), "utf8");
+  assert.match(script, /find "\$changelog_dir" -type f/);
+  assert.match(script, /configmap_key="\$\(printf 'file-%04d'/);
+  assert.match(script, /--arg path "\$changelog_dir\/\$relative_path"/);
+  assert.doesNotMatch(script, /Nested changelog directories are not supported/);
+});

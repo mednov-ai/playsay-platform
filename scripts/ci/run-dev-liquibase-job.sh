@@ -30,12 +30,7 @@ case "$changelog_dir" in
     exit 2
     ;;
 esac
-if find "$changelog_dir" -mindepth 2 -type f | grep -q .; then
-  echo "Nested changelog directories are not supported by the migration ConfigMap." >&2
-  exit 2
-fi
-
-for command_name in kubectl jq find grep tr cut; do
+for command_name in kubectl jq find grep tr cut mktemp; do
   command -v "$command_name" >/dev/null 2>&1 || {
     echo "Missing command: $command_name" >&2
     exit 1
@@ -49,24 +44,42 @@ source_suffix="$(printf '%s' "$source_suffix" | tr '[:upper:]' '[:lower:]' | tr 
 name_suffix="$(printf '%s-%s-%s' "$module_name" "$build_number" "$source_suffix" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | cut -c1-44)"
 job_name="playsay-migrate-${name_suffix}"
 configmap_name="playsay-migration-${name_suffix}"
+manifest_dir="$(mktemp -d)"
+changelog_list="$manifest_dir/changelog-files"
 
 cleanup() {
   kubectl -n "$namespace" delete job "$job_name" --ignore-not-found --wait=false >/dev/null 2>&1 || true
   kubectl -n "$namespace" delete configmap "$configmap_name" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  rm -rf "$manifest_dir"
 }
 trap cleanup EXIT HUP INT TERM
 
 cleanup
-kubectl -n "$namespace" create configmap "$configmap_name" \
-  --from-file="$changelog_dir" >/dev/null
+mkdir -p "$manifest_dir"
+find "$changelog_dir" -type f -print | LC_ALL=C sort > "$changelog_list"
+[ -s "$changelog_list" ] || {
+  echo "No changelog files found below $changelog_dir" >&2
+  exit 2
+}
 
-configmap_items="$({
-  find "$changelog_dir" -maxdepth 1 -type f -print
-} | LC_ALL=C sort | jq -R -s --arg prefix "$changelog_dir/" '
-  split("\n")
-  | map(select(length > 0))
-  | map({key: (split("/") | last), path: ($prefix + (split("/") | last))})
-')"
+set --
+configmap_items='[]'
+file_index=0
+while IFS= read -r changelog_file; do
+  relative_path="${changelog_file#"$changelog_dir"/}"
+  file_index="$((file_index + 1))"
+  configmap_key="$(printf 'file-%04d' "$file_index")"
+  set -- "$@" "--from-file=${configmap_key}=${changelog_file}"
+  configmap_items="$(
+    printf '%s' "$configmap_items" |
+      jq -c \
+        --arg key "$configmap_key" \
+        --arg path "$changelog_dir/$relative_path" \
+        '. + [{key: $key, path: $path}]'
+  )"
+done < "$changelog_list"
+
+kubectl -n "$namespace" create configmap "$configmap_name" "$@" >/dev/null
 
 jq -n \
   --arg namespace "$namespace" \

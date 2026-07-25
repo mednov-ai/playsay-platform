@@ -72,6 +72,9 @@ spec:
             sh "git checkout --detach ${requestedCommit}"
           }
           env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
+          if (env.CI_BRANCH.startsWith('release/') && !(env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/)) {
+            error 'Production release branches must match release/<number>.<number>.<number>.'
+          }
           env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
           currentBuild.displayName = "dispatch-${env.BUILD_NUMBER}"

@@ -320,11 +320,13 @@ spec:
           }
           env.BUILD_LABEL_PREFIX = buildPrefix
           env.BUILD_LABEL = "${buildPrefix}-${env.BUILD_NUMBER}"
+          if (env.CI_BRANCH.startsWith('release/')) {
+            error 'Use the branch dispatcher for production release branches; the manual full rebuild is dev-only.'
+          }
           env.DEPLOY_TO_DEV = (
             env.CI_BRANCH == 'develop' ||
             env.CI_BRANCH.startsWith('codex/') ||
             env.CI_BRANCH.startsWith('feature/') ||
-            env.CI_BRANCH.startsWith('release/') ||
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
 

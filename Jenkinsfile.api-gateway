@@ -86,7 +86,7 @@ spec:
   }
 
   parameters {
-    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev.', trim: true)
+    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build; dev branches deploy to dev and numeric release branches prepare production.', trim: true)
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
     string(name: 'ARGOCD_REFRESH_MODE', defaultValue: 'webhook', description: 'ArgoCD refresh mode: webhook or annotate.', trim: true)
@@ -133,13 +133,19 @@ spec:
           }
           env.BUILD_LABEL_PREFIX = buildPrefix ?: 'api'
           env.BUILD_LABEL = "${env.BUILD_LABEL_PREFIX}-${env.BUILD_NUMBER}"
+          env.DEPLOY_TO_PROD = (env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/).toString()
+          if (env.CI_BRANCH.startsWith('release/') && env.DEPLOY_TO_PROD != 'true') {
+            error 'Production release branches must match release/<number>.<number>.<number>.'
+          }
           env.DEPLOY_TO_DEV = (
             env.CI_BRANCH == 'develop' ||
             env.CI_BRANCH.startsWith('codex/') ||
             env.CI_BRANCH.startsWith('feature/') ||
-            env.CI_BRANCH.startsWith('release/') ||
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
+          env.DEPLOY_IMAGE = (env.DEPLOY_TO_DEV == 'true' || env.DEPLOY_TO_PROD == 'true').toString()
+          env.DEPLOY_ENVIRONMENT = env.DEPLOY_TO_PROD == 'true' ? 'prod' : (env.DEPLOY_TO_DEV == 'true' ? 'dev' : 'none')
+          env.INFRA_BRANCH = env.DEPLOY_TO_PROD == 'true' ? env.CI_BRANCH : 'develop'
 
           env.RUN_DB_MIGRATE = 'true'
           def before = params.GITHUB_BEFORE?.trim()
@@ -204,7 +210,7 @@ spec:
 
     stage('Build and push image') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_IMAGE == 'true' }
       }
       steps {
         container('kaniko') {
@@ -222,12 +228,10 @@ spec:
               cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-              /kaniko/executor \
-                --context "$WORKSPACE/backend" \
-                --dockerfile "$WORKSPACE/backend/api-gateway/Dockerfile" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${GIT_COMMIT}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${BUILD_LABEL}" \
-                --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:dev"
+              KANIKO_CONTEXT="$WORKSPACE/backend" \
+                KANIKO_DOCKERFILE="$WORKSPACE/backend/api-gateway/Dockerfile" \
+                IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}" \
+                /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
             '''
           }
         }
@@ -236,7 +240,7 @@ EOF
 
     stage('Tag source commit') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_IMAGE == 'true' }
       }
       steps {
         container('tools') {
@@ -247,14 +251,14 @@ EOF
       }
     }
 
-    stage('Update dev image tag') {
+    stage('Update environment image reference') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_IMAGE == 'true' }
       }
       steps {
         container('tools') {
           withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
-            sh 'apk add --no-cache git yq && CHART_VALUES_FILE=helm-charts/api-gateway/values-dev.yaml ./scripts/ci/update-dev-image-tag.sh'
+            sh 'apk add --no-cache git yq && CHART_NAME=api-gateway ./scripts/ci/update-routed-image-reference.sh'
           }
         }
       }

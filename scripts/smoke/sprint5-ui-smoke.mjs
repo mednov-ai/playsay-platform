@@ -656,19 +656,25 @@ async function waitForSharedPresenceReady(...pages) {
 }
 
 async function clearMaterialCursors(...pages) {
-  await Promise.all(pages.map((page) => page.mouse.move(0, 0)));
+  await Promise.all(pages.map(async (page) => {
+    const surface = page.locator("[data-testid='lesson-material-surface']").first();
+    if (await surface.count()) {
+      await surface.dispatchEvent("pointerout", {
+        bubbles: true,
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: "mouse",
+        relatedTarget: null,
+      });
+    }
+  }));
   await Promise.all(pages.map((page) => page.waitForFunction(() => (
     document.querySelectorAll("[data-testid='lesson-material-surface'] .playsay-presence-cursor").length === 0
   ), null, { timeout: timeoutMs })));
 }
 
 async function verifyMaterialCursor(sourcePage, targetPage) {
-  const sourceSurface = sourcePage.locator("[data-testid='lesson-material-surface']").first();
-  const box = await sourceSurface.boundingBox();
-  if (!box) {
-    throw new Error("Source material surface is not visible.");
-  }
-  await sourcePage.mouse.move(box.x + box.width * 0.34, box.y + box.height * 0.38);
+  await dispatchMaterialCursorMove(sourcePage, 0.34, 0.38, "material cursor");
   await targetPage.waitForFunction(() => {
     const surface = document.querySelector("[data-testid='lesson-material-surface']");
     const cursor = surface?.querySelector(".playsay-presence-cursor");
@@ -685,12 +691,7 @@ async function verifyMaterialCursor(sourcePage, targetPage) {
 }
 
 async function verifyMaterialCursorAlignment(sourcePage, targetPage, xRatio, yRatio, label) {
-  const sourceSurface = sourcePage.locator("[data-testid='lesson-material-surface']").first();
-  const box = await sourceSurface.boundingBox();
-  if (!box) {
-    throw new Error(`Source material surface is not visible for ${label}.`);
-  }
-  await sourcePage.mouse.move(box.x + box.width * xRatio, box.y + box.height * yRatio);
+  await dispatchMaterialCursorMove(sourcePage, xRatio, yRatio, label);
   await targetPage.waitForFunction(({ expectedXRatio, expectedYRatio, nextLabel }) => {
     const surface = document.querySelector("[data-testid='lesson-material-surface']");
     const cursor = surface?.querySelector(".playsay-presence-cursor");
@@ -722,6 +723,23 @@ async function verifyMaterialCursorAlignment(sourcePage, targetPage, xRatio, yRa
   }, { expectedXRatio: xRatio, expectedYRatio: yRatio, nextLabel: label }, { timeout: timeoutMs }).catch(async (error) => {
     const debug = await targetPage.evaluate(() => window.__playsayCursorAlignmentDebug ?? null).catch(() => null);
     throw new Error(`Timed out waiting for aligned ${label}; debug=${JSON.stringify(debug)}: ${error instanceof Error ? error.message : String(error)}`);
+  });
+}
+
+async function dispatchMaterialCursorMove(sourcePage, xRatio, yRatio, label) {
+  const sourceSurface = sourcePage.locator("[data-testid='lesson-material-surface']").first();
+  const box = await sourceSurface.boundingBox();
+  if (!box) {
+    throw new Error(`Source material surface is not visible for ${label}.`);
+  }
+  await sourceSurface.dispatchEvent("pointermove", {
+    bubbles: true,
+    buttons: 0,
+    clientX: box.x + box.width * xRatio,
+    clientY: box.y + box.height * yRatio,
+    isPrimary: true,
+    pointerId: 1,
+    pointerType: "mouse",
   });
 }
 

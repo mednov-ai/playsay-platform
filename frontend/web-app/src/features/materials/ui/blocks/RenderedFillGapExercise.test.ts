@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MaterialEditorBlock, MaterialExerciseItem } from "../../model/materialDocument";
@@ -10,6 +12,23 @@ import {
   materialManualInputHintValue,
 } from "../../model/materialDocument";
 import { RenderedFillGapExercise } from "./RenderedFillGapExercise";
+
+vi.hoisted(() => {
+  const values = new Map<string, string>([["playsay.language", "ru"]]);
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      clear: () => values.clear(),
+      getItem: (key: string) => values.get(key) ?? null,
+      key: (index: number) => Array.from(values.keys())[index] ?? null,
+      get length() { return values.size; },
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
+  });
+});
+
+afterEach(cleanup);
 
 describe("RenderedFillGapExercise hints", () => {
   it("reveals manual fill gap hints by configured answer proportions", () => {
@@ -152,6 +171,81 @@ describe("RenderedFillGapExercise hints", () => {
     expect(markup).toContain("playsay-inline-select");
     expect(markup).toContain("playsay-word-bank-drop");
     expect(markup).not.toContain("playsay-answer-row");
+  });
+
+  it("publishes a word-bank selection and its applied answer", () => {
+    const block = {
+      id: "block-gaps",
+      type: "fillGaps",
+      title: "Weather",
+      items: [{
+        id: "gap-cloud",
+        prompt: "I see a ␣.",
+        answer: "cloud",
+        answerOptionId: "bank-cloud",
+        gapMode: "wordBank",
+      }],
+      wordBankOptions: [
+        { id: "bank-cloud", value: "cloud" },
+        { id: "bank-rain", value: "rain" },
+      ],
+    } as MaterialEditorBlock;
+    const onAnswerChange = vi.fn();
+    const onInteractionChange = vi.fn();
+    const { container } = render(createElement(RenderedFillGapExercise, {
+      block,
+      onAnswerChange,
+      onInteractionChange,
+    }));
+
+    fireEvent.click(container.querySelectorAll<HTMLButtonElement>(".playsay-word-bank-chip")[0]!);
+    expect(onInteractionChange).toHaveBeenLastCalledWith({
+      blockId: "block-gaps",
+      kind: "wordBankDrag",
+      optionId: "bank-cloud",
+    });
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>(".playsay-word-bank-drop")!);
+    expect(onAnswerChange).toHaveBeenCalledWith("block-gaps", expect.objectContaining({
+      items: { "gap-cloud": "cloud" },
+      optionIds: { "gap-cloud": "bank-cloud" },
+      type: "fillGaps",
+    }));
+    expect(onInteractionChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("highlights the remote word and target gap with the participant color", () => {
+    const block = {
+      id: "block-gaps",
+      type: "fillGaps",
+      title: "Weather",
+      items: [{
+        id: "gap-cloud",
+        prompt: "I see a ␣.",
+        answer: "cloud",
+        answerOptionId: "bank-cloud",
+        gapMode: "wordBank",
+      }],
+      wordBankOptions: [{ id: "bank-cloud", value: "cloud" }],
+    } as MaterialEditorBlock;
+    const markup = renderToStaticMarkup(createElement(RenderedFillGapExercise, {
+      block,
+      participants: [{
+        clientId: 7,
+        color: "#2574ff",
+        interaction: {
+          blockId: "block-gaps",
+          kind: "wordBankDrag",
+          optionId: "bank-cloud",
+          targetItemKey: "gap-cloud",
+        },
+        name: "Student",
+      }],
+    }));
+
+    expect(markup.match(/data-live-active="true"/g)).toHaveLength(2);
+    expect(markup).toContain("--playsay-live-color:#2574ff");
+    expect(markup).toContain("Student");
   });
 
   it("renders form transform base form as a placeholder and reveals a key after failed attempts", () => {

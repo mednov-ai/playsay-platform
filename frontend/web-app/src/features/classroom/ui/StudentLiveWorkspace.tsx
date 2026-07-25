@@ -100,6 +100,7 @@ export function StudentLiveWorkspace({
         lessonId={lessonId}
         material={material}
         annotationSync={annotationSync}
+        exerciseSync={groupAnnotationWorkspace.exerciseSync}
         htmlGameSync={htmlGameSync}
         externalActivitySync={externalActivitiesEnabled ? externalActivitySync : undefined}
         onSaveAnswers={onSaveAnswers}

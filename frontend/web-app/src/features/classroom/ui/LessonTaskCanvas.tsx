@@ -43,6 +43,7 @@ import {
   type MaterialAnswerState,
   type MaterialHtmlGameSync,
   type MaterialExternalActivitySync,
+  type MaterialExerciseSync,
 } from "../../materials";
 import {
   annotationFontSizePresets,
@@ -79,6 +80,7 @@ export function LessonTaskCanvas({
   teacherName,
   canControlPages = false,
   htmlGameSync,
+  exerciseSync,
   externalActivitySync,
   liveActivePageId,
   onPresentationModeChange,
@@ -86,6 +88,7 @@ export function LessonTaskCanvas({
   annotationSync?: LiveAnnotationSync | null;
   canControlPages?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
+  exerciseSync?: MaterialExerciseSync;
   externalActivitySync?: MaterialExternalActivitySync;
   liveActivePageId?: string | null;
   onPresentationModeChange?: (mode: LessonPresentationMode) => void;
@@ -140,6 +143,7 @@ export function LessonTaskCanvas({
     updateSelectedStrokeWidth,
   } = useLessonAnnotation({ initialPageId: firstPageId, lessonId, liveAnnotation: annotationSync, materialId: material?.id });
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
+  const effectiveAnswers = exerciseSync?.answers ?? answers;
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const activePage = document?.pages.find((page) => page.id === activePageId) ?? document?.pages[0] ?? null;
   const materialSurfaceRef = useRef<HTMLDivElement>(null);
@@ -167,8 +171,12 @@ export function LessonTaskCanvas({
   const activePageAcceptsAnswers = materialPageAcceptsAnswers(activePage);
 
   useEffect(() => {
-    setAnswers(materialAnswersFromSubmission(submission));
-  }, [material?.id, submission?.id, submission?.updatedAt]);
+    const submittedAnswers = materialAnswersFromSubmission(submission);
+    setAnswers(submittedAnswers);
+    exerciseSync?.seedAnswers(submittedAnswers);
+  }, [exerciseSync?.seedAnswers, material?.id, submission?.id, submission?.updatedAt]);
+
+  useEffect(() => () => exerciseSync?.updateInteraction(null), [exerciseSync?.updateInteraction, material?.id]);
 
   useEffect(() => {
     if (liveActivePageId && document?.pages.some((page) => page.id === liveActivePageId)) {
@@ -187,6 +195,7 @@ export function LessonTaskCanvas({
       ...current,
       [blockId]: answer,
     }));
+    exerciseSync?.setAnswer(blockId, answer);
   }
 
   function submitAnswers() {
@@ -196,13 +205,13 @@ export function LessonTaskCanvas({
     onSaveAnswers({
       schemaVersion: 1,
       materialId: material.id,
-      answers,
+      answers: effectiveAnswers,
     });
   }
 
   const savedAnswersKey = JSON.stringify(materialAnswersFromSubmission(submission));
-  const answersKey = JSON.stringify(answers);
-  const liveScore = material ? materialLiveScore(material, answers) : null;
+  const answersKey = JSON.stringify(effectiveAnswers);
+  const liveScore = material ? materialLiveScore(material, effectiveAnswers) : null;
   const displayScore = answersKey !== savedAnswersKey && liveScore !== null
     ? liveScore
     : score ?? liveScore;
@@ -393,10 +402,12 @@ export function LessonTaskCanvas({
             {material ? (
               <LessonMaterialDocumentView
                 activePageId={activePageId}
-                answers={answers}
+                answers={effectiveAnswers}
                 canControlPages={canControlPages}
                 material={material}
                 htmlGameSync={htmlGameSync}
+                exerciseParticipants={exerciseSync?.participants}
+                onExerciseInteractionChange={exerciseSync?.updateInteraction}
                 externalActivitySync={externalActivitySync}
                 mode="classroom"
                 onActivePageIdChange={setActivePageId}

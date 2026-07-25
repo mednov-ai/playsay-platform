@@ -99,6 +99,29 @@ describe("RenderedMatchingPairsExercise card flow", () => {
     expect(markup).not.toContain("playsay-answer-attempt-bar");
   });
 
+  it("highlights the matching pair currently selected by a remote participant", () => {
+    const markup = renderToStaticMarkup(createElement(RenderedMatchingPairsExercise, {
+      assetUrls: {},
+      block,
+      mode: "classroom",
+      participants: [{
+        clientId: 9,
+        color: "#00a878",
+        interaction: {
+          blockId: "block-matching",
+          kind: "matchingSelection",
+          leftId: "pair-a",
+          rightId: "pair-b",
+        },
+        name: "Teacher",
+      }],
+    }));
+
+    expect(markup.match(/data-live-active="true"/g)).toHaveLength(2);
+    expect(markup).toContain("--playsay-live-color:#00a878");
+    expect(markup).toContain("title=\"Teacher\"");
+  });
+
   it("renders image targets with a shared sizing hook in unresolved and solved cards", () => {
     const markup = renderToStaticMarkup(createElement(RenderedMatchingPairsExercise, {
       answer: {

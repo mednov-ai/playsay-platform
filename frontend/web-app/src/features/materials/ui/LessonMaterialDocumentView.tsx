@@ -7,6 +7,8 @@ import {
   MaterialEditorBlock,
   MaterialHtmlGameSync,
   MaterialExternalActivitySync,
+  MaterialExerciseInteraction,
+  MaterialExerciseParticipant,
   MaterialRenderMode,
   defaultMaterialPage,
   editorDocumentFromJson,
@@ -30,6 +32,8 @@ export function LessonMaterialDocumentView({
   mode = "classroom",
   onActivePageIdChange,
   onAnswerChange,
+  exerciseParticipants = [],
+  onExerciseInteractionChange,
   onAssetTagsChange,
   onBlockPatchCommit,
   onBlockPatch,
@@ -47,6 +51,8 @@ export function LessonMaterialDocumentView({
   mode?: MaterialRenderMode;
   onActivePageIdChange?: (pageId: string) => void;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
+  exerciseParticipants?: MaterialExerciseParticipant[];
+  onExerciseInteractionChange?: (interaction: MaterialExerciseInteraction | null) => void;
   onAssetTagsChange?: (assetId: string, tags: string[]) => Promise<LessonMaterialAsset | null>;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
@@ -293,6 +299,8 @@ export function LessonMaterialDocumentView({
             materialId={material.id}
             mode={mode}
             onAnswerChange={onAnswerChange}
+            exerciseParticipants={exerciseParticipants}
+            onExerciseInteractionChange={onExerciseInteractionChange}
             onAssetTagsChange={async (assetId, tags) => {
               setAssetTags((current) => ({ ...current, [assetId]: tags }));
               await onAssetTagsChange?.(assetId, tags);

@@ -1,6 +1,13 @@
 import type { LessonMaterialJson } from "../../../shared/api/playsay";
 import type { AnnotationElement } from "../model/annotation";
-import type { MaterialHtmlGameEffect, MaterialHtmlGameInputEvent, MaterialHtmlGameSnapshot } from "../../materials/model/materialDocument";
+import type {
+  MaterialAnswerBlock,
+  MaterialAnswerState,
+  MaterialExerciseInteraction,
+  MaterialHtmlGameEffect,
+  MaterialHtmlGameInputEvent,
+  MaterialHtmlGameSnapshot,
+} from "../../materials/model/materialDocument";
 
 export type { AnnotationElement } from "../model/annotation";
 
@@ -14,6 +21,7 @@ export type CollaborationParticipant = {
   clientId: number;
   color: string;
   cursor: CollaborationCursor | null;
+  exerciseInteraction: MaterialExerciseInteraction | null;
   htmlGameAuthorityRuns: Record<string, string>;
   name: string;
 };
@@ -29,10 +37,13 @@ export type YjsWorkspaceRuntime = {
   publishHtmlGameInput: (event: MaterialHtmlGameInputEvent) => void;
   setHtmlGameSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
   setHtmlGamePresentedBlock: (blockId: string | null) => void;
+  seedMaterialAnswers: (answers: MaterialAnswerState) => void;
+  setMaterialAnswer: (blockId: string, answer: MaterialAnswerBlock) => void;
   updateHtmlGameAuthority: (blockId: string, runId: string | null) => void;
   snapshot: () => LessonMaterialJson;
   startSocketSync: (socket: WebSocket) => void;
   updateCursor: (cursor: CollaborationCursor | null) => void;
+  updateExerciseInteraction: (interaction: MaterialExerciseInteraction | null) => void;
   updateText: (nextText: string) => void;
 };
 
@@ -43,12 +54,15 @@ export function createYjsWorkspaceRuntime(options: {
   onHtmlGameInputsChange: (events: MaterialHtmlGameInputEvent[]) => void;
   onHtmlGamePresentationChange?: (blockId: string | null) => void;
   onHtmlGameSnapshotsChange: (snapshots: Record<string, MaterialHtmlGameSnapshot>) => void;
+  onMaterialAnswersChange?: (answers: MaterialAnswerState) => void;
   onDocumentUpdate?: (update: Uint8Array) => void;
   onParticipantsChange: (participants: CollaborationParticipant[]) => void;
   onTextChange: (text: string) => void;
   participantName: string;
   snapshot?: LessonMaterialJson | null;
 }): YjsWorkspaceRuntime;
+
+export function normalizeExerciseInteraction(value: unknown): MaterialExerciseInteraction | null;
 
 export function updateHtmlGameAuthorityRuns(
   current: unknown,

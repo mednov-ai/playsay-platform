@@ -154,12 +154,17 @@ try {
     await assertAnnotationInsideSurface(studentB.page);
     addCheck("annotation-sync-stays-inside-material-after-scroll-and-resize");
 
+    await verifySharedExerciseSync(teacher.page, studentA.page);
+    addCheck("shared-exercise-actions-and-answers-sync-live");
+
     await studentB.page.reload({ waitUntil: "domcontentloaded" });
     await completeClassroomPreJoin(studentB.page);
     await studentB.page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
     await waitForSharedPresenceReady(studentB.page);
     await waitForLocatorCount(studentB.page, "[data-testid='lesson-material-surface'] .playsay-annotation-layer path.playsay-annotation-element", 1, "student B annotation path after reload");
     addCheck("reconnect-restores-annotations");
+    await assertSharedExerciseState(studentB.page);
+    addCheck("reconnect-restores-shared-exercise-answers");
 
     await submitStudentMaterialWork(studentA.page, studentA.tokens.accessToken, lesson.id);
     addCheck("student-material-submit-creates-submission");
@@ -502,6 +507,33 @@ async function createSmokeMaterial(token) {
               prompt: "Write a short answer in the material.",
               title: "Individual answer",
               type: "freeWriting",
+            },
+            {
+              id: "smoke-word-bank",
+              items: [
+                {
+                  answer: "cloud",
+                  answerOptionId: "smoke-bank-cloud",
+                  gapMode: "wordBank",
+                  id: "smoke-bank-gap",
+                  prompt: "I can see a ␣.",
+                },
+              ],
+              title: "Word cloud",
+              type: "fillGaps",
+              wordBankOptions: [
+                { id: "smoke-bank-cloud", value: "cloud" },
+                { id: "smoke-bank-rain", value: "rain" },
+              ],
+            },
+            {
+              id: "smoke-matching",
+              pairs: [
+                { id: "smoke-pair-cloud", left: "cloud", right: "cloud", targetKind: "TEXT" },
+                { id: "smoke-pair-rain", left: "rain", right: "rain", targetKind: "TEXT" },
+              ],
+              title: "Match weather words",
+              type: "matchingPairs",
             },
             {
               height: 360,
@@ -986,13 +1018,98 @@ async function scrollMaterialDocument(page, top) {
 }
 
 async function submitStudentMaterialWork(page, token, lessonId) {
-  await page.locator(".playsay-render-block-fill-gaps .playsay-inline-select").selectOption("write");
+  const select = page.locator(".playsay-render-block-fill-gaps .playsay-inline-select").first();
+  if (await select.inputValue() !== "write") {
+    await select.selectOption("write");
+  }
   await page.locator(".playsay-student-answer").fill(`Material answer ${runId}`);
   await page.locator(".playsay-task-footer button").first().click();
   await waitForApi(async () => {
     const submission = await apiRequest(token, "GET", `/schedule/lessons/${lessonId}/material-submission`, 200);
     return Boolean(submission.submittedAt);
   });
+}
+
+async function verifySharedExerciseSync(teacherPage, studentPage) {
+  const studentChoice = studentPage.locator(".playsay-render-block-fill-gaps .playsay-inline-select").first();
+  const teacherChoice = teacherPage.locator(".playsay-render-block-fill-gaps .playsay-inline-select").first();
+  await studentChoice.selectOption("write");
+  await waitForInputValue(teacherChoice, "write", "teacher shared choice");
+
+  const studentWriting = studentPage.locator(".playsay-student-answer");
+  const teacherWriting = teacherPage.locator(".playsay-student-answer");
+  await studentWriting.fill(`Student live answer ${runId}`);
+  await waitForInputValue(teacherWriting, `Student live answer ${runId}`, "teacher shared writing");
+
+  const source = studentPage.locator("[data-option-id='smoke-bank-cloud']");
+  const target = studentPage.locator("[data-item-key='smoke-bank-gap']");
+  await source.scrollIntoViewIfNeeded();
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (!sourceBox || !targetBox) {
+    throw new Error("Word-bank source or target has no visible bounding box.");
+  }
+  await studentPage.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+  await studentPage.mouse.down();
+  await studentPage.mouse.move(sourceBox.x + sourceBox.width / 2 + 12, sourceBox.y + sourceBox.height / 2 + 8, { steps: 4 });
+  await studentPage.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 12 });
+  await teacherPage.locator("[data-option-id='smoke-bank-cloud'][data-live-active='true']").waitFor({ timeout: timeoutMs });
+  await teacherPage.locator("[data-item-key='smoke-bank-gap'][data-live-active='true']").waitFor({ timeout: timeoutMs });
+  await studentPage.mouse.up();
+  await waitForText(teacherPage.locator("[data-item-key='smoke-bank-gap']"), "cloud", "teacher applied word-bank answer");
+
+  const studentLeft = studentPage.locator(".playsay-match-word[data-pair-id='smoke-pair-cloud']");
+  const studentRight = studentPage.locator(".playsay-match-picture[data-pair-id='smoke-pair-cloud']");
+  await studentLeft.click();
+  await teacherPage.locator(".playsay-match-word[data-pair-id='smoke-pair-cloud'][data-live-active='true']").waitFor({ timeout: timeoutMs });
+  await studentRight.hover();
+  await teacherPage.locator(".playsay-match-picture[data-pair-id='smoke-pair-cloud'][data-live-active='true']").waitFor({ timeout: timeoutMs });
+  await studentRight.click();
+  await teacherPage.waitForFunction(() => {
+    return Array.from(document.querySelectorAll(".playsay-match-solved-pair"))
+      .some((element) => element.textContent?.includes("cloud"));
+  }, null, { timeout: timeoutMs });
+
+  await teacherWriting.fill(`Teacher live answer ${runId}`);
+  await waitForInputValue(studentWriting, `Teacher live answer ${runId}`, "student shared teacher edit");
+}
+
+async function assertSharedExerciseState(page) {
+  await waitForInputValue(
+    page.locator(".playsay-render-block-fill-gaps .playsay-inline-select").first(),
+    "write",
+    "reconnected shared choice",
+  );
+  await waitForInputValue(
+    page.locator(".playsay-student-answer"),
+    `Teacher live answer ${runId}`,
+    "reconnected shared writing",
+  );
+  await waitForText(page.locator("[data-item-key='smoke-bank-gap']"), "cloud", "reconnected word-bank answer");
+  await page.waitForFunction(() => {
+    return Array.from(document.querySelectorAll(".playsay-match-solved-pair"))
+      .some((element) => element.textContent?.includes("cloud"));
+  }, null, { timeout: timeoutMs });
+}
+
+async function waitForInputValue(locator, value, label) {
+  await locator.waitFor({ timeout: timeoutMs });
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (await locator.inputValue().catch(() => null) === value) return;
+    await delay(100);
+  }
+  throw new Error(`Timed out waiting for ${label}; expected input value ${JSON.stringify(value)}.`);
+}
+
+async function waitForText(locator, text, label) {
+  await locator.waitFor({ timeout: timeoutMs });
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if ((await locator.textContent().catch(() => null))?.includes(text)) return;
+    await delay(100);
+  }
+  throw new Error(`Timed out waiting for ${label}; expected text ${JSON.stringify(text)}.`);
 }
 
 async function waitForLocatorCount(page, selector, minimumCount, label = selector) {

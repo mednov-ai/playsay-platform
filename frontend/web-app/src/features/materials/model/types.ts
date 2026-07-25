@@ -257,6 +257,36 @@ export type MaterialAnswerBlock = Record<string, unknown>;
 
 export type MaterialAnswerState = Record<string, MaterialAnswerBlock>;
 
+export type MaterialExerciseInteraction =
+  | {
+    blockId: string;
+    kind: "wordBankDrag";
+    optionId: string;
+    targetItemKey?: string;
+  }
+  | {
+    blockId: string;
+    kind: "matchingSelection";
+    leftId: string;
+    rightId?: string;
+  };
+
+export type MaterialExerciseParticipant = {
+  clientId: number;
+  color: string;
+  interaction: MaterialExerciseInteraction;
+  name: string;
+};
+
+export type MaterialExerciseSync = {
+  answers: MaterialAnswerState;
+  participants: MaterialExerciseParticipant[];
+  ready: boolean;
+  seedAnswers: (answers: MaterialAnswerState) => void;
+  setAnswer: (blockId: string, answer: MaterialAnswerBlock) => void;
+  updateInteraction: (interaction: MaterialExerciseInteraction | null) => void;
+};
+
 export type MaterialFormState = {
   id: string | null;
   updatedAt: string | null;

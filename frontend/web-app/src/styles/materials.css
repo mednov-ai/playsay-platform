@@ -2577,6 +2577,14 @@
   color: #ffffff;
 }
 
+.playsay-word-bank-chip[data-live-active="true"],
+.playsay-word-bank-drop[data-live-active="true"],
+.playsay-match-word[data-live-active="true"],
+.playsay-match-picture[data-live-active="true"] {
+  border-color: var(--playsay-live-color, #2574ff);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--playsay-live-color, #2574ff) 24%, transparent);
+}
+
 .playsay-word-bank-chip:disabled {
   cursor: default;
   opacity: 0.42;

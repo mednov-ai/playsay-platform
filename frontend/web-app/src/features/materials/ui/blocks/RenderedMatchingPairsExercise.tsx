@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link2, Loader2, Sparkles } from "lucide-react";
 import {
   DEFAULT_MATCHING_PAIR_MAX_ERRORS,
@@ -15,6 +15,8 @@ import {
   resolveMaterialImageUrl,
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
+  type MaterialExerciseInteraction,
+  type MaterialExerciseParticipant,
   type MaterialMatchingPair,
   type MaterialRenderMode,
 } from "../../model/materialDocument";
@@ -26,12 +28,16 @@ export function RenderedMatchingPairsExercise({
   assetUrls,
   block,
   mode,
+  participants = [],
+  onInteractionChange,
   onAnswerChange,
 }: {
   answer?: MaterialAnswerBlock;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
   mode: MaterialRenderMode;
+  participants?: MaterialExerciseParticipant[];
+  onInteractionChange?: (interaction: MaterialExerciseInteraction | null) => void;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
   const { t } = useAppTranslation();
@@ -52,12 +58,27 @@ export function RenderedMatchingPairsExercise({
     pairs.length,
   );
   const matchingLocked = maxErrors > 0 && materialMatchingIncorrectAttemptCount(attempts) >= maxErrors;
+  const remoteMatchingInteractions = participants.filter((participant) => (
+    participant.interaction.blockId === block.id && participant.interaction.kind === "matchingSelection"
+  ));
+
+  useEffect(() => () => onInteractionChange?.(null), [block.id, onInteractionChange]);
+
+  function publishMatchingInteraction(leftId: string, rightId?: string) {
+    onInteractionChange?.({
+      blockId: block.id,
+      kind: "matchingSelection",
+      leftId,
+      ...(rightId ? { rightId } : {}),
+    });
+  }
 
   useEffect(() => {
     if (activeLeftId && solvedPairIds.has(activeLeftId)) {
       setActiveLeftId(null);
+      onInteractionChange?.(null);
     }
-  }, [activeLeftId, solvedPairIds]);
+  }, [activeLeftId, onInteractionChange, solvedPairIds]);
 
   function connectPair(rightId: string) {
     if (!activeLeftId || matchingLocked) {
@@ -72,6 +93,7 @@ export function RenderedMatchingPairsExercise({
       return;
     }
     setActiveLeftId(null);
+    onInteractionChange?.(null);
   }
 
   if (pairs.length === 0) {
@@ -88,15 +110,31 @@ export function RenderedMatchingPairsExercise({
       <div className="playsay-match-columns">
         <div className="playsay-match-column" data-side="left">
           {unresolvedLeftPairs.map((leftPair, index) => {
+            const remoteParticipants = remoteMatchingInteractions.filter((participant) => (
+              participant.interaction.kind === "matchingSelection" && participant.interaction.leftId === leftPair.id
+            ));
+            const remoteParticipant = remoteParticipants[0];
             return (
               <div className="playsay-match-left-control" key={leftPair.id}>
                 <button
                   aria-label={t("materials.matching.chooseLeftAria", { index: index + 1 })}
                   className="playsay-match-word"
                   data-active={activeLeftId === leftPair.id ? "true" : "false"}
+                  data-live-active={remoteParticipant ? "true" : undefined}
+                  data-pair-id={leftPair.id}
                   data-status={matchingLocked ? "locked" : "empty"}
                   disabled={matchingLocked}
-                  onClick={() => setActiveLeftId((current) => (current === leftPair.id ? null : leftPair.id))}
+                  onClick={() => setActiveLeftId((current) => {
+                    const nextLeftId = current === leftPair.id ? null : leftPair.id;
+                    if (nextLeftId) {
+                      publishMatchingInteraction(nextLeftId);
+                    } else {
+                      onInteractionChange?.(null);
+                    }
+                    return nextLeftId;
+                  })}
+                  style={remoteParticipant ? { "--playsay-live-color": remoteParticipant.color } as CSSProperties : undefined}
+                  title={remoteParticipants.length > 0 ? remoteParticipants.map((participant) => participant.name).join(", ") : undefined}
                   type="button"
                 >
                   <MarkdownInline className="playsay-match-markdown" value={leftPair.left} />
@@ -108,6 +146,10 @@ export function RenderedMatchingPairsExercise({
 
         <div className="playsay-match-column" data-side="right">
           {unresolvedRightOptions.map((pair, index) => {
+          const remoteParticipants = remoteMatchingInteractions.filter((participant) => (
+            participant.interaction.kind === "matchingSelection" && participant.interaction.rightId === pair.id
+          ));
+          const remoteParticipant = remoteParticipants[0];
           return (
               <button
                 aria-label={pairTargetKindLabel(pair, t, index)}
@@ -115,11 +157,21 @@ export function RenderedMatchingPairsExercise({
                 data-flash={wrongFlashRightId === pair.id ? "wrong" : "none"}
                 data-hovered={hoveredRightId === pair.id ? "true" : "false"}
                 data-kind={materialMatchingPairTargetKind(pair).toLowerCase()}
+                data-live-active={remoteParticipant ? "true" : undefined}
+                data-pair-id={pair.id}
                 key={pair.id}
                 disabled={matchingLocked}
                 onClick={() => connectPair(pair.id)}
-                onMouseEnter={() => setHoveredRightId(pair.id)}
-                onMouseLeave={() => setHoveredRightId((current) => (current === pair.id ? null : current))}
+                onMouseEnter={() => {
+                  setHoveredRightId(pair.id);
+                  if (activeLeftId) publishMatchingInteraction(activeLeftId, pair.id);
+                }}
+                onMouseLeave={() => {
+                  setHoveredRightId((current) => (current === pair.id ? null : current));
+                  if (activeLeftId) publishMatchingInteraction(activeLeftId);
+                }}
+                style={remoteParticipant ? { "--playsay-live-color": remoteParticipant.color } as CSSProperties : undefined}
+                title={remoteParticipants.length > 0 ? remoteParticipants.map((participant) => participant.name).join(", ") : undefined}
                 type="button"
               >
                 <MatchingPairTarget pair={pair} assetUrls={assetUrls} optionIndex={index} />

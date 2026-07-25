@@ -26,6 +26,7 @@ export function createYjsWorkspaceRuntime({
   onHtmlGameInputsChange,
   onHtmlGamePresentationChange = () => undefined,
   onHtmlGameSnapshotsChange,
+  onMaterialAnswersChange = () => undefined,
   onDocumentUpdate,
   onParticipantsChange,
   onTextChange,
@@ -40,6 +41,7 @@ export function createYjsWorkspaceRuntime({
   const yhtmlGameInputs = ydoc.getArray("htmlGameInputs");
   const yhtmlGameEffects = ydoc.getArray("htmlGameEffects");
   const yhtmlGamePresentation = ydoc.getMap("htmlGamePresentation");
+  const ymaterialAnswerFields = ydoc.getMap("materialAnswerFields");
   const awareness = new awarenessProtocol.Awareness(ydoc);
   let socket = null;
   let disposed = false;
@@ -66,6 +68,9 @@ export function createYjsWorkspaceRuntime({
   const updateHtmlGamePresentation = () => {
     if (!disposed) onHtmlGamePresentationChange(asString(yhtmlGamePresentation.get("activeBlockId")) || null);
   };
+  const updateMaterialAnswers = () => {
+    if (!disposed) onMaterialAnswersChange(materialAnswersFromFields(ymaterialAnswerFields));
+  };
   const syncUpdateHandler = (update, origin) => {
     onDocumentUpdate?.(update);
     if (origin !== socket) {
@@ -89,10 +94,12 @@ export function createYjsWorkspaceRuntime({
   yhtmlGameInputs.observe(updateHtmlGameInputs);
   yhtmlGameEffects.observe(updateHtmlGameEffects);
   yhtmlGamePresentation.observe(updateHtmlGamePresentation);
+  ymaterialAnswerFields.observe(updateMaterialAnswers);
   ydoc.on("update", syncUpdateHandler);
   awareness.on("update", awarenessUpdateHandler);
   awareness.setLocalState({
     cursor: null,
+    exerciseInteraction: null,
     htmlGameAuthorities: {},
     user: { color, name: participantName },
   });
@@ -102,6 +109,7 @@ export function createYjsWorkspaceRuntime({
   updateHtmlGameInputs();
   updateHtmlGameEffects();
   updateHtmlGamePresentation();
+  updateMaterialAnswers();
 
   return {
     applyAnnotationChanges({ deleteIds, upserts }) {
@@ -121,6 +129,7 @@ export function createYjsWorkspaceRuntime({
       yhtmlGameInputs.unobserve(updateHtmlGameInputs);
       yhtmlGameEffects.unobserve(updateHtmlGameEffects);
       yhtmlGamePresentation.unobserve(updateHtmlGamePresentation);
+      ymaterialAnswerFields.unobserve(updateMaterialAnswers);
       ydoc.off("update", syncUpdateHandler);
       ydoc.destroy();
       onParticipantsChange([]);
@@ -165,6 +174,25 @@ export function createYjsWorkspaceRuntime({
         yhtmlGamePresentation.delete("activeBlockId");
       }
     },
+    seedMaterialAnswers(answers) {
+      if (ymaterialAnswerFields.size > 0) {
+        return;
+      }
+      const normalized = normalizeJsonRecord(answers);
+      ydoc.transact(() => {
+        Object.entries(normalized).forEach(([blockId, answer]) => {
+          writeMaterialAnswerFields(ymaterialAnswerFields, blockId, answer);
+        });
+      });
+    },
+    setMaterialAnswer(blockId, answer) {
+      const cleanBlockId = asString(blockId);
+      const normalized = normalizeJsonObject(answer);
+      if (!cleanBlockId || !normalized) {
+        return;
+      }
+      ydoc.transact(() => writeMaterialAnswerFields(ymaterialAnswerFields, cleanBlockId, normalized));
+    },
     snapshot() {
       return {
         schemaVersion: 1,
@@ -180,6 +208,9 @@ export function createYjsWorkspaceRuntime({
     },
     updateCursor(cursor) {
       awareness.setLocalStateField("cursor", cursor);
+    },
+    updateExerciseInteraction(interaction) {
+      awareness.setLocalStateField("exerciseInteraction", normalizeExerciseInteraction(interaction));
     },
     updateHtmlGameAuthority(blockId, runId) {
       awareness.setLocalStateField(
@@ -198,6 +229,143 @@ export function createYjsWorkspaceRuntime({
       onTextChange(nextText);
     },
   };
+}
+
+function materialAnswersFromFields(fields) {
+  const answers = {};
+  fields.forEach((value, encodedPath) => {
+    const path = materialAnswerPath(encodedPath);
+    if (!path) {
+      return;
+    }
+    const [blockId, ...answerPath] = path;
+    const normalized = normalizeJsonValue(value);
+    if (normalized === undefined) {
+      return;
+    }
+    const answer = answers[blockId] ?? {};
+    setJsonPath(answer, answerPath, normalized);
+    answers[blockId] = answer;
+  });
+  return answers;
+}
+
+function writeMaterialAnswerFields(fields, blockId, answer) {
+  const nextFields = new Map();
+  flattenJsonObject(answer, [], nextFields);
+  fields.forEach((_value, encodedPath) => {
+    const path = materialAnswerPath(encodedPath);
+    if (path?.[0] === blockId && !nextFields.has(JSON.stringify(path.slice(1)))) {
+      fields.delete(encodedPath);
+    }
+  });
+  nextFields.forEach((value, encodedAnswerPath) => {
+    const answerPath = JSON.parse(encodedAnswerPath);
+    const encodedPath = JSON.stringify([blockId, ...answerPath]);
+    if (!valuesEqual(fields.get(encodedPath), value)) {
+      fields.set(encodedPath, value);
+    }
+  });
+}
+
+function flattenJsonObject(value, path, result) {
+  Object.entries(value).forEach(([key, item]) => {
+    const nextPath = [...path, key];
+    const normalizedObject = normalizeJsonObject(item);
+    if (normalizedObject) {
+      flattenJsonObject(normalizedObject, nextPath, result);
+      return;
+    }
+    const normalized = normalizeJsonValue(item);
+    if (normalized !== undefined) {
+      result.set(JSON.stringify(nextPath), normalized);
+    }
+  });
+}
+
+function materialAnswerPath(value) {
+  try {
+    const path = JSON.parse(value);
+    return Array.isArray(path) && path.length >= 2 && path.every((item) => typeof item === "string" && item)
+      ? path
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function setJsonPath(target, path, value) {
+  if (path.length === 0) {
+    return;
+  }
+  let current = target;
+  path.slice(0, -1).forEach((key) => {
+    const child = asObject(current[key]) ?? {};
+    current[key] = child;
+    current = child;
+  });
+  current[path.at(-1)] = value;
+}
+
+function normalizeJsonRecord(value) {
+  return normalizeJsonObject(value) ?? {};
+}
+
+function normalizeJsonObject(value) {
+  const object = asObject(value);
+  if (!object) {
+    return null;
+  }
+  return Object.fromEntries(Object.entries(object).flatMap(([key, item]) => {
+    const normalized = normalizeJsonValue(item);
+    return normalized === undefined ? [] : [[key, normalized]];
+  }));
+}
+
+function normalizeJsonValue(value) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      const normalized = normalizeJsonValue(item);
+      return normalized === undefined ? [] : [normalized];
+    });
+  }
+  return normalizeJsonObject(value) ?? undefined;
+}
+
+export function normalizeExerciseInteraction(value) {
+  const interaction = asObject(value);
+  const blockId = asString(interaction?.blockId);
+  const kind = asString(interaction?.kind);
+  if (!blockId) {
+    return null;
+  }
+  if (kind === "wordBankDrag") {
+    const optionId = asString(interaction?.optionId);
+    const targetItemKey = asString(interaction?.targetItemKey);
+    return optionId ? {
+      blockId,
+      kind,
+      optionId,
+      ...(targetItemKey ? { targetItemKey } : {}),
+    } : null;
+  }
+  if (kind === "matchingSelection") {
+    const leftId = asString(interaction?.leftId);
+    const rightId = asString(interaction?.rightId);
+    return leftId ? {
+      blockId,
+      kind,
+      leftId,
+      ...(rightId ? { rightId } : {}),
+    } : null;
+  }
+  return null;
 }
 
 function boundedArrayPush(array, value, limit) {
@@ -523,6 +691,7 @@ function updateParticipants(awareness, onParticipantsChange) {
           x: clamp01(asNumber(cursor.x)),
           y: clamp01(asNumber(cursor.y)),
         } : null,
+        exerciseInteraction: normalizeExerciseInteraction(root?.exerciseInteraction),
         htmlGameAuthorityRuns,
         name: asString(user?.name) || "Play&Say",
       };

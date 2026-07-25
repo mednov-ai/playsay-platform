@@ -1,4 +1,4 @@
-import { type CSSProperties, type DragEvent, type KeyboardEvent, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type DragEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { CornerDownLeft, KeyRound } from "lucide-react";
 import { i18n, useAppTranslation } from "../../../../shared/i18n";
 import {
@@ -26,6 +26,8 @@ import {
   splitFillGapPrompt,
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
+  type MaterialExerciseInteraction,
+  type MaterialExerciseParticipant,
   type MaterialExerciseItem,
   type MaterialHintEntry,
 } from "../../model/materialDocument";
@@ -35,10 +37,14 @@ import { MarkdownInline } from "../markdown/RenderedMarkdown";
 export function RenderedFillGapExercise({
   answer,
   block,
+  participants = [],
+  onInteractionChange,
   onAnswerChange,
 }: {
   answer?: MaterialAnswerBlock;
   block: MaterialEditorBlock;
+  participants?: MaterialExerciseParticipant[];
+  onInteractionChange?: (interaction: MaterialExerciseInteraction | null) => void;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
 }) {
   const { t } = useAppTranslation();
@@ -53,6 +59,20 @@ export function RenderedFillGapExercise({
   const [wrongFeedbackItemKey, setWrongFeedbackItemKey] = useState<string | null>(null);
   const [focusedManualItemKey, setFocusedManualItemKey] = useState<string | null>(null);
   const manualInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const remoteWordBankInteractions = participants.filter((participant) => (
+    participant.interaction.blockId === block.id && participant.interaction.kind === "wordBankDrag"
+  ));
+
+  useEffect(() => () => onInteractionChange?.(null), [block.id, onInteractionChange]);
+
+  function publishWordBankInteraction(optionId: string, targetItemKey?: string) {
+    onInteractionChange?.({
+      blockId: block.id,
+      kind: "wordBankDrag",
+      optionId,
+      ...(targetItemKey ? { targetItemKey } : {}),
+    });
+  }
 
   function updateItemValue(itemKey: string, value: string) {
     onAnswerChange?.(block.id, {
@@ -183,6 +203,7 @@ export function RenderedFillGapExercise({
     if (optionId) {
       assignWordBankOption(itemKey, item, optionId);
     }
+    onInteractionChange?.(null);
   }
 
   function handleManualInputKeyDown(event: KeyboardEvent<HTMLInputElement>, itemKey: string) {
@@ -201,20 +222,45 @@ export function RenderedFillGapExercise({
           {wordBankOptions.map((option) => {
             const used = usedWordBankOptionIds.has(option.id);
             const selected = selectedWordBankOptionId === option.id;
+            const remoteParticipants = remoteWordBankInteractions.filter((participant) => (
+              participant.interaction.kind === "wordBankDrag" && participant.interaction.optionId === option.id
+            ));
+            const remoteParticipant = remoteParticipants[0];
             return (
               <button
                 aria-pressed={selected}
                 className="playsay-word-bank-chip"
                 data-selected={selected || undefined}
+                data-live-active={remoteParticipant ? "true" : undefined}
+                data-option-id={option.id}
                 disabled={used}
                 draggable={!used}
                 key={option.id}
-                onClick={() => setSelectedWordBankOptionId(selected ? null : option.id)}
+                onClick={() => {
+                  const nextOptionId = selected ? null : option.id;
+                  setSelectedWordBankOptionId(nextOptionId);
+                  if (nextOptionId) {
+                    publishWordBankInteraction(nextOptionId);
+                  } else {
+                    onInteractionChange?.(null);
+                  }
+                }}
+                onDragEnd={() => {
+                  setSelectedWordBankOptionId(null);
+                  onInteractionChange?.(null);
+                }}
                 onDragStart={(event) => {
                   event.dataTransfer.setData("text/plain", option.id);
                   event.dataTransfer.effectAllowed = "move";
+                  setSelectedWordBankOptionId(option.id);
+                  publishWordBankInteraction(option.id);
                 }}
-                title={used ? t("materials.renderer.wordBankOptionUsed", { value: option.value }) : t("materials.renderer.wordBankOptionTitle", { value: option.value })}
+                style={remoteParticipant ? { "--playsay-live-color": remoteParticipant.color } as CSSProperties : undefined}
+                title={remoteParticipants.length > 0
+                  ? `${remoteParticipants.map((participant) => participant.name).join(", ")}: ${option.value}`
+                  : used
+                    ? t("materials.renderer.wordBankOptionUsed", { value: option.value })
+                    : t("materials.renderer.wordBankOptionTitle", { value: option.value })}
                 type="button"
               >
                 {option.value}
@@ -249,6 +295,10 @@ export function RenderedFillGapExercise({
           const selectedWordBankOption = selectedWordBankOptionId
             ? wordBankOptions.find((option) => option.id === selectedWordBankOptionId)
             : null;
+          const remoteTargetParticipants = remoteWordBankInteractions.filter((participant) => (
+            participant.interaction.kind === "wordBankDrag" && participant.interaction.targetItemKey === itemKey
+          ));
+          const remoteTargetParticipant = remoteTargetParticipants[0];
 
           return (
             <span className="playsay-answer-fragment" data-input-mode={isWordBank ? "wordBank" : isFormTransform ? "formTransform" : isManualInput ? "manual" : "select"} data-status={status.kind} key={itemKey}>
@@ -260,15 +310,33 @@ export function RenderedFillGapExercise({
                       aria-label={answers[itemKey] ? t("materials.renderer.wordBankFilledGap", { value: answers[itemKey] }) : t("materials.renderer.wordBankEmptyGap", { number: index + 1 })}
                       className="playsay-word-bank-drop"
                       data-status={status.kind}
+                      data-live-active={remoteTargetParticipant ? "true" : undefined}
+                      data-item-key={itemKey}
                       disabled={status.locked || status.correct}
                       onClick={() => {
                         if (selectedWordBankOption) {
                           assignWordBankOption(itemKey, item, selectedWordBankOption.id);
+                          onInteractionChange?.(null);
                         }
                       }}
-                      onDragOver={(event) => event.preventDefault()}
+                      onDragEnter={() => {
+                        if (selectedWordBankOptionId) {
+                          publishWordBankInteraction(selectedWordBankOptionId, itemKey);
+                        }
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        if (selectedWordBankOptionId) {
+                          publishWordBankInteraction(selectedWordBankOptionId, itemKey);
+                        }
+                      }}
                       onDrop={(event) => handleWordBankDrop(event, itemKey, item)}
-                      title={selectedWordBankOption ? t("materials.renderer.wordBankPlaceSelected", { value: selectedWordBankOption.value }) : t("materials.renderer.wordBankDropTitle")}
+                      style={remoteTargetParticipant ? { "--playsay-live-color": remoteTargetParticipant.color } as CSSProperties : undefined}
+                      title={remoteTargetParticipants.length > 0
+                        ? remoteTargetParticipants.map((participant) => participant.name).join(", ")
+                        : selectedWordBankOption
+                          ? t("materials.renderer.wordBankPlaceSelected", { value: selectedWordBankOption.value })
+                          : t("materials.renderer.wordBankDropTitle")}
                       type="button"
                     >
                       {answers[itemKey] || t("materials.renderer.wordBankGapPlaceholder")}

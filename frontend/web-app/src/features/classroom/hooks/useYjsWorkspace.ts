@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createCollaborationDocumentToken,
   type CollaborationDocument,
@@ -13,6 +13,12 @@ import {
   type YjsWorkspaceRuntime,
 } from "./yjsRuntime";
 import type { MaterialHtmlGameEffect, MaterialHtmlGameInputEvent, MaterialHtmlGameSnapshot, MaterialHtmlGameSync } from "../../materials/model/materialDocument";
+import type {
+  MaterialAnswerBlock,
+  MaterialAnswerState,
+  MaterialExerciseInteraction,
+  MaterialExerciseSync,
+} from "../../materials/model/types";
 
 export type { CollaborationCursor, CollaborationParticipant };
 
@@ -37,7 +43,9 @@ export function useYjsWorkspace({
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
   const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
+  const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
+  const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -50,6 +58,8 @@ export function useYjsWorkspace({
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
       setPresentedHtmlGameBlockId(null);
+      setMaterialAnswers({});
+      exerciseInteractionRef.current = null;
       return undefined;
     }
 
@@ -61,6 +71,7 @@ export function useYjsWorkspace({
       onHtmlGameInputsChange: setHtmlGameInputs,
       onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
+      onMaterialAnswersChange: setMaterialAnswers,
       onParticipantsChange: setParticipants,
       onTextChange: setText,
       participantName,
@@ -113,6 +124,8 @@ export function useYjsWorkspace({
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
       setPresentedHtmlGameBlockId(null);
+      setMaterialAnswers({});
+      exerciseInteractionRef.current = null;
     };
   }, [color, document?.id, enabled, participantName]);
 
@@ -171,6 +184,22 @@ export function useYjsWorkspace({
     runtimeRef.current?.setHtmlGamePresentedBlock(blockId);
   }, []);
 
+  const setMaterialAnswer = useCallback((blockId: string, answer: MaterialAnswerBlock) => {
+    runtimeRef.current?.setMaterialAnswer(blockId, answer);
+  }, []);
+
+  const seedMaterialAnswers = useCallback((answers: MaterialAnswerState) => {
+    runtimeRef.current?.seedMaterialAnswers(answers);
+  }, []);
+
+  const updateExerciseInteraction = useCallback((interaction: MaterialExerciseInteraction | null) => {
+    if (JSON.stringify(exerciseInteractionRef.current) === JSON.stringify(interaction)) {
+      return;
+    }
+    exerciseInteractionRef.current = interaction;
+    runtimeRef.current?.updateExerciseInteraction(interaction);
+  }, []);
+
   const htmlGameSync = useCallback((isAuthority: boolean): MaterialHtmlGameSync => ({
     authorityRuns: Object.fromEntries(participants
       .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))),
@@ -187,11 +216,26 @@ export function useYjsWorkspace({
     snapshots: htmlGameSnapshots,
   }), [htmlGameEffects, htmlGameInputs, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status]);
 
+  const exerciseSync = useMemo<MaterialExerciseSync>(() => ({
+    answers: materialAnswers,
+    participants: participants.flatMap((participant) => participant.exerciseInteraction ? [{
+      clientId: participant.clientId,
+      color: participant.color,
+      interaction: participant.exerciseInteraction,
+      name: participant.name,
+    }] : []),
+    ready: status === "connected",
+    seedAnswers: seedMaterialAnswers,
+    setAnswer: setMaterialAnswer,
+    updateInteraction: updateExerciseInteraction,
+  }), [materialAnswers, participants, seedMaterialAnswers, setMaterialAnswer, status, updateExerciseInteraction]);
+
   return {
     annotationElements,
     connected: status === "connected",
     participants,
     htmlGameSync,
+    exerciseSync,
     setAnnotationElements,
     snapshot,
     status,

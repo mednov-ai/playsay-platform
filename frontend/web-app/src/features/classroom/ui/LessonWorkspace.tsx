@@ -367,6 +367,7 @@ export function LessonWorkspace({
                 lessonId={session.lessonId}
                 material={visibleMaterial}
                 annotationSync={isParallelWork ? null : teacherAnnotationSync}
+                exerciseSync={isParallelWork ? undefined : teacherAnnotationWorkspace.exerciseSync}
                 htmlGameSync={isParallelWork ? undefined : teacherHtmlGameSync}
                 externalActivitySync={isParallelWork || !externalActivitiesEnabled ? undefined : teacherExternalActivitySync}
                 liveActivePageId={liveActivePageId}

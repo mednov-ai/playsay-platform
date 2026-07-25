@@ -1,7 +1,12 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import { createYjsWorkspaceRuntime, type AnnotationElement, updateHtmlGameAuthorityRuns } from "./yjsRuntime";
+import {
+  createYjsWorkspaceRuntime,
+  normalizeExerciseInteraction,
+  type AnnotationElement,
+  updateHtmlGameAuthorityRuns,
+} from "./yjsRuntime";
 
 describe("yjs workspace runtime annotations", () => {
   it("stores annotation strokes in the collaboration document", () => {
@@ -365,6 +370,134 @@ describe("yjs workspace runtime annotations", () => {
       width: 220,
     })]);
     runtime.destroy();
+  });
+
+  it("persists material answers and restores them from a collaboration snapshot", () => {
+    withWindowBase64(() => {
+      const answers: Array<Record<string, Record<string, unknown>>> = [];
+      const runtime = createYjsWorkspaceRuntime({
+        color: "#2574ff",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onMaterialAnswersChange: (nextAnswers) => answers.push(nextAnswers),
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Student",
+        snapshot: null,
+      });
+
+      runtime.setMaterialAnswer("fill-1", {
+        type: "fillGaps",
+        items: { first: "cloud", second: "rain" },
+        optionIds: { first: "option-cloud" },
+      });
+      const snapshot = runtime.snapshot();
+      expect(answers.at(-1)).toEqual({
+        "fill-1": {
+          type: "fillGaps",
+          items: { first: "cloud", second: "rain" },
+          optionIds: { first: "option-cloud" },
+        },
+      });
+      runtime.destroy();
+
+      const restoredAnswers: Array<Record<string, Record<string, unknown>>> = [];
+      const restored = createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onMaterialAnswersChange: (nextAnswers) => restoredAnswers.push(nextAnswers),
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Teacher",
+        snapshot,
+      });
+
+      expect(restoredAnswers.at(-1)).toEqual(answers.at(-1));
+      restored.destroy();
+    });
+  });
+
+  it("merges simultaneous answers for different exercise items", () => {
+    withWindowBase64(() => {
+      const createRuntime = (participantName: string) => createYjsWorkspaceRuntime({
+        color: "#2574ff",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName,
+        snapshot: null,
+      });
+      const teacher = createRuntime("Teacher");
+      const student = createRuntime("Student");
+      teacher.setMaterialAnswer("fill-1", { type: "fillGaps", items: { first: "cloud" } });
+      student.setMaterialAnswer("fill-1", { type: "fillGaps", items: { second: "rain" } });
+
+      const mergedDocument = new Y.Doc();
+      Y.applyUpdate(mergedDocument, Buffer.from(String(teacher.snapshot().yjsUpdateBase64), "base64"));
+      Y.applyUpdate(mergedDocument, Buffer.from(String(student.snapshot().yjsUpdateBase64), "base64"));
+      teacher.destroy();
+      student.destroy();
+
+      const mergedAnswers: Array<Record<string, Record<string, unknown>>> = [];
+      const merged = createYjsWorkspaceRuntime({
+        color: "#00a878",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onMaterialAnswersChange: (answers) => mergedAnswers.push(answers),
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Reconnected",
+        snapshot: {
+          encoding: "yjs-update-v1",
+          savedAt: new Date(0).toISOString(),
+          schemaVersion: 1,
+          yjsUpdateBase64: Buffer.from(Y.encodeStateAsUpdate(mergedDocument)).toString("base64"),
+        },
+      });
+
+      expect(mergedAnswers.at(-1)).toEqual({
+        "fill-1": {
+          type: "fillGaps",
+          items: { first: "cloud", second: "rain" },
+        },
+      });
+      merged.destroy();
+      mergedDocument.destroy();
+    });
+  });
+
+  it("normalizes only supported transient exercise interactions", () => {
+    expect(normalizeExerciseInteraction({
+      blockId: "fill-1",
+      kind: "wordBankDrag",
+      optionId: "option-1",
+      targetItemKey: "gap-1",
+    })).toEqual({
+      blockId: "fill-1",
+      kind: "wordBankDrag",
+      optionId: "option-1",
+      targetItemKey: "gap-1",
+    });
+    expect(normalizeExerciseInteraction({
+      blockId: "match-1",
+      kind: "matchingSelection",
+      leftId: "pair-1",
+    })).toEqual({
+      blockId: "match-1",
+      kind: "matchingSelection",
+      leftId: "pair-1",
+    });
+    expect(normalizeExerciseInteraction({ blockId: "fill-1", kind: "unknown" })).toBeNull();
   });
 
   it("persists HTML game state separately for each block", () => {

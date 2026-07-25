@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
-import type { MaterialHtmlGameSync } from "../../materials/model/materialDocument";
+import type { MaterialExerciseSync, MaterialHtmlGameSync } from "../../materials/model/materialDocument";
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
 
 const apiMocks = vi.hoisted(() => ({
@@ -69,6 +69,26 @@ const staticImageMaterial = {
         title: "Static worksheet",
         url: "https://example.com/static.png",
         objectFit: "contain",
+      }],
+    }],
+  },
+  blockCount: 1,
+} satisfies LessonMaterial;
+
+const freeWritingMaterial = {
+  ...material,
+  id: "material-writing",
+  document: {
+    schemaVersion: 1,
+    pages: [{
+      id: "page-writing",
+      title: "Write together",
+      layout: "FLOW",
+      blocks: [{
+        id: "writing-1",
+        type: "freeWriting",
+        title: "Shared answer",
+        prompt: "Describe the weather.",
       }],
     }],
   },
@@ -191,6 +211,41 @@ beforeEach(() => {
 });
 
 describe("LessonTaskCanvas", () => {
+  it("renders shared exercise answers and publishes edits to the collaboration document", () => {
+    const setAnswer = vi.fn();
+    const seedAnswers = vi.fn();
+    const exerciseSync: MaterialExerciseSync = {
+      answers: {
+        "writing-1": { type: "freeWriting", text: "It is sunny." },
+      },
+      participants: [],
+      ready: true,
+      seedAnswers,
+      setAnswer,
+      updateInteraction: vi.fn(),
+    };
+    const { container } = render(createElement(LessonTaskCanvas, {
+      exerciseSync,
+      lessonId: "lesson-1",
+      material: freeWritingMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+    const textarea = container.querySelector<HTMLTextAreaElement>(".playsay-student-answer")!;
+
+    expect(textarea.value).toBe("It is sunny.");
+    fireEvent.change(textarea, { target: { value: "It is raining." } });
+    expect(setAnswer).toHaveBeenCalledWith("writing-1", expect.objectContaining({
+      text: "It is raining.",
+      type: "freeWriting",
+    }));
+    expect(seedAnswers).toHaveBeenCalledWith({});
+  });
+
   it("shows a localized empty state instead of an English exercise when no material is assigned", () => {
     const markup = renderToStaticMarkup(createElement(LessonTaskCanvas, {
       lessonId: "lesson-empty",

@@ -11,6 +11,8 @@ import {
   type MaterialAnswerBlock,
   type MaterialEditorBlock,
   type MaterialEditorPage,
+  type MaterialExerciseInteraction,
+  type MaterialExerciseParticipant,
   type MaterialRenderMode,
 } from "../../model/materialDocument";
 import { RenderedMarkdown, MarkdownInline } from "../markdown/RenderedMarkdown";
@@ -32,6 +34,8 @@ export function RenderedMaterialBlock({
   block,
   mode,
   onAnswerChange,
+  exerciseParticipants = [],
+  onExerciseInteractionChange,
   onAssetTagsChange,
   onBlockPatchCommit,
   onBlockPatch,
@@ -47,6 +51,8 @@ export function RenderedMaterialBlock({
   materialId?: string;
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
+  exerciseParticipants?: MaterialExerciseParticipant[];
+  onExerciseInteractionChange?: (interaction: MaterialExerciseInteraction | null) => void;
   onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
@@ -362,7 +368,13 @@ export function RenderedMaterialBlock({
       return blockSection(
         <>
           <h4>{block.title}</h4>
-          <RenderedFillGapExercise answer={answer} block={block} onAnswerChange={onAnswerChange} />
+          <RenderedFillGapExercise
+            answer={answer}
+            block={block}
+            onAnswerChange={onAnswerChange}
+            participants={exerciseParticipants}
+            onInteractionChange={onExerciseInteractionChange}
+          />
         </>,
         "playsay-render-block playsay-render-block-fill-gaps",
       );
@@ -383,6 +395,8 @@ export function RenderedMaterialBlock({
             block={block}
             mode={mode}
             onAnswerChange={onAnswerChange}
+            participants={exerciseParticipants}
+            onInteractionChange={onExerciseInteractionChange}
           />
         </>,
       );

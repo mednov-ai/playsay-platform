@@ -847,6 +847,20 @@ paths:
       responses:
         "200":
           description: OK
+  /webhooks/mailjet:
+    post:
+      tags:
+      - mailjet-webhook-proxy-controller
+      operationId: webhook_1
+      parameters:
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
   /teacher/students/attach:
     post:
       tags:

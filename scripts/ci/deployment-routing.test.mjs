@@ -30,6 +30,11 @@ test("module pipelines route numeric release branches to prod only", () => {
       pipelineName,
     );
     assert.match(pipeline, /env\.INFRA_BRANCH = env\.DEPLOY_TO_PROD == 'true' \? env\.CI_BRANCH : 'develop'/, pipelineName);
+    assert.doesNotMatch(
+      pipeline,
+      /^\s*INFRA_BRANCH\s*=\s*'develop'\s*$/m,
+      `${pipelineName} must not let Declarative Pipeline reset the computed release branch between stages`,
+    );
     assert.match(pipeline, /stage\('Build and push image'\)[\s\S]*?env\.DEPLOY_IMAGE == 'true'/, pipelineName);
     assert.match(pipeline, /stage\('Update environment image reference'\)[\s\S]*?env\.DEPLOY_IMAGE == 'true'/, pipelineName);
 

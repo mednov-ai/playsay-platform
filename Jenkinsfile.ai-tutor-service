@@ -99,7 +99,6 @@ spec:
     AI_TUTOR_IMAGE_NAME = 'playsay-ai-tutor-service'
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
-    INFRA_BRANCH = 'develop'
   }
 
   stages {

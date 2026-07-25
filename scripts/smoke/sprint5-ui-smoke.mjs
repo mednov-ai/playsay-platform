@@ -15,9 +15,13 @@ const sshHost = process.env.PLAY_SAY_SMOKE_SSH_HOST ?? "root@146.103.126.15";
 const headless = process.env.PLAY_SAY_SMOKE_HEADLESS !== "false";
 const timeoutMs = Number(process.env.PLAY_SAY_SMOKE_TIMEOUT_MS ?? 45_000);
 const annotationScreenshotPath = process.env.PLAY_SAY_SMOKE_ANNOTATION_SCREENSHOT_PATH?.trim() || null;
+const failureScreenshotDir = process.env.PLAY_SAY_SMOKE_FAILURE_SCREENSHOT_DIR?.trim()
+  || (annotationScreenshotPath ? path.dirname(annotationScreenshotPath) : null);
 const annotationOnly = process.env.PLAY_SAY_SMOKE_ANNOTATION_ONLY === "true";
 const runId = `sprint5-ui-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
 const tokenStorageKey = "playsay.auth.tokens";
+const scrollImageBlockId = "smoke-scroll-image";
+const scrollImageText = "Anchored scroll text";
 
 const demoUsers = {
   teacher: {
@@ -79,9 +83,11 @@ try {
     addCheck("ai-tutor-personas-switch-animated-avatar");
   }
 
-  const material = await createSmokeMaterial(teacher.tokens.accessToken);
+  let material = await createSmokeMaterial(teacher.tokens.accessToken);
   created.materialId = material.id;
   summary.materialId = material.id;
+  material = await addSmokeScrollImage(teacher.tokens.accessToken, material);
+  addCheck("scroll-image-material-prepared");
 
   const lesson = await createSmokeLesson(
     teacher.tokens.accessToken,
@@ -116,14 +122,19 @@ try {
   addCheck("student-workspace-hides-document-tabs-and-side-editor");
 
   if (annotationOnly) {
+    await waitForSharedPresenceReady(teacher.page, studentA.page, studentB.page);
     await drawTextAndMindMap(teacher.page);
     await captureAnnotationScreenshot(teacher.page);
     addCheck("text-and-mind-map-use-compact-content-bounds");
+    await verifyAnchoredTextScroll(teacher.page, studentA.page);
+    addCheck("teacher-and-student-text-stays-anchored-during-image-scroll");
   } else {
     await waitForSharedPresenceReady(teacher.page, studentA.page, studentB.page);
     await drawTextAndMindMap(teacher.page);
     await captureAnnotationScreenshot(teacher.page);
     addCheck("text-and-mind-map-use-compact-content-bounds");
+    await verifyAnchoredTextScroll(teacher.page, studentA.page);
+    addCheck("teacher-and-student-text-stays-anchored-during-image-scroll");
     await clearMaterialCursors(teacher.page, studentA.page, studentB.page);
     await verifyMaterialCursor(studentA.page, studentB.page);
     await verifyMaterialCursorAlignment(studentA.page, studentB.page, 0.34, 0.38, "student A cursor on student B");
@@ -159,6 +170,7 @@ try {
 
   console.log(JSON.stringify(summary, null, 2));
 } catch (error) {
+  await captureFailureScreenshots(sessions);
   try {
     const teacherToken = sessions.find((session) => session.role === "teacher")?.tokens.accessToken;
     if (teacherToken) {
@@ -514,6 +526,64 @@ async function createSmokeMaterial(token) {
   return apiRequest(token, "POST", "/materials", 201, created.materialRequest);
 }
 
+async function addSmokeScrollImage(token, material) {
+  const imageAsset = await uploadSmokeImageAsset(token, material.id);
+  created.materialRequest = {
+    ...created.materialRequest,
+    document: {
+      ...created.materialRequest.document,
+      pages: created.materialRequest.document.pages.map((page, index) => index === 0 ? {
+        ...page,
+        blocks: [{
+          alt: "Tall worksheet used to verify annotation scrolling.",
+          id: scrollImageBlockId,
+          imageSize: "FULL",
+          title: "Tall annotation worksheet",
+          type: "image",
+          url: `material-asset:${imageAsset.id}`,
+        }, ...page.blocks],
+      } : page),
+    },
+  };
+  return apiRequest(token, "PUT", `/materials/${material.id}`, 200, created.materialRequest);
+}
+
+async function uploadSmokeImageAsset(token, materialId) {
+  const formData = new FormData();
+  formData.append("file", new Blob([tallSmokeSvg()], { type: "image/svg+xml" }), "annotation-scroll.svg");
+  const response = await fetch(`${apiBaseUrl}/materials/${materialId}/assets/images`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Accept-Language": "en",
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  const text = await response.text();
+  if (response.status !== 201) {
+    throw new Error(`POST /materials/${materialId}/assets/images expected HTTP 201, got ${response.status}${text ? `: ${text.slice(0, 300)}` : ""}`);
+  }
+  return JSON.parse(text);
+}
+
+function tallSmokeSvg() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="2400" viewBox="0 0 800 2400">
+  <rect width="800" height="2400" fill="#fffaf6"/>
+  <rect x="48" y="48" width="704" height="2304" rx="28" fill="#ffffff" stroke="#ece6df" stroke-width="8"/>
+  <circle cx="120" cy="180" r="38" fill="#ff5c00"/>
+  <text x="180" y="200" font-family="sans-serif" font-size="54" font-weight="700" fill="#111111">Annotation scroll smoke</text>
+  <path d="M100 420 H700 M100 780 H700 M100 1140 H700 M100 1500 H700 M100 1860 H700 M100 2220 H700" stroke="#00a878" stroke-width="16"/>
+  <text x="120" y="390" font-family="sans-serif" font-size="42" fill="#62666f">Section 1</text>
+  <text x="120" y="750" font-family="sans-serif" font-size="42" fill="#62666f">Section 2</text>
+  <text x="120" y="1110" font-family="sans-serif" font-size="42" fill="#62666f">Section 3</text>
+  <text x="120" y="1470" font-family="sans-serif" font-size="42" fill="#62666f">Section 4</text>
+  <text x="120" y="1830" font-family="sans-serif" font-size="42" fill="#62666f">Section 5</text>
+  <text x="120" y="2190" font-family="sans-serif" font-size="42" fill="#62666f">Section 6</text>
+</svg>`;
+}
+
 async function createSmokeLesson(token, materialId, participantSubjects) {
   const now = Date.now();
   const lesson = await apiRequest(token, "POST", "/schedule/lessons", 201, {
@@ -680,21 +750,24 @@ async function drawAnnotation(page) {
 }
 
 async function drawTextAndMindMap(page) {
-  const layer = page.locator(".playsay-annotation-layer");
+  const layer = page.locator('.playsay-annotation-layer[data-anchored="false"]');
   const bounds = await layer.boundingBox();
   if (!bounds) {
     throw new Error("Annotation layer is not visible for Text/Mind Map smoke.");
   }
+  const viewport = page.viewportSize() ?? { width: 1280, height: 860 };
+  const textY = Math.min(Math.max(bounds.y + 220, bounds.y + 48), viewport.height - 280);
+  const mindMapY = Math.min(Math.max(textY + 150, bounds.y + 120), viewport.height - 120);
 
   await page.locator("[data-testid='annotation-tool-text']").click();
-  await page.mouse.click(bounds.x + bounds.width * 0.56, bounds.y + bounds.height * 0.34);
+  await page.mouse.click(bounds.x + bounds.width * 0.56, textY);
   const textEditor = page.locator(".playsay-annotation-text-text textarea");
   await textEditor.waitFor({ timeout: timeoutMs });
-  await textEditor.fill("Small friendly text");
+  await textEditor.fill("Friendly text");
   await textEditor.press("Control+Enter");
 
   await page.locator("[data-testid='annotation-tool-mind-map']").click();
-  await page.mouse.click(bounds.x + bounds.width * 0.48, bounds.y + bounds.height * 0.46);
+  await page.mouse.click(bounds.x + bounds.width * 0.48, mindMapY);
   const mindMapEditor = page.locator(".playsay-annotation-text-mindMapNode textarea");
   await mindMapEditor.waitFor({ timeout: timeoutMs });
   await mindMapEditor.fill("Present Simple");
@@ -731,6 +804,111 @@ async function drawTextAndMindMap(page) {
   }
 }
 
+async function verifyAnchoredTextScroll(teacherPage, studentPage) {
+  await Promise.all([
+    openFocusedSmokeImage(teacherPage),
+    openFocusedSmokeImage(studentPage),
+  ]);
+
+  const teacherLayer = teacherPage.locator(`.playsay-annotation-layer[data-anchor-id='${scrollImageBlockId}']`);
+  const teacherBounds = await teacherLayer.boundingBox();
+  if (!teacherBounds) {
+    throw new Error("Teacher image annotation layer is not visible.");
+  }
+  const teacherViewport = teacherPage.viewportSize() ?? { width: 1440, height: 920 };
+  const clickY = Math.min(Math.max(teacherBounds.y + 180, teacherBounds.y + 48), teacherViewport.height - 140);
+  await teacherPage.locator("[data-testid='annotation-tool-text']").click();
+  await teacherPage.mouse.click(teacherBounds.x + teacherBounds.width * 0.52, clickY);
+  const teacherEditor = teacherLayer.locator(".playsay-annotation-text-text textarea");
+  await teacherEditor.waitFor({ timeout: timeoutMs });
+  await teacherEditor.fill(scrollImageText);
+  await teacherEditor.press("Control+Enter");
+
+  const studentText = studentPage.locator(
+    `.playsay-annotation-layer[data-anchor-id='${scrollImageBlockId}'] .playsay-annotation-text-text`,
+  ).filter({ hasText: scrollImageText });
+  await studentText.waitFor({ timeout: timeoutMs });
+
+  await assertAnchoredTextFollowsImageScroll(teacherPage, "teacher");
+  await assertAnchoredTextFollowsImageScroll(studentPage, "student");
+
+  await Promise.all([
+    teacherPage.locator("[data-testid='material-focus-close']").click(),
+    studentPage.locator("[data-testid='material-focus-close']").click(),
+  ]);
+}
+
+async function openFocusedSmokeImage(page) {
+  await page.locator(`[data-testid='material-image-focus-${scrollImageBlockId}']`).click();
+  await page.locator(
+    `.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${scrollImageBlockId}']`,
+  ).waitFor({ timeout: timeoutMs });
+  await page.waitForFunction((blockId) => {
+    const image = document.querySelector(`.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${blockId}']`);
+    return image instanceof HTMLImageElement && image.complete && image.naturalHeight > 0;
+  }, scrollImageBlockId, { timeout: timeoutMs });
+}
+
+async function assertAnchoredTextFollowsImageScroll(page, role) {
+  const before = await imageTextGeometry(page);
+  const targetScrollTop = Math.min(360, before.scrollHeight - before.clientHeight);
+  if (targetScrollTop < 120) {
+    throw new Error(`${role} focused image is not vertically scrollable: ${JSON.stringify(before)}`);
+  }
+
+  await page.locator(".playsay-material-focused-image").evaluate((element, scrollTop) => {
+    element.scrollTop = scrollTop;
+    element.dispatchEvent(new Event("scroll"));
+  }, targetScrollTop);
+  await page.waitForFunction(({ blockId, expectedOffset, expectedScrollTop, text }) => {
+    const scroller = document.querySelector(".playsay-material-focused-image");
+    const image = document.querySelector(`.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${blockId}']`);
+    const annotations = Array.from(document.querySelectorAll(
+      `.playsay-annotation-layer[data-anchor-id='${blockId}'] .playsay-annotation-text-text`,
+    ));
+    const annotation = annotations.find((element) => element.textContent?.includes(text));
+    if (!(scroller instanceof HTMLElement) || !(image instanceof HTMLElement) || !(annotation instanceof HTMLElement)) {
+      return false;
+    }
+    const imageRect = image.getBoundingClientRect();
+    const annotationRect = annotation.getBoundingClientRect();
+    return Math.abs(scroller.scrollTop - expectedScrollTop) <= 1
+      && Math.abs((annotationRect.top - imageRect.top) - expectedOffset) <= 3;
+  }, {
+    blockId: scrollImageBlockId,
+    expectedOffset: before.textOffsetTop,
+    expectedScrollTop: targetScrollTop,
+    text: scrollImageText,
+  }, { timeout: timeoutMs }).catch(async (error) => {
+    const after = await imageTextGeometry(page).catch(() => null);
+    throw new Error(`${role} text detached from its image during scroll; before=${JSON.stringify(before)}, after=${JSON.stringify(after)}: ${error instanceof Error ? error.message : String(error)}`);
+  });
+}
+
+async function imageTextGeometry(page) {
+  return page.evaluate(({ blockId, text }) => {
+    const scroller = document.querySelector(".playsay-material-focused-image");
+    const image = document.querySelector(`.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${blockId}']`);
+    const annotations = Array.from(document.querySelectorAll(
+      `.playsay-annotation-layer[data-anchor-id='${blockId}'] .playsay-annotation-text-text`,
+    ));
+    const annotation = annotations.find((element) => element.textContent?.includes(text));
+    if (!(scroller instanceof HTMLElement) || !(image instanceof HTMLElement) || !(annotation instanceof HTMLElement)) {
+      throw new Error("Focused image or anchored text is missing.");
+    }
+    const imageRect = image.getBoundingClientRect();
+    const annotationRect = annotation.getBoundingClientRect();
+    return {
+      clientHeight: scroller.clientHeight,
+      imageTop: imageRect.top,
+      scrollHeight: scroller.scrollHeight,
+      scrollTop: scroller.scrollTop,
+      textOffsetTop: annotationRect.top - imageRect.top,
+      textTop: annotationRect.top,
+    };
+  }, { blockId: scrollImageBlockId, text: scrollImageText });
+}
+
 async function captureAnnotationScreenshot(page) {
   if (!annotationScreenshotPath) return;
   mkdirSync(path.dirname(annotationScreenshotPath), { recursive: true });
@@ -754,6 +932,15 @@ async function captureAnnotationScreenshot(page) {
       await page.setViewportSize(originalViewport);
     }
   }
+}
+
+async function captureFailureScreenshots(activeSessions) {
+  if (!failureScreenshotDir) return;
+  mkdirSync(failureScreenshotDir, { recursive: true });
+  await Promise.allSettled(activeSessions.map(({ page, role }) => page.screenshot({
+    fullPage: true,
+    path: path.join(failureScreenshotDir, `${runId}-${role}-failure.png`),
+  })));
 }
 
 async function assertAnnotationInsideSurface(page) {

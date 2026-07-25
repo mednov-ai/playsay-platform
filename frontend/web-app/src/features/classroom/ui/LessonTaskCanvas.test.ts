@@ -365,6 +365,82 @@ describe("LessonTaskCanvas", () => {
     rectSpy.mockRestore();
   });
 
+  it("keeps anchored text aligned while a focused image scrolls", async () => {
+    apiMocks.fetchAnnotation.mockResolvedValueOnce({
+      content: {
+        activePageId: "page-1",
+        coordinateSpace: "material-page",
+        elements: [{
+          anchorId: "image-a",
+          autoWidth: true,
+          color: "#ff5c00",
+          createdAt: 1,
+          fill: "transparent",
+          fontSize: 18,
+          height: 34,
+          id: "anchored-text",
+          kind: "text",
+          pageId: "page-1",
+          text: "Scroll with me",
+          width: 120,
+          x: 200,
+          y: 300,
+        }],
+        schemaVersion: 6,
+      },
+    });
+    let focusedImageTop = 80;
+    const rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if (this.classList.contains("playsay-task-document-surface")) {
+        return domRect({ height: 900, left: 10, top: 20, width: 800 });
+      }
+      if (this.getAttribute("data-playsay-annotation-anchor-id") === "image-a") {
+        const focused = Boolean(this.closest('.playsay-material-focus-stack[data-active="true"]'));
+        return focused
+          ? domRect({ height: 1800, left: 10, top: focusedImageTop, width: 800 })
+          : domRect({ height: 400, left: 30, top: 70, width: 760 });
+      }
+      if (this.getAttribute("data-playsay-annotation-anchor-id") === "image-b") {
+        return domRect({ height: 300, left: 50, top: 510, width: 720 });
+      }
+      return domRect({ height: 0, left: 0, top: 0, width: 0 });
+    });
+
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: flowImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('[data-testid="material-image-focus-image-a"]')!);
+    const focusedScroller = await waitFor(() => {
+      const element = container.querySelector<HTMLElement>('.playsay-material-focus-stack[data-active="true"] .playsay-material-focused-image');
+      expect(element).toBeTruthy();
+      return element!;
+    });
+    const anchoredLayer = await waitFor(() => {
+      const element = container.querySelector<SVGSVGElement>('.playsay-annotation-layer[data-anchor-id="image-a"]');
+      expect(element?.style.top).toBe("60px");
+      expect(element?.querySelector(".playsay-annotation-text-text")?.textContent).toContain("Scroll with me");
+      return element!;
+    });
+
+    focusedImageTop = -120;
+    fireEvent.scroll(focusedScroller);
+
+    await waitFor(() => {
+      expect(anchoredLayer.style.top).toBe("-140px");
+      expect(Number.parseFloat(anchoredLayer.style.top) - (focusedImageTop - 20)).toBe(0);
+    });
+
+    rectSpy.mockRestore();
+  });
+
   it("reanchors a legacy page element when it is selected over a flow image", async () => {
     apiMocks.fetchAnnotation.mockResolvedValueOnce({
       content: {

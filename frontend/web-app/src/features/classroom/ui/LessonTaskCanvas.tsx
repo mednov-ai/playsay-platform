@@ -527,11 +527,33 @@ function useAnnotationAnchors(
       return;
     }
     const surfaceElement: HTMLDivElement = currentSurface;
+    const ownerDocument = surfaceElement.ownerDocument;
 
     const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
-      : new ResizeObserver(() => measure());
+      : new ResizeObserver(() => scheduleMeasure());
     let observedElements = new Set<Element>();
+    let measurementFrame: number | null = null;
+
+    function scheduleMeasure() {
+      if (measurementFrame !== null) {
+        return;
+      }
+      measurementFrame = window.requestAnimationFrame(() => {
+        measurementFrame = null;
+        measure();
+      });
+    }
+
+    function handleRelatedScroll(event: Event) {
+      const target = event.target;
+      if (target === ownerDocument || (
+        target instanceof Element &&
+        (target.contains(surfaceElement) || surfaceElement.contains(target))
+      )) {
+        scheduleMeasure();
+      }
+    }
 
     function measure() {
       const surfaceRect = surfaceElement.getBoundingClientRect();
@@ -569,13 +591,18 @@ function useAnnotationAnchors(
 
     const mutationObserver = typeof MutationObserver === "undefined"
       ? null
-      : new MutationObserver(measure);
+      : new MutationObserver(scheduleMeasure);
     mutationObserver?.observe(surfaceElement, { childList: true, subtree: true });
-    window.addEventListener("resize", measure);
+    ownerDocument.addEventListener("scroll", handleRelatedScroll, true);
+    window.addEventListener("resize", scheduleMeasure);
     measure();
 
     return () => {
-      window.removeEventListener("resize", measure);
+      ownerDocument.removeEventListener("scroll", handleRelatedScroll, true);
+      window.removeEventListener("resize", scheduleMeasure);
+      if (measurementFrame !== null) {
+        window.cancelAnimationFrame(measurementFrame);
+      }
       mutationObserver?.disconnect();
       resizeObserver?.disconnect();
     };

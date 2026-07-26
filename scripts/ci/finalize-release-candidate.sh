@@ -50,6 +50,24 @@ fi
 START_DIR="$(pwd)"
 MANIFEST_PATH="argocd-apps/prod/release-candidate.yaml"
 
+ensure_helm_dependency_repositories() {
+  chart_dir="$1"
+  for repository in $(yq -r '.dependencies[]?.repository // ""' "$chart_dir/Chart.yaml"); do
+    case "$repository" in
+      https://charts.bitnami.com/bitnami)
+        helm repo add bitnami "$repository" --force-update >/dev/null
+        ;;
+      file://*|oci://*) ;;
+      "")
+        ;;
+      *)
+        echo "Unsupported Helm dependency repository in $chart_dir: $repository" >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
 for attempt in 1 2 3; do
   cd "$START_DIR"
   WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/playsay-release-finalize.XXXXXX")"
@@ -137,6 +155,7 @@ for attempt in 1 2 3; do
     chart_name="$(basename "$chart_dir")"
     rendered_file="$WORK_DIR/${chart_name}.yaml"
     if grep -Eq '^dependencies:' "$chart_dir/Chart.yaml"; then
+      ensure_helm_dependency_repositories "$chart_dir"
       helm dependency build --skip-refresh "$chart_dir" >/dev/null
     fi
     helm template "$chart_name" "$chart_dir" -f "$values_file" > "$rendered_file"

@@ -86,6 +86,11 @@ test("release candidate lifecycle preserves a manual production gate", () => {
   assert.match(finalize, /manifest_status.*"building"/);
   assert.match(finalize, /\.build\.commit/);
   assert.match(finalize, /Unaffected chart .* changed image\/build metadata/);
+  assert.match(
+    finalize,
+    /helm repo add bitnami "\$repository" --force-update/,
+  );
+  assert.match(finalize, /Unsupported Helm dependency repository/);
   assert.match(finalize, /helm template/);
   assert.match(finalize, /\.status = "ready"/);
   assert.doesNotMatch(`${prepare}\n${finalize}`, /prod-kubeconfig|kubectl/);

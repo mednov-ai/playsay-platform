@@ -29,6 +29,9 @@ describe("auth helpers", () => {
     expect(defaultAuthIssuer("online.honey.school")).toBe(
       "https://ops.honey.school/keycloak/realms/playsay",
     );
+    expect(defaultAuthIssuer("online.honeyschool.ru")).toBe(
+      "https://ops.honey.school/keycloak/realms/playsay",
+    );
     expect(defaultAuthIssuer("dev.online.honey.school")).toBe(
       "https://dev.ops.honey.school/keycloak/realms/playsay",
     );

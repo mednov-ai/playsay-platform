@@ -17,6 +17,9 @@ describe("keyboard auth helpers", () => {
     expect(defaultAuthIssuer("key.honey.school")).toBe(
       "https://ops.honey.school/keycloak/realms/playsay",
     );
+    expect(defaultAuthIssuer("key.honeyschool.ru")).toBe(
+      "https://ops.honey.school/keycloak/realms/playsay",
+    );
     expect(defaultAuthIssuer("dev.key.honey.school")).toBe(
       "https://dev.ops.honey.school/keycloak/realms/playsay",
     );

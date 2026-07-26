@@ -39,7 +39,12 @@ type CompletedLoginFlow = {
 type ThemeMode = "system" | "light" | "dark";
 
 export function defaultAuthIssuer(hostname = globalThis.location?.hostname ?? ""): string {
-  if (hostname === "online.honey.school" || hostname === "key.honey.school") {
+  if (
+    hostname === "online.honey.school"
+    || hostname === "key.honey.school"
+    || hostname === "online.honeyschool.ru"
+    || hostname === "key.honeyschool.ru"
+  ) {
     return "https://ops.honey.school/keycloak/realms/playsay";
   }
   if (hostname === "dev.online.honey.school" || hostname === "dev.key.honey.school") {

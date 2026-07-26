@@ -108,6 +108,7 @@ spec:
           }
           env.AFFECTED_JOBS = detection.AFFECTED_JOBS ?: ''
           env.AFFECTED_TARGETS = detection.AFFECTED_TARGETS ?: ''
+          env.MIGRATION_TARGETS = detection.MIGRATION_TARGETS ?: ''
           env.AFFECTED_REASON = detection.AFFECTED_REASON ?: 'unknown'
           env.VALIDATION_SUITES = detection.VALIDATION_SUITES ?: ''
           env.DETECTION_MODE = detection.DETECTION_MODE ?: 'unknown'
@@ -117,6 +118,7 @@ spec:
           echo "Dispatcher source branch: ${env.CI_BRANCH}"
           echo "Dispatcher source commit: ${env.GIT_COMMIT}"
           echo "Affected targets: ${env.AFFECTED_TARGETS ?: '(none)'}"
+          echo "Migration targets: ${env.MIGRATION_TARGETS ?: '(none)'}"
           echo "Validation suites: ${env.VALIDATION_SUITES ?: '(none)'}"
           echo "Detection reason: ${env.AFFECTED_REASON}"
           echo "Detection mode: ${env.DETECTION_MODE}"
@@ -187,6 +189,7 @@ spec:
                   BASE_PLATFORM_COMMIT="$DETECTION_BASE" \
                   JENKINS_JOB_NAME="$JOB_NAME" \
                   JENKINS_BUILD_NUMBER="$BUILD_NUMBER" \
+                  JENKINS_BUILD_URL="$BUILD_URL" \
                     ./scripts/ci/prepare-release-candidate.sh
                 ''',
                 returnStdout: true
@@ -197,6 +200,11 @@ spec:
                 .find { it.startsWith('RELEASE_AFFECTED_TARGETS=') }
                 ?.substring('RELEASE_AFFECTED_TARGETS='.length()) ?: env.AFFECTED_TARGETS
               env.AFFECTED_TARGETS = preparedTargets
+              def preparedMigrations = prepareOutput
+                .split('\\n')
+                .find { it.startsWith('RELEASE_MIGRATION_TARGETS=') }
+                ?.substring('RELEASE_MIGRATION_TARGETS='.length()) ?: env.MIGRATION_TARGETS
+              env.MIGRATION_TARGETS = preparedMigrations
               def targetJobs = [
                 'api-gateway': 'playsay-api-gateway-develop',
                 'ai-tutor-service': 'playsay-ai-tutor-service-develop',
@@ -222,6 +230,7 @@ spec:
                 }
                 .join(',')
               echo "Release candidate targets: ${env.AFFECTED_TARGETS ?: '(none)'}"
+              echo "Release migration targets: ${env.MIGRATION_TARGETS ?: '(none)'}"
             }
           }
         }

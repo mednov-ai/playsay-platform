@@ -50,6 +50,26 @@ test("module source changes trigger only their deploy target", () => {
   );
 });
 
+test("database changelogs declare only their owning production migration target", () => {
+  const app = detectTargetsForPaths([
+    "backend/api-gateway/src/main/resources/db/changelog/2026-07-27-001-example.xml",
+  ]);
+  assert.deepEqual(app.deployTargets, ["api-gateway"]);
+  assert.deepEqual(app.migrationTargets, ["api-gateway"]);
+
+  const keyboard = detectTargetsForPaths([
+    "backend/keyboard-service/src/main/resources/db/changelog/db.changelog-master.xml",
+    "frontend/keyboard-app/src/App.tsx",
+  ]);
+  assert.deepEqual(keyboard.deployTargets, ["keyboard-service", "keyboard-app"]);
+  assert.deepEqual(keyboard.migrationTargets, ["keyboard-service"]);
+
+  const internal = detectTargetsForPaths([
+    "backend/registration-service/src/main/kotlin/com/playsay/registration/RegistrationService.kt",
+  ]);
+  assert.deepEqual(internal.migrationTargets, []);
+});
+
 test("module Jenkinsfiles trigger only the corresponding module", () => {
   assertDetection(
     ["Jenkinsfile.api-gateway"],

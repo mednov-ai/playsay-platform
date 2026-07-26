@@ -20,6 +20,15 @@ export const TARGETS = Object.freeze([
 ]);
 
 export const VALIDATION_SUITES = Object.freeze(["ci-contracts", "smoke-syntax"]);
+export const MIGRATION_TARGETS = Object.freeze([
+  "api-gateway",
+  "ai-tutor-service",
+  "vocabulary-service",
+  "payment-service",
+  "registration-service",
+  "email-service",
+  "keyboard-service",
+]);
 
 const NUMERIC_RELEASE_PATTERN = /^release\/[0-9]+\.[0-9]+\.[0-9]+$/;
 const ZERO_COMMIT_PATTERN = /^0{40}$/;
@@ -60,6 +69,15 @@ const MODULE_PIPELINES = Object.freeze({
   "Jenkinsfile.email-service": "email-service",
   "Jenkinsfile.keyboard-backend": "keyboard-service",
   "Jenkinsfile.keyboard-frontend": "keyboard-app",
+});
+const MIGRATION_PATH_PREFIXES = Object.freeze({
+  "backend/api-gateway/src/main/resources/db/changelog/": "api-gateway",
+  "backend/ai-tutor-service/src/main/resources/db/changelog/": "ai-tutor-service",
+  "backend/vocabulary-service/src/main/resources/db/changelog/": "vocabulary-service",
+  "backend/payment-service/src/main/resources/db/changelog/": "payment-service",
+  "backend/registration-service/src/main/resources/db/changelog/": "registration-service",
+  "backend/email-service/src/main/resources/db/changelog/": "email-service",
+  "backend/keyboard-service/src/main/resources/db/changelog/": "keyboard-service",
 });
 
 export class DetectionError extends Error {
@@ -134,6 +152,15 @@ function isSharedFrontendPath(path) {
   );
 }
 
+function migrationTargetForPath(path) {
+  for (const [prefix, target] of Object.entries(MIGRATION_PATH_PREFIXES)) {
+    if (path.startsWith(prefix)) {
+      return target;
+    }
+  }
+  return null;
+}
+
 export function detectTargetsForPaths(paths, options = {}) {
   const forcedTargets = parseTargetList(options.forceTargets ?? "");
   if (forcedTargets) {
@@ -149,11 +176,19 @@ export function detectTargetsForPaths(paths, options = {}) {
   }
 
   const deployTargets = new Set();
+  const migrationTargets = new Set();
   const validationSuites = new Set();
   const unmappedFiles = [];
 
   for (const path of paths) {
     if (!path || isDocsOnlyPath(path)) {
+      continue;
+    }
+
+    const migrationTarget = migrationTargetForPath(path);
+    if (migrationTarget) {
+      deployTargets.add(migrationTarget);
+      migrationTargets.add(migrationTarget);
       continue;
     }
 
@@ -297,6 +332,7 @@ export function detectTargetsForPaths(paths, options = {}) {
     baseReleaseBranch: options.baseReleaseBranch ?? "",
     changedFiles: paths,
     unmappedFiles,
+    migrationTargets,
   });
 }
 
@@ -308,9 +344,12 @@ export function buildDetectionResult(deployTargets, validationSuites = new Set()
     parameters: {},
   }));
   const suiteList = VALIDATION_SUITES.filter((suite) => validationSuites.has(suite));
+  const migrationTargetSet = metadata.migrationTargets ?? new Set();
+  const migrationTargetList = MIGRATION_TARGETS.filter((target) => migrationTargetSet.has(target));
 
   return {
     deployTargets: targetList,
+    migrationTargets: migrationTargetList,
     downstreamJobs: jobs,
     validationSuites: suiteList,
     detectionMode: metadata.detectionMode ?? "webhook-range",
@@ -455,6 +494,7 @@ function renderEnv(result) {
   return [
     `AFFECTED_TARGETS=${result.deployTargets.join(",")}`,
     `AFFECTED_JOBS=${result.downstreamJobs.map((job) => job.name).join(",")}`,
+    `MIGRATION_TARGETS=${result.migrationTargets.join(",")}`,
     `VALIDATION_SUITES=${result.validationSuites.join(",")}`,
     `AFFECTED_REASON=${result.reason}`,
     `DETECTION_MODE=${result.detectionMode}`,

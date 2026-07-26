@@ -81,7 +81,12 @@ for attempt in 1 2 3; do
     echo "Missing production candidate manifest on $CI_BRANCH." >&2
     exit 1
   fi
-  manifest_commit="$(yq -r '.platformCommit // ""' "$MANIFEST_PATH")"
+  manifest_schema="$(yq -r '.schemaVersion // 0' "$MANIFEST_PATH")"
+  if [ "$manifest_schema" != "2" ]; then
+    echo "Candidate manifest must use schemaVersion 2; found $manifest_schema." >&2
+    exit 1
+  fi
+  manifest_commit="$(yq -r '.platformSha // ""' "$MANIFEST_PATH")"
   manifest_status="$(yq -r '.status // ""' "$MANIFEST_PATH")"
   if [ "$manifest_commit" != "$GIT_COMMIT" ]; then
     echo "Candidate manifest source $manifest_commit does not match $GIT_COMMIT." >&2
@@ -93,7 +98,8 @@ for attempt in 1 2 3; do
   fi
 
   affected_targets="$(yq -r '.affectedTargets[]?' "$MANIFEST_PATH" | paste -sd, -)"
-  base_infra_commit="$(yq -r '.baseInfraCommit // ""' "$MANIFEST_PATH")"
+  migration_targets="$(yq -r '.migrationTargets[]?' "$MANIFEST_PATH" | paste -sd, -)"
+  base_infra_commit="$(yq -r '.infraBaseSha // ""' "$MANIFEST_PATH")"
   base_release="$(yq -r '.baseRelease // ""' "$MANIFEST_PATH")"
   if ! printf '%s\n' "$base_infra_commit" | grep -Eq '^[0-9a-f]{40}$'; then
     echo "Candidate manifest has an invalid baseInfraCommit." >&2
@@ -123,6 +129,23 @@ for attempt in 1 2 3; do
       echo "Affected target $target has no immutable image digest." >&2
       exit 1
     fi
+  done
+
+  for migration_target in $(printf '%s' "$migration_targets" | tr ',' ' '); do
+    case ",$affected_targets," in
+      *",$migration_target,"*) ;;
+      *)
+        echo "Migration target $migration_target is not an affected deploy target." >&2
+        exit 1
+        ;;
+    esac
+    case "$migration_target" in
+      api-gateway|ai-tutor-service|vocabulary-service|payment-service|registration-service|email-service|keyboard-service) ;;
+      *)
+        echo "Unsupported production migration target: $migration_target" >&2
+        exit 1
+        ;;
+    esac
   done
 
   for values_file in helm-charts/*/values-prod.yaml; do
@@ -171,17 +194,26 @@ for attempt in 1 2 3; do
 
   if [ "$manifest_status" != "ready" ]; then
     updated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-    UPDATED_AT="$updated_at" yq -i '.status = "ready" | .updatedAt = strenv(UPDATED_AT)' "$MANIFEST_PATH"
+    validated_infra_sha="$(git rev-parse HEAD)"
+    UPDATED_AT="$updated_at" VALIDATED_INFRA_SHA="$validated_infra_sha" yq -i \
+      '.status = "ready" | .infraSha = strenv(VALIDATED_INFRA_SHA) | .updatedAt = strenv(UPDATED_AT)' \
+      "$MANIFEST_PATH"
     git add "$MANIFEST_PATH"
     git commit --quiet \
       -m "chore: mark ${CI_BRANCH} production candidate ready" \
       -m "Source commit: ${GIT_COMMIT}"
+  else
+    validated_infra_sha="$(yq -r '.infraSha // ""' "$MANIFEST_PATH")"
+    if ! printf '%s\n' "$validated_infra_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+      echo "Ready candidate has an invalid infraSha." >&2
+      exit 1
+    fi
   fi
 
   if git push --quiet origin "HEAD:${CI_BRANCH}"; then
     cd "$START_DIR"
     rm -rf "$WORK_DIR"
-    echo "Production candidate $CI_BRANCH is ready for manual review and promotion."
+    echo "Production candidate $CI_BRANCH is ready for reviewed Argo Workflows promotion."
     exit 0
   fi
 

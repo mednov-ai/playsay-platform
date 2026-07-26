@@ -38,6 +38,7 @@ for commit in "$GIT_COMMIT" "$BASE_PLATFORM_COMMIT"; do
 done
 
 TARGET_ORDER="api-gateway ai-tutor-service vocabulary-service web-app collaboration-service media-service payment-service registration-service email-service keyboard-service keyboard-app"
+MIGRATION_ORDER="api-gateway ai-tutor-service vocabulary-service payment-service registration-service email-service keyboard-service"
 VALIDATION_ORDER="ci-contracts smoke-syntax"
 
 normalize_list() {
@@ -73,6 +74,7 @@ validate_list() {
 }
 
 validate_list "${AFFECTED_TARGETS:-}" "$TARGET_ORDER" "affected target"
+validate_list "${MIGRATION_TARGETS:-}" "$MIGRATION_ORDER" "migration target"
 validate_list "${VALIDATION_SUITES:-}" "$VALIDATION_ORDER" "validation suite"
 
 case "$INFRA_REPO" in
@@ -125,14 +127,32 @@ for attempt in 1 2 3 4 5; do
   git config user.name "Play&Say Jenkins"
 
   previous_targets=""
+  previous_migrations=""
   if [ -f "$MANIFEST_PATH" ]; then
+    previous_schema="$(yq -r '.schemaVersion // 0' "$MANIFEST_PATH")"
+    if [ "$previous_schema" != "2" ]; then
+      echo "Existing candidate uses legacy schema v${previous_schema}; create a new numeric release branch." >&2
+      exit 1
+    fi
     previous_status="$(yq -r '.status // ""' "$MANIFEST_PATH")"
     if [ "$previous_status" != "ready" ]; then
       previous_targets="$(yq -r '.affectedTargets[]?' "$MANIFEST_PATH" | paste -sd, -)"
+      previous_migrations="$(yq -r '.migrationTargets[]?' "$MANIFEST_PATH" | paste -sd, -)"
     fi
   fi
   combined_targets="$(normalize_list "${AFFECTED_TARGETS:-},${previous_targets}" "$TARGET_ORDER")"
+  combined_migrations="$(normalize_list "${MIGRATION_TARGETS:-},${previous_migrations}" "$MIGRATION_ORDER")"
   normalized_validations="$(normalize_list "${VALIDATION_SUITES:-}" "$VALIDATION_ORDER")"
+
+  for migration_target in $(printf '%s' "$combined_migrations" | tr ',' ' '); do
+    case ",$combined_targets," in
+      *",$migration_target,"*) ;;
+      *)
+        echo "Migration target $migration_target is not an affected deploy target." >&2
+        exit 1
+        ;;
+    esac
+  done
 
   for app_manifest in argocd-apps/prod/root-app.yaml argocd-apps/prod/apps/*.yaml; do
     INFRA_BRANCH="$CI_BRANCH" yq -i '.spec.source.targetRevision = strenv(INFRA_BRANCH)' "$app_manifest"
@@ -140,24 +160,46 @@ for attempt in 1 2 3 4 5; do
 
   updated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   {
-    echo "schemaVersion: 1"
+    echo "schemaVersion: 2"
     echo "status: building"
     printf 'releaseBranch: "%s"\n' "$CI_BRANCH"
     printf 'baseRelease: "%s"\n' "$BASE_RELEASE_BRANCH"
-    printf 'basePlatformCommit: "%s"\n' "$BASE_PLATFORM_COMMIT"
-    printf 'baseInfraCommit: "%s"\n' "$base_infra_commit"
-    printf 'platformCommit: "%s"\n' "$GIT_COMMIT"
+    printf 'basePlatformSha: "%s"\n' "$BASE_PLATFORM_COMMIT"
+    printf 'infraBaseSha: "%s"\n' "$base_infra_commit"
+    printf 'platformSha: "%s"\n' "$GIT_COMMIT"
+    echo 'infraSha: ""'
     echo "affectedTargets:"
     for target in $(printf '%s' "$combined_targets" | tr ',' ' '); do
+      printf '  - "%s"\n' "$target"
+    done
+    echo "migrationTargets:"
+    for target in $(printf '%s' "$combined_migrations" | tr ',' ' '); do
       printf '  - "%s"\n' "$target"
     done
     echo "validationSuites:"
     for suite in $(printf '%s' "$normalized_validations" | tr ',' ' '); do
       printf '  - "%s"\n' "$suite"
     done
-    echo "dispatcher:"
+    echo "jenkinsBuild:"
     printf '  job: "%s"\n' "$JENKINS_JOB_NAME"
-    printf '  build: "%s"\n' "$JENKINS_BUILD_NUMBER"
+    printf '  number: "%s"\n' "$JENKINS_BUILD_NUMBER"
+    printf '  url: "%s"\n' "${JENKINS_BUILD_URL:-}"
+    echo "promotion:"
+    printf '  previousRelease: "%s"\n' "$BASE_RELEASE_BRANCH"
+    echo '  workflow: ""'
+    echo '  requestedBy: ""'
+    echo '  approvedBy:'
+    echo '    backup: ""'
+    echo '    deploy: ""'
+    echo '  startedAt: null'
+    echo '  finishedAt: null'
+    echo '  backupPrefix: ""'
+    echo '  smokeResult: pending'
+    echo '  currentReleasePr: ""'
+    echo '  rollback:'
+    echo '    release: ""'
+    echo '    result: not-required'
+    printf 'createdAt: "%s"\n' "$updated_at"
     printf 'updatedAt: "%s"\n' "$updated_at"
   } > "$MANIFEST_PATH"
 
@@ -174,6 +216,7 @@ for attempt in 1 2 3 4 5; do
     rm -rf "$WORK_DIR"
     echo "Production candidate $CI_BRANCH is marked building."
     echo "RELEASE_AFFECTED_TARGETS=$combined_targets"
+    echo "RELEASE_MIGRATION_TARGETS=$combined_migrations"
     exit 0
   fi
 

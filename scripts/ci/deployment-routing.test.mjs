@@ -78,12 +78,18 @@ test("release candidate lifecycle preserves a manual production gate", () => {
   const finalize = readFileSync(resolve(platformRoot, "scripts/ci/finalize-release-candidate.sh"), "utf8");
 
   assert.match(prepare, /status: building/);
+  assert.match(prepare, /schemaVersion: 2/);
+  assert.match(prepare, /migrationTargets:/);
+  assert.match(prepare, /platformSha:/);
+  assert.match(prepare, /infraSha:/);
   assert.match(prepare, /argocd-apps\/prod\/current-release\.txt/);
   assert.match(prepare, /\.image = load\(strenv\(BASE_VALUES_FILE\)\)\.image/);
   assert.match(prepare, /previous_status.*!= "ready"/);
   assert.match(prepare, /RELEASE_AFFECTED_TARGETS=/);
 
   assert.match(finalize, /manifest_status.*"building"/);
+  assert.match(finalize, /schemaVersion 2/);
+  assert.match(finalize, /\.infraSha = strenv\(VALIDATED_INFRA_SHA\)/);
   assert.match(finalize, /\.build\.commit/);
   assert.match(finalize, /Unaffected chart .* changed image\/build metadata/);
   assert.match(

@@ -250,7 +250,8 @@
     gap: 0.45rem;
   }
 
-  .playsay-classroom-controls .lk-button {
+  .playsay-classroom-controls .lk-button,
+  .playsay-classroom-controls .lk-start-audio-button {
     width: 2.55rem;
     min-width: 2.55rem;
     min-height: 2.3rem;
@@ -259,7 +260,8 @@
     font-size: 0;
   }
 
-  .playsay-classroom-controls .lk-button svg {
+  .playsay-classroom-controls .lk-button svg,
+  .playsay-classroom-controls .lk-start-audio-button svg {
     width: 1.1rem;
     height: 1.1rem;
     margin: 0;
@@ -661,8 +663,8 @@
   }
 }
 
-.playsay-classroom-shell[data-viewport-mode="mobilePortrait"] .playsay-classroom-controls .lk-button[data-lk-source="screen_share"],
-.playsay-classroom-shell[data-viewport-mode="mobileLandscape"] .playsay-classroom-controls .lk-button[data-lk-source="screen_share"] {
+.playsay-classroom-shell[data-viewport-mode="mobilePortrait"] .playsay-screen-share-control,
+.playsay-classroom-shell[data-viewport-mode="mobileLandscape"] .playsay-screen-share-control {
   display: none;
 }
 
@@ -828,7 +830,8 @@ body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expand
   gap: 0.45rem;
 }
 
-body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-conference[data-mode="focus-only"] .playsay-classroom-controls .lk-button {
+body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-conference[data-mode="focus-only"] .playsay-classroom-controls .lk-button,
+body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-conference[data-mode="focus-only"] .playsay-classroom-controls .lk-start-audio-button {
   width: 2.5rem;
   min-width: 2.5rem;
   min-height: 2.25rem;
@@ -837,7 +840,8 @@ body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expand
   font-size: 0;
 }
 
-body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-conference[data-mode="focus-only"] .playsay-classroom-controls .lk-button svg {
+body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-conference[data-mode="focus-only"] .playsay-classroom-controls .lk-button svg,
+body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-classroom-conference[data-mode="focus-only"] .playsay-classroom-controls .lk-start-audio-button svg {
   width: 1.05rem;
   height: 1.05rem;
   margin: 0;

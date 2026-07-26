@@ -1,9 +1,34 @@
-import { MediaDeviceMenu, StartMediaButton, TrackToggle, usePersistentUserChoices } from "@livekit/components-react";
-import { Track } from "livekit-client";
-import { ChevronUp, Languages, LoaderCircle, ScreenShare } from "lucide-react";
+import {
+  TrackToggle,
+  usePersistentUserChoices,
+  useRoomContext,
+  useStartAudio,
+  useStartVideo,
+  useTracks,
+  useTrackToggle,
+} from "@livekit/components-react";
+import { getBrowser, Track, type ScreenShareCaptureOptions } from "livekit-client";
+import { Languages, LoaderCircle, ScreenShare, Volume2 } from "lucide-react";
+import { useState } from "react";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { LessonTranslationController } from "../hooks/useLessonTranslation";
 import type { TranslationRole } from "../model/realtimeTranslation";
+
+type ScreenShareAudioCaptureOptions = Exclude<ScreenShareCaptureOptions["audio"], boolean | undefined> & {
+  restrictOwnAudio: ConstrainBoolean;
+};
+
+export type ClassroomScreenShareAudioWarning = "missing" | "safari" | null;
+
+const screenShareAudioCaptureOptions: ScreenShareAudioCaptureOptions = {
+  restrictOwnAudio: true,
+};
+const screenShareAudioSources: Track.Source[] = [Track.Source.ScreenShareAudio];
+
+export const classroomScreenShareCaptureOptions = {
+  audio: screenShareAudioCaptureOptions,
+  systemAudio: "include",
+} satisfies ScreenShareCaptureOptions;
 
 export function ClassroomControlBar({
   role,
@@ -16,45 +41,26 @@ export function ClassroomControlBar({
 }) {
   const { t } = useAppTranslation();
   const {
-    saveAudioInputDeviceId,
     saveAudioInputEnabled,
-    saveVideoInputDeviceId,
     saveVideoInputEnabled,
   } = usePersistentUserChoices();
 
   return (
     <div className="lk-control-bar playsay-classroom-controls" ref={setControlsRef}>
-      <div className="lk-button-group playsay-device-control">
-        <TrackToggle onChange={(enabled, userInitiated) => { if (userInitiated) saveAudioInputEnabled(enabled); }} source={Track.Source.Microphone}>
-          {t("classroom.controls.microphone")}
-        </TrackToggle>
-        <MediaDeviceMenu
-          aria-label={t("classroom.controls.chooseMicrophone")}
-          kind="audioinput"
-          onActiveDeviceChange={(_kind, deviceId) => saveAudioInputDeviceId(deviceId)}
-          title={t("classroom.controls.chooseMicrophone")}
-        >
-          <ChevronUp className="h-4 w-4" />
-        </MediaDeviceMenu>
-      </div>
-      <div className="lk-button-group playsay-device-control">
-        <TrackToggle onChange={(enabled, userInitiated) => { if (userInitiated) saveVideoInputEnabled(enabled); }} source={Track.Source.Camera}>
-          {t("classroom.controls.camera")}
-        </TrackToggle>
-        <MediaDeviceMenu
-          aria-label={t("classroom.controls.chooseCamera")}
-          kind="videoinput"
-          onActiveDeviceChange={(_kind, deviceId) => saveVideoInputDeviceId(deviceId)}
-          title={t("classroom.controls.chooseCamera")}
-        >
-          <ChevronUp className="h-4 w-4" />
-        </MediaDeviceMenu>
-      </div>
-      <TrackToggle source={Track.Source.ScreenShare}>
-        <ScreenShare className="h-4 w-4" />
-        {t("classroom.controls.screen")}
-      </TrackToggle>
-      <StartMediaButton label={t("classroom.controls.startMedia")} />
+      <TrackToggle
+        aria-label={t("classroom.controls.microphone")}
+        onChange={(enabled, userInitiated) => { if (userInitiated) saveAudioInputEnabled(enabled); }}
+        source={Track.Source.Microphone}
+        title={t("classroom.controls.microphone")}
+      />
+      <TrackToggle
+        aria-label={t("classroom.controls.camera")}
+        onChange={(enabled, userInitiated) => { if (userInitiated) saveVideoInputEnabled(enabled); }}
+        source={Track.Source.Camera}
+        title={t("classroom.controls.camera")}
+      />
+      <ClassroomScreenShareToggle />
+      <ClassroomStartMediaButton />
       {role && (translation.canEnable || translation.localEnabled) ? (
         <button
           aria-label={translationButtonLabel(translation, role, t)}
@@ -96,11 +102,90 @@ export function ClassroomControlBar({
           {translation.status === "connecting" || translation.status === "starting" || translation.status === "draining"
             ? <LoaderCircle className="h-4 w-4 animate-spin" />
             : <Languages className="h-4 w-4" />}
-          <span>{translationButtonLabel(translation, role, t)}</span>
         </button>
       ) : null}
     </div>
   );
+}
+
+function ClassroomStartMediaButton() {
+  const { t } = useAppTranslation();
+  const room = useRoomContext();
+  const label = t("classroom.controls.startMedia");
+  const { mergedProps: audioProps, canPlayAudio } = useStartAudio({
+    props: { "aria-label": label, title: label },
+    room,
+  });
+  const { mergedProps, canPlayVideo } = useStartVideo({ props: audioProps, room });
+  const { style, ...buttonProps } = mergedProps;
+
+  return (
+    <button
+      {...buttonProps}
+      style={{ ...style, display: canPlayAudio && canPlayVideo ? "none" : "inline-flex" }}
+      type="button"
+    >
+      <Volume2 aria-hidden="true" className="h-4 w-4" />
+    </button>
+  );
+}
+
+function ClassroomScreenShareToggle() {
+  const { t } = useAppTranslation();
+  const room = useRoomContext();
+  const [captureSettled, setCaptureSettled] = useState(false);
+  const screenShareAudioTracks = useTracks(screenShareAudioSources, { onlySubscribed: false, room });
+  const { buttonProps, enabled, toggle } = useTrackToggle({
+    "aria-label": t("classroom.controls.screen"),
+    captureOptions: classroomScreenShareCaptureOptions,
+    room,
+    source: Track.Source.ScreenShare,
+    title: t("classroom.controls.screen"),
+  });
+  const screenShareAudioPublished = screenShareAudioTracks.some(
+    (trackRef) => trackRef.participant === room.localParticipant && Boolean(trackRef.publication.track),
+  );
+  const warning = classroomScreenShareAudioWarning(
+    captureSettled && enabled,
+    screenShareAudioPublished,
+    getBrowser()?.name,
+  );
+
+  async function handleScreenShareToggle() {
+    const nextEnabled = !room.localParticipant.isScreenShareEnabled;
+    setCaptureSettled(false);
+
+    try {
+      await toggle(nextEnabled);
+      setCaptureSettled(room.localParticipant.isScreenShareEnabled);
+    } catch {
+      setCaptureSettled(room.localParticipant.isScreenShareEnabled);
+    }
+  }
+
+  return (
+    <div className="playsay-screen-share-control">
+      <button {...buttonProps} onClick={() => { void handleScreenShareToggle(); }} type="button">
+        <ScreenShare className="h-4 w-4" />
+      </button>
+      {warning ? (
+        <div aria-live="polite" className="playsay-screen-share-audio-warning" role="status">
+          {t(warning === "safari"
+            ? "classroom.controls.screenAudioMissingSafari"
+            : "classroom.controls.screenAudioMissing")}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function classroomScreenShareAudioWarning(
+  screenShareEnabled: boolean,
+  screenShareAudioPublished: boolean,
+  browserName?: string,
+): ClassroomScreenShareAudioWarning {
+  if (!screenShareEnabled || screenShareAudioPublished) return null;
+  return browserName === "Safari" ? "safari" : "missing";
 }
 
 function translationButtonLabel(

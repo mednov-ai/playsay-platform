@@ -1286,9 +1286,9 @@ export const fr = {
     controls: {
       microphone: "Micro",
       camera: "Caméra",
-      chooseCamera: "Choisir la caméra",
-      chooseMicrophone: "Choisir le microphone",
       screen: "Écran",
+      screenAudioMissing: "L’écran est partagé sans son. Arrête le partage, relance-le et active le partage audio.",
+      screenAudioMissingSafari: "Safari ne peut pas partager le son de l’écran. L’écran reste visible ; ouvre le cours dans Chrome ou Edge pour partager le son.",
       startMedia: "Activer les médias",
     },
     preJoin: {

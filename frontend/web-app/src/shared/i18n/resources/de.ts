@@ -1286,9 +1286,9 @@ export const de = {
     controls: {
       microphone: "Mikrofon",
       camera: "Kamera",
-      chooseCamera: "Kamera auswählen",
-      chooseMicrophone: "Mikrofon auswählen",
       screen: "Bildschirm",
+      screenAudioMissing: "Der Bildschirm wird ohne Ton geteilt. Beende die Freigabe, starte sie erneut und aktiviere die Audiofreigabe.",
+      screenAudioMissingSafari: "Safari kann den Bildschirmton nicht übertragen. Der Bildschirm ist sichtbar; öffne die Lektion für Ton in Chrome oder Edge.",
       startMedia: "Medien starten",
     },
     preJoin: {

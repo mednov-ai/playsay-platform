@@ -1314,9 +1314,9 @@ export const ru = {
     controls: {
       microphone: "Микрофон",
       camera: "Камера",
-      chooseCamera: "Выбрать камеру",
-      chooseMicrophone: "Выбрать микрофон",
       screen: "Экран",
+      screenAudioMissing: "Экран передаётся без звука. Остановите демонстрацию, запустите её снова и включите передачу аудио.",
+      screenAudioMissingSafari: "Safari не передаёт звук демонстрации. Экран виден, но для звука откройте урок в Chrome или Edge.",
       startMedia: "Включить медиа",
     },
     preJoin: {

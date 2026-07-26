@@ -855,10 +855,8 @@ async function drawTextAndMindMap(page) {
 }
 
 async function verifyAnchoredTextScroll(teacherPage, studentPage) {
-  await Promise.all([
-    openFocusedSmokeImage(teacherPage),
-    openFocusedSmokeImage(studentPage),
-  ]);
+  await openFocusedSmokeImage(teacherPage);
+  await waitForFocusedSmokeImage(studentPage);
 
   const teacherLayer = teacherPage.locator(`.playsay-annotation-layer[data-anchor-id='${scrollImageBlockId}']`);
   const teacherBounds = await teacherLayer.boundingBox();
@@ -882,14 +880,19 @@ async function verifyAnchoredTextScroll(teacherPage, studentPage) {
   await assertAnchoredTextFollowsImageScroll(teacherPage, "teacher");
   await assertAnchoredTextFollowsImageScroll(studentPage, "student");
 
+  await studentPage.locator("[data-testid='material-focus-close']").click();
   await Promise.all([
-    teacherPage.locator("[data-testid='material-focus-close']").click(),
-    studentPage.locator("[data-testid='material-focus-close']").click(),
+    waitForFocusedSmokeImageClosed(teacherPage),
+    waitForFocusedSmokeImageClosed(studentPage),
   ]);
 }
 
 async function openFocusedSmokeImage(page) {
   await page.locator(`[data-testid='material-image-focus-${scrollImageBlockId}']`).click();
+  await waitForFocusedSmokeImage(page);
+}
+
+async function waitForFocusedSmokeImage(page) {
   await page.locator(
     `.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${scrollImageBlockId}']`,
   ).waitFor({ timeout: timeoutMs });
@@ -897,6 +900,11 @@ async function openFocusedSmokeImage(page) {
     const image = document.querySelector(`.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${blockId}']`);
     return image instanceof HTMLImageElement && image.complete && image.naturalHeight > 0;
   }, scrollImageBlockId, { timeout: timeoutMs });
+}
+
+async function waitForFocusedSmokeImageClosed(page) {
+  await page.locator(".playsay-material-focus-stack[data-active='false']").waitFor({ timeout: timeoutMs });
+  await page.locator("[data-testid='material-focus-close']").waitFor({ state: "detached", timeout: timeoutMs });
 }
 
 async function assertAnchoredTextFollowsImageScroll(page, role) {

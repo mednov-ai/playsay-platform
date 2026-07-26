@@ -8,11 +8,11 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const platformRoot = resolve(scriptDir, "../..");
 const projectRoot = resolve(platformRoot, "..");
 const dispatcher = readFileSync(resolve(platformRoot, "Jenkinsfile.dispatcher"), "utf8");
+const webhookDispatchJobXmlPath = resolve(projectRoot, "playsay-infra/jenkins/jobs/playsay-platform-dispatch-webhook.xml");
 const developDispatchJobXmlPath = resolve(projectRoot, "playsay-infra/jenkins/jobs/playsay-platform-dispatch-develop.xml");
 const releaseDispatchJobXmlPath = resolve(projectRoot, "playsay-infra/jenkins/jobs/playsay-platform-dispatch-release.xml");
 
-test("dispatcher defaults to four downstream jobs and validates the operator override", () => {
-  assert.match(dispatcher, /string\(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '4'/);
+test("dispatcher validates the four-agent operator override", () => {
   assert.match(dispatcher, /MAX_PARALLEL_MODULE_JOBS must be between 1 and 4/);
   assert.match(dispatcher, /maxParallelModuleJobs = maxParallelText\.toInteger\(\)/);
 });
@@ -23,32 +23,59 @@ test("dispatcher runs downstream jobs in bounded batches and aggregates their re
   assert.match(dispatcher, /wait: true, propagate: false/);
   assert.match(dispatcher, /Downstream module job results:/);
   assert.match(dispatcher, /Downstream module job failures:/);
+  assert.doesNotMatch(dispatcher, /catch \(err\)/);
 });
 
 test(
-  "develop and release dispatcher jobs expose the same four-agent parameter",
-  { skip: !existsSync(developDispatchJobXmlPath) || !existsSync(releaseDispatchJobXmlPath) },
+  "webhook and internal dispatcher jobs expose the same four-agent parameter",
+  {
+    skip:
+      !existsSync(webhookDispatchJobXmlPath) ||
+      !existsSync(developDispatchJobXmlPath) ||
+      !existsSync(releaseDispatchJobXmlPath),
+  },
   () => {
-    for (const dispatchJobXmlPath of [developDispatchJobXmlPath, releaseDispatchJobXmlPath]) {
+    for (const dispatchJobXmlPath of [
+      webhookDispatchJobXmlPath,
+      developDispatchJobXmlPath,
+      releaseDispatchJobXmlPath,
+    ]) {
       const dispatchJobXml = readFileSync(dispatchJobXmlPath, "utf8");
       assert.match(dispatchJobXml, /<name>MAX_PARALLEL_MODULE_JOBS<\/name>/);
       assert.match(dispatchJobXml, /<defaultValue>4<\/defaultValue>/);
-      assert.match(dispatchJobXml, /Maximum downstream module jobs to run concurrently/);
+      assert.match(dispatchJobXml, /Maximum downstream module jobs/);
     }
   },
 );
 
 test(
-  "develop aborts stale dispatchers while numeric releases serialize independently",
-  { skip: !existsSync(developDispatchJobXmlPath) || !existsSync(releaseDispatchJobXmlPath) },
+  "one webhook router feeds triggerless internal dispatchers with independent concurrency",
+  {
+    skip:
+      !existsSync(webhookDispatchJobXmlPath) ||
+      !existsSync(developDispatchJobXmlPath) ||
+      !existsSync(releaseDispatchJobXmlPath),
+  },
   () => {
+    const webhookXml = readFileSync(webhookDispatchJobXmlPath, "utf8");
     const developXml = readFileSync(developDispatchJobXmlPath, "utf8");
     const releaseXml = readFileSync(releaseDispatchJobXmlPath, "utf8");
+
+    assert.match(webhookXml, /<tokenCredentialId>github-webhook-token<\/tokenCredentialId>/);
+    assert.match(
+      webhookXml,
+      /\^refs\/heads\/\(develop\|release\/\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\) /,
+    );
+    assert.match(webhookXml, /playsay-platform-dispatch-develop/);
+    assert.match(webhookXml, /playsay-platform-dispatch-release/);
+
     assert.match(developXml, /<abortPrevious>true<\/abortPrevious>/);
-    assert.match(developXml, /\^refs\/heads\/develop /);
-    assert.doesNotMatch(developXml, /release\/\.\+/);
     assert.match(releaseXml, /<abortPrevious>false<\/abortPrevious>/);
-    assert.match(releaseXml, /\^refs\/heads\/release\/\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+ /);
+    for (const internalXml of [developXml, releaseXml]) {
+      assert.doesNotMatch(internalXml, /GenericTrigger/);
+      assert.doesNotMatch(internalXml, /tokenCredentialId/);
+      assert.match(internalXml, /<triggers\/>/);
+    }
   },
 );
 

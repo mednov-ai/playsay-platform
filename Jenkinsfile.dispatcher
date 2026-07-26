@@ -8,14 +8,6 @@ pipeline {
     timeout(time: 360, unit: 'MINUTES')
   }
 
-  parameters {
-    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch received from GitHub push event.', trim: true)
-    string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA.', trim: true)
-    string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA.', trim: true)
-    string(name: 'FORCE_TARGETS', defaultValue: '', description: 'Optional manual override: all or comma-separated deploy targets.', trim: true)
-    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '4', description: 'Maximum downstream module jobs to run concurrently on dedicated CI; allowed range is 1..4.', trim: true)
-  }
-
   environment {
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
@@ -264,17 +256,13 @@ spec:
                   string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
                 ]
                 echo "Triggering ${downstreamJobName} (${jobIndex + 1}/${jobs.size()})"
-                try {
-                  def downstreamBuild = build job: downstreamJobName, parameters: downstreamParams, wait: true, propagate: false
-                  return [
-                    job: downstreamJobName,
-                    result: downstreamBuild?.result ?: 'UNKNOWN',
-                    number: downstreamBuild?.number ?: '',
-                    url: downstreamBuild?.absoluteUrl ?: ''
-                  ]
-                } catch (err) {
-                  return [job: downstreamJobName, result: 'FAILURE', number: '', url: '', error: err.toString()]
-                }
+                def downstreamBuild = build job: downstreamJobName, parameters: downstreamParams, wait: true, propagate: false
+                return [
+                  job: downstreamJobName,
+                  result: downstreamBuild?.result ?: 'UNKNOWN',
+                  number: downstreamBuild?.number ?: '',
+                  url: downstreamBuild?.absoluteUrl ?: ''
+                ]
               }
             }
             def batchResults = parallel branches

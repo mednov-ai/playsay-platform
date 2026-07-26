@@ -2,11 +2,18 @@ import { describe, expect, it } from "vitest";
 import { cdpCommandForInput, isTrustedPlaySayOrigin, parsePageCommand } from "./protocol";
 
 describe("extension protocol", () => {
-  it("accepts production and local Play&Say origins only", () => {
-    expect(isTrustedPlaySayOrigin("https://online.play-and-say.ru")).toBe(true);
+  it("accepts current HoneySchool and local Play&Say origins only", () => {
+    expect(isTrustedPlaySayOrigin("https://dev.online.honey.school")).toBe(true);
+    expect(isTrustedPlaySayOrigin("https://online.honey.school")).toBe(true);
+    expect(isTrustedPlaySayOrigin("https://online.honeyschool.ru")).toBe(true);
     expect(isTrustedPlaySayOrigin("http://localhost:5173")).toBe(true);
+    expect(isTrustedPlaySayOrigin("http://127.0.0.1:4173")).toBe(true);
+    expect(isTrustedPlaySayOrigin("https://online.play-and-say.ru")).toBe(false);
+    expect(isTrustedPlaySayOrigin("https://play-and-say.ru")).toBe(false);
     expect(isTrustedPlaySayOrigin("https://evil.example")).toBe(false);
-    expect(isTrustedPlaySayOrigin("https://online.play-and-say.ru.evil.example")).toBe(false);
+    expect(isTrustedPlaySayOrigin("https://online.honey.school.evil.example")).toBe(false);
+    expect(isTrustedPlaySayOrigin("https://dev-online.honey.school")).toBe(false);
+    expect(isTrustedPlaySayOrigin("http://online.honey.school")).toBe(false);
   });
 
   it("requires a versioned command with matching session and nonce", () => {

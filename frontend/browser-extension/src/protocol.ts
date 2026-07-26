@@ -1,5 +1,15 @@
 export const PAGE_CHANNEL = "playsay.external-activity.page.v1";
 export const EXTENSION_CHANNEL = "playsay.external-activity.extension.v1";
+export const TRUSTED_PLAY_SAY_HTTPS_HOSTNAMES = [
+  "dev.online.honey.school",
+  "online.honey.school",
+  "online.honeyschool.ru",
+] as const;
+export const TRUSTED_PLAY_SAY_HTTP_HOSTNAMES = ["localhost", "127.0.0.1"] as const;
+export const TRUSTED_PLAY_SAY_MATCH_PATTERNS = [
+  ...TRUSTED_PLAY_SAY_HTTPS_HOSTNAMES.map((hostname) => `https://${hostname}/*`),
+  ...TRUSTED_PLAY_SAY_HTTP_HOSTNAMES.map((hostname) => `http://${hostname}/*`),
+] as const;
 
 export type ExternalInput =
   | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; button?: "left" | "middle" | "right"; clickCount?: number }
@@ -18,8 +28,8 @@ export type PageCommand = {
 export function isTrustedPlaySayOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
-    return (url.protocol === "https:" && (url.hostname === "online.play-and-say.ru" || url.hostname === "play-and-say.ru"))
-      || (url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1"));
+    return (url.protocol === "https:" && TRUSTED_PLAY_SAY_HTTPS_HOSTNAMES.some((hostname) => hostname === url.hostname))
+      || (url.protocol === "http:" && TRUSTED_PLAY_SAY_HTTP_HOSTNAMES.some((hostname) => hostname === url.hostname));
   } catch {
     return false;
   }

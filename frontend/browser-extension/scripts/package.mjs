@@ -14,4 +14,5 @@ async function collect(directory) {
 }
 
 await collect(root.pathname);
+files["INSTALL-RU.md"] = new Uint8Array(await readFile(new URL("../README.md", import.meta.url)));
 await writeFile(new URL("../playsay-browser-extension.zip", import.meta.url), zipSync(files, { level: 9 }));

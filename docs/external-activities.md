@@ -16,12 +16,19 @@ Other public HTTPS hosts are stored as `EXPERIMENTAL`. Localhost, `.local`, priv
 
 ## Install the development extension
 
-1. Run `npm --workspace browser-extension run package` from `frontend/`.
-2. Open `chrome://extensions` or `edge://extensions`, enable developer mode, and choose **Load unpacked**.
-3. Select `frontend/browser-extension/dist`.
-4. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for a production-mode web build. Local development enables the feature automatically, and Jenkins sets the flag for builds deployed to the shared dev stand.
+Chrome or Edge 116+ is required. The source directory is not itself an installable extension: the browser must receive a directory with `manifest.json` at its root.
 
-The packaged artifact is `frontend/browser-extension/playsay-browser-extension.zip`. Production must keep the flag disabled until the extension is signed and distributed through the Chrome/Edge extension stores.
+1. From `frontend/`, run `npm ci` and then `npm --workspace browser-extension run package`.
+2. Open `chrome://extensions` or `edge://extensions`, enable developer mode, and choose **Load unpacked**.
+3. Select `frontend/browser-extension/dist` — do not select `frontend/browser-extension`.
+4. Pin the bee action through the browser's extensions menu.
+5. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for a production-mode web build. Local development enables the feature automatically, and Jenkins sets the flag for builds deployed to the shared dev stand.
+
+The packaged Jenkins artifact is `frontend/browser-extension/playsay-browser-extension.zip`. Extract it completely, then load the extracted directory that contains `manifest.json`; do not select the ZIP itself. The archive includes `INSTALL-RU.md` with the same installation, update, troubleshooting, and lesson-use steps.
+
+To update an unpacked installation, replace/rebuild its files and click **Reload** on the extension card. If Chrome reports `Manifest file is missing or unreadable`, the wrong directory was selected or the build has not produced `dist/manifest.json`.
+
+Version `0.1.2` is manually distributed as this unpacked/Jenkins artifact. Chrome Web Store and Edge Add-ons publication are not part of the current release flow.
 
 ## Lesson flow
 
@@ -36,7 +43,8 @@ The teacher can lock/unlock student input, navigate back, reload, minimize, or s
 
 ## Security and privacy
 
-- The extension has no `<all_urls>` host permission. Its content bridge is installed only on Play&Say production and localhost origins.
+- The extension has no `<all_urls>` host permission. Its content bridge is installed only on the current HoneySchool application and localhost origins.
+- The exact bridge allowlist is `dev.online.honey.school`, `online.honey.school`, `online.honeyschool.ru`, `localhost`, and `127.0.0.1`; legacy `play-and-say.ru` application origins are intentionally excluded.
 - Every page command is versioned and bound to a session id plus a random nonce.
 - The service worker accepts commands only from the Play&Say consumer tab that created the session.
 - Pop-up tabs opened by a hosted provider are closed. Download behavior is denied and file chooser interception is enabled.

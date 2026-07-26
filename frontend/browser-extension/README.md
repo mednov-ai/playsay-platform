@@ -2,6 +2,10 @@
 
 Расширение позволяет учителю показывать внешнее интерактивное задание участникам общего урока Play&Say. Поддерживаются Google Chrome и Microsoft Edge версии 116 или новее.
 
+## Готовая сборка из `develop`
+
+Каталог `browser-extension/dist` хранится в ветке `develop` уже собранным. После клонирования или обновления репозитория его можно сразу выбрать через **Загрузить распакованное расширение**. Пересобирать расширение нужно только после изменения исходников.
+
 ## Сборка
 
 Из каталога `playsay-platform/frontend` выполните:
@@ -16,7 +20,7 @@ npm --workspace browser-extension run package
 - распакованное расширение в `browser-extension/dist`;
 - архив `browser-extension/playsay-browser-extension.zip`.
 
-## Установка из исходников
+## Установка из `develop`
 
 1. Откройте `chrome://extensions` или `edge://extensions`.
 2. Включите **Режим разработчика**.
@@ -24,7 +28,7 @@ npm --workspace browser-extension run package
 4. Выберите каталог `playsay-platform/frontend/browser-extension/dist`.
 5. Закрепите кнопку с пчёлкой через меню расширений браузера.
 
-Важно: не выбирайте каталог `browser-extension`. Chrome загружает только каталог, в корне которого находится готовый `manifest.json`; после сборки это каталог `dist`.
+Важно: не выбирайте каталог `browser-extension`. Chrome загружает только каталог, в корне которого находится готовый `manifest.json`; в репозитории это каталог `dist`.
 
 ## Установка из Jenkins ZIP
 
@@ -49,7 +53,7 @@ npm --workspace browser-extension run package
 Ошибка означает, что выбранный каталог не содержит читаемый `manifest.json` прямо в своём корне.
 
 - Для исходников выберите `browser-extension/dist`, а не `browser-extension`.
-- Если `dist/manifest.json` отсутствует, снова выполните команду сборки.
+- Если `dist/manifest.json` отсутствует, обновите ветку `develop` или снова выполните команду сборки.
 - Для Jenkins ZIP сначала распакуйте архив целиком и выбирайте распакованный каталог, а не сам ZIP.
 
 ## Запуск совместного задания

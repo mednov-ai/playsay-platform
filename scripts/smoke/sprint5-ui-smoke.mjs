@@ -903,7 +903,10 @@ async function waitForFocusedSmokeImage(page) {
 }
 
 async function waitForFocusedSmokeImageClosed(page) {
-  await page.locator(".playsay-material-focus-stack[data-active='false']").waitFor({ timeout: timeoutMs });
+  await page.locator(".playsay-material-focus-stack[data-active='false']").waitFor({
+    state: "attached",
+    timeout: timeoutMs,
+  });
   await page.locator("[data-testid='material-focus-close']").waitFor({ state: "detached", timeout: timeoutMs });
 }
 

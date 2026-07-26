@@ -1709,7 +1709,14 @@
 }
 
 .playsay-task-board[data-presentation-mode="image-focus"] .playsay-task-document {
+  overflow: hidden;
   padding: 0;
+}
+
+.playsay-task-board[data-presentation-mode="image-focus"] .playsay-task-document-surface,
+.playsay-task-board[data-presentation-mode="image-focus"] .playsay-rendered-material {
+  min-height: 0;
+  height: 100%;
 }
 
 .playsay-task-board[data-presentation-mode="image-focus"] .playsay-material-focus-stack {

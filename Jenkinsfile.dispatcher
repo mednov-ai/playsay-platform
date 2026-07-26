@@ -3,7 +3,6 @@ pipeline {
 
   options {
     buildDiscarder(logRotator(numToKeepStr: '30'))
-    disableConcurrentBuilds()
     skipDefaultCheckout(true)
     timestamps()
     timeout(time: 360, unit: 'MINUTES')
@@ -19,6 +18,7 @@ pipeline {
 
   environment {
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
+    INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
   }
 
   stages {
@@ -75,6 +75,12 @@ spec:
           if (env.CI_BRANCH.startsWith('release/') && !(env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/)) {
             error 'Production release branches must match release/<number>.<number>.<number>.'
           }
+          if (env.JOB_NAME == 'playsay-platform-dispatch-develop' && env.CI_BRANCH != 'develop') {
+            error 'The develop dispatcher accepts only the develop branch.'
+          }
+          if (env.JOB_NAME == 'playsay-platform-dispatch-release' && !(env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/)) {
+            error 'The release dispatcher accepts only numeric release branches.'
+          }
           env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
           currentBuild.displayName = "dispatch-${env.BUILD_NUMBER}"
@@ -89,9 +95,12 @@ spec:
               apt-get install -y --no-install-recommends git ca-certificates
             fi
             git config --global --add safe.directory "$WORKSPACE"
+            EFFECTIVE_AFTER="${GITHUB_AFTER:-$GIT_COMMIT}"
+            BRANCH_NAME="$CI_BRANCH" \
             GITHUB_BEFORE="${GITHUB_BEFORE:-}" \
-            GITHUB_AFTER="${GITHUB_AFTER:-}" \
+            GITHUB_AFTER="$EFFECTIVE_AFTER" \
             FORCE_TARGETS="${FORCE_TARGETS:-}" \
+            INFRA_REPO="$INFRA_REPO" \
               node scripts/ci/detect-affected-targets.mjs --env > affected-targets.env
             cat affected-targets.env
           '''
@@ -108,10 +117,121 @@ spec:
           env.AFFECTED_JOBS = detection.AFFECTED_JOBS ?: ''
           env.AFFECTED_TARGETS = detection.AFFECTED_TARGETS ?: ''
           env.AFFECTED_REASON = detection.AFFECTED_REASON ?: 'unknown'
+          env.VALIDATION_SUITES = detection.VALIDATION_SUITES ?: ''
+          env.DETECTION_MODE = detection.DETECTION_MODE ?: 'unknown'
+          env.DETECTION_BASE = detection.DETECTION_BASE ?: ''
+          env.DETECTION_HEAD = detection.DETECTION_HEAD ?: env.GIT_COMMIT
+          env.BASE_RELEASE_BRANCH = detection.BASE_RELEASE_BRANCH ?: ''
           echo "Dispatcher source branch: ${env.CI_BRANCH}"
           echo "Dispatcher source commit: ${env.GIT_COMMIT}"
           echo "Affected targets: ${env.AFFECTED_TARGETS ?: '(none)'}"
+          echo "Validation suites: ${env.VALIDATION_SUITES ?: '(none)'}"
           echo "Detection reason: ${env.AFFECTED_REASON}"
+          echo "Detection mode: ${env.DETECTION_MODE}"
+          echo "Detection base: ${env.DETECTION_BASE ?: '(none)'}"
+        }
+
+        script {
+          def suites = (env.VALIDATION_SUITES ?: '').split(',').collect { it.trim() }.findAll { it }
+          container('node') {
+            if (suites.contains('ci-contracts')) {
+              sh './scripts/ci/validate-ci-contracts.sh'
+            } else if (suites.contains('smoke-syntax')) {
+              sh './scripts/ci/validate-smoke-syntax.sh'
+            }
+          }
+        }
+
+        stash name: 'dispatcher-ci-scripts', includes: 'scripts/ci/**'
+      }
+    }
+
+    stage('Prepare release candidate') {
+      when {
+        expression { env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/ }
+      }
+      agent {
+        kubernetes {
+          yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  activeDeadlineSeconds: 900
+  serviceAccountName: jenkins
+  containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 384Mi
+    - name: tools
+      image: alpine:3.20
+      command: ["cat"]
+      tty: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 300m
+          memory: 384Mi
+"""
+        }
+      }
+      steps {
+        deleteDir()
+        unstash 'dispatcher-ci-scripts'
+        container('tools') {
+          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+            script {
+              def prepareOutput = sh(
+                script: '''
+                  set -eu
+                  apk add --no-cache git yq
+                  BASE_PLATFORM_COMMIT="$DETECTION_BASE" \
+                  JENKINS_JOB_NAME="$JOB_NAME" \
+                  JENKINS_BUILD_NUMBER="$BUILD_NUMBER" \
+                    ./scripts/ci/prepare-release-candidate.sh
+                ''',
+                returnStdout: true
+              ).trim()
+              echo prepareOutput
+              def preparedTargets = prepareOutput
+                .split('\\n')
+                .find { it.startsWith('RELEASE_AFFECTED_TARGETS=') }
+                ?.substring('RELEASE_AFFECTED_TARGETS='.length()) ?: env.AFFECTED_TARGETS
+              env.AFFECTED_TARGETS = preparedTargets
+              def targetJobs = [
+                'api-gateway': 'playsay-api-gateway-develop',
+                'ai-tutor-service': 'playsay-ai-tutor-service-develop',
+                'vocabulary-service': 'playsay-vocabulary-service-develop',
+                'web-app': 'playsay-web-app-develop',
+                'collaboration-service': 'playsay-collaboration-service-develop',
+                'media-service': 'playsay-media-service-develop',
+                'payment-service': 'playsay-payment-service-develop',
+                'registration-service': 'playsay-registration-service-develop',
+                'email-service': 'playsay-email-service-develop',
+                'keyboard-service': 'playsay-keyboard-backend-develop',
+                'keyboard-app': 'playsay-keyboard-frontend-develop'
+              ]
+              env.AFFECTED_JOBS = preparedTargets
+                .split(',')
+                .collect { it.trim() }
+                .findAll { it }
+                .collect { target ->
+                  if (!targetJobs.containsKey(target)) {
+                    error "Release candidate contains an unknown target: ${target}"
+                  }
+                  targetJobs[target]
+                }
+                .join(',')
+              echo "Release candidate targets: ${env.AFFECTED_TARGETS ?: '(none)'}"
+            }
+          }
         }
       }
     }
@@ -173,6 +293,57 @@ spec:
           def failures = downstreamResults.findAll { it.result != 'SUCCESS' }
           if (!failures.isEmpty()) {
             error "Downstream module job failures: ${failures.collect { it.job + '=' + it.result }.join(', ')}"
+          }
+        }
+      }
+    }
+
+    stage('Finalize release candidate') {
+      when {
+        expression { env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/ }
+      }
+      agent {
+        kubernetes {
+          yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  activeDeadlineSeconds: 1200
+  serviceAccountName: jenkins
+  containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 384Mi
+    - name: tools
+      image: alpine:3.20
+      command: ["cat"]
+      tty: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 300m
+          memory: 512Mi
+"""
+        }
+      }
+      steps {
+        deleteDir()
+        unstash 'dispatcher-ci-scripts'
+        container('tools') {
+          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+            sh '''
+              set -eu
+              apk add --no-cache git yq helm
+              ./scripts/ci/finalize-release-candidate.sh
+            '''
           }
         }
       }

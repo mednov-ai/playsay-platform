@@ -50,6 +50,11 @@ test("release routing never grants Jenkins production cluster credentials", () =
     const pipeline = readFileSync(resolve(platformRoot, pipelineName), "utf8");
     assert.doesNotMatch(pipeline, /prod-kubeconfig|playsay-prod/, pipelineName);
     assert.match(pipeline, /KUBECONFIG = credentials\('dev-kubeconfig'\)/, pipelineName);
+    assert.match(
+      pipeline,
+      /assert-current-branch-head\.sh && CHART_NAME=/,
+      `${pipelineName} must not update GitOps from a stale branch head`,
+    );
   }
 });
 
@@ -66,6 +71,24 @@ test("image update helper pins dev and prod digests and matches release branches
   assert.match(helper, /cd "\$START_DIR"\s+rm -rf "\$WORK_DIR"\s+echo "Infra push race/);
   assert.match(routedHelper, /Missing image digest produced by Kaniko/);
   assert.match(routedHelper, /IMAGE_DIGEST=.*image-digest\.txt/);
+});
+
+test("release candidate lifecycle preserves a manual production gate", () => {
+  const prepare = readFileSync(resolve(platformRoot, "scripts/ci/prepare-release-candidate.sh"), "utf8");
+  const finalize = readFileSync(resolve(platformRoot, "scripts/ci/finalize-release-candidate.sh"), "utf8");
+
+  assert.match(prepare, /status: building/);
+  assert.match(prepare, /argocd-apps\/prod\/current-release\.txt/);
+  assert.match(prepare, /\.image = load\(strenv\(BASE_VALUES_FILE\)\)\.image/);
+  assert.match(prepare, /previous_status.*!= "ready"/);
+  assert.match(prepare, /RELEASE_AFFECTED_TARGETS=/);
+
+  assert.match(finalize, /manifest_status.*"building"/);
+  assert.match(finalize, /\.build\.commit/);
+  assert.match(finalize, /Unaffected chart .* changed image\/build metadata/);
+  assert.match(finalize, /helm template/);
+  assert.match(finalize, /\.status = "ready"/);
+  assert.doesNotMatch(`${prepare}\n${finalize}`, /prod-kubeconfig|kubectl/);
 });
 
 test("image update retry reclones from a stable working directory after a push race", () => {

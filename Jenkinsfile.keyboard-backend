@@ -232,7 +232,7 @@ EOF
       steps {
         container('tools') {
           withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
-            sh 'apk add --no-cache git yq && CHART_NAME=keyboard-service ./scripts/ci/update-routed-image-reference.sh'
+            sh 'apk add --no-cache git yq && ./scripts/ci/assert-current-branch-head.sh && CHART_NAME=keyboard-service ./scripts/ci/update-routed-image-reference.sh'
           }
         }
       }

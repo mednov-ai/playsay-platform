@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { CircleAlert, ExternalLink, Gamepad2, ImageIcon, Maximize2, Play, Video } from "lucide-react";
 import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
 import {
@@ -254,7 +254,10 @@ export function RenderedMaterialBlock({
         const imageHeight = block.height ? `${block.height}px` : undefined;
         const imageSize = block.imageSize ?? "MEDIUM";
         const objectFit = block.objectFit ?? (pageLayout === "STATIC_IMAGE" ? "contain" : undefined);
-        const canFocusImage = pageLayout === "STATIC_IMAGE" || imageSize === "LARGE" || imageSize === "FULL";
+        const canFocusImage = Boolean(onRequestFocus)
+          || pageLayout === "STATIC_IMAGE"
+          || imageSize === "LARGE"
+          || imageSize === "FULL";
         return blockSection(
           <>
             {pageLayout === "STATIC_IMAGE" ? null : <h4>{block.title}</h4>}
@@ -269,6 +272,8 @@ export function RenderedMaterialBlock({
                 <img
                   alt={block.alt || block.caption || block.prompt || block.title}
                   data-playsay-annotation-anchor-id={block.id}
+                  draggable={false}
+                  onDragStart={(event) => event.preventDefault()}
                   src={imageUrl}
                 />
                 {canFocusImage ? (
@@ -418,15 +423,12 @@ export function RenderedMaterialBlock({
         <>
           <h4>{block.title}</h4>
           <RenderedMarkdown value={block.prompt} />
-          <textarea
-            className="playsay-student-answer"
-            onChange={(event) => onAnswerChange?.(block.id, {
-              type: "freeWriting",
-              text: event.target.value,
-              context: materialAnswerContextForBlock(block),
-            })}
+          <RenderedFreeWritingAnswer
+            answer={answer}
+            block={block}
+            materialId={materialId}
+            onAnswerChange={onAnswerChange}
             placeholder={t("materials.renderer.studentAnswerPlaceholder")}
-            value={materialAnswerText(answer)}
           />
         </>,
       );
@@ -448,6 +450,79 @@ export function RenderedMaterialBlock({
     default:
       return null;
   }
+}
+
+function RenderedFreeWritingAnswer({
+  answer,
+  block,
+  materialId,
+  onAnswerChange,
+  placeholder,
+}: {
+  answer?: MaterialAnswerBlock;
+  block: MaterialEditorBlock;
+  materialId?: string;
+  onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
+  placeholder: string;
+}) {
+  const externalText = materialAnswerText(answer);
+  const resetKey = `${materialId ?? "preview"}:${block.id}`;
+  const [draft, setDraft] = useState(externalText);
+  const editingRef = useRef(false);
+  const composingRef = useRef(false);
+  const resetKeyRef = useRef(resetKey);
+
+  useEffect(() => {
+    if (resetKeyRef.current !== resetKey) {
+      resetKeyRef.current = resetKey;
+      editingRef.current = false;
+      composingRef.current = false;
+      setDraft(externalText);
+      return;
+    }
+    if (!editingRef.current && !composingRef.current) {
+      setDraft(externalText);
+    }
+  }, [externalText, resetKey]);
+
+  function publish(nextText: string) {
+    onAnswerChange?.(block.id, {
+      type: "freeWriting",
+      text: nextText,
+      context: materialAnswerContextForBlock(block),
+    });
+  }
+
+  return (
+    <textarea
+      className="playsay-student-answer"
+      data-playsay-native-input="true"
+      onBlur={(event) => {
+        editingRef.current = false;
+        if (!composingRef.current) publish(event.currentTarget.value);
+      }}
+      onChange={(event) => {
+        const nextText = event.currentTarget.value;
+        setDraft(nextText);
+        publish(nextText);
+      }}
+      onCompositionEnd={(event) => {
+        composingRef.current = false;
+        const nextText = event.currentTarget.value;
+        setDraft(nextText);
+        publish(nextText);
+      }}
+      onCompositionStart={() => {
+        composingRef.current = true;
+        editingRef.current = true;
+      }}
+      onFocus={() => {
+        editingRef.current = true;
+      }}
+      placeholder={placeholder}
+      value={draft}
+    />
+  );
 }
 
 function MaterialVideoResizeHandle({

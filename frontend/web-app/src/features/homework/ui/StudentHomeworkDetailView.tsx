@@ -86,6 +86,7 @@ export function StudentHomeworkDetailView({
         <VocabularyQuickAdd source={{ sourceType: "HOMEWORK", assignmentId: detail.assignment.id, materialId: detail.material.id }}>
           <LessonMaterialDocumentView
             answers={answers}
+            key={detail.assignment.id}
             material={detail.material}
             mode="classroom"
             onAnswerChange={onAnswerChange}

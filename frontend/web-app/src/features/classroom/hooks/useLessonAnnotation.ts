@@ -23,6 +23,7 @@ import {
   type AnnotationFontSize,
   type AnnotationMindMapNode,
   type AnnotationPoint,
+  type AnnotationResizeHandle,
   type AnnotationStroke,
   type AnnotationStrokeWidth,
   type AnnotationTool,
@@ -52,7 +53,7 @@ type ActiveInteraction =
   | {
       before: AnnotationElement;
       beforeGroup?: AnnotationElement[];
-      handle?: "end" | "ne" | "nw" | "se" | "start" | "sw";
+      handle?: AnnotationResizeHandle;
       id: string;
       mode: "move" | "resize";
       start: AnnotationPoint;
@@ -461,7 +462,7 @@ export function useLessonAnnotation({
   function beginElementResize(
     event: PointerEvent<SVGElement>,
     elementId: string,
-    handle: "end" | "ne" | "nw" | "se" | "start" | "sw",
+    handle: AnnotationResizeHandle,
   ) {
     const element = elementsRef.current.find((candidate) => candidate.id === elementId);
     if (!element) {
@@ -678,10 +679,11 @@ export function useLessonAnnotation({
     const height = tool === "stickyNote" ? 160 : 34;
     const element: AnnotationElement = {
       ...(point.anchorId ? { anchorId: point.anchorId } : {}),
+      autoHeight: tool === "text",
       autoWidth: tool === "text",
       color: tool === "stickyNote" ? "#111111" : annotationColor,
       createdAt: Date.now(),
-      fill: tool === "stickyNote" ? "#fff0a8" : "transparent",
+      fill: tool === "stickyNote" ? "#fff0a8" : "#fffaf5",
       fontSize: tool === "stickyNote" ? 30 : defaultAnnotationFontSize,
       height,
       id: annotationElementId(tool),

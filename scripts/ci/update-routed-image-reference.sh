@@ -9,6 +9,12 @@ if [ -z "${WORKSPACE:-}" ]; then
   echo "Missing required environment variable: WORKSPACE" >&2
   exit 1
 fi
+if [ ! -s "$WORKSPACE/image-digest.txt" ]; then
+  echo "Missing image digest produced by Kaniko." >&2
+  exit 1
+fi
+IMAGE_DIGEST="$(tr -d '[:space:]' < "$WORKSPACE/image-digest.txt")"
+export IMAGE_DIGEST
 
 case "$CHART_NAME" in
   ai-tutor-service|api-gateway|collaboration-service|email-service|keyboard-app|keyboard-service|media-service|payment-service|registration-service|vocabulary-service|web-app) ;;
@@ -20,13 +26,7 @@ case "${DEPLOY_ENVIRONMENT:-}" in
     CHART_VALUES_FILE="helm-charts/${CHART_NAME}/values-dev.yaml"
     ;;
   prod)
-    if [ ! -s "$WORKSPACE/image-digest.txt" ]; then
-      echo "Missing image digest produced by Kaniko." >&2
-      exit 1
-    fi
     CHART_VALUES_FILE="helm-charts/${CHART_NAME}/values-prod.yaml"
-    IMAGE_DIGEST="$(tr -d '[:space:]' < "$WORKSPACE/image-digest.txt")"
-    export IMAGE_DIGEST
     ;;
   *)
     echo "DEPLOY_ENVIRONMENT must be dev or prod." >&2

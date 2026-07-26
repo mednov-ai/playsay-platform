@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, FileText, Loader2, Minimize2, RefreshCw } from "lucide-react";
 import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, fetchMaterialAssetText, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
 import {
@@ -42,6 +42,7 @@ export function LessonMaterialDocumentView({
   htmlGameSync,
   externalActivitySync,
   onPresentationModeChange,
+  sharedImageFocusBlockId,
 }: {
   activePageId?: string | null;
   allowVideoFullscreen?: boolean;
@@ -60,7 +61,11 @@ export function LessonMaterialDocumentView({
   showScoreBadge?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
   externalActivitySync?: MaterialExternalActivitySync;
-  onPresentationModeChange?: (mode: "default" | "html-game-focus" | "image-focus" | "external-activity-focus") => void;
+  onPresentationModeChange?: (
+    mode: "default" | "html-game-focus" | "image-focus" | "external-activity-focus",
+    blockId?: string,
+  ) => void;
+  sharedImageFocusBlockId?: string | null;
 }) {
   const { t } = useAppTranslation();
   const document = useMemo(
@@ -78,6 +83,7 @@ export function LessonMaterialDocumentView({
   const [assetLoadState, setAssetLoadState] = useState<"idle" | "loading" | "ready" | "partial-error" | "error">("idle");
   const [assetReloadVersion, setAssetReloadVersion] = useState(0);
   const [focusedBlock, setFocusedBlock] = useState<{ kind: "htmlGame" | "image" | "externalActivity"; blockId: string } | null>(null);
+  const onPresentationModeChangeRef = useRef(onPresentationModeChange);
   const [launchedGameIds, setLaunchedGameIds] = useState<Set<string>>(() => new Set());
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
   const videoFullscreenAllowed = allowVideoFullscreen ?? mode === "teacherPreview";
@@ -89,6 +95,7 @@ export function LessonMaterialDocumentView({
   const focusedBlockValue = focusedBlock ? allBlocks.find((block) => block.id === focusedBlock.blockId) ?? null : null;
   const presentedHtmlGameBlockId = htmlGameSync?.presentedBlockId ?? null;
   const presentedExternalActivityBlockId = externalActivitySync?.active?.visible ? externalActivitySync.active.blockId : null;
+  onPresentationModeChangeRef.current = onPresentationModeChange;
 
   useEffect(() => {
     setInternalActivePageId(null);
@@ -132,16 +139,29 @@ export function LessonMaterialDocumentView({
   }, [allBlocks, presentedExternalActivityBlockId]);
 
   useEffect(() => {
-    onPresentationModeChange?.(focusedBlock === null
+    if (sharedImageFocusBlockId === undefined) return;
+    if (sharedImageFocusBlockId === null) {
+      setFocusedBlock((current) => current?.kind === "image" ? null : current);
+      return;
+    }
+    const block = allBlocks.find((candidate) => (
+      candidate.id === sharedImageFocusBlockId
+      && (candidate.type === "image" || candidate.type === "generatedImage")
+    ));
+    if (block) setFocusedBlock({ kind: "image", blockId: block.id });
+  }, [allBlocks, sharedImageFocusBlockId]);
+
+  useEffect(() => {
+    onPresentationModeChangeRef.current?.(focusedBlock === null
       ? "default"
       : focusedBlock.kind === "htmlGame"
         ? "html-game-focus"
         : focusedBlock.kind === "externalActivity"
           ? "external-activity-focus"
-          : "image-focus");
-  }, [focusedBlock, onPresentationModeChange]);
+          : "image-focus", focusedBlock?.blockId);
+  }, [focusedBlock]);
 
-  useEffect(() => () => onPresentationModeChange?.("default"), [onPresentationModeChange]);
+  useEffect(() => () => onPresentationModeChangeRef.current?.("default"), []);
 
   useEffect(() => {
     let active = true;
@@ -262,6 +282,15 @@ export function LessonMaterialDocumentView({
       });
     }
   }
+
+  useEffect(() => {
+    if (!focusedBlock) return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeBlockFocus();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [focusedBlock]);
 
   return (
     <div
@@ -411,6 +440,8 @@ export function LessonMaterialDocumentView({
               <img
                 alt={focusedBlockValue.alt || focusedBlockValue.caption || focusedBlockValue.prompt || focusedBlockValue.title}
                 data-playsay-annotation-anchor-id={focusedBlockValue.id}
+                draggable={false}
+                onDragStart={(event) => event.preventDefault()}
                 src={resolveMaterialImageUrl(focusedBlockValue.url, assetUrls)}
               />
             ) : null}

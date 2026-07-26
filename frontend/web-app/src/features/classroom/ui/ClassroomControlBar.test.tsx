@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   room: {
     localParticipant: {
       isScreenShareEnabled: false,
+      setScreenShareEnabled: vi.fn(),
     },
   },
   saveAudioInputEnabled: vi.fn(),
@@ -105,6 +106,11 @@ vi.mock("../../../shared/i18n", () => ({
   useAppTranslation: () => ({
     t: (key: string) => ({
       "classroom.controls.screen": "Экран",
+      "classroom.controls.screenStop": "Завершить демонстрацию",
+      "classroom.controls.screenStarting": "Запуск демонстрации",
+      "classroom.controls.screenStopping": "Завершение демонстрации",
+      "classroom.controls.screenPickerHint": "Не выбирайте вкладку урока.",
+      "classroom.controls.screenStopError": "Не удалось завершить демонстрацию.",
       "classroom.controls.microphone": "Микрофон",
       "classroom.controls.camera": "Камера",
       "classroom.controls.screenAudioMissing": "Экран передаётся без звука.",
@@ -126,6 +132,11 @@ beforeEach(() => {
   mocks.saveAudioInputEnabled.mockReset();
   mocks.saveVideoInputEnabled.mockReset();
   mocks.toggle.mockReset();
+  mocks.room.localParticipant.setScreenShareEnabled.mockReset();
+  mocks.room.localParticipant.setScreenShareEnabled.mockImplementation(async (enabled: boolean) => {
+    mocks.room.localParticipant.isScreenShareEnabled = enabled;
+    return enabled;
+  });
   mocks.toggle.mockImplementation(async (enabled?: boolean) => {
     mocks.room.localParticipant.isScreenShareEnabled = Boolean(enabled);
     return enabled;
@@ -170,6 +181,9 @@ describe("ClassroomControlBar screen sharing", () => {
     expect(mocks.captureOptions).toEqual(classroomScreenShareCaptureOptions);
     expect(classroomScreenShareCaptureOptions).toEqual({
       audio: { restrictOwnAudio: true },
+      preferCurrentTab: false,
+      selfBrowserSurface: "exclude",
+      surfaceSwitching: "include",
       systemAudio: "include",
     });
   });
@@ -178,7 +192,7 @@ describe("ClassroomControlBar screen sharing", () => {
     const view = renderControlBar();
 
     fireEvent.click(screen.getByRole("button", { name: "Экран" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Safari не передаёт звук демонстрации.");
+    expect(await screen.findByText("Safari не передаёт звук демонстрации.")).toBeInTheDocument();
 
     mocks.audioTracks = [{
       participant: mocks.room.localParticipant,
@@ -188,7 +202,7 @@ describe("ClassroomControlBar screen sharing", () => {
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
 
     mocks.audioTracks = [];
-    fireEvent.click(screen.getByRole("button", { name: "Экран" }));
+    fireEvent.click(screen.getByRole("button", { name: "Завершить демонстрацию" }));
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
   });
 
@@ -198,7 +212,7 @@ describe("ClassroomControlBar screen sharing", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Экран" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Экран передаётся без звука.");
+    expect(await screen.findByText("Экран передаётся без звука.")).toBeInTheDocument();
   });
 
   it("selects the generic warning outside Safari", () => {

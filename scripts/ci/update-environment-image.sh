@@ -22,6 +22,12 @@ require_env CI_BRANCH
 require_env BUILD_LABEL_PREFIX
 require_env GIT_COMMIT
 require_env GIT_COMMIT_SHORT
+require_env IMAGE_DIGEST
+
+if ! printf '%s\n' "$IMAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+  echo "IMAGE_DIGEST must be an immutable sha256 digest." >&2
+  exit 1
+fi
 
 case "$INFRA_REPO" in
   https://*) AUTH_REPO="https://${GITHUB_USER}:${GITHUB_TOKEN}@${INFRA_REPO#https://}" ;;
@@ -56,11 +62,6 @@ case "$DEPLOY_ENVIRONMENT" in
       helm-charts/*/values-prod.yaml) ;;
       *) echo "Production deployment must update values-prod.yaml." >&2; exit 1 ;;
     esac
-    require_env IMAGE_DIGEST
-    if ! printf '%s\n' "$IMAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
-      echo "IMAGE_DIGEST must be an immutable sha256 digest." >&2
-      exit 1
-    fi
     ;;
   *)
     echo "DEPLOY_ENVIRONMENT must be dev or prod." >&2
@@ -121,8 +122,8 @@ for attempt in 1 2 3 4 5; do
     commit_subject="chore: prepare ${BUILD_LABEL} for production"
     tag_message="Play&Say production candidate ${BUILD_LABEL}"
   else
-    yq -i \
-      '.image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)' \
+    IMAGE_DIGEST="$IMAGE_DIGEST" yq -i \
+      '.image.tag = strenv(BUILD_LABEL) | .image.digest = strenv(IMAGE_DIGEST) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)' \
       "$CHART_VALUES_FILE"
     commit_subject="chore: deploy ${BUILD_LABEL} to dev"
     tag_message="Play&Say dev deployment ${BUILD_LABEL}"

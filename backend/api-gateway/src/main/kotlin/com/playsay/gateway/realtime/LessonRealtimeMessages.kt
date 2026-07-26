@@ -23,6 +23,8 @@ data class LessonRealtimeOutboundMessage(
     val type: String,
     val lesson: ScheduledLessonResponse? = null,
     val lessonId: UUID? = null,
+    val assignmentId: UUID? = null,
+    val change: String? = null,
     val participants: List<LessonParticipantPresence>? = null,
     val message: String? = null,
 )

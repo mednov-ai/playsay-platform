@@ -51,13 +51,17 @@ test("release routing never grants Jenkins production cluster credentials", () =
   }
 });
 
-test("image update helper requires prod digests and matching release branches", () => {
+test("image update helper pins dev and prod digests and matches release branches", () => {
   const helper = readFileSync(resolve(platformRoot, "scripts/ci/update-environment-image.sh"), "utf8");
+  const routedHelper = readFileSync(resolve(platformRoot, "scripts/ci/update-routed-image-reference.sh"), "utf8");
   assert.match(helper, /\^release\/\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\$/);
   assert.match(helper, /if \[ "\$INFRA_BRANCH" != "\$CI_BRANCH" \]/);
   assert.match(helper, /\^sha256:\[0-9a-f\]\{64\}\$/);
+  assert.match(helper, /\.image\.digest = strenv\(IMAGE_DIGEST\)/);
   assert.match(helper, /helm-charts\/\*\/values-prod\.yaml/);
   assert.match(helper, /argocd-apps\/prod\/current-release\.txt/);
+  assert.match(routedHelper, /Missing image digest produced by Kaniko/);
+  assert.match(routedHelper, /IMAGE_DIGEST=.*image-digest\.txt/);
 });
 
 test("Kaniko publishes a mutable dev tag only for dev builds", () => {

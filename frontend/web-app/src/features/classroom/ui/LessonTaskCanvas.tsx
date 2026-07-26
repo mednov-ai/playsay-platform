@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -56,6 +57,7 @@ import type { CollaborationCursor, CollaborationParticipant } from "../hooks/use
 import { useAppTranslation } from "../../../shared/i18n";
 import { PresenceCursorLayer } from "./PresenceCursorLayer";
 import { AnnotationLayer, type AnnotationLayerBounds } from "./AnnotationLayer";
+import type { MaterialViewportState, MaterialViewportUpdate } from "../model/materialViewport";
 
 type LiveAnnotationSync = {
   elements: AnnotationElement[];
@@ -63,6 +65,12 @@ type LiveAnnotationSync = {
   ready: boolean;
   setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
   updateCursor: (cursor: CollaborationCursor | null) => void;
+};
+
+type MaterialViewportSync = {
+  publish: (viewport: MaterialViewportUpdate) => void;
+  ready: boolean;
+  state: MaterialViewportState | null;
 };
 
 export type LessonPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus";
@@ -84,6 +92,7 @@ export function LessonTaskCanvas({
   externalActivitySync,
   liveActivePageId,
   onPresentationModeChange,
+  viewportSync,
 }: {
   annotationSync?: LiveAnnotationSync | null;
   canControlPages?: boolean;
@@ -92,6 +101,7 @@ export function LessonTaskCanvas({
   externalActivitySync?: MaterialExternalActivitySync;
   liveActivePageId?: string | null;
   onPresentationModeChange?: (mode: LessonPresentationMode) => void;
+  viewportSync?: MaterialViewportSync;
   collaborationControls?: ReactNode;
   lessonId: string;
   material?: LessonMaterial | null;
@@ -145,8 +155,13 @@ export function LessonTaskCanvas({
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
   const effectiveAnswers = exerciseSync?.answers ?? answers;
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
+  const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const activePage = document?.pages.find((page) => page.id === activePageId) ?? document?.pages[0] ?? null;
   const materialSurfaceRef = useRef<HTMLDivElement>(null);
+  const taskDocumentRef = useRef<HTMLDivElement>(null);
+  const applyingRemoteViewportRef = useRef(false);
+  const lastViewportPublishAtRef = useRef(0);
+  const viewportPublishTimerRef = useRef<number | null>(null);
   const annotationAnchors = useAnnotationAnchors(
     materialSurfaceRef,
     activePage?.id ?? null,
@@ -189,6 +204,81 @@ export function LessonTaskCanvas({
   }, [onPresentationModeChange, presentationMode]);
 
   useEffect(() => () => onPresentationModeChange?.("default"), [onPresentationModeChange]);
+
+  const publishViewport = useCallback((
+    pageId = activePageId,
+    mode = presentationMode,
+    blockId = focusedBlockId,
+  ) => {
+    if (!viewportSync?.ready || !material || applyingRemoteViewportRef.current) return;
+    const scrollContainer = mode === "image-focus" ? "image" : "document";
+    const node = scrollContainer === "image"
+      ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null
+      : taskDocumentRef.current;
+    if (!node) return;
+    const maxLeft = Math.max(0, node.scrollWidth - node.clientWidth);
+    const maxTop = Math.max(0, node.scrollHeight - node.clientHeight);
+    viewportSync.publish({
+      ...(blockId ? { focusedBlockId: blockId } : {}),
+      materialId: material.id,
+      pageId,
+      presentationMode: mode,
+      scrollContainer,
+      x: maxLeft > 0 ? node.scrollLeft / maxLeft : 0,
+      y: maxTop > 0 ? node.scrollTop / maxTop : 0,
+    });
+    lastViewportPublishAtRef.current = performance.now();
+  }, [activePageId, focusedBlockId, material, presentationMode, viewportSync?.publish, viewportSync?.ready]);
+
+  useEffect(() => {
+    const node = presentationMode === "image-focus"
+      ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null
+      : taskDocumentRef.current;
+    if (!node || !viewportSync) return undefined;
+
+    const handleScroll = () => {
+      if (applyingRemoteViewportRef.current) return;
+      const elapsed = performance.now() - lastViewportPublishAtRef.current;
+      if (elapsed >= 50) {
+        publishViewport();
+        return;
+      }
+      if (viewportPublishTimerRef.current !== null) return;
+      viewportPublishTimerRef.current = window.setTimeout(() => {
+        viewportPublishTimerRef.current = null;
+        publishViewport();
+      }, Math.max(0, 50 - elapsed));
+    };
+    node.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      node.removeEventListener("scroll", handleScroll);
+      if (viewportPublishTimerRef.current !== null) {
+        window.clearTimeout(viewportPublishTimerRef.current);
+        viewportPublishTimerRef.current = null;
+      }
+    };
+  }, [presentationMode, publishViewport, viewportSync]);
+
+  useEffect(() => {
+    const viewport = viewportSync?.state;
+    if (!viewport || !material || viewport.materialId !== material.id) return;
+    applyingRemoteViewportRef.current = true;
+    if (document?.pages.some((page) => page.id === viewport.pageId) && viewport.pageId !== activePageId) {
+      setActivePageId(viewport.pageId);
+    }
+    window.requestAnimationFrame(() => {
+      const node = viewport.scrollContainer === "image"
+        ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null
+        : taskDocumentRef.current;
+      if (node) {
+        node.scrollLeft = viewport.x * Math.max(0, node.scrollWidth - node.clientWidth);
+        node.scrollTop = viewport.y * Math.max(0, node.scrollHeight - node.clientHeight);
+      }
+      window.requestAnimationFrame(() => {
+        applyingRemoteViewportRef.current = false;
+      });
+    });
+  }, [activePageId, document, material, setActivePageId, viewportSync?.state]);
 
   function updateAnswer(blockId: string, answer: MaterialAnswerBlock) {
     setAnswers((current) => ({
@@ -389,7 +479,7 @@ export function LessonTaskCanvas({
       </aside>
 
       <div className="playsay-task-page">
-        <div className="playsay-task-document">
+        <div className="playsay-task-document" ref={taskDocumentRef}>
           <div
             className="playsay-task-document-surface"
             data-live-presence={annotationSync ? "true" : "false"}
@@ -403,16 +493,36 @@ export function LessonTaskCanvas({
               <LessonMaterialDocumentView
                 activePageId={activePageId}
                 answers={effectiveAnswers}
-                canControlPages={canControlPages}
+                canControlPages={canControlPages || Boolean(viewportSync)}
                 material={material}
                 htmlGameSync={htmlGameSync}
                 exerciseParticipants={exerciseSync?.participants}
                 onExerciseInteractionChange={exerciseSync?.updateInteraction}
                 externalActivitySync={externalActivitySync}
                 mode="classroom"
-                onActivePageIdChange={setActivePageId}
+                onActivePageIdChange={(pageId) => {
+                  setActivePageId(pageId);
+                  window.requestAnimationFrame(() => publishViewport(pageId));
+                }}
                 onAnswerChange={updateAnswer}
-                onPresentationModeChange={setPresentationMode}
+                onPresentationModeChange={(mode, blockId) => {
+                  setPresentationMode(mode);
+                  setFocusedBlockId(blockId ?? null);
+                  const shared = viewportSync?.state;
+                  if (
+                    shared?.materialId === material.id
+                    && shared.presentationMode === mode
+                    && (shared.focusedBlockId ?? null) === (blockId ?? null)
+                  ) {
+                    return;
+                  }
+                  window.requestAnimationFrame(() => publishViewport(activePageId, mode, blockId ?? null));
+                }}
+                sharedImageFocusBlockId={viewportSync?.state?.materialId === material.id
+                  ? viewportSync.state.presentationMode === "image-focus"
+                    ? viewportSync.state.focusedBlockId ?? null
+                    : null
+                  : undefined}
                 score={displayScore}
               />
             ) : (

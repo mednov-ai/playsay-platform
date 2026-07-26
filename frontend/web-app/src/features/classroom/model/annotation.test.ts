@@ -10,13 +10,14 @@ import {
   layoutMindMap,
   pointsToSvgPath,
   resizeMindMapNodeForText,
+  resizeAnnotationElement,
   type AnnotationElement,
   type AnnotationMindMapNode,
   type AnnotationStroke,
 } from "./annotation";
 
 describe("annotation model", () => {
-  it("stores mixed board elements in schema v6 material-page coordinates", () => {
+  it("stores mixed board elements in schema v7 material-page coordinates", () => {
     const elements: AnnotationElement[] = [
       stroke(),
       {
@@ -53,7 +54,7 @@ describe("annotation model", () => {
         expect.objectContaining({ id: "arrow-1", kind: "arrow", strokeWidth: 16 }),
         expect.objectContaining({ id: "sticky-1", kind: "stickyNote", text: "Remember this" }),
       ]),
-      schemaVersion: 6,
+      schemaVersion: 7,
     });
   });
 
@@ -147,7 +148,7 @@ describe("annotation model", () => {
     expect(laidOut.find((node) => node.id === "left")!.x).toBeLessThan(root.x);
     expect(laidOut.find((node) => node.id === "right")!.x).toBeGreaterThan(root.x);
     expect(annotationContentFromElements(laidOut, "page-1")).toEqual(expect.objectContaining({
-      schemaVersion: 6,
+      schemaVersion: 7,
       elements: expect.arrayContaining([expect.objectContaining({ kind: "mindMapNode", mapId: "map-1", parentId: "map-1" })]),
     }));
   });
@@ -161,9 +162,42 @@ describe("annotation model", () => {
       ],
     });
 
-    expect(content.schemaVersion).toBe(6);
-    expect(content.elements.find((element) => element.id === "text")).toEqual(expect.objectContaining({ autoWidth: true, fontSize: 30 }));
+    expect(content.schemaVersion).toBe(7);
+    expect(content.elements.find((element) => element.id === "text")).toEqual(expect.objectContaining({
+      autoHeight: true,
+      autoWidth: true,
+      fontSize: 30,
+    }));
     expect(content.elements.find((element) => element.id === "map")).toEqual(expect.objectContaining({ fontSize: 18, height: 82, width: 220 }));
+  });
+
+  it("keeps a manually resized text height after content measurement", () => {
+    const text: AnnotationElement = {
+      autoHeight: true,
+      autoWidth: true,
+      color: "#111111",
+      createdAt: 1,
+      fill: "#fffaf5",
+      fontSize: 18,
+      height: 34,
+      id: "text-resize",
+      kind: "text",
+      pageId: "page-1",
+      text: "Top-left text",
+      width: 120,
+      x: 100,
+      y: 100,
+    };
+
+    const resized = resizeAnnotationElement(text, "s", { pageId: "page-1", x: 160, y: 360 });
+
+    expect(resized).toEqual(expect.objectContaining({
+      autoHeight: false,
+      autoWidth: true,
+      height: 260,
+      width: 120,
+    }));
+    expect(estimateAnnotationTextSize(resized as Extract<AnnotationElement, { kind: "text" }>).height).toBe(260);
   });
 
   it("preserves image anchors and isolates erasing to the active anchor", () => {

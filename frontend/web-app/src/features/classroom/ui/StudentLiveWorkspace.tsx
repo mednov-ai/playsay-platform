@@ -77,6 +77,15 @@ export function StudentLiveWorkspace({
     () => groupAnnotationWorkspace.htmlGameSync(false),
     [groupAnnotationWorkspace.htmlGameSync],
   );
+  const viewportSync = useMemo(() => ({
+    publish: groupAnnotationWorkspace.setMaterialViewport,
+    ready: groupAnnotationWorkspace.connected,
+    state: groupAnnotationWorkspace.materialViewport,
+  }), [
+    groupAnnotationWorkspace.connected,
+    groupAnnotationWorkspace.materialViewport,
+    groupAnnotationWorkspace.setMaterialViewport,
+  ]);
   const externalActivityBlocks = useMemo(
     () => materialDocumentBlocks(material),
     [material.document, material.id, material.title],
@@ -110,6 +119,7 @@ export function StudentLiveWorkspace({
         submissionMessage={submissionMessage}
         submissionSaving={submissionSaving}
         teacherName={teacherName}
+        viewportSync={viewportSync}
       />
     </section>
   );

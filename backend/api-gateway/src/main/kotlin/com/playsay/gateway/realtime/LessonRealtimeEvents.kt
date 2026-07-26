@@ -10,3 +10,9 @@ data class LessonChangedEvent(
 data class LessonDeletedEvent(
     val lessonId: UUID,
 )
+
+data class AssignmentChangedEvent(
+    val assignmentId: UUID,
+    val visibleSubjects: Set<String>,
+    val change: String,
+)

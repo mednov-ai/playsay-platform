@@ -63,6 +63,7 @@ export type AnnotationBoxElement = {
 
 export type AnnotationTextElement = {
   [Kind in "stickyNote" | "text"]: AnnotationElementBase & {
+    autoHeight?: boolean;
     autoWidth?: boolean;
     fill: string;
     fontSize: AnnotationFontSize;
@@ -110,8 +111,10 @@ export type AnnotationContent = {
   activePageId: string;
   coordinateSpace: "material-page";
   elements: AnnotationElement[];
-  schemaVersion: 6;
+  schemaVersion: 7;
 };
+
+export type AnnotationResizeHandle = "e" | "end" | "n" | "ne" | "nw" | "s" | "se" | "start" | "sw" | "w";
 
 export function svgPointFromEvent(
   event: PointerEvent<SVGElement>,
@@ -163,7 +166,7 @@ export function emptyAnnotationContent(activePageId = defaultAnnotationPageId): 
     activePageId,
     coordinateSpace: "material-page",
     elements: [],
-    schemaVersion: 6,
+    schemaVersion: 7,
   };
 }
 
@@ -175,7 +178,7 @@ export function annotationContentFromElements(
     activePageId,
     coordinateSpace: "material-page",
     elements: elements.map((element) => serializeAnnotationElement(element)),
-    schemaVersion: 6,
+    schemaVersion: 7,
   };
 }
 
@@ -199,7 +202,7 @@ export function annotationContentFromJson(
     activePageId,
     coordinateSpace: "material-page",
     elements,
-    schemaVersion: 6,
+    schemaVersion: 7,
   };
 }
 
@@ -349,6 +352,7 @@ export function estimateAnnotationTextSize(
 ): { height: number; width: number } {
   const constraints = annotationTextSizingConstraints(element);
   const autoWidth = element.kind === "mindMapNode" || (element.kind === "text" && element.autoWidth !== false);
+  const autoHeight = element.kind === "mindMapNode" || (element.kind === "text" && element.autoHeight !== false);
   const widestLine = Math.max(...(text || " ").split("\n").map((line) => Math.max(1, Array.from(line).length)));
   const estimatedCharacterWidth = element.fontSize * 0.56;
   const width = autoWidth
@@ -363,11 +367,13 @@ export function estimateAnnotationTextSize(
   const lineCount = (text || " ").split("\n").reduce((total, line) => (
     total + Math.max(1, Math.ceil(Math.max(1, Array.from(line).length) / charactersPerLine))
   ), 0);
-  const height = clampSize(
-    Math.ceil(lineCount * element.fontSize * 1.2 + constraints.verticalPadding * 2),
-    constraints.minHeight,
-    constraints.maxHeight,
-  );
+  const height = autoHeight
+    ? clampSize(
+      Math.ceil(lineCount * element.fontSize * 1.2 + constraints.verticalPadding * 2),
+      constraints.minHeight,
+      constraints.maxHeight,
+    )
+    : Math.max(constraints.minHeight, element.height);
   return { height, width };
 }
 
@@ -440,7 +446,7 @@ export type AnnotationBounds = { height: number; width: number; x: number; y: nu
 
 export function resizeAnnotationElement(
   element: AnnotationElement,
-  handle: "end" | "ne" | "nw" | "se" | "start" | "sw",
+  handle: AnnotationResizeHandle,
   point: AnnotationPoint,
 ): AnnotationElement {
   if (element.kind === "line" || element.kind === "arrow") {
@@ -459,21 +465,30 @@ export function resizeAnnotationElement(
   const minimumHeight = element.kind === "text" ? textSizingConstraints.minHeight : minimumElementSize;
   const right = element.x + element.width;
   const bottom = element.y + element.height;
-  const nextX = handle === "nw" || handle === "sw"
+  const nextX = handle === "w" || handle === "nw" || handle === "sw"
     ? Math.min(point.x, right - minimumWidth)
     : element.x;
-  const nextY = handle === "nw" || handle === "ne"
+  const nextY = handle === "n" || handle === "nw" || handle === "ne"
     ? Math.min(point.y, bottom - minimumHeight)
     : element.y;
-  const nextRight = handle === "ne" || handle === "se"
+  const nextRight = handle === "e" || handle === "ne" || handle === "se"
     ? Math.max(point.x, element.x + minimumWidth)
     : right;
-  const nextBottom = handle === "sw" || handle === "se"
+  const nextBottom = handle === "s" || handle === "sw" || handle === "se"
     ? Math.max(point.y, element.y + minimumHeight)
     : bottom;
   return {
     ...element,
-    ...(element.kind === "text" ? { autoWidth: false } : {}),
+    ...(element.kind === "text"
+      ? {
+          autoHeight: ["n", "ne", "nw", "s", "se", "sw"].includes(handle)
+            ? false
+            : element.autoHeight !== false,
+          autoWidth: ["e", "ne", "nw", "se", "sw", "w"].includes(handle)
+            ? false
+            : element.autoWidth !== false,
+        }
+      : {}),
     height: Math.min(annotationCoordinateMax - nextY, nextBottom - nextY),
     width: Math.min(annotationCoordinateMax - nextX, nextRight - nextX),
     x: clampCoordinate(nextX),
@@ -535,7 +550,12 @@ function serializeAnnotationElement(element: AnnotationElement): Record<string, 
     ...base,
     fill: element.fill,
     ...(element.kind === "text" || element.kind === "stickyNote" ? { fontSize: element.fontSize } : {}),
-    ...(element.kind === "text" ? { autoWidth: element.autoWidth !== false } : {}),
+    ...(element.kind === "text"
+      ? {
+          autoHeight: element.autoHeight !== false,
+          autoWidth: element.autoWidth !== false,
+        }
+      : {}),
     height: roundCoordinate(element.height),
     ...(element.kind === "text" || element.kind === "stickyNote" ? { text: element.text } : { strokeWidth: element.strokeWidth }),
     width: roundCoordinate(element.width),
@@ -610,11 +630,13 @@ function annotationElementFromJson(value: unknown, index: number): AnnotationEle
   }
   if (kind === "text" || kind === "stickyNote") {
     const autoWidth = kind === "text" ? element.autoWidth !== false : false;
+    const autoHeight = kind === "text" ? element.autoHeight === undefined ? autoWidth : element.autoHeight !== false : false;
     const constraints = kind === "text" ? textSizingConstraints : stickyNoteSizingConstraints;
     return {
       ...base,
+      autoHeight,
       autoWidth,
-      fill: asString(element.fill) || (kind === "stickyNote" ? defaultStickyFill : "transparent"),
+      fill: asString(element.fill) || (kind === "stickyNote" ? defaultStickyFill : "#fffaf5"),
       fontSize: annotationFontSize(element.fontSize, 30),
       height: kind === "text"
         ? clampSize(height, constraints.minHeight, constraints.maxHeight)

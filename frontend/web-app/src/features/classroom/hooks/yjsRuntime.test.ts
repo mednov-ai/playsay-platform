@@ -194,6 +194,108 @@ describe("yjs workspace runtime annotations", () => {
     });
   });
 
+  it("merges simultaneous edits in the same annotation Y Text without losing characters", () => {
+    withWindowBase64(() => {
+      const baseText: AnnotationElement = {
+        autoHeight: true,
+        autoWidth: true,
+        color: "#111111",
+        createdAt: 1,
+        fill: "#fffaf5",
+        fontSize: 18,
+        height: 34,
+        id: "text-1",
+        kind: "text",
+        pageId: "page-1",
+        text: "A",
+        width: 72,
+        x: 20,
+        y: 30,
+      };
+      const createRuntime = (
+        participantName: string,
+        snapshot: Parameters<typeof createYjsWorkspaceRuntime>[0]["snapshot"],
+        onAnnotationChange: (elements: AnnotationElement[]) => void = () => undefined,
+      ) => createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName,
+        snapshot,
+      });
+      const seed = createRuntime("Seed", null);
+      seed.setAnnotationElements([baseText]);
+      const sharedSnapshot = seed.snapshot();
+      seed.destroy();
+
+      const teacher = createRuntime("Teacher", sharedSnapshot);
+      const student = createRuntime("Student", sharedSnapshot);
+      teacher.applyAnnotationChanges({ deleteIds: [], upserts: [{ ...baseText, text: "AB" }] });
+      student.applyAnnotationChanges({ deleteIds: [], upserts: [{ ...baseText, text: "AC" }] });
+
+      const mergedDocument = new Y.Doc();
+      Y.applyUpdate(mergedDocument, Buffer.from(String(teacher.snapshot().yjsUpdateBase64), "base64"));
+      Y.applyUpdate(mergedDocument, Buffer.from(String(student.snapshot().yjsUpdateBase64), "base64"));
+      teacher.destroy();
+      student.destroy();
+
+      const mergedAnnotations: AnnotationElement[][] = [];
+      const merged = createRuntime("Merged", {
+        encoding: "yjs-update-v1",
+        savedAt: new Date(0).toISOString(),
+        schemaVersion: 1,
+        yjsUpdateBase64: Buffer.from(Y.encodeStateAsUpdate(mergedDocument)).toString("base64"),
+      }, (elements) => mergedAnnotations.push(elements));
+      const mergedElement = mergedAnnotations.at(-1)?.[0];
+      const mergedText = String(mergedElement && "text" in mergedElement ? mergedElement.text : "");
+      expect(mergedText).toContain("A");
+      expect(mergedText).toContain("B");
+      expect(mergedText).toContain("C");
+      merged.destroy();
+      mergedDocument.destroy();
+    });
+  });
+
+  it("stores a normalized shared material viewport without a feedback payload", () => {
+    const viewportChanges: Array<Record<string, unknown> | null> = [];
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: () => undefined,
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
+      onMaterialViewportChange: (viewport) => viewportChanges.push(viewport),
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      participantName: "Student",
+      snapshot: null,
+    });
+
+    runtime.setMaterialViewport({
+      focusedBlockId: "image-1",
+      materialId: "material-1",
+      pageId: "page-1",
+      presentationMode: "image-focus",
+      scrollContainer: "image",
+      x: 1.5,
+      y: -0.2,
+    });
+
+    expect(viewportChanges.at(-1)).toEqual(expect.objectContaining({
+      focusedBlockId: "image-1",
+      materialId: "material-1",
+      presentationMode: "image-focus",
+      scrollContainer: "image",
+      x: 1,
+      y: 0,
+    }));
+    runtime.destroy();
+  });
+
   it("applies element changes by id without replacing unrelated collaborative objects", () => {
     const annotationChanges: AnnotationElement[][] = [];
     const runtime = createYjsWorkspaceRuntime({

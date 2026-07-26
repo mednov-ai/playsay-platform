@@ -150,6 +150,15 @@ export function LessonWorkspace({
     () => teacherAnnotationWorkspace.htmlGameSync(true),
     [teacherAnnotationWorkspace.htmlGameSync],
   );
+  const teacherViewportSync = useMemo(() => ({
+    publish: teacherAnnotationWorkspace.setMaterialViewport,
+    ready: teacherAnnotationWorkspace.connected,
+    state: teacherAnnotationWorkspace.materialViewport,
+  }), [
+    teacherAnnotationWorkspace.connected,
+    teacherAnnotationWorkspace.materialViewport,
+    teacherAnnotationWorkspace.setMaterialViewport,
+  ]);
   const externalActivityBlocks = useMemo(
     () => visibleMaterial ? materialDocumentBlocks(visibleMaterial) : [],
     [visibleMaterial?.document, visibleMaterial?.id, visibleMaterial?.title],
@@ -378,6 +387,7 @@ export function LessonWorkspace({
                 submissionMessage={submissionMessage}
                 submissionSaving={submissionSaving}
                 teacherName={session.teacherName ?? displayName}
+                viewportSync={isParallelWork ? undefined : teacherViewportSync}
               />
             ) : (
               <div className="playsay-task-board playsay-teacher-task-reveal">

@@ -1,4 +1,4 @@
-import { memo, useEffect, useId, useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { useAppTranslation } from "../../../shared/i18n";
 import {
   annotationElementBounds,
@@ -6,6 +6,7 @@ import {
   estimateAnnotationTextSize,
   pointsToSvgPath,
   type AnnotationElement,
+  type AnnotationResizeHandle,
   type AnnotationTool,
 } from "../model/annotation";
 
@@ -52,7 +53,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   onResizeElement: (
     event: PointerEvent<SVGElement>,
     elementId: string,
-    handle: "end" | "ne" | "nw" | "se" | "start" | "sw",
+    handle: AnnotationResizeHandle,
   ) => void;
   onSelectElement: (elementId: string | null) => void;
   onTextChange: (elementId: string, text: string) => void;
@@ -214,6 +215,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
   const label = t(`classroom.annotation.element.${element.kind}`);
   const sizeableTextElement = element.kind === "text" || element.kind === "mindMapNode" ? element : null;
   const sizeableAutoWidth = sizeableTextElement?.kind === "text" ? sizeableTextElement.autoWidth : undefined;
+  const sizeableAutoHeight = sizeableTextElement?.kind === "text" ? sizeableTextElement.autoHeight : undefined;
   const sizeableParentId = sizeableTextElement?.kind === "mindMapNode" ? sizeableTextElement.parentId : undefined;
 
   useEffect(() => {
@@ -223,12 +225,17 @@ const AnnotationElementView = memo(function AnnotationElementView({
   useLayoutEffect(() => {
     if (!sizeableTextElement) return undefined;
     let cancelled = false;
+    let frameId: number | null = null;
     const measure = () => {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
       const measurement = measurementRef.current;
       if (!measurement || cancelled) return;
       const constraints = annotationTextSizingConstraints(sizeableTextElement);
       const fallback = estimateAnnotationTextSize(sizeableTextElement);
       const autoWidth = sizeableTextElement.kind === "mindMapNode" || sizeableTextElement.autoWidth !== false;
+      const autoHeight = sizeableTextElement.kind === "mindMapNode" || sizeableTextElement.autoHeight !== false;
       const availableWidth = Math.max(
         1,
         (autoWidth ? constraints.maxWidth : sizeableTextElement.width) - constraints.horizontalPadding * 2,
@@ -249,21 +256,29 @@ const AnnotationElementView = memo(function AnnotationElementView({
       measurement.style.maxWidth = measurement.style.width;
       const wrappedBounds = measurement.getBoundingClientRect();
       const wrappedHeight = wrappedBounds.height / measurementScale.y;
-      const nextHeight = wrappedHeight > 0
+      const nextHeight = autoHeight && wrappedHeight > 0
         ? clampMeasurement(
           Math.ceil(wrappedHeight + constraints.verticalPadding * 2),
           constraints.minHeight,
           constraints.maxHeight,
         )
-        : fallback.height;
-      onElementSizeChangeRef.current(sizeableTextElement.id, nextWidth, nextHeight);
+        : autoHeight ? fallback.height : sizeableTextElement.height;
+      if (
+        Math.abs(nextWidth - sizeableTextElement.width) >= 0.5
+        || Math.abs(nextHeight - sizeableTextElement.height) >= 0.5
+      ) {
+        onElementSizeChangeRef.current(sizeableTextElement.id, nextWidth, nextHeight);
+      }
+      });
     };
     measure();
     void document.fonts?.ready.then(measure);
     return () => {
       cancelled = true;
+      if (frameId !== null) cancelAnimationFrame(frameId);
     };
   }, [
+    sizeableAutoHeight,
     sizeableAutoWidth,
     sizeableTextElement?.fontSize,
     sizeableTextElement?.id,
@@ -382,37 +397,17 @@ const AnnotationElementView = memo(function AnnotationElementView({
           </span>
         ) : null}
         {editing ? (
-          <textarea
-            aria-label={label}
-            autoFocus
-            maxLength={element.kind === "mindMapNode" ? 500 : 3_000}
-            onBlur={onFinishTextEditing}
-            onChange={(event) => onTextChange(element.id, event.target.value)}
-            onKeyDown={(event) => {
-              event.stopPropagation();
-              if (element.kind === "mindMapNode" && event.key === "Tab") {
-                event.preventDefault();
-                event.currentTarget.blur();
-                onMindMapKey(element.id, "Tab");
-                return;
-              }
-              if (element.kind === "mindMapNode" && event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.blur();
-                onMindMapKey(element.id, "Enter");
-                return;
-              }
-              if (event.key === "Escape" || ((event.metaKey || event.ctrlKey) && event.key === "Enter")) {
-                event.currentTarget.blur();
-              }
-            }}
-            onPointerDown={(event) => event.stopPropagation()}
+          <AnnotationTextEditor
+            element={element}
+            label={label}
+            onFinish={onFinishTextEditing}
+            onMindMapKey={onMindMapKey}
+            onTextChange={onTextChange}
             placeholder={element.kind === "stickyNote"
               ? t("classroom.annotation.stickyPlaceholder")
               : element.kind === "mindMapNode"
                 ? t("classroom.annotation.mindMapPlaceholder")
                 : t("classroom.annotation.textPlaceholder")}
-            value={element.text}
           />
         ) : (
           <span>{element.text || (element.kind === "stickyNote"
@@ -425,6 +420,80 @@ const AnnotationElementView = memo(function AnnotationElementView({
     </foreignObject>
   );
 });
+
+function AnnotationTextEditor({
+  element,
+  label,
+  onFinish,
+  onMindMapKey,
+  onTextChange,
+  placeholder,
+}: {
+  element: Extract<AnnotationElement, { kind: "mindMapNode" | "stickyNote" | "text" }>;
+  label: string;
+  onFinish: () => void;
+  onMindMapKey: (elementId: string, key: "ArrowDown" | "ArrowLeft" | "ArrowRight" | "ArrowUp" | "Enter" | "Tab") => void;
+  onTextChange: (elementId: string, text: string) => void;
+  placeholder: string;
+}) {
+  const [draft, setDraft] = useState(element.text);
+  const composingRef = useRef(false);
+
+  useEffect(() => {
+    if (!composingRef.current) {
+      setDraft((current) => current === element.text ? current : element.text);
+    }
+  }, [element.text]);
+
+  return (
+    <textarea
+      aria-label={label}
+      autoFocus
+      data-playsay-native-input="true"
+      maxLength={element.kind === "mindMapNode" ? 500 : 3_000}
+      onBlur={(event) => {
+        composingRef.current = false;
+        onTextChange(element.id, event.currentTarget.value);
+        onFinish();
+      }}
+      onChange={(event) => {
+        const nextText = event.currentTarget.value;
+        setDraft(nextText);
+        if (!composingRef.current) onTextChange(element.id, nextText);
+      }}
+      onCompositionEnd={(event) => {
+        composingRef.current = false;
+        const nextText = event.currentTarget.value;
+        setDraft(nextText);
+        onTextChange(element.id, nextText);
+      }}
+      onCompositionStart={() => {
+        composingRef.current = true;
+      }}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (element.kind === "mindMapNode" && event.key === "Tab") {
+          event.preventDefault();
+          event.currentTarget.blur();
+          onMindMapKey(element.id, "Tab");
+          return;
+        }
+        if (element.kind === "mindMapNode" && event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          event.currentTarget.blur();
+          onMindMapKey(element.id, "Enter");
+          return;
+        }
+        if (event.key === "Escape" || ((event.metaKey || event.ctrlKey) && event.key === "Enter")) {
+          event.currentTarget.blur();
+        }
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      placeholder={placeholder}
+      value={draft}
+    />
+  );
+}
 
 function MindMapConnector({
   child,
@@ -456,7 +525,7 @@ function SelectionOutline({
   onResizeElement: (
     event: PointerEvent<SVGElement>,
     elementId: string,
-    handle: "end" | "ne" | "nw" | "se" | "start" | "sw",
+    handle: AnnotationResizeHandle,
   ) => void;
 }) {
   if (element.kind === "line" || element.kind === "arrow") {
@@ -508,6 +577,10 @@ function SelectionOutline({
           <ResizeHandle elementId={element.id} handle="ne" onResize={onResizeElement} x={outline.x + outline.width} y={outline.y} />
           <ResizeHandle elementId={element.id} handle="sw" onResize={onResizeElement} x={outline.x} y={outline.y + outline.height} />
           <ResizeHandle elementId={element.id} handle="se" onResize={onResizeElement} x={outline.x + outline.width} y={outline.y + outline.height} />
+          <ResizeHandle elementId={element.id} handle="n" onResize={onResizeElement} x={outline.x + outline.width / 2} y={outline.y} />
+          <ResizeHandle elementId={element.id} handle="e" onResize={onResizeElement} x={outline.x + outline.width} y={outline.y + outline.height / 2} />
+          <ResizeHandle elementId={element.id} handle="s" onResize={onResizeElement} x={outline.x + outline.width / 2} y={outline.y + outline.height} />
+          <ResizeHandle elementId={element.id} handle="w" onResize={onResizeElement} x={outline.x} y={outline.y + outline.height / 2} />
         </>
       ) : null}
     </g>
@@ -594,11 +667,11 @@ function ResizeHandle({
   y,
 }: {
   elementId: string;
-  handle: "end" | "ne" | "nw" | "se" | "start" | "sw";
+  handle: AnnotationResizeHandle;
   onResize: (
     event: PointerEvent<SVGElement>,
     elementId: string,
-    handle: "end" | "ne" | "nw" | "se" | "start" | "sw",
+    handle: AnnotationResizeHandle,
   ) => void;
   x: number;
   y: number;

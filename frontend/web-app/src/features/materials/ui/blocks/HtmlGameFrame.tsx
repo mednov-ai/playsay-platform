@@ -8,7 +8,21 @@ import type {
 import { useAppTranslation } from "../../../../shared/i18n";
 
 type BridgeMessage =
-  | { channel: string; type: "snapshot"; html: string; sequence: number }
+  | {
+      canvases?: Record<string, string>;
+      channel: string;
+      controls?: Record<string, {
+        checked?: boolean;
+        selectedIndex?: number;
+        selectionEnd?: number | null;
+        selectionStart?: number | null;
+        value?: string;
+      }>;
+      html: string;
+      scroll?: Record<string, { left: number; top: number }>;
+      sequence: number;
+      type: "snapshot";
+    }
   | { channel: string; type: "input"; event: Omit<MaterialHtmlGameInputEvent, "id" | "at" | "blockId"> }
   | { channel: string; type: "effect"; effect: Omit<MaterialHtmlGameEffect, "id" | "at" | "blockId"> };
 
@@ -59,8 +73,11 @@ export function HtmlGameFrame({
       const message = messageEvent.data;
       if (message.type === "snapshot" && sync?.isAuthority) {
         sync.publishSnapshot(blockId, {
+          canvases: message.canvases,
+          controls: message.controls,
           html: message.html,
           runId: channel,
+          scroll: message.scroll,
           sequence: message.sequence,
           updatedAt: Date.now(),
         });
@@ -218,6 +235,35 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       });
     };
     const send = (value) => nativePostMessage({ channel, ...value }, '*');
+    const formState = (node) => {
+      const state = {};
+      if ('value' in node) state.value = String(node.value ?? '');
+      if ('checked' in node) state.checked = Boolean(node.checked);
+      if ('selectedIndex' in node) state.selectedIndex = Number(node.selectedIndex);
+      if ('selectionStart' in node) {
+        state.selectionStart = node.selectionStart;
+        state.selectionEnd = node.selectionEnd;
+      }
+      return state;
+    };
+    const serializeControls = () => Object.fromEntries(
+      [...document.querySelectorAll('input, textarea, select')]
+        .map((node) => [targetId(node), formState(node)])
+    );
+    const serializeScroll = () => {
+      const entries = [];
+      const documentScroller = document.scrollingElement;
+      if (documentScroller) entries.push(['__document__', { left: documentScroller.scrollLeft, top: documentScroller.scrollTop }]);
+      document.querySelectorAll('[data-playsay-node-id]').forEach((node) => {
+        if (node.scrollLeft || node.scrollTop) entries.push([targetId(node), { left: node.scrollLeft, top: node.scrollTop }]);
+      });
+      return Object.fromEntries(entries);
+    };
+    const serializeCanvases = () => Object.fromEntries(
+      [...document.querySelectorAll('canvas')].flatMap((canvas) => {
+        try { return [[targetId(canvas), canvas.toDataURL('image/png')]]; } catch (_) { return []; }
+      })
+    );
     const flushSnapshot = () => {
       window.clearTimeout(snapshotDebounceTimer);
       window.clearTimeout(snapshotMaxTimer);
@@ -225,17 +271,21 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       snapshotMaxTimer = 0;
       identify();
       const html = document.body?.outerHTML ?? '<body></body>';
-      if (html === lastSnapshotHtml) return;
-      lastSnapshotHtml = html;
+      const controls = serializeControls();
+      const scroll = serializeScroll();
+      const canvases = serializeCanvases();
+      const signature = JSON.stringify([html, controls, scroll, canvases]);
+      if (signature === lastSnapshotHtml) return;
+      lastSnapshotHtml = signature;
       lastSnapshotAt = Date.now();
-      send({ type: 'snapshot', html, sequence: ++snapshotSequence });
+      send({ type: 'snapshot', canvases, controls, html, scroll, sequence: ++snapshotSequence });
     };
-    const scheduleSnapshot = () => {
+    const scheduleSnapshot = (meaningfulInput = false) => {
       if (mirror) return;
       window.clearTimeout(snapshotDebounceTimer);
       const now = Date.now();
-      const minimumIntervalRemaining = lastSnapshotAt ? Math.max(0, 500 - (now - lastSnapshotAt)) : 0;
-      snapshotDebounceTimer = window.setTimeout(flushSnapshot, Math.max(250, minimumIntervalRemaining));
+      const minimumIntervalRemaining = lastSnapshotAt ? Math.max(0, (meaningfulInput ? 50 : 500) - (now - lastSnapshotAt)) : 0;
+      snapshotDebounceTimer = window.setTimeout(flushSnapshot, Math.max(meaningfulInput ? 0 : 250, minimumIntervalRemaining));
       if (!snapshotMaxTimer) {
         snapshotMaxTimer = window.setTimeout(flushSnapshot, Math.max(500, minimumIntervalRemaining));
       }
@@ -245,7 +295,8 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       const node = target.closest('[data-playsay-node-id]');
       return node?.dataset.playsayNodeId ?? '__document__';
     };
-    const inputTypes = ['click', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'dragstart', 'dragover', 'drop'];
+    const semanticInputTypes = new Set(['beforeinput', 'input', 'change', 'focus', 'blur', 'compositionstart', 'compositionupdate', 'compositionend']);
+    const inputTypes = ['click', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'dragstart', 'dragover', 'drop', ...semanticInputTypes];
     inputTypes.forEach((type) => document.addEventListener(type, (event) => {
       if (event.__playsayReplay) return;
       const resolvedTarget = mirror && type === 'pointerup' && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)
@@ -253,8 +304,10 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         : event.target;
       const eventTargetId = targetId(resolvedTarget);
       if (mirror) {
+        const editableTarget = Boolean(event.target?.closest?.('input, textarea, select, [contenteditable="true"]'));
         const nativeDragEvent = type === 'pointerdown' || type === 'pointerup' || type === 'dragstart' || type === 'dragover' || type === 'drop';
-        if (type === 'dragover' || !nativeDragEvent) event.preventDefault();
+        const allowNativeEditing = semanticInputTypes.has(type) || (editableTarget && (type === 'keydown' || type === 'keyup'));
+        if (!allowNativeEditing && (type === 'dragover' || !nativeDragEvent)) event.preventDefault();
         if (!nativeDragEvent) event.stopImmediatePropagation();
         if (type === 'pointerdown') {
           const draggable = event.target?.closest?.('[draggable="true"]');
@@ -280,9 +333,12 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         altKey: Boolean(event.altKey),
         ctrlKey: Boolean(event.ctrlKey),
         metaKey: Boolean(event.metaKey),
-        shiftKey: Boolean(event.shiftKey)
+        shiftKey: Boolean(event.shiftKey),
+        ...formState(resolvedTarget),
+        data: event.data ?? null,
+        inputType: event.inputType
       }});
-      if (!mirror) scheduleSnapshot();
+      if (!mirror) scheduleSnapshot(semanticInputTypes.has(type));
     }, true));
     document.addEventListener('pointermove', (event) => {
       if (!mirror || !pointerDragSourceId) return;
@@ -317,6 +373,12 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       let event;
       if (input.type === 'keydown' || input.type === 'keyup') {
         event = new KeyboardEvent(input.type, { ...common, key: input.key ?? '', code: input.code ?? '', altKey: input.altKey, ctrlKey: input.ctrlKey, metaKey: input.metaKey, shiftKey: input.shiftKey });
+      } else if (input.type === 'beforeinput' || input.type === 'input') {
+        event = new InputEvent(input.type, { ...common, data: input.data ?? null, inputType: input.inputType ?? '' });
+      } else if (input.type.startsWith('composition')) {
+        event = new CompositionEvent(input.type, { ...common, data: input.data ?? '' });
+      } else if (input.type === 'change' || input.type === 'focus' || input.type === 'blur') {
+        event = new Event(input.type, common);
       } else if (input.type.startsWith('pointer')) {
         event = new PointerEvent(input.type, common);
       } else if (input.type === 'dragstart' || input.type === 'dragover' || input.type === 'drop') {
@@ -327,6 +389,41 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       }
       Object.defineProperty(event, '__playsayReplay', { value: true });
       return event;
+    };
+    const applyFormState = (target, state) => {
+      if (!target || target === document) return;
+      if ('value' in target && state.value !== undefined) target.value = state.value;
+      if ('checked' in target && state.checked !== undefined) target.checked = Boolean(state.checked);
+      if ('selectedIndex' in target && state.selectedIndex !== undefined) target.selectedIndex = Number(state.selectedIndex);
+      if (
+        typeof target.setSelectionRange === 'function'
+        && state.selectionStart !== undefined
+        && state.selectionStart !== null
+      ) {
+        try { target.setSelectionRange(state.selectionStart, state.selectionEnd ?? state.selectionStart); } catch (_) {}
+      }
+    };
+    const applySnapshotState = (snapshot) => {
+      Object.entries(snapshot.controls ?? {}).forEach(([id, state]) => {
+        const target = document.querySelector('[data-playsay-node-id="' + CSS.escape(id) + '"]');
+        applyFormState(target, state);
+      });
+      Object.entries(snapshot.scroll ?? {}).forEach(([id, state]) => {
+        const target = id === '__document__'
+          ? document.scrollingElement
+          : document.querySelector('[data-playsay-node-id="' + CSS.escape(id) + '"]');
+        if (target) {
+          target.scrollLeft = Number(state.left) || 0;
+          target.scrollTop = Number(state.top) || 0;
+        }
+      });
+      Object.entries(snapshot.canvases ?? {}).forEach(([id, dataUrl]) => {
+        const canvas = document.querySelector('[data-playsay-node-id="' + CSS.escape(id) + '"]');
+        if (!(canvas instanceof HTMLCanvasElement) || !dataUrl) return;
+        const image = new Image();
+        image.onload = () => canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        image.src = dataUrl;
+      });
     };
     const playEffect = (effect) => {
       if (effect.kind === 'speech' && 'speechSynthesis' in window) {
@@ -404,11 +501,15 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         parsed.querySelectorAll('script').forEach((script) => script.type = 'application/playsay-disabled');
         if (document.body && parsed.body) patchNode(document.body, parsed.body);
         identify();
+        applySnapshotState(message.snapshot);
       } else if (message.type === 'applyInput' && !mirror) {
         const input = message.event;
         const target = input.targetId === '__document__' ? document : document.querySelector('[data-playsay-node-id="' + CSS.escape(input.targetId) + '"]');
+        applyFormState(target, input);
+        if (input.type === 'focus') target?.focus?.();
+        if (input.type === 'blur') target?.blur?.();
         target?.dispatchEvent(makeEvent(input));
-        scheduleSnapshot();
+        scheduleSnapshot(semanticInputTypes.has(input.type));
       } else if (message.type === 'applyEffect' && mirror) {
         playEffect(message.effect);
       }

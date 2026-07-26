@@ -36,8 +36,12 @@ describe("HTML game sandbox", () => {
     expect(mirror).toContain('type="application/playsay-disabled"');
     expect(mirror).toContain("data-playsay-game-bridge");
     expect(authority).toContain("lastSnapshotHtml");
-    expect(authority).toContain("Math.max(250, minimumIntervalRemaining)");
+    expect(authority).toContain("meaningfulInput ? 0 : 250");
     expect(authority).toContain("Math.max(500, minimumIntervalRemaining)");
+    expect(authority).toContain("'beforeinput', 'input', 'change', 'focus', 'blur'");
+    expect(authority).toContain("serializeControls");
+    expect(authority).toContain("serializeCanvases");
+    expect(authority).toContain("applyFormState(target, input)");
     expect(authority).not.toContain("}, 120)");
   });
 

@@ -1661,6 +1661,12 @@
   min-height: 100%;
 }
 
+.playsay-task-document-surface :is(button, input, textarea, select, [contenteditable="true"]) {
+  position: relative;
+  z-index: 4;
+  pointer-events: auto;
+}
+
 .playsay-task-board[data-presentation-mode="html-game-focus"] .playsay-task-document {
   overflow: hidden;
   padding: 0;

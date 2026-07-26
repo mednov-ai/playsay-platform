@@ -18,11 +18,14 @@ import {
 import { useAppTranslation } from "../../shared/i18n";
 import type { SessionStatus } from "../../features/profile/ui/ProfileAccountPanel";
 import type { SessionErrorHandler } from "./types";
+import { publishHomeworkAssignmentChange } from "../../features/homework/model/homeworkRealtime";
 
 type LessonRealtimeMessage = {
   type?: string;
   lesson?: ScheduledLesson;
   lessonId?: string;
+  assignmentId?: string;
+  change?: string;
   participants?: Array<{ subject?: string; state?: string }>;
   message?: string;
 };
@@ -172,6 +175,13 @@ export function useLessonRealtime({
     try {
       const freshSchedule = await fetchScheduledLessons();
       setScheduledLessons(freshSchedule);
+      const activeSession = roomSessionRef.current;
+      const activeLesson = activeSession
+        ? freshSchedule.find((lesson) => lesson.id === activeSession.lessonId)
+        : null;
+      if (activeLesson) {
+        applyRealtimeLessonSnapshot(activeLesson);
+      }
       if (options.message) {
         setScheduleMessage(options.message);
       }
@@ -192,6 +202,14 @@ export function useLessonRealtime({
 
     if (message.type === "schedule.changed") {
       void syncScheduleFromServer();
+      return;
+    }
+
+    if (message.type === "assignment.changed" && message.assignmentId) {
+      publishHomeworkAssignmentChange({
+        assignmentId: message.assignmentId,
+        change: message.change ?? "UPDATED",
+      });
       return;
     }
 

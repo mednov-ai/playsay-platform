@@ -27,6 +27,7 @@ export function createYjsWorkspaceRuntime({
   onHtmlGamePresentationChange = () => undefined,
   onHtmlGameSnapshotsChange,
   onMaterialAnswersChange = () => undefined,
+  onMaterialViewportChange = () => undefined,
   onDocumentUpdate,
   onParticipantsChange,
   onTextChange,
@@ -42,6 +43,7 @@ export function createYjsWorkspaceRuntime({
   const yhtmlGameEffects = ydoc.getArray("htmlGameEffects");
   const yhtmlGamePresentation = ydoc.getMap("htmlGamePresentation");
   const ymaterialAnswerFields = ydoc.getMap("materialAnswerFields");
+  const ymaterialViewport = ydoc.getMap("materialViewport");
   const awareness = new awarenessProtocol.Awareness(ydoc);
   let socket = null;
   let disposed = false;
@@ -71,6 +73,9 @@ export function createYjsWorkspaceRuntime({
   const updateMaterialAnswers = () => {
     if (!disposed) onMaterialAnswersChange(materialAnswersFromFields(ymaterialAnswerFields));
   };
+  const updateMaterialViewport = () => {
+    if (!disposed) onMaterialViewportChange(normalizeMaterialViewport(ymaterialViewport.get("state")));
+  };
   const syncUpdateHandler = (update, origin) => {
     onDocumentUpdate?.(update);
     if (origin !== socket) {
@@ -95,6 +100,7 @@ export function createYjsWorkspaceRuntime({
   yhtmlGameEffects.observe(updateHtmlGameEffects);
   yhtmlGamePresentation.observe(updateHtmlGamePresentation);
   ymaterialAnswerFields.observe(updateMaterialAnswers);
+  ymaterialViewport.observe(updateMaterialViewport);
   ydoc.on("update", syncUpdateHandler);
   awareness.on("update", awarenessUpdateHandler);
   awareness.setLocalState({
@@ -110,6 +116,7 @@ export function createYjsWorkspaceRuntime({
   updateHtmlGameEffects();
   updateHtmlGamePresentation();
   updateMaterialAnswers();
+  updateMaterialViewport();
 
   return {
     applyAnnotationChanges({ deleteIds, upserts }) {
@@ -130,6 +137,7 @@ export function createYjsWorkspaceRuntime({
       yhtmlGameEffects.unobserve(updateHtmlGameEffects);
       yhtmlGamePresentation.unobserve(updateHtmlGamePresentation);
       ymaterialAnswerFields.unobserve(updateMaterialAnswers);
+      ymaterialViewport.unobserve(updateMaterialViewport);
       ydoc.off("update", syncUpdateHandler);
       ydoc.destroy();
       onParticipantsChange([]);
@@ -192,6 +200,17 @@ export function createYjsWorkspaceRuntime({
         return;
       }
       ydoc.transact(() => writeMaterialAnswerFields(ymaterialAnswerFields, cleanBlockId, normalized));
+    },
+    setMaterialViewport(viewport) {
+      const normalized = normalizeMaterialViewport({
+        ...viewport,
+        revision: Math.max(
+          Date.now(),
+          finiteNumberOr(normalizeMaterialViewport(ymaterialViewport.get("state"))?.revision, 0) + 1,
+        ),
+        sourceClientId: ydoc.clientID,
+      });
+      if (normalized) ymaterialViewport.set("state", normalized);
     },
     snapshot() {
       return {
@@ -413,6 +432,10 @@ function writeAnnotationElement(yannotations, element) {
   });
 
   Object.entries(element).forEach(([key, value]) => {
+    if (key === "text" && typeof value === "string") {
+      writeAnnotationText(yElement, value);
+      return;
+    }
     if (key === "points" && Array.isArray(value)) {
       writeAnnotationPoints(yElement, value);
       return;
@@ -422,6 +445,37 @@ function writeAnnotationElement(yannotations, element) {
       yElement.set(key, value);
     }
   });
+}
+
+function writeAnnotationText(yElement, nextText) {
+  let yText = yElement.get("text");
+  if (!(yText instanceof Y.Text)) {
+    yText = new Y.Text();
+    yElement.set("text", yText);
+  }
+
+  const currentText = yText.toString();
+  if (currentText === nextText) return;
+  let prefixLength = 0;
+  while (
+    prefixLength < currentText.length
+    && prefixLength < nextText.length
+    && currentText[prefixLength] === nextText[prefixLength]
+  ) {
+    prefixLength += 1;
+  }
+  let suffixLength = 0;
+  while (
+    suffixLength < currentText.length - prefixLength
+    && suffixLength < nextText.length - prefixLength
+    && currentText[currentText.length - suffixLength - 1] === nextText[nextText.length - suffixLength - 1]
+  ) {
+    suffixLength += 1;
+  }
+  const removedLength = currentText.length - prefixLength - suffixLength;
+  if (removedLength > 0) yText.delete(prefixLength, removedLength);
+  const insertedText = nextText.slice(prefixLength, nextText.length - suffixLength);
+  if (insertedText) yText.insert(prefixLength, insertedText);
 }
 
 function writeAnnotationPoints(yElement, points) {
@@ -463,7 +517,14 @@ function valuesEqual(left, right) {
   if (left === right) {
     return true;
   }
-  if (left instanceof Y.Map || left instanceof Y.Array || right instanceof Y.Map || right instanceof Y.Array) {
+  if (
+    left instanceof Y.Map
+    || left instanceof Y.Array
+    || left instanceof Y.Text
+    || right instanceof Y.Map
+    || right instanceof Y.Array
+    || right instanceof Y.Text
+  ) {
     return false;
   }
   return JSON.stringify(left) === JSON.stringify(right);
@@ -541,10 +602,14 @@ function normalizeAnnotationElement(value, index) {
   }
   if (kind === "text" || kind === "stickyNote") {
     const autoWidth = kind === "text" ? element?.autoWidth !== false : false;
+    const autoHeight = kind === "text"
+      ? element?.autoHeight === undefined ? autoWidth : element.autoHeight !== false
+      : false;
     return {
       ...base,
+      autoHeight,
       autoWidth,
-      fill: asString(element?.fill) || (kind === "stickyNote" ? "#fff0a8" : "transparent"),
+      fill: asString(element?.fill) || (kind === "stickyNote" ? "#fff0a8" : "#fffaf5"),
       fontSize: normalizeFontSize(element?.fontSize, 30),
       height: kind === "text" ? clampSize(height, 34, 320) : Math.max(36, height),
       kind,
@@ -577,6 +642,37 @@ function normalizeAnnotationPoint(value, fallbackPageId) {
     pageId: asString(point?.pageId) || fallbackPageId,
     x: clampCoordinate(x),
     y: clampCoordinate(y),
+  };
+}
+
+function normalizeMaterialViewport(value) {
+  const viewport = asObject(value);
+  const materialId = asString(viewport?.materialId);
+  const pageId = asString(viewport?.pageId);
+  const presentationMode = asString(viewport?.presentationMode);
+  const scrollContainer = viewport?.scrollContainer === "image" ? "image" : "document";
+  const sourceClientId = finiteNumberOr(viewport?.sourceClientId, null);
+  const revision = finiteNumberOr(viewport?.revision, null);
+  if (
+    !materialId
+    || !pageId
+    || sourceClientId === null
+    || revision === null
+    || !["default", "html-game-focus", "image-focus", "external-activity-focus"].includes(presentationMode)
+  ) {
+    return null;
+  }
+  const focusedBlockId = asString(viewport?.focusedBlockId);
+  return {
+    ...(focusedBlockId ? { focusedBlockId } : {}),
+    materialId,
+    pageId,
+    presentationMode,
+    revision,
+    scrollContainer,
+    sourceClientId,
+    x: clamp01(finiteNumberOr(viewport?.x, 0)),
+    y: clamp01(finiteNumberOr(viewport?.y, 0)),
   };
 }
 

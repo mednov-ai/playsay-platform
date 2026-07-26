@@ -32,7 +32,23 @@ export type MaterialHtmlGameInputEvent = {
   runId?: string;
   at: number;
   blockId: string;
-  type: "click" | "pointerdown" | "pointerup" | "keydown" | "keyup" | "dragstart" | "dragover" | "drop";
+  type:
+    | "beforeinput"
+    | "blur"
+    | "change"
+    | "click"
+    | "compositionend"
+    | "compositionstart"
+    | "compositionupdate"
+    | "dragover"
+    | "dragstart"
+    | "drop"
+    | "focus"
+    | "input"
+    | "keydown"
+    | "keyup"
+    | "pointerdown"
+    | "pointerup";
   targetId: string;
   key?: string;
   code?: string;
@@ -40,6 +56,13 @@ export type MaterialHtmlGameInputEvent = {
   ctrlKey?: boolean;
   metaKey?: boolean;
   shiftKey?: boolean;
+  checked?: boolean;
+  data?: string | null;
+  inputType?: string;
+  selectedIndex?: number;
+  selectionEnd?: number | null;
+  selectionStart?: number | null;
+  value?: string;
 };
 
 export type MaterialHtmlGameEffect = {
@@ -51,8 +74,17 @@ export type MaterialHtmlGameEffect = {
 };
 
 export type MaterialHtmlGameSnapshot = {
+  canvases?: Record<string, string>;
+  controls?: Record<string, {
+    checked?: boolean;
+    selectedIndex?: number;
+    selectionEnd?: number | null;
+    selectionStart?: number | null;
+    value?: string;
+  }>;
   html: string;
   runId?: string;
+  scroll?: Record<string, { left: number; top: number }>;
   sequence: number;
   updatedAt: number;
 };

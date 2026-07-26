@@ -19,6 +19,7 @@ import {
   type MaterialAnswerState,
 } from "../../materials";
 import { useAppTranslation } from "../../../shared/i18n";
+import { subscribeHomeworkAssignmentChanges } from "../model/homeworkRealtime";
 
 export function useHomeworkAssignments({
   canManage,
@@ -41,6 +42,7 @@ export function useHomeworkAssignments({
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const pendingDraftSaveRef = useRef<Promise<HomeworkSubmission> | null>(null);
+  const refreshAssignmentsRef = useRef<(options?: { silent?: boolean }) => Promise<void>>(async () => undefined);
 
   const selectedAssignment = assignments.find((assignment) => assignment.id === selectedAssignmentId) ?? null;
 
@@ -180,6 +182,28 @@ export function useHomeworkAssignments({
     };
   }, [canManage, profile?.subject, selectedAssignmentId]);
 
+  useEffect(() => {
+    if (!profile) return undefined;
+
+    const silentlyRefresh = () => {
+      void refreshAssignmentsRef.current({ silent: true });
+    };
+    const unsubscribe = subscribeHomeworkAssignmentChanges(silentlyRefresh);
+    const intervalId = window.setInterval(silentlyRefresh, 15_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") silentlyRefresh();
+    };
+
+    window.addEventListener("focus", silentlyRefresh);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      unsubscribe();
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", silentlyRefresh);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [profile?.subject]);
+
   const studentScore = useMemo(() => {
     if (!studentDetail) {
       return null;
@@ -270,11 +294,11 @@ export function useHomeworkAssignments({
     studentHasUnsavedChanges,
   ]);
 
-  async function refreshAssignments() {
+  async function refreshAssignments({ silent = false }: { silent?: boolean } = {}) {
     if (!profile) {
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const items = canManage ? await fetchHomeworkAssignments() : await fetchMyHomeworkAssignments();
       const nextSelectedId = selectedAssignmentId && items.some((item) => item.id === selectedAssignmentId)
@@ -297,9 +321,11 @@ export function useHomeworkAssignments({
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : t("homework.messages.loadFailed"));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
+
+  refreshAssignmentsRef.current = refreshAssignments;
 
   async function submitStudentHomework() {
     if (!studentDetail) {

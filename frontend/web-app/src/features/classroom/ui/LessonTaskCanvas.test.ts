@@ -412,7 +412,7 @@ describe("LessonTaskCanvas", () => {
       expect.objectContaining({
         content: expect.objectContaining({
           elements: expect.arrayContaining([expect.objectContaining({ anchorId: "image-a", kind: "text" })]),
-          schemaVersion: 6,
+          schemaVersion: 7,
         }),
       }),
     ), { timeout: 1_500 });

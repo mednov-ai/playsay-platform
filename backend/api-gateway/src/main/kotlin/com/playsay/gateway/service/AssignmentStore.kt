@@ -28,12 +28,14 @@ import com.playsay.gateway.repo.LessonParticipantRepo
 import com.playsay.gateway.repo.LessonRepo
 import com.playsay.gateway.repo.MaterialSubmissionRow
 import com.playsay.gateway.repo.SubmissionRepo
+import com.playsay.gateway.realtime.AssignmentChangedEvent
 import com.playsay.gateway.utils.MetaData
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
 import java.util.UUID
 import org.springframework.http.HttpStatus
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -57,6 +59,7 @@ class AssignmentStore(
     private val materialScoringService: MaterialScoringService,
     private val progressCalculator: AssignmentProgressCalculator,
     private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -87,6 +90,7 @@ class AssignmentStore(
             ),
         )
         ensureRecipients(assignment.id, recipients, request.dueAt, now)
+        publishAssignmentChanged(authentication, assignment.id, recipients, "CREATED")
         return teacherDetail(authentication, assignment.id)
     }
 
@@ -111,11 +115,12 @@ class AssignmentStore(
         val now = Instant.now()
         val title = request.title.optionalClean("title", 160) ?: scheduleRow.lessonTitle ?: material.title
         val instructions = request.instructions.optionalClean("instructions", 2_000)
-        val assignment = assignmentRepo.findFirstBySourceLessonIdAndTypeAndStatusNotOrderByCreatedAtAsc(
+        val existingAssignment = assignmentRepo.findFirstBySourceLessonIdAndTypeAndStatusNotOrderByCreatedAtAsc(
             sourceLessonId = lessonId,
             type = MetaData.AssignmentTypes.HOMEWORK,
             status = MetaData.AssignmentStatuses.ARCHIVED,
-        ) ?: AssignmentEntity(
+        )
+        val assignment = existingAssignment ?: AssignmentEntity(
             id = UUID.randomUUID(),
             createdAt = now,
         )
@@ -135,6 +140,12 @@ class AssignmentStore(
 
         val saved = assignmentRepo.saveAndFlush(assignment)
         ensureRecipients(saved.id, recipients, request.dueAt, now)
+        publishAssignmentChanged(
+            authentication,
+            saved.id,
+            recipients,
+            if (existingAssignment == null) "CREATED" else "UPDATED",
+        )
         return teacherDetail(authentication, saved.id)
     }
 
@@ -473,6 +484,23 @@ class AssignmentStore(
                 assignmentRecipientRepo.save(existing)
             }
         }
+    }
+
+    private fun publishAssignmentChanged(
+        authentication: JwtAuthenticationToken,
+        assignmentId: UUID,
+        recipients: List<AppUserEntity>,
+        change: String,
+    ) {
+        eventPublisher.publishEvent(
+            AssignmentChangedEvent(
+                assignmentId = assignmentId,
+                visibleSubjects = recipients
+                    .mapTo(mutableSetOf()) { user -> user.keycloakSubject }
+                    .apply { add(authentication.token.subject) },
+                change = change,
+            ),
+        )
     }
 
     private fun resolveRecipientUsers(subjects: List<String>): List<AppUserEntity> {

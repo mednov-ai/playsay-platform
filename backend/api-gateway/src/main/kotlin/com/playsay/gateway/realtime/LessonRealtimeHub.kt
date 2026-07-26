@@ -113,6 +113,26 @@ class LessonRealtimeHub(
         }
     }
 
+    fun publishAssignmentChanged(
+        assignmentId: UUID,
+        visibleSubjects: Set<String>,
+        change: String,
+    ) {
+        principals.forEach { (sessionId, principal) ->
+            if (principal.subject !in visibleSubjects && !principal.canManagePresence()) return@forEach
+            sessions[sessionId]?.let { session ->
+                sendToSession(
+                    session,
+                    LessonRealtimeOutboundMessage(
+                        type = "assignment.changed",
+                        assignmentId = assignmentId,
+                        change = change,
+                    ),
+                )
+            }
+        }
+    }
+
     private fun publishLessonPresence(lessonId: UUID) {
         val lesson = lessonSnapshots[lessonId] ?: return
         lessonSubscriptions[lessonId].orEmpty().forEach { sessionId ->

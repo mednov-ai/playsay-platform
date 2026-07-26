@@ -19,6 +19,7 @@ import type {
   MaterialExerciseInteraction,
   MaterialExerciseSync,
 } from "../../materials/model/types";
+import type { MaterialViewportState, MaterialViewportUpdate } from "../model/materialViewport";
 
 export type { CollaborationCursor, CollaborationParticipant };
 
@@ -44,6 +45,7 @@ export function useYjsWorkspace({
   const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
+  const [materialViewport, setMaterialViewportState] = useState<MaterialViewportState | null>(null);
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -59,6 +61,7 @@ export function useYjsWorkspace({
       setHtmlGameEffects([]);
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
+      setMaterialViewportState(null);
       exerciseInteractionRef.current = null;
       return undefined;
     }
@@ -72,6 +75,7 @@ export function useYjsWorkspace({
       onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onMaterialAnswersChange: setMaterialAnswers,
+      onMaterialViewportChange: setMaterialViewportState,
       onParticipantsChange: setParticipants,
       onTextChange: setText,
       participantName,
@@ -125,6 +129,7 @@ export function useYjsWorkspace({
       setHtmlGameEffects([]);
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
+      setMaterialViewportState(null);
       exerciseInteractionRef.current = null;
     };
   }, [color, document?.id, enabled, participantName]);
@@ -188,6 +193,10 @@ export function useYjsWorkspace({
     runtimeRef.current?.setMaterialAnswer(blockId, answer);
   }, []);
 
+  const setMaterialViewport = useCallback((viewport: MaterialViewportUpdate) => {
+    runtimeRef.current?.setMaterialViewport(viewport);
+  }, []);
+
   const seedMaterialAnswers = useCallback((answers: MaterialAnswerState) => {
     runtimeRef.current?.seedMaterialAnswers(answers);
   }, []);
@@ -236,9 +245,11 @@ export function useYjsWorkspace({
     participants,
     htmlGameSync,
     exerciseSync,
+    materialViewport,
     setAnnotationElements,
     snapshot,
     status,
+    setMaterialViewport,
     text,
     updateCursor,
     updateText,

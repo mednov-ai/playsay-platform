@@ -85,6 +85,33 @@ class LessonRealtimeHubTest {
         })
     }
 
+    @Test
+    fun `assignment changes reach recipients and teachers but not unrelated students`() {
+        val hub = LessonRealtimeHub(objectMapper)
+        val assignmentId = UUID.randomUUID()
+        val teacherSession = RecordingWebSocketSession()
+        val recipientSession = RecordingWebSocketSession()
+        val unrelatedSession = RecordingWebSocketSession()
+
+        hub.register(teacherSession, LessonRealtimePrincipal(subject = "teacher-1", roles = setOf("TEACHER")))
+        hub.register(recipientSession, LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT")))
+        hub.register(unrelatedSession, LessonRealtimePrincipal(subject = "student-2", roles = setOf("STUDENT")))
+
+        hub.publishAssignmentChanged(
+            assignmentId = assignmentId,
+            visibleSubjects = setOf("teacher-1", "student-1"),
+            change = "CREATED",
+        )
+
+        listOf(teacherSession, recipientSession).forEach { session ->
+            val message = objectMapper.readTree(session.sentMessages.last())
+            assertEquals("assignment.changed", message["type"].asText())
+            assertEquals(assignmentId.toString(), message["assignmentId"].asText())
+            assertEquals("CREATED", message["change"].asText())
+        }
+        assertTrue(unrelatedSession.sentMessages.isEmpty())
+    }
+
     private fun assertPresence(session: RecordingWebSocketSession, expectedState: String) {
         val message = session.sentMessages
             .map(objectMapper::readTree)

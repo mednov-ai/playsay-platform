@@ -1,5 +1,6 @@
 import type { LessonMaterialJson } from "../../../shared/api/playsay";
 import type { AnnotationElement } from "../model/annotation";
+import type { MaterialViewportState, MaterialViewportUpdate } from "../model/materialViewport";
 import type {
   MaterialAnswerBlock,
   MaterialAnswerState,
@@ -39,6 +40,7 @@ export type YjsWorkspaceRuntime = {
   setHtmlGamePresentedBlock: (blockId: string | null) => void;
   seedMaterialAnswers: (answers: MaterialAnswerState) => void;
   setMaterialAnswer: (blockId: string, answer: MaterialAnswerBlock) => void;
+  setMaterialViewport: (viewport: MaterialViewportUpdate) => void;
   updateHtmlGameAuthority: (blockId: string, runId: string | null) => void;
   snapshot: () => LessonMaterialJson;
   startSocketSync: (socket: WebSocket) => void;
@@ -55,6 +57,7 @@ export function createYjsWorkspaceRuntime(options: {
   onHtmlGamePresentationChange?: (blockId: string | null) => void;
   onHtmlGameSnapshotsChange: (snapshots: Record<string, MaterialHtmlGameSnapshot>) => void;
   onMaterialAnswersChange?: (answers: MaterialAnswerState) => void;
+  onMaterialViewportChange?: (viewport: MaterialViewportState | null) => void;
   onDocumentUpdate?: (update: Uint8Array) => void;
   onParticipantsChange: (participants: CollaborationParticipant[]) => void;
   onTextChange: (text: string) => void;

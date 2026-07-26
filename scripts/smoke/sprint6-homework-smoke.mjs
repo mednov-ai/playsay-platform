@@ -134,6 +134,7 @@ try {
   addCheck("teacher-ui-shows-group-homework-due-instructions-and-empty-progress");
 
   await openHomeworkTab(studentA.page);
+  await selectHomeworkAssignment(studentA.page, groupAssignment.assignment.title);
   await expectText(studentA.page, groupAssignment.assignment.title);
   await expectText(studentA.page, instructions);
   await expectText(studentA.page, "Draft not submitted");

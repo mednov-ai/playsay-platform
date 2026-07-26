@@ -29,6 +29,7 @@ type MaterialVideoQuality = "LOW" | "MEDIUM" | "HIGH";
 export function RenderedMaterialBlock({
   allowVideoFullscreen = false,
   answer,
+  assetsLoading = false,
   assetTags,
   assetUrls,
   block,
@@ -45,6 +46,7 @@ export function RenderedMaterialBlock({
 }: {
   allowVideoFullscreen?: boolean;
   answer?: MaterialAnswerBlock;
+  assetsLoading?: boolean;
   assetTags: Record<string, string[]>;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
@@ -296,7 +298,18 @@ export function RenderedMaterialBlock({
             ) : (
               <figure className="playsay-image-placeholder">
                 <ImageIcon className="h-6 w-6 text-primary" />
-                <figcaption><RenderedMarkdown className="playsay-caption-markdown" value={block.caption || block.prompt || block.url || t("materials.renderer.imageFallback")} /></figcaption>
+                <figcaption>
+                  <RenderedMarkdown
+                    className="playsay-caption-markdown"
+                    value={block.caption
+                      || block.prompt
+                      || (assetId
+                        ? assetsLoading
+                          ? t("materials.renderer.imageLoading")
+                          : t("materials.renderer.imageUnavailable")
+                        : block.url || t("materials.renderer.imageFallback"))}
+                  />
+                </figcaption>
                 {mode === "teacherPreview" ? (
                   <MaterialImagePromptPopover block={block} />
                 ) : null}

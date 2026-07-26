@@ -3,6 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
 const webBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_WEB_BASE_URL ?? "https://online.play-and-say.ru");
@@ -43,6 +44,7 @@ const summary = {
   webBaseUrl,
   checks: [],
   materialId: null,
+  materialAssetId: null,
   groupAssignmentId: null,
   singleAssignmentId: null,
   lessonHomeworkAssignmentId: null,
@@ -135,8 +137,9 @@ try {
   await expectText(studentA.page, groupAssignment.assignment.title);
   await expectText(studentA.page, instructions);
   await expectText(studentA.page, "Draft not submitted");
+  await assertHomeworkImageLoaded(studentA.page);
   await assertMobileHomeworkLayout(studentA.page);
-  addCheck("student-mobile-ui-shows-homework-with-compact-fill-gaps");
+  addCheck("student-mobile-ui-opens-private-homework-image-and-compact-fill-gaps");
 
   const wrongContent = homeworkContent(material.id, {
     fish: "flies",
@@ -154,8 +157,23 @@ try {
   await apiRequest(studentB.tokens.accessToken, "GET", `/me/assignments/${singleAssignment.assignment.id}`, 404);
   addCheck("student-cannot-read-another-students-assignment");
 
+  await openHomeworkTab(studentA.page);
   await selectHomeworkAssignment(studentA.page, groupAssignment.assignment.title);
-  await chooseSelectAnswers(studentA.page, ["flies", "swims"]);
+  const draftSaveResponse = studentA.page.waitForResponse((response) => {
+    const request = response.request();
+    if (request.method() !== "PUT" || !response.url().endsWith(`/me/assignments/${groupAssignment.assignment.id}/submission`)) {
+      return false;
+    }
+    try {
+      return request.postDataJSON()?.submitted === false;
+    } catch {
+      return false;
+    }
+  }, { timeout: timeoutMs });
+  await chooseSelectAnswers(studentA.page, ["walks", "swims"]);
+  const savedDraftResponse = await draftSaveResponse;
+  assert(savedDraftResponse.status() === 200, `Homework autosave returned HTTP ${savedDraftResponse.status()}.`);
+  addCheck("student-ui-autosaves-homework-draft");
   await clickSubmit(studentA.page);
   await waitForSubmitted(studentA.tokens.accessToken, groupAssignment.assignment.id);
   addCheck("student-a-submits-known-wrong-answers-through-ui");
@@ -227,13 +245,17 @@ try {
     studentCarryOverList.some((item) => item.id === lessonHomework.assignment.id),
     "Student A must see carry-over homework after completed lesson.",
   );
-  addCheck("completed-lesson-is-not-joinable-but-carry-over-homework-is-visible");
+  await openHomeworkTab(studentA.page);
+  await selectHomeworkAssignment(studentA.page, lessonHomework.assignment.title);
+  await assertHomeworkImageLoaded(studentA.page);
+  addCheck("completed-lesson-is-not-joinable-and-carry-over-private-image-is-readable");
 
   await cleanup(teacher.tokens.accessToken);
   addCheck("cleanup-completed");
 
   console.log(JSON.stringify(summary, null, 2));
 } catch (error) {
+  await captureHomeworkDiagnostics(sessions).catch(() => undefined);
   try {
     const teacherToken = sessions.find((session) => session.role === "teacher")?.tokens.accessToken;
     if (teacherToken) {
@@ -417,12 +439,16 @@ async function selectHomeworkAssignment(page, title) {
   const item = page.locator(".playsay-homework-panel button").filter({ hasText: title }).first();
   await item.waitFor({ timeout: timeoutMs });
   await item.click();
-  await page.waitForFunction((expectedTitle) => {
-    const buttons = [...document.querySelectorAll(".playsay-homework-panel button")];
-    const button = buttons.find((candidate) => candidate.textContent?.includes(expectedTitle));
-    return button?.getAttribute("data-active") === "true";
-  }, title, { timeout: timeoutMs });
   await page.locator(".playsay-homework-panel h3").filter({ hasText: title }).first().waitFor({ timeout: timeoutMs });
+}
+
+async function assertHomeworkImageLoaded(page) {
+  await page.waitForFunction(() => {
+    const image = document.querySelector('.playsay-homework-panel img[alt="Tall homework test image"]');
+    return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+  }, null, { timeout: timeoutMs });
+  const panelText = await page.locator(".playsay-homework-panel").innerText();
+  assert(!panelText.includes("material-asset:"), "Homework UI must never expose an internal material asset reference.");
 }
 
 async function expectText(page, text) {
@@ -550,7 +576,59 @@ async function createHomeworkMaterial(token) {
     title: `Sprint 6 homework smoke material ${runId}`,
     visibility: "PRIVATE",
   };
-  return apiRequest(token, "POST", "/materials", 201, created.materialRequest);
+  const material = await apiRequest(token, "POST", "/materials", 201, created.materialRequest);
+  const imageAsset = await uploadHomeworkImageAsset(token, material.id);
+  summary.materialAssetId = imageAsset.id;
+  created.materialRequest = {
+    ...created.materialRequest,
+    document: {
+      ...created.materialRequest.document,
+      pages: created.materialRequest.document.pages.map((page, index) => index === 0
+        ? {
+            ...page,
+            blocks: [
+              {
+                alt: "Tall homework test image",
+                id: "homework-image",
+                imageSize: "LARGE",
+                objectFit: "contain",
+                title: "Tall homework test image",
+                type: "image",
+                url: `material-asset:${imageAsset.id}`,
+              },
+              ...page.blocks,
+            ],
+          }
+        : page),
+    },
+  };
+  return apiRequest(token, "PUT", `/materials/${material.id}`, 200, created.materialRequest);
+}
+
+async function uploadHomeworkImageAsset(token, materialId) {
+  const form = new FormData();
+  form.set("file", new Blob([`
+    <svg xmlns="http://www.w3.org/2000/svg" width="480" height="1440" viewBox="0 0 480 1440">
+      <rect width="480" height="1440" fill="#fff7f1"/>
+      <circle cx="240" cy="240" r="120" fill="#ff5c00"/>
+      <rect x="80" y="520" width="320" height="720" rx="48" fill="#c8f3df"/>
+      <text x="240" y="1360" text-anchor="middle" font-family="sans-serif" font-size="32">Sprint 6 homework image</text>
+    </svg>
+  `], { type: "image/svg+xml" }), "homework-tall.svg");
+  const response = await fetch(`${apiBaseUrl}/materials/${materialId}/assets/images`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Accept-Language": "en",
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+  const text = await response.text();
+  if (response.status !== 201) {
+    throw new Error(`POST material image expected HTTP 201, got ${response.status}${text ? `: ${text.slice(0, 300)}` : ""}`);
+  }
+  return JSON.parse(text);
 }
 
 async function createCompletedLesson(token, materialId, participantSubjects) {
@@ -642,6 +720,17 @@ async function cleanup(token) {
     }).catch(() => null);
     created.materialId = null;
   }
+}
+
+async function captureHomeworkDiagnostics(activeSessions) {
+  const artifactDir = path.resolve(process.cwd(), "tmp", "smoke-artifacts", runId);
+  await mkdir(artifactDir, { recursive: true });
+  await Promise.allSettled(activeSessions.map(async (session) => {
+    await session.page.screenshot({
+      fullPage: true,
+      path: path.join(artifactDir, `${session.role}.png`),
+    });
+  }));
 }
 
 function addCheck(name) {

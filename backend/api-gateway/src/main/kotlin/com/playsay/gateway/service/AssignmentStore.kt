@@ -180,7 +180,7 @@ class AssignmentStore(
                     status = MetaData.AssignmentStatuses.ARCHIVED,
                 )
             }
-            .mapNotNull { assignment -> summaryIfMaterialAvailable(assignment) }
+            .mapNotNull { assignment -> summaryIfMaterialAvailable(assignment, userId) }
     }
 
     @Transactional
@@ -303,16 +303,25 @@ class AssignmentStore(
         return summary(assignment, material)
     }
 
-    private fun summaryIfMaterialAvailable(assignment: StoredAssignment): AssignmentSummaryResponse? {
+    private fun summaryIfMaterialAvailable(
+        assignment: StoredAssignment,
+        studentUserId: UUID? = null,
+    ): AssignmentSummaryResponse? {
         val materialId = assignment.materialId ?: return null
         val material = availableMaterialById(materialId) ?: return null
-        return summary(assignment, material)
+        return summary(assignment, material, studentUserId)
     }
 
-    private fun summary(assignment: StoredAssignment, material: StoredHomeworkMaterial): AssignmentSummaryResponse {
-        val submissions = latestSubmissionsByStudent(assignment.id).values.toList()
+    private fun summary(
+        assignment: StoredAssignment,
+        material: StoredHomeworkMaterial,
+        studentUserId: UUID? = null,
+    ): AssignmentSummaryResponse {
+        val submissionsByStudent = latestSubmissionsByStudent(assignment.id)
+        val submissions = submissionsByStudent.values.toList()
         val scores = submissions.mapNotNull { submission -> submission.score }
         val errors = submissions.mapNotNull { submission -> submission.errorsCount?.let(::BigDecimal) }
+        val studentSubmission = studentUserId?.let(submissionsByStudent::get)
 
         return AssignmentSummaryResponse(
             id = assignment.id,
@@ -333,6 +342,15 @@ class AssignmentStore(
             averageErrorsCount = progressCalculator.average(errors),
             createdAt = assignment.createdAt,
             updatedAt = assignment.updatedAt,
+            mySubmissionState = when {
+                studentUserId == null -> null
+                studentSubmission == null -> MetaData.HomeworkSubmissionStates.NOT_STARTED
+                studentSubmission.submittedAt == null -> MetaData.HomeworkSubmissionStates.DRAFT
+                else -> MetaData.HomeworkSubmissionStates.SUBMITTED
+            },
+            myScore = studentSubmission?.score,
+            mySubmittedAt = studentSubmission?.submittedAt,
+            mySubmissionUpdatedAt = studentSubmission?.updatedAt,
         )
     }
 

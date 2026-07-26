@@ -4774,6 +4774,28 @@ components:
         updatedAt:
           type: string
           format: date-time
+        mySubmissionState:
+          type:
+          - string
+          - "null"
+          enum:
+          - NOT_STARTED
+          - DRAFT
+          - SUBMITTED
+        myScore:
+          type:
+          - number
+          - "null"
+        mySubmittedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        mySubmissionUpdatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
       required:
       - createdAt
       - id

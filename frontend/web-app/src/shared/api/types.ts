@@ -301,6 +301,10 @@ export type HomeworkAssignment = {
   averageErrorsCount?: number | null;
   createdAt: string;
   updatedAt: string;
+  mySubmissionState?: "NOT_STARTED" | "DRAFT" | "SUBMITTED" | null;
+  myScore?: number | null;
+  mySubmittedAt?: string | null;
+  mySubmissionUpdatedAt?: string | null;
 };
 export type HomeworkRecipientProgress = {
   assignmentId: string;

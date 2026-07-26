@@ -42,6 +42,7 @@ class LessonMaterialStore(
     private val lessonMaterialCatalogService: LessonMaterialCatalogService,
     private val lessonMaterialAuthoringService: LessonMaterialAuthoringService,
     private val materialAssetService: MaterialAssetService,
+    private val materialReadAccessPolicy: MaterialReadAccessPolicy,
     private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
     private val materialSubmissionService: MaterialSubmissionService,
     private val materialAnnotationService: MaterialAnnotationService,
@@ -218,13 +219,13 @@ class LessonMaterialStore(
 
     @Transactional
     fun listAssets(authentication: JwtAuthenticationToken, materialId: UUID): List<MaterialAssetResponse> {
-        requireReadableMaterialOrActiveParticipant(authentication, materialId)
+        materialReadAccessPolicy.requireReadable(authentication, materialId)
         return materialAssetService.list(materialId)
     }
 
     @Transactional
     fun assetContent(authentication: JwtAuthenticationToken, materialId: UUID, assetId: UUID): ResponseEntity<ByteArray> {
-        requireReadableMaterialOrActiveParticipant(authentication, materialId)
+        materialReadAccessPolicy.requireReadable(authentication, materialId)
         return materialAssetService.content(materialId, assetId)
     }
 
@@ -289,7 +290,7 @@ class LessonMaterialStore(
         assetId: UUID,
         blockId: String,
     ): MaterialHtmlGameEnrichmentResponse {
-        requireReadableMaterialOrActiveParticipant(authentication, materialId)
+        materialReadAccessPolicy.requireReadable(authentication, materialId)
         return materialHtmlGameEnrichmentService.status(materialId, assetId, blockId)
     }
 
@@ -337,28 +338,8 @@ class LessonMaterialStore(
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
     }
 
-    private fun requireReadableMaterialOrActiveParticipant(authentication: JwtAuthenticationToken, materialId: UUID) {
-        val material = lessonMaterialCatalogService.find(materialId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        val currentUserId = lessonMaterialCatalogService.currentUserIdIfNeeded(authentication)
-        val canRead = lessonMaterialCatalogService.canRead(material, authentication, currentUserId) ||
-            isActiveMaterialParticipant(materialId, authentication.token.subject, Instant.now())
-        if (!canRead) {
-            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        }
-    }
-
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0
-
-    private fun isActiveMaterialParticipant(materialId: UUID, subject: String, now: Instant): Boolean =
-        lessonRepo.countActiveMaterialParticipant(
-            materialId = materialId,
-            subject = subject,
-            accessStartsBy = lessonAccessStartsBy(now),
-            accessEndsAfter = lessonAccessEndsAfter(now),
-            excludedStatuses = expiredMaterialParticipantStatuses,
-        ) > 0
 }
 
 private fun ScheduledMaterialLookup.isVisibleToParticipant(now: Instant): Boolean =

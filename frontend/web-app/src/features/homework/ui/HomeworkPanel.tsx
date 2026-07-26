@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpenCheck, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   createHomeworkAssignment,
@@ -43,10 +43,13 @@ export function HomeworkPanel({
     answers,
     assignments,
     detail,
+    draftSaveState,
+    draftSaving,
     lastLoadedAt,
     loading,
     message,
     refreshAssignments,
+    retryStudentDraftSave,
     saving,
     selectedAssignment,
     selectedAssignmentId,
@@ -55,6 +58,7 @@ export function HomeworkPanel({
     setSaving,
     setSelectedAssignmentId,
     studentDetail,
+    studentHasUnsavedChanges,
     studentScore,
     submitStudentHomework,
     updateAnswer,
@@ -151,57 +155,70 @@ export function HomeworkPanel({
     setSelectedSubjects((current) => current.filter((subject) => !visibleSubjects.has(subject)));
   }
 
+  function closeStudentAssignment() {
+    if (
+      studentHasUnsavedChanges
+      && studentDetail?.submission.submittedAt
+      && !window.confirm(t("homework.confirm.leaveUnsubmittedChanges"))
+    ) {
+      return;
+    }
+    setSelectedAssignmentId(null);
+  }
+
   return (
     <section className="playsay-homework-panel rounded-[1.25rem] border border-border bg-white/80 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <div className="flex items-center gap-2">
-          <BookOpenCheck className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-extrabold">{t("homework.title")}</h2>
+      {canManage || !selectedAssignmentId ? (
+        <div className={`flex flex-wrap items-center gap-3 border-b border-border pb-4${canManage ? " justify-between" : " justify-end"}`}>
+          {canManage ? (
+            <div className="flex items-center gap-2">
+              <BookOpenCheck className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-extrabold">{t("homework.title")}</h2>
+            </div>
+          ) : null}
+          <Button disabled={disabled || loading} onClick={() => void refreshAssignments()} type="button" variant="outline">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {t("common.actions.refresh")}
+          </Button>
         </div>
-        <Button disabled={disabled || loading} onClick={() => void refreshAssignments()} type="button" variant="outline">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {t("common.actions.refresh")}
-        </Button>
-      </div>
+      ) : null}
 
       {!profile ? (
         <div className="mt-4 rounded-2xl border border-border bg-muted/70 p-4 text-sm font-semibold text-muted-foreground">
           {t("homework.loginRequired")}
         </div>
-      ) : (
+      ) : canManage ? (
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(18rem,24rem)_1fr]">
           <div className="grid gap-4">
-            {canManage ? (
-              <HomeworkCreateForm
-                assignableMaterials={assignableMaterials}
-                disabled={disabled}
-                dueAt={dueAt}
-                filteredStudentUsers={filteredStudentUsers}
-                instructions={instructions}
-                lessonHomeworkOptions={lessonHomeworkOptions}
-                onClearVisibleStudents={clearVisibleStudents}
-                onCreateFromLesson={() => void createFromLesson()}
-                onCreateStandaloneHomework={() => void createStandaloneHomework()}
-                onSelectVisibleStudents={selectVisibleStudents}
-                onToggleSubject={toggleSubject}
-                saving={saving}
-                selectedLessonId={selectedLessonId}
-                selectedMaterialId={selectedMaterialId}
-                selectedSubjects={selectedSubjects}
-                setDueAt={setDueAt}
-                setInstructions={setInstructions}
-                setSelectedLessonId={setSelectedLessonId}
-                setSelectedMaterialId={setSelectedMaterialId}
-                setStudentSearch={setStudentSearch}
-                setTitle={setTitle}
-                studentSearch={studentSearch}
-                studentUsers={studentUsers}
-                title={title}
-              />
-            ) : null}
+            <HomeworkCreateForm
+              assignableMaterials={assignableMaterials}
+              disabled={disabled}
+              dueAt={dueAt}
+              filteredStudentUsers={filteredStudentUsers}
+              instructions={instructions}
+              lessonHomeworkOptions={lessonHomeworkOptions}
+              onClearVisibleStudents={clearVisibleStudents}
+              onCreateFromLesson={() => void createFromLesson()}
+              onCreateStandaloneHomework={() => void createStandaloneHomework()}
+              onSelectVisibleStudents={selectVisibleStudents}
+              onToggleSubject={toggleSubject}
+              saving={saving}
+              selectedLessonId={selectedLessonId}
+              selectedMaterialId={selectedMaterialId}
+              selectedSubjects={selectedSubjects}
+              setDueAt={setDueAt}
+              setInstructions={setInstructions}
+              setSelectedLessonId={setSelectedLessonId}
+              setSelectedMaterialId={setSelectedMaterialId}
+              setStudentSearch={setStudentSearch}
+              setTitle={setTitle}
+              studentSearch={studentSearch}
+              studentUsers={studentUsers}
+              title={title}
+            />
 
             {message ? (
-              <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+              <div aria-live="polite" className="playsay-homework-inline-message">
                 {message}
               </div>
             ) : null}
@@ -215,20 +232,55 @@ export function HomeworkPanel({
           </div>
 
           <div className="min-w-0">
-            {canManage ? (
-              <TeacherHomeworkDetail assignment={selectedAssignment} detail={detail} lastLoadedAt={lastLoadedAt} />
-            ) : (
-              <StudentHomeworkDetailView
-                answers={answers}
-                detail={studentDetail}
-                disabled={disabled || saving}
-                onAnswerChange={updateAnswer}
-                onSubmit={() => void submitStudentHomework()}
-                saving={saving}
-                score={studentScore}
-              />
-            )}
+            <TeacherHomeworkDetail assignment={selectedAssignment} detail={detail} lastLoadedAt={lastLoadedAt} />
           </div>
+        </div>
+      ) : selectedAssignmentId ? (
+        <div className="mt-3">
+          {message ? (
+            <div aria-live="assertive" className="playsay-homework-inline-message mb-3">
+              {message}
+            </div>
+          ) : null}
+          {loading && !studentDetail ? (
+            <div className="flex min-h-48 items-center justify-center text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : studentDetail ? (
+            <StudentHomeworkDetailView
+              answers={answers}
+              detail={studentDetail}
+              disabled={disabled || saving}
+              draftSaveState={draftSaveState}
+              draftSaving={draftSaving}
+              hasUnsavedChanges={studentHasUnsavedChanges}
+              onAnswerChange={updateAnswer}
+              onBack={closeStudentAssignment}
+              onRetryDraftSave={retryStudentDraftSave}
+              onSubmit={() => void submitStudentHomework()}
+              saving={saving}
+              score={studentScore}
+            />
+          ) : (
+            <Button onClick={closeStudentAssignment} type="button" variant="outline">
+              <ArrowLeft className="h-4 w-4" />
+              {t("homework.actions.backToList")}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="mx-auto mt-4 grid max-w-3xl gap-3">
+          {message ? (
+            <div aria-live="assertive" className="playsay-homework-inline-message">
+              {message}
+            </div>
+          ) : null}
+          <HomeworkAssignmentList
+            assignments={assignments}
+            canManage={false}
+            onSelectAssignment={setSelectedAssignmentId}
+            selectedAssignmentId={null}
+          />
         </div>
       )}
     </section>

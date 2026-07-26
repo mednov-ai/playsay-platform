@@ -4,12 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.playsay.gateway.dto.MaterialVideoPlaybackRequest
 import com.playsay.gateway.dto.MaterialVideoPlaybackResponse
 import com.playsay.gateway.error.ProjectResponseException
-import com.playsay.gateway.repo.AssignmentRecipientRepo
-import com.playsay.gateway.repo.LessonMaterialRow
-import com.playsay.gateway.repo.LessonRepo
 import com.playsay.gateway.utils.MetaData
 import jakarta.servlet.http.HttpServletRequest
-import java.time.Clock
 import java.util.UUID
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -20,9 +16,8 @@ import org.springframework.stereotype.Component
 @Component
 class MaterialVideoPlaybackService(
     private val materialCatalogService: LessonMaterialCatalogService,
+    private val materialReadAccessPolicy: MaterialReadAccessPolicy,
     private val userProfileStore: UserProfileStore,
-    private val assignmentRecipientRepo: AssignmentRecipientRepo,
-    private val lessonRepo: LessonRepo,
     private val youtubeMediaClient: YoutubeMediaClient,
     private val materialAssetService: MaterialAssetService,
     private val youtubeVideoCacheService: YoutubeVideoCacheService,
@@ -34,7 +29,6 @@ class MaterialVideoPlaybackService(
     private val requireGeoCountry: Boolean,
     @param:Value("\${playsay.video.youtube.cache.enabled:false}")
     private val youtubeCacheEnabled: Boolean,
-    private val clock: Clock = Clock.systemUTC(),
 ) {
     fun playback(
         authentication: JwtAuthenticationToken,
@@ -44,10 +38,9 @@ class MaterialVideoPlaybackService(
     ): MaterialVideoPlaybackResponse {
         val requestedQuality = YoutubePlaybackQuality.normalized(request.quality)
         val profile = userProfileStore.current(authentication)
-        val currentUserId = userProfileStore.currentUserId(authentication)
         val materialRow = materialCatalogService.find(materialId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        if (materialRow.status == MetaData.MaterialStatuses.ARCHIVED || !canAccessMaterial(authentication, materialRow, currentUserId, profile.subject)) {
+        if (materialRow.status == MetaData.MaterialStatuses.ARCHIVED || !materialReadAccessPolicy.canRead(authentication, materialRow)) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         }
         val material = materialCatalogService.toResponse(materialRow)
@@ -161,29 +154,6 @@ class MaterialVideoPlaybackService(
             deliverySource = mediaSession.deliverySource,
             cacheStatus = cacheStatus(meta.videoId),
         )
-    }
-
-    private fun canAccessMaterial(
-        authentication: JwtAuthenticationToken,
-        material: LessonMaterialRow,
-        currentUserId: UUID,
-        subject: String,
-    ): Boolean {
-        val now = clock.instant()
-        return materialCatalogService.canRead(material, authentication, currentUserId) ||
-            assignmentRecipientRepo.countActiveMaterialRecipients(
-                materialId = material.id,
-                studentUserId = currentUserId,
-                type = MetaData.AssignmentTypes.HOMEWORK,
-                archivedStatus = MetaData.AssignmentStatuses.ARCHIVED,
-            ) > 0 ||
-            lessonRepo.countActiveMaterialParticipant(
-                materialId = material.id,
-                subject = subject,
-                accessStartsBy = lessonAccessStartsBy(now),
-                accessEndsAfter = lessonAccessEndsAfter(now),
-                excludedStatuses = listOf(MetaData.LessonStatuses.CANCELLED, MetaData.LessonStatuses.COMPLETED),
-            ) > 0
     }
 
     private fun resolveIpCountry(request: HttpServletRequest): String? {

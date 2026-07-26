@@ -1,6 +1,7 @@
-import type { AdminUserProfile, HomeworkRecipientProgress } from "../../../shared/api/playsay";
+import type { AdminUserProfile, HomeworkAssignment, HomeworkRecipientProgress } from "../../../shared/api/playsay";
 
 export type HomeworkProgressFilter = "all" | "missing" | "errors";
+export type StudentHomeworkStatus = "NOT_STARTED" | "DRAFT" | "SUBMITTED" | "OVERDUE";
 
 export function localDateTimeToIso(value: string): string | null {
   if (!value) {
@@ -19,6 +20,22 @@ export function formatHomeworkDate(value?: string | null): string {
     return "";
   }
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+export function studentHomeworkStatus(
+  assignment: HomeworkAssignment,
+  nowMs = Date.now(),
+): StudentHomeworkStatus {
+  if (assignment.mySubmissionState === "SUBMITTED") {
+    return "SUBMITTED";
+  }
+  if (assignment.dueAt) {
+    const dueAtMs = Date.parse(assignment.dueAt);
+    if (Number.isFinite(dueAtMs) && dueAtMs < nowMs) {
+      return "OVERDUE";
+    }
+  }
+  return assignment.mySubmissionState === "DRAFT" ? "DRAFT" : "NOT_STARTED";
 }
 
 export function studentSearchText(student: AdminUserProfile): string {

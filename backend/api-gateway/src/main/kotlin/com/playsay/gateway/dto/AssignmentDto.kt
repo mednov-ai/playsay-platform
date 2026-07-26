@@ -49,6 +49,14 @@ data class AssignmentSummaryResponse(
     val averageErrorsCount: BigDecimal?,
     val createdAt: Instant,
     val updatedAt: Instant,
+    @field:Schema(nullable = true, allowableValues = ["NOT_STARTED", "DRAFT", "SUBMITTED"])
+    val mySubmissionState: String? = null,
+    @field:Schema(nullable = true)
+    val myScore: BigDecimal? = null,
+    @field:Schema(nullable = true)
+    val mySubmittedAt: Instant? = null,
+    @field:Schema(nullable = true)
+    val mySubmissionUpdatedAt: Instant? = null,
 )
 
 data class AssignmentRecipientProgressResponse(

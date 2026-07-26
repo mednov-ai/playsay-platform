@@ -1131,6 +1131,78 @@
   font-size: 0.6875rem;
 }
 
+.playsay-student-homework-card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0.35rem 1rem rgb(17 17 17 / 0.035);
+}
+
+.playsay-student-homework-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0.55rem 1.4rem rgb(17 17 17 / 0.07);
+}
+
+.playsay-homework-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 900;
+  padding: 0.25rem 0.625rem;
+}
+
+.playsay-homework-status-badge[data-homework-status="DRAFT"] {
+  background: #fff3eb;
+  color: hsl(var(--primary));
+}
+
+.playsay-homework-status-badge[data-homework-status="SUBMITTED"] {
+  background: #e9f8ef;
+  color: #14753d;
+}
+
+.playsay-homework-status-badge[data-homework-status="OVERDUE"] {
+  background: #fff0f0;
+  color: #b42318;
+}
+
+.playsay-homework-inline-message {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--muted) / 0.55);
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+  font-weight: 750;
+  padding: 0.625rem 0.75rem;
+}
+
+.playsay-homework-submit-bar {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgb(255 92 0 / 0.24);
+  border-radius: 1rem;
+  background: hsl(var(--background) / 0.96);
+  box-shadow: 0 0.75rem 2rem rgb(17 17 17 / 0.12);
+  padding: 0.75rem;
+  backdrop-filter: blur(12px);
+}
+
+.dark .playsay-homework-status-badge[data-homework-status="SUBMITTED"] {
+  background: rgb(20 117 61 / 0.22);
+  color: #83e6a7;
+}
+
+.dark .playsay-homework-status-badge[data-homework-status="OVERDUE"] {
+  background: rgb(180 35 24 / 0.22);
+  color: #ff9a91;
+}
+
 .playsay-lesson-inline-message {
   flex: 0 0 auto;
   overflow: hidden;

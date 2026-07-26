@@ -710,6 +710,18 @@ export interface AssignmentRecipientProgressResponse {
   updatedAt?: string | null;
 }
 
+/**
+ * @nullable
+ */
+export type AssignmentSummaryResponseMySubmissionState = typeof AssignmentSummaryResponseMySubmissionState[keyof typeof AssignmentSummaryResponseMySubmissionState] | null;
+
+
+export const AssignmentSummaryResponseMySubmissionState = {
+  NOT_STARTED: 'NOT_STARTED',
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+} as const;
+
 export interface AssignmentSummaryResponse {
   id: string;
   materialId: string;
@@ -736,6 +748,14 @@ export interface AssignmentSummaryResponse {
   averageErrorsCount?: number | null;
   createdAt: string;
   updatedAt: string;
+  /** @nullable */
+  mySubmissionState?: AssignmentSummaryResponseMySubmissionState;
+  /** @nullable */
+  myScore?: number | null;
+  /** @nullable */
+  mySubmittedAt?: string | null;
+  /** @nullable */
+  mySubmissionUpdatedAt?: string | null;
 }
 
 export interface TeacherAssignmentDetailResponse {
@@ -3229,6 +3249,46 @@ export const webhook = async ( options?: RequestInit): Promise<webhookResponse> 
 
   const data: webhookResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as webhookResponse
+}
+
+
+
+export type webhook1Response200 = {
+  data: void
+  status: 200
+}
+
+export type webhook1ResponseSuccess = (webhook1Response200) & {
+  headers: Headers;
+};
+;
+
+export type webhook1Response = (webhook1ResponseSuccess)
+
+export const getWebhook1Url = () => {
+
+
+
+
+  return `/api/webhooks/mailjet`
+}
+
+export const webhook1 = async ( options?: RequestInit): Promise<webhook1Response> => {
+
+  const res = await fetch(getWebhook1Url(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: webhook1Response['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as webhook1Response
 }
 
 

@@ -90,6 +90,12 @@ object MetaData {
         const val ARCHIVED = "ARCHIVED"
     }
 
+    object HomeworkSubmissionStates {
+        const val NOT_STARTED = "NOT_STARTED"
+        const val DRAFT = "DRAFT"
+        const val SUBMITTED = "SUBMITTED"
+    }
+
     object AiProviders {
         const val STUB = "stub"
         const val OPENAI = "openai"

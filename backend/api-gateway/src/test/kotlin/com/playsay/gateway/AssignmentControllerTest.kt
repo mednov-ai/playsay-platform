@@ -3,6 +3,7 @@ package com.playsay.gateway
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.controller.AssignmentController
+import com.playsay.gateway.controller.MaterialAssetController
 import com.playsay.gateway.controller.MaterialCrudController
 import com.playsay.gateway.controller.ScheduledLessonController
 import com.playsay.gateway.dto.HomeworkAssignmentRequest
@@ -18,6 +19,7 @@ import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.LessonParticipantRepo
 import com.playsay.gateway.repo.LessonRepo
 import com.playsay.gateway.repo.LessonTemplateRepo
+import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.repo.SubmissionRepo
 import com.playsay.gateway.service.UserProfileStore
 import java.math.BigDecimal
@@ -38,6 +40,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.web.server.ResponseStatusException
 import javax.sql.DataSource
 import liquibase.integration.spring.SpringLiquibase
@@ -55,6 +58,7 @@ import liquibase.integration.spring.SpringLiquibase
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AssignmentControllerTest @Autowired constructor(
     private val assignmentController: AssignmentController,
+    private val materialAssetController: MaterialAssetController,
     private val materialCrudController: MaterialCrudController,
     private val scheduleController: ScheduledLessonController,
     private val userProfileStore: UserProfileStore,
@@ -66,6 +70,7 @@ class AssignmentControllerTest @Autowired constructor(
     private val lessonTemplateRepo: LessonTemplateRepo,
     private val courseRepo: CourseRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
+    private val materialAssetRepo: MaterialAssetRepo,
     private val appUserRepo: AppUserRepo,
     private val dataSource: DataSource,
 ) {
@@ -88,6 +93,7 @@ class AssignmentControllerTest @Autowired constructor(
         lessonRepo.deleteAllInBatch()
         lessonTemplateRepo.deleteAllInBatch()
         courseRepo.deleteAllInBatch()
+        materialAssetRepo.deleteAllInBatch()
         lessonMaterialRepo.deleteAllInBatch()
         appUserRepo.deleteAllInBatch()
         appUserRepo.seedPrimaryTeacherWithStudents()
@@ -123,11 +129,23 @@ class AssignmentControllerTest @Autowired constructor(
         assertTrue(created.recipients.all { recipient -> recipient.score == null })
         assertTrue(created.recipients.all { recipient -> !recipient.showGroupIndicator })
 
+        val unopenedSummary = assignmentController.listMyHomeworkAssignments(studentOne)
+            .single { assignment -> assignment.id == created.assignment.id }
+        assertEquals("NOT_STARTED", unopenedSummary.mySubmissionState)
+        assertNull(unopenedSummary.myScore)
+        assertNull(unopenedSummary.mySubmittedAt)
+        assertNull(unopenedSummary.mySubmissionUpdatedAt)
+
         val studentDetail = assignmentController.getMyHomeworkAssignment(studentOne, created.assignment.id)
         assertEquals(material.id, studentDetail.material.id)
         assertNull(studentDetail.submission.score)
         assertNull(studentDetail.submission.errorsCount)
         assertNull(studentDetail.submission.progressTone)
+
+        val openedSummary = assignmentController.listMyHomeworkAssignments(studentOne)
+            .single { assignment -> assignment.id == created.assignment.id }
+        assertEquals("DRAFT", openedSummary.mySubmissionState)
+        assertEquals(studentDetail.submission.updatedAt, openedSummary.mySubmissionUpdatedAt)
 
         val teacherView = assignmentController.getHomeworkAssignment(teacher, created.assignment.id)
         val opened = teacherView.recipients.single { recipient -> recipient.studentSubject == "student-1" }
@@ -135,6 +153,56 @@ class AssignmentControllerTest @Autowired constructor(
         assertNull(opened.score)
         assertNull(opened.progressTone)
         assertEquals(0, teacherView.assignment.scoredCount)
+    }
+
+    @Test
+    fun `homework recipient can read private material assets until recipient is archived`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val recipient = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val unrelated = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(recipient)
+        userProfileStore.currentUserId(unrelated)
+        val material = fillGapMaterial(teacher)
+        val uploaded = materialAssetController.uploadImageAsset(
+            teacher,
+            material.id,
+            MockMultipartFile(
+                "file",
+                "homework.svg",
+                "image/svg+xml",
+                """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="40"><rect width="20" height="40"/></svg>""".toByteArray(),
+            ),
+        ).body!!
+        val assignment = assignmentController.createHomeworkAssignment(
+            teacher,
+            HomeworkAssignmentRequest(
+                materialId = material.id,
+                studentSubjects = listOf("student-1"),
+            ),
+        ).body!!.assignment
+
+        assertEquals(listOf(uploaded.id), materialAssetController.listAssets(recipient, material.id).map { asset -> asset.id })
+        assertEquals(
+            "image/svg+xml",
+            materialAssetController.assetContent(recipient, material.id, uploaded.id).headers.contentType.toString(),
+        )
+        assertEquals(
+            HttpStatus.NOT_FOUND,
+            assertFailsWith<ResponseStatusException> {
+                materialAssetController.listAssets(unrelated, material.id)
+            }.statusCode,
+        )
+
+        val recipientRow = assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignment.id).single()
+        recipientRow.archivedAt = Instant.now()
+        assignmentRecipientRepo.saveAndFlush(recipientRow)
+
+        assertEquals(
+            HttpStatus.NOT_FOUND,
+            assertFailsWith<ResponseStatusException> {
+                materialAssetController.listAssets(recipient, material.id)
+            }.statusCode,
+        )
     }
 
     @Test

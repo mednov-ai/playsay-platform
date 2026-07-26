@@ -577,6 +577,20 @@
     max-width: 13rem;
   }
 
+  .playsay-homework-panel {
+    padding: 0.75rem;
+  }
+
+  .playsay-homework-submit-bar {
+    bottom: 0.5rem;
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .playsay-homework-submit-bar > button {
+    width: 100%;
+  }
+
   .playsay-inline-hint-ghost {
     max-width: 3.25rem;
     padding-inline: 0.3rem;

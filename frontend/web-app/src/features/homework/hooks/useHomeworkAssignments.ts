@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchHomeworkAssignment,
   fetchHomeworkAssignments,
@@ -7,6 +7,7 @@ import {
   saveMyHomeworkAssignmentSubmission,
   type HomeworkAssignment,
   type HomeworkAssignmentDetail,
+  type HomeworkSubmission,
   type LessonMaterialJson,
   type MeProfile,
   type StudentHomeworkDetail,
@@ -34,8 +35,12 @@ export function useHomeworkAssignments({
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftSaveState, setDraftSaveState] = useState<"idle" | "saved" | "error">("idle");
+  const [draftSaveNonce, setDraftSaveNonce] = useState(0);
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const pendingDraftSaveRef = useRef<Promise<HomeworkSubmission> | null>(null);
 
   const selectedAssignment = assignments.find((assignment) => assignment.id === selectedAssignmentId) ?? null;
 
@@ -56,7 +61,12 @@ export function useHomeworkAssignments({
         const items = canManage ? await fetchHomeworkAssignments() : await fetchMyHomeworkAssignments();
         if (!cancelled) {
           setAssignments(items);
-          setSelectedAssignmentId((current) => current ?? items[0]?.id ?? null);
+          setSelectedAssignmentId((current) => {
+            if (current && items.some((item) => item.id === current)) {
+              return current;
+            }
+            return canManage ? items[0]?.id ?? null : null;
+          });
           setLastLoadedAt(new Date().toISOString());
           setMessage(null);
         }
@@ -82,6 +92,8 @@ export function useHomeworkAssignments({
     if (!selectedAssignmentId) {
       setDetail(null);
       setStudentDetail(null);
+      setAnswers({});
+      setDraftSaveState("idle");
       return undefined;
     }
 
@@ -104,6 +116,18 @@ export function useHomeworkAssignments({
             setStudentDetail(loaded);
             setDetail(null);
             setAnswers(materialAnswersFromSubmission(loaded.submission));
+            setAssignments((current) => current.map((assignment) => (
+              assignment.id === assignmentId
+                ? {
+                    ...assignment,
+                    myScore: loaded.submission.score,
+                    mySubmissionState: loaded.submission.submittedAt ? "SUBMITTED" : "DRAFT",
+                    mySubmittedAt: loaded.submission.submittedAt,
+                    mySubmissionUpdatedAt: loaded.submission.updatedAt,
+                  }
+                : assignment
+            )));
+            setDraftSaveState("idle");
             setLastLoadedAt(new Date().toISOString());
           }
         }
@@ -160,6 +184,9 @@ export function useHomeworkAssignments({
     if (!studentDetail) {
       return null;
     }
+    if (studentDetail.submission.submittedAt) {
+      return studentDetail.submission.score ?? null;
+    }
     const savedAnswers = JSON.stringify(materialAnswersFromSubmission(studentDetail.submission));
     const currentAnswers = JSON.stringify(answers);
     const liveScore = materialLiveScore(studentDetail.material, answers);
@@ -167,6 +194,81 @@ export function useHomeworkAssignments({
       ? liveScore
       : studentDetail.submission.score ?? liveScore;
   }, [answers, studentDetail?.assignment.id, studentDetail?.submission.updatedAt]);
+  const savedStudentAnswers = useMemo(
+    () => studentDetail ? materialAnswersFromSubmission(studentDetail.submission) : {},
+    [studentDetail?.assignment.id, studentDetail?.submission.updatedAt],
+  );
+  const studentHasUnsavedChanges = studentDetail !== null
+    && JSON.stringify(answers) !== JSON.stringify(savedStudentAnswers);
+
+  useEffect(() => {
+    if (
+      canManage
+      || !studentDetail
+      || !studentHasUnsavedChanges
+      || studentDetail.submission.submittedAt
+      || saving
+    ) {
+      return undefined;
+    }
+
+    let active = true;
+    const assignmentId = studentDetail.assignment.id;
+    const materialId = studentDetail.material.id;
+    const timeoutId = window.setTimeout(() => {
+      setDraftSaving(true);
+      setDraftSaveState("idle");
+      const request = saveMyHomeworkAssignmentSubmission(assignmentId, {
+        content: homeworkSubmissionContent(materialId, answers),
+        submitted: false,
+      });
+      pendingDraftSaveRef.current = request;
+      request
+        .then((saved) => {
+          if (!active) return;
+          setStudentDetail((current) => (
+            current?.assignment.id === assignmentId ? { ...current, submission: saved } : current
+          ));
+          setAssignments((current) => current.map((assignment) => (
+            assignment.id === assignmentId
+              ? {
+                  ...assignment,
+                  myScore: saved.score,
+                  mySubmissionState: "DRAFT",
+                  mySubmissionUpdatedAt: saved.updatedAt,
+                }
+              : assignment
+          )));
+          setDraftSaveState("saved");
+        })
+        .catch(() => {
+          if (active) {
+            setDraftSaveState("error");
+          }
+        })
+        .finally(() => {
+          if (pendingDraftSaveRef.current === request) {
+            pendingDraftSaveRef.current = null;
+          }
+          if (active) {
+            setDraftSaving(false);
+          }
+        });
+    }, 1_000);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    answers,
+    canManage,
+    draftSaveNonce,
+    saving,
+    studentDetail?.assignment.id,
+    studentDetail?.submission.submittedAt,
+    studentHasUnsavedChanges,
+  ]);
 
   async function refreshAssignments() {
     if (!profile) {
@@ -177,26 +279,21 @@ export function useHomeworkAssignments({
       const items = canManage ? await fetchHomeworkAssignments() : await fetchMyHomeworkAssignments();
       const nextSelectedId = selectedAssignmentId && items.some((item) => item.id === selectedAssignmentId)
         ? selectedAssignmentId
-        : items[0]?.id ?? null;
+        : canManage ? items[0]?.id ?? null : null;
       setAssignments(items);
       setSelectedAssignmentId(nextSelectedId);
-      if (nextSelectedId) {
-        if (canManage) {
-          const loaded = await fetchHomeworkAssignment(nextSelectedId);
-          setDetail(loaded);
-          setStudentDetail(null);
-        } else {
-          const loaded = await fetchMyHomeworkAssignment(nextSelectedId);
-          setStudentDetail(loaded);
-          setDetail(null);
-          setAnswers(materialAnswersFromSubmission(loaded.submission));
-        }
+      if (nextSelectedId && canManage) {
+        const loaded = await fetchHomeworkAssignment(nextSelectedId);
+        setDetail(loaded);
+        setStudentDetail(null);
       } else {
         setDetail(null);
-        setStudentDetail(null);
+        if (!nextSelectedId) {
+          setStudentDetail(null);
+        }
       }
       setLastLoadedAt(new Date().toISOString());
-      setMessage(t("homework.messages.refreshed"));
+      setMessage(null);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : t("homework.messages.loadFailed"));
     } finally {
@@ -210,17 +307,25 @@ export function useHomeworkAssignments({
     }
     setSaving(true);
     try {
+      await pendingDraftSaveRef.current?.catch(() => undefined);
       const saved = await saveMyHomeworkAssignmentSubmission(studentDetail.assignment.id, {
-        content: {
-          schemaVersion: 1,
-          materialId: studentDetail.material.id,
-          answers,
-        } satisfies LessonMaterialJson,
+        content: homeworkSubmissionContent(studentDetail.material.id, answers),
         submitted: true,
       });
       setStudentDetail({ ...studentDetail, submission: saved });
-      setMessage(t("homework.messages.submitted"));
-      await refreshAssignments();
+      setAssignments((current) => current.map((assignment) => (
+        assignment.id === studentDetail.assignment.id
+          ? {
+              ...assignment,
+              myScore: saved.score,
+              mySubmissionState: "SUBMITTED",
+              mySubmittedAt: saved.submittedAt,
+              mySubmissionUpdatedAt: saved.updatedAt,
+            }
+          : assignment
+      )));
+      setDraftSaveState("idle");
+      setMessage(null);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : t("homework.messages.submitFailed"));
     } finally {
@@ -239,6 +344,8 @@ export function useHomeworkAssignments({
     answers,
     assignments,
     detail,
+    draftSaveState,
+    draftSaving,
     lastLoadedAt,
     loading,
     message,
@@ -251,8 +358,18 @@ export function useHomeworkAssignments({
     setSaving,
     setSelectedAssignmentId,
     studentDetail,
+    studentHasUnsavedChanges,
     studentScore,
     submitStudentHomework,
+    retryStudentDraftSave: () => setDraftSaveNonce((current) => current + 1),
     updateAnswer,
+  };
+}
+
+function homeworkSubmissionContent(materialId: string, answers: MaterialAnswerState): LessonMaterialJson {
+  return {
+    schemaVersion: 1,
+    materialId,
+    answers,
   };
 }

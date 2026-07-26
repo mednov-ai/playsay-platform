@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { FileText, Minimize2 } from "lucide-react";
+import { AlertCircle, FileText, Loader2, Minimize2, RefreshCw } from "lucide-react";
 import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, fetchMaterialAssetText, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
 import {
   MaterialAnswerBlock,
@@ -75,6 +75,8 @@ export function LessonMaterialDocumentView({
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [htmlAssets, setHtmlAssets] = useState<Record<string, string>>({});
   const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
+  const [assetLoadState, setAssetLoadState] = useState<"idle" | "loading" | "ready" | "partial-error" | "error">("idle");
+  const [assetReloadVersion, setAssetReloadVersion] = useState(0);
   const [focusedBlock, setFocusedBlock] = useState<{ kind: "htmlGame" | "image" | "externalActivity"; blockId: string } | null>(null);
   const [launchedGameIds, setLaunchedGameIds] = useState<Set<string>>(() => new Set());
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
@@ -149,43 +151,63 @@ export function LessonMaterialDocumentView({
       setAssetUrls({});
       setHtmlAssets({});
       setAssetTags({});
+      setAssetLoadState("idle");
       return () => {
         active = false;
       };
     }
 
+    setAssetUrls({});
+    setHtmlAssets({});
+    setAssetTags({});
+    setAssetLoadState("loading");
     fetchMaterialAssets(material.id)
       .then(async (assets) => {
-        const entries = await Promise.all(assets.map(async (asset) => {
+        const referencedAssetIds = new Set(assetIds);
+        const referencedAssets = assets.filter((asset) => referencedAssetIds.has(asset.id));
+        const settledEntries = await Promise.allSettled(referencedAssets.map(async (asset) => {
           if (asset.kind === "HTML_GAME") {
-            return null;
+            if (!asset.contentUrl?.trim()) {
+              throw new Error("missing-html-game-content");
+            }
+            return {
+              id: asset.id,
+              kind: "html" as const,
+              value: await fetchMaterialAssetText(material.id, asset.id),
+            };
           }
           const externalUrl = asset.externalUrl?.trim();
           if (externalUrl) {
-            return [asset.id, externalUrl] as const;
+            return { id: asset.id, kind: "image" as const, value: externalUrl };
           }
-
           if (!asset.contentUrl?.trim()) {
-            return null;
+            throw new Error("missing-material-asset-content");
           }
 
           const objectUrl = await fetchMaterialAssetObjectUrl(material.id, asset.id);
           if (!active) {
             URL.revokeObjectURL(objectUrl);
-            return null;
+            throw new Error("material-asset-load-cancelled");
           }
           objectUrls.add(objectUrl);
-          return [asset.id, objectUrl] as const;
+          return { id: asset.id, kind: "image" as const, value: objectUrl };
         }));
 
-        const htmlEntries = await Promise.all(assets
-          .filter((asset) => asset.kind === "HTML_GAME" && asset.contentUrl?.trim())
-          .map(async (asset) => [asset.id, await fetchMaterialAssetText(material.id, asset.id)] as const));
+        const fulfilledEntries = settledEntries.flatMap((entry) => entry.status === "fulfilled" ? [entry.value] : []);
+        const imageEntries = fulfilledEntries
+          .filter((entry) => entry.kind === "image")
+          .map((entry) => [entry.id, entry.value] as const);
+        const htmlEntries = fulfilledEntries
+          .filter((entry) => entry.kind === "html")
+          .map((entry) => [entry.id, entry.value] as const);
+        const resolvedIds = new Set(fulfilledEntries.map((entry) => entry.id));
+        const failedCount = assetIds.filter((assetId) => !resolvedIds.has(assetId)).length;
 
         if (active) {
-          setAssetUrls(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null)));
+          setAssetUrls(Object.fromEntries(imageEntries));
           setHtmlAssets(Object.fromEntries(htmlEntries));
           setAssetTags(materialAssetTagsMap(assets));
+          setAssetLoadState(failedCount === 0 ? "ready" : fulfilledEntries.length > 0 ? "partial-error" : "error");
         }
       })
       .catch(() => {
@@ -195,6 +217,7 @@ export function LessonMaterialDocumentView({
           setAssetUrls({});
           setHtmlAssets({});
           setAssetTags({});
+          setAssetLoadState("error");
         }
       });
 
@@ -203,7 +226,7 @@ export function LessonMaterialDocumentView({
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.clear();
     };
-  }, [assetKey, material.id, material.updatedAt]);
+  }, [assetKey, assetReloadVersion, material.id, material.updatedAt]);
 
   function requestBlockFocus(kind: "htmlGame" | "image" | "externalActivity", blockId: string) {
     if (kind === "htmlGame") {
@@ -283,6 +306,30 @@ export function LessonMaterialDocumentView({
           ))}
         </nav>
       ) : null}
+      {assetLoadState === "loading" ? (
+        <div aria-live="polite" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {t("materials.renderer.assetsLoading")}
+        </div>
+      ) : null}
+      {assetLoadState === "partial-error" || assetLoadState === "error" ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm font-bold" role="alert">
+          <span className="inline-flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            {assetLoadState === "partial-error"
+              ? t("materials.renderer.assetsPartiallyUnavailable")
+              : t("materials.renderer.assetsUnavailable")}
+          </span>
+          <button
+            className="inline-flex items-center gap-1.5 font-extrabold text-primary underline"
+            onClick={() => setAssetReloadVersion((current) => current + 1)}
+            type="button"
+          >
+            <RefreshCw className="h-4 w-4" />
+            {t("materials.renderer.retryAssets")}
+          </button>
+        </div>
+      ) : null}
       {!isStaticImagePage && !isHtmlGamePage ? <h3>{page.title}</h3> : null}
       {!isStaticImagePage && !isHtmlGamePage && material.description ? <p className="playsay-task-subtitle">{material.description}</p> : null}
       <div
@@ -292,6 +339,7 @@ export function LessonMaterialDocumentView({
           <RenderedMaterialBlock
             allowVideoFullscreen={videoFullscreenAllowed}
             answer={answers[block.id]}
+            assetsLoading={assetLoadState === "loading"}
             assetTags={assetTags}
             assetUrls={assetUrls}
             block={block}

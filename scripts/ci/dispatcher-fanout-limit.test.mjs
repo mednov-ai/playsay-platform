@@ -10,17 +10,16 @@ const projectRoot = resolve(platformRoot, "..");
 const dispatcher = readFileSync(resolve(platformRoot, "Jenkinsfile.dispatcher"), "utf8");
 const dispatchJobXmlPath = resolve(projectRoot, "playsay-infra/jenkins/jobs/playsay-platform-dispatch-develop.xml");
 
-test("dispatcher fixes downstream concurrency to one job", () => {
-  assert.match(dispatcher, /string\(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1'/);
-  assert.match(dispatcher, /MAX_PARALLEL_MODULE_JOBS is fixed to 1 on the dedicated 2-vCPU CI VM/);
-  assert.doesNotMatch(dispatcher, /maxParallelModuleJobs = maxParallelText\.toInteger\(\)/);
+test("dispatcher defaults to four downstream jobs and validates the operator override", () => {
+  assert.match(dispatcher, /string\(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '4'/);
+  assert.match(dispatcher, /MAX_PARALLEL_MODULE_JOBS must be between 1 and 4/);
+  assert.match(dispatcher, /maxParallelModuleJobs = maxParallelText\.toInteger\(\)/);
 });
 
-test("dispatcher runs downstream jobs sequentially and aggregates their results", () => {
-  assert.match(dispatcher, /jobs\.eachWithIndex/);
-  assert.doesNotMatch(dispatcher, /parallel branches/);
+test("dispatcher runs downstream jobs in bounded batches and aggregates their results", () => {
+  assert.match(dispatcher, /jobs\.collate\(maxParallelModuleJobs\)/);
+  assert.match(dispatcher, /batchResults = parallel branches/);
   assert.match(dispatcher, /wait: true, propagate: false/);
-  assert.doesNotMatch(dispatcher, /wait: false, propagate: false/);
   assert.match(dispatcher, /Downstream module job results:/);
   assert.match(dispatcher, /Downstream module job failures:/);
 });
@@ -28,6 +27,6 @@ test("dispatcher runs downstream jobs sequentially and aggregates their results"
 test("dispatcher job XML exposes the same concurrency parameter", { skip: !existsSync(dispatchJobXmlPath) }, () => {
   const dispatchJobXml = readFileSync(dispatchJobXmlPath, "utf8");
   assert.match(dispatchJobXml, /<name>MAX_PARALLEL_MODULE_JOBS<\/name>/);
-  assert.match(dispatchJobXml, /<defaultValue>1<\/defaultValue>/);
-  assert.match(dispatchJobXml, /Maximum downstream module jobs to run at once/);
+  assert.match(dispatchJobXml, /<defaultValue>4<\/defaultValue>/);
+  assert.match(dispatchJobXml, /Maximum downstream module jobs to run concurrently/);
 });

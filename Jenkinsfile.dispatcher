@@ -14,7 +14,7 @@ pipeline {
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA.', trim: true)
     string(name: 'FORCE_TARGETS', defaultValue: '', description: 'Optional manual override: all or comma-separated deploy targets.', trim: true)
-    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '1', description: 'Dedicated 2-vCPU CI is fixed to one downstream module job.', trim: true)
+    string(name: 'MAX_PARALLEL_MODULE_JOBS', defaultValue: '4', description: 'Maximum downstream module jobs to run concurrently on dedicated CI; allowed range is 1..4.', trim: true)
   }
 
   environment {
@@ -119,9 +119,11 @@ spec:
     stage('Dispatch downstream jobs') {
       steps {
         script {
-          if ((params.MAX_PARALLEL_MODULE_JOBS?.trim() ?: '1') != '1') {
-            error 'MAX_PARALLEL_MODULE_JOBS is fixed to 1 on the dedicated 2-vCPU CI VM.'
+          def maxParallelText = params.MAX_PARALLEL_MODULE_JOBS?.trim() ?: '4'
+          if (!(maxParallelText ==~ /^[1-4]$/)) {
+            error 'MAX_PARALLEL_MODULE_JOBS must be between 1 and 4.'
           }
+          def maxParallelModuleJobs = maxParallelText.toInteger()
           def jobs = (env.AFFECTED_JOBS ?: '').split(',').collect { it.trim() }.findAll { it }
           if (jobs.isEmpty()) {
             echo 'No downstream jobs needed for this change.'
@@ -129,23 +131,36 @@ spec:
           }
 
           def downstreamResults = []
-          jobs.eachWithIndex { jobName, index ->
-            def downstreamParams = [
-              string(name: 'BRANCH_NAME', value: env.CI_BRANCH),
-              string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
-              string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
-            ]
-            echo "Triggering ${jobName} (${index + 1}/${jobs.size()})"
-            try {
-              def downstreamBuild = build job: jobName, parameters: downstreamParams, wait: true, propagate: false
-              downstreamResults << [
-                job: jobName,
-                result: downstreamBuild?.result ?: 'UNKNOWN',
-                number: downstreamBuild?.number ?: '',
-                url: downstreamBuild?.absoluteUrl ?: ''
-              ]
-            } catch (err) {
-              downstreamResults << [job: jobName, result: 'FAILURE', number: '', url: '', error: err.toString()]
+          jobs.collate(maxParallelModuleJobs).eachWithIndex { batch, batchIndex ->
+            def branches = [:]
+            batch.eachWithIndex { jobName, batchOffset ->
+              def downstreamJobName = jobName
+              def jobIndex = batchIndex * maxParallelModuleJobs + batchOffset
+              def branchKey = "${jobIndex + 1}-${downstreamJobName}"
+              branches[branchKey] = {
+                def downstreamParams = [
+                  string(name: 'BRANCH_NAME', value: env.CI_BRANCH),
+                  string(name: 'GITHUB_BEFORE', value: params.GITHUB_BEFORE?.trim() ?: ''),
+                  string(name: 'GITHUB_AFTER', value: env.GIT_COMMIT)
+                ]
+                echo "Triggering ${downstreamJobName} (${jobIndex + 1}/${jobs.size()})"
+                try {
+                  def downstreamBuild = build job: downstreamJobName, parameters: downstreamParams, wait: true, propagate: false
+                  return [
+                    job: downstreamJobName,
+                    result: downstreamBuild?.result ?: 'UNKNOWN',
+                    number: downstreamBuild?.number ?: '',
+                    url: downstreamBuild?.absoluteUrl ?: ''
+                  ]
+                } catch (err) {
+                  return [job: downstreamJobName, result: 'FAILURE', number: '', url: '', error: err.toString()]
+                }
+              }
+            }
+            def batchResults = parallel branches
+            batch.eachWithIndex { jobName, batchOffset ->
+              def jobIndex = batchIndex * maxParallelModuleJobs + batchOffset
+              downstreamResults << batchResults["${jobIndex + 1}-${jobName}"]
             }
           }
 

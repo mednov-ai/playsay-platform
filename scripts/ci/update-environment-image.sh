@@ -24,6 +24,8 @@ require_env GIT_COMMIT
 require_env GIT_COMMIT_SHORT
 require_env IMAGE_DIGEST
 
+START_DIR="$(pwd)"
+
 if ! printf '%s\n' "$IMAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
   echo "IMAGE_DIGEST must be an immutable sha256 digest." >&2
   exit 1
@@ -136,6 +138,7 @@ for attempt in 1 2 3 4 5; do
 
   if git diff --cached --quiet; then
     echo "No ${DEPLOY_ENVIRONMENT} image reference changes for ${BUILD_LABEL}"
+    cd "$START_DIR"
     rm -rf "$WORK_DIR"
     exit 0
   fi
@@ -164,10 +167,12 @@ for attempt in 1 2 3 4 5; do
     if [ "$DEPLOY_ENVIRONMENT" = "prod" ]; then
       echo "Production GitOps candidate ${INFRA_BRANCH} is ready for manual ArgoCD sync."
     fi
+    cd "$START_DIR"
     rm -rf "$WORK_DIR"
     exit 0
   fi
 
+  cd "$START_DIR"
   rm -rf "$WORK_DIR"
   echo "Infra push race for ${BUILD_LABEL}; retrying ${attempt}/5"
   sleep $((attempt * 3))

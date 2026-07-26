@@ -1,5 +1,5 @@
-import { BookOpen, Clock3, Eye, FileCode2, ImagePlus, Loader2, Plus, Users } from "lucide-react";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { BookOpen, Clock3, Eye, Loader2, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import { formatLessonRange, formatParticipantCount } from "../../../entities/schedule/model";
@@ -30,6 +30,7 @@ import {
 import { LessonTaskCanvas, type LessonPresentationMode } from "./LessonTaskCanvas";
 import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
+import { TeacherLessonToolbar } from "./TeacherLessonToolbar";
 import { useAppTranslation } from "../../../shared/i18n";
 import { VocabularyQuickAdd } from "../../vocabulary/ui/VocabularyQuickAdd";
 
@@ -212,115 +213,69 @@ export function LessonWorkspace({
     setStudentHealthState((current) => acknowledgeStudentHealth(current, subject));
   }
 
-  function handleImagePageSelect(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (file) {
-      void uploadImagePage(file);
-    }
-  }
-
-  function handleHtmlGamePageSelect(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (file) {
-      void uploadHtmlGamePage(file);
-    }
-  }
-
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
     <section className="playsay-workbench" data-presentation-mode={presentationMode}>
-      <header className="playsay-workbench-topbar">
-        <nav className="playsay-lesson-tabs" aria-label={t("classroom.tabs.aria")}>
-          <button className="playsay-lesson-tab" data-active="true" type="button">
-            {t("classroom.tabs.lesson")}
-          </button>
-        </nav>
+      {canMonitorSubmissions ? (
+        <TeacherLessonToolbar
+          activeStudentSubject={activeParticipant?.subject ?? null}
+          assigningMaterial={assigningMaterial}
+          canManageMaterial={canManageMaterial}
+          currentMaterialId={session.materialId}
+          materials={selectableMaterials}
+          onAssignMaterial={() => void assignMaterial()}
+          onSelectMaterial={setSelectedMaterialId}
+          onSelectStudent={selectStudentWork}
+          onUploadHtmlGamePage={(file) => void uploadHtmlGamePage(file)}
+          onUploadImagePage={(file) => void uploadImagePage(file)}
+          participants={teacherWorkParticipants}
+          selectedMaterialId={selectedMaterialId}
+          uploadingHtmlGamePage={uploadingHtmlGamePage}
+          uploadingImagePage={uploadingImagePage}
+          vocabularyAction={(
+            <VocabularyQuickAdd
+              recipientSubjects={session.participants.map((participant) => participant.subject)}
+              source={{
+                sourceType: "LESSON",
+                lessonId: session.lessonId,
+                materialId: visibleMaterial?.id,
+                ownerSubject: activeParticipant?.subject,
+              }}
+              triggerClassName="playsay-teacher-toolbar-vocabulary"
+              triggerLabelClassName="playsay-teacher-toolbar-action-label"
+            />
+          )}
+        />
+      ) : (
+        <header className="playsay-workbench-topbar">
+          <nav className="playsay-lesson-tabs" aria-label={t("classroom.tabs.aria")}>
+            <button className="playsay-lesson-tab" data-active="true" type="button">
+              {t("classroom.tabs.lesson")}
+            </button>
+          </nav>
 
-        <div className="playsay-workbench-tools">
-          <VocabularyQuickAdd recipientSubjects={canMonitorSubmissions ? session.participants.map((participant) => participant.subject) : []} source={{ sourceType: "LESSON", lessonId: session.lessonId, materialId: visibleMaterial?.id, ownerSubject: canMonitorSubmissions ? activeParticipant?.subject : undefined }}><span /></VocabularyQuickAdd>
-          {canMonitorSubmissions && teacherWorkParticipants.length > 0 ? (
-            <label className="playsay-teacher-target-picker">
-              <span>{t("classroom.teacherTask.targetLabel")}</span>
-              <select
-                className="playsay-input"
-                onChange={(event) => selectStudentWork(event.target.value)}
-                value={activeParticipant?.subject ?? ""}
-              >
-                {teacherWorkParticipants.map((participant) => (
-                  <option key={participant.subject} value={participant.subject}>
-                    {participant.displayName ?? participant.username ?? participant.subject}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          {canManageMaterial ? (
-            <div className="playsay-lesson-material-picker">
-              <select
-                className="playsay-input"
-                disabled={assigningMaterial || selectableMaterials.length === 0}
-                onChange={(event) => setSelectedMaterialId(event.target.value)}
-                value={selectedMaterialId}
-              >
-                <option value="">{t("classroom.material.pickerEmpty")}</option>
-                {selectableMaterials.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.title}
-                  </option>
-                ))}
-              </select>
-              <Button
-                disabled={assigningMaterial || selectedMaterialId === (session.materialId ?? "")}
-                onClick={() => void assignMaterial()}
-                type="button"
-                variant="outline"
-              >
-                {assigningMaterial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                {t("classroom.actions.assign")}
-              </Button>
-              <Button asChild variant="outline">
-                <label aria-disabled={uploadingImagePage ? "true" : "false"} className="playsay-live-image-upload">
-                  <input
-                    accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                    className="sr-only"
-                    disabled={uploadingImagePage}
-                    onChange={handleImagePageSelect}
-                    type="file"
-                  />
-                  {uploadingImagePage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                  {uploadingImagePage ? t("classroom.actions.uploadingImagePage") : t("classroom.actions.addImagePage")}
-                </label>
-              </Button>
-              <Button asChild variant="outline">
-                <label aria-disabled={uploadingHtmlGamePage ? "true" : "false"} className="playsay-live-image-upload">
-                  <input
-                    accept="text/html,.html"
-                    className="sr-only"
-                    disabled={uploadingHtmlGamePage}
-                    onChange={handleHtmlGamePageSelect}
-                    type="file"
-                  />
-                  {uploadingHtmlGamePage ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode2 className="h-4 w-4" />}
-                  {uploadingHtmlGamePage ? t("classroom.actions.uploadingHtmlGamePage") : t("classroom.actions.addHtmlGamePage")}
-                </label>
-              </Button>
+          <div className="playsay-workbench-tools">
+            <VocabularyQuickAdd
+              source={{
+                sourceType: "LESSON",
+                lessonId: session.lessonId,
+                materialId: visibleMaterial?.id,
+              }}
+            />
+            <div className="playsay-lesson-statusline">
+              <span className="inline-flex items-center gap-1.5">
+                <Clock3 className="h-4 w-4 text-primary" />
+                {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt, translate)}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-primary" />
+                {formatParticipantCount(session.participants.length, translate)}
+              </span>
             </div>
-          ) : null}
-          <div className="playsay-lesson-statusline">
-            <span className="inline-flex items-center gap-1.5">
-              <Clock3 className="h-4 w-4 text-primary" />
-              {formatLessonRange(session.lessonStartsAt, session.lessonEndsAt, translate)}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-primary" />
-              {formatParticipantCount(session.participants.length, translate)}
-            </span>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <div className="playsay-workbench-body">
 

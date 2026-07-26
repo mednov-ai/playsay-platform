@@ -12,7 +12,19 @@ import { useAppTranslation } from "../../../shared/i18n";
 
 const automaticTranslationDelayMs = 450;
 
-export function VocabularyQuickAdd({ children, recipientSubjects = [], source }: { children: ReactNode; recipientSubjects?: string[]; source: Omit<CreateVocabularyEntry, "sourceText"> }) {
+export function VocabularyQuickAdd({
+  children,
+  recipientSubjects = [],
+  source,
+  triggerClassName = "mt-2",
+  triggerLabelClassName,
+}: {
+  children?: ReactNode;
+  recipientSubjects?: string[];
+  source: Omit<CreateVocabularyEntry, "sourceText">;
+  triggerClassName?: string;
+  triggerLabelClassName?: string;
+}) {
   const { t } = useAppTranslation();
   const requestSerial = useRef(0);
   const translationAbortController = useRef<AbortController | null>(null);
@@ -137,7 +149,17 @@ export function VocabularyQuickAdd({ children, recipientSubjects = [], source }:
 
   return <div className="relative">
     {children}
-    <Button className="mt-2" onClick={() => setOpen(true)} type="button" variant="outline"><BookPlus className="h-4 w-4" />{t("vocabulary.actions.add")}</Button>
+    <Button
+      aria-label={t("vocabulary.actions.add")}
+      className={triggerClassName}
+      onClick={() => setOpen(true)}
+      title={t("vocabulary.actions.add")}
+      type="button"
+      variant="outline"
+    >
+      <BookPlus className="h-4 w-4" />
+      <span className={triggerLabelClassName}>{t("vocabulary.actions.add")}</span>
+    </Button>
     {open ? <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-black/40 p-4" role="dialog" aria-label={t("vocabulary.quickAdd.title")} aria-modal="true">
       <div className="my-auto w-full max-w-xl rounded-2xl border border-border bg-background p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-extrabold">{t("vocabulary.quickAdd.title")}</h2><Button aria-label={t("common.actions.close")} onClick={close} type="button" variant="outline"><X className="h-4 w-4" /></Button></div>

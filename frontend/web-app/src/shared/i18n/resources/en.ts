@@ -1271,6 +1271,7 @@ export const en = {
       checkingDevices: "Checking connection",
     },
     actions: {
+      add: "Add",
       assign: "Assign",
       addImagePage: "Add image",
       addHtmlGamePage: "Add HTML game",
@@ -1447,6 +1448,7 @@ export const en = {
       restoreGame: "Restore game",
     },
     material: {
+      pickerLabel: "Lesson card",
       pickerEmpty: "No material selected",
       assignedAria: "Assigned tasks",
       unassignedTitle: "No material assigned",
@@ -1459,6 +1461,9 @@ export const en = {
       hiddenTitle: "Task hidden",
       credit: "Answers count for: {{name}}",
       show: "Show task",
+    },
+    teacherToolbar: {
+      aria: "Teacher lesson controls",
     },
     messages: {
       materialAssigned: "Material assigned",

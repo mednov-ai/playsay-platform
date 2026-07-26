@@ -1271,6 +1271,7 @@ export const fr = {
       checkingDevices: "Vérifie la connexion",
     },
     actions: {
+      add: "Ajouter",
       assign: "Attribuer",
       addImagePage: "Ajouter image",
       addHtmlGamePage: "Ajouter un jeu HTML",
@@ -1447,6 +1448,7 @@ export const fr = {
       restoreGame: "Restaurer le jeu",
     },
     material: {
+      pickerLabel: "Support du cours",
       pickerEmpty: "Aucun support sélectionné",
       assignedAria: "Exercices attribués",
       unassignedTitle: "Aucun support attribué",
@@ -1459,6 +1461,9 @@ export const fr = {
       hiddenTitle: "Exercice masqué",
       credit: "Les réponses comptent pour : {{name}}",
       show: "Afficher l'exercice",
+    },
+    teacherToolbar: {
+      aria: "Commandes du professeur",
     },
     messages: {
       materialAssigned: "Support attribué",

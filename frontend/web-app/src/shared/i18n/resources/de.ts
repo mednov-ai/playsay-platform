@@ -1271,6 +1271,7 @@ export const de = {
       checkingDevices: "Verbindung wird geprüft",
     },
     actions: {
+      add: "Hinzufügen",
       assign: "Zuweisen",
       addImagePage: "Bild hinzufügen",
       addHtmlGamePage: "HTML-Spiel hinzufügen",
@@ -1447,6 +1448,7 @@ export const de = {
       restoreGame: "Spiel wiederherstellen",
     },
     material: {
+      pickerLabel: "Karte für die Stunde",
       pickerEmpty: "Kein Material ausgewählt",
       assignedAria: "Zugewiesene Aufgaben",
       unassignedTitle: "Kein Material zugewiesen",
@@ -1459,6 +1461,9 @@ export const de = {
       hiddenTitle: "Aufgabe verborgen",
       credit: "Antworten zählen für: {{name}}",
       show: "Aufgabe zeigen",
+    },
+    teacherToolbar: {
+      aria: "Steuerleiste für Lehrkräfte",
     },
     messages: {
       materialAssigned: "Material zugewiesen",

@@ -45,11 +45,6 @@
     font-size: 1.25rem;
   }
 
-  .playsay-lesson-material-picker {
-    width: 100%;
-    grid-template-columns: 1fr;
-  }
-
   .playsay-task-cards {
     grid-template-columns: 1fr;
   }

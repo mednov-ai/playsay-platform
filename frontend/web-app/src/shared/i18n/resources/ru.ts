@@ -1299,6 +1299,7 @@ export const ru = {
       checkingDevices: "Проверяет связь",
     },
     actions: {
+      add: "Добавить",
       assign: "Назначить",
       addImagePage: "Добавить картинку",
       addHtmlGamePage: "Добавить HTML-игру",
@@ -1475,6 +1476,7 @@ export const ru = {
       restoreGame: "Вернуть игру",
     },
     material: {
+      pickerLabel: "Карточка урока",
       pickerEmpty: "Материал не выбран",
       assignedAria: "Назначенные задания",
       unassignedTitle: "Материал не назначен",
@@ -1487,6 +1489,9 @@ export const ru = {
       hiddenTitle: "Задание скрыто",
       credit: "Ответы пойдут в зачёт: {{name}}",
       show: "Показать задание",
+    },
+    teacherToolbar: {
+      aria: "Панель учителя",
     },
     messages: {
       materialAssigned: "Материал назначен",

@@ -185,6 +185,11 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path.startsWith("frontend/browser-extension/")) {
+      targets.add("web-app");
+      continue;
+    }
+
     if (
       path === "frontend/package.json" ||
       path === "frontend/package-lock.json" ||

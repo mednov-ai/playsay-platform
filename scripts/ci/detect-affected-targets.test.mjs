@@ -32,6 +32,14 @@ test("web-app changes trigger only web-app job", () => {
   assertDetection(["frontend/web-app/src/App.tsx"], ["web-app"], ["playsay-web-app-develop"]);
 });
 
+test("browser extension changes trigger the web-app job that publishes its artifact", () => {
+  assertDetection(
+    ["frontend/browser-extension/src/protocol.ts", "frontend/browser-extension/public/manifest.json"],
+    ["web-app"],
+    ["playsay-web-app-develop"],
+  );
+});
+
 test("api-gateway contract changes trigger api-gateway and web-app", () => {
   assertDetection(
     ["contracts/openapi.yaml"],

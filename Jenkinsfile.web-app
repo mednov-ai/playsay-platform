@@ -201,8 +201,11 @@ spec:
               fi
               npm --workspace web-app run build
             '''
+            sh 'npm --workspace browser-extension run test'
+            sh 'npm --workspace browser-extension run package'
           }
         }
+        archiveArtifacts artifacts: 'frontend/browser-extension/playsay-browser-extension.zip', fingerprint: true
       }
     }
 

@@ -159,9 +159,38 @@ export function LessonTaskCanvas({
   const activePage = document?.pages.find((page) => page.id === activePageId) ?? document?.pages[0] ?? null;
   const materialSurfaceRef = useRef<HTMLDivElement>(null);
   const taskDocumentRef = useRef<HTMLDivElement>(null);
+  const documentScrollBeforeImageFocusRef = useRef<{ left: number; top: number } | null>(null);
+  const previousPresentationModeRef = useRef<LessonPresentationMode>("default");
   const applyingRemoteViewportRef = useRef(false);
   const lastViewportPublishAtRef = useRef(0);
   const viewportPublishTimerRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    const taskDocument = taskDocumentRef.current;
+    const previousMode = previousPresentationModeRef.current;
+    previousPresentationModeRef.current = presentationMode;
+    if (!taskDocument) return;
+
+    if (previousMode !== "image-focus" && presentationMode === "image-focus") {
+      documentScrollBeforeImageFocusRef.current = {
+        left: taskDocument.scrollLeft,
+        top: taskDocument.scrollTop,
+      };
+      taskDocument.scrollLeft = 0;
+      taskDocument.scrollTop = 0;
+      return;
+    }
+
+    if (previousMode === "image-focus" && presentationMode !== "image-focus") {
+      const previousScroll = documentScrollBeforeImageFocusRef.current;
+      documentScrollBeforeImageFocusRef.current = null;
+      if (previousScroll) {
+        taskDocument.scrollLeft = previousScroll.left;
+        taskDocument.scrollTop = previousScroll.top;
+      }
+    }
+  }, [presentationMode]);
+
   const annotationAnchors = useAnnotationAnchors(
     materialSurfaceRef,
     activePage?.id ?? null,

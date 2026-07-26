@@ -472,7 +472,12 @@ describe("LessonTaskCanvas", () => {
       teacherName: "Teacher Demo",
     }));
 
+    const taskDocument = container.querySelector<HTMLElement>(".playsay-task-document")!;
+    taskDocument.scrollLeft = 18;
+    taskDocument.scrollTop = 254;
     fireEvent.click(container.querySelector<HTMLButtonElement>('[data-testid="material-image-focus-image-a"]')!);
+    expect(taskDocument.scrollLeft).toBe(0);
+    expect(taskDocument.scrollTop).toBe(0);
     const focusedScroller = await waitFor(() => {
       const element = container.querySelector<HTMLElement>('.playsay-material-focus-stack[data-active="true"] .playsay-material-focused-image');
       expect(element).toBeTruthy();
@@ -493,6 +498,9 @@ describe("LessonTaskCanvas", () => {
       expect(Number.parseFloat(anchoredLayer.style.top) - (focusedImageTop - 20)).toBe(0);
     });
 
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
+    expect(taskDocument.scrollLeft).toBe(18);
+    expect(taskDocument.scrollTop).toBe(254);
     rectSpy.mockRestore();
   });
 

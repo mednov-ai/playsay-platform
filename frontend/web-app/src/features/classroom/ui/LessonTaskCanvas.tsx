@@ -168,6 +168,11 @@ export function LessonTaskCanvas({
   const previousPresentationModeRef = useRef<LessonPresentationMode>("default");
   const applyingRemoteViewportRef = useRef(false);
   const appliedRemoteViewportRevisionRef = useRef(0);
+  const expectedRemoteScrollRef = useRef<{
+    left: number;
+    node: HTMLElement;
+    top: number;
+  } | null>(null);
   const suppressTransitionScrollPublishRef = useRef(false);
   const transitionScrollFrameRef = useRef<number | null>(null);
   const lastViewportPublishAtRef = useRef(0);
@@ -298,6 +303,16 @@ export function LessonTaskCanvas({
     if (!node || !viewportSync) return undefined;
 
     const handleScroll = () => {
+      const expectedRemoteScroll = expectedRemoteScrollRef.current;
+      if (expectedRemoteScroll?.node === node) {
+        expectedRemoteScrollRef.current = null;
+        if (
+          Math.abs(node.scrollLeft - expectedRemoteScroll.left) <= 1
+          && Math.abs(node.scrollTop - expectedRemoteScroll.top) <= 1
+        ) {
+          return;
+        }
+      }
       if (applyingRemoteViewportRef.current || suppressTransitionScrollPublishRef.current) return;
       const elapsed = performance.now() - lastViewportPublishAtRef.current;
       if (elapsed >= 50) {
@@ -341,8 +356,11 @@ export function LessonTaskCanvas({
         ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null
         : taskDocumentRef.current;
       if (node) {
-        node.scrollLeft = viewport.x * Math.max(0, node.scrollWidth - node.clientWidth);
-        node.scrollTop = viewport.y * Math.max(0, node.scrollHeight - node.clientHeight);
+        const left = viewport.x * Math.max(0, node.scrollWidth - node.clientWidth);
+        const top = viewport.y * Math.max(0, node.scrollHeight - node.clientHeight);
+        expectedRemoteScrollRef.current = { left, node, top };
+        node.scrollLeft = left;
+        node.scrollTop = top;
         appliedRemoteViewportRevisionRef.current = viewport.revision;
         window.requestAnimationFrame(() => {
           if (!cancelled) applyingRemoteViewportRef.current = false;

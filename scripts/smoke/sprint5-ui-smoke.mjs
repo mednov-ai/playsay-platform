@@ -882,8 +882,8 @@ async function verifyAnchoredTextScroll(teacherPage, studentPage) {
 
   await studentPage.locator("[data-testid='material-focus-close']").click();
   await Promise.all([
-    waitForFocusedSmokeImageClosed(teacherPage),
-    waitForFocusedSmokeImageClosed(studentPage),
+    waitForFocusedSmokeImageClosed(teacherPage, "teacher"),
+    waitForFocusedSmokeImageClosed(studentPage, "student"),
   ]);
 }
 
@@ -902,12 +902,26 @@ async function waitForFocusedSmokeImage(page) {
   }, scrollImageBlockId, { timeout: timeoutMs });
 }
 
-async function waitForFocusedSmokeImageClosed(page) {
-  await page.locator(".playsay-material-focus-stack[data-active='false']").waitFor({
-    state: "attached",
-    timeout: timeoutMs,
-  });
-  await page.locator("[data-testid='material-focus-close']").waitFor({ state: "detached", timeout: timeoutMs });
+async function waitForFocusedSmokeImageClosed(page, role) {
+  try {
+    await page.locator(".playsay-material-focus-stack[data-active='false']").waitFor({
+      state: "attached",
+      timeout: timeoutMs,
+    });
+    await page.locator("[data-testid='material-focus-close']").waitFor({ state: "detached", timeout: timeoutMs });
+  } catch (error) {
+    const state = await page.evaluate(() => {
+      const board = document.querySelector(".playsay-task-board");
+      const focusStack = document.querySelector(".playsay-material-focus-stack");
+      const focusedImage = document.querySelector(".playsay-material-focused-image");
+      return {
+        boardMode: board?.getAttribute("data-presentation-mode") ?? null,
+        focusActive: focusStack?.getAttribute("data-active") ?? null,
+        focusedImageScrollTop: focusedImage instanceof HTMLElement ? focusedImage.scrollTop : null,
+      };
+    }).catch(() => null);
+    throw new Error(`${role} did not close shared image focus; state=${JSON.stringify(state)}: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 async function assertAnchoredTextFollowsImageScroll(page, role) {

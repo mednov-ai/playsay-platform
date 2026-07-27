@@ -760,6 +760,43 @@ describe("LessonTaskCanvas", () => {
     performanceNow.mockRestore();
   });
 
+  it("does not echo a delayed DOM scroll event after applying a remote viewport", async () => {
+    const publish = vi.fn();
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: staticImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+      viewportSync: {
+        clientId: 7,
+        publish,
+        ready: true,
+        state: {
+          materialId: staticImageMaterial.id,
+          pageId: "page-static",
+          presentationMode: "default",
+          revision: 10,
+          scrollContainer: "document",
+          sourceClientId: 9,
+          x: 0,
+          y: 0,
+        },
+      },
+    }));
+    const taskDocument = container.querySelector<HTMLElement>(".playsay-task-document")!;
+    await new Promise((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(resolve));
+    });
+
+    fireEvent.scroll(taskDocument);
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
   it("draws with the selected line width and returns one-shot shapes to the pointer", async () => {
     const { container } = render(createElement(LessonTaskCanvas, {
       lessonId: "lesson-1",

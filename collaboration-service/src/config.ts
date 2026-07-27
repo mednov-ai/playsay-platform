@@ -5,17 +5,27 @@ export interface CollaborationServiceConfig {
   collaborationServiceToken: string;
   collaborationTokenSecret: string;
   snapshotIntervalMs: number;
+  websocketHardLimitBytes: number;
+  websocketMaxPayloadBytes: number;
+  websocketSoftLimitBytes: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CollaborationServiceConfig {
-  return {
+  const config = {
     port: numberEnv(env.PORT, 8081),
     keycloakJwksUrl: env.KEYCLOAK_JWKS_URL?.trim() ?? "",
     playsayApiBaseUrl: requiredEnv(env, "PLAYSAY_API_BASE_URL"),
     collaborationServiceToken: requiredEnv(env, "COLLABORATION_SERVICE_TOKEN"),
     collaborationTokenSecret: requiredEnv(env, "COLLABORATION_TOKEN_SECRET"),
     snapshotIntervalMs: numberEnv(env.SNAPSHOT_INTERVAL_MS, 10_000),
+    websocketHardLimitBytes: numberEnv(env.WEBSOCKET_HARD_LIMIT_BYTES, 4 * 1024 * 1024),
+    websocketMaxPayloadBytes: numberEnv(env.WEBSOCKET_MAX_PAYLOAD_BYTES, 4 * 1024 * 1024),
+    websocketSoftLimitBytes: numberEnv(env.WEBSOCKET_SOFT_LIMIT_BYTES, 1024 * 1024),
   };
+  if (config.websocketHardLimitBytes <= config.websocketSoftLimitBytes) {
+    throw new Error("websocket hard limit must exceed the soft limit");
+  }
+  return config;
 }
 
 function requiredEnv(env: NodeJS.ProcessEnv, key: string): string {

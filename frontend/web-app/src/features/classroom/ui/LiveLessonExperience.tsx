@@ -1,6 +1,6 @@
 import { LiveKitRoom } from "@livekit/components-react";
 import { CheckCircle2, Maximize2, Minimize2, PhoneOff, Radio } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import {
   formatLessonRange,
@@ -13,6 +13,7 @@ import {
 } from "../../../shared/api/playsay";
 import { Button } from "../../../components/ui/button";
 import type { LessonRoomSession } from "../model/session";
+import { lessonLiveKitRoomOptions } from "../model/liveKitRoomOptions";
 import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoStage";
 import { LessonWorkspace } from "./LessonWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -85,6 +86,10 @@ export function LiveLessonExperience({
       ? "videoOnly"
       : "lesson";
   const showWorkspace = shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
+  const liveKitRoomOptions = useMemo(
+    () => lessonLiveKitRoomOptions(session.mediaChoices.audioOutputDeviceId),
+    [session.mediaChoices.audioOutputDeviceId],
+  );
 
   useEffect(() => {
     document.body.classList.toggle("playsay-classroom-video-expanded", videoExpanded);
@@ -148,7 +153,7 @@ export function LiveLessonExperience({
         className="playsay-livekit-context"
         connect
         data-lk-theme="default"
-        options={{ audioOutput: { deviceId: session.mediaChoices.audioOutputDeviceId } }}
+        options={liveKitRoomOptions}
         serverUrl={session.serverUrl}
         token={session.token}
         video={session.mediaChoices.videoEnabled ? { deviceId: session.mediaChoices.videoDeviceId } : false}

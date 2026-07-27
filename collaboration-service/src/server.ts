@@ -6,7 +6,12 @@ import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import { tokenFromRequestUrl, verifyCollaborationToken } from "./auth.js";
+import {
+  sendWithBackpressure,
+  type CollaborationBackpressurePolicy,
+} from "./backpressure.js";
 import { loadConfig } from "./config.js";
+import { CollaborationMetrics } from "./metrics.js";
 import { SnapshotQueue } from "./snapshots.js";
 import type { CollaborationClaims } from "./rooms.js";
 import { assertRoomMatchesClaims } from "./rooms.js";
@@ -25,12 +30,46 @@ const rooms = new Map<string, CollaborationRoom>();
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const snapshots = new SnapshotQueue(config);
-  const server = http.createServer((_request, response) => {
-    response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ status: "ok" }));
+  const metrics = new CollaborationMetrics();
+  const snapshots = new SnapshotQueue(config, metrics);
+  const backpressurePolicy = {
+    hardLimitBytes: config.websocketHardLimitBytes,
+    softLimitBytes: config.websocketSoftLimitBytes,
+  };
+  const wss = new WebSocketServer({
+    maxPayload: config.websocketMaxPayloadBytes,
+    noServer: true,
   });
-  const wss = new WebSocketServer({ noServer: true });
+  const server = http.createServer((request, response) => {
+    if (request.url === "/healthz") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+    if (request.url === "/metrics") {
+      const bufferedBytes = [...wss.clients].reduce(
+        (total, client) => total + client.bufferedAmount,
+        0,
+      );
+      void metrics
+        .render({
+          activeConnections: wss.clients.size,
+          activeRooms: rooms.size,
+          bufferedBytes,
+        })
+        .then((body) => {
+          response.writeHead(200, { "content-type": metrics.contentType });
+          response.end(body);
+        })
+        .catch(() => {
+          response.writeHead(500);
+          response.end();
+        });
+      return;
+    }
+    response.writeHead(404);
+    response.end();
+  });
 
   snapshots.start();
 
@@ -58,10 +97,13 @@ async function main(): Promise<void> {
       });
   });
 
-  wss.on("connection", (ws: WebSocket, _request: http.IncomingMessage, claims: CollaborationClaims) => {
-    const room = getRoom(claims);
-    bindWebSocket(room, ws, snapshots);
-  });
+  wss.on(
+    "connection",
+    (ws: WebSocket, _request: http.IncomingMessage, claims: CollaborationClaims) => {
+      const room = getRoom(claims);
+      bindWebSocket(room, ws, snapshots, backpressurePolicy, metrics);
+    },
+  );
 
   process.on("SIGTERM", () => {
     shutdown(server, wss, snapshots);
@@ -92,12 +134,18 @@ function getRoom(claims: CollaborationClaims): CollaborationRoom {
   return room;
 }
 
-function bindWebSocket(room: CollaborationRoom, ws: WebSocket, snapshots: SnapshotQueue): void {
+function bindWebSocket(
+  room: CollaborationRoom,
+  ws: WebSocket,
+  snapshots: SnapshotQueue,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   room.connections.set(ws, new Set());
 
   const updateHandler = (update: Uint8Array, origin: unknown) => {
     if (origin !== ws) {
-      sendSyncUpdate(ws, update);
+      sendSyncUpdate(ws, update, backpressurePolicy, metrics);
     }
     snapshots.markDirty(room.claims, room.doc);
   };
@@ -109,14 +157,14 @@ function bindWebSocket(room: CollaborationRoom, ws: WebSocket, snapshots: Snapsh
     if (origin === ws) {
       room.connections.set(ws, new Set(changedClients));
     }
-    broadcastAwareness(room, changedClients, ws);
+    broadcastAwareness(room, changedClients, ws, backpressurePolicy, metrics);
   };
 
   room.doc.on("update", updateHandler);
   room.awareness.on("update", awarenessHandler);
 
   ws.on("message", (message) => {
-    handleMessage(room, ws, message);
+    handleMessage(room, ws, message, backpressurePolicy, metrics);
   });
 
   ws.on("close", () => {
@@ -132,11 +180,17 @@ function bindWebSocket(room: CollaborationRoom, ws: WebSocket, snapshots: Snapsh
     }
   });
 
-  sendSyncStep1(ws, room.doc);
-  sendCurrentAwareness(ws, room.awareness);
+  sendSyncStep1(ws, room.doc, backpressurePolicy, metrics);
+  sendCurrentAwareness(ws, room.awareness, backpressurePolicy, metrics);
 }
 
-function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData): void {
+function handleMessage(
+  room: CollaborationRoom,
+  ws: WebSocket,
+  message: RawData,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   const bytes = rawDataToUint8Array(message);
   const decoder = decoding.createDecoder(bytes);
   const messageType = decoding.readVarUint(decoder);
@@ -146,7 +200,13 @@ function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData)
     encoding.writeVarUint(encoder, messageSync);
     syncProtocol.readSyncMessage(decoder, encoder, room.doc, ws);
     if (encoding.length(encoder) > 1) {
-      ws.send(encoding.toUint8Array(encoder));
+      sendWithBackpressure(
+        ws,
+        encoding.toUint8Array(encoder),
+        "sync",
+        backpressurePolicy,
+        metrics,
+      );
     }
     return;
   }
@@ -156,21 +216,36 @@ function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData)
   }
 }
 
-function sendSyncStep1(ws: WebSocket, doc: Y.Doc): void {
+function sendSyncStep1(
+  ws: WebSocket,
+  doc: Y.Doc,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageSync);
   syncProtocol.writeSyncStep1(encoder, doc);
-  ws.send(encoding.toUint8Array(encoder));
+  sendWithBackpressure(ws, encoding.toUint8Array(encoder), "sync", backpressurePolicy, metrics);
 }
 
-function sendSyncUpdate(ws: WebSocket, update: Uint8Array): void {
+function sendSyncUpdate(
+  ws: WebSocket,
+  update: Uint8Array,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageSync);
   syncProtocol.writeUpdate(encoder, update);
-  ws.send(encoding.toUint8Array(encoder));
+  sendWithBackpressure(ws, encoding.toUint8Array(encoder), "sync", backpressurePolicy, metrics);
 }
 
-function sendCurrentAwareness(ws: WebSocket, awareness: awarenessProtocol.Awareness): void {
+function sendCurrentAwareness(
+  ws: WebSocket,
+  awareness: awarenessProtocol.Awareness,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   const states = [...awareness.getStates().keys()];
   if (states.length === 0) {
     return;
@@ -178,10 +253,25 @@ function sendCurrentAwareness(ws: WebSocket, awareness: awarenessProtocol.Awaren
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageAwareness);
   encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(awareness, states));
-  ws.send(encoding.toUint8Array(encoder));
+  sendWithBackpressure(
+    ws,
+    encoding.toUint8Array(encoder),
+    "awareness",
+    backpressurePolicy,
+    metrics,
+  );
 }
 
-function broadcastAwareness(room: CollaborationRoom, changedClients: number[], origin: WebSocket): void {
+function broadcastAwareness(
+  room: CollaborationRoom,
+  changedClients: number[],
+  origin: WebSocket,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
+  if (changedClients.length === 0) {
+    return;
+  }
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageAwareness);
   encoding.writeVarUint8Array(
@@ -191,7 +281,7 @@ function broadcastAwareness(room: CollaborationRoom, changedClients: number[], o
   const payload = encoding.toUint8Array(encoder);
   room.connections.forEach((_controlledIds, connection) => {
     if (connection !== origin && connection.readyState === connection.OPEN) {
-      connection.send(payload);
+      sendWithBackpressure(connection, payload, "awareness", backpressurePolicy, metrics);
     }
   });
 }
@@ -206,7 +296,9 @@ function rawDataToUint8Array(data: RawData): Uint8Array {
   return new Uint8Array(data);
 }
 
-function runCatching<T>(action: () => T): { value: T; error?: never } | { value?: never; error: unknown } {
+function runCatching<T>(
+  action: () => T,
+): { value: T; error?: never } | { value?: never; error: unknown } {
   try {
     return { value: action() };
   } catch (error) {

@@ -7,6 +7,11 @@ export interface SnapshotConfig {
   snapshotIntervalMs: number;
 }
 
+export interface SnapshotMetrics {
+  recordSnapshotFlush(outcome: "saved" | "discard" | "retry", durationSeconds: number): void;
+  setSnapshotQueueSize(size: number): void;
+}
+
 interface DirtyRoom {
   claims: CollaborationClaims;
   doc: Y.Doc;
@@ -16,10 +21,14 @@ export class SnapshotQueue {
   private readonly dirtyRooms = new Map<string, DirtyRoom>();
   private interval: NodeJS.Timeout | undefined;
 
-  constructor(private readonly config: SnapshotConfig) {}
+  constructor(
+    private readonly config: SnapshotConfig,
+    private readonly metrics?: SnapshotMetrics,
+  ) {}
 
   markDirty(claims: CollaborationClaims, doc: Y.Doc): void {
     this.dirtyRooms.set(claims.documentId, { claims, doc });
+    this.metrics?.setSnapshotQueueSize(this.dirtyRooms.size);
   }
 
   start(): void {
@@ -42,7 +51,7 @@ export class SnapshotQueue {
   async flushAll(): Promise<void> {
     const entries = [...this.dirtyRooms.values()];
     this.dirtyRooms.clear();
-
+    this.metrics?.setSnapshotQueueSize(0);
     await Promise.all(entries.map((entry) => this.flushWithRecovery(entry)));
   }
 
@@ -50,10 +59,12 @@ export class SnapshotQueue {
     const result = await this.flush(entry);
     if (result === "retry") {
       this.dirtyRooms.set(entry.claims.documentId, entry);
+      this.metrics?.setSnapshotQueueSize(this.dirtyRooms.size);
     }
   }
 
   private async flush(entry: DirtyRoom): Promise<"saved" | "discard" | "retry"> {
+    const startedAt = performance.now();
     const snapshot = {
       schemaVersion: 1,
       encoding: "yjs-update-v1",
@@ -77,15 +88,17 @@ export class SnapshotQueue {
       return null;
     });
 
+    let outcome: "saved" | "discard" | "retry";
     if (!response) {
-      return "retry";
-    }
-
-    if (!response.ok) {
+      outcome = "retry";
+    } else if (!response.ok) {
       console.warn(snapshotFailureMessage(entry, `HTTP ${response.status}`));
-      return isRetryableSnapshotStatus(response.status) ? "retry" : "discard";
+      outcome = isRetryableSnapshotStatus(response.status) ? "retry" : "discard";
+    } else {
+      outcome = "saved";
     }
-    return "saved";
+    this.metrics?.recordSnapshotFlush(outcome, (performance.now() - startedAt) / 1000);
+    return outcome;
   }
 }
 

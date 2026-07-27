@@ -44,6 +44,8 @@ export function useExternalActivitySession({
   const collapseTimerRef = useRef<number | null>(null);
   const extensionTimerRef = useRef<number | null>(null);
   const blocksRef = useRef(blocks);
+  const handledInputEventsRef = useRef(new Set<string>());
+  const stateResponseReceivedRef = useRef(false);
 
   useEffect(() => { blocksRef.current = blocks; }, [blocks]);
   useEffect(() => { activeRef.current = active; }, [active]);
@@ -146,6 +148,15 @@ export function useExternalActivitySession({
       const message = parseExternalActivityMessage(decoded);
       if (!message || !participant) return;
 
+      if (message.type === "REQUEST_STATE" && isHost) {
+        const current = activeRef.current;
+        if (current) {
+          broadcastState(current);
+        } else {
+          publish({ version: 1, type: "HOST_IDLE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
+        }
+        return;
+      }
       if (message.type === "REQUEST_OPEN" && isHost) {
         void startHostSession(message.blockId, message.sessionId);
         return;
@@ -155,6 +166,12 @@ export function useExternalActivitySession({
         return;
       }
       if (message.type === "INPUT" && isHost && message.input && activeRef.current?.sessionId === message.sessionId) {
+        if (!message.eventId || handledInputEventsRef.current.has(message.eventId)) return;
+        handledInputEventsRef.current.add(message.eventId);
+        if (handledInputEventsRef.current.size > 500) {
+          const oldest = handledInputEventsRef.current.values().next().value;
+          if (oldest) handledInputEventsRef.current.delete(oldest);
+        }
         if (!activeRef.current.studentsLocked) {
           const nonce = extensionNonceRef.current;
           if (nonce) postExtensionCommand({ version: 1, type: "INPUT", sessionId: message.sessionId, nonce, input: message.input });
@@ -176,6 +193,7 @@ export function useExternalActivitySession({
       }
       if (message.type === "STOPPED") {
         if (!participantCanHostExternalActivity(participant.metadata)) return;
+        stateResponseReceivedRef.current = true;
         if (activeRef.current?.sessionId === message.sessionId && (!activeRef.current.hostIdentity || activeRef.current.hostIdentity === participant.identity)) {
           setActive(null);
           activeRef.current = null;
@@ -184,8 +202,18 @@ export function useExternalActivitySession({
         }
         return;
       }
+      if (message.type === "HOST_IDLE") {
+        if (!participantCanHostExternalActivity(participant.metadata)) return;
+        stateResponseReceivedRef.current = true;
+        setActive(null);
+        activeRef.current = null;
+        setMediaStream(null);
+        setCursorsByIdentity({});
+        return;
+      }
       if (message.type === "HOST_STATE" && message.phase) {
         if (!participantCanHostExternalActivity(participant.metadata)) return;
+        stateResponseReceivedRef.current = true;
         const current = activeRef.current;
         if (current?.hostIdentity && current.hostIdentity !== participant.identity) return;
         const nextState: ExternalActivityState = {
@@ -204,6 +232,47 @@ export function useExternalActivitySession({
     room.on(RoomEvent.DataReceived, handleData);
     return () => { room.off(RoomEvent.DataReceived, handleData); };
   }, [collapseHostSession, enabled, isHost, postExtensionCommand, room, startHostSession]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const announceOrRequestState = () => {
+      if (isHost) {
+        const current = activeRef.current;
+        if (current) broadcastState(current);
+        else publish({ version: 1, type: "HOST_IDLE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
+      } else {
+        stateResponseReceivedRef.current = false;
+        publish({ version: 1, type: "REQUEST_STATE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
+      }
+    };
+    let retryCount = 0;
+    const retryTimer = isHost ? null : window.setInterval(() => {
+      if (stateResponseReceivedRef.current || retryCount >= 5) {
+        if (retryTimer !== null) window.clearInterval(retryTimer);
+        return;
+      }
+      retryCount += 1;
+      publish({ version: 1, type: "REQUEST_STATE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
+    }, 1_000);
+    const handleParticipantDisconnected = (participant: RemoteParticipant) => {
+      if (activeRef.current?.hostIdentity !== participant.identity) return;
+      activeRef.current = null;
+      setActive(null);
+      setMediaStream(null);
+      setCursorsByIdentity({});
+      stateResponseReceivedRef.current = false;
+    };
+    room.on(RoomEvent.ParticipantConnected, announceOrRequestState);
+    room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+    room.on(RoomEvent.Reconnected, announceOrRequestState);
+    announceOrRequestState();
+    return () => {
+      if (retryTimer !== null) window.clearInterval(retryTimer);
+      room.off(RoomEvent.ParticipantConnected, announceOrRequestState);
+      room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+      room.off(RoomEvent.Reconnected, announceOrRequestState);
+    };
+  }, [broadcastState, enabled, isHost, publish, room]);
 
   useEffect(() => {
     if (!enabled || !isHost) return undefined;

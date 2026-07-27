@@ -223,7 +223,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
   }, [onElementSizeChange]);
 
   useLayoutEffect(() => {
-    if (!sizeableTextElement) return undefined;
+    if (!sizeableTextElement || !editing) return undefined;
     let cancelled = false;
     let frameId: number | null = null;
     const measure = () => {
@@ -278,6 +278,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
       if (frameId !== null) cancelAnimationFrame(frameId);
     };
   }, [
+    editing,
     sizeableAutoHeight,
     sizeableAutoWidth,
     sizeableTextElement?.fontSize,

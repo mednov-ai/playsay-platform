@@ -7,6 +7,7 @@ import com.playsay.gateway.dto.FinalizeCollaborationDocumentRequest
 import com.playsay.gateway.dto.MaterialSubmissionResponse
 import com.playsay.gateway.dto.SaveCollaborationSnapshotRequest
 import com.playsay.gateway.service.CollaborationDocumentService
+import com.playsay.gateway.service.CollaborationSnapshotService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController
 @Tag(name = "Collaboration")
 class CollaborationDocumentController(
     private val service: CollaborationDocumentService,
+    private val snapshotService: CollaborationSnapshotService,
 ) {
     @GetMapping(
         "/schedule/lessons/{lessonId}/collaboration-documents/current",
@@ -137,10 +139,28 @@ class CollaborationDocumentController(
         @RequestHeader("X-PlaySay-Collaboration-Service-Token", required = false) serviceToken: String? = null,
     ): CollaborationDocumentResponse =
         if (authentication != null) {
-            service.saveSnapshot(authentication, lessonId, documentId, request)
+            snapshotService.saveSnapshot(authentication, lessonId, documentId, request)
         } else {
-            service.saveSnapshotFromService(serviceToken, lessonId, documentId, request)
+            snapshotService.saveSnapshotFromService(serviceToken, lessonId, documentId, request)
         }
+
+    @GetMapping(
+        "/schedule/lessons/{lessonId}/collaboration-documents/{documentId}/snapshot",
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "getCollaborationDocumentSnapshotForService",
+        summary = "Load collaboration document snapshot",
+        description = "Internal snapshot restore endpoint for the collaboration service.",
+        hidden = true,
+    )
+    fun getSnapshotForService(
+        @PathVariable lessonId: UUID,
+        @PathVariable documentId: UUID,
+        @Parameter(hidden = true)
+        @RequestHeader("X-PlaySay-Collaboration-Service-Token", required = false) serviceToken: String? = null,
+    ): CollaborationDocumentResponse =
+        snapshotService.getSnapshotFromService(serviceToken, lessonId, documentId)
 
     @PostMapping(
         "/schedule/lessons/{lessonId}/collaboration-documents/{documentId}/finalize",
@@ -168,7 +188,7 @@ class CollaborationDocumentController(
         @PathVariable documentId: UUID,
         @RequestBody request: FinalizeCollaborationDocumentRequest,
     ): MaterialSubmissionResponse =
-        service.finalize(authentication, lessonId, documentId, request)
+        snapshotService.finalize(authentication, lessonId, documentId, request)
 
     @PostMapping(
         "/schedule/lessons/{lessonId}/collaboration-documents/{documentId}/token",

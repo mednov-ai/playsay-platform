@@ -15,6 +15,7 @@ interface DirtyRoom {
 export class SnapshotQueue {
   private readonly dirtyRooms = new Map<string, DirtyRoom>();
   private interval: NodeJS.Timeout | undefined;
+  private flushing: Promise<void> | null = null;
 
   constructor(private readonly config: SnapshotConfig) {}
 
@@ -39,16 +40,43 @@ export class SnapshotQueue {
     this.interval = undefined;
   }
 
+  async load(claims: CollaborationClaims): Promise<unknown | null> {
+    const url = new URL(
+      `/schedule/lessons/${claims.lessonId}/collaboration-documents/${claims.documentId}/snapshot`,
+      this.config.playsayApiBaseUrl,
+    );
+    const response = await fetch(url, {
+      headers: {
+        "x-playsay-collaboration-service-token": this.config.collaborationServiceToken,
+      },
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`snapshot restore failed with HTTP ${response.status}`);
+    const document = await response.json() as { snapshot?: unknown };
+    return document.snapshot ?? null;
+  }
+
   async flushAll(): Promise<void> {
+    if (this.flushing) {
+      return this.flushing;
+    }
+    this.flushing = this.drain();
+    try {
+      await this.flushing;
+    } finally {
+      this.flushing = null;
+    }
+  }
+
+  private async drain(): Promise<void> {
     const entries = [...this.dirtyRooms.values()];
     this.dirtyRooms.clear();
-
     await Promise.all(entries.map((entry) => this.flushWithRecovery(entry)));
   }
 
   private async flushWithRecovery(entry: DirtyRoom): Promise<void> {
     const result = await this.flush(entry);
-    if (result === "retry") {
+    if (result === "retry" && !this.dirtyRooms.has(entry.claims.documentId)) {
       this.dirtyRooms.set(entry.claims.documentId, entry);
     }
   }

@@ -31,6 +31,27 @@ describe("external activity classroom protocol", () => {
     });
     expect(parseExternalActivityMessage({ version: 2, type: "REQUEST_OPEN", sessionId: "session-1", blockId: "block-1" })).toBeNull();
     expect(parseExternalActivityMessage({ version: 1, type: "INPUT", sessionId: "session-1", blockId: "block-1", input: { type: "clipboard" } })).toBeNull();
+    expect(parseExternalActivityMessage({
+      version: 1,
+      type: "INPUT",
+      sessionId: "session-1",
+      blockId: "block-1",
+      input: { type: "key", action: "down", key: "a" },
+    })).toBeNull();
+    expect(parseExternalActivityMessage({
+      version: 1,
+      type: "INPUT",
+      eventId: "event-1",
+      sessionId: "session-1",
+      blockId: "block-1",
+      input: { type: "key", action: "down", key: "a" },
+    })).toMatchObject({ eventId: "event-1", type: "INPUT" });
+    expect(parseExternalActivityMessage({
+      version: 1,
+      type: "REQUEST_STATE",
+      sessionId: "current",
+      blockId: "current",
+    })).toMatchObject({ type: "REQUEST_STATE" });
   });
 
   it("accepts extension capture only for the expected session", () => {

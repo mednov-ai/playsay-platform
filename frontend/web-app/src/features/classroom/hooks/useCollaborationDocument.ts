@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createCurrentCollaborationDocument,
   finalizeCollaborationDocument,
@@ -28,11 +28,13 @@ export function useCollaborationDocument({
   const [finalizing, setFinalizing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const requestGenerationRef = useRef(0);
 
   const scope = collaborationScopeForMode(mode);
   const activeDocument = document?.scope === scope ? document : null;
 
   const refresh = useCallback(async () => {
+    const requestGeneration = ++requestGenerationRef.current;
     if (!enabled || !materialId) {
       setDocument(null);
       setError(null);
@@ -48,31 +50,24 @@ export function useCollaborationDocument({
         materialId,
         scope: scope as CollaborationDocumentScope,
       });
+      if (requestGenerationRef.current !== requestGeneration) return null;
       setDocument(nextDocument);
       return nextDocument;
     } catch (caught) {
+      if (requestGenerationRef.current !== requestGeneration) return null;
       const nextError = caught instanceof Error ? caught.message : t("classroom.collaboration.loadFailed");
       setDocument(null);
       setError(nextError);
       return null;
     } finally {
-      setLoading(false);
+      if (requestGenerationRef.current === requestGeneration) setLoading(false);
     }
   }, [enabled, lessonId, materialId, scope, t]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      const nextDocument = await refresh();
-      if (cancelled && nextDocument) {
-        setDocument(null);
-      }
-    }
-
-    void load();
+    void refresh();
     return () => {
-      cancelled = true;
+      requestGenerationRef.current += 1;
     };
   }, [refresh]);
 

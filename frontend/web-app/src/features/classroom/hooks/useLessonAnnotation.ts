@@ -30,9 +30,13 @@ import {
 } from "../model/annotation";
 
 type LiveAnnotationSync = {
+  canRedo?: boolean;
+  canUndo?: boolean;
   elements: AnnotationElement[];
   ready: boolean;
+  redo?: () => void;
   setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
+  undo?: () => void;
 };
 
 type AnnotationHistoryEntry = {
@@ -145,6 +149,7 @@ export function useLessonAnnotation({
           const currentLiveAnnotation = liveAnnotationRef.current;
           if (currentLiveAnnotation) {
             if (
+              currentLiveAnnotation.ready &&
               !liveSeedAttemptedRef.current &&
               !localLiveMutationRef.current &&
               liveElementCountRef.current === 0 &&
@@ -184,18 +189,20 @@ export function useLessonAnnotation({
     setEditingElementId(null);
     void loadAnnotation();
 
-    const intervalId = window.setInterval(() => {
-      void loadAnnotation();
-    }, 2_000);
+    const intervalId = liveAnnotationRef.current
+      ? null
+      : window.setInterval(() => {
+        void loadAnnotation();
+      }, 2_000);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      if (intervalId !== null) window.clearInterval(intervalId);
     };
-  }, [lessonId, materialId, normalizedInitialPageId]);
+  }, [lessonId, liveAnnotation?.ready, liveAnnotation?.setElements, materialId, normalizedInitialPageId]);
 
   useEffect(() => {
-    if (!materialId || !annotationReady) {
+    if (!materialId || !annotationReady || liveAnnotationRef.current) {
       return undefined;
     }
 
@@ -606,6 +613,10 @@ export function useLessonAnnotation({
   }
 
   function undo() {
+    if (liveAnnotationRef.current?.undo) {
+      liveAnnotationRef.current.undo();
+      return;
+    }
     const entry = undoHistoryRef.current.pop();
     if (!entry) {
       return;
@@ -616,6 +627,10 @@ export function useLessonAnnotation({
   }
 
   function redo() {
+    if (liveAnnotationRef.current?.redo) {
+      liveAnnotationRef.current.redo();
+      return;
+    }
     const entry = redoHistoryRef.current.pop();
     if (!entry) {
       return;
@@ -866,6 +881,9 @@ export function useLessonAnnotation({
   }
 
   function recordHistory(before: AnnotationElement[], after: AnnotationElement[]) {
+    if (liveAnnotationRef.current) {
+      return;
+    }
     if (JSON.stringify(before) === JSON.stringify(after)) {
       return;
     }
@@ -914,8 +932,8 @@ export function useLessonAnnotation({
     beginElementMove,
     beginElementResize,
     beginTextEditing,
-    canRedo: historyState.canRedo,
-    canUndo: historyState.canUndo,
+    canRedo: liveAnnotation?.canRedo ?? historyState.canRedo,
+    canUndo: liveAnnotation?.canUndo ?? historyState.canUndo,
     deleteSelectedElement,
     editingElementId,
     endAnnotation,

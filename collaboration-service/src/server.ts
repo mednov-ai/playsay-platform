@@ -13,15 +13,19 @@ import { assertRoomMatchesClaims } from "./rooms.js";
 
 const messageSync = 0;
 const messageAwareness = 1;
+const messageEphemeral = 2;
+const maxEphemeralPayloadBytes = 64 * 1024;
 
 interface CollaborationRoom {
   claims: CollaborationClaims;
   doc: Y.Doc;
   awareness: awarenessProtocol.Awareness;
   connections: Map<WebSocket, Set<number>>;
+  destroy: () => void;
+  idleTimer: NodeJS.Timeout | null;
 }
 
-const rooms = new Map<string, CollaborationRoom>();
+const rooms = new Map<string, Promise<CollaborationRoom>>();
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -59,8 +63,22 @@ async function main(): Promise<void> {
   });
 
   wss.on("connection", (ws: WebSocket, _request: http.IncomingMessage, claims: CollaborationClaims) => {
-    const room = getRoom(claims);
-    bindWebSocket(room, ws, snapshots);
+    const pendingMessages: RawData[] = [];
+    const queuePendingMessage = (message: RawData) => {
+      if (pendingMessages.length >= 100) {
+        ws.close(1009, "too many messages while restoring room");
+        return;
+      }
+      pendingMessages.push(message);
+    };
+    ws.on("message", queuePendingMessage);
+    void getRoom(claims, snapshots)
+      .then((room) => {
+        ws.off("message", queuePendingMessage);
+        if (ws.readyState !== ws.OPEN) return;
+        bindWebSocket(room, ws, snapshots, pendingMessages);
+      })
+      .catch(() => ws.close(1011, "room restore failed"));
   });
 
   process.on("SIGTERM", () => {
@@ -75,30 +93,37 @@ async function main(): Promise<void> {
   });
 }
 
-function getRoom(claims: CollaborationClaims): CollaborationRoom {
+function getRoom(claims: CollaborationClaims, snapshots: SnapshotQueue): Promise<CollaborationRoom> {
   const existing = rooms.get(claims.yjsDocumentId);
   if (existing) {
     return existing;
   }
 
+  const roomPromise = createRoom(claims, snapshots);
+  rooms.set(claims.yjsDocumentId, roomPromise);
+  void roomPromise.catch(() => rooms.delete(claims.yjsDocumentId));
+  return roomPromise;
+}
+
+async function createRoom(claims: CollaborationClaims, snapshots: SnapshotQueue): Promise<CollaborationRoom> {
   const doc = new Y.Doc();
-  const room: CollaborationRoom = {
+  const persistedSnapshot = await snapshots.load(claims);
+  applyPersistedSnapshot(doc, persistedSnapshot);
+  const room = {
     claims,
     doc,
     awareness: new awarenessProtocol.Awareness(doc),
     connections: new Map(),
-  };
-  rooms.set(claims.yjsDocumentId, room);
-  return room;
-}
-
-function bindWebSocket(room: CollaborationRoom, ws: WebSocket, snapshots: SnapshotQueue): void {
-  room.connections.set(ws, new Set());
-
+    destroy: () => undefined,
+    idleTimer: null,
+  } satisfies CollaborationRoom;
   const updateHandler = (update: Uint8Array, origin: unknown) => {
-    if (origin !== ws) {
-      sendSyncUpdate(ws, update);
-    }
+    const originSocket = room.connections.has(origin as WebSocket) ? origin as WebSocket : null;
+    room.connections.forEach((_controlledIds, connection) => {
+      if (connection !== originSocket && connection.readyState === connection.OPEN) {
+        sendSyncUpdate(connection, update);
+      }
+    });
     snapshots.markDirty(room.claims, room.doc);
   };
   const awarenessHandler = (
@@ -106,17 +131,52 @@ function bindWebSocket(room: CollaborationRoom, ws: WebSocket, snapshots: Snapsh
     origin: unknown,
   ) => {
     const changedClients = [...changes.added, ...changes.updated, ...changes.removed];
-    if (origin === ws) {
-      room.connections.set(ws, new Set(changedClients));
+    const originSocket = room.connections.has(origin as WebSocket) ? origin as WebSocket : null;
+    if (originSocket) {
+      const controlledIds = room.connections.get(originSocket) ?? new Set<number>();
+      for (const clientId of [...changes.added, ...changes.updated]) {
+        controlledIds.add(clientId);
+      }
+      for (const clientId of changes.removed) {
+        controlledIds.delete(clientId);
+      }
+      room.connections.set(originSocket, controlledIds);
     }
-    broadcastAwareness(room, changedClients, ws);
+    broadcastAwareness(room, changedClients, originSocket);
   };
-
-  room.doc.on("update", updateHandler);
+  doc.on("update", updateHandler);
   room.awareness.on("update", awarenessHandler);
+  room.destroy = () => {
+    if (room.idleTimer) clearTimeout(room.idleTimer);
+    doc.off("update", updateHandler);
+    room.awareness.off("update", awarenessHandler);
+    room.awareness.destroy();
+    doc.destroy();
+  };
+  return room;
+}
+
+function applyPersistedSnapshot(doc: Y.Doc, snapshot: unknown): void {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const value = snapshot as Record<string, unknown>;
+  if (value.encoding !== "yjs-update-v1" || typeof value.yjsUpdateBase64 !== "string") return;
+  Y.applyUpdate(doc, Buffer.from(value.yjsUpdateBase64, "base64"));
+}
+
+function bindWebSocket(
+  room: CollaborationRoom,
+  ws: WebSocket,
+  snapshots: SnapshotQueue,
+  pendingMessages: RawData[] = [],
+): void {
+  if (room.idleTimer) {
+    clearTimeout(room.idleTimer);
+    room.idleTimer = null;
+  }
+  room.connections.set(ws, new Set());
 
   ws.on("message", (message) => {
-    handleMessage(room, ws, message);
+    processMessage(room, ws, message);
   });
 
   ws.on("close", () => {
@@ -125,15 +185,31 @@ function bindWebSocket(room: CollaborationRoom, ws: WebSocket, snapshots: Snapsh
     if (controlledIds && controlledIds.size > 0) {
       awarenessProtocol.removeAwarenessStates(room.awareness, [...controlledIds], ws);
     }
-    room.doc.off("update", updateHandler);
-    room.awareness.off("update", awarenessHandler);
     if (room.connections.size === 0) {
       snapshots.markDirty(room.claims, room.doc);
+      room.idleTimer = setTimeout(() => {
+        room.idleTimer = null;
+        void snapshots.flushAll().finally(() => {
+          if (room.connections.size === 0) {
+            rooms.delete(room.claims.yjsDocumentId);
+            room.destroy();
+          }
+        });
+      }, 30_000);
     }
   });
 
   sendSyncStep1(ws, room.doc);
   sendCurrentAwareness(ws, room.awareness);
+  pendingMessages.forEach((message) => processMessage(room, ws, message));
+}
+
+function processMessage(room: CollaborationRoom, ws: WebSocket, message: RawData): void {
+  try {
+    handleMessage(room, ws, message);
+  } catch {
+    ws.close(1003, "invalid collaboration message");
+  }
 }
 
 function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData): void {
@@ -153,7 +229,27 @@ function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData)
 
   if (messageType === messageAwareness) {
     awarenessProtocol.applyAwarenessUpdate(room.awareness, decoding.readVarUint8Array(decoder), ws);
+    return;
   }
+
+  if (messageType === messageEphemeral) {
+    const payload = decoding.readVarUint8Array(decoder);
+    if (payload.byteLength > maxEphemeralPayloadBytes) {
+      throw new Error("ephemeral payload is too large");
+    }
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, messageEphemeral);
+    encoding.writeVarUint8Array(encoder, payload);
+    const encoded = encoding.toUint8Array(encoder);
+    room.connections.forEach((_controlledIds, connection) => {
+      if (connection !== ws && connection.readyState === connection.OPEN) {
+        connection.send(encoded);
+      }
+    });
+    return;
+  }
+
+  throw new Error("unsupported collaboration message");
 }
 
 function sendSyncStep1(ws: WebSocket, doc: Y.Doc): void {
@@ -181,7 +277,10 @@ function sendCurrentAwareness(ws: WebSocket, awareness: awarenessProtocol.Awaren
   ws.send(encoding.toUint8Array(encoder));
 }
 
-function broadcastAwareness(room: CollaborationRoom, changedClients: number[], origin: WebSocket): void {
+function broadcastAwareness(room: CollaborationRoom, changedClients: number[], origin: WebSocket | null): void {
+  if (changedClients.length === 0) {
+    return;
+  }
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageAwareness);
   encoding.writeVarUint8Array(

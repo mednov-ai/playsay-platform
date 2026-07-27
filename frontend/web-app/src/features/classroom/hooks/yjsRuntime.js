@@ -1,4 +1,4 @@
-/* global Blob, WebSocket, window */
+/* global Blob, TextDecoder, TextEncoder, WebSocket, window */
 
 import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
@@ -8,6 +8,7 @@ import * as Y from "yjs";
 
 const messageSync = 0;
 const messageAwareness = 1;
+const messageEphemeral = 2;
 const annotationElementKinds = new Set([
   "arrow",
   "ellipse",
@@ -28,6 +29,7 @@ export function createYjsWorkspaceRuntime({
   onHtmlGameSnapshotsChange,
   onMaterialAnswersChange = () => undefined,
   onMaterialViewportChange = () => undefined,
+  onAnnotationUndoStateChange = () => undefined,
   onDocumentUpdate,
   onParticipantsChange,
   onTextChange,
@@ -45,8 +47,21 @@ export function createYjsWorkspaceRuntime({
   const ymaterialAnswerFields = ydoc.getMap("materialAnswerFields");
   const ymaterialViewport = ydoc.getMap("materialViewport");
   const awareness = new awarenessProtocol.Awareness(ydoc);
+  const localAnnotationOrigin = {};
+  const annotationUndoManager = new Y.UndoManager(yannotations, {
+    captureTimeout: 500,
+    trackedOrigins: new Set([localAnnotationOrigin]),
+  });
   let socket = null;
   let disposed = false;
+  let materialViewportState = null;
+  let transientHtmlGameInputs = yhtmlGameInputs.toArray();
+  let transientHtmlGameEffects = yhtmlGameEffects.toArray();
+  const pendingEphemeralMessages = new Map();
+  const seenEphemeralIds = new Set([
+    ...transientHtmlGameInputs.map((event) => event?.id),
+    ...transientHtmlGameEffects.map((effect) => effect?.id),
+  ].filter(Boolean));
 
   const updateLocalText = () => {
     if (!disposed) {
@@ -62,10 +77,50 @@ export function createYjsWorkspaceRuntime({
     if (!disposed) onHtmlGameSnapshotsChange(Object.fromEntries(yhtmlGameSnapshots.entries()));
   };
   const updateHtmlGameInputs = () => {
-    if (!disposed) onHtmlGameInputsChange(yhtmlGameInputs.toArray());
+    if (!disposed) {
+      transientHtmlGameInputs = mergeBoundedById(
+        yhtmlGameInputs.toArray(),
+        transientHtmlGameInputs,
+        200,
+      );
+      onHtmlGameInputsChange(transientHtmlGameInputs);
+    }
   };
   const updateHtmlGameEffects = () => {
-    if (!disposed) onHtmlGameEffectsChange(yhtmlGameEffects.toArray());
+    if (!disposed) {
+      transientHtmlGameEffects = mergeBoundedById(
+        yhtmlGameEffects.toArray(),
+        transientHtmlGameEffects,
+        120,
+      );
+      onHtmlGameEffectsChange(transientHtmlGameEffects);
+    }
+  };
+  const applyEphemeralMessage = (message) => {
+    const id = asString(message?.payload?.id);
+    if (!id || seenEphemeralIds.has(id)) return;
+    seenEphemeralIds.add(id);
+    if (seenEphemeralIds.size > 500) {
+      const oldest = seenEphemeralIds.values().next().value;
+      if (oldest) seenEphemeralIds.delete(oldest);
+    }
+    if (message.kind === "html-game-input") {
+      transientHtmlGameInputs = appendBounded(transientHtmlGameInputs, message.payload, 200);
+      onHtmlGameInputsChange(transientHtmlGameInputs);
+    } else if (message.kind === "html-game-effect") {
+      transientHtmlGameEffects = appendBounded(transientHtmlGameEffects, message.payload, 120);
+      onHtmlGameEffectsChange(transientHtmlGameEffects);
+    }
+  };
+  const publishEphemeral = (kind, payload) => {
+    const id = asString(payload?.id);
+    if (!id) return;
+    applyEphemeralMessage({ kind, payload });
+    pendingEphemeralMessages.set(id, { kind, payload });
+    while (pendingEphemeralMessages.size > 200) {
+      pendingEphemeralMessages.delete(pendingEphemeralMessages.keys().next().value);
+    }
+    sendEphemeralMessage(socket, { kind, payload });
   };
   const updateHtmlGamePresentation = () => {
     if (!disposed) onHtmlGamePresentationChange(asString(yhtmlGamePresentation.get("activeBlockId")) || null);
@@ -74,7 +129,21 @@ export function createYjsWorkspaceRuntime({
     if (!disposed) onMaterialAnswersChange(materialAnswersFromFields(ymaterialAnswerFields));
   };
   const updateMaterialViewport = () => {
-    if (!disposed) onMaterialViewportChange(normalizeMaterialViewport(ymaterialViewport.get("state")));
+    if (disposed) return;
+    const persisted = normalizeMaterialViewport(ymaterialViewport.get("state"));
+    if (isNewerViewport(persisted, materialViewportState)) {
+      materialViewportState = persisted;
+      onMaterialViewportChange(materialViewportState);
+      awareness.setLocalStateField("materialViewport", materialViewportState);
+    }
+  };
+  const updateAnnotationUndoState = () => {
+    if (!disposed) {
+      onAnnotationUndoStateChange({
+        canRedo: annotationUndoManager.redoStack.length > 0,
+        canUndo: annotationUndoManager.undoStack.length > 0,
+      });
+    }
   };
   const syncUpdateHandler = (update, origin) => {
     onDocumentUpdate?.(update);
@@ -84,6 +153,15 @@ export function createYjsWorkspaceRuntime({
   };
   const awarenessUpdateHandler = (changes, origin) => {
     updateParticipants(awareness, onParticipantsChange);
+    const latestViewport = latestMaterialViewport(awareness, materialViewportState);
+    if (isNewerViewport(latestViewport, materialViewportState)) {
+      materialViewportState = latestViewport;
+      onMaterialViewportChange(materialViewportState);
+      const localViewport = normalizeMaterialViewport(awareness.getLocalState()?.materialViewport);
+      if (isNewerViewport(materialViewportState, localViewport)) {
+        awareness.setLocalStateField("materialViewport", materialViewportState);
+      }
+    }
     if (origin !== socket) {
       sendAwarenessUpdate(socket, awareness, [
         ...changes.added,
@@ -103,10 +181,15 @@ export function createYjsWorkspaceRuntime({
   ymaterialViewport.observe(updateMaterialViewport);
   ydoc.on("update", syncUpdateHandler);
   awareness.on("update", awarenessUpdateHandler);
+  annotationUndoManager.on("stack-item-added", updateAnnotationUndoState);
+  annotationUndoManager.on("stack-item-popped", updateAnnotationUndoState);
+  annotationUndoManager.on("stack-cleared", updateAnnotationUndoState);
+  annotationUndoManager.on("stack-item-updated", updateAnnotationUndoState);
   awareness.setLocalState({
     cursor: null,
     exerciseInteraction: null,
     htmlGameAuthorities: {},
+    materialViewport: materialViewportState,
     user: { color, name: participantName },
   });
   updateLocalText();
@@ -117,6 +200,7 @@ export function createYjsWorkspaceRuntime({
   updateHtmlGamePresentation();
   updateMaterialAnswers();
   updateMaterialViewport();
+  updateAnnotationUndoState();
 
   return {
     applyAnnotationChanges({ deleteIds, upserts }) {
@@ -124,12 +208,13 @@ export function createYjsWorkspaceRuntime({
       ydoc.transact(() => {
         deleteIds.forEach((id) => yannotations.delete(id));
         nextElements.forEach((element) => writeAnnotationElement(yannotations, element));
-      });
+      }, localAnnotationOrigin);
     },
     destroy() {
       disposed = true;
       socket = null;
       awareness.destroy();
+      annotationUndoManager.destroy();
       ytext.unobserve(updateLocalText);
       yannotations.unobserveDeep(updateLocalAnnotations);
       yhtmlGameSnapshots.unobserve(updateHtmlGameSnapshots);
@@ -142,17 +227,23 @@ export function createYjsWorkspaceRuntime({
       ydoc.destroy();
       onParticipantsChange([]);
     },
+    getClientId() {
+      return ydoc.clientID;
+    },
     getText() {
       return ytext.toString();
     },
     publishHtmlGameEffect(effect) {
-      boundedArrayPush(yhtmlGameEffects, effect, 120);
+      publishEphemeral("html-game-effect", effect);
     },
     publishHtmlGameInput(event) {
-      boundedArrayPush(yhtmlGameInputs, event, 200);
+      publishEphemeral("html-game-input", event);
+    },
+    redoAnnotation() {
+      annotationUndoManager.redo();
     },
     handleSocketMessage(data) {
-      handleMessage(ydoc, awareness, socket, data);
+      handleMessage(ydoc, awareness, socket, data, applyEphemeralMessage);
     },
     setSocket(nextSocket) {
       socket = nextSocket;
@@ -169,10 +260,10 @@ export function createYjsWorkspaceRuntime({
         nextElements.forEach((element) => {
           writeAnnotationElement(yannotations, element);
         });
-      });
+      }, localAnnotationOrigin);
     },
     setHtmlGameSnapshot(blockId, snapshot) {
-      yhtmlGameSnapshots.set(blockId, snapshot);
+      yhtmlGameSnapshots.set(blockId, fitHtmlGameSnapshot(snapshot));
     },
     setHtmlGamePresentedBlock(blockId) {
       const cleanBlockId = asString(blockId);
@@ -206,11 +297,15 @@ export function createYjsWorkspaceRuntime({
         ...viewport,
         revision: Math.max(
           Date.now(),
-          finiteNumberOr(normalizeMaterialViewport(ymaterialViewport.get("state"))?.revision, 0) + 1,
+          finiteNumberOr(materialViewportState?.revision, 0) + 1,
         ),
         sourceClientId: ydoc.clientID,
       });
-      if (normalized) ymaterialViewport.set("state", normalized);
+      if (normalized) {
+        materialViewportState = normalized;
+        onMaterialViewportChange(normalized);
+        awareness.setLocalStateField("materialViewport", normalized);
+      }
     },
     snapshot() {
       return {
@@ -224,6 +319,16 @@ export function createYjsWorkspaceRuntime({
       socket = nextSocket;
       sendSyncStep1(nextSocket, ydoc);
       sendAwarenessUpdate(nextSocket, awareness, [ydoc.clientID]);
+      const now = Date.now();
+      pendingEphemeralMessages.forEach((message, id) => {
+        const age = now - finiteNumberOr(message?.payload?.at, 0);
+        const maxAge = message.kind === "html-game-effect" ? 5_000 : 15_000;
+        if (age >= 0 && age <= maxAge) sendEphemeralMessage(nextSocket, message);
+        else pendingEphemeralMessages.delete(id);
+      });
+    },
+    undoAnnotation() {
+      annotationUndoManager.undo();
     },
     updateCursor(cursor) {
       awareness.setLocalStateField("cursor", cursor);
@@ -385,14 +490,6 @@ export function normalizeExerciseInteraction(value) {
     } : null;
   }
   return null;
-}
-
-function boundedArrayPush(array, value, limit) {
-  array.doc?.transact(() => {
-    array.push([value]);
-    const overflow = array.length - limit;
-    if (overflow > 0) array.delete(0, overflow);
-  });
 }
 
 export function updateHtmlGameAuthorityRuns(current, blockId, runId) {
@@ -676,6 +773,24 @@ function normalizeMaterialViewport(value) {
   };
 }
 
+function latestMaterialViewport(awareness, fallback) {
+  let latest = fallback;
+  awareness.getStates().forEach((state) => {
+    const candidate = normalizeMaterialViewport(state?.materialViewport);
+    if (isNewerViewport(candidate, latest)) latest = candidate;
+  });
+  return latest;
+}
+
+function isNewerViewport(candidate, current) {
+  if (!candidate) return false;
+  if (!current) return true;
+  return candidate.revision > current.revision || (
+    candidate.revision === current.revision
+    && candidate.sourceClientId > current.sourceClientId
+  );
+}
+
 function annotationElementKind(kind, legacyPoints) {
   return annotationElementKinds.has(kind)
     ? kind
@@ -717,7 +832,7 @@ function clampCoordinate(value) {
   return Math.max(0, Math.min(1000, value));
 }
 
-function handleMessage(ydoc, awareness, socket, data) {
+function handleMessage(ydoc, awareness, socket, data, onEphemeralMessage) {
   const decoder = decoding.createDecoder(rawMessageToUint8Array(data));
   const messageType = decoding.readVarUint(decoder);
   if (messageType === messageSync) {
@@ -732,7 +847,59 @@ function handleMessage(ydoc, awareness, socket, data) {
 
   if (messageType === messageAwareness) {
     awarenessProtocol.applyAwarenessUpdate(awareness, decoding.readVarUint8Array(decoder), socket);
+    return;
   }
+
+  if (messageType === messageEphemeral) {
+    try {
+      const payload = decoding.readVarUint8Array(decoder);
+      onEphemeralMessage(JSON.parse(new TextDecoder().decode(payload)));
+    } catch {
+      // Ignore malformed transient room events without affecting Yjs document sync.
+    }
+  }
+}
+
+function sendEphemeralMessage(socket, message) {
+  if (!isSocketOpen(socket)) return;
+  const payload = new TextEncoder().encode(JSON.stringify(message));
+  if (payload.byteLength > 64 * 1024) return;
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageEphemeral);
+  encoding.writeVarUint8Array(encoder, payload);
+  socket.send(encoding.toUint8Array(encoder));
+}
+
+function appendBounded(current, value, limit) {
+  const next = [...current, value];
+  return next.length > limit ? next.slice(next.length - limit) : next;
+}
+
+function fitHtmlGameSnapshot(snapshot) {
+  const maxSnapshotCharacters = 240_000;
+  if (!snapshot?.canvases || JSON.stringify(snapshot).length <= maxSnapshotCharacters) {
+    return snapshot;
+  }
+  const canvases = { ...snapshot.canvases };
+  const bySizeDescending = Object.entries(canvases)
+    .sort((left, right) => right[1].length - left[1].length);
+  const next = { ...snapshot, canvases };
+  for (const [canvasId] of bySizeDescending) {
+    delete canvases[canvasId];
+    if (JSON.stringify(next).length <= maxSnapshotCharacters) break;
+  }
+  return next;
+}
+
+function mergeBoundedById(...args) {
+  const limit = args.pop();
+  const byId = new Map();
+  args.flat().forEach((value) => {
+    const id = asString(value?.id);
+    if (id) byId.set(id, value);
+  });
+  const merged = [...byId.values()];
+  return merged.length > limit ? merged.slice(merged.length - limit) : merged;
 }
 
 function sendSyncStep1(socket, ydoc) {

@@ -58,18 +58,25 @@ export function StudentLiveWorkspace({
       return null;
     }
     return {
+      canRedo: groupAnnotationWorkspace.annotationUndoState.canRedo,
+      canUndo: groupAnnotationWorkspace.annotationUndoState.canUndo,
       participants: sharedPresenceEnabled ? groupAnnotationWorkspace.participants : [],
       ready: groupAnnotationWorkspace.connected,
+      redo: groupAnnotationWorkspace.redoAnnotation,
       elements: groupAnnotationWorkspace.annotationElements,
       setElements: groupAnnotationWorkspace.setAnnotationElements,
+      undo: groupAnnotationWorkspace.undoAnnotation,
       updateCursor: sharedPresenceEnabled ? groupAnnotationWorkspace.updateCursor : () => undefined,
     };
   }, [
     groupAnnotationDocumentState.document?.id,
     groupAnnotationWorkspace.annotationElements,
+    groupAnnotationWorkspace.annotationUndoState,
     groupAnnotationWorkspace.connected,
     groupAnnotationWorkspace.participants,
     groupAnnotationWorkspace.setAnnotationElements,
+    groupAnnotationWorkspace.redoAnnotation,
+    groupAnnotationWorkspace.undoAnnotation,
     groupAnnotationWorkspace.updateCursor,
     sharedPresenceEnabled,
   ]);
@@ -78,6 +85,7 @@ export function StudentLiveWorkspace({
     [groupAnnotationWorkspace.htmlGameSync],
   );
   const viewportSync = useMemo(() => ({
+    clientId: groupAnnotationWorkspace.workspaceClientId,
     publish: groupAnnotationWorkspace.setMaterialViewport,
     ready: groupAnnotationWorkspace.connected,
     state: groupAnnotationWorkspace.materialViewport,
@@ -85,6 +93,7 @@ export function StudentLiveWorkspace({
     groupAnnotationWorkspace.connected,
     groupAnnotationWorkspace.materialViewport,
     groupAnnotationWorkspace.setMaterialViewport,
+    groupAnnotationWorkspace.workspaceClientId,
   ]);
   const externalActivityBlocks = useMemo(
     () => materialDocumentBlocks(material),

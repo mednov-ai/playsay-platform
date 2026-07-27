@@ -133,18 +133,25 @@ export function LessonWorkspace({
       return null;
     }
     return {
+      canRedo: teacherAnnotationWorkspace.annotationUndoState.canRedo,
+      canUndo: teacherAnnotationWorkspace.annotationUndoState.canUndo,
       participants: teacherAnnotationWorkspace.participants,
       ready: teacherAnnotationWorkspace.connected,
+      redo: teacherAnnotationWorkspace.redoAnnotation,
       elements: teacherAnnotationWorkspace.annotationElements,
       setElements: teacherAnnotationWorkspace.setAnnotationElements,
+      undo: teacherAnnotationWorkspace.undoAnnotation,
       updateCursor: teacherAnnotationWorkspace.updateCursor,
     };
   }, [
     teacherAnnotationDocumentState.document?.id,
     teacherAnnotationWorkspace.annotationElements,
+    teacherAnnotationWorkspace.annotationUndoState,
     teacherAnnotationWorkspace.connected,
     teacherAnnotationWorkspace.participants,
     teacherAnnotationWorkspace.setAnnotationElements,
+    teacherAnnotationWorkspace.redoAnnotation,
+    teacherAnnotationWorkspace.undoAnnotation,
     teacherAnnotationWorkspace.updateCursor,
   ]);
   const teacherHtmlGameSync = useMemo(
@@ -152,6 +159,7 @@ export function LessonWorkspace({
     [teacherAnnotationWorkspace.htmlGameSync],
   );
   const teacherViewportSync = useMemo(() => ({
+    clientId: teacherAnnotationWorkspace.workspaceClientId,
     publish: teacherAnnotationWorkspace.setMaterialViewport,
     ready: teacherAnnotationWorkspace.connected,
     state: teacherAnnotationWorkspace.materialViewport,
@@ -159,6 +167,7 @@ export function LessonWorkspace({
     teacherAnnotationWorkspace.connected,
     teacherAnnotationWorkspace.materialViewport,
     teacherAnnotationWorkspace.setMaterialViewport,
+    teacherAnnotationWorkspace.workspaceClientId,
   ]);
   const externalActivityBlocks = useMemo(
     () => visibleMaterial ? materialDocumentBlocks(visibleMaterial) : [],

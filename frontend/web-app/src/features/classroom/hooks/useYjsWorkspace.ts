@@ -20,10 +20,11 @@ import type {
   MaterialExerciseSync,
 } from "../../materials/model/types";
 import type { MaterialViewportState, MaterialViewportUpdate } from "../model/materialViewport";
+import { realtimeReconnectDelayMs } from "../model/realtimeLifecycle";
 
 export type { CollaborationCursor, CollaborationParticipant };
 
-export type YjsWorkspaceStatus = "idle" | "connecting" | "connected" | "disconnected" | "error";
+export type YjsWorkspaceStatus = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
 
 export function useYjsWorkspace({
   color,
@@ -46,6 +47,8 @@ export function useYjsWorkspace({
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
   const [materialViewport, setMaterialViewportState] = useState<MaterialViewportState | null>(null);
+  const [workspaceClientId, setWorkspaceClientId] = useState<number | null>(null);
+  const [annotationUndoState, setAnnotationUndoState] = useState({ canRedo: false, canUndo: false });
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -62,14 +65,19 @@ export function useYjsWorkspace({
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
+      setWorkspaceClientId(null);
+      setAnnotationUndoState({ canRedo: false, canUndo: false });
       exerciseInteractionRef.current = null;
       return undefined;
     }
 
     let disposed = false;
+    let reconnectTimer: number | null = null;
+    let reconnectAttempt = 0;
     const runtime = createYjsWorkspaceRuntime({
       color,
       onAnnotationChange: setAnnotationElementsState,
+      onAnnotationUndoStateChange: setAnnotationUndoState,
       onHtmlGameEffectsChange: setHtmlGameEffects,
       onHtmlGameInputsChange: setHtmlGameInputs,
       onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
@@ -82,44 +90,90 @@ export function useYjsWorkspace({
       snapshot: document.snapshot,
     });
     runtimeRef.current = runtime;
+    setWorkspaceClientId(runtime.getClientId());
     setStatus("connecting");
 
-    void createCollaborationDocumentToken(document.lessonId, document.id)
-      .then((tokenResponse) => {
-        if (disposed) {
-          return;
-        }
+    const clearReconnectTimer = () => {
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    };
+    const scheduleReconnect = () => {
+      if (disposed || reconnectTimer !== null) return;
+      setStatus("reconnecting");
+      const delay = realtimeReconnectDelayMs(reconnectAttempt);
+      reconnectAttempt += 1;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        void connect();
+      }, delay);
+    };
+    const connect = async () => {
+      if (disposed || !navigator.onLine) {
+        scheduleReconnect();
+        return;
+      }
+      clearReconnectTimer();
+      setStatus(reconnectAttempt === 0 ? "connecting" : "reconnecting");
+      try {
+        const tokenResponse = await createCollaborationDocumentToken(document.lessonId, document.id);
+        if (disposed) return;
         const socket = new WebSocket(collaborationWebSocketUrl(tokenResponse));
         socket.binaryType = "arraybuffer";
         socketRef.current = socket;
         socket.onopen = () => {
+          if (disposed || socketRef.current !== socket) {
+            socket.close();
+            return;
+          }
+          reconnectAttempt = 0;
           setStatus("connected");
           runtime.startSocketSync(socket);
         };
         socket.onmessage = (event) => {
-          runtime.handleSocketMessage(event.data);
+          if (socketRef.current === socket) runtime.handleSocketMessage(event.data);
         };
         socket.onclose = () => {
-          if (!disposed) {
-            setStatus("disconnected");
+          if (socketRef.current === socket) {
+            socketRef.current = null;
+            runtime.setSocket(null);
           }
+          if (!disposed) scheduleReconnect();
         };
         socket.onerror = () => {
-          if (!disposed) {
-            setStatus("error");
-          }
+          if (!disposed && socketRef.current === socket) setStatus("error");
+          socket.close();
         };
-      })
-      .catch(() => {
+      } catch {
         if (!disposed) {
           setStatus("error");
+          scheduleReconnect();
         }
-      });
+      }
+    };
+    const reconnectNow = () => {
+      if (disposed) return;
+      clearReconnectTimer();
+      const current = socketRef.current;
+      if (current?.readyState === WebSocket.OPEN || current?.readyState === WebSocket.CONNECTING) return;
+      void connect();
+    };
+    const handleVisibilityChange = () => {
+      if (globalThis.document.visibilityState === "visible") reconnectNow();
+    };
+    window.addEventListener("online", reconnectNow);
+    globalThis.document.addEventListener("visibilitychange", handleVisibilityChange);
+    void connect();
 
     return () => {
       disposed = true;
+      clearReconnectTimer();
+      window.removeEventListener("online", reconnectNow);
+      globalThis.document.removeEventListener("visibilitychange", handleVisibilityChange);
       socketRef.current?.close();
       socketRef.current = null;
+      runtime.setSocket(null);
       runtime.destroy();
       runtimeRef.current = null;
       setAnnotationElementsState([]);
@@ -130,6 +184,8 @@ export function useYjsWorkspace({
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
+      setWorkspaceClientId(null);
+      setAnnotationUndoState({ canRedo: false, canUndo: false });
       exerciseInteractionRef.current = null;
     };
   }, [color, document?.id, enabled, participantName]);
@@ -160,6 +216,9 @@ export function useYjsWorkspace({
       return nextElements;
     });
   }, []);
+
+  const undoAnnotation = useCallback(() => runtimeRef.current?.undoAnnotation(), []);
+  const redoAnnotation = useCallback(() => runtimeRef.current?.redoAnnotation(), []);
 
   const snapshot = useCallback((): LessonMaterialJson | null => {
     const runtime = runtimeRef.current;
@@ -241,18 +300,22 @@ export function useYjsWorkspace({
 
   return {
     annotationElements,
+    annotationUndoState,
     connected: status === "connected",
     participants,
     htmlGameSync,
     exerciseSync,
     materialViewport,
+    workspaceClientId,
     setAnnotationElements,
+    redoAnnotation,
     snapshot,
     status,
     setMaterialViewport,
     text,
     updateCursor,
     updateText,
+    undoAnnotation,
   };
 }
 

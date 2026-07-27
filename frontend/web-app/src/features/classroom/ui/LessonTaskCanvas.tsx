@@ -60,14 +60,19 @@ import { AnnotationLayer, type AnnotationLayerBounds } from "./AnnotationLayer";
 import type { MaterialViewportState, MaterialViewportUpdate } from "../model/materialViewport";
 
 type LiveAnnotationSync = {
+  canRedo?: boolean;
+  canUndo?: boolean;
   elements: AnnotationElement[];
   participants: CollaborationParticipant[];
   ready: boolean;
+  redo?: () => void;
   setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
+  undo?: () => void;
   updateCursor: (cursor: CollaborationCursor | null) => void;
 };
 
 type MaterialViewportSync = {
+  clientId: number | null;
   publish: (viewport: MaterialViewportUpdate) => void;
   ready: boolean;
   state: MaterialViewportState | null;
@@ -162,6 +167,7 @@ export function LessonTaskCanvas({
   const documentScrollBeforeImageFocusRef = useRef<{ left: number; top: number } | null>(null);
   const previousPresentationModeRef = useRef<LessonPresentationMode>("default");
   const applyingRemoteViewportRef = useRef(false);
+  const appliedRemoteViewportRevisionRef = useRef(0);
   const lastViewportPublishAtRef = useRef(0);
   const viewportPublishTimerRef = useRef<number | null>(null);
 
@@ -290,24 +296,46 @@ export function LessonTaskCanvas({
 
   useEffect(() => {
     const viewport = viewportSync?.state;
-    if (!viewport || !material || viewport.materialId !== material.id) return;
+    if (
+      !viewport
+      || !material
+      || viewport.materialId !== material.id
+      || viewport.sourceClientId === viewportSync?.clientId
+      || viewport.revision <= appliedRemoteViewportRevisionRef.current
+    ) return;
+    let cancelled = false;
+    let attemptsRemaining = 12;
     applyingRemoteViewportRef.current = true;
     if (document?.pages.some((page) => page.id === viewport.pageId) && viewport.pageId !== activePageId) {
       setActivePageId(viewport.pageId);
     }
-    window.requestAnimationFrame(() => {
+    const applyWhenReady = () => {
+      if (cancelled) return;
       const node = viewport.scrollContainer === "image"
         ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null
         : taskDocumentRef.current;
       if (node) {
         node.scrollLeft = viewport.x * Math.max(0, node.scrollWidth - node.clientWidth);
         node.scrollTop = viewport.y * Math.max(0, node.scrollHeight - node.clientHeight);
+        appliedRemoteViewportRevisionRef.current = viewport.revision;
+        window.requestAnimationFrame(() => {
+          if (!cancelled) applyingRemoteViewportRef.current = false;
+        });
+        return;
       }
-      window.requestAnimationFrame(() => {
+      attemptsRemaining -= 1;
+      if (attemptsRemaining > 0) {
+        window.requestAnimationFrame(applyWhenReady);
+      } else {
         applyingRemoteViewportRef.current = false;
-      });
-    });
-  }, [activePageId, document, material, setActivePageId, viewportSync?.state]);
+      }
+    };
+    window.requestAnimationFrame(applyWhenReady);
+    return () => {
+      cancelled = true;
+      applyingRemoteViewportRef.current = false;
+    };
+  }, [activePageId, document, material, setActivePageId, viewportSync?.clientId, viewportSync?.state]);
 
   function updateAnswer(blockId: string, answer: MaterialAnswerBlock) {
     setAnswers((current) => ({

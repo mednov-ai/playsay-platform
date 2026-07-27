@@ -19,6 +19,7 @@ import { useAppTranslation } from "../../shared/i18n";
 import type { SessionStatus } from "../../features/profile/ui/ProfileAccountPanel";
 import type { SessionErrorHandler } from "./types";
 import { publishHomeworkAssignmentChange } from "../../features/homework/model/homeworkRealtime";
+import { realtimeReconnectDelayMs } from "../../features/classroom/model/realtimeLifecycle";
 
 type LessonRealtimeMessage = {
   type?: string;
@@ -56,11 +57,13 @@ export function useLessonRealtime({
   const { t } = useAppTranslation();
   const realtimeSocketRef = useRef<WebSocket | null>(null);
   const realtimeReconnectTimerRef = useRef<number | null>(null);
+  const realtimeReconnectAttemptRef = useRef(0);
   const roomSessionRef = useRef<LessonRoomSession | null>(null);
   const activeLessonIdRef = useRef<string | null>(null);
   const checkingDevicesRef = useRef(false);
   const reportedCheckingLessonIdRef = useRef<string | null>(null);
   const scheduleSyncInFlightRef = useRef(false);
+  const scheduleSyncPendingRef = useRef(false);
   const roomSessionLessonId = roomSession?.lessonId ?? null;
   const activeLessonId = roomSessionLessonId ?? classroomLessonId;
   const checkingDevices = Boolean(
@@ -100,10 +103,29 @@ export function useLessonRealtime({
     }
 
     let closed = false;
+    const scheduleRealtimeReconnect = () => {
+      if (closed || realtimeReconnectTimerRef.current !== null) return;
+      const reconnectDelay = realtimeReconnectDelayMs(realtimeReconnectAttemptRef.current);
+      realtimeReconnectAttemptRef.current += 1;
+      realtimeReconnectTimerRef.current = window.setTimeout(() => {
+        realtimeReconnectTimerRef.current = null;
+        void connectRealtime();
+      }, reconnectDelay);
+    };
 
     async function connectRealtime() {
-      const accessToken = await getValidAccessToken();
-      if (closed || !accessToken) {
+      let accessToken: string | null | undefined;
+      try {
+        accessToken = await getValidAccessToken();
+      } catch {
+        scheduleRealtimeReconnect();
+        return;
+      }
+      if (closed) {
+        return;
+      }
+      if (!accessToken) {
+        scheduleRealtimeReconnect();
         return;
       }
 
@@ -111,6 +133,7 @@ export function useLessonRealtime({
       realtimeSocketRef.current = socket;
 
       socket.onopen = () => {
+        realtimeReconnectAttemptRef.current = 0;
         const lessonId = activeLessonIdRef.current;
         if (lessonId) {
           sendLessonRealtimeSubscribe(lessonId);
@@ -130,19 +153,31 @@ export function useLessonRealtime({
         if (realtimeSocketRef.current === socket) {
           realtimeSocketRef.current = null;
         }
-        if (!closed) {
-          realtimeReconnectTimerRef.current = window.setTimeout(() => {
-            realtimeReconnectTimerRef.current = null;
-            void connectRealtime();
-          }, 2_000);
-        }
+        scheduleRealtimeReconnect();
       };
     }
 
+    const reconnectNow = () => {
+      if (closed) return;
+      const current = realtimeSocketRef.current;
+      if (current?.readyState === WebSocket.OPEN || current?.readyState === WebSocket.CONNECTING) return;
+      if (realtimeReconnectTimerRef.current !== null) {
+        window.clearTimeout(realtimeReconnectTimerRef.current);
+        realtimeReconnectTimerRef.current = null;
+      }
+      void connectRealtime();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") reconnectNow();
+    };
+    window.addEventListener("online", reconnectNow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     void connectRealtime();
 
     return () => {
       closed = true;
+      window.removeEventListener("online", reconnectNow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (realtimeReconnectTimerRef.current !== null) {
         window.clearTimeout(realtimeReconnectTimerRef.current);
         realtimeReconnectTimerRef.current = null;
@@ -168,25 +203,31 @@ export function useLessonRealtime({
 
   async function syncScheduleFromServer(options: { message?: string } = {}) {
     if (scheduleSyncInFlightRef.current) {
+      scheduleSyncPendingRef.current = true;
       return;
     }
 
     scheduleSyncInFlightRef.current = true;
     try {
-      const freshSchedule = await fetchScheduledLessons();
-      setScheduledLessons(freshSchedule);
-      const activeSession = roomSessionRef.current;
-      const activeLesson = activeSession
-        ? freshSchedule.find((lesson) => lesson.id === activeSession.lessonId)
-        : null;
-      if (activeLesson) {
-        applyRealtimeLessonSnapshot(activeLesson);
-      }
-      if (options.message) {
-        setScheduleMessage(options.message);
-      }
-    } catch (caught) {
-      applySessionError(caught, t("schedule.messages.scheduleSyncFailed"));
+      do {
+        scheduleSyncPendingRef.current = false;
+        try {
+          const freshSchedule = await fetchScheduledLessons();
+          setScheduledLessons(freshSchedule);
+          const activeSession = roomSessionRef.current;
+          const activeLesson = activeSession
+            ? freshSchedule.find((lesson) => lesson.id === activeSession.lessonId)
+            : null;
+          if (activeLesson) {
+            applyRealtimeLessonSnapshot(activeLesson);
+          }
+          if (options.message) {
+            setScheduleMessage(options.message);
+          }
+        } catch (caught) {
+          applySessionError(caught, t("schedule.messages.scheduleSyncFailed"));
+        }
+      } while (scheduleSyncPendingRef.current);
     } finally {
       scheduleSyncInFlightRef.current = false;
     }

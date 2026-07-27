@@ -77,6 +77,42 @@ describe("yjs workspace runtime annotations", () => {
     runtime.destroy();
   });
 
+  it("undoes only annotation transactions tracked by the local runtime", () => {
+    const annotationChanges: AnnotationElement[][] = [];
+    const undoStates: Array<{ canRedo: boolean; canUndo: boolean }> = [];
+    const stroke: AnnotationElement = {
+      color: "#ff5c00",
+      createdAt: 1,
+      id: "stroke-local",
+      kind: "stroke",
+      pageId: "material",
+      points: [{ pageId: "material", x: 10, y: 20 }],
+      strokeWidth: 8,
+    };
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: (elements) => annotationChanges.push(elements),
+      onAnnotationUndoStateChange: (state) => undoStates.push(state),
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      participantName: "Student",
+      snapshot: null,
+    });
+
+    runtime.setAnnotationElements([stroke]);
+    expect(undoStates.at(-1)).toEqual({ canRedo: false, canUndo: true });
+    runtime.undoAnnotation();
+    expect(annotationChanges.at(-1)).toEqual([]);
+    expect(undoStates.at(-1)).toEqual({ canRedo: true, canUndo: false });
+    runtime.redoAnnotation();
+    expect(annotationChanges.at(-1)).toEqual([stroke]);
+
+    runtime.destroy();
+  });
+
   it("restores text and annotations from the Yjs snapshot after reconnect", () => {
     withWindowBase64(() => {
       const stroke: AnnotationElement = {
@@ -621,17 +657,67 @@ describe("yjs workspace runtime annotations", () => {
 
       runtime.setHtmlGameSnapshot("game-a", { html: "<p>one</p>", sequence: 1, updatedAt: 10 });
       runtime.setHtmlGameSnapshot("game-b", { html: "<p>two</p>", sequence: 4, updatedAt: 20 });
+      runtime.setHtmlGameSnapshot("game-large-canvas", {
+        canvases: { canvas: `data:image/webp;base64,${"a".repeat(250_000)}` },
+        html: "<canvas></canvas>",
+        sequence: 1,
+        updatedAt: 25,
+      });
       runtime.publishHtmlGameInput({ at: 30, blockId: "game-a", id: "input-1", targetId: "start", type: "click" });
       runtime.publishHtmlGameEffect({ at: 40, blockId: "game-a", id: "effect-1", kind: "speech", payload: { text: "go" } });
 
       expect(snapshots.at(-1)).toEqual({
         "game-a": { html: "<p>one</p>", sequence: 1, updatedAt: 10 },
         "game-b": { html: "<p>two</p>", sequence: 4, updatedAt: 20 },
+        "game-large-canvas": {
+          canvases: {},
+          html: "<canvas></canvas>",
+          sequence: 1,
+          updatedAt: 25,
+        },
       });
       expect(inputs.at(-1)?.at(-1)?.id).toBe("input-1");
       expect(effects.at(-1)?.at(-1)?.id).toBe("effect-1");
 
       runtime.destroy();
+    });
+  });
+
+  it("keeps HTML game input and effect events out of durable snapshots", () => {
+    withWindowBase64(() => {
+      const runtime = createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Teacher",
+        snapshot: null,
+      });
+      runtime.publishHtmlGameInput({ at: 30, blockId: "game-a", id: "input-ephemeral", targetId: "start", type: "click" });
+      runtime.publishHtmlGameEffect({ at: 40, blockId: "game-a", id: "effect-ephemeral", kind: "speech", payload: { text: "go" } });
+      const snapshot = runtime.snapshot();
+      runtime.destroy();
+
+      const restoredInputs: Array<Array<{ id: string }>> = [];
+      const restoredEffects: Array<Array<{ id: string }>> = [];
+      const restored = createYjsWorkspaceRuntime({
+        color: "#2574ff",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: (effects) => restoredEffects.push(effects),
+        onHtmlGameInputsChange: (inputs) => restoredInputs.push(inputs),
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Student",
+        snapshot,
+      });
+
+      expect(restoredInputs.at(-1)).toEqual([]);
+      expect(restoredEffects.at(-1)).toEqual([]);
+      restored.destroy();
     });
   });
 

@@ -1,6 +1,5 @@
 package com.playsay.gateway.service
 
-import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
@@ -11,9 +10,6 @@ import com.nimbusds.jwt.SignedJWT
 import com.playsay.gateway.dto.CollaborationDocumentResponse
 import com.playsay.gateway.dto.CollaborationTokenResponse
 import com.playsay.gateway.dto.CreateCollaborationDocumentRequest
-import com.playsay.gateway.dto.FinalizeCollaborationDocumentRequest
-import com.playsay.gateway.dto.MaterialSubmissionResponse
-import com.playsay.gateway.dto.SaveCollaborationSnapshotRequest
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.CollaborationDocumentEntity
 import com.playsay.gateway.error.ProjectResponseException
@@ -84,10 +80,8 @@ class CollaborationDocumentService(
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val userProfileStore: UserProfileStore,
     private val lessonAuthorizationService: ScheduledLessonAuthorizationService,
-    private val lessonMaterialStore: LessonMaterialStore,
     private val tokenService: CollaborationTokenService,
     private val objectMapper: ObjectMapper,
-    @param:Value("\${playsay.collaboration.service-token:}") private val collaborationServiceToken: String,
 ) {
     @Transactional
     fun createCurrent(
@@ -171,69 +165,6 @@ class CollaborationDocumentService(
             .map { document -> document.toResponse(usersById[document.studentUserId]) }
     }
 
-    @Transactional
-    fun saveSnapshot(
-        authentication: JwtAuthenticationToken,
-        lessonId: UUID,
-        documentId: UUID,
-        request: SaveCollaborationSnapshotRequest,
-    ): CollaborationDocumentResponse {
-        val document = visibleDocument(authentication, lessonId, documentId)
-        return saveSnapshot(document, request)
-    }
-
-    @Transactional
-    fun saveSnapshotFromService(
-        serviceToken: String?,
-        lessonId: UUID,
-        documentId: UUID,
-        request: SaveCollaborationSnapshotRequest,
-    ): CollaborationDocumentResponse {
-        requireValidServiceToken(serviceToken)
-        val document = collaborationDocumentRepo.findById(documentId).orElse(null)
-            ?.takeIf { found -> found.lessonId == lessonId }
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COLLABORATION_DOCUMENT_NOT_FOUND)
-        return saveSnapshot(document, request)
-    }
-
-    private fun saveSnapshot(
-        document: CollaborationDocumentEntity,
-        request: SaveCollaborationSnapshotRequest,
-    ): CollaborationDocumentResponse {
-        validateSnapshot(request.snapshot)
-        document.snapshotJson = objectMapper.writeValueAsString(request.snapshot)
-        document.snapshotStorageKey = request.snapshotStorageKey?.trim()?.takeIf { key -> key.isNotEmpty() }
-        document.version += 1
-        document.updatedAt = Instant.now()
-        val saved = collaborationDocumentRepo.save(document)
-        return saved.toResponse(saved.studentUser())
-    }
-
-    @Transactional
-    fun finalize(
-        authentication: JwtAuthenticationToken,
-        lessonId: UUID,
-        documentId: UUID,
-        request: FinalizeCollaborationDocumentRequest,
-    ): MaterialSubmissionResponse {
-        val document = visibleDocument(authentication, lessonId, documentId)
-        if (document.collaborationScope != MetaData.CollaborationScopes.INDIVIDUAL || document.studentUserId == null) {
-            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.COLLABORATION_SCOPE_INVALID)
-        }
-        val snapshot = document.snapshotJson
-            ?.let { value -> runCatching { objectMapper.readTree(value) }.getOrNull() }
-            ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.COLLABORATION_SNAPSHOT_INVALID)
-        validateSnapshot(snapshot)
-        return lessonMaterialStore.saveCollaborationSubmission(
-            lessonId = lessonId,
-            materialId = document.materialId,
-            studentUserId = document.studentUserId!!,
-            yjsDocumentId = document.yjsDocumentId,
-            content = snapshot,
-            submitted = request.submitted,
-        )
-    }
-
     @Transactional(readOnly = true)
     fun token(
         authentication: JwtAuthenticationToken,
@@ -243,6 +174,17 @@ class CollaborationDocumentService(
         val document = visibleDocument(authentication, lessonId, documentId)
         return tokenService.createToken(authentication, document)
     }
+
+    fun requireDocumentAccess(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+        documentId: UUID,
+    ) {
+        visibleDocument(authentication, lessonId, documentId)
+    }
+
+    fun response(document: CollaborationDocumentEntity): CollaborationDocumentResponse =
+        document.toResponse(document.studentUser())
 
     private fun accessibleScheduledMaterial(
         authentication: JwtAuthenticationToken,
@@ -365,12 +307,6 @@ class CollaborationDocumentService(
         return appUserRepo.findByIdIn(ids).associateBy { user -> user.id }
     }
 
-    private fun validateSnapshot(snapshot: JsonNode) {
-        if (objectMapper.writeValueAsBytes(snapshot).size > 1_000_000) {
-            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.COLLABORATION_SNAPSHOT_INVALID)
-        }
-    }
-
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0
 
@@ -379,15 +315,6 @@ class CollaborationDocumentService(
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
     }
 
-    private fun requireValidServiceToken(serviceToken: String?) {
-        val expected = collaborationServiceToken.trim()
-        if (expected.length < 32) {
-            throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.COLLABORATION_NOT_CONFIGURED)
-        }
-        if (serviceToken?.trim() != expected) {
-            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        }
-    }
 }
 
 private data class ValidatedCollaborationDocumentRequest(

@@ -307,6 +307,12 @@ class CollaborationDocumentControllerTest @Autowired constructor(
         assertEquals(1L, saved.version)
         assertEquals(snapshot, saved.snapshot)
         assertEquals(document.id, saved.id)
+        val restored = collaborationController.getSnapshotForService(
+            lessonId = classroom.lessonId,
+            documentId = document.id,
+            serviceToken = "service-token-01234567890123456789",
+        )
+        assertEquals(snapshot, restored.snapshot)
     }
 
     @Test

@@ -187,8 +187,11 @@ export function HtmlGameFrame({
       return;
     }
     if (handledInputsRef.current === null) {
-      handledInputsRef.current = new Set(sync.inputs.map((event) => event.id));
-      return;
+      handledInputsRef.current = new Set(
+        sync.inputs
+          .filter((event) => event.runId !== channel)
+          .map((event) => event.id),
+      );
     }
     sync.inputs.forEach((event) => {
       if (event.blockId !== blockId || handledInputsRef.current?.has(event.id)) {

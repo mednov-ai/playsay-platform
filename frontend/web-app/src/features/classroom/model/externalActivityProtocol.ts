@@ -15,7 +15,7 @@ export type ExternalActivityInput =
 
 export type ExternalActivityMessage = {
   version: 1;
-  type: "REQUEST_OPEN" | "REQUEST_CLOSE" | "INPUT" | "CURSOR" | "HOST_STATE" | "STOPPED" | "SET_LOCK" | "RELOAD" | "BACK";
+  type: "REQUEST_OPEN" | "REQUEST_CLOSE" | "REQUEST_STATE" | "INPUT" | "CURSOR" | "HOST_STATE" | "HOST_IDLE" | "STOPPED" | "SET_LOCK" | "RELOAD" | "BACK";
   sessionId: string;
   blockId: string;
   eventId?: string;
@@ -42,9 +42,10 @@ export type ExternalActivityBlock = MaterialEditorBlock & { type: "externalActiv
 export function parseExternalActivityMessage(value: unknown): ExternalActivityMessage | null {
   if (!value || typeof value !== "object") return null;
   const message = value as Partial<ExternalActivityMessage>;
-  const types = ["REQUEST_OPEN", "REQUEST_CLOSE", "INPUT", "CURSOR", "HOST_STATE", "STOPPED", "SET_LOCK", "RELOAD", "BACK"];
+  const types = ["REQUEST_OPEN", "REQUEST_CLOSE", "REQUEST_STATE", "INPUT", "CURSOR", "HOST_STATE", "HOST_IDLE", "STOPPED", "SET_LOCK", "RELOAD", "BACK"];
   if (message.version !== 1 || !types.includes(message.type ?? "") || !safeToken(message.sessionId) || !safeToken(message.blockId)) return null;
   if (message.type === "INPUT" && !validInput(message.input)) return null;
+  if (message.type === "INPUT" && !safeToken(message.eventId)) return null;
   if (message.type === "CURSOR" && !validCursor(message.cursor)) return null;
   if (message.type === "HOST_STATE" && !["REQUESTED", "AWAITING_EXTENSION", "STARTING", "ACTIVE", "ERROR"].includes(message.phase ?? "")) return null;
   return message as ExternalActivityMessage;

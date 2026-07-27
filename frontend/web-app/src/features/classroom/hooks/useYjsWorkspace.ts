@@ -19,7 +19,11 @@ import type {
   MaterialExerciseInteraction,
   MaterialExerciseSync,
 } from "../../materials/model/types";
-import type { MaterialViewportState, MaterialViewportUpdate } from "../model/materialViewport";
+import type {
+  MaterialViewportPublishOptions,
+  MaterialViewportState,
+  MaterialViewportUpdate,
+} from "../model/materialViewport";
 import { realtimeReconnectDelayMs } from "../model/realtimeLifecycle";
 
 export type { CollaborationCursor, CollaborationParticipant };
@@ -252,8 +256,11 @@ export function useYjsWorkspace({
     runtimeRef.current?.setMaterialAnswer(blockId, answer);
   }, []);
 
-  const setMaterialViewport = useCallback((viewport: MaterialViewportUpdate) => {
-    runtimeRef.current?.setMaterialViewport(viewport);
+  const setMaterialViewport = useCallback((
+    viewport: MaterialViewportUpdate,
+    options?: MaterialViewportPublishOptions,
+  ) => {
+    runtimeRef.current?.setMaterialViewport(viewport, options);
   }, []);
 
   const seedMaterialAnswers = useCallback((answers: MaterialAnswerState) => {

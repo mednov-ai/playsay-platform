@@ -57,7 +57,12 @@ import type { CollaborationCursor, CollaborationParticipant } from "../hooks/use
 import { useAppTranslation } from "../../../shared/i18n";
 import { PresenceCursorLayer } from "./PresenceCursorLayer";
 import { AnnotationLayer, type AnnotationLayerBounds } from "./AnnotationLayer";
-import type { MaterialViewportState, MaterialViewportUpdate } from "../model/materialViewport";
+import {
+  isMaterialViewportNewer,
+  type MaterialViewportPublishOptions,
+  type MaterialViewportState,
+  type MaterialViewportUpdate,
+} from "../model/materialViewport";
 
 type LiveAnnotationSync = {
   canRedo?: boolean;
@@ -73,7 +78,10 @@ type LiveAnnotationSync = {
 
 type MaterialViewportSync = {
   clientId: number | null;
-  publish: (viewport: MaterialViewportUpdate) => void;
+  publish: (
+    viewport: MaterialViewportUpdate,
+    options?: MaterialViewportPublishOptions,
+  ) => void;
   ready: boolean;
   state: MaterialViewportState | null;
 };
@@ -167,7 +175,7 @@ export function LessonTaskCanvas({
   const documentScrollBeforeImageFocusRef = useRef<{ left: number; top: number } | null>(null);
   const previousPresentationModeRef = useRef<LessonPresentationMode>("default");
   const applyingRemoteViewportRef = useRef(false);
-  const appliedRemoteViewportRevisionRef = useRef(0);
+  const appliedRemoteViewportRef = useRef<MaterialViewportState | null>(null);
   const expectedRemoteScrollRef = useRef<{
     left: number;
     node: HTMLElement;
@@ -275,6 +283,7 @@ export function LessonTaskCanvas({
     pageId = activePageId,
     mode = presentationMode,
     blockId = focusedBlockId,
+    options?: MaterialViewportPublishOptions,
   ) => {
     if (!viewportSync?.ready || !material) return;
     const scrollContainer = mode === "image-focus" ? "image" : "document";
@@ -292,7 +301,7 @@ export function LessonTaskCanvas({
       scrollContainer,
       x: maxLeft > 0 ? node.scrollLeft / maxLeft : 0,
       y: maxTop > 0 ? node.scrollTop / maxTop : 0,
-    });
+    }, options);
     lastViewportPublishAtRef.current = performance.now();
   }, [activePageId, focusedBlockId, material, presentationMode, viewportSync?.publish, viewportSync?.ready]);
 
@@ -342,7 +351,7 @@ export function LessonTaskCanvas({
       || !material
       || viewport.materialId !== material.id
       || viewport.sourceClientId === viewportSync?.clientId
-      || viewport.revision <= appliedRemoteViewportRevisionRef.current
+      || !isMaterialViewportNewer(viewport, appliedRemoteViewportRef.current)
     ) return;
     let cancelled = false;
     let attemptsRemaining = 12;
@@ -361,7 +370,7 @@ export function LessonTaskCanvas({
         expectedRemoteScrollRef.current = { left, node, top };
         node.scrollLeft = left;
         node.scrollTop = top;
-        appliedRemoteViewportRevisionRef.current = viewport.revision;
+        appliedRemoteViewportRef.current = viewport;
         window.requestAnimationFrame(() => {
           if (!cancelled) applyingRemoteViewportRef.current = false;
         });
@@ -603,7 +612,12 @@ export function LessonTaskCanvas({
                 mode="classroom"
                 onActivePageIdChange={(pageId) => {
                   setActivePageId(pageId);
-                  window.requestAnimationFrame(() => publishViewport(pageId));
+                  window.requestAnimationFrame(() => publishViewport(
+                    pageId,
+                    presentationMode,
+                    focusedBlockId,
+                    { presentationChanged: true },
+                  ));
                 }}
                 onAnswerChange={updateAnswer}
                 onPresentationModeChange={(mode, blockId) => {
@@ -617,7 +631,12 @@ export function LessonTaskCanvas({
                   ) {
                     return;
                   }
-                  window.requestAnimationFrame(() => publishViewport(activePageId, mode, blockId ?? null));
+                  window.requestAnimationFrame(() => publishViewport(
+                    activePageId,
+                    mode,
+                    blockId ?? null,
+                    { presentationChanged: true },
+                  ));
                 }}
                 sharedImageFocusBlockId={viewportSync?.state?.materialId === material.id
                   ? viewportSync.state.presentationMode === "image-focus"

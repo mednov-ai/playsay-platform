@@ -754,7 +754,7 @@ describe("LessonTaskCanvas", () => {
       focusedBlockId: "image-1",
       presentationMode: "image-focus",
       scrollContainer: "image",
-    })));
+    }), { presentationChanged: true }));
     await new Promise((resolve) => window.setTimeout(resolve, 70));
     expect(publish.mock.calls.some(([viewport]) => viewport.presentationMode === "default")).toBe(false);
     performanceNow.mockRestore();
@@ -778,6 +778,7 @@ describe("LessonTaskCanvas", () => {
         state: {
           materialId: staticImageMaterial.id,
           pageId: "page-static",
+          presentationRevision: 10,
           presentationMode: "default",
           revision: 10,
           scrollContainer: "document",
@@ -823,6 +824,7 @@ describe("LessonTaskCanvas", () => {
           focusedBlockId: "image-1",
           materialId: staticImageMaterial.id,
           pageId: "page-static",
+          presentationRevision: 10,
           presentationMode: "image-focus",
           revision: 10,
           scrollContainer: "image",
@@ -850,7 +852,7 @@ describe("LessonTaskCanvas", () => {
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({
       presentationMode: "default",
       scrollContainer: "document",
-    }));
+    }), { presentationChanged: true });
     requestAnimationFrame.mockRestore();
   });
 

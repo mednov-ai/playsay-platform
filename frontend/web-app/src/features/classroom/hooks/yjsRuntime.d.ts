@@ -1,6 +1,10 @@
 import type { LessonMaterialJson } from "../../../shared/api/playsay";
 import type { AnnotationElement } from "../model/annotation";
-import type { MaterialViewportState, MaterialViewportUpdate } from "../model/materialViewport";
+import type {
+  MaterialViewportPublishOptions,
+  MaterialViewportState,
+  MaterialViewportUpdate,
+} from "../model/materialViewport";
 import type {
   MaterialAnswerBlock,
   MaterialAnswerState,
@@ -41,7 +45,10 @@ export type YjsWorkspaceRuntime = {
   setHtmlGamePresentedBlock: (blockId: string | null) => void;
   seedMaterialAnswers: (answers: MaterialAnswerState) => void;
   setMaterialAnswer: (blockId: string, answer: MaterialAnswerBlock) => void;
-  setMaterialViewport: (viewport: MaterialViewportUpdate) => void;
+  setMaterialViewport: (
+    viewport: MaterialViewportUpdate,
+    options?: MaterialViewportPublishOptions,
+  ) => void;
   redoAnnotation: () => void;
   undoAnnotation: () => void;
   updateHtmlGameAuthority: (blockId: string, runId: string | null) => void;

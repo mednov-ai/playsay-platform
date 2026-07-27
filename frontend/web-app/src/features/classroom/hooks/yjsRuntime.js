@@ -5,6 +5,7 @@ import * as syncProtocol from "y-protocols/sync";
 import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import * as Y from "yjs";
+import { isMaterialViewportNewer } from "../model/materialViewport";
 
 const messageSync = 0;
 const messageAwareness = 1;
@@ -131,7 +132,7 @@ export function createYjsWorkspaceRuntime({
   const updateMaterialViewport = () => {
     if (disposed) return;
     const persisted = normalizeMaterialViewport(ymaterialViewport.get("state"));
-    if (isNewerViewport(persisted, materialViewportState)) {
+    if (isMaterialViewportNewer(persisted, materialViewportState)) {
       materialViewportState = persisted;
       onMaterialViewportChange(materialViewportState);
       awareness.setLocalStateField("materialViewport", materialViewportState);
@@ -154,11 +155,11 @@ export function createYjsWorkspaceRuntime({
   const awarenessUpdateHandler = (changes, origin) => {
     updateParticipants(awareness, onParticipantsChange);
     const latestViewport = latestMaterialViewport(awareness, materialViewportState);
-    if (isNewerViewport(latestViewport, materialViewportState)) {
+    if (isMaterialViewportNewer(latestViewport, materialViewportState)) {
       materialViewportState = latestViewport;
       onMaterialViewportChange(materialViewportState);
       const localViewport = normalizeMaterialViewport(awareness.getLocalState()?.materialViewport);
-      if (isNewerViewport(materialViewportState, localViewport)) {
+      if (isMaterialViewportNewer(materialViewportState, localViewport)) {
         awareness.setLocalStateField("materialViewport", materialViewportState);
       }
     }
@@ -292,13 +293,20 @@ export function createYjsWorkspaceRuntime({
       }
       ydoc.transact(() => writeMaterialAnswerFields(ymaterialAnswerFields, cleanBlockId, normalized));
     },
-    setMaterialViewport(viewport) {
+    setMaterialViewport(viewport, { presentationChanged = false } = {}) {
+      const revision = Math.max(
+        Date.now(),
+        finiteNumberOr(materialViewportState?.revision, 0) + 1,
+      );
       const normalized = normalizeMaterialViewport({
         ...viewport,
-        revision: Math.max(
-          Date.now(),
-          finiteNumberOr(materialViewportState?.revision, 0) + 1,
-        ),
+        presentationRevision: presentationChanged
+          ? revision
+          : finiteNumberOr(
+            materialViewportState?.presentationRevision,
+            materialViewportState?.revision ?? revision,
+          ),
+        revision,
         sourceClientId: ydoc.clientID,
       });
       if (normalized) {
@@ -760,10 +768,12 @@ function normalizeMaterialViewport(value) {
     return null;
   }
   const focusedBlockId = asString(viewport?.focusedBlockId);
+  const presentationRevision = finiteNumberOr(viewport?.presentationRevision, revision);
   return {
     ...(focusedBlockId ? { focusedBlockId } : {}),
     materialId,
     pageId,
+    presentationRevision,
     presentationMode,
     revision,
     scrollContainer,
@@ -777,18 +787,9 @@ function latestMaterialViewport(awareness, fallback) {
   let latest = fallback;
   awareness.getStates().forEach((state) => {
     const candidate = normalizeMaterialViewport(state?.materialViewport);
-    if (isNewerViewport(candidate, latest)) latest = candidate;
+    if (isMaterialViewportNewer(candidate, latest)) latest = candidate;
   });
   return latest;
-}
-
-function isNewerViewport(candidate, current) {
-  if (!candidate) return false;
-  if (!current) return true;
-  return candidate.revision > current.revision || (
-    candidate.revision === current.revision
-    && candidate.sourceClientId > current.sourceClientId
-  );
 }
 
 function annotationElementKind(kind, legacyPoints) {

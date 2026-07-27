@@ -2,7 +2,7 @@
 // @vitest-environment-options { "url": "http://localhost/" }
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
 import type { MaterialExerciseSync, MaterialHtmlGameSync } from "../../materials/model/materialDocument";
@@ -795,6 +795,62 @@ describe("LessonTaskCanvas", () => {
     fireEvent.scroll(taskDocument);
 
     expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("publishes an explicit focus close while a remote scroll is still applying", async () => {
+    const animationFrames: FrameRequestCallback[] = [];
+    const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        animationFrames.push(callback);
+        return animationFrames.length;
+      });
+    const publish = vi.fn();
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: staticImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+      viewportSync: {
+        clientId: 7,
+        publish,
+        ready: true,
+        state: {
+          focusedBlockId: "image-1",
+          materialId: staticImageMaterial.id,
+          pageId: "page-static",
+          presentationMode: "image-focus",
+          revision: 10,
+          scrollContainer: "image",
+          sourceClientId: 9,
+          x: 0,
+          y: 0.5,
+        },
+      },
+    }));
+    const close = await waitFor(() => {
+      const button = container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']");
+      expect(button).toBeTruthy();
+      return button!;
+    });
+
+    fireEvent.click(close);
+    await waitFor(() => {
+      expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
+    });
+    await act(async () => {
+      animationFrames.splice(0).forEach((callback) => callback(0));
+      await Promise.resolve();
+    });
+
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({
+      presentationMode: "default",
+      scrollContainer: "document",
+    }));
+    requestAnimationFrame.mockRestore();
   });
 
   it("draws with the selected line width and returns one-shot shapes to the pointer", async () => {

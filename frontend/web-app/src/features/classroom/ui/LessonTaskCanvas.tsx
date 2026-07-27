@@ -276,7 +276,7 @@ export function LessonTaskCanvas({
     mode = presentationMode,
     blockId = focusedBlockId,
   ) => {
-    if (!viewportSync?.ready || !material || applyingRemoteViewportRef.current) return;
+    if (!viewportSync?.ready || !material) return;
     const scrollContainer = mode === "image-focus" ? "image" : "document";
     const node = scrollContainer === "image"
       ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null

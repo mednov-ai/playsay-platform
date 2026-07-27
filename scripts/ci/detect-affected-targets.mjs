@@ -131,6 +131,7 @@ function isSharedFrontendPath(path) {
   return (
     path === "frontend/package.json" ||
     path === "frontend/package-lock.json" ||
+    path === "frontend/.dockerignore" ||
     path === "frontend/.npmrc" ||
     path.startsWith("frontend/scripts/") ||
     path.startsWith("frontend/config/")

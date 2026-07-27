@@ -143,7 +143,7 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
     ],
   );
   assertDetection(
-    ["frontend/package-lock.json"],
+    ["frontend/package-lock.json", "frontend/.dockerignore"],
     ["web-app", "game-adapter-service", "keyboard-app"],
     [
       "playsay-web-app-develop",

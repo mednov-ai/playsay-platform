@@ -723,6 +723,40 @@ describe("LessonTaskCanvas", () => {
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
   });
 
+  it("does not publish a stale default viewport while entering image focus", async () => {
+    const publish = vi.fn();
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: staticImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+      viewportSync: {
+        clientId: 7,
+        publish,
+        ready: true,
+        state: null,
+      },
+    }));
+    const taskDocument = container.querySelector<HTMLElement>(".playsay-task-document")!;
+    taskDocument.scrollTop = 180;
+    await waitFor(() => expect(publish).toHaveBeenCalled());
+    publish.mockClear();
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-image-focus-image-1']")!);
+    fireEvent.scroll(taskDocument);
+
+    await waitFor(() => expect(publish).toHaveBeenCalledWith(expect.objectContaining({
+      focusedBlockId: "image-1",
+      presentationMode: "image-focus",
+      scrollContainer: "image",
+    })));
+    expect(publish.mock.calls.some(([viewport]) => viewport.presentationMode === "default")).toBe(false);
+  });
+
   it("draws with the selected line width and returns one-shot shapes to the pointer", async () => {
     const { container } = render(createElement(LessonTaskCanvas, {
       lessonId: "lesson-1",

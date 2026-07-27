@@ -168,6 +168,8 @@ export function LessonTaskCanvas({
   const previousPresentationModeRef = useRef<LessonPresentationMode>("default");
   const applyingRemoteViewportRef = useRef(false);
   const appliedRemoteViewportRevisionRef = useRef(0);
+  const suppressTransitionScrollPublishRef = useRef(false);
+  const transitionScrollFrameRef = useRef<number | null>(null);
   const lastViewportPublishAtRef = useRef(0);
   const viewportPublishTimerRef = useRef<number | null>(null);
 
@@ -177,11 +179,23 @@ export function LessonTaskCanvas({
     previousPresentationModeRef.current = presentationMode;
     if (!taskDocument) return;
 
+    const suppressTransitionScrollPublish = () => {
+      suppressTransitionScrollPublishRef.current = true;
+      if (transitionScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(transitionScrollFrameRef.current);
+      }
+      transitionScrollFrameRef.current = window.requestAnimationFrame(() => {
+        transitionScrollFrameRef.current = null;
+        suppressTransitionScrollPublishRef.current = false;
+      });
+    };
+
     if (previousMode !== "image-focus" && presentationMode === "image-focus") {
       documentScrollBeforeImageFocusRef.current = {
         left: taskDocument.scrollLeft,
         top: taskDocument.scrollTop,
       };
+      suppressTransitionScrollPublish();
       taskDocument.scrollLeft = 0;
       taskDocument.scrollTop = 0;
       return;
@@ -191,11 +205,19 @@ export function LessonTaskCanvas({
       const previousScroll = documentScrollBeforeImageFocusRef.current;
       documentScrollBeforeImageFocusRef.current = null;
       if (previousScroll) {
+        suppressTransitionScrollPublish();
         taskDocument.scrollLeft = previousScroll.left;
         taskDocument.scrollTop = previousScroll.top;
       }
     }
   }, [presentationMode]);
+
+  useEffect(() => () => {
+    if (transitionScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(transitionScrollFrameRef.current);
+      transitionScrollFrameRef.current = null;
+    }
+  }, []);
 
   const annotationAnchors = useAnnotationAnchors(
     materialSurfaceRef,
@@ -272,7 +294,7 @@ export function LessonTaskCanvas({
     if (!node || !viewportSync) return undefined;
 
     const handleScroll = () => {
-      if (applyingRemoteViewportRef.current) return;
+      if (applyingRemoteViewportRef.current || suppressTransitionScrollPublishRef.current) return;
       const elapsed = performance.now() - lastViewportPublishAtRef.current;
       if (elapsed >= 50) {
         publishViewport();

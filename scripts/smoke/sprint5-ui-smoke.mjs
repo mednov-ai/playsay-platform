@@ -911,7 +911,7 @@ async function waitForFocusedSmokeImageClosed(page) {
 }
 
 async function assertAnchoredTextFollowsImageScroll(page, role) {
-  const before = await imageTextGeometry(page);
+  const before = await stableImageTextGeometry(page);
   const targetScrollTop = Math.min(360, before.scrollHeight - before.clientHeight);
   if (targetScrollTop < 120) {
     throw new Error(`${role} focused image is not vertically scrollable: ${JSON.stringify(before)}`);
@@ -944,6 +944,23 @@ async function assertAnchoredTextFollowsImageScroll(page, role) {
     const after = await imageTextGeometry(page).catch(() => null);
     throw new Error(`${role} text detached from its image during scroll; before=${JSON.stringify(before)}, after=${JSON.stringify(after)}: ${error instanceof Error ? error.message : String(error)}`);
   });
+}
+
+async function stableImageTextGeometry(page) {
+  let previous = null;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const current = await imageTextGeometry(page);
+    if (previous
+      && Math.abs(current.scrollTop - previous.scrollTop) <= 1
+      && Math.abs(current.textOffsetTop - previous.textOffsetTop) <= 1) {
+      return current;
+    }
+    previous = current;
+    await page.evaluate(() => new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    }));
+  }
+  return previous;
 }
 
 async function imageTextGeometry(page) {

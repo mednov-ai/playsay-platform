@@ -222,6 +222,7 @@ spec:
                 'ai-tutor-service': 'playsay-ai-tutor-service-develop',
                 'vocabulary-service': 'playsay-vocabulary-service-develop',
                 'web-app': 'playsay-web-app-develop',
+                'game-adapter-service': 'playsay-game-adapter-service-develop',
                 'collaboration-service': 'playsay-collaboration-service-develop',
                 'media-service': 'playsay-media-service-develop',
                 'payment-service': 'playsay-payment-service-develop',

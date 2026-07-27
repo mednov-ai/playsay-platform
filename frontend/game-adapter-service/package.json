@@ -1,0 +1,17 @@
+{
+  "name": "@playsay/game-adapter-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp ../game-sync-sdk/dist/game-sync.iife.js dist/game-sync.iife.js",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.5"
+  }
+}

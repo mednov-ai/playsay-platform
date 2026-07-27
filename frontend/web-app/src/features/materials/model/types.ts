@@ -1,4 +1,10 @@
 import type { LessonMaterialAsset, LessonMaterialJson } from "../../../shared/api/playsay";
+import type {
+  GameActionRequest,
+  GameCheckpoint,
+  GameEffect,
+  OrderedGameAction,
+} from "@playsay/game-sync";
 
 export type MaterialBlockType =
   | "text"
@@ -133,8 +139,31 @@ export type MaterialHtmlGameSnapshot = {
   updatedAt: number;
 };
 
+export type MaterialHtmlGameSdkActionRequest = GameActionRequest & {
+  at: number;
+  blockId: string;
+  id: string;
+};
+
+export type MaterialHtmlGameSdkOrderedAction = OrderedGameAction & {
+  at: number;
+  blockId: string;
+  id: string;
+};
+
+export type MaterialHtmlGameSdkEffect = GameEffect & {
+  at: number;
+  blockId: string;
+  id: string;
+};
+
+export type MaterialHtmlGameSdkCheckpoint = GameCheckpoint & {
+  updatedAt: number;
+};
+
 export type MaterialHtmlGameSync = {
   authorityRuns: Record<string, string>;
+  clientId: number | null;
   effects: MaterialHtmlGameEffect[];
   inputs: MaterialHtmlGameInputEvent[];
   isAuthority: boolean;
@@ -145,6 +174,14 @@ export type MaterialHtmlGameSync = {
   publishEffect: (effect: MaterialHtmlGameEffect) => void;
   publishInput: (event: MaterialHtmlGameInputEvent) => void;
   publishSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
+  publishSdkAction: (action: MaterialHtmlGameSdkOrderedAction) => void;
+  publishSdkCheckpoint: (blockId: string, checkpoint: MaterialHtmlGameSdkCheckpoint) => void;
+  publishSdkEffect: (effect: MaterialHtmlGameSdkEffect) => void;
+  publishSdkRequest: (request: MaterialHtmlGameSdkActionRequest) => void;
+  sdkActions: MaterialHtmlGameSdkOrderedAction[];
+  sdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint>;
+  sdkEffects: MaterialHtmlGameSdkEffect[];
+  sdkRequests: MaterialHtmlGameSdkActionRequest[];
   setAuthorityRun: (blockId: string, runId: string | null) => void;
   setPresentedBlock: (blockId: string | null) => void;
   snapshots: Record<string, MaterialHtmlGameSnapshot>;
@@ -327,6 +364,9 @@ export type MaterialEditorBlock = {
   wordBankOptions?: MaterialWordBankOption[];
   height?: number;
   gameIconUrl?: string;
+  gameSyncCompatibility?: "SDK_V1" | "LEGACY_PREDICTIVE" | "LEGACY_MIRROR" | "UNSUPPORTED";
+  gameAdaptationSourceAssetId?: string;
+  gameAdaptationJobId?: string;
   gameTitleSource?: "FILE" | "HTML" | "AI" | "USER";
 };
 

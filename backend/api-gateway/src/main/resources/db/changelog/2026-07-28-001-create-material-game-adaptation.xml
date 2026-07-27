@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-28-001-create-material-game-adaptation" author="codex">
+        <createTable tableName="material_game_adaptation">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_material_game_adaptation"/>
+            </column>
+            <column name="material_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="source_asset_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="adapted_asset_id" type="UUID"/>
+            <column name="block_id" type="VARCHAR(120)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="compatibility" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="report" type="TEXT"/>
+            <column name="model" type="VARCHAR(120)"/>
+            <column name="prompt_hash" type="VARCHAR(128)"/>
+            <column name="attempts" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="lease_until" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_error_code" type="VARCHAR(120)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="material_game_adaptation" baseColumnNames="material_id"
+            constraintName="fk_material_game_adaptation_material" referencedTableName="lesson_material"
+            referencedColumnNames="id" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="material_game_adaptation" baseColumnNames="source_asset_id"
+            constraintName="fk_material_game_adaptation_source_asset" referencedTableName="material_asset"
+            referencedColumnNames="id" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="material_game_adaptation" baseColumnNames="adapted_asset_id"
+            constraintName="fk_material_game_adaptation_adapted_asset" referencedTableName="material_asset"
+            referencedColumnNames="id" onDelete="SET NULL"/>
+        <createIndex tableName="material_game_adaptation" indexName="idx_material_game_adaptation_claim">
+            <column name="status"/><column name="next_attempt_at"/><column name="updated_at"/>
+        </createIndex>
+        <createIndex tableName="material_game_adaptation" indexName="idx_material_game_adaptation_target">
+            <column name="material_id"/><column name="source_asset_id"/><column name="block_id"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="material_game_adaptation"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -1780,6 +1780,124 @@ paths:
                 $ref: "#/components/schemas/MaterialHtmlGameEnrichmentResponse"
       security:
       - bearerAuth: []
+  /materials/{materialId}/assets/{assetId}/game-adaptations:
+    post:
+      tags:
+      - Materials
+      summary: Adapt an HTML game to Play&Say Game Sync
+      operationId: requestMaterialGameAdaptation
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: assetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialGameAdaptationRequest"
+      responses:
+        "202":
+          description: Adaptation queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialGameAdaptationResponse"
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets/{assetId}/game-adaptations/{jobId}:
+    get:
+      tags:
+      - Materials
+      summary: Get HTML game adaptation status
+      operationId: getMaterialGameAdaptation
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: assetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: jobId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialGameAdaptationResponse"
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets/{assetId}/game-adaptations/{jobId}/apply:
+    post:
+      tags:
+      - Materials
+      summary: Apply a reviewed HTML game adaptation
+      operationId: applyMaterialGameAdaptation
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: assetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: jobId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialGameAdaptationResponse"
+        "409":
+          description: Material source changed or adaptation is not ready
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets/{assetId}/game-adaptations/{jobId}/rollback:
+    post:
+      tags:
+      - Materials
+      summary: Restore the original HTML game
+      operationId: rollbackMaterialGameAdaptation
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: assetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: jobId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Original restored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialGameAdaptationResponse"
+        "409":
+          description: Material source changed
+      security:
+      - bearerAuth: []
   /materials/{materialId}/assets/images:
     post:
       tags:
@@ -5194,6 +5312,40 @@ components:
       - assetId
       - blockId
       - status
+    MaterialGameAdaptationRequest:
+      type: object
+      properties:
+        blockId:
+          type: string
+          maxLength: 120
+      required:
+      - blockId
+    MaterialGameAdaptationResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        materialId: { type: string, format: uuid }
+        sourceAssetId: { type: string, format: uuid }
+        adaptedAssetId:
+          type: [string, "null"]
+          format: uuid
+        blockId: { type: string }
+        status: { type: string }
+        compatibility: { type: string }
+        report: { type: [string, "null"] }
+        model: { type: [string, "null"] }
+        errorCode: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+      - id
+      - materialId
+      - sourceAssetId
+      - blockId
+      - status
+      - compatibility
+      - createdAt
+      - updatedAt
     MaterialAssetResponse:
       type: object
       properties:

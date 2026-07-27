@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { LayoutGrid, Plus } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
-import type { MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
+import type { MaterialGameAdaptation, MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
 import {
   type MaterialAssetLibraryItem,
   type MaterialEditorBlock,
@@ -22,10 +22,15 @@ export function MaterialEditorForm({
   form,
   imageGenerationProgress,
   htmlGameEnrichments,
+  htmlGameAdaptations,
   message,
   onActivateBlock,
   onMoveBlock,
   onRegenerateHtmlGameIcon,
+  onApplyGameAdaptation,
+  onPreviewGameAdaptation,
+  onRequestGameAdaptation,
+  onRollbackGameAdaptation,
   onRemoveBlock,
   onRequestPalette,
   onSuggestAcceptedAnswers,
@@ -39,10 +44,15 @@ export function MaterialEditorForm({
   form: MaterialFormState;
   imageGenerationProgress: MaterialImageGenerationProgress | null;
   htmlGameEnrichments: Record<string, MaterialHtmlGameEnrichment>;
+  htmlGameAdaptations: Record<string, MaterialGameAdaptation>;
   message: string | null;
   onActivateBlock: (blockId: string) => void;
   onMoveBlock: (blockId: string, direction: -1 | 1) => void;
   onRegenerateHtmlGameIcon: (blockId: string) => void;
+  onApplyGameAdaptation: (blockId: string) => void;
+  onPreviewGameAdaptation: (blockId: string) => void;
+  onRequestGameAdaptation: (blockId: string) => void;
+  onRollbackGameAdaptation: (blockId: string) => void;
   onRemoveBlock: (blockId: string) => void;
   onRequestPalette: () => void;
   onSuggestAcceptedAnswers: (blockId: string, itemIds: string[]) => void;
@@ -117,6 +127,7 @@ export function MaterialEditorForm({
                   disabled={disabled}
                   index={index}
                   htmlGameEnrichment={htmlGameEnrichments[block.id]}
+                  htmlGameAdaptation={htmlGameAdaptations[block.id]}
                   key={block.id}
                   onActivate={() => onActivateBlock(block.id)}
                   onPreview={() => setPreviewBlockId(block.id)}
@@ -124,6 +135,10 @@ export function MaterialEditorForm({
                   onMoveDown={() => onMoveBlock(block.id, 1)}
                   onMoveUp={() => onMoveBlock(block.id, -1)}
                   onRegenerateHtmlGameIcon={() => onRegenerateHtmlGameIcon(block.id)}
+                  onApplyGameAdaptation={() => onApplyGameAdaptation(block.id)}
+                  onPreviewGameAdaptation={() => onPreviewGameAdaptation(block.id)}
+                  onRequestGameAdaptation={() => onRequestGameAdaptation(block.id)}
+                  onRollbackGameAdaptation={() => onRollbackGameAdaptation(block.id)}
                   onRemove={() => onRemoveBlock(block.id)}
                   onSuggestAcceptedAnswers={onSuggestAcceptedAnswers}
                   onToggleCollapsed={() => setExpandedBlockId((current) => toggleExpandedMaterialBlock(current, block.id))}

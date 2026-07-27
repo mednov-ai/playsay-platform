@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Gamepad2, Loader2 } from "lucide-react";
+import {
+  classifyGameHtml,
+  GAME_SYNC_LIMITS,
+  type GameActionRequest,
+  type GameSyncInboundMessage,
+  type GameSyncOutboundMessage,
+  type OrderedGameAction,
+} from "@playsay/game-sync";
 import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
@@ -29,11 +37,39 @@ type BridgeMessage =
   | { channel: string; runId?: string; sequence: number; type: "snapshotApplied" }
   | { channel: string; operations: MaterialHtmlGamePatchOperation[]; sequence: number; type: "patch" }
   | { channel: string; runId?: string; sequence: number; type: "patchRejected" }
+  | { channel: string; type: "sdkReady" }
   | { channel: string; type: "input"; event: Omit<MaterialHtmlGameInputEvent, "id" | "at" | "blockId"> }
   | { channel: string; type: "effect"; effect: Omit<MaterialHtmlGameEffect, "id" | "at" | "blockId"> };
 
 const MIRROR_SNAPSHOT_RETRY_MS = 750;
 const MIRROR_RECOVERY_SNAPSHOT_MS = 5_000;
+
+function seedFromRunId(runId: string): number {
+  let seed = 0x811c9dc5;
+  for (let index = 0; index < runId.length; index += 1) {
+    seed ^= runId.charCodeAt(index);
+    seed = Math.imul(seed, 0x01000193);
+  }
+  return seed >>> 0;
+}
+
+function serializedMessageBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+function orderSdkAction(
+  request: GameActionRequest & { at: number; blockId: string; id: string },
+  revision: { current: number },
+  logicalTime: { current: number },
+): OrderedGameAction & { at: number; blockId: string; id: string } {
+  revision.current += 1;
+  logicalTime.current += 1;
+  return {
+    ...request,
+    authorityRevision: revision.current,
+    logicalTime: logicalTime.current,
+  };
+}
 
 export function HtmlGameFrame({
   blockId,
@@ -53,10 +89,13 @@ export function HtmlGameFrame({
   const { t } = useAppTranslation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useMemo(() => crypto.randomUUID(), [blockId, html]);
-  const isMirror = Boolean(sync && !sync.isAuthority);
+  const sdkRuntime = Boolean(html && classifyGameHtml(html) === "SDK_V1");
+  const isMirror = Boolean(sync && !sync.isAuthority && !sdkRuntime);
   const authorityRunId = sync?.authorityRuns[blockId];
   const predictiveMirror = Boolean(isMirror && html && supportsPredictiveHtmlGame(html));
-  const runtimeRunId = isMirror ? authorityRunId ?? blockId : channel;
+  const runtimeRunId = (isMirror || (sdkRuntime && !sync?.isAuthority))
+    ? authorityRunId ?? blockId
+    : channel;
   const srcDoc = useMemo(
     () => html ? createSandboxedGameDocument(html, channel, isMirror, runtimeRunId, predictiveMirror) : "",
     [channel, html, isMirror, predictiveMirror, runtimeRunId],
@@ -66,17 +105,25 @@ export function HtmlGameFrame({
   const nextInputSequenceRef = useRef(0);
   const handledEffectsRef = useRef<Set<string> | null>(null);
   const handledPatchesRef = useRef<Set<string> | null>(null);
+  const sdkPortRef = useRef<MessagePort | null>(null);
+  const handledSdkActionsRef = useRef(new Set<string>());
+  const handledSdkEffectsRef = useRef(new Set<string>());
+  const handledSdkRequestsRef = useRef(new Set<string>());
+  const sdkRevisionRef = useRef(0);
+  const sdkLogicalTimeRef = useRef(0);
   const mirrorReadyRef = useRef(false);
   const pendingMirrorSnapshotRef = useRef<MaterialHtmlGameSnapshot | null>(null);
   const mirrorSnapshotRetryRef = useRef<number | null>(null);
   const lastMirrorSnapshotAppliedAtRef = useRef(0);
   const [appliedAuthorityRunId, setAppliedAuthorityRunId] = useState<string | null>(null);
   const activeSnapshot = sync?.snapshots[blockId];
-  const authorityAvailable = !isMirror || Boolean(
-    authorityRunId &&
-    activeSnapshot?.runId === authorityRunId &&
-    appliedAuthorityRunId === authorityRunId,
-  );
+  const authorityAvailable = sdkRuntime
+    ? !sync || sync.isAuthority || Boolean(authorityRunId)
+    : !isMirror || Boolean(
+      authorityRunId &&
+      activeSnapshot?.runId === authorityRunId &&
+      appliedAuthorityRunId === authorityRunId,
+    );
 
   const clearMirrorSnapshotRetry = useCallback(() => {
     if (mirrorSnapshotRetryRef.current !== null) {
@@ -112,6 +159,13 @@ export function HtmlGameFrame({
     nextInputSequenceRef.current = 0;
     handledEffectsRef.current = null;
     handledPatchesRef.current = null;
+    handledSdkActionsRef.current = new Set();
+    handledSdkEffectsRef.current = new Set();
+    handledSdkRequestsRef.current = new Set();
+    sdkRevisionRef.current = 0;
+    sdkLogicalTimeRef.current = 0;
+    sdkPortRef.current?.close();
+    sdkPortRef.current = null;
     mirrorReadyRef.current = false;
     pendingMirrorSnapshotRef.current = null;
     lastMirrorSnapshotAppliedAtRef.current = 0;
@@ -120,6 +174,11 @@ export function HtmlGameFrame({
   }, [blockId, channel, clearMirrorSnapshotRetry, sync?.isAuthority]);
 
   useEffect(() => () => clearMirrorSnapshotRetry(), [clearMirrorSnapshotRetry]);
+
+  useEffect(() => () => {
+    sdkPortRef.current?.close();
+    sdkPortRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!isMirror) {
@@ -209,11 +268,157 @@ export function HtmlGameFrame({
           blockId,
           id: crypto.randomUUID(),
         });
+      } else if (message.type === "sdkReady" && sdkRuntime) {
+        sdkPortRef.current?.close();
+        const ports = new MessageChannel();
+        sdkPortRef.current = ports.port1;
+        ports.port1.onmessage = (event: MessageEvent<GameSyncOutboundMessage>) => {
+          const outbound = event.data;
+          if (outbound.kind === "hello") {
+            const checkpoint = sync?.sdkCheckpoints[blockId];
+            const context: GameSyncInboundMessage = {
+              actorId: String(sync?.clientId ?? channel),
+              checkpoint: checkpoint?.runId === runtimeRunId ? checkpoint : undefined,
+              kind: "context",
+              runId: runtimeRunId,
+              seed: seedFromRunId(runtimeRunId),
+            };
+            ports.port1.postMessage(context);
+          } else if (outbound.kind === "action-request") {
+            if (serializedMessageBytes(outbound.action) > GAME_SYNC_LIMITS.actionBytes) {
+              ports.port1.postMessage({
+                code: "ACTION_TOO_LARGE",
+                eventId: outbound.action.eventId,
+                kind: "rejected",
+              } satisfies GameSyncInboundMessage);
+              return;
+            }
+            const request = {
+              ...outbound.action,
+              at: Date.now(),
+              blockId,
+              id: outbound.action.eventId,
+              runId: runtimeRunId,
+            };
+            if (!sync || sync.isAuthority) {
+              const action = orderSdkAction(request, sdkRevisionRef, sdkLogicalTimeRef);
+              handledSdkActionsRef.current.add(action.id);
+              ports.port1.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
+              sync?.publishSdkAction(action);
+            } else {
+              sync.publishSdkRequest(request);
+            }
+          } else if (outbound.kind === "effect") {
+            if (serializedMessageBytes(outbound.effect) > GAME_SYNC_LIMITS.effectBytes) {
+              return;
+            }
+            const effect = {
+              ...outbound.effect,
+              at: Date.now(),
+              blockId,
+              id: outbound.effect.effectId,
+              runId: runtimeRunId,
+            };
+            handledSdkEffectsRef.current.add(effect.id);
+            sync?.publishSdkEffect(effect);
+          } else if (outbound.kind === "checkpoint" && (!sync || sync.isAuthority)) {
+            if (serializedMessageBytes(outbound.checkpoint) > GAME_SYNC_LIMITS.checkpointBytes) {
+              return;
+            }
+            const checkpoint = {
+              ...outbound.checkpoint,
+              runId: runtimeRunId,
+              updatedAt: Date.now(),
+            };
+            if (sync) {
+              sync.publishSdkCheckpoint(blockId, checkpoint);
+            }
+          }
+        };
+        ports.port1.start();
+        iframeRef.current?.contentWindow?.postMessage(
+          { channel, type: "playsay-sdk-connect" },
+          "*",
+          [ports.port2],
+        );
       }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [activeSnapshot, authorityRunId, blockId, channel, isMirror, sendMirrorSnapshot, sync]);
+  }, [activeSnapshot, authorityRunId, blockId, channel, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
+
+  useEffect(() => {
+    if (!sdkRuntime || !sync?.isAuthority) {
+      return;
+    }
+    const existingActions = sync.sdkActions
+      .filter((action) => action.blockId === blockId && action.runId === runtimeRunId);
+    const checkpoint = sync.sdkCheckpoints[blockId];
+    sdkRevisionRef.current = Math.max(
+      sdkRevisionRef.current,
+      checkpoint?.runId === runtimeRunId ? checkpoint.revision : 0,
+      ...existingActions.map((action) => action.authorityRevision),
+    );
+    sdkLogicalTimeRef.current = Math.max(
+      sdkLogicalTimeRef.current,
+      checkpoint?.runId === runtimeRunId ? checkpoint.logicalTime : 0,
+      ...existingActions.map((action) => action.logicalTime),
+    );
+    const orderedEventIds = new Set(existingActions.map((action) => action.eventId));
+    const requests = sync.sdkRequests
+      .filter((request) => request.blockId === blockId && request.runId === runtimeRunId)
+      .sort((left, right) => left.at - right.at || left.actorSequence - right.actorSequence);
+    requests.forEach((request) => {
+      if (handledSdkRequestsRef.current.has(request.id) || orderedEventIds.has(request.eventId)) {
+        return;
+      }
+      handledSdkRequestsRef.current.add(request.id);
+      const action = orderSdkAction(request, sdkRevisionRef, sdkLogicalTimeRef);
+      handledSdkActionsRef.current.add(action.id);
+      sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
+      sync.publishSdkAction(action);
+    });
+  }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.isAuthority, sync?.sdkRequests]);
+
+  useEffect(() => {
+    if (!sdkRuntime || !sync) {
+      return;
+    }
+    const checkpointRevision = sync.sdkCheckpoints[blockId]?.runId === runtimeRunId
+      ? sync.sdkCheckpoints[blockId]?.revision ?? 0
+      : 0;
+    sync.sdkActions
+      .filter((action) => (
+        action.blockId === blockId &&
+        action.runId === runtimeRunId &&
+        action.authorityRevision > checkpointRevision
+      ))
+      .sort((left, right) => left.authorityRevision - right.authorityRevision)
+      .forEach((action) => {
+        sdkRevisionRef.current = Math.max(sdkRevisionRef.current, action.authorityRevision);
+        sdkLogicalTimeRef.current = Math.max(sdkLogicalTimeRef.current, action.logicalTime);
+        if (handledSdkActionsRef.current.has(action.id)) {
+          return;
+        }
+        handledSdkActionsRef.current.add(action.id);
+        sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
+      });
+  }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.sdkActions, sync?.sdkCheckpoints]);
+
+  useEffect(() => {
+    if (!sdkRuntime || !sync) {
+      return;
+    }
+    sync.sdkEffects
+      .filter((effect) => effect.blockId === blockId && effect.runId === runtimeRunId)
+      .forEach((effect) => {
+        if (handledSdkEffectsRef.current.has(effect.id)) {
+          return;
+        }
+        handledSdkEffectsRef.current.add(effect.id);
+        sdkPortRef.current?.postMessage({ effect, kind: "effect" } satisfies GameSyncInboundMessage);
+      });
+  }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.sdkEffects]);
 
   useEffect(() => {
     if (!sync) {
@@ -317,7 +522,7 @@ export function HtmlGameFrame({
       data-authority={sync?.isAuthority ? "true" : "false"}
       data-fill-available={fillAvailable ? "true" : "false"}
       data-paused={authorityAvailable ? "false" : "true"}
-      data-runtime={predictiveMirror ? "predictive" : isMirror ? "authority-mirror" : "authority"}
+      data-runtime={sdkRuntime ? "sdk-v1" : predictiveMirror ? "predictive" : isMirror ? "authority-mirror" : "authority"}
     >
       <iframe
         allow="autoplay"
@@ -327,7 +532,7 @@ export function HtmlGameFrame({
         style={{ height: fillAvailable ? "100%" : height }}
         title={title}
       />
-      {isMirror && !authorityAvailable ? (
+      {(isMirror || (sdkRuntime && !sync?.isAuthority)) && !authorityAvailable ? (
         <div className="playsay-html-game-waiting" role="status">
           <Gamepad2 className="h-5 w-5 text-primary" />
           <span>{t("materials.renderer.htmlGameWaiting")}</span>
@@ -344,13 +549,17 @@ export function createSandboxedGameDocument(
   runId = channel,
   predictive = false,
 ): string {
+  const sdkRuntime = classifyGameHtml(html) === "SDK_V1";
   const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">`;
+  const sdkBridge = sdkRuntime
+    ? `<script data-playsay-game-sdk-host>${sdkHostBridgeSource(channel)}</script>`
+    : "";
   const bridge = `<script data-playsay-game-bridge>${gameBridgeSource(channel, mirror, runId, predictive)}</script>`;
-  const headContent = `${csp}${bridge}`;
+  const headContent = `${csp}${sdkBridge}${bridge}`;
   const withHead = /<head\b[^>]*>/i.test(html)
     ? html.replace(/<head\b[^>]*>/i, (head) => `${head}${headContent}`)
     : html.replace(/<html\b[^>]*>/i, (root) => `${root}<head>${headContent}</head>`);
-  if (!mirror || predictive) {
+  if (sdkRuntime || !mirror || predictive) {
     return withHead;
   }
   return withHead.replace(/<script\b(?![^>]*data-playsay-game-bridge)([^>]*)>/gi, '<script type="application/playsay-disabled"$1>');
@@ -358,6 +567,52 @@ export function createSandboxedGameDocument(
 
 export function supportsPredictiveHtmlGame(html: string): boolean {
   return !/\b(?:EventSource|RTCPeerConnection|WebSocket|fetch|geolocation|getUserMedia)\b/.test(html);
+}
+
+function sdkHostBridgeSource(channel: string): string {
+  return `(() => {
+    const channel = ${JSON.stringify(channel)};
+    let port = null;
+    let readyTimer = 0;
+    const outbound = [];
+    const listeners = new Set();
+    const transport = {
+      close() {
+        listeners.clear();
+        port?.close();
+        port = null;
+      },
+      send(message) {
+        if (port) port.postMessage(message);
+        else outbound.push(message);
+      },
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }
+    };
+    Object.defineProperty(window, '__PLAY_SAY_GAME_SYNC_TRANSPORT__', {
+      configurable: false,
+      value: transport
+    });
+    window.addEventListener('message', (event) => {
+      if (
+        event.source !== window.parent ||
+        event.data?.channel !== channel ||
+        event.data?.type !== 'playsay-sdk-connect' ||
+        !event.ports?.[0]
+      ) return;
+      port?.close();
+      port = event.ports[0];
+      window.clearInterval(readyTimer);
+      port.onmessage = (portEvent) => listeners.forEach((listener) => listener(portEvent.data));
+      port.start();
+      outbound.splice(0).forEach((message) => port.postMessage(message));
+    });
+    const announceReady = () => window.parent.postMessage({ channel, type: 'sdkReady' }, '*');
+    announceReady();
+    readyTimer = window.setInterval(announceReady, 500);
+  })();`;
 }
 
 function gameBridgeSource(channel: string, mirror: boolean, runId: string, predictive: boolean): string {

@@ -13,6 +13,8 @@ import com.playsay.gateway.dto.MaterialAssetResponse
 import com.playsay.gateway.dto.MaterialAssetUpdateRequest
 import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentRequest
 import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentResponse
+import com.playsay.gateway.dto.MaterialGameAdaptationRequest
+import com.playsay.gateway.dto.MaterialGameAdaptationResponse
 import com.playsay.gateway.dto.MaterialGenerateImagesRequest
 import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.MaterialSubmissionResponse
@@ -44,6 +46,7 @@ class LessonMaterialStore(
     private val materialAssetService: MaterialAssetService,
     private val materialReadAccessPolicy: MaterialReadAccessPolicy,
     private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
+    private val materialGameAdaptationService: MaterialGameAdaptationService,
     private val materialSubmissionService: MaterialSubmissionService,
     private val materialAnnotationService: MaterialAnnotationService,
 ) {
@@ -292,6 +295,50 @@ class LessonMaterialStore(
     ): MaterialHtmlGameEnrichmentResponse {
         materialReadAccessPolicy.requireReadable(authentication, materialId)
         return materialHtmlGameEnrichmentService.status(materialId, assetId, blockId)
+    }
+
+    @Transactional
+    fun requestGameAdaptation(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        assetId: UUID,
+        request: MaterialGameAdaptationRequest,
+    ): MaterialGameAdaptationResponse {
+        lessonMaterialCatalogService.requireEditable(authentication, materialId, MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN)
+        return materialGameAdaptationService.request(materialId, assetId, request)
+    }
+
+    @Transactional(readOnly = true)
+    fun gameAdaptationStatus(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        assetId: UUID,
+        jobId: UUID,
+    ): MaterialGameAdaptationResponse {
+        lessonMaterialCatalogService.requireEditable(authentication, materialId, MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN)
+        return materialGameAdaptationService.status(materialId, assetId, jobId)
+    }
+
+    @Transactional
+    fun applyGameAdaptation(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        assetId: UUID,
+        jobId: UUID,
+    ): MaterialGameAdaptationResponse {
+        lessonMaterialCatalogService.requireEditable(authentication, materialId, MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN)
+        return materialGameAdaptationService.apply(materialId, assetId, jobId)
+    }
+
+    @Transactional
+    fun rollbackGameAdaptation(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        assetId: UUID,
+        jobId: UUID,
+    ): MaterialGameAdaptationResponse {
+        lessonMaterialCatalogService.requireEditable(authentication, materialId, MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN)
+        return materialGameAdaptationService.rollback(materialId, assetId, jobId)
     }
 
     private fun materialForAccessibleScheduledLesson(

@@ -17,6 +17,10 @@ import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
   MaterialHtmlGamePatch,
+  MaterialHtmlGameSdkActionRequest,
+  MaterialHtmlGameSdkCheckpoint,
+  MaterialHtmlGameSdkEffect,
+  MaterialHtmlGameSdkOrderedAction,
   MaterialHtmlGameSnapshot,
   MaterialHtmlGameSync,
 } from "../../materials/model/materialDocument";
@@ -61,6 +65,10 @@ export function useYjsWorkspace({
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
   const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
   const [htmlGamePatches, setHtmlGamePatches] = useState<MaterialHtmlGamePatch[]>([]);
+  const [htmlGameSdkActions, setHtmlGameSdkActions] = useState<MaterialHtmlGameSdkOrderedAction[]>([]);
+  const [htmlGameSdkCheckpoints, setHtmlGameSdkCheckpoints] = useState<Record<string, MaterialHtmlGameSdkCheckpoint>>({});
+  const [htmlGameSdkEffects, setHtmlGameSdkEffects] = useState<MaterialHtmlGameSdkEffect[]>([]);
+  const [htmlGameSdkRequests, setHtmlGameSdkRequests] = useState<MaterialHtmlGameSdkActionRequest[]>([]);
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
   const [materialViewport, setMaterialViewportState] = useState<MaterialViewportState | null>(null);
@@ -81,6 +89,10 @@ export function useYjsWorkspace({
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
       setHtmlGamePatches([]);
+      setHtmlGameSdkActions([]);
+      setHtmlGameSdkCheckpoints({});
+      setHtmlGameSdkEffects([]);
+      setHtmlGameSdkRequests([]);
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
@@ -102,6 +114,10 @@ export function useYjsWorkspace({
       onHtmlGameInputsChange: setHtmlGameInputs,
       onHtmlGamePatchesChange: setHtmlGamePatches,
       onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
+      onHtmlGameSdkActionsChange: setHtmlGameSdkActions,
+      onHtmlGameSdkCheckpointsChange: setHtmlGameSdkCheckpoints,
+      onHtmlGameSdkEffectsChange: setHtmlGameSdkEffects,
+      onHtmlGameSdkRequestsChange: setHtmlGameSdkRequests,
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onMaterialAnswersChange: setMaterialAnswers,
       onMaterialViewportChange: setMaterialViewportState,
@@ -209,6 +225,10 @@ export function useYjsWorkspace({
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
       setHtmlGamePatches([]);
+      setHtmlGameSdkActions([]);
+      setHtmlGameSdkCheckpoints({});
+      setHtmlGameSdkEffects([]);
+      setHtmlGameSdkRequests([]);
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
@@ -273,6 +293,25 @@ export function useYjsWorkspace({
     runtimeRef.current?.setHtmlGameSnapshot(blockId, gameSnapshot);
   }, []);
 
+  const publishHtmlGameSdkAction = useCallback((action: MaterialHtmlGameSdkOrderedAction) => {
+    runtimeRef.current?.publishHtmlGameSdkAction(action);
+  }, []);
+
+  const publishHtmlGameSdkCheckpoint = useCallback((
+    blockId: string,
+    checkpoint: MaterialHtmlGameSdkCheckpoint,
+  ) => {
+    runtimeRef.current?.setHtmlGameSdkCheckpoint(blockId, checkpoint);
+  }, []);
+
+  const publishHtmlGameSdkEffect = useCallback((effect: MaterialHtmlGameSdkEffect) => {
+    runtimeRef.current?.publishHtmlGameSdkEffect(effect);
+  }, []);
+
+  const publishHtmlGameSdkRequest = useCallback((request: MaterialHtmlGameSdkActionRequest) => {
+    runtimeRef.current?.publishHtmlGameSdkRequest(request);
+  }, []);
+
   const setHtmlGameAuthorityRun = useCallback((blockId: string, runId: string | null) => {
     runtimeRef.current?.updateHtmlGameAuthority(blockId, runId);
   }, []);
@@ -315,6 +354,7 @@ export function useYjsWorkspace({
   const htmlGameSync = useCallback((isAuthority: boolean): MaterialHtmlGameSync => ({
     authorityRuns: Object.fromEntries(participants
       .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))),
+    clientId: workspaceClientId,
     effects: htmlGameEffects,
     inputs: htmlGameInputs,
     isAuthority,
@@ -325,10 +365,18 @@ export function useYjsWorkspace({
     publishInput: publishHtmlGameInput,
     publishPatch: publishHtmlGamePatch,
     publishSnapshot: publishHtmlGameSnapshot,
+    publishSdkAction: publishHtmlGameSdkAction,
+    publishSdkCheckpoint: publishHtmlGameSdkCheckpoint,
+    publishSdkEffect: publishHtmlGameSdkEffect,
+    publishSdkRequest: publishHtmlGameSdkRequest,
+    sdkActions: htmlGameSdkActions,
+    sdkCheckpoints: htmlGameSdkCheckpoints,
+    sdkEffects: htmlGameSdkEffects,
+    sdkRequests: htmlGameSdkRequests,
     setAuthorityRun: setHtmlGameAuthorityRun,
     setPresentedBlock: setPresentedHtmlGameBlock,
     snapshots: htmlGameSnapshots,
-  }), [htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status]);
+  }), [htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSdkActions, htmlGameSdkCheckpoints, htmlGameSdkEffects, htmlGameSdkRequests, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSdkAction, publishHtmlGameSdkCheckpoint, publishHtmlGameSdkEffect, publishHtmlGameSdkRequest, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status, workspaceClientId]);
 
   const exerciseSync = useMemo<MaterialExerciseSync>(() => ({
     answers: materialAnswers,

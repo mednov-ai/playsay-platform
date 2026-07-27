@@ -18,5 +18,6 @@
     "jsx": "react-jsx"
   },
   "include": ["src"],
+  "exclude": ["src/test-support/jsdom.d 2.ts"],
   "references": []
 }

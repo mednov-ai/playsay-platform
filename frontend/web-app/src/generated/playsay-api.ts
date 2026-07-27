@@ -980,6 +980,30 @@ export interface MaterialHtmlGameEnrichmentResponse {
   errorCode?: string | null;
 }
 
+export interface MaterialGameAdaptationRequest {
+  /** @maxLength 120 */
+  blockId: string;
+}
+
+export interface MaterialGameAdaptationResponse {
+  id: string;
+  materialId: string;
+  sourceAssetId: string;
+  /** @nullable */
+  adaptedAssetId?: string | null;
+  blockId: string;
+  status: string;
+  compatibility: string;
+  /** @nullable */
+  report?: string | null;
+  /** @nullable */
+  model?: string | null;
+  /** @nullable */
+  errorCode?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MaterialAssetResponse {
   id: string;
   materialId: string;
@@ -5028,6 +5052,207 @@ export const requestMaterialHtmlGameEnrichment = async (materialId: string,
 
   const data: requestMaterialHtmlGameEnrichmentResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as requestMaterialHtmlGameEnrichmentResponse
+}
+
+
+
+export type requestMaterialGameAdaptationResponse202 = {
+  data: MaterialGameAdaptationResponse
+  status: 202
+}
+
+export type requestMaterialGameAdaptationResponseSuccess = (requestMaterialGameAdaptationResponse202) & {
+  headers: Headers;
+};
+;
+
+export type requestMaterialGameAdaptationResponse = (requestMaterialGameAdaptationResponseSuccess)
+
+export const getRequestMaterialGameAdaptationUrl = (materialId: string,
+    assetId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations`
+}
+
+/**
+ * @summary Adapt an HTML game to Play&Say Game Sync
+ */
+export const requestMaterialGameAdaptation = async (materialId: string,
+    assetId: string,
+    materialGameAdaptationRequest: MaterialGameAdaptationRequest, options?: RequestInit): Promise<requestMaterialGameAdaptationResponse> => {
+
+  const res = await fetch(getRequestMaterialGameAdaptationUrl(materialId,assetId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(materialGameAdaptationRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: requestMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as requestMaterialGameAdaptationResponse
+}
+
+
+
+export type getMaterialGameAdaptationResponse200 = {
+  data: MaterialGameAdaptationResponse
+  status: 200
+}
+
+export type getMaterialGameAdaptationResponseSuccess = (getMaterialGameAdaptationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMaterialGameAdaptationResponse = (getMaterialGameAdaptationResponseSuccess)
+
+export const getGetMaterialGameAdaptationUrl = (materialId: string,
+    assetId: string,
+    jobId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}`
+}
+
+/**
+ * @summary Get HTML game adaptation status
+ */
+export const getMaterialGameAdaptation = async (materialId: string,
+    assetId: string,
+    jobId: string, options?: RequestInit): Promise<getMaterialGameAdaptationResponse> => {
+
+  const res = await fetch(getGetMaterialGameAdaptationUrl(materialId,assetId,jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMaterialGameAdaptationResponse
+}
+
+
+
+export type applyMaterialGameAdaptationResponse200 = {
+  data: MaterialGameAdaptationResponse
+  status: 200
+}
+
+export type applyMaterialGameAdaptationResponse409 = {
+  data: void
+  status: 409
+}
+
+export type applyMaterialGameAdaptationResponseSuccess = (applyMaterialGameAdaptationResponse200) & {
+  headers: Headers;
+};
+export type applyMaterialGameAdaptationResponseError = (applyMaterialGameAdaptationResponse409) & {
+  headers: Headers;
+};
+
+export type applyMaterialGameAdaptationResponse = (applyMaterialGameAdaptationResponseSuccess | applyMaterialGameAdaptationResponseError)
+
+export const getApplyMaterialGameAdaptationUrl = (materialId: string,
+    assetId: string,
+    jobId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}/apply`
+}
+
+/**
+ * @summary Apply a reviewed HTML game adaptation
+ */
+export const applyMaterialGameAdaptation = async (materialId: string,
+    assetId: string,
+    jobId: string, options?: RequestInit): Promise<applyMaterialGameAdaptationResponse> => {
+
+  const res = await fetch(getApplyMaterialGameAdaptationUrl(materialId,assetId,jobId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: applyMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as applyMaterialGameAdaptationResponse
+}
+
+
+
+export type rollbackMaterialGameAdaptationResponse200 = {
+  data: MaterialGameAdaptationResponse
+  status: 200
+}
+
+export type rollbackMaterialGameAdaptationResponse409 = {
+  data: void
+  status: 409
+}
+
+export type rollbackMaterialGameAdaptationResponseSuccess = (rollbackMaterialGameAdaptationResponse200) & {
+  headers: Headers;
+};
+export type rollbackMaterialGameAdaptationResponseError = (rollbackMaterialGameAdaptationResponse409) & {
+  headers: Headers;
+};
+
+export type rollbackMaterialGameAdaptationResponse = (rollbackMaterialGameAdaptationResponseSuccess | rollbackMaterialGameAdaptationResponseError)
+
+export const getRollbackMaterialGameAdaptationUrl = (materialId: string,
+    assetId: string,
+    jobId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}/rollback`
+}
+
+/**
+ * @summary Restore the original HTML game
+ */
+export const rollbackMaterialGameAdaptation = async (materialId: string,
+    assetId: string,
+    jobId: string, options?: RequestInit): Promise<rollbackMaterialGameAdaptationResponse> => {
+
+  const res = await fetch(getRollbackMaterialGameAdaptationUrl(materialId,assetId,jobId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: rollbackMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as rollbackMaterialGameAdaptationResponse
 }
 
 

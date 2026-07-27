@@ -192,6 +192,7 @@ spec:
         container('node') {
           dir('frontend') {
             sh 'npm install --cache /cache/npm --prefer-offline'
+            sh 'npm --workspace game-sync-sdk run typecheck && npm --workspace game-sync-sdk test && npm --workspace game-sync-sdk run build'
             sh 'npm --workspace web-app run generate'
             sh 'npm --workspace web-app run lint'
             sh 'npm --workspace web-app run test'

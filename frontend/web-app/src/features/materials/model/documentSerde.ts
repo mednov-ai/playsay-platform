@@ -196,6 +196,9 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   const imageSize = normalizeMaterialImageSize(asString(block.imageSize));
   const height = asNumber(block.height);
   const gameIconUrl = asString(block.gameIconUrl);
+  const gameSyncCompatibility = normalizeGameSyncCompatibility(asString(block.gameSyncCompatibility));
+  const gameAdaptationSourceAssetId = asString(block.gameAdaptationSourceAssetId);
+  const gameAdaptationJobId = asString(block.gameAdaptationJobId);
   const gameTitleSource = normalizeGameTitleSource(asString(block.gameTitleSource));
   const externalActivitySupportLevel = normalizeExternalActivitySupportLevel(asString(block.externalActivitySupportLevel));
   const videoClip = normalizeMaterialVideoClip(block.videoClip);
@@ -232,6 +235,9 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   }
   if (type === "htmlGame") {
     result.gameIconUrl = gameIconUrl || undefined;
+    result.gameSyncCompatibility = gameSyncCompatibility;
+    result.gameAdaptationSourceAssetId = gameAdaptationSourceAssetId || undefined;
+    result.gameAdaptationJobId = gameAdaptationJobId || undefined;
     result.gameTitleSource = gameTitleSource;
   }
   if (type === "externalActivity") {
@@ -317,6 +323,13 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
       clean.gameIconUrl = block.gameIconUrl.trim();
     }
     clean.gameTitleSource = normalizeGameTitleSource(block.gameTitleSource) ?? "USER";
+    clean.gameSyncCompatibility = normalizeGameSyncCompatibility(block.gameSyncCompatibility);
+    if (block.gameAdaptationSourceAssetId?.trim()) {
+      clean.gameAdaptationSourceAssetId = block.gameAdaptationSourceAssetId.trim();
+    }
+    if (block.gameAdaptationJobId?.trim()) {
+      clean.gameAdaptationJobId = block.gameAdaptationJobId.trim();
+    }
   }
   if (block.type === "externalActivity") {
     clean.provider = block.provider?.trim() || "EXPERIMENTAL";
@@ -415,6 +428,17 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   }
 
   return clean;
+}
+
+function normalizeGameSyncCompatibility(
+  value: unknown,
+): MaterialEditorBlock["gameSyncCompatibility"] {
+  return value === "SDK_V1" ||
+    value === "LEGACY_PREDICTIVE" ||
+    value === "LEGACY_MIRROR" ||
+    value === "UNSUPPORTED"
+    ? value
+    : undefined;
 }
 
 function normalizeGameTitleSource(value: string | undefined): MaterialEditorBlock["gameTitleSource"] {

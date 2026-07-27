@@ -48,6 +48,11 @@ test("module source changes trigger only their deploy target", () => {
     ["collaboration-service"],
     ["playsay-collaboration-service-develop"],
   );
+  assertDetection(
+    ["frontend/game-adapter-service/src/server.ts"],
+    ["game-adapter-service"],
+    ["playsay-game-adapter-service-develop"],
+  );
 });
 
 test("module Jenkinsfiles trigger only the corresponding module", () => {
@@ -60,6 +65,11 @@ test("module Jenkinsfiles trigger only the corresponding module", () => {
     ["Jenkinsfile.keyboard-frontend"],
     ["keyboard-app"],
     ["playsay-keyboard-frontend-develop"],
+  );
+  assertDetection(
+    ["Jenkinsfile.game-adapter-service"],
+    ["game-adapter-service"],
+    ["playsay-game-adapter-service-develop"],
   );
 });
 
@@ -101,6 +111,11 @@ test("frontend and browser extension changes stay scoped", () => {
     ["keyboard-app"],
     ["playsay-keyboard-frontend-develop"],
   );
+  assertDetection(
+    ["frontend/game-sync-sdk/src/runtime.ts"],
+    ["web-app", "game-adapter-service"],
+    ["playsay-web-app-develop", "playsay-game-adapter-service-develop"],
+  );
 });
 
 test("shared backend and frontend changes use explicit consumer sets", () => {
@@ -129,8 +144,12 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
   );
   assertDetection(
     ["frontend/package-lock.json"],
-    ["web-app", "keyboard-app"],
-    ["playsay-web-app-develop", "playsay-keyboard-frontend-develop"],
+    ["web-app", "game-adapter-service", "keyboard-app"],
+    [
+      "playsay-web-app-develop",
+      "playsay-game-adapter-service-develop",
+      "playsay-keyboard-frontend-develop",
+    ],
   );
 });
 

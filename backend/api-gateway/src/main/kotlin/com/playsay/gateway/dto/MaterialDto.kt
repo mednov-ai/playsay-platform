@@ -107,6 +107,26 @@ data class MaterialHtmlGameEnrichmentResponse(
     val errorCode: String?,
 )
 
+data class MaterialGameAdaptationRequest(
+    @field:Schema(maxLength = 120)
+    val blockId: String,
+)
+
+data class MaterialGameAdaptationResponse(
+    val id: UUID,
+    val materialId: UUID,
+    val sourceAssetId: UUID,
+    val adaptedAssetId: UUID?,
+    val blockId: String,
+    val status: String,
+    val compatibility: String,
+    val report: String?,
+    val model: String?,
+    val errorCode: String?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
 data class MaterialExternalActivityResolveRequest(
     @field:Schema(maxLength = 2_048)
     val url: String,

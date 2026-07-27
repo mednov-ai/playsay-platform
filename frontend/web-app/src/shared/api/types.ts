@@ -238,6 +238,23 @@ export type MaterialHtmlGameEnrichmentInput = {
   preferredTitle?: string | null;
   regenerateIcon?: boolean | null;
 };
+export type MaterialGameAdaptation = {
+  id: string;
+  materialId: string;
+  sourceAssetId: string;
+  adaptedAssetId?: string | null;
+  blockId: string;
+  status: "PENDING" | "ANALYZING" | "PATCHING" | "VALIDATING" | "READY_FOR_REVIEW" | "APPLIED" | "ROLLED_BACK" | "RETRY" | "FAILED" | string;
+  compatibility: "SDK_V1" | "LEGACY_PREDICTIVE" | "LEGACY_MIRROR" | "UNSUPPORTED" | string;
+  report?: string | null;
+  model?: string | null;
+  errorCode?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type MaterialGameAdaptationInput = {
+  blockId: string;
+};
 export type LessonMaterialDraft = Omit<LessonMaterialInput, "title"> & {
   title: string;
   description?: string | null;

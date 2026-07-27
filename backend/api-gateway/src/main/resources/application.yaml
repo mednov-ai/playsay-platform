@@ -75,6 +75,11 @@ playsay:
     base-url: ${PLAYSAY_MEDIA_SERVICE_BASE_URL:http://media-service.playsay-dev.svc.cluster.local}
     service-token: ${PLAYSAY_MEDIA_SERVICE_TOKEN:}
     cache-request-timeout-seconds: ${PLAYSAY_MEDIA_SERVICE_CACHE_REQUEST_TIMEOUT_SECONDS:660}
+  game-adapter-service:
+    base-url: ${PLAYSAY_GAME_ADAPTER_SERVICE_BASE_URL:http://game-adapter-service.playsay-dev.svc.cluster.local}
+    service-token: ${PLAYSAY_GAME_ADAPTER_SERVICE_TOKEN:}
+    enabled: ${PLAYSAY_GAME_ADAPTER_ENABLED:true}
+    poll-delay-ms: ${PLAYSAY_GAME_ADAPTER_POLL_DELAY_MS:3000}
   payment-service:
     base-url: ${PLAYSAY_PAYMENT_SERVICE_BASE_URL:http://payment-service.playsay-dev.svc.cluster.local}
     service-token: ${PLAYSAY_PAYMENT_SERVICE_TOKEN:}

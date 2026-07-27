@@ -16,6 +16,7 @@ const modulePipelines = [
   "Jenkinsfile.keyboard-backend",
   "Jenkinsfile.keyboard-frontend",
   "Jenkinsfile.media-service",
+  "Jenkinsfile.game-adapter-service",
   "Jenkinsfile.payment-service",
   "Jenkinsfile.registration-service",
   "Jenkinsfile.vocabulary-service",

@@ -4,11 +4,13 @@
     "web-app",
     "keyboard-app",
     "shared-ui",
+    "game-sync-sdk",
+    "game-adapter-service",
     "browser-extension"
   ],
   "scripts": {
-    "build": "npm --workspace web-app run generate && npm --workspace web-app run build",
+    "build": "npm --workspace game-sync-sdk run build && npm --workspace web-app run generate && npm --workspace web-app run build",
     "generate": "npm --workspace web-app run generate",
-    "test": "npm --workspace web-app run generate && npm --workspace web-app run test && npm --workspace browser-extension run test"
+    "test": "npm --workspace game-sync-sdk run test && npm --workspace web-app run generate && npm --workspace web-app run test && npm --workspace browser-extension run test"
   }
 }

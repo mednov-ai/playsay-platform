@@ -1092,6 +1092,7 @@ describe("LessonTaskCanvas", () => {
 function htmlGameSync(overrides: Partial<MaterialHtmlGameSync> = {}): MaterialHtmlGameSync {
   return {
     authorityRuns: {},
+    clientId: null,
     effects: [],
     inputs: [],
     isAuthority: false,
@@ -1099,10 +1100,18 @@ function htmlGameSync(overrides: Partial<MaterialHtmlGameSync> = {}): MaterialHt
     publishEffect: vi.fn(),
     publishInput: vi.fn(),
     publishSnapshot: vi.fn(),
+    publishSdkAction: vi.fn(),
+    publishSdkCheckpoint: vi.fn(),
+    publishSdkEffect: vi.fn(),
+    publishSdkRequest: vi.fn(),
     ready: true,
     setAuthorityRun: vi.fn(),
     setPresentedBlock: vi.fn(),
     snapshots: {},
+    sdkActions: [],
+    sdkCheckpoints: {},
+    sdkEffects: [],
+    sdkRequests: [],
     ...overrides,
   };
 }

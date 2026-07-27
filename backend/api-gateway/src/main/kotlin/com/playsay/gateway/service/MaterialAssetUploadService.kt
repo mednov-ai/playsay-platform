@@ -144,6 +144,7 @@ class MaterialAssetUploadService(
         val id = UUID.randomUUID()
         val storageKey = "material-assets/$materialId/$id.html"
         val gameMetadata = materialHtmlGameMetadataService.extract(bytes, originalFileName)
+        val compatibility = classifyHtmlGameCompatibility(bytes.toString(StandardCharsets.UTF_8))
         try {
             materialObjectStorage.putObject(storageKey, bytes, "text/html")
             materialAssetRepo.saveAndFlush(
@@ -165,6 +166,63 @@ class MaterialAssetUploadService(
                             put("gameTitleSource", gameMetadata.titleSource)
                             put("gameTitleNeedsAi", gameMetadata.titleNeedsAi)
                             put("enrichmentStatus", "IDLE")
+                            put("syncCompatibility", compatibility)
+                        },
+                    ),
+                    createdAt = Instant.now(),
+                ),
+            )
+        } catch (exception: MaterialObjectStorageException) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
+        } catch (exception: RuntimeException) {
+            runCatching { materialObjectStorage.deleteObject(storageKey) }
+            throw exception
+        }
+        return id
+    }
+
+    fun insertAdaptedHtmlGameAsset(
+        materialId: UUID,
+        sourceAssetId: UUID,
+        bytes: ByteArray,
+        report: String,
+        model: String,
+        promptHash: String,
+    ): UUID {
+        require(bytes.isNotEmpty() && bytes.size <= materialHtmlGameMaxBytes)
+        val html = decodeStrictUtf8(bytes)
+            ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_HTML_GAME_INVALID_UTF8)
+        if (
+            !materialHtmlDocumentPattern.containsMatchIn(html) ||
+            unsafeMaterialHtmlPatterns.any { it.containsMatchIn(html) } ||
+            classifyHtmlGameCompatibility(html) != "SDK_V1"
+        ) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_HTML_GAME_UNSAFE)
+        }
+        val id = UUID.randomUUID()
+        val storageKey = "material-assets/$materialId/$id.html"
+        try {
+            materialObjectStorage.putObject(storageKey, bytes, "text/html")
+            materialAssetRepo.saveAndFlush(
+                MaterialAssetEntity(
+                    id = id,
+                    materialId = materialId,
+                    kind = "HTML_GAME",
+                    storageKey = storageKey,
+                    externalUrl = null,
+                    provider = "AI_ADAPTED",
+                    metadata = objectMapper.writeValueAsString(
+                        objectMapper.createObjectNode().apply {
+                            put("fileName", "adapted-$sourceAssetId.html")
+                            put("mimeType", "text/html")
+                            put("byteSize", bytes.size)
+                            put("storageKey", storageKey)
+                            put("selfContained", true)
+                            put("syncCompatibility", "SDK_V1")
+                            put("sourceAssetId", sourceAssetId.toString())
+                            put("adaptationReport", report.take(8_000))
+                            put("adaptationModel", model.take(120))
+                            put("adaptationPromptHash", promptHash.take(128))
                         },
                     ),
                     createdAt = Instant.now(),
@@ -223,6 +281,27 @@ private val unsafeMaterialHtmlPatterns = listOf(
     Regex("""\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(""", RegexOption.IGNORE_CASE),
     Regex("""navigator\s*\.\s*sendBeacon\s*\(""", RegexOption.IGNORE_CASE),
 )
+
+internal fun classifyHtmlGameCompatibility(html: String): String {
+    val hasSdkManifest = Regex(
+        """<script[^>]+type\s*=\s*["']application/playsay-game\+json["'][^>]*>[\s\S]*?playsay-game-sync/v1[\s\S]*?</script>""",
+        RegexOption.IGNORE_CASE,
+    ).containsMatchIn(html)
+    if (hasSdkManifest) return "SDK_V1"
+    if (
+        Regex(
+            """(?:\b(?:WebSocket|EventSource|RTCPeerConnection|XMLHttpRequest|getUserMedia)\b|\bfetch\s*\(|navigator\.geolocation)""",
+            RegexOption.IGNORE_CASE,
+        ).containsMatchIn(html)
+    ) {
+        return "LEGACY_MIRROR"
+    }
+    return if (Regex("""<(?:script|canvas|svg|button|input)\b""", RegexOption.IGNORE_CASE).containsMatchIn(html)) {
+        "LEGACY_PREDICTIVE"
+    } else {
+        "UNSUPPORTED"
+    }
+}
 
 private fun normalizedMaterialAssetContentType(value: String?): String? =
     value

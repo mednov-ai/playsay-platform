@@ -742,6 +742,84 @@ describe("yjs workspace runtime annotations", () => {
     });
   });
 
+  it("keeps SDK actions ephemeral and checkpoints durable", () => {
+    withWindowBase64(() => {
+      const actions: Array<Array<{ id: string }>> = [];
+      const requests: Array<Array<{ id: string }>> = [];
+      const checkpoints: Array<Record<string, { revision: number }>> = [];
+      const runtime = createYjsWorkspaceRuntime({
+        color: "#ff5c00",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSdkActionsChange: (items) => actions.push(items),
+        onHtmlGameSdkCheckpointsChange: (items) => checkpoints.push(items),
+        onHtmlGameSdkRequestsChange: (items) => requests.push(items),
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Teacher",
+        snapshot: null,
+      });
+      const request = {
+        actorId: "student",
+        actorSequence: 1,
+        at: 10,
+        blockId: "game-a",
+        eventId: "event-1",
+        gameId: "quiz",
+        id: "event-1",
+        payload: { answer: 2 },
+        runId: "run-a",
+        stateVersion: "1",
+        type: "answer",
+      };
+      runtime.publishHtmlGameSdkRequest(request);
+      runtime.publishHtmlGameSdkAction({
+        ...request,
+        authorityRevision: 1,
+        id: "event-1:ordered",
+        logicalTime: 1,
+      });
+      runtime.setHtmlGameSdkCheckpoint("game-a", {
+        checksum: "fnv1a-test",
+        gameId: "quiz",
+        logicalTime: 1,
+        revision: 1,
+        runId: "run-a",
+        seed: 7,
+        state: { score: 1 },
+        stateVersion: "1",
+        updatedAt: 20,
+      });
+
+      expect(requests.at(-1)?.at(-1)?.id).toBe("event-1");
+      expect(actions.at(-1)?.at(-1)?.id).toBe("event-1:ordered");
+      expect(checkpoints.at(-1)?.["game-a"]?.revision).toBe(1);
+      const snapshot = runtime.snapshot();
+      runtime.destroy();
+
+      const restoredActions: Array<Array<{ id: string }>> = [];
+      const restoredCheckpoints: Array<Record<string, { revision: number }>> = [];
+      const restored = createYjsWorkspaceRuntime({
+        color: "#2574ff",
+        onAnnotationChange: () => undefined,
+        onHtmlGameEffectsChange: () => undefined,
+        onHtmlGameInputsChange: () => undefined,
+        onHtmlGameSdkActionsChange: (items) => restoredActions.push(items),
+        onHtmlGameSdkCheckpointsChange: (items) => restoredCheckpoints.push(items),
+        onHtmlGameSnapshotsChange: () => undefined,
+        onParticipantsChange: () => undefined,
+        onTextChange: () => undefined,
+        participantName: "Student",
+        snapshot,
+      });
+      expect(restoredActions.at(-1)).toEqual([]);
+      expect(restoredCheckpoints.at(-1)?.["game-a"]?.revision).toBe(1);
+      restored.destroy();
+    });
+  });
+
   it("keeps HTML game input and effect events out of durable snapshots", () => {
     withWindowBase64(() => {
       const runtime = createYjsWorkspaceRuntime({

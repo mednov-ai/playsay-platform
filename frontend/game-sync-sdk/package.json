@@ -1,0 +1,33 @@
+{
+  "name": "@playsay/game-sync",
+  "version": "0.1.0",
+  "description": "Deterministic realtime synchronization SDK for Play&Say HTML games",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/game-sync.iife.js",
+  "module": "./dist/game-sync.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/game-sync.js",
+      "default": "./dist/game-sync.iife.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^4.1.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

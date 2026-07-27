@@ -21,6 +21,8 @@ import type {
   MaterialImagePageResult,
   MaterialHtmlGameEnrichment,
   MaterialHtmlGameEnrichmentInput,
+  MaterialGameAdaptation,
+  MaterialGameAdaptationInput,
   MaterialVideoPlayback,
   MaterialVideoPlaybackInput,
   MaterialExternalActivityResolution,
@@ -224,6 +226,59 @@ export async function fetchMaterialHtmlGameEnrichment(
   return apiJson<MaterialHtmlGameEnrichment>(
     `/api/materials/${materialId}/assets/${assetId}/html-game-enrichment?blockId=${encodeURIComponent(blockId)}`,
     { method: "GET" },
+    config,
+  );
+}
+
+export async function requestMaterialGameAdaptation(
+  materialId: string,
+  assetId: string,
+  input: MaterialGameAdaptationInput,
+  config = authConfig,
+): Promise<MaterialGameAdaptation> {
+  return apiJson<MaterialGameAdaptation>(
+    `/api/materials/${materialId}/assets/${assetId}/game-adaptations`,
+    { method: "POST", body: JSON.stringify(input) },
+    config,
+    202,
+  );
+}
+
+export async function fetchMaterialGameAdaptation(
+  materialId: string,
+  assetId: string,
+  jobId: string,
+  config = authConfig,
+): Promise<MaterialGameAdaptation> {
+  return apiJson<MaterialGameAdaptation>(
+    `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}`,
+    { method: "GET" },
+    config,
+  );
+}
+
+export async function applyMaterialGameAdaptation(
+  materialId: string,
+  assetId: string,
+  jobId: string,
+  config = authConfig,
+): Promise<MaterialGameAdaptation> {
+  return apiJson<MaterialGameAdaptation>(
+    `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}/apply`,
+    { method: "POST" },
+    config,
+  );
+}
+
+export async function rollbackMaterialGameAdaptation(
+  materialId: string,
+  assetId: string,
+  jobId: string,
+  config = authConfig,
+): Promise<MaterialGameAdaptation> {
+  return apiJson<MaterialGameAdaptation>(
+    `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}/rollback`,
+    { method: "POST" },
     config,
   );
 }

@@ -28,6 +28,10 @@ export function createYjsWorkspaceRuntime({
   onHtmlGameInputsChange,
   onHtmlGamePatchesChange = () => undefined,
   onHtmlGamePresentationChange = () => undefined,
+  onHtmlGameSdkActionsChange = () => undefined,
+  onHtmlGameSdkCheckpointsChange = () => undefined,
+  onHtmlGameSdkEffectsChange = () => undefined,
+  onHtmlGameSdkRequestsChange = () => undefined,
   onHtmlGameSnapshotsChange,
   onMaterialAnswersChange = () => undefined,
   onMaterialViewportChange = () => undefined,
@@ -46,6 +50,7 @@ export function createYjsWorkspaceRuntime({
   const yhtmlGameSnapshots = ydoc.getMap("htmlGameSnapshots");
   const yhtmlGameInputs = ydoc.getArray("htmlGameInputs");
   const yhtmlGameEffects = ydoc.getArray("htmlGameEffects");
+  const yhtmlGameSdkCheckpoints = ydoc.getMap("htmlGameSdkCheckpoints");
   const yhtmlGamePresentation = ydoc.getMap("htmlGamePresentation");
   const ymaterialAnswerFields = ydoc.getMap("materialAnswerFields");
   const ymaterialViewport = ydoc.getMap("materialViewport");
@@ -62,11 +67,17 @@ export function createYjsWorkspaceRuntime({
   let transientHtmlGameInputs = yhtmlGameInputs.toArray();
   let transientHtmlGameEffects = yhtmlGameEffects.toArray();
   let transientHtmlGamePatches = [];
+  let transientHtmlGameSdkActions = [];
+  let transientHtmlGameSdkEffects = [];
+  let transientHtmlGameSdkRequests = [];
   const pendingEphemeralMessages = new Map();
   const seenEphemeralIds = new Set([
     ...transientHtmlGameInputs.map((event) => event?.id),
     ...transientHtmlGameEffects.map((effect) => effect?.id),
     ...transientHtmlGamePatches.map((patch) => patch?.id),
+    ...transientHtmlGameSdkActions.map((action) => action?.id),
+    ...transientHtmlGameSdkEffects.map((effect) => effect?.id),
+    ...transientHtmlGameSdkRequests.map((request) => request?.id),
   ].filter(Boolean));
 
   const updateLocalText = () => {
@@ -102,6 +113,11 @@ export function createYjsWorkspaceRuntime({
       onHtmlGameEffectsChange(transientHtmlGameEffects);
     }
   };
+  const updateHtmlGameSdkCheckpoints = () => {
+    if (!disposed) {
+      onHtmlGameSdkCheckpointsChange(Object.fromEntries(yhtmlGameSdkCheckpoints.entries()));
+    }
+  };
   const applyEphemeralMessage = (message) => {
     const id = asString(message?.payload?.id);
     if (!id || seenEphemeralIds.has(id)) return;
@@ -119,6 +135,15 @@ export function createYjsWorkspaceRuntime({
     } else if (message.kind === "html-game-patch") {
       transientHtmlGamePatches = appendBounded(transientHtmlGamePatches, message.payload, 120);
       onHtmlGamePatchesChange(transientHtmlGamePatches);
+    } else if (message.kind === "html-game-sdk-request") {
+      transientHtmlGameSdkRequests = appendBounded(transientHtmlGameSdkRequests, message.payload, 200);
+      onHtmlGameSdkRequestsChange(transientHtmlGameSdkRequests);
+    } else if (message.kind === "html-game-sdk-action") {
+      transientHtmlGameSdkActions = appendBounded(transientHtmlGameSdkActions, message.payload, 200);
+      onHtmlGameSdkActionsChange(transientHtmlGameSdkActions);
+    } else if (message.kind === "html-game-sdk-effect") {
+      transientHtmlGameSdkEffects = appendBounded(transientHtmlGameSdkEffects, message.payload, 120);
+      onHtmlGameSdkEffectsChange(transientHtmlGameSdkEffects);
     }
   };
   const publishEphemeral = (kind, payload) => {
@@ -191,6 +216,7 @@ export function createYjsWorkspaceRuntime({
   yhtmlGameSnapshots.observe(updateHtmlGameSnapshots);
   yhtmlGameInputs.observe(updateHtmlGameInputs);
   yhtmlGameEffects.observe(updateHtmlGameEffects);
+  yhtmlGameSdkCheckpoints.observe(updateHtmlGameSdkCheckpoints);
   yhtmlGamePresentation.observe(updateHtmlGamePresentation);
   ymaterialAnswerFields.observe(updateMaterialAnswers);
   ymaterialViewport.observe(updateMaterialViewport);
@@ -213,7 +239,11 @@ export function createYjsWorkspaceRuntime({
   updateHtmlGameSnapshots();
   updateHtmlGameInputs();
   updateHtmlGameEffects();
+  updateHtmlGameSdkCheckpoints();
   onHtmlGamePatchesChange(transientHtmlGamePatches);
+  onHtmlGameSdkActionsChange(transientHtmlGameSdkActions);
+  onHtmlGameSdkEffectsChange(transientHtmlGameSdkEffects);
+  onHtmlGameSdkRequestsChange(transientHtmlGameSdkRequests);
   updateHtmlGamePresentation();
   updateMaterialAnswers();
   updateMaterialViewport();
@@ -238,6 +268,7 @@ export function createYjsWorkspaceRuntime({
       yhtmlGameSnapshots.unobserve(updateHtmlGameSnapshots);
       yhtmlGameInputs.unobserve(updateHtmlGameInputs);
       yhtmlGameEffects.unobserve(updateHtmlGameEffects);
+      yhtmlGameSdkCheckpoints.unobserve(updateHtmlGameSdkCheckpoints);
       yhtmlGamePresentation.unobserve(updateHtmlGamePresentation);
       ymaterialAnswerFields.unobserve(updateMaterialAnswers);
       ymaterialViewport.unobserve(updateMaterialViewport);
@@ -259,6 +290,15 @@ export function createYjsWorkspaceRuntime({
     },
     publishHtmlGamePatch(patch) {
       publishEphemeral("html-game-patch", patch);
+    },
+    publishHtmlGameSdkAction(action) {
+      publishEphemeral("html-game-sdk-action", action);
+    },
+    publishHtmlGameSdkEffect(effect) {
+      publishEphemeral("html-game-sdk-effect", effect);
+    },
+    publishHtmlGameSdkRequest(request) {
+      publishEphemeral("html-game-sdk-request", request);
     },
     redoAnnotation() {
       annotationUndoManager.redo();
@@ -285,6 +325,9 @@ export function createYjsWorkspaceRuntime({
     },
     setHtmlGameSnapshot(blockId, snapshot) {
       yhtmlGameSnapshots.set(blockId, fitHtmlGameSnapshot(snapshot));
+    },
+    setHtmlGameSdkCheckpoint(blockId, checkpoint) {
+      yhtmlGameSdkCheckpoints.set(blockId, checkpoint);
     },
     setHtmlGamePresentedBlock(blockId) {
       const cleanBlockId = asString(blockId);

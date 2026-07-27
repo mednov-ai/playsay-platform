@@ -10,6 +10,7 @@ export const TARGETS = Object.freeze([
   "ai-tutor-service",
   "vocabulary-service",
   "web-app",
+  "game-adapter-service",
   "collaboration-service",
   "media-service",
   "payment-service",
@@ -34,12 +35,13 @@ const BACKEND_TARGETS = new Set([
   "email-service",
   "keyboard-service",
 ]);
-const FRONTEND_TARGETS = new Set(["web-app", "keyboard-app"]);
+const FRONTEND_TARGETS = new Set(["web-app", "game-adapter-service", "keyboard-app"]);
 const TARGET_JOBS = Object.freeze({
   "api-gateway": "playsay-api-gateway-develop",
   "ai-tutor-service": "playsay-ai-tutor-service-develop",
   "vocabulary-service": "playsay-vocabulary-service-develop",
   "web-app": "playsay-web-app-develop",
+  "game-adapter-service": "playsay-game-adapter-service-develop",
   "collaboration-service": "playsay-collaboration-service-develop",
   "media-service": "playsay-media-service-develop",
   "payment-service": "playsay-payment-service-develop",
@@ -53,6 +55,7 @@ const MODULE_PIPELINES = Object.freeze({
   "Jenkinsfile.ai-tutor-service": "ai-tutor-service",
   "Jenkinsfile.vocabulary-service": "vocabulary-service",
   "Jenkinsfile.web-app": "web-app",
+  "Jenkinsfile.game-adapter-service": "game-adapter-service",
   "Jenkinsfile.collaboration-service": "collaboration-service",
   "Jenkinsfile.media-service": "media-service",
   "Jenkinsfile.payment-service": "payment-service",
@@ -257,6 +260,17 @@ export function detectTargetsForPaths(paths, options = {}) {
 
     if (path.startsWith("frontend/web-app/") || path.startsWith("frontend/browser-extension/")) {
       deployTargets.add("web-app");
+      continue;
+    }
+
+    if (path.startsWith("frontend/game-adapter-service/")) {
+      deployTargets.add("game-adapter-service");
+      continue;
+    }
+
+    if (path.startsWith("frontend/game-sync-sdk/")) {
+      deployTargets.add("web-app");
+      deployTargets.add("game-adapter-service");
       continue;
     }
 

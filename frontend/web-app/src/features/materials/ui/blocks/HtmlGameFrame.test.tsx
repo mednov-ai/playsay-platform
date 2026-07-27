@@ -18,6 +18,18 @@ vi.mock("../../../../shared/i18n", () => ({
 
 const gameHtml = "<html><head><title>Game</title></head><body><button id=\"start\">Start</button><script>document.body.dataset.ready = 'true'</script></body></html>";
 
+const sdkSyncFields = () => ({
+  clientId: 1,
+  publishSdkAction: vi.fn(),
+  publishSdkCheckpoint: vi.fn(),
+  publishSdkEffect: vi.fn(),
+  publishSdkRequest: vi.fn(),
+  sdkActions: [],
+  sdkCheckpoints: {},
+  sdkEffects: [],
+  sdkRequests: [],
+});
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
@@ -78,6 +90,19 @@ describe("HTML game sandbox", () => {
     expect(supportsPredictiveHtmlGame(unsupported)).toBe(false);
   });
 
+  it("injects the SDK host transport before an SDK v1 game starts", () => {
+    const sdkGame = `<html><head><script type="application/playsay-game+json">{
+      "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
+      "reducerVersion":"1","buildHash":"test"
+    }</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>`;
+    const document = createSandboxedGameDocument(sdkGame, "sdk-channel", true, "teacher-run", false);
+
+    expect(document).toContain("data-playsay-game-sdk-host");
+    expect(document).toContain("__PLAY_SAY_GAME_SYNC_TRANSPORT__");
+    expect(document).toContain("playsay-sdk-connect");
+    expect(document).not.toContain('type="application/playsay-disabled"');
+  });
+
   it("renders srcdoc in a sandbox without same-origin or navigation permissions", () => {
     const markup = renderToStaticMarkup(
       <HtmlGameFrame blockId="game-1" height={640} html={gameHtml} title="Game" />,
@@ -91,6 +116,7 @@ describe("HTML game sandbox", () => {
   it("announces a mounted authority run when collaboration finishes connecting", () => {
     const setAuthorityRun = vi.fn();
     const createSync = (ready: boolean): MaterialHtmlGameSync => ({
+      ...sdkSyncFields(),
       authorityRuns: {},
       effects: [],
       inputs: [],
@@ -123,6 +149,7 @@ describe("HTML game sandbox", () => {
   it("does not replay delayed input history into a newly restarted authority", () => {
     const setAuthorityRun = vi.fn();
     const createSync = (inputs: MaterialHtmlGameSync["inputs"]): MaterialHtmlGameSync => ({
+      ...sdkSyncFields(),
       authorityRuns: {},
       effects: [],
       inputs,
@@ -176,6 +203,7 @@ describe("HTML game sandbox", () => {
   it("deduplicates an out-of-order input sequence within the current authority run", () => {
     const setAuthorityRun = vi.fn();
     const createSync = (inputs: MaterialHtmlGameSync["inputs"]): MaterialHtmlGameSync => ({
+      ...sdkSyncFields(),
       authorityRuns: {},
       effects: [],
       inputs,
@@ -224,6 +252,7 @@ describe("HTML game sandbox", () => {
       updatedAt: 100,
     };
     const createMirrorSync = (snapshot = firstSnapshot): MaterialHtmlGameSync => ({
+      ...sdkSyncFields(),
       authorityRuns: { "game-1": "authority-run" },
       effects: [],
       inputs: [],

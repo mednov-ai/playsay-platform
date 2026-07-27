@@ -2,8 +2,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type CourseLessonMap } from "../../../entities/schedule/model";
 import {
   fetchMaterialAssets,
+  fetchMaterial,
+  fetchMaterialAssetText,
+  fetchMaterialGameAdaptation,
   fetchMaterialHtmlGameEnrichment,
+  applyMaterialGameAdaptation,
   requestMaterialHtmlGameEnrichment,
+  requestMaterialGameAdaptation,
+  rollbackMaterialGameAdaptation,
   uploadMaterialHtmlGameAsset,
   uploadMaterialImageAsset,
   type Course,
@@ -18,6 +24,7 @@ import {
   type LessonMaterialGenerateImagesInput,
   type LessonMaterialInput,
   type MaterialHtmlGameEnrichment,
+  type MaterialGameAdaptation,
   type LessonMaterialUrlDraftInput,
   type MeProfile,
 } from "../../../shared/api/playsay";
@@ -55,6 +62,7 @@ import { MaterialLessonLinkPanel } from "./MaterialLessonLinkPanel";
 import { MaterialLibraryHeader } from "./MaterialLibraryHeader";
 import { MaterialLibraryList } from "./MaterialLibraryList";
 import { MaterialPlayPreviewDialog } from "./MaterialPlayPreviewDialog";
+import { GameAdaptationReviewDialog } from "./GameAdaptationReviewDialog";
 import { MaterialReaderPreview } from "./MaterialReaderPreview";
 import { useAppTranslation } from "../../../shared/i18n";
 
@@ -115,7 +123,11 @@ export function MaterialLibraryPanel({
   const [imageGenerationProgress, setImageGenerationProgress] = useState<MaterialImageGenerationProgress | null>(null);
   const [assetUploadMessage, setAssetUploadMessage] = useState<string | null>(null);
   const [htmlGameEnrichments, setHtmlGameEnrichments] = useState<Record<string, MaterialHtmlGameEnrichment>>({});
+  const [htmlGameAdaptations, setHtmlGameAdaptations] = useState<Record<string, MaterialGameAdaptation>>({});
+  const [gameAdaptationPreview, setGameAdaptationPreview] = useState<{ blockId: string; html: string; report?: string | null } | null>(null);
   const enrichmentPollTokensRef = useRef<Record<string, number>>({});
+  const adaptationPollTokensRef = useRef<Record<string, number>>({});
+  const adaptationHydrationKeyRef = useRef("");
   const mountedRef = useRef(true);
   const formRef = useRef(form);
   const savedFormFingerprintRef = useRef(savedFormFingerprint);
@@ -191,6 +203,67 @@ export function MaterialLibraryPanel({
     }
   }
 
+  async function pollGameAdaptation(materialId: string, assetId: string, blockId: string, jobId: string) {
+    const token = (adaptationPollTokensRef.current[blockId] ?? 0) + 1;
+    adaptationPollTokensRef.current[blockId] = token;
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, attempt < 5 ? 2_000 : 5_000));
+      if (!mountedRef.current || adaptationPollTokensRef.current[blockId] !== token) return;
+      try {
+        const status = await fetchMaterialGameAdaptation(materialId, assetId, jobId);
+        setHtmlGameAdaptations((current) => ({ ...current, [blockId]: status }));
+        if (status.status === "READY_FOR_REVIEW" || status.status === "FAILED") {
+          if (status.status === "READY_FOR_REVIEW") {
+            const assets = await fetchMaterialAssets(materialId);
+            const material = materials.find((item) => item.id === materialId);
+            if (material) syncMaterialAssets(material, assets);
+          }
+          return;
+        }
+      } catch {
+        if (attempt >= 89) return;
+      }
+    }
+  }
+
+  const adaptationHydrationKey = form.id
+    ? `${form.id}:${blocks
+      .filter((block) => block.gameAdaptationJobId && block.gameAdaptationSourceAssetId)
+      .map((block) => `${block.id}:${block.gameAdaptationSourceAssetId}:${block.gameAdaptationJobId}`)
+      .join("|")}`
+    : "";
+
+  useEffect(() => {
+    if (!adaptationHydrationKey || adaptationHydrationKeyRef.current === adaptationHydrationKey || !form.id) {
+      return;
+    }
+    adaptationHydrationKeyRef.current = adaptationHydrationKey;
+    let cancelled = false;
+    const materialId = form.id;
+    const resumable = blocks.filter(
+      (block) => block.gameAdaptationJobId && block.gameAdaptationSourceAssetId,
+    );
+
+    void Promise.all(resumable.map(async (block) => {
+      const sourceAssetId = block.gameAdaptationSourceAssetId!;
+      const jobId = block.gameAdaptationJobId!;
+      try {
+        const status = await fetchMaterialGameAdaptation(materialId, sourceAssetId, jobId);
+        if (cancelled || !mountedRef.current) return;
+        setHtmlGameAdaptations((current) => ({ ...current, [block.id]: status }));
+        if (!["READY_FOR_REVIEW", "APPLIED", "ROLLED_BACK", "FAILED"].includes(status.status)) {
+          void pollGameAdaptation(materialId, sourceAssetId, block.id, jobId);
+        }
+      } catch {
+        // A removed or inaccessible adaptation must not block opening the material.
+      }
+    }));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adaptationHydrationKey, blocks, form.id]);
+
   async function startHtmlGameEnrichment(
     materialId: string,
     assetId: string,
@@ -222,7 +295,9 @@ export function MaterialLibraryPanel({
     setActiveBlockId(null);
     setDetailsOpen(false);
     setHtmlGameEnrichments({});
+    setHtmlGameAdaptations({});
     enrichmentPollTokensRef.current = {};
+    adaptationPollTokensRef.current = {};
     setWorkspaceMode("edit");
   }
 
@@ -237,7 +312,9 @@ export function MaterialLibraryPanel({
     setActiveBlockId(nextForm.document.pages[0]?.blocks[0]?.id ?? null);
     setDetailsOpen(false);
     setHtmlGameEnrichments({});
+    setHtmlGameAdaptations({});
     enrichmentPollTokensRef.current = {};
+    adaptationPollTokensRef.current = {};
     setWorkspaceMode("preview");
   }
 
@@ -565,11 +642,17 @@ export function MaterialLibraryPanel({
         : await uploadMaterialHtmlGameAsset(materialId, file);
       const gameTitle = typeof asset.metadata.gameTitle === "string" ? asset.metadata.gameTitle.trim() : fallbackTitle;
       const gameTitleSource = normalizeGameTitleSource(typeof asset.metadata.gameTitleSource === "string" ? asset.metadata.gameTitleSource : undefined);
+      const gameSyncCompatibility = normalizeGameSyncCompatibility(asset.metadata.syncCompatibility);
       const nextForm = materialFormWithBlockPatch(workingForm, blockId, {
         url: `material-asset:${asset.id}`,
         ...(kind === "image"
           ? { alt: fallbackTitle, imageSize: workingForm.document.pages.flatMap((page) => page.blocks).find((block) => block.id === blockId)?.imageSize ?? "MEDIUM" }
-          : { height: 640, title: gameTitle || fallbackTitle, gameTitleSource: gameTitleSource ?? "FILE" }),
+          : {
+              height: 640,
+              title: gameTitle || fallbackTitle,
+              gameTitleSource: gameTitleSource ?? "FILE",
+              gameSyncCompatibility,
+            }),
       });
       const saved = await onSave(materialFormToInput(nextForm), materialId);
       if (!saved) {
@@ -623,6 +706,95 @@ export function MaterialLibraryPanel({
     }
   }
 
+  async function requestGameAdaptation(blockId: string) {
+    const currentForm = formRef.current;
+    const block = currentForm.document.pages.flatMap((page) => page.blocks).find((item) => item.id === blockId);
+    const materialId = currentForm.id;
+    const assetId = materialAssetIdFromUrl(block?.url);
+    if (!block || !materialId || !assetId) return;
+    try {
+      const adaptation = await requestMaterialGameAdaptation(materialId, assetId, { blockId });
+      setHtmlGameAdaptations((current) => ({ ...current, [blockId]: adaptation }));
+      setAssetUploadMessage(
+        adaptation.status === "READY_FOR_REVIEW"
+          ? t("materials.messages.gameSyncAlreadyCompatible")
+          : t("materials.messages.gameAdaptationStarted"),
+      );
+      if (adaptation.status !== "READY_FOR_REVIEW") {
+        void pollGameAdaptation(materialId, assetId, blockId, adaptation.id);
+      } else if (adaptation.compatibility === "SDK_V1" && !adaptation.adaptedAssetId) {
+        const nextForm = materialFormWithBlockPatch(currentForm, blockId, { gameSyncCompatibility: "SDK_V1" });
+        formRef.current = nextForm;
+        setForm(nextForm);
+      }
+    } catch (caught) {
+      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.gameAdaptationFailed"));
+    }
+  }
+
+  async function previewGameAdaptation(blockId: string) {
+    const adaptation = htmlGameAdaptations[blockId];
+    if (!form.id || !adaptation?.adaptedAssetId) return;
+    try {
+      const html = await fetchMaterialAssetText(form.id, adaptation.adaptedAssetId);
+      setGameAdaptationPreview({ blockId, html, report: adaptation.report });
+    } catch (caught) {
+      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.gameAdaptationPreviewFailed"));
+    }
+  }
+
+  async function applyGameAdaptation(blockId: string) {
+    const adaptation = htmlGameAdaptations[blockId];
+    const materialId = formRef.current.id;
+    if (!materialId || !adaptation) return;
+    try {
+      const applied = await applyMaterialGameAdaptation(
+        materialId,
+        adaptation.sourceAssetId,
+        adaptation.id,
+      );
+      setHtmlGameAdaptations((current) => ({ ...current, [blockId]: applied }));
+      setGameAdaptationPreview(null);
+      await reloadAdaptedMaterial(materialId);
+      setAssetUploadMessage(t("materials.messages.gameAdaptationApplied"));
+    } catch (caught) {
+      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.gameAdaptationFailed"));
+    }
+  }
+
+  async function rollbackGameAdaptation(blockId: string) {
+    const adaptation = htmlGameAdaptations[blockId];
+    const materialId = formRef.current.id;
+    if (!materialId || !adaptation) return;
+    try {
+      const rolledBack = await rollbackMaterialGameAdaptation(
+        materialId,
+        adaptation.sourceAssetId,
+        adaptation.id,
+      );
+      setHtmlGameAdaptations((current) => ({ ...current, [blockId]: rolledBack }));
+      await reloadAdaptedMaterial(materialId);
+      setAssetUploadMessage(t("materials.messages.gameAdaptationRolledBack"));
+    } catch (caught) {
+      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.gameAdaptationFailed"));
+    }
+  }
+
+  async function reloadAdaptedMaterial(materialId: string) {
+    const [material, assets] = await Promise.all([
+      fetchMaterial(materialId),
+      fetchMaterialAssets(materialId),
+    ]);
+    const nextForm = materialToForm(material);
+    formRef.current = nextForm;
+    setForm(nextForm);
+    const fingerprint = materialFormFingerprint(nextForm);
+    savedFormFingerprintRef.current = fingerprint;
+    setSavedFormFingerprint(fingerprint);
+    syncMaterialAssets(material, assets);
+    onRefresh();
+  }
+
   function requestPalette() {
     setPaletteOpen(true);
     window.requestAnimationFrame(() => {
@@ -637,6 +809,7 @@ export function MaterialLibraryPanel({
     setDetailsOpen(false);
     setPaletteOpen(false);
     enrichmentPollTokensRef.current = {};
+    adaptationPollTokensRef.current = {};
     setWorkspaceMode("library");
   }
 
@@ -710,6 +883,14 @@ export function MaterialLibraryPanel({
         onClose={() => setPlayPreviewOpen(false)}
         open={playPreviewOpen && Boolean(form.title.trim())}
       />
+      {gameAdaptationPreview ? (
+        <GameAdaptationReviewDialog
+          html={gameAdaptationPreview.html}
+          onApply={() => void applyGameAdaptation(gameAdaptationPreview.blockId)}
+          onClose={() => setGameAdaptationPreview(null)}
+          report={gameAdaptationPreview.report}
+        />
+      ) : null}
       {!canManage ? (
         <div className="p-4">
           <MaterialLibraryHeader />
@@ -816,9 +997,14 @@ export function MaterialLibraryPanel({
                   imageGenerationProgress={imageGenerationProgress}
                   message={assetUploadMessage ?? message}
                   htmlGameEnrichments={htmlGameEnrichments}
+                  htmlGameAdaptations={htmlGameAdaptations}
                   onActivateBlock={setActiveBlockId}
                   onMoveBlock={moveBlock}
                   onRegenerateHtmlGameIcon={(blockId) => void regenerateHtmlGameIcon(blockId)}
+                  onApplyGameAdaptation={(blockId) => void applyGameAdaptation(blockId)}
+                  onPreviewGameAdaptation={(blockId) => void previewGameAdaptation(blockId)}
+                  onRequestGameAdaptation={(blockId) => void requestGameAdaptation(blockId)}
+                  onRollbackGameAdaptation={(blockId) => void rollbackGameAdaptation(blockId)}
                   onRemoveBlock={removeBlock}
                   onRequestPalette={requestPalette}
                   onSuggestAcceptedAnswers={(blockId, itemIds) => void suggestAcceptedAnswers(blockId, itemIds)}
@@ -844,6 +1030,15 @@ export function MaterialLibraryPanel({
 
 function normalizeGameTitleSource(value: string | null | undefined): MaterialEditorBlock["gameTitleSource"] {
   return value === "FILE" || value === "HTML" || value === "AI" || value === "USER" ? value : undefined;
+}
+
+function normalizeGameSyncCompatibility(value: unknown): MaterialEditorBlock["gameSyncCompatibility"] {
+  return value === "SDK_V1" ||
+    value === "LEGACY_PREDICTIVE" ||
+    value === "LEGACY_MIRROR" ||
+    value === "UNSUPPORTED"
+    ? value
+    : undefined;
 }
 
 function materialFormFingerprint(form: MaterialFormState): string {

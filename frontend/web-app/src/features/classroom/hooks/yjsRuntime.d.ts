@@ -12,6 +12,10 @@ import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
   MaterialHtmlGamePatch,
+  MaterialHtmlGameSdkActionRequest,
+  MaterialHtmlGameSdkCheckpoint,
+  MaterialHtmlGameSdkEffect,
+  MaterialHtmlGameSdkOrderedAction,
   MaterialHtmlGameSnapshot,
   MaterialVideoPlaybackAction,
   MaterialVideoPlaybackState,
@@ -45,7 +49,11 @@ export type YjsWorkspaceRuntime = {
   publishHtmlGameEffect: (effect: MaterialHtmlGameEffect) => void;
   publishHtmlGameInput: (event: MaterialHtmlGameInputEvent) => void;
   publishHtmlGamePatch: (patch: MaterialHtmlGamePatch) => void;
+  publishHtmlGameSdkAction: (action: MaterialHtmlGameSdkOrderedAction) => void;
+  publishHtmlGameSdkEffect: (effect: MaterialHtmlGameSdkEffect) => void;
+  publishHtmlGameSdkRequest: (request: MaterialHtmlGameSdkActionRequest) => void;
   setHtmlGameSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
+  setHtmlGameSdkCheckpoint: (blockId: string, checkpoint: MaterialHtmlGameSdkCheckpoint) => void;
   setHtmlGamePresentedBlock: (blockId: string | null) => void;
   seedMaterialAnswers: (answers: MaterialAnswerState) => void;
   setMaterialAnswer: (blockId: string, answer: MaterialAnswerBlock) => void;
@@ -79,6 +87,12 @@ export function createYjsWorkspaceRuntime(options: {
   onHtmlGameInputsChange: (events: MaterialHtmlGameInputEvent[]) => void;
   onHtmlGamePatchesChange?: (patches: MaterialHtmlGamePatch[]) => void;
   onHtmlGamePresentationChange?: (blockId: string | null) => void;
+  onHtmlGameSdkActionsChange?: (actions: MaterialHtmlGameSdkOrderedAction[]) => void;
+  onHtmlGameSdkCheckpointsChange?: (
+    checkpoints: Record<string, MaterialHtmlGameSdkCheckpoint>,
+  ) => void;
+  onHtmlGameSdkEffectsChange?: (effects: MaterialHtmlGameSdkEffect[]) => void;
+  onHtmlGameSdkRequestsChange?: (requests: MaterialHtmlGameSdkActionRequest[]) => void;
   onHtmlGameSnapshotsChange: (snapshots: Record<string, MaterialHtmlGameSnapshot>) => void;
   onMaterialAnswersChange?: (answers: MaterialAnswerState) => void;
   onMaterialViewportChange?: (viewport: MaterialViewportState | null) => void;

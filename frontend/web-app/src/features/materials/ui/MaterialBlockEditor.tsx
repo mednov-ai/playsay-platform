@@ -18,7 +18,7 @@ import { ExerciseItemsEditor } from "./ExerciseItemsEditor";
 import { materialBlockIcon } from "./materialBlockIcon";
 import { MatchingPairsEditor } from "./MatchingPairsEditor";
 import { useAppTranslation } from "../../../shared/i18n";
-import { resolveMaterialExternalActivity, type MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
+import { resolveMaterialExternalActivity, type MaterialGameAdaptation, type MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
 import { isEnglishHtmlGameTitle } from "../model/htmlGameTitle";
 
 export function MaterialBlockEditor({
@@ -33,10 +33,15 @@ export function MaterialBlockEditor({
   disabled,
   index,
   htmlGameEnrichment,
+  htmlGameAdaptation,
   onActivate,
   onMoveDown,
   onMoveUp,
   onRegenerateHtmlGameIcon,
+  onApplyGameAdaptation,
+  onPreviewGameAdaptation,
+  onRequestGameAdaptation,
+  onRollbackGameAdaptation,
   onPreview,
   onPreviewEnd,
   onRemove,
@@ -56,10 +61,15 @@ export function MaterialBlockEditor({
   disabled: boolean;
   index: number;
   htmlGameEnrichment?: MaterialHtmlGameEnrichment;
+  htmlGameAdaptation?: MaterialGameAdaptation;
   onActivate: () => void;
   onMoveDown: () => void;
   onMoveUp: () => void;
   onRegenerateHtmlGameIcon: () => void;
+  onApplyGameAdaptation: () => void;
+  onPreviewGameAdaptation: () => void;
+  onRequestGameAdaptation: () => void;
+  onRollbackGameAdaptation: () => void;
   onPreview: () => void;
   onPreviewEnd: () => void;
   onRemove: () => void;
@@ -471,6 +481,46 @@ export function MaterialBlockEditor({
                 {t("materials.blockEditor.regenerateGameIcon")}
               </Button>
             </div>
+            <div className="playsay-game-icon-enrichment playsay-material-field-grid-span" data-status={htmlGameAdaptation?.status ?? block.gameSyncCompatibility ?? "IDLE"}>
+              <span className="playsay-game-icon-enrichment-symbol">
+                {htmlGameAdaptation && ["PENDING", "ANALYZING", "PATCHING", "VALIDATING", "RETRY"].includes(htmlGameAdaptation.status)
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : htmlGameAdaptation?.status === "FAILED" || block.gameSyncCompatibility === "UNSUPPORTED"
+                    ? <AlertTriangle className="h-4 w-4" />
+                    : <CheckCircle2 className="h-4 w-4" />}
+              </span>
+              <div>
+                <strong>{t("materials.blockEditor.gameSyncTitle")}</strong>
+                <small>{gameSyncStatusLabel(block.gameSyncCompatibility, htmlGameAdaptation, t)}</small>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                {htmlGameAdaptation?.status === "READY_FOR_REVIEW" && htmlGameAdaptation.adaptedAssetId ? (
+                  <>
+                    <Button disabled={disabled} onClick={onPreviewGameAdaptation} type="button" variant="outline">
+                      {t("materials.blockEditor.previewGameAdaptation")}
+                    </Button>
+                    <Button disabled={disabled} onClick={onApplyGameAdaptation} type="button">
+                      {t("materials.blockEditor.applyGameAdaptation")}
+                    </Button>
+                  </>
+                ) : htmlGameAdaptation?.status === "APPLIED" ? (
+                  <Button disabled={disabled} onClick={onRollbackGameAdaptation} type="button" variant="outline">
+                    {t("materials.blockEditor.rollbackGameAdaptation")}
+                  </Button>
+                ) : block.gameSyncCompatibility !== "SDK_V1" ? (
+                  <Button
+                    disabled={disabled || uploading || !block.url || Boolean(htmlGameAdaptation && ["PENDING", "ANALYZING", "PATCHING", "VALIDATING"].includes(htmlGameAdaptation.status))}
+                    onClick={onRequestGameAdaptation}
+                    type="button"
+                    variant="outline"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {t("materials.blockEditor.improveGameSync")}
+                  </Button>
+                ) : null}
+              </div>
+              {htmlGameAdaptation?.report ? <p className="col-span-full text-xs text-muted-foreground">{htmlGameAdaptation.report}</p> : null}
+            </div>
           </div>
         ) : null}
 
@@ -608,6 +658,22 @@ function materialBlockSummary(block: MaterialEditorBlock, t: (key: string, value
     default:
       return compactSummary(block.prompt || block.body) || t("materials.blockEditor.summaryOpen");
   }
+}
+
+function gameSyncStatusLabel(
+  compatibility: MaterialEditorBlock["gameSyncCompatibility"],
+  adaptation: MaterialGameAdaptation | undefined,
+  t: (key: string, values?: Record<string, unknown>) => string,
+): string {
+  if (adaptation?.status === "FAILED") return t("materials.blockEditor.gameSyncFailed");
+  if (adaptation && ["PENDING", "ANALYZING", "PATCHING", "VALIDATING", "RETRY"].includes(adaptation.status)) {
+    return t("materials.blockEditor.gameSyncAdapting");
+  }
+  if (adaptation?.status === "READY_FOR_REVIEW") return t("materials.blockEditor.gameSyncReview");
+  if (adaptation?.status === "APPLIED" || compatibility === "SDK_V1") return t("materials.blockEditor.gameSyncSdk");
+  if (compatibility === "LEGACY_MIRROR") return t("materials.blockEditor.gameSyncMirror");
+  if (compatibility === "UNSUPPORTED") return t("materials.blockEditor.gameSyncUnsupported");
+  return t("materials.blockEditor.gameSyncPredictive");
 }
 
 function compactSummary(value: string | undefined): string {

@@ -13,7 +13,13 @@ import {
   type CollaborationParticipant,
   type YjsWorkspaceRuntime,
 } from "./yjsRuntime";
-import type { MaterialHtmlGameEffect, MaterialHtmlGameInputEvent, MaterialHtmlGameSnapshot, MaterialHtmlGameSync } from "../../materials/model/materialDocument";
+import type {
+  MaterialHtmlGameEffect,
+  MaterialHtmlGameInputEvent,
+  MaterialHtmlGamePatch,
+  MaterialHtmlGameSnapshot,
+  MaterialHtmlGameSync,
+} from "../../materials/model/materialDocument";
 import type {
   MaterialAnswerBlock,
   MaterialAnswerState,
@@ -54,6 +60,7 @@ export function useYjsWorkspace({
   const [htmlGameSnapshots, setHtmlGameSnapshots] = useState<Record<string, MaterialHtmlGameSnapshot>>({});
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
   const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
+  const [htmlGamePatches, setHtmlGamePatches] = useState<MaterialHtmlGamePatch[]>([]);
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
   const [materialViewport, setMaterialViewportState] = useState<MaterialViewportState | null>(null);
@@ -73,6 +80,7 @@ export function useYjsWorkspace({
       setHtmlGameSnapshots({});
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
+      setHtmlGamePatches([]);
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
@@ -92,6 +100,7 @@ export function useYjsWorkspace({
       onAnnotationUndoStateChange: setAnnotationUndoState,
       onHtmlGameEffectsChange: setHtmlGameEffects,
       onHtmlGameInputsChange: setHtmlGameInputs,
+      onHtmlGamePatchesChange: setHtmlGamePatches,
       onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onMaterialAnswersChange: setMaterialAnswers,
@@ -199,6 +208,7 @@ export function useYjsWorkspace({
       setHtmlGameSnapshots({});
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
+      setHtmlGamePatches([]);
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
@@ -255,6 +265,10 @@ export function useYjsWorkspace({
     runtimeRef.current?.publishHtmlGameEffect(effect);
   }, []);
 
+  const publishHtmlGamePatch = useCallback((patch: MaterialHtmlGamePatch) => {
+    runtimeRef.current?.publishHtmlGamePatch(patch);
+  }, []);
+
   const publishHtmlGameSnapshot = useCallback((blockId: string, gameSnapshot: MaterialHtmlGameSnapshot) => {
     runtimeRef.current?.setHtmlGameSnapshot(blockId, gameSnapshot);
   }, []);
@@ -304,15 +318,17 @@ export function useYjsWorkspace({
     effects: htmlGameEffects,
     inputs: htmlGameInputs,
     isAuthority,
+    patches: htmlGamePatches,
     presentedBlockId: presentedHtmlGameBlockId,
     ready: status === "connected",
     publishEffect: publishHtmlGameEffect,
     publishInput: publishHtmlGameInput,
+    publishPatch: publishHtmlGamePatch,
     publishSnapshot: publishHtmlGameSnapshot,
     setAuthorityRun: setHtmlGameAuthorityRun,
     setPresentedBlock: setPresentedHtmlGameBlock,
     snapshots: htmlGameSnapshots,
-  }), [htmlGameEffects, htmlGameInputs, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status]);
+  }), [htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status]);
 
   const exerciseSync = useMemo<MaterialExerciseSync>(() => ({
     answers: materialAnswers,

@@ -691,11 +691,13 @@ describe("yjs workspace runtime annotations", () => {
       const snapshots: Array<Record<string, { html: string; sequence: number; updatedAt: number }>> = [];
       const inputs: Array<Array<{ id: string }>> = [];
       const effects: Array<Array<{ id: string }>> = [];
+      const patches: Array<Array<{ id: string }>> = [];
       const runtime = createYjsWorkspaceRuntime({
         color: "#ff5c00",
         onAnnotationChange: () => undefined,
         onHtmlGameEffectsChange: (nextEffects) => effects.push(nextEffects),
         onHtmlGameInputsChange: (nextInputs) => inputs.push(nextInputs),
+        onHtmlGamePatchesChange: (nextPatches) => patches.push(nextPatches),
         onHtmlGameSnapshotsChange: (nextSnapshots) => snapshots.push(nextSnapshots),
         onParticipantsChange: () => undefined,
         onTextChange: () => undefined,
@@ -713,6 +715,14 @@ describe("yjs workspace runtime annotations", () => {
       });
       runtime.publishHtmlGameInput({ at: 30, blockId: "game-a", id: "input-1", targetId: "start", type: "click" });
       runtime.publishHtmlGameEffect({ at: 40, blockId: "game-a", id: "effect-1", kind: "speech", payload: { text: "go" } });
+      runtime.publishHtmlGamePatch({
+        at: 45,
+        blockId: "game-a",
+        id: "patch-1",
+        operations: [{ name: "class", targetId: "modal", type: "attribute", value: "open" }],
+        runId: "run-a",
+        sequence: 1,
+      });
 
       expect(snapshots.at(-1)).toEqual({
         "game-a": { html: "<p>one</p>", sequence: 1, updatedAt: 10 },
@@ -726,6 +736,7 @@ describe("yjs workspace runtime annotations", () => {
       });
       expect(inputs.at(-1)?.at(-1)?.id).toBe("input-1");
       expect(effects.at(-1)?.at(-1)?.id).toBe("effect-1");
+      expect(patches.at(-1)?.at(-1)?.id).toBe("patch-1");
 
       runtime.destroy();
     });
@@ -746,16 +757,26 @@ describe("yjs workspace runtime annotations", () => {
       });
       runtime.publishHtmlGameInput({ at: 30, blockId: "game-a", id: "input-ephemeral", targetId: "start", type: "click" });
       runtime.publishHtmlGameEffect({ at: 40, blockId: "game-a", id: "effect-ephemeral", kind: "speech", payload: { text: "go" } });
+      runtime.publishHtmlGamePatch({
+        at: 50,
+        blockId: "game-a",
+        id: "patch-ephemeral",
+        operations: [{ targetId: "modal", type: "remove" }],
+        runId: "run-a",
+        sequence: 1,
+      });
       const snapshot = runtime.snapshot();
       runtime.destroy();
 
       const restoredInputs: Array<Array<{ id: string }>> = [];
       const restoredEffects: Array<Array<{ id: string }>> = [];
+      const restoredPatches: Array<Array<{ id: string }>> = [];
       const restored = createYjsWorkspaceRuntime({
         color: "#2574ff",
         onAnnotationChange: () => undefined,
         onHtmlGameEffectsChange: (effects) => restoredEffects.push(effects),
         onHtmlGameInputsChange: (inputs) => restoredInputs.push(inputs),
+        onHtmlGamePatchesChange: (patches) => restoredPatches.push(patches),
         onHtmlGameSnapshotsChange: () => undefined,
         onParticipantsChange: () => undefined,
         onTextChange: () => undefined,
@@ -765,6 +786,7 @@ describe("yjs workspace runtime annotations", () => {
 
       expect(restoredInputs.at(-1)).toEqual([]);
       expect(restoredEffects.at(-1)).toEqual([]);
+      expect(restoredPatches.at(-1)).toEqual([]);
       restored.destroy();
     });
   });

@@ -270,7 +270,7 @@ class ChatControllerTest @Autowired constructor(
         val firstEmail = RecordingChatEmailClient.sent.single()
         assertEquals("2", firstEmail.model["messageCount"])
         assertEquals("teacher-email", firstEmail.model["senderNames"])
-        assertEquals("https://online.play-and-say.ru/?chat=${conversation.id}", firstEmail.model["chatUrl"])
+        assertEquals("https://online.honey.school/?chat=${conversation.id}", firstEmail.model["chatUrl"])
         assertTrue(firstEmail.model.values.none { value -> value?.contains("Offline") == true })
 
         controller.sendMessage(

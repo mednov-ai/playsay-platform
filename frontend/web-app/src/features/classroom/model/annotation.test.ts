@@ -244,7 +244,7 @@ describe("annotation model", () => {
       y: 0,
     };
 
-    expect(estimateAnnotationTextSize(text)).toEqual({ height: 38, width: 72 });
+    expect(estimateAnnotationTextSize(text)).toEqual({ height: 56, width: 72 });
     expect(estimateAnnotationTextSize({ ...text, text: "A very long classroom note ".repeat(20) })).toEqual(expect.objectContaining({ width: 360 }));
   });
 

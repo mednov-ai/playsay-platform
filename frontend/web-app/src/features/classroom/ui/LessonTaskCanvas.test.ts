@@ -1041,7 +1041,19 @@ describe("LessonTaskCanvas", () => {
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-font-size-decrease']")!);
     fireEvent.pointerDown(layer, { button: 0, clientX: 250, clientY: 260, pointerId: 1 });
 
-    expect(container.querySelector<HTMLElement>(".playsay-annotation-text-text")?.style.fontSize).toBe("14px");
+    const textElement = container.querySelector<HTMLElement>(".playsay-annotation-text-text");
+    const textFrame = textElement?.closest("foreignObject");
+    expect(textElement?.style.fontSize).toBe("14px");
+    expect(textFrame?.getAttribute("width")).toBe("240");
+    expect(textFrame?.getAttribute("height")).toBe("56");
+    expect(container.querySelectorAll(".playsay-annotation-resize-handle")).toHaveLength(2);
+
+    const editor = textElement?.querySelector("textarea");
+    fireEvent.change(editor!, {
+      target: { value: "A long classroom annotation that wraps across several lines without hiding the active line ".repeat(4) },
+    });
+    await waitFor(() => expect(Number(textFrame?.getAttribute("height"))).toBeGreaterThan(56));
+
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-font-size-increase']")!);
     expect(container.querySelector<HTMLElement>(".playsay-annotation-text-text")?.style.fontSize).toBe("18px");
   });

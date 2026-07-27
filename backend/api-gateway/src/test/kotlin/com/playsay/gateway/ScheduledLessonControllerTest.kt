@@ -526,7 +526,7 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(2, sent.size)
         assertEquals(listOf("student.one@example.com", "teacher.one@example.com"), sent.map { email -> email.to }.sorted())
         assertTrue(sent.all { email -> email.templateKey == "lesson-reminder-30m" })
-        assertTrue(sent.all { email -> email.model["lessonUrl"] == "https://online.play-and-say.ru/lessons/${lesson.id}/classroom" })
+        assertTrue(sent.all { email -> email.model["lessonUrl"] == "https://online.honey.school/lessons/${lesson.id}/classroom" })
         assertEquals(2, reminders.count { reminder -> reminder.status == "SENT" })
         assertEquals(1, reminders.count { reminder -> reminder.status == "SKIPPED" })
     }

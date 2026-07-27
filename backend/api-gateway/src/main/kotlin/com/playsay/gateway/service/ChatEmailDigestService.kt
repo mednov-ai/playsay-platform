@@ -94,7 +94,7 @@ class ChatEmailDigestScheduler(
     private val hub: ChatRealtimeHub,
     private val emailClient: ChatEmailClient,
     private val clock: Clock,
-    @param:Value("\${playsay.public-app-url:https://online.play-and-say.ru}")
+    @param:Value("\${playsay.public-app-url:https://online.honey.school}")
     private val publicAppUrl: String,
     @Value("\${playsay.chat-email.retry-delays:PT1M,PT5M,PT15M}")
     retryDelaysValue: String,

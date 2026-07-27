@@ -4,6 +4,8 @@ import com.playsay.gateway.realtime.LessonRealtimeWebSocketHandler
 import com.playsay.gateway.realtime.ChatRealtimeWebSocketHandler
 import com.playsay.gateway.realtime.PLAY_SAY_WEBSOCKET_PROTOCOL
 import com.playsay.gateway.realtime.authenticationAttribute
+import java.net.URI
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.server.ServerHttpRequest
 import org.springframework.http.server.ServerHttpResponse
@@ -24,22 +26,54 @@ class WebSocketConfig(
     private val lessonRealtimeWebSocketHandler: LessonRealtimeWebSocketHandler,
     private val chatRealtimeWebSocketHandler: ChatRealtimeWebSocketHandler,
     private val lessonWebSocketAuthInterceptor: LessonWebSocketAuthInterceptor,
+    private val webSocketOriginPolicy: WebSocketOriginPolicy,
 ) : WebSocketConfigurer {
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
+        val allowedOriginPatterns = webSocketOriginPolicy.patterns.toTypedArray()
         registry.addHandler(lessonRealtimeWebSocketHandler, "/ws/lessons")
             .addInterceptors(lessonWebSocketAuthInterceptor)
-            .setAllowedOriginPatterns(
-                "https://online.play-and-say.ru",
-                "http://localhost:[*]",
-                "http://127.0.0.1:[*]",
-            )
+            .setAllowedOriginPatterns(*allowedOriginPatterns)
         registry.addHandler(chatRealtimeWebSocketHandler, "/ws/chat")
             .addInterceptors(lessonWebSocketAuthInterceptor)
-            .setAllowedOriginPatterns(
-                "https://online.play-and-say.ru",
-                "http://localhost:[*]",
-                "http://127.0.0.1:[*]",
-            )
+            .setAllowedOriginPatterns(*allowedOriginPatterns)
+    }
+}
+
+internal fun websocketAllowedOriginPatterns(configured: String): List<String> =
+    configured
+        .split(",")
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .filter { pattern -> pattern in supportedWebSocketOriginPatterns }
+        .distinct()
+        .also { patterns ->
+            require(patterns.isNotEmpty()) { "playsay.websocket.allowed-origin-patterns must not be empty" }
+        }
+
+private val supportedWebSocketOriginPatterns = setOf(
+    "https://dev.online.honey.school",
+    "https://online.honey.school",
+    "https://online.honeyschool.ru",
+    "https://honeyschool.ru",
+    "http://localhost:[*]",
+    "http://127.0.0.1:[*]",
+)
+
+@Component
+class WebSocketOriginPolicy(
+    @Value("\${playsay.websocket.allowed-origin-patterns}") configured: String,
+) {
+    val patterns: List<String> = websocketAllowedOriginPatterns(configured)
+
+    fun allows(origin: String?): Boolean {
+        val normalizedOrigin = origin?.trim()?.trimEnd('/')?.takeIf(String::isNotEmpty) ?: return false
+        if (normalizedOrigin in patterns) return true
+        val parsed = runCatching { URI(normalizedOrigin) }.getOrNull() ?: return false
+        return parsed.scheme == "http" && parsed.port >= 0 && when (parsed.host) {
+            "localhost" -> "http://localhost:[*]" in patterns
+            "127.0.0.1" -> "http://127.0.0.1:[*]" in patterns
+            else -> false
+        }
     }
 }
 
@@ -47,6 +81,7 @@ class WebSocketConfig(
 class LessonWebSocketAuthInterceptor(
     private val jwtDecoder: JwtDecoder,
     private val jwtAuthenticationConverter: JwtAuthenticationConverter,
+    private val webSocketOriginPolicy: WebSocketOriginPolicy,
 ) : HandshakeInterceptor {
     override fun beforeHandshake(
         request: ServerHttpRequest,
@@ -54,6 +89,9 @@ class LessonWebSocketAuthInterceptor(
         wsHandler: WebSocketHandler,
         attributes: MutableMap<String, Any>,
     ): Boolean {
+        if (!webSocketOriginPolicy.allows(request.headers.origin)) {
+            return false
+        }
         val protocols = request.headers["Sec-WebSocket-Protocol"]
             .orEmpty()
             .flatMap { header -> header.split(",") }

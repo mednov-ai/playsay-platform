@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component
 class ScheduledLessonParticipantLinkService(
     private val appUserRepo: AppUserRepo,
     private val registrationGateway: RegistrationGateway,
-    @param:Value("\${playsay.public-app-url:https://online.play-and-say.ru}") private val publicAppUrl: String,
+    @param:Value("\${playsay.public-app-url:https://online.honey.school}") private val publicAppUrl: String,
 ) {
     fun createLinks(
         lesson: ScheduledLessonRow,

@@ -3,6 +3,7 @@ import { Gamepad2, Loader2 } from "lucide-react";
 import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
+  MaterialHtmlGamePatchOperation,
   MaterialHtmlGameSnapshot,
   MaterialHtmlGameSync,
 } from "../../model/materialDocument";
@@ -26,6 +27,8 @@ type BridgeMessage =
     }
   | { channel: string; mirror: boolean; type: "ready" }
   | { channel: string; runId?: string; sequence: number; type: "snapshotApplied" }
+  | { channel: string; operations: MaterialHtmlGamePatchOperation[]; sequence: number; type: "patch" }
+  | { channel: string; runId?: string; sequence: number; type: "patchRejected" }
   | { channel: string; type: "input"; event: Omit<MaterialHtmlGameInputEvent, "id" | "at" | "blockId"> }
   | { channel: string; type: "effect"; effect: Omit<MaterialHtmlGameEffect, "id" | "at" | "blockId"> };
 
@@ -62,6 +65,7 @@ export function HtmlGameFrame({
   const latestInputSequenceRef = useRef<Map<string, number>>(new Map());
   const nextInputSequenceRef = useRef(0);
   const handledEffectsRef = useRef<Set<string> | null>(null);
+  const handledPatchesRef = useRef<Set<string> | null>(null);
   const mirrorReadyRef = useRef(false);
   const pendingMirrorSnapshotRef = useRef<MaterialHtmlGameSnapshot | null>(null);
   const mirrorSnapshotRetryRef = useRef<number | null>(null);
@@ -107,6 +111,7 @@ export function HtmlGameFrame({
     latestInputSequenceRef.current = new Map();
     nextInputSequenceRef.current = 0;
     handledEffectsRef.current = null;
+    handledPatchesRef.current = null;
     mirrorReadyRef.current = false;
     pendingMirrorSnapshotRef.current = null;
     lastMirrorSnapshotAppliedAtRef.current = 0;
@@ -122,6 +127,7 @@ export function HtmlGameFrame({
     }
     pendingMirrorSnapshotRef.current = null;
     handledInputsRef.current = null;
+    handledPatchesRef.current = null;
     latestInputSequenceRef.current = new Map();
     clearMirrorSnapshotRetry();
     setAppliedAuthorityRunId(null);
@@ -185,6 +191,17 @@ export function HtmlGameFrame({
         (handledInputsRef.current ??= new Set()).add(input.id);
         latestInputSequenceRef.current.set(channel, input.sequence);
         sync.publishInput(input);
+      } else if (message.type === "patch" && sync?.isAuthority && sync.publishPatch) {
+        sync.publishPatch({
+          at: Date.now(),
+          blockId,
+          id: crypto.randomUUID(),
+          operations: message.operations,
+          runId: channel,
+          sequence: message.sequence,
+        });
+      } else if (message.type === "patchRejected" && isMirror) {
+        sendMirrorSnapshot(activeSnapshot);
       } else if (message.type === "effect" && sync?.isAuthority) {
         sync.publishEffect({
           ...message.effect,
@@ -242,6 +259,31 @@ export function HtmlGameFrame({
     }
     sendMirrorSnapshot(activeSnapshot);
   }, [activeSnapshot, appliedAuthorityRunId, authorityRunId, blockId, channel, sendMirrorSnapshot, sync?.isAuthority]);
+
+  useEffect(() => {
+    if (!sync || sync.isAuthority || !authorityAvailable) {
+      return;
+    }
+    const patches = sync.patches ?? [];
+    if (handledPatchesRef.current === null) {
+      handledPatchesRef.current = new Set(
+        patches
+          .filter((patch) => patch.runId !== authorityRunId || patch.at <= (activeSnapshot?.updatedAt ?? 0))
+          .map((patch) => patch.id),
+      );
+    }
+    patches.forEach((patch) => {
+      if (
+        patch.blockId !== blockId
+        || patch.runId !== authorityRunId
+        || handledPatchesRef.current?.has(patch.id)
+      ) {
+        return;
+      }
+      handledPatchesRef.current?.add(patch.id);
+      iframeRef.current?.contentWindow?.postMessage({ channel, patch, type: "applyPatch" }, "*");
+    });
+  }, [activeSnapshot?.updatedAt, authorityAvailable, authorityRunId, blockId, channel, sync, sync?.isAuthority, sync?.patches]);
 
   useEffect(() => {
     if (!sync || sync.isAuthority || predictiveMirror) {
@@ -328,6 +370,8 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
     const memory = new Map();
     const canvasSnapshotIntervalMs = 1500;
     const maxCanvasDataUrlLength = 150 * 1024;
+    const maxPatchBytes = 64 * 1024;
+    const maxPatchOperations = 80;
     const maxCanvasWidth = 960;
     const maxCanvasHeight = 540;
     const pointerMoveIntervalMs = 1000 / 30;
@@ -371,6 +415,10 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
     try { Object.defineProperty(window, 'localStorage', { configurable: false, value: storage }); } catch (_) {}
     let nextNodeId = 1;
     let snapshotSequence = 0;
+    let patchSequence = 0;
+    let patchWindowUntil = 0;
+    let patchFlushTimer = 0;
+    let pendingPatchOperations = [];
     let snapshotDebounceTimer = 0;
     let snapshotDebounceAt = 0;
     let snapshotMaxTimer = 0;
@@ -390,6 +438,8 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
     let applyingSnapshotRunId = '';
     let applyingSnapshotSequence = 0;
     let appliedSnapshotSequence = 0;
+    let appliedPatchRunId = '';
+    let appliedPatchSequence = 0;
     let dragTransfer = null;
     let pointerDragSourceId = null;
     let pointerDragStartX = 0;
@@ -404,6 +454,109 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
       });
     };
     const send = (value) => nativePostMessage({ channel, ...value }, '*');
+    const compactPatchOperations = (operations) => {
+      const deduplicated = [];
+      const latestByKey = new Map();
+      operations.forEach((operation) => {
+        const key = operation.type + ':' + operation.targetId + ':' + (operation.name ?? '');
+        const previousIndex = latestByKey.get(key);
+        if (previousIndex === undefined) {
+          latestByKey.set(key, deduplicated.length);
+          deduplicated.push(operation);
+        } else {
+          deduplicated[previousIndex] = operation;
+        }
+      });
+      return deduplicated;
+    };
+    const patchAttributeNames = new Set(['aria-hidden', 'class', 'data-state', 'hidden', 'open', 'role', 'style']);
+    const mutationOperations = (mutations) => {
+      const operations = [];
+      const push = (operation) => {
+        if (operations.length < maxPatchOperations) operations.push(operation);
+      };
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes') {
+          if (mutation.attributeName === 'data-playsay-node-id') return;
+          if (!patchAttributeNames.has(mutation.attributeName)) return;
+          const target = mutation.target;
+          const targetIdentifier = targetId(target);
+          if (targetIdentifier === '__document__' || !mutation.attributeName) return;
+          push({
+            type: 'attribute',
+            targetId: targetIdentifier,
+            name: mutation.attributeName,
+            value: target.getAttribute(mutation.attributeName)
+          });
+          return;
+        }
+        if (mutation.type === 'characterData') {
+          const parent = mutation.target.parentElement;
+          const targetIdentifier = parent ? targetId(parent) : '__document__';
+          if (!parent || targetIdentifier === '__document__') return;
+          push({ type: 'replace', targetId: targetIdentifier, html: parent.outerHTML });
+          return;
+        }
+        mutation.removedNodes.forEach((node) => {
+          if (node.nodeType !== Node.ELEMENT_NODE) return;
+          const targetIdentifier = node.dataset.playsayNodeId;
+          if (targetIdentifier) push({ type: 'remove', targetId: targetIdentifier });
+        });
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType !== Node.ELEMENT_NODE || !node.isConnected) return;
+          identify(node);
+          const parent = node.parentElement;
+          const parentIdentifier = parent ? targetId(parent) : '__document__';
+          const targetIdentifier = targetId(node);
+          if (!parent || parentIdentifier === '__document__' || targetIdentifier === '__document__') return;
+          let nextElement = node.nextElementSibling;
+          while (nextElement && targetId(nextElement) === '__document__') nextElement = nextElement.nextElementSibling;
+          const beforeId = nextElement ? targetId(nextElement) : undefined;
+          push({
+            type: 'upsert',
+            targetId: targetIdentifier,
+            parentId: parentIdentifier,
+            ...(beforeId && beforeId !== '__document__' ? { beforeId } : {}),
+            html: node.outerHTML
+          });
+        });
+        const hasTextNodeChange = [...mutation.addedNodes, ...mutation.removedNodes]
+          .some((node) => node.nodeType === Node.TEXT_NODE);
+        if (hasTextNodeChange && mutation.target instanceof Element) {
+          const targetIdentifier = targetId(mutation.target);
+          if (targetIdentifier !== '__document__') {
+            push({ type: 'replace', targetId: targetIdentifier, html: mutation.target.outerHTML });
+          }
+        }
+      });
+      return compactPatchOperations(operations);
+    };
+    const flushMutationPatch = () => {
+      patchFlushTimer = 0;
+      const operations = compactPatchOperations(pendingPatchOperations);
+      pendingPatchOperations = [];
+      if (!operations.length) return;
+      const serialized = JSON.stringify(operations);
+      if (serialized.length > maxPatchBytes || operations.length >= maxPatchOperations) {
+        scheduleSnapshot(true);
+        return;
+      }
+      send({ type: 'patch', operations, sequence: ++patchSequence });
+    };
+    const publishMutationPatch = (mutations) => {
+      if (mirror || performance.now() > patchWindowUntil) return;
+      const operations = mutationOperations(mutations);
+      if (!operations.length) return;
+      pendingPatchOperations.push(...operations);
+      if (pendingPatchOperations.length >= maxPatchOperations) {
+        window.clearTimeout(patchFlushTimer);
+        patchFlushTimer = 0;
+        pendingPatchOperations = [];
+        scheduleSnapshot(true);
+        return;
+      }
+      if (!patchFlushTimer) patchFlushTimer = window.setTimeout(flushMutationPatch, 50);
+    };
     const formState = (node) => {
       const state = {};
       if ('value' in node) state.value = String(node.value ?? '');
@@ -600,6 +753,9 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         : null;
       const resolvedTarget = activePointerTarget ?? event.target;
       const eventTargetId = targetId(resolvedTarget);
+      if (!mirror && immediateSnapshotInputTypes.has(type)) {
+        patchWindowUntil = performance.now() + 1000;
+      }
       if (mirror) {
         const editableTarget = Boolean(event.target?.closest?.('input, textarea, select, [contenteditable="true"]'));
         const nativeDragEvent = type === 'pointerdown' || type === 'pointerup' || type === 'pointercancel' || type === 'dragstart' || type === 'dragover' || type === 'drop';
@@ -837,6 +993,77 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         cursor = nextCursor;
       }
     };
+    const patchElementFromHtml = (html, body = false) => {
+      if (body) {
+        const parsed = new DOMParser().parseFromString(String(html), 'text/html');
+        parsed.querySelectorAll('script').forEach((script) => script.type = 'application/playsay-disabled');
+        return parsed.body;
+      }
+      const template = document.createElement('template');
+      template.innerHTML = String(html).trim();
+      template.content.querySelectorAll('script').forEach((script) => script.type = 'application/playsay-disabled');
+      return template.content.firstElementChild;
+    };
+    const rejectPatch = (runId, sequence) => {
+      send({ type: 'patchRejected', runId, sequence });
+    };
+    const applyPatchOperations = (patch) => {
+      const runId = typeof patch.runId === 'string' ? patch.runId : '';
+      const sequence = Number(patch.sequence) || 0;
+      if (!runId || sequence <= 0) return;
+      if (runId !== appliedPatchRunId) {
+        appliedPatchRunId = runId;
+        appliedPatchSequence = 0;
+      }
+      if (sequence <= appliedPatchSequence) return;
+      if (appliedPatchSequence > 0 && sequence !== appliedPatchSequence + 1) {
+        rejectPatch(runId, sequence);
+        return;
+      }
+      try {
+        for (const operation of patch.operations ?? []) {
+          if (operation.type === 'remove') {
+            targetById(operation.targetId)?.remove?.();
+            continue;
+          }
+          if (operation.type === 'attribute') {
+            const target = targetById(operation.targetId);
+            if (!(target instanceof Element)) throw new Error('missing patch attribute target');
+            if (operation.value === null) target.removeAttribute(operation.name);
+            else target.setAttribute(operation.name, operation.value);
+            continue;
+          }
+          if (operation.type === 'replace') {
+            const current = targetById(operation.targetId);
+            if (!(current instanceof Element)) throw new Error('missing patch replace target');
+            const next = patchElementFromHtml(operation.html, current === document.body);
+            if (!(next instanceof Element)) throw new Error('invalid patch replacement');
+            if (current.outerHTML !== next.outerHTML) patchNode(current, next);
+            continue;
+          }
+          if (operation.type === 'upsert') {
+            const parent = targetById(operation.parentId);
+            if (!(parent instanceof Element)) throw new Error('missing patch parent');
+            const next = patchElementFromHtml(operation.html);
+            if (!(next instanceof Element)) throw new Error('invalid patch insertion');
+            const current = targetById(operation.targetId);
+            const before = operation.beforeId ? targetById(operation.beforeId) : null;
+            if (current instanceof Element) {
+              if (current.outerHTML !== next.outerHTML) patchNode(current, next);
+              const positioned = targetById(operation.targetId);
+              if (!(positioned instanceof Element)) throw new Error('missing patched insertion target');
+              parent.insertBefore(positioned, before instanceof Node ? before : null);
+            } else {
+              parent.insertBefore(next, before instanceof Node ? before : null);
+            }
+          }
+        }
+        identify();
+        appliedPatchSequence = sequence;
+      } catch (_) {
+        rejectPatch(runId, sequence);
+      }
+    };
     window.addEventListener('message', async (messageEvent) => {
       const message = messageEvent.data;
       if (!message || message.channel !== channel) return;
@@ -861,13 +1088,20 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         await applySnapshotState(message.snapshot, runId, sequence);
         if (applyingSnapshotRunId === runId && applyingSnapshotSequence === sequence) {
           appliedSnapshotSequence = sequence;
+          appliedPatchRunId = runId;
+          appliedPatchSequence = 0;
           window.clearInterval(readyRetryTimer);
           readyRetryTimer = 0;
           send({ type: 'snapshotApplied', runId, sequence });
         }
+      } else if (message.type === 'applyPatch' && mirror) {
+        applyPatchOperations(message.patch);
       } else if (message.type === 'applyInput' && (!mirror || predictive)) {
         const input = message.event;
         const target = targetById(input.targetId);
+        if (!mirror && immediateSnapshotInputTypes.has(input.type)) {
+          patchWindowUntil = performance.now() + 1000;
+        }
         applyFormState(target, input);
         if (input.type === 'focus') target?.focus?.();
         if (input.type === 'blur') target?.blur?.();
@@ -933,7 +1167,10 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         announceReady();
         readyRetryTimer = window.setInterval(announceReady, 500);
       } else {
-        new MutationObserver(() => scheduleSnapshot(false, true)).observe(document.documentElement, { attributes: true, characterData: true, childList: true, subtree: true });
+        new MutationObserver((mutations) => {
+          publishMutationPatch(mutations);
+          scheduleSnapshot(false, true);
+        }).observe(document.documentElement, { attributes: true, characterData: true, childList: true, subtree: true });
         scheduleSnapshot();
       }
     };

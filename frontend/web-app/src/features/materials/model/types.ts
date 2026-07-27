@@ -84,6 +84,39 @@ export type MaterialHtmlGameEffect = {
   payload: Record<string, string | number | boolean>;
 };
 
+export type MaterialHtmlGamePatchOperation =
+  | {
+      name: string;
+      targetId: string;
+      type: "attribute";
+      value: string | null;
+    }
+  | {
+      targetId: string;
+      type: "remove";
+    }
+  | {
+      html: string;
+      targetId: string;
+      type: "replace";
+    }
+  | {
+      beforeId?: string;
+      html: string;
+      parentId: string;
+      targetId: string;
+      type: "upsert";
+    };
+
+export type MaterialHtmlGamePatch = {
+  at: number;
+  blockId: string;
+  id: string;
+  operations: MaterialHtmlGamePatchOperation[];
+  runId: string;
+  sequence: number;
+};
+
 export type MaterialHtmlGameSnapshot = {
   canvases?: Record<string, string>;
   controls?: Record<string, {
@@ -105,7 +138,9 @@ export type MaterialHtmlGameSync = {
   effects: MaterialHtmlGameEffect[];
   inputs: MaterialHtmlGameInputEvent[];
   isAuthority: boolean;
+  patches?: MaterialHtmlGamePatch[];
   presentedBlockId: string | null;
+  publishPatch?: (patch: MaterialHtmlGamePatch) => void;
   ready: boolean;
   publishEffect: (effect: MaterialHtmlGameEffect) => void;
   publishInput: (event: MaterialHtmlGameInputEvent) => void;

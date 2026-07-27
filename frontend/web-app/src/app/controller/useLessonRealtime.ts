@@ -135,6 +135,7 @@ export function useLessonRealtime({
 
       socket.onopen = () => {
         realtimeReconnectAttemptRef.current = 0;
+        void syncScheduleFromServerRef.current();
         const lessonId = activeLessonIdRef.current;
         if (lessonId) {
           sendLessonRealtimeSubscribe(lessonId);

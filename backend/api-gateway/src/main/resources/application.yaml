@@ -39,6 +39,8 @@ logging:
     org.hibernate.orm.connections.pooling: warn
 
 playsay:
+  websocket:
+    allowed-origin-patterns: "${PLAYSAY_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:[*],http://127.0.0.1:[*]}"
   ai:
     provider: ${PLAYSAY_AI_PROVIDER:stub}
     html-game-enrichment:
@@ -54,7 +56,7 @@ playsay:
         answer-suggestion: ${OPENAI_ANSWER_SUGGESTION_REASONING_EFFORT:medium}
         html-game-metadata: ${OPENAI_HTML_GAME_REASONING_EFFORT:medium}
   livekit:
-    url: ${PLAYSAY_LIVEKIT_URL:wss://online.play-and-say.ru/livekit}
+    url: ${PLAYSAY_LIVEKIT_URL:wss://online.honey.school/livekit}
     api-key: ${PLAYSAY_LIVEKIT_API_KEY:}
     api-secret: ${PLAYSAY_LIVEKIT_API_SECRET:}
     token-ttl-seconds: ${PLAYSAY_LIVEKIT_TOKEN_TTL_SECONDS:3600}
@@ -65,7 +67,7 @@ playsay:
     model: ${PLAYSAY_LESSON_TRANSLATION_MODEL:gpt-realtime-translate}
     base-url: ${PLAYSAY_LESSON_TRANSLATION_BASE_URL:${OPENAI_BASE_URL:https://api.openai.com/v1}}
   collaboration:
-    websocket-url: ${PLAYSAY_COLLABORATION_WEBSOCKET_URL:wss://online.play-and-say.ru/collab/ws}
+    websocket-url: ${PLAYSAY_COLLABORATION_WEBSOCKET_URL:wss://online.honey.school/collab/ws}
     token-secret: ${PLAYSAY_COLLABORATION_TOKEN_SECRET:}
     service-token: ${PLAYSAY_COLLABORATION_SERVICE_TOKEN:}
     token-ttl-seconds: ${PLAYSAY_COLLABORATION_TOKEN_TTL_SECONDS:900}
@@ -90,7 +92,7 @@ playsay:
     mailjet:
       webhook-username: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_USERNAME:}
       webhook-password: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_PASSWORD:}
-  public-app-url: ${PLAYSAY_PUBLIC_APP_URL:https://online.play-and-say.ru}
+  public-app-url: ${PLAYSAY_PUBLIC_APP_URL:https://online.honey.school}
   lesson-reminders:
     poll-delay-ms: ${PLAYSAY_LESSON_REMINDERS_POLL_DELAY_MS:60000}
   chat-email:

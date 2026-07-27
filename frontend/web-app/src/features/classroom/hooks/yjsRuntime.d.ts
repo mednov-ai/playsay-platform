@@ -11,6 +11,7 @@ import type {
   MaterialExerciseInteraction,
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
+  MaterialHtmlGamePatch,
   MaterialHtmlGameSnapshot,
   MaterialVideoPlaybackAction,
   MaterialVideoPlaybackState,
@@ -43,6 +44,7 @@ export type YjsWorkspaceRuntime = {
   setAnnotationElements: (elements: AnnotationElement[]) => void;
   publishHtmlGameEffect: (effect: MaterialHtmlGameEffect) => void;
   publishHtmlGameInput: (event: MaterialHtmlGameInputEvent) => void;
+  publishHtmlGamePatch: (patch: MaterialHtmlGamePatch) => void;
   setHtmlGameSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
   setHtmlGamePresentedBlock: (blockId: string | null) => void;
   seedMaterialAnswers: (answers: MaterialAnswerState) => void;
@@ -75,6 +77,7 @@ export function createYjsWorkspaceRuntime(options: {
   onAnnotationChange: (elements: AnnotationElement[]) => void;
   onHtmlGameEffectsChange: (effects: MaterialHtmlGameEffect[]) => void;
   onHtmlGameInputsChange: (events: MaterialHtmlGameInputEvent[]) => void;
+  onHtmlGamePatchesChange?: (patches: MaterialHtmlGamePatch[]) => void;
   onHtmlGamePresentationChange?: (blockId: string | null) => void;
   onHtmlGameSnapshotsChange: (snapshots: Record<string, MaterialHtmlGameSnapshot>) => void;
   onMaterialAnswersChange?: (answers: MaterialAnswerState) => void;

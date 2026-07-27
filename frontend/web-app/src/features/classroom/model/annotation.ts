@@ -785,7 +785,7 @@ const textSizingConstraints: AnnotationTextSizingConstraints = {
   horizontalPadding: 12,
   maxHeight: 320,
   maxWidth: 360,
-  minHeight: 34,
+  minHeight: 56,
   minWidth: 72,
   verticalPadding: 8,
 };

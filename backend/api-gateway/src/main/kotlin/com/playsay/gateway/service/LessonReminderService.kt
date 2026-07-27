@@ -190,7 +190,7 @@ class LessonReminderScheduler(
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val appUserRepo: AppUserRepo,
     private val emailClient: LessonReminderEmailClient,
-    @param:Value("\${playsay.public-app-url:https://online.play-and-say.ru}")
+    @param:Value("\${playsay.public-app-url:https://online.honey.school}")
     private val publicAppUrl: String,
 ) {
     @Scheduled(fixedDelayString = "\${playsay.lesson-reminders.poll-delay-ms:60000}")

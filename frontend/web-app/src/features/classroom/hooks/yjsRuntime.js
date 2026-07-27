@@ -26,6 +26,7 @@ export function createYjsWorkspaceRuntime({
   onAnnotationChange,
   onHtmlGameEffectsChange,
   onHtmlGameInputsChange,
+  onHtmlGamePatchesChange = () => undefined,
   onHtmlGamePresentationChange = () => undefined,
   onHtmlGameSnapshotsChange,
   onMaterialAnswersChange = () => undefined,
@@ -60,10 +61,12 @@ export function createYjsWorkspaceRuntime({
   let videoPlaybackStates = {};
   let transientHtmlGameInputs = yhtmlGameInputs.toArray();
   let transientHtmlGameEffects = yhtmlGameEffects.toArray();
+  let transientHtmlGamePatches = [];
   const pendingEphemeralMessages = new Map();
   const seenEphemeralIds = new Set([
     ...transientHtmlGameInputs.map((event) => event?.id),
     ...transientHtmlGameEffects.map((effect) => effect?.id),
+    ...transientHtmlGamePatches.map((patch) => patch?.id),
   ].filter(Boolean));
 
   const updateLocalText = () => {
@@ -113,6 +116,9 @@ export function createYjsWorkspaceRuntime({
     } else if (message.kind === "html-game-effect") {
       transientHtmlGameEffects = appendBounded(transientHtmlGameEffects, message.payload, 120);
       onHtmlGameEffectsChange(transientHtmlGameEffects);
+    } else if (message.kind === "html-game-patch") {
+      transientHtmlGamePatches = appendBounded(transientHtmlGamePatches, message.payload, 120);
+      onHtmlGamePatchesChange(transientHtmlGamePatches);
     }
   };
   const publishEphemeral = (kind, payload) => {
@@ -207,6 +213,7 @@ export function createYjsWorkspaceRuntime({
   updateHtmlGameSnapshots();
   updateHtmlGameInputs();
   updateHtmlGameEffects();
+  onHtmlGamePatchesChange(transientHtmlGamePatches);
   updateHtmlGamePresentation();
   updateMaterialAnswers();
   updateMaterialViewport();
@@ -249,6 +256,9 @@ export function createYjsWorkspaceRuntime({
     },
     publishHtmlGameInput(event) {
       publishEphemeral("html-game-input", event);
+    },
+    publishHtmlGamePatch(patch) {
+      publishEphemeral("html-game-patch", patch);
     },
     redoAnnotation() {
       annotationUndoManager.redo();

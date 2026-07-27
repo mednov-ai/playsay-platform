@@ -217,6 +217,9 @@ const AnnotationElementView = memo(function AnnotationElementView({
   const sizeableAutoWidth = sizeableTextElement?.kind === "text" ? sizeableTextElement.autoWidth : undefined;
   const sizeableAutoHeight = sizeableTextElement?.kind === "text" ? sizeableTextElement.autoHeight : undefined;
   const sizeableParentId = sizeableTextElement?.kind === "mindMapNode" ? sizeableTextElement.parentId : undefined;
+  const sizeableTextClamped = sizeableTextElement
+    ? sizeableTextElement.height >= annotationTextSizingConstraints(sizeableTextElement).maxHeight
+    : false;
 
   useEffect(() => {
     onElementSizeChangeRef.current = onElementSizeChange;
@@ -389,7 +392,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
         className={`playsay-annotation-text playsay-annotation-text-${element.kind}`}
         data-empty={element.text ? "false" : "true"}
         data-mind-map-root={element.kind === "mindMapNode" && element.parentId === null ? "true" : undefined}
-        data-text-clamped={element.kind === "mindMapNode" && element.height >= 160 ? "true" : undefined}
+        data-text-clamped={sizeableTextClamped ? "true" : undefined}
         style={{ backgroundColor: element.fill, color: element.color, fontSize: `${element.fontSize}px` }}
       >
         {sizeableTextElement ? (
@@ -460,7 +463,7 @@ function AnnotationTextEditor({
       onChange={(event) => {
         const nextText = event.currentTarget.value;
         setDraft(nextText);
-        if (!composingRef.current) onTextChange(element.id, nextText);
+        onTextChange(element.id, nextText);
       }}
       onCompositionEnd={(event) => {
         composingRef.current = false;
@@ -572,7 +575,12 @@ function SelectionOutline({
       {element.kind === "mindMapNode" ? (
         <MindMapAddHandles element={element} onAdd={onAddMindMapNode} onDelete={onDeleteSelected} />
       ) : null}
-      {canResize ? (
+      {canResize && element.kind === "text" ? (
+        <>
+          <ResizeHandle elementId={element.id} handle="e" onResize={onResizeElement} x={outline.x + outline.width} y={outline.y + outline.height / 2} />
+          <ResizeHandle elementId={element.id} handle="w" onResize={onResizeElement} x={outline.x} y={outline.y + outline.height / 2} />
+        </>
+      ) : canResize ? (
         <>
           <ResizeHandle elementId={element.id} handle="nw" onResize={onResizeElement} x={outline.x} y={outline.y} />
           <ResizeHandle elementId={element.id} handle="ne" onResize={onResizeElement} x={outline.x + outline.width} y={outline.y} />

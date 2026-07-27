@@ -53,6 +53,10 @@ describe("HTML game sandbox", () => {
     expect(authority).toContain("'image/webp'");
     expect(authority).toContain("dataUrl.length <= maxCanvasDataUrlLength ? dataUrl : ''");
     expect(authority).toContain("snapshotInFlight");
+    expect(authority).toContain("publishMutationPatch");
+    expect(authority).toContain("maxPatchBytes = 64 * 1024");
+    expect(mirror).toContain("applyPatchOperations");
+    expect(mirror).toContain("type: 'patchRejected'");
     expect(authority).toContain("meaningfulInput ? 120 : 500");
     expect(authority).toContain("const maxDelay = canvasSnapshotIntervalMs");
     expect(authority).toContain("'beforeinput', 'input', 'change', 'focus', 'blur'");
@@ -224,6 +228,24 @@ describe("HTML game sandbox", () => {
       effects: [],
       inputs: [],
       isAuthority: false,
+      patches: [
+        {
+          at: 50,
+          blockId: "game-1",
+          id: "covered-by-snapshot",
+          operations: [{ targetId: "old", type: "remove" }],
+          runId: "authority-run",
+          sequence: 1,
+        },
+        {
+          at: 150,
+          blockId: "game-1",
+          id: "after-snapshot",
+          operations: [{ targetId: "new", type: "remove" }],
+          runId: "authority-run",
+          sequence: 2,
+        },
+      ],
       presentedBlockId: "game-1",
       publishEffect: vi.fn(),
       publishInput: vi.fn(),
@@ -282,6 +304,14 @@ describe("HTML game sandbox", () => {
       }));
     });
     expect(container.querySelector(".playsay-html-game-waiting")).toBeNull();
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      patch: expect.objectContaining({ id: "after-snapshot" }),
+      type: "applyPatch",
+    }), "*");
+    expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+      patch: expect.objectContaining({ id: "covered-by-snapshot" }),
+      type: "applyPatch",
+    }), "*");
     act(() => {
       vi.advanceTimersByTime(5_000);
     });
@@ -430,6 +460,130 @@ describe("HTML game sandbox", () => {
       }));
     } finally {
       dom.window.close();
+    }
+  });
+
+  it("publishes compact authority DOM mutations and applies them in a mirror without a full snapshot", async () => {
+    const authorityChannel = "authority-patch-test";
+    const authorityMessages: Array<Record<string, unknown>> = [];
+    const authorityDocument = createSandboxedGameDocument(
+      "<html><head><title>Game</title></head><body><main id=\"game\"></main></body></html>",
+      authorityChannel,
+      false,
+    );
+    const authorityDom = new JSDOM(authorityDocument, {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "http://localhost/",
+      beforeParse(window) {
+        window.addEventListener("message", (event) => {
+          const message = event.data as Record<string, unknown>;
+          if (message?.channel === authorityChannel) authorityMessages.push(message);
+        });
+        Object.defineProperty(window, "CSS", {
+          configurable: true,
+          value: { escape: (value: string) => value },
+        });
+      },
+    });
+
+    try {
+      await waitFor(() => expect(authorityMessages.some((message) => message.type === "snapshot")).toBe(true));
+      const game = authorityDom.window.document.querySelector("#game")!;
+      let modal: HTMLElement | null = null;
+      game.addEventListener("click", () => {
+        modal = authorityDom.window.document.createElement("section");
+        modal.id = "result-modal";
+        modal.textContent = "Level complete";
+        authorityDom.window.document.body.append(modal);
+      }, { once: true });
+      game.dispatchEvent(new authorityDom.window.MouseEvent("click", { bubbles: true }));
+
+      await waitFor(() => expect(authorityMessages.some((message) => message.type === "patch")).toBe(true));
+      const patchMessage = authorityMessages.find((message) => message.type === "patch");
+      expect(patchMessage).toEqual(expect.objectContaining({
+        operations: expect.arrayContaining([
+          expect.objectContaining({
+            html: expect.stringContaining("Level complete"),
+            type: "upsert",
+          }),
+        ]),
+        sequence: 1,
+      }));
+      expect(modal).not.toBeNull();
+      modal!.textContent = "Next level";
+      await waitFor(() => expect(authorityMessages.some((message) => (
+        message.type === "patch"
+        && message.sequence === 2
+        && JSON.stringify(message.operations).includes("Next level")
+      ))).toBe(true));
+
+      const mirrorChannel = "mirror-patch-test";
+      const mirrorMessages: Array<Record<string, unknown>> = [];
+      const mirrorDocument = createSandboxedGameDocument(
+        "<html><head><title>Game</title></head><body><main id=\"game\"></main></body></html>",
+        mirrorChannel,
+        true,
+      );
+      const mirrorDom = new JSDOM(mirrorDocument, {
+        pretendToBeVisual: true,
+        runScripts: "dangerously",
+        url: "http://localhost/",
+        beforeParse(window) {
+          window.addEventListener("message", (event) => {
+            const message = event.data as Record<string, unknown>;
+            if (message?.channel === mirrorChannel) mirrorMessages.push(message);
+          });
+          Object.defineProperty(window, "CSS", {
+            configurable: true,
+            value: { escape: (value: string) => value },
+          });
+        },
+      });
+      try {
+        await waitFor(() => expect(mirrorDom.window.document.body.dataset.playsayNodeId).toBeTruthy());
+        const parentId = mirrorDom.window.document.body.dataset.playsayNodeId!;
+        mirrorDom.window.postMessage({
+          channel: mirrorChannel,
+          patch: {
+            at: 1,
+            blockId: "game-1",
+            id: "patch-1",
+            operations: [{
+              html: '<section id="result-modal" data-playsay-node-id="modal-1">Level complete</section>',
+              parentId,
+              targetId: "modal-1",
+              type: "upsert",
+            }],
+            runId: "authority-run",
+            sequence: 1,
+          },
+          type: "applyPatch",
+        }, "*");
+
+        await waitFor(() => expect(mirrorDom.window.document.querySelector("#result-modal")?.textContent).toBe("Level complete"));
+        mirrorDom.window.postMessage({
+          channel: mirrorChannel,
+          patch: {
+            at: 3,
+            blockId: "game-1",
+            id: "patch-3",
+            operations: [{ name: "class", targetId: "modal-1", type: "attribute", value: "open" }],
+            runId: "authority-run",
+            sequence: 3,
+          },
+          type: "applyPatch",
+        }, "*");
+        await waitFor(() => expect(mirrorMessages).toContainEqual(expect.objectContaining({
+          runId: "authority-run",
+          sequence: 3,
+          type: "patchRejected",
+        })));
+      } finally {
+        mirrorDom.window.close();
+      }
+    } finally {
+      authorityDom.window.close();
     }
   });
 });

@@ -482,7 +482,7 @@
 
 .playsay-material-block-summary strong,
 .playsay-material-block-summary span {
-  overflow: hidden;
+  overflow: auto;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3146,9 +3146,18 @@
   font: inherit;
   line-height: inherit;
   box-sizing: border-box;
-  overflow: auto;
+  overflow: hidden;
   padding: 0;
   text-align: inherit;
+}
+
+.playsay-annotation-text-text textarea,
+.playsay-annotation-text-mindMapNode textarea {
+  overflow: hidden;
+}
+
+.playsay-annotation-text[data-text-clamped="true"] textarea {
+  overflow: auto;
 }
 
 .playsay-annotation-text-text > span:not(.playsay-annotation-text-measure) {

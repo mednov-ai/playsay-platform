@@ -1459,6 +1459,7 @@
   border: 1px solid hsl(var(--border));
   border-radius: 0.875rem;
   background: #111111;
+  margin-inline: auto;
 }
 
 .playsay-video-embed[data-editable="true"] {
@@ -1474,6 +1475,48 @@
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+.playsay-youtube-sync-player {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.playsay-video-sync-resume {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  display: inline-flex;
+  max-width: calc(100% - 2rem);
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 0.3);
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  transform: translate(-50%, -50%);
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.playsay-video-sync-resume:hover,
+.playsay-video-sync-resume:focus-visible {
+  background: #df4100;
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.playsay-video-sync-resume svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
 }
 
 .playsay-relay-player {

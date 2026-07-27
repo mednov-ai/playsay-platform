@@ -8,7 +8,18 @@ import {
   useTrackToggle,
 } from "@livekit/components-react";
 import { getBrowser, Track, type LocalParticipant, type ScreenShareCaptureOptions } from "livekit-client";
-import { Languages, LoaderCircle, ScreenShare, ScreenShareOff, Volume2 } from "lucide-react";
+import {
+  CheckCircle2,
+  Ellipsis,
+  Languages,
+  LoaderCircle,
+  Maximize2,
+  Minimize2,
+  PhoneOff,
+  ScreenShare,
+  ScreenShareOff,
+  Volume2,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { LessonTranslationController } from "../hooks/useLessonTranslation";
@@ -27,10 +38,24 @@ export const classroomScreenShareCaptureOptions = {
 } satisfies ScreenShareCaptureOptions;
 
 export function ClassroomControlBar({
+  canCompleteLesson = false,
+  fullscreenActive = false,
+  fullscreenLabel = "",
+  fullscreenPending = false,
+  onComplete = () => undefined,
+  onLeave = () => undefined,
+  onToggleFullscreen = () => undefined,
   role,
   setControlsRef,
   translation,
 }: {
+  canCompleteLesson?: boolean;
+  fullscreenActive?: boolean;
+  fullscreenLabel?: string;
+  fullscreenPending?: boolean;
+  onComplete?: () => void;
+  onLeave?: () => void;
+  onToggleFullscreen?: () => void;
   role: TranslationRole | null;
   setControlsRef: (node: HTMLDivElement | null) => void;
   translation: LessonTranslationController;
@@ -57,6 +82,16 @@ export function ClassroomControlBar({
       />
       <ClassroomScreenShareToggle />
       <ClassroomStartMediaButton />
+      <button
+        aria-label={fullscreenLabel}
+        className="lk-button playsay-classroom-fullscreen-control"
+        disabled={fullscreenPending}
+        onClick={onToggleFullscreen}
+        title={fullscreenLabel}
+        type="button"
+      >
+        {fullscreenActive ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+      </button>
       {role && (translation.canEnable || translation.localEnabled) ? (
         <button
           aria-label={translationButtonLabel(translation, role, t)}
@@ -100,6 +135,33 @@ export function ClassroomControlBar({
             : <Languages className="h-4 w-4" />}
         </button>
       ) : null}
+      {canCompleteLesson ? (
+        <details className="playsay-classroom-more">
+          <summary aria-label={t("classroom.actions.more")} title={t("classroom.actions.more")}>
+            <Ellipsis aria-hidden="true" />
+          </summary>
+          <div className="playsay-classroom-more-menu">
+            <button
+              onClick={() => {
+                if (window.confirm(t("classroom.confirm.complete"))) onComplete();
+              }}
+              type="button"
+            >
+              <CheckCircle2 aria-hidden="true" />
+              {t("classroom.actions.completeLesson")}
+            </button>
+          </div>
+        </details>
+      ) : null}
+      <button
+        aria-label={t("classroom.actions.leave")}
+        className="lk-button playsay-classroom-leave-control"
+        onClick={onLeave}
+        title={t("classroom.actions.leave")}
+        type="button"
+      >
+        <PhoneOff aria-hidden="true" />
+      </button>
     </div>
   );
 }

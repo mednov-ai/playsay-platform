@@ -52,6 +52,16 @@ export function parsePageCommand(value: unknown): PageCommand | null {
   return candidate as PageCommand;
 }
 
+export function sessionsToReplace<T extends { consumerTabId: number; sessionId: string }>(
+  sessions: Iterable<T>,
+  consumerTabId: number,
+  nextSessionId: string,
+): T[] {
+  return [...sessions].filter((session) => (
+    session.consumerTabId === consumerTabId || session.sessionId === nextSessionId
+  ));
+}
+
 export function cdpCommandForInput(input: ExternalInput): { method: string; params: Record<string, unknown> } | null {
   if (!input || typeof input !== "object") return null;
   if (input.type === "pointer") {

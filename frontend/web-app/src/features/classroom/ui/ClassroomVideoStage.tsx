@@ -28,7 +28,14 @@ export function ClassroomVideoStage({
   lessonId,
   lessonType,
   mode,
+  canCompleteLesson,
+  fullscreenActive,
+  fullscreenLabel,
+  fullscreenPending,
+  onComplete,
+  onLeave,
   onScreenShareActiveChange,
+  onToggleFullscreen,
   participantPresence,
   showExpectedParticipants,
   translationAllowed,
@@ -38,7 +45,14 @@ export function ClassroomVideoStage({
   lessonId: string;
   lessonType: string;
   mode: ClassroomVideoMode;
+  canCompleteLesson: boolean;
+  fullscreenActive: boolean;
+  fullscreenLabel: string;
+  fullscreenPending: boolean;
+  onComplete: () => void;
+  onLeave: () => void;
   onScreenShareActiveChange: (active: boolean) => void;
+  onToggleFullscreen: () => void;
   participantPresence: LessonParticipantPresenceMap;
   showExpectedParticipants: boolean;
   translationAllowed: boolean;
@@ -227,7 +241,18 @@ export function ClassroomVideoStage({
             )}
         </div>
         <ClassroomTranslationOverlay translation={translation} />
-        <ClassroomControlBar role={translationRole} setControlsRef={(node) => { controlsRef.current = node; }} translation={translation} />
+        <ClassroomControlBar
+          canCompleteLesson={canCompleteLesson}
+          fullscreenActive={fullscreenActive}
+          fullscreenLabel={fullscreenLabel}
+          fullscreenPending={fullscreenPending}
+          onComplete={onComplete}
+          onLeave={onLeave}
+          onToggleFullscreen={onToggleFullscreen}
+          role={translationRole}
+          setControlsRef={(node) => { controlsRef.current = node; }}
+          translation={translation}
+        />
         <RoomAudioRenderer />
         <ConnectionStateToast />
       </div>
@@ -273,7 +298,18 @@ export function ClassroomVideoStage({
         </div>
       </div>
       <ClassroomTranslationOverlay translation={translation} />
-      <ClassroomControlBar role={translationRole} setControlsRef={(node) => { controlsRef.current = node; }} translation={translation} />
+      <ClassroomControlBar
+        canCompleteLesson={canCompleteLesson}
+        fullscreenActive={fullscreenActive}
+        fullscreenLabel={fullscreenLabel}
+        fullscreenPending={fullscreenPending}
+        onComplete={onComplete}
+        onLeave={onLeave}
+        onToggleFullscreen={onToggleFullscreen}
+        role={translationRole}
+        setControlsRef={(node) => { controlsRef.current = node; }}
+        translation={translation}
+      />
       <RoomAudioRenderer />
       <ConnectionStateToast />
     </div>

@@ -254,7 +254,6 @@ export function AppShell(props: AppShellProps) {
   const hasGlobalTools = Boolean(
     isAuthenticated &&
     profile &&
-    !profile.roles.includes("ADMIN") &&
     profile.roles.some((role) => role === "TEACHER" || role === "STUDENT"),
   );
 

@@ -332,6 +332,54 @@ describe("yjs workspace runtime annotations", () => {
     runtime.destroy();
   });
 
+  it("publishes ordered room video state and advances heartbeat without changing the revision", () => {
+    const changes: Array<Record<string, {
+      action: string;
+      heartbeat: number;
+      playing: boolean;
+      positionSeconds: number;
+      revision: number;
+    }>> = [];
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: () => undefined,
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      onVideoPlaybackChange: (states) => changes.push(states),
+      participantName: "Student",
+      snapshot: null,
+    });
+
+    runtime.setVideoPlayback("video-1", { action: "play", playing: true, positionSeconds: 12.5 });
+    const played = changes.at(-1)?.["video-1"];
+    expect(played).toEqual(expect.objectContaining({
+      action: "play",
+      heartbeat: 0,
+      playing: true,
+      positionSeconds: 12.5,
+      revision: 1,
+    }));
+
+    runtime.setVideoPlayback("video-1", { action: "play", playing: true, positionSeconds: 14.5 }, { heartbeat: true });
+    expect(changes.at(-1)?.["video-1"]).toEqual(expect.objectContaining({
+      heartbeat: 1,
+      positionSeconds: 14.5,
+      revision: played?.revision,
+    }));
+
+    runtime.setVideoPlayback("video-1", { action: "seek", playing: false, positionSeconds: -3 });
+    expect(changes.at(-1)?.["video-1"]).toEqual(expect.objectContaining({
+      action: "seek",
+      playing: false,
+      positionSeconds: 0,
+      revision: 2,
+    }));
+    runtime.destroy();
+  });
+
   it("applies element changes by id without replacing unrelated collaborative objects", () => {
     const annotationChanges: AnnotationElement[][] = [];
     const runtime = createYjsWorkspaceRuntime({

@@ -30,6 +30,7 @@ export function createYjsWorkspaceRuntime({
   onHtmlGameSnapshotsChange,
   onMaterialAnswersChange = () => undefined,
   onMaterialViewportChange = () => undefined,
+  onVideoPlaybackChange = () => undefined,
   onAnnotationUndoStateChange = () => undefined,
   onDocumentUpdate,
   onParticipantsChange,
@@ -56,6 +57,7 @@ export function createYjsWorkspaceRuntime({
   let socket = null;
   let disposed = false;
   let materialViewportState = null;
+  let videoPlaybackStates = {};
   let transientHtmlGameInputs = yhtmlGameInputs.toArray();
   let transientHtmlGameEffects = yhtmlGameEffects.toArray();
   const pendingEphemeralMessages = new Map();
@@ -146,6 +148,11 @@ export function createYjsWorkspaceRuntime({
       });
     }
   };
+  const updateVideoPlayback = () => {
+    if (disposed) return;
+    videoPlaybackStates = latestVideoPlaybackStates(awareness, videoPlaybackStates);
+    onVideoPlaybackChange(videoPlaybackStates);
+  };
   const syncUpdateHandler = (update, origin) => {
     onDocumentUpdate?.(update);
     if (origin !== socket) {
@@ -154,6 +161,7 @@ export function createYjsWorkspaceRuntime({
   };
   const awarenessUpdateHandler = (changes, origin) => {
     updateParticipants(awareness, onParticipantsChange);
+    updateVideoPlayback();
     const latestViewport = latestMaterialViewport(awareness, materialViewportState);
     if (isMaterialViewportNewer(latestViewport, materialViewportState)) {
       materialViewportState = latestViewport;
@@ -191,6 +199,7 @@ export function createYjsWorkspaceRuntime({
     exerciseInteraction: null,
     htmlGameAuthorities: {},
     materialViewport: materialViewportState,
+    videoPlayback: {},
     user: { color, name: participantName },
   });
   updateLocalText();
@@ -202,6 +211,7 @@ export function createYjsWorkspaceRuntime({
   updateMaterialAnswers();
   updateMaterialViewport();
   updateAnnotationUndoState();
+  updateVideoPlayback();
 
   return {
     applyAnnotationChanges({ deleteIds, upserts }) {
@@ -314,6 +324,29 @@ export function createYjsWorkspaceRuntime({
         onMaterialViewportChange(normalized);
         awareness.setLocalStateField("materialViewport", normalized);
       }
+    },
+    setVideoPlayback(blockId, state, { heartbeat = false } = {}) {
+      const cleanBlockId = asString(blockId);
+      const current = videoPlaybackStates[cleanBlockId];
+      const positionSeconds = Math.max(0, finiteNumberOr(state?.positionSeconds, 0));
+      if (!cleanBlockId || !["pause", "play", "seek"].includes(state?.action)) return;
+      const next = normalizeVideoPlaybackState({
+        action: state.action,
+        blockId: cleanBlockId,
+        heartbeat: heartbeat && current ? current.heartbeat + 1 : 0,
+        playing: Boolean(state.playing),
+        positionSeconds,
+        revision: heartbeat && current
+          ? current.revision
+          : finiteNumberOr(current?.revision, 0) + 1,
+        sourceClientId: ydoc.clientID,
+      });
+      if (!next) return;
+      const localStates = normalizeVideoPlaybackRecord(awareness.getLocalState()?.videoPlayback);
+      localStates[cleanBlockId] = next;
+      videoPlaybackStates = { ...videoPlaybackStates, [cleanBlockId]: next };
+      onVideoPlaybackChange(videoPlaybackStates);
+      awareness.setLocalStateField("videoPlayback", localStates);
     },
     snapshot() {
       return {
@@ -790,6 +823,56 @@ function latestMaterialViewport(awareness, fallback) {
     if (isMaterialViewportNewer(candidate, latest)) latest = candidate;
   });
   return latest;
+}
+
+function latestVideoPlaybackStates(awareness, fallback) {
+  const latest = { ...fallback };
+  awareness.getStates().forEach((state) => {
+    const states = normalizeVideoPlaybackRecord(state?.videoPlayback);
+    Object.entries(states).forEach(([blockId, candidate]) => {
+      if (isVideoPlaybackNewer(candidate, latest[blockId])) latest[blockId] = candidate;
+    });
+  });
+  return latest;
+}
+
+function normalizeVideoPlaybackRecord(value) {
+  const record = asObject(value);
+  if (!record) return {};
+  return Object.fromEntries(
+    Object.entries(record)
+      .map(([blockId, state]) => [blockId, normalizeVideoPlaybackState(state)])
+      .filter((entry) => Boolean(entry[1])),
+  );
+}
+
+function normalizeVideoPlaybackState(value) {
+  const state = asObject(value);
+  const action = asString(state?.action);
+  const blockId = asString(state?.blockId);
+  const sourceClientId = Math.floor(finiteNumberOr(state?.sourceClientId, 0));
+  if (!blockId || !["pause", "play", "seek"].includes(action) || sourceClientId <= 0) return null;
+  return {
+    action,
+    blockId,
+    heartbeat: Math.max(0, Math.floor(finiteNumberOr(state?.heartbeat, 0))),
+    playing: Boolean(state?.playing),
+    positionSeconds: Math.max(0, finiteNumberOr(state?.positionSeconds, 0)),
+    revision: Math.max(0, Math.floor(finiteNumberOr(state?.revision, 0))),
+    sourceClientId,
+  };
+}
+
+function isVideoPlaybackNewer(candidate, current) {
+  if (!candidate) return false;
+  if (!current) return true;
+  return candidate.revision > current.revision
+    || (candidate.revision === current.revision && candidate.heartbeat > current.heartbeat)
+    || (
+      candidate.revision === current.revision
+      && candidate.heartbeat === current.heartbeat
+      && candidate.sourceClientId > current.sourceClientId
+    );
 }
 
 function annotationElementKind(kind, legacyPoints) {

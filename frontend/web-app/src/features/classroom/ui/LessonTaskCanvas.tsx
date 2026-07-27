@@ -45,6 +45,7 @@ import {
   type MaterialHtmlGameSync,
   type MaterialExternalActivitySync,
   type MaterialExerciseSync,
+  type MaterialVideoSync,
 } from "../../materials";
 import {
   annotationFontSizePresets,
@@ -102,6 +103,7 @@ export function LessonTaskCanvas({
   canControlPages = false,
   htmlGameSync,
   exerciseSync,
+  videoSync,
   externalActivitySync,
   liveActivePageId,
   onPresentationModeChange,
@@ -111,6 +113,7 @@ export function LessonTaskCanvas({
   canControlPages?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
   exerciseSync?: MaterialExerciseSync;
+  videoSync?: MaterialVideoSync;
   externalActivitySync?: MaterialExternalActivitySync;
   liveActivePageId?: string | null;
   onPresentationModeChange?: (mode: LessonPresentationMode) => void;
@@ -276,6 +279,12 @@ export function LessonTaskCanvas({
   useEffect(() => {
     onPresentationModeChange?.(presentationMode);
   }, [onPresentationModeChange, presentationMode]);
+
+  useEffect(() => {
+    if (presentationMode === "external-activity-focus") {
+      annotationSync?.updateCursor(null);
+    }
+  }, [annotationSync?.updateCursor, presentationMode]);
 
   useEffect(() => () => onPresentationModeChange?.("default"), [onPresentationModeChange]);
 
@@ -483,7 +492,8 @@ export function LessonTaskCanvas({
 
   return (
     <div className="playsay-task-board" data-presentation-mode={presentationMode}>
-      <aside className="playsay-annotation-toolbar" aria-label={t("classroom.annotation.toolbar")}>
+      {presentationMode !== "external-activity-focus" ? (
+        <aside className="playsay-annotation-toolbar" aria-label={t("classroom.annotation.toolbar")}>
         <AnnotationToolButton active={annotationTool === "pointer"} label={t("classroom.annotation.pointer")} onClick={() => setAnnotationTool("pointer")} testId="annotation-tool-pointer">
           <MousePointer2 className="h-4 w-4" />
         </AnnotationToolButton>
@@ -586,17 +596,18 @@ export function LessonTaskCanvas({
             />
           ))}
         </div>
-      </aside>
+        </aside>
+      ) : null}
 
       <div className="playsay-task-page">
         <div className="playsay-task-document" ref={taskDocumentRef}>
           <div
             className="playsay-task-document-surface"
-            data-live-presence={annotationSync ? "true" : "false"}
-            data-live-presence-ready={annotationSync?.ready ? "true" : "false"}
+            data-live-presence={annotationSync && presentationMode !== "external-activity-focus" ? "true" : "false"}
+            data-live-presence-ready={annotationSync?.ready && presentationMode !== "external-activity-focus" ? "true" : "false"}
             data-testid="lesson-material-surface"
-            onPointerLeave={clearMaterialCursor}
-            onPointerMove={updateMaterialCursor}
+            onPointerLeave={presentationMode === "external-activity-focus" ? undefined : clearMaterialCursor}
+            onPointerMove={presentationMode === "external-activity-focus" ? undefined : updateMaterialCursor}
             ref={materialSurfaceRef}
           >
             {material ? (
@@ -606,6 +617,7 @@ export function LessonTaskCanvas({
                 canControlPages={canControlPages || Boolean(viewportSync)}
                 material={material}
                 htmlGameSync={htmlGameSync}
+                videoSync={videoSync}
                 exerciseParticipants={exerciseSync?.participants}
                 onExerciseInteractionChange={exerciseSync?.updateInteraction}
                 externalActivitySync={externalActivitySync}
@@ -648,7 +660,9 @@ export function LessonTaskCanvas({
             ) : (
               <UnassignedLessonMaterial />
             )}
-            <AnnotationLayer
+            {presentationMode !== "external-activity-focus" ? (
+              <>
+                <AnnotationLayer
               editingElementId={editingElementId}
               elements={pageAnnotationElements}
               onAddMindMapNode={addMindMapNode}
@@ -669,9 +683,9 @@ export function LessonTaskCanvas({
               onUndo={undo}
               selectedElementId={selectedElementId}
               tool={annotationTool}
-            />
-            {annotationAnchors.map((anchor) => (
-              <AnnotationLayer
+                />
+                {annotationAnchors.map((anchor) => (
+                  <AnnotationLayer
                 anchorId={anchor.id}
                 anchorBounds={anchor.bounds}
                 editingElementId={editingElementId}
@@ -697,20 +711,22 @@ export function LessonTaskCanvas({
                 onUndo={undo}
                 selectedElementId={selectedElementId}
                 tool={annotationTool}
-              />
-            ))}
-            {mindMapLimitReached ? (
-              <div className="playsay-mind-map-limit" role="status">{t("classroom.annotation.mindMapLimit")}</div>
-            ) : null}
-            <PresenceCursorLayer participants={annotationSync?.participants ?? []} />
-            {annotationAnchors.map((anchor) => (
-              <PresenceCursorLayer
+                  />
+                ))}
+                {mindMapLimitReached ? (
+                  <div className="playsay-mind-map-limit" role="status">{t("classroom.annotation.mindMapLimit")}</div>
+                ) : null}
+                <PresenceCursorLayer participants={annotationSync?.participants ?? []} />
+                {annotationAnchors.map((anchor) => (
+                  <PresenceCursorLayer
                 anchorBounds={anchor.bounds}
                 anchorId={anchor.id}
                 key={anchor.id}
                 participants={annotationSync?.participants ?? []}
-              />
-            ))}
+                  />
+                ))}
+              </>
+            ) : null}
           </div>
         </div>
       </div>

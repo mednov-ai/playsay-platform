@@ -10,6 +10,7 @@ import {
   MaterialExerciseInteraction,
   MaterialExerciseParticipant,
   MaterialRenderMode,
+  MaterialVideoSync,
   defaultMaterialPage,
   editorDocumentFromJson,
   formatMaterialScore,
@@ -40,6 +41,7 @@ export function LessonMaterialDocumentView({
   score,
   showScoreBadge = true,
   htmlGameSync,
+  videoSync,
   externalActivitySync,
   onPresentationModeChange,
   sharedImageFocusBlockId,
@@ -60,6 +62,7 @@ export function LessonMaterialDocumentView({
   score?: number | null;
   showScoreBadge?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
+  videoSync?: MaterialVideoSync;
   externalActivitySync?: MaterialExternalActivitySync;
   onPresentationModeChange?: (
     mode: "default" | "html-game-focus" | "image-focus" | "external-activity-focus",
@@ -375,6 +378,7 @@ export function LessonMaterialDocumentView({
             key={block.id}
             materialId={material.id}
             mode={mode}
+            videoSync={videoSync}
             onAnswerChange={onAnswerChange}
             exerciseParticipants={exerciseParticipants}
             onExerciseInteractionChange={onExerciseInteractionChange}

@@ -3,6 +3,7 @@ import {
   externalActivityCaptureConstraints,
   externalActivityCaptureErrorCode,
   externalActivityTrackName,
+  isCurrentExternalActivityCapture,
   parseExternalActivityMessage,
   parseExtensionEvent,
   participantCanHostExternalActivity,
@@ -57,6 +58,12 @@ describe("external activity classroom protocol", () => {
   it("accepts extension capture only for the expected session", () => {
     expect(parseExtensionEvent({ version: 1, type: "CAPTURE_READY", sessionId: "session-1", streamId: "stream-1" }, "session-1")).toMatchObject({ streamId: "stream-1" });
     expect(parseExtensionEvent({ version: 1, type: "CAPTURE_READY", sessionId: "other", streamId: "stream-1" }, "session-1")).toBeNull();
+  });
+
+  it("rejects a late capture after either session or generation changes", () => {
+    expect(isCurrentExternalActivityCapture(3, "session-3", 3, { sessionId: "session-3" })).toBe(true);
+    expect(isCurrentExternalActivityCapture(2, "session-2", 3, { sessionId: "session-3" })).toBe(false);
+    expect(isCurrentExternalActivityCapture(3, "session-2", 3, { sessionId: "session-3" })).toBe(false);
   });
 
   it("uses a reserved track prefix", () => {

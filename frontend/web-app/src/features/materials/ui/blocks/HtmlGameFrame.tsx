@@ -30,6 +30,7 @@ type BridgeMessage =
   | { channel: string; type: "effect"; effect: Omit<MaterialHtmlGameEffect, "id" | "at" | "blockId"> };
 
 const MIRROR_SNAPSHOT_RETRY_MS = 750;
+const MIRROR_RECOVERY_SNAPSHOT_MS = 5_000;
 
 export function HtmlGameFrame({
   blockId,
@@ -50,15 +51,23 @@ export function HtmlGameFrame({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useMemo(() => crypto.randomUUID(), [blockId, html]);
   const isMirror = Boolean(sync && !sync.isAuthority);
-  const srcDoc = useMemo(() => html ? createSandboxedGameDocument(html, channel, isMirror) : "", [channel, html, isMirror]);
+  const authorityRunId = sync?.authorityRuns[blockId];
+  const predictiveMirror = Boolean(isMirror && html && supportsPredictiveHtmlGame(html));
+  const runtimeRunId = isMirror ? authorityRunId ?? blockId : channel;
+  const srcDoc = useMemo(
+    () => html ? createSandboxedGameDocument(html, channel, isMirror, runtimeRunId, predictiveMirror) : "",
+    [channel, html, isMirror, predictiveMirror, runtimeRunId],
+  );
   const handledInputsRef = useRef<Set<string> | null>(null);
+  const latestInputSequenceRef = useRef<Map<string, number>>(new Map());
+  const nextInputSequenceRef = useRef(0);
   const handledEffectsRef = useRef<Set<string> | null>(null);
   const mirrorReadyRef = useRef(false);
   const pendingMirrorSnapshotRef = useRef<MaterialHtmlGameSnapshot | null>(null);
   const mirrorSnapshotRetryRef = useRef<number | null>(null);
+  const lastMirrorSnapshotAppliedAtRef = useRef(0);
   const [appliedAuthorityRunId, setAppliedAuthorityRunId] = useState<string | null>(null);
   const activeSnapshot = sync?.snapshots[blockId];
-  const authorityRunId = sync?.authorityRuns[blockId];
   const authorityAvailable = !isMirror || Boolean(
     authorityRunId &&
     activeSnapshot?.runId === authorityRunId &&
@@ -95,9 +104,12 @@ export function HtmlGameFrame({
 
   useEffect(() => {
     handledInputsRef.current = null;
+    latestInputSequenceRef.current = new Map();
+    nextInputSequenceRef.current = 0;
     handledEffectsRef.current = null;
     mirrorReadyRef.current = false;
     pendingMirrorSnapshotRef.current = null;
+    lastMirrorSnapshotAppliedAtRef.current = 0;
     clearMirrorSnapshotRetry();
     setAppliedAuthorityRunId(null);
   }, [blockId, channel, clearMirrorSnapshotRetry, sync?.isAuthority]);
@@ -109,6 +121,8 @@ export function HtmlGameFrame({
       return;
     }
     pendingMirrorSnapshotRef.current = null;
+    handledInputsRef.current = null;
+    latestInputSequenceRef.current = new Map();
     clearMirrorSnapshotRetry();
     setAppliedAuthorityRunId(null);
   }, [authorityRunId, clearMirrorSnapshotRetry, isMirror]);
@@ -148,6 +162,7 @@ export function HtmlGameFrame({
           activeSnapshot?.runId === authorityRunId
         ) {
           setAppliedAuthorityRunId(authorityRunId);
+          lastMirrorSnapshotAppliedAtRef.current = Date.now();
         }
         if (
           pendingSnapshot &&
@@ -160,14 +175,15 @@ export function HtmlGameFrame({
       } else if (message.type === "input" && sync) {
         const input = {
           ...message.event,
+          actorId: channel,
           at: Date.now(),
           blockId,
           id: crypto.randomUUID(),
           runId: sync.isAuthority ? channel : sync.authorityRuns[blockId],
+          sequence: ++nextInputSequenceRef.current,
         };
-        if (sync.isAuthority) {
-          (handledInputsRef.current ??= new Set()).add(input.id);
-        }
+        (handledInputsRef.current ??= new Set()).add(input.id);
+        latestInputSequenceRef.current.set(channel, input.sequence);
         sync.publishInput(input);
       } else if (message.type === "effect" && sync?.isAuthority) {
         sync.publishEffect({
@@ -183,13 +199,15 @@ export function HtmlGameFrame({
   }, [activeSnapshot, authorityRunId, blockId, channel, isMirror, sendMirrorSnapshot, sync]);
 
   useEffect(() => {
-    if (!sync?.isAuthority) {
+    if (!sync) {
       return;
     }
+    const expectedRunId = sync.isAuthority ? channel : authorityRunId;
+    if (!expectedRunId) return;
     if (handledInputsRef.current === null) {
       handledInputsRef.current = new Set(
         sync.inputs
-          .filter((event) => event.runId !== channel)
+          .filter((event) => !sync.isAuthority || event.runId !== expectedRunId)
           .map((event) => event.id),
       );
     }
@@ -198,22 +216,35 @@ export function HtmlGameFrame({
         return;
       }
       handledInputsRef.current?.add(event.id);
-      if (event.runId !== channel) {
+      if (event.runId !== expectedRunId) {
         return;
+      }
+      const actorId = event.actorId;
+      const sequence = event.sequence;
+      if (actorId && Number.isFinite(sequence)) {
+        const latest = latestInputSequenceRef.current.get(actorId) ?? 0;
+        if ((sequence ?? 0) <= latest) return;
+        latestInputSequenceRef.current.set(actorId, sequence ?? 0);
       }
       iframeRef.current?.contentWindow?.postMessage({ channel, type: "applyInput", event }, "*");
     });
-  }, [blockId, channel, sync?.inputs, sync?.isAuthority]);
+  }, [authorityRunId, blockId, channel, sync, sync?.inputs, sync?.isAuthority]);
 
   useEffect(() => {
     if (!sync || sync.isAuthority) {
       return;
     }
+    if (
+      appliedAuthorityRunId === authorityRunId
+      && Date.now() - lastMirrorSnapshotAppliedAtRef.current < MIRROR_RECOVERY_SNAPSHOT_MS
+    ) {
+      return;
+    }
     sendMirrorSnapshot(activeSnapshot);
-  }, [activeSnapshot, authorityRunId, blockId, channel, sendMirrorSnapshot, sync?.isAuthority]);
+  }, [activeSnapshot, appliedAuthorityRunId, authorityRunId, blockId, channel, sendMirrorSnapshot, sync?.isAuthority]);
 
   useEffect(() => {
-    if (!sync || sync.isAuthority) {
+    if (!sync || sync.isAuthority || predictiveMirror) {
       return;
     }
     if (handledEffectsRef.current === null) {
@@ -227,7 +258,7 @@ export function HtmlGameFrame({
       handledEffectsRef.current?.add(effect.id);
       iframeRef.current?.contentWindow?.postMessage({ channel, type: "applyEffect", effect }, "*");
     });
-  }, [blockId, channel, sync?.effects, sync?.isAuthority]);
+  }, [blockId, channel, predictiveMirror, sync?.effects, sync?.isAuthority]);
 
   if (!html) {
     return (
@@ -244,6 +275,7 @@ export function HtmlGameFrame({
       data-authority={sync?.isAuthority ? "true" : "false"}
       data-fill-available={fillAvailable ? "true" : "false"}
       data-paused={authorityAvailable ? "false" : "true"}
+      data-runtime={predictiveMirror ? "predictive" : isMirror ? "authority-mirror" : "authority"}
     >
       <iframe
         allow="autoplay"
@@ -263,30 +295,71 @@ export function HtmlGameFrame({
   );
 }
 
-export function createSandboxedGameDocument(html: string, channel: string, mirror: boolean): string {
+export function createSandboxedGameDocument(
+  html: string,
+  channel: string,
+  mirror: boolean,
+  runId = channel,
+  predictive = false,
+): string {
   const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">`;
-  const bridge = `<script data-playsay-game-bridge>${gameBridgeSource(channel, mirror)}</script>`;
+  const bridge = `<script data-playsay-game-bridge>${gameBridgeSource(channel, mirror, runId, predictive)}</script>`;
   const headContent = `${csp}${bridge}`;
   const withHead = /<head\b[^>]*>/i.test(html)
     ? html.replace(/<head\b[^>]*>/i, (head) => `${head}${headContent}`)
     : html.replace(/<html\b[^>]*>/i, (root) => `${root}<head>${headContent}</head>`);
-  if (!mirror) {
+  if (!mirror || predictive) {
     return withHead;
   }
   return withHead.replace(/<script\b(?![^>]*data-playsay-game-bridge)([^>]*)>/gi, '<script type="application/playsay-disabled"$1>');
 }
 
-function gameBridgeSource(channel: string, mirror: boolean): string {
+export function supportsPredictiveHtmlGame(html: string): boolean {
+  return !/\b(?:EventSource|RTCPeerConnection|WebSocket|fetch|geolocation|getUserMedia)\b/.test(html);
+}
+
+function gameBridgeSource(channel: string, mirror: boolean, runId: string, predictive: boolean): string {
   return `(() => {
     const channel = ${JSON.stringify(channel)};
     const mirror = ${mirror ? "true" : "false"};
+    const predictive = ${predictive ? "true" : "false"};
+    const runId = ${JSON.stringify(runId)};
     const nativePostMessage = window.parent.postMessage.bind(window.parent);
     const memory = new Map();
-    const canvasSnapshotIntervalMs = 250;
+    const canvasSnapshotIntervalMs = 1500;
     const maxCanvasDataUrlLength = 150 * 1024;
     const maxCanvasWidth = 960;
     const maxCanvasHeight = 540;
     const pointerMoveIntervalMs = 1000 / 30;
+    let randomState = 2166136261;
+    for (let index = 0; index < runId.length; index += 1) {
+      randomState ^= runId.charCodeAt(index);
+      randomState = Math.imul(randomState, 16777619);
+    }
+    const seededRandom = () => {
+      randomState += 0x6D2B79F5;
+      let value = randomState;
+      value = Math.imul(value ^ value >>> 15, value | 1);
+      value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+      return ((value ^ value >>> 14) >>> 0) / 4294967296;
+    };
+    try { Object.defineProperty(Math, 'random', { configurable: false, value: seededRandom }); } catch (_) {}
+    try {
+      const nativeGetRandomValues = crypto.getRandomValues.bind(crypto);
+      crypto.getRandomValues = (array) => {
+        if (!ArrayBuffer.isView(array)) return nativeGetRandomValues(array);
+        const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+        for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(seededRandom() * 256);
+        return array;
+      };
+      crypto.randomUUID = () => {
+        const bytes = crypto.getRandomValues(new Uint8Array(16));
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const value = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+        return value.slice(0, 8) + '-' + value.slice(8, 12) + '-' + value.slice(12, 16) + '-' + value.slice(16, 20) + '-' + value.slice(20);
+      };
+    } catch (_) {}
     const storage = {
       get length() { return memory.size; },
       clear() { memory.clear(); },
@@ -441,9 +514,9 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
     const scheduleSnapshot = (meaningfulInput = false, continuousInput = false) => {
       if (mirror) return;
       const now = Date.now();
-      const minimumInterval = meaningfulInput ? 50 : continuousInput ? canvasSnapshotIntervalMs : 500;
-      const debounceDelay = meaningfulInput ? 0 : continuousInput ? 50 : 250;
-      const maxDelay = continuousInput ? canvasSnapshotIntervalMs : 500;
+      const minimumInterval = meaningfulInput ? 750 : canvasSnapshotIntervalMs;
+      const debounceDelay = meaningfulInput ? 120 : 500;
+      const maxDelay = canvasSnapshotIntervalMs;
       const minimumIntervalRemaining = lastSnapshotAt ? Math.max(0, minimumInterval - (now - lastSnapshotAt)) : 0;
       const desiredDebounceDelay = Math.max(debounceDelay, minimumIntervalRemaining);
       const desiredDebounceAt = now + desiredDebounceDelay;
@@ -531,8 +604,8 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         const editableTarget = Boolean(event.target?.closest?.('input, textarea, select, [contenteditable="true"]'));
         const nativeDragEvent = type === 'pointerdown' || type === 'pointerup' || type === 'pointercancel' || type === 'dragstart' || type === 'dragover' || type === 'drop';
         const allowNativeEditing = semanticInputTypes.has(type) || (editableTarget && (type === 'keydown' || type === 'keyup'));
-        if (!allowNativeEditing && (type === 'dragover' || !nativeDragEvent)) event.preventDefault();
-        if (!nativeDragEvent) event.stopImmediatePropagation();
+        if (!predictive && !allowNativeEditing && (type === 'dragover' || !nativeDragEvent)) event.preventDefault();
+        if (!predictive && !nativeDragEvent) event.stopImmediatePropagation();
         if (type === 'pointerdown') {
           activePointerTargetId = eventTargetId;
           const draggable = event.target?.closest?.('[draggable="true"]');
@@ -560,7 +633,7 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         return;
       }
       if (activePointerTargetId) {
-        event.preventDefault();
+        if (!predictive) event.preventDefault();
         schedulePointerMove(event);
       }
       if (pointerDragSourceId) {
@@ -569,7 +642,7 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       }
     }, true);
     const finishPointerDrag = (event) => {
-      if (!mirror || !pointerDragSourceId) return;
+      if (!mirror || predictive || !pointerDragSourceId) return;
       const eventX = Number(event.clientX) || 0;
       const eventY = Number(event.clientY) || 0;
       const eventDistance = Math.hypot(eventX - pointerDragStartX, eventY - pointerDragStartY);
@@ -792,7 +865,7 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
           readyRetryTimer = 0;
           send({ type: 'snapshotApplied', runId, sequence });
         }
-      } else if (message.type === 'applyInput' && !mirror) {
+      } else if (message.type === 'applyInput' && (!mirror || predictive)) {
         const input = message.event;
         const target = targetById(input.targetId);
         applyFormState(target, input);
@@ -855,6 +928,7 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
     const start = () => {
       identify();
       if (mirror) {
+        if (predictive) new MutationObserver(() => identify()).observe(document.documentElement, { childList: true, subtree: true });
         const announceReady = () => send({ type: 'ready', mirror: true });
         announceReady();
         readyRetryTimer = window.setInterval(announceReady, 500);

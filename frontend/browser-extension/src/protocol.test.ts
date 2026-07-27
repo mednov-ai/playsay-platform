@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cdpCommandForInput, isTrustedPlaySayOrigin, parsePageCommand } from "./protocol";
+import {
+  cdpCommandForInput,
+  isTrustedPlaySayOrigin,
+  parsePageCommand,
+  sessionsToReplace,
+} from "./protocol";
 
 describe("extension protocol", () => {
   it("accepts current HoneySchool and local Play&Say origins only", () => {
@@ -46,5 +51,18 @@ describe("extension protocol", () => {
   it("rejects out of bounds and unsupported input", () => {
     expect(cdpCommandForInput({ type: "pointer", action: "move", x: -1, y: 20 })).toBeNull();
     expect(cdpCommandForInput({ type: "clipboard", value: "secret" } as never)).toBeNull();
+  });
+
+  it("replaces the previous tab whenever the same classroom launches a new capture session", () => {
+    const sessions = [
+      { consumerTabId: 10, sessionId: "old-session" },
+      { consumerTabId: 11, sessionId: "other-classroom" },
+      { consumerTabId: 12, sessionId: "new-session" },
+    ];
+
+    expect(sessionsToReplace(sessions, 10, "new-session")).toEqual([
+      sessions[0],
+      sessions[2],
+    ]);
   });
 });

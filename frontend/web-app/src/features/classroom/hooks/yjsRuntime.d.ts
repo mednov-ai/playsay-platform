@@ -12,6 +12,8 @@ import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
   MaterialHtmlGameSnapshot,
+  MaterialVideoPlaybackAction,
+  MaterialVideoPlaybackState,
 } from "../../materials/model/materialDocument";
 
 export type { AnnotationElement } from "../model/annotation";
@@ -49,6 +51,15 @@ export type YjsWorkspaceRuntime = {
     viewport: MaterialViewportUpdate,
     options?: MaterialViewportPublishOptions,
   ) => void;
+  setVideoPlayback: (
+    blockId: string,
+    state: {
+      action: MaterialVideoPlaybackAction;
+      playing: boolean;
+      positionSeconds: number;
+    },
+    options?: { heartbeat?: boolean },
+  ) => void;
   redoAnnotation: () => void;
   undoAnnotation: () => void;
   updateHtmlGameAuthority: (blockId: string, runId: string | null) => void;
@@ -68,6 +79,7 @@ export function createYjsWorkspaceRuntime(options: {
   onHtmlGameSnapshotsChange: (snapshots: Record<string, MaterialHtmlGameSnapshot>) => void;
   onMaterialAnswersChange?: (answers: MaterialAnswerState) => void;
   onMaterialViewportChange?: (viewport: MaterialViewportState | null) => void;
+  onVideoPlaybackChange?: (states: Record<string, MaterialVideoPlaybackState>) => void;
   onAnnotationUndoStateChange?: (state: { canRedo: boolean; canUndo: boolean }) => void;
   onDocumentUpdate?: (update: Uint8Array) => void;
   onParticipantsChange: (participants: CollaborationParticipant[]) => void;

@@ -19,6 +19,9 @@ import type {
   MaterialAnswerState,
   MaterialExerciseInteraction,
   MaterialExerciseSync,
+  MaterialVideoPlaybackAction,
+  MaterialVideoPlaybackState,
+  MaterialVideoSync,
 } from "../../materials/model/types";
 import type {
   MaterialViewportPublishOptions,
@@ -54,6 +57,7 @@ export function useYjsWorkspace({
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
   const [materialViewport, setMaterialViewportState] = useState<MaterialViewportState | null>(null);
+  const [videoPlaybackStates, setVideoPlaybackStates] = useState<Record<string, MaterialVideoPlaybackState>>({});
   const [workspaceClientId, setWorkspaceClientId] = useState<number | null>(null);
   const [annotationUndoState, setAnnotationUndoState] = useState({ canRedo: false, canUndo: false });
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
@@ -72,6 +76,7 @@ export function useYjsWorkspace({
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
+      setVideoPlaybackStates({});
       setWorkspaceClientId(null);
       setAnnotationUndoState({ canRedo: false, canUndo: false });
       exerciseInteractionRef.current = null;
@@ -91,6 +96,7 @@ export function useYjsWorkspace({
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onMaterialAnswersChange: setMaterialAnswers,
       onMaterialViewportChange: setMaterialViewportState,
+      onVideoPlaybackChange: setVideoPlaybackStates,
       onParticipantsChange: setParticipants,
       onTextChange: setText,
       participantName,
@@ -196,6 +202,7 @@ export function useYjsWorkspace({
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
+      setVideoPlaybackStates({});
       setWorkspaceClientId(null);
       setAnnotationUndoState({ canRedo: false, canUndo: false });
       exerciseInteractionRef.current = null;
@@ -283,6 +290,14 @@ export function useYjsWorkspace({
     runtimeRef.current?.updateExerciseInteraction(interaction);
   }, []);
 
+  const setVideoPlayback = useCallback((
+    blockId: string,
+    state: { action: MaterialVideoPlaybackAction; playing: boolean; positionSeconds: number },
+    options?: { heartbeat?: boolean },
+  ) => {
+    runtimeRef.current?.setVideoPlayback(blockId, state, options);
+  }, []);
+
   const htmlGameSync = useCallback((isAuthority: boolean): MaterialHtmlGameSync => ({
     authorityRuns: Object.fromEntries(participants
       .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))),
@@ -313,6 +328,13 @@ export function useYjsWorkspace({
     updateInteraction: updateExerciseInteraction,
   }), [materialAnswers, participants, seedMaterialAnswers, setMaterialAnswer, status, updateExerciseInteraction]);
 
+  const videoSync = useMemo<MaterialVideoSync>(() => ({
+    clientId: workspaceClientId,
+    publish: setVideoPlayback,
+    ready: status === "connected",
+    states: videoPlaybackStates,
+  }), [setVideoPlayback, status, videoPlaybackStates, workspaceClientId]);
+
   return {
     annotationElements,
     annotationUndoState,
@@ -320,6 +342,7 @@ export function useYjsWorkspace({
     participants,
     htmlGameSync,
     exerciseSync,
+    videoSync,
     materialViewport,
     workspaceClientId,
     setAnnotationElements,

@@ -125,6 +125,10 @@ vi.mock("../../../shared/i18n", () => ({
       "classroom.controls.screenAudioMissingSafari": "Safari не передаёт звук демонстрации.",
       "classroom.controls.screenReselect": "Перевыбрать со звуком",
       "classroom.controls.startMedia": "Включить медиа",
+      "classroom.actions.leave": "Выйти",
+      "classroom.actions.more": "Другие действия",
+      "classroom.actions.completeLesson": "Завершить занятие",
+      "classroom.confirm.complete": "Комната закроется для всех.",
     })[key] ?? key,
   }),
 }));
@@ -182,6 +186,46 @@ describe("ClassroomControlBar compact controls", () => {
     expect(startMedia).toHaveClass("lk-start-audio-button");
     expect(startMedia).toHaveStyle({ display: "inline-flex" });
     expect(startMedia.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("leaves only the current participant from the round hang-up control", () => {
+    const onLeave = vi.fn();
+    render(
+      <ClassroomControlBar
+        onLeave={onLeave}
+        role={null}
+        setControlsRef={vi.fn()}
+        translation={{} as LessonTranslationController}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Выйти" }));
+    expect(onLeave).toHaveBeenCalledOnce();
+  });
+
+  it("shows completion only to an authorized teacher and requires explicit confirmation", () => {
+    const onComplete = vi.fn();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    render(
+      <ClassroomControlBar
+        canCompleteLesson
+        onComplete={onComplete}
+        role="teacher"
+        setControlsRef={vi.fn()}
+        translation={{} as LessonTranslationController}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Завершить занятие"));
+    expect(confirm).toHaveBeenCalledWith("Комната закроется для всех.");
+    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Завершить занятие"));
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("does not expose lesson completion without the teacher permission", () => {
+    renderControlBar();
+    expect(screen.queryByText("Завершить занятие")).not.toBeInTheDocument();
   });
 });
 

@@ -14,9 +14,11 @@ import {
   type MaterialExerciseInteraction,
   type MaterialExerciseParticipant,
   type MaterialRenderMode,
+  type MaterialVideoSync,
 } from "../../model/materialDocument";
 import { RenderedMarkdown, MarkdownInline } from "../markdown/RenderedMarkdown";
 import { PlaySayRelayVideoPlayer } from "../media/PlaySayRelayVideoPlayer";
+import { YouTubeSyncedPlayer } from "../media/YouTubeSyncedPlayer";
 import { materialVideoEmbedFrame } from "../media/videoEmbed";
 import { MaterialImageInlineTools, MaterialImagePromptPopover } from "./MaterialImageInlineTools";
 import { RenderedChoiceExercise } from "./RenderedChoiceExercise";
@@ -43,6 +45,7 @@ export function RenderedMaterialBlock({
   onRequestFocus,
   pageLayout,
   materialId,
+  videoSync,
 }: {
   allowVideoFullscreen?: boolean;
   answer?: MaterialAnswerBlock;
@@ -51,6 +54,7 @@ export function RenderedMaterialBlock({
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
   materialId?: string;
+  videoSync?: MaterialVideoSync;
   mode: MaterialRenderMode;
   onAnswerChange?: (blockId: string, answer: MaterialAnswerBlock) => void;
   exerciseParticipants?: MaterialExerciseParticipant[];
@@ -158,6 +162,7 @@ export function RenderedMaterialBlock({
                 >
                   <PlaySayRelayVideoPlayer
                     allowFullscreen={allowVideoFullscreen}
+                    blockId={block.id}
                     clip={block.videoClip}
                     onQualityChange={(quality, currentTimeSeconds) => {
                       setVideoResumeAtSeconds(currentTimeSeconds);
@@ -168,6 +173,7 @@ export function RenderedMaterialBlock({
                     src={frame.src}
                     thumbnailUrl={frame.thumbnailUrl}
                     title={frame.title}
+                    sync={videoSync}
                   />
                 </div>
                 {isVideoResizable ? (
@@ -215,14 +221,24 @@ export function RenderedMaterialBlock({
                   data-editable={isVideoResizable ? "true" : "false"}
                   style={videoFrameStyle}
                 >
-                  <iframe
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen={allowVideoFullscreen}
-                    loading="lazy"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    src={frame.src}
-                    title={frame.title}
-                  />
+                  {(block.provider ?? "").toUpperCase() === "YOUTUBE" && videoSync ? (
+                    <YouTubeSyncedPlayer
+                      allowFullscreen={allowVideoFullscreen}
+                      blockId={block.id}
+                      src={frame.src}
+                      sync={videoSync}
+                      title={frame.title}
+                    />
+                  ) : (
+                    <iframe
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen={allowVideoFullscreen}
+                      loading="lazy"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      src={frame.src}
+                      title={frame.title}
+                    />
+                  )}
                 </div>
                 {isVideoResizable ? (
                   <MaterialVideoResizeHandle

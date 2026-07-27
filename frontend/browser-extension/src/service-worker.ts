@@ -1,4 +1,4 @@
-import { cdpCommandForInput, parsePageCommand, type PageCommand } from "./protocol";
+import { cdpCommandForInput, parsePageCommand, sessionsToReplace, type PageCommand } from "./protocol";
 import { applyCaptureHardening } from "./capture-hardening";
 
 type HostSession = {
@@ -72,8 +72,8 @@ chrome.tabs.onCreated.addListener((tab) => {
 async function handleCommand(command: PageCommand, consumerTabId: number): Promise<{ ok: boolean }> {
   await hydration;
   if (command.type === "PREPARE") {
-    const previous = sessions.get(command.sessionId);
-    if (previous) await stopSession(previous, true);
+    const previousSessions = sessionsToReplace(sessions.values(), consumerTabId, command.sessionId);
+    for (const previous of previousSessions) await stopSession(previous, true);
     const target = await chrome.tabs.create({ url: command.url, active: true });
     if (target.id === undefined) throw new Error("TARGET_TAB_NOT_CREATED");
     sessions.set(command.sessionId, {

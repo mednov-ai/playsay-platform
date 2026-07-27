@@ -6,7 +6,11 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
 import type { MaterialHtmlGameSync } from "../../model/materialDocument";
-import { HtmlGameFrame, createSandboxedGameDocument } from "./HtmlGameFrame";
+import {
+  HtmlGameFrame,
+  createSandboxedGameDocument,
+  supportsPredictiveHtmlGame,
+} from "./HtmlGameFrame";
 
 vi.mock("../../../../shared/i18n", () => ({
   useAppTranslation: () => ({ t: (key: string) => key }),
@@ -44,18 +48,30 @@ describe("HTML game sandbox", () => {
     expect(mirror).toContain('type="application/playsay-disabled"');
     expect(mirror).toContain("data-playsay-game-bridge");
     expect(authority).toContain("lastSnapshotHtml");
-    expect(authority).toContain("canvasSnapshotIntervalMs = 250");
+    expect(authority).toContain("canvasSnapshotIntervalMs = 1500");
     expect(authority).toContain("maxCanvasDataUrlLength = 150 * 1024");
     expect(authority).toContain("'image/webp'");
     expect(authority).toContain("dataUrl.length <= maxCanvasDataUrlLength ? dataUrl : ''");
     expect(authority).toContain("snapshotInFlight");
-    expect(authority).toContain("meaningfulInput ? 0 : continuousInput ? 50 : 250");
-    expect(authority).toContain("continuousInput ? canvasSnapshotIntervalMs : 500");
+    expect(authority).toContain("meaningfulInput ? 120 : 500");
+    expect(authority).toContain("const maxDelay = canvasSnapshotIntervalMs");
     expect(authority).toContain("'beforeinput', 'input', 'change', 'focus', 'blur'");
     expect(authority).toContain("serializeControls");
     expect(authority).toContain("serializeCanvases");
     expect(authority).toContain("applyFormState(target, input)");
     expect(authority).not.toContain("}, 120)");
+  });
+
+  it("runs supported mirror games predictively with the authority seed and falls back for nondeterministic APIs", () => {
+    const predictive = createSandboxedGameDocument(gameHtml, "student-channel", true, "authority-run", true);
+    const unsupported = `${gameHtml}<script>fetch('/state')</script>`;
+
+    expect(predictive).toContain("const predictive = true");
+    expect(predictive).toContain('const runId = "authority-run"');
+    expect(predictive).toContain("seededRandom");
+    expect(predictive).not.toContain('type="application/playsay-disabled"');
+    expect(supportsPredictiveHtmlGame(gameHtml)).toBe(true);
+    expect(supportsPredictiveHtmlGame(unsupported)).toBe(false);
   });
 
   it("renders srcdoc in a sandbox without same-origin or navigation permissions", () => {
@@ -153,6 +169,48 @@ describe("HTML game sandbox", () => {
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ id: "new" }), type: "applyInput" }), "*");
   });
 
+  it("deduplicates an out-of-order input sequence within the current authority run", () => {
+    const setAuthorityRun = vi.fn();
+    const createSync = (inputs: MaterialHtmlGameSync["inputs"]): MaterialHtmlGameSync => ({
+      authorityRuns: {},
+      effects: [],
+      inputs,
+      isAuthority: true,
+      presentedBlockId: null,
+      publishEffect: vi.fn(),
+      publishInput: vi.fn(),
+      publishSnapshot: vi.fn(),
+      ready: true,
+      setAuthorityRun,
+      setPresentedBlock: vi.fn(),
+      snapshots: {},
+    });
+    const { container, rerender } = render(
+      <HtmlGameFrame blockId="game-1" height={640} html={gameHtml} sync={createSync([])} title="Game" />,
+    );
+    const iframeWindow = container.querySelector("iframe")?.contentWindow;
+    const postMessage = vi.spyOn(iframeWindow!, "postMessage");
+    const runId = setAuthorityRun.mock.calls.find((call) => call[1] !== null)?.[1] as string;
+
+    rerender(
+      <HtmlGameFrame
+        blockId="game-1"
+        height={640}
+        html={gameHtml}
+        sync={createSync([
+          { actorId: "student", at: 2, blockId: "game-1", id: "newer", runId, sequence: 2, targetId: "__document__", type: "click" },
+          { actorId: "student", at: 1, blockId: "game-1", id: "older", runId, sequence: 1, targetId: "__document__", type: "click" },
+        ])}
+        title="Game"
+      />,
+    );
+
+    const appliedIds = postMessage.mock.calls
+      .filter(([message]) => (message as { type?: string }).type === "applyInput")
+      .map(([message]) => (message as { event?: { id?: string } }).event?.id);
+    expect(appliedIds).toEqual(["newer"]);
+  });
+
   it("waits for mirror readiness and acknowledgement before exposing the game", () => {
     vi.useFakeTimers();
     const firstSnapshot = {
@@ -225,7 +283,7 @@ describe("HTML game sandbox", () => {
     });
     expect(container.querySelector(".playsay-html-game-waiting")).toBeNull();
     act(() => {
-      vi.advanceTimersByTime(1_500);
+      vi.advanceTimersByTime(5_000);
     });
     expect(postMessage.mock.calls.filter(([message]) => (
       (message as { type?: string }).type === "applySnapshot"

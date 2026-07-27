@@ -28,8 +28,10 @@ export type ExternalActivitySupportLevel = "GUARANTEED" | "EXPERIMENTAL";
 export type MaterialImageSize = "SMALL" | "MEDIUM" | "LARGE" | "FULL";
 
 export type MaterialHtmlGameInputEvent = {
+  actorId?: string;
   id: string;
   runId?: string;
+  sequence?: number;
   at: number;
   blockId: string;
   type:
@@ -111,6 +113,29 @@ export type MaterialHtmlGameSync = {
   setAuthorityRun: (blockId: string, runId: string | null) => void;
   setPresentedBlock: (blockId: string | null) => void;
   snapshots: Record<string, MaterialHtmlGameSnapshot>;
+};
+
+export type MaterialVideoPlaybackAction = "pause" | "play" | "seek";
+
+export type MaterialVideoPlaybackState = {
+  action: MaterialVideoPlaybackAction;
+  blockId: string;
+  heartbeat: number;
+  playing: boolean;
+  positionSeconds: number;
+  revision: number;
+  sourceClientId: number;
+};
+
+export type MaterialVideoSync = {
+  clientId: number | null;
+  publish: (
+    blockId: string,
+    state: Pick<MaterialVideoPlaybackState, "action" | "playing" | "positionSeconds">,
+    options?: { heartbeat?: boolean },
+  ) => void;
+  ready: boolean;
+  states: Record<string, MaterialVideoPlaybackState>;
 };
 
 export type MaterialExternalActivitySync = {

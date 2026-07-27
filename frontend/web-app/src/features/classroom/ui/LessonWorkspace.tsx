@@ -343,6 +343,7 @@ export function LessonWorkspace({
                 annotationSync={isParallelWork ? null : teacherAnnotationSync}
                 exerciseSync={isParallelWork ? undefined : teacherAnnotationWorkspace.exerciseSync}
                 htmlGameSync={isParallelWork ? undefined : teacherHtmlGameSync}
+                videoSync={isParallelWork ? undefined : teacherAnnotationWorkspace.videoSync}
                 externalActivitySync={isParallelWork || !externalActivitiesEnabled ? undefined : teacherExternalActivitySync}
                 liveActivePageId={liveActivePageId}
                 onSaveAnswers={(content) => void saveMaterialAnswers(content, activeParticipant?.subject)}

@@ -1,7 +1,7 @@
 import { Maximize2, Minimize2, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useAppTranslation } from "../../../../shared/i18n";
-import type { MaterialVideoClip } from "../../model/materialDocument";
+import type { MaterialVideoClip, MaterialVideoSync } from "../../model/materialDocument";
 import {
   absoluteTimeForRelayClip,
   displayTimeForRelayClip,
@@ -12,6 +12,7 @@ import {
 
 type PlaySayRelayVideoPlayerProps = {
   allowFullscreen?: boolean;
+  blockId?: string;
   clip?: MaterialVideoClip;
   onQualityChange?: (quality: MaterialVideoQuality, currentTimeSeconds: number) => void;
   quality?: MaterialVideoQuality;
@@ -19,6 +20,7 @@ type PlaySayRelayVideoPlayerProps = {
   src: string;
   thumbnailUrl?: string | null;
   title: string;
+  sync?: MaterialVideoSync;
 };
 
 type FullscreenElement = HTMLElement & {
@@ -29,6 +31,7 @@ type MaterialVideoQuality = "LOW" | "MEDIUM" | "HIGH";
 
 export function PlaySayRelayVideoPlayer({
   allowFullscreen = true,
+  blockId = "",
   clip,
   onQualityChange,
   quality = "MEDIUM",
@@ -36,6 +39,7 @@ export function PlaySayRelayVideoPlayer({
   src,
   thumbnailUrl,
   title,
+  sync,
 }: PlaySayRelayVideoPlayerProps) {
   const { t } = useAppTranslation();
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -47,6 +51,8 @@ export function PlaySayRelayVideoPlayer({
   const playPromisePendingRef = useRef(false);
   const playRequestedRef = useRef(false);
   const playRetryCountRef = useRef(0);
+  const currentTimeRef = useRef(0);
+  const appliedRemoteVersionRef = useRef("");
   const [activated, setActivated] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -54,11 +60,17 @@ export function PlaySayRelayVideoPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [remotePlaybackBlocked, setRemotePlaybackBlocked] = useState(false);
   const [volume, setVolume] = useState(100);
+  const remotePlayback = sync?.states[blockId];
 
   useEffect(() => {
     activatedRef.current = activated;
   }, [activated]);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
 
   useEffect(() => {
     function updateFullscreenState() {
@@ -107,6 +119,57 @@ export function PlaySayRelayVideoPlayer({
     video.muted = volume === 0;
   }, [volume]);
 
+  useEffect(() => {
+    if (!remotePlayback || remotePlayback.sourceClientId === sync?.clientId) return;
+    const version = `${remotePlayback.revision}:${remotePlayback.heartbeat}:${remotePlayback.sourceClientId}`;
+    if (appliedRemoteVersionRef.current === version) return;
+    appliedRemoteVersionRef.current = version;
+
+    const video = videoRef.current;
+    if (!video) return;
+    setRemotePlaybackBlocked(false);
+    if (!activatedRef.current) {
+      activatedRef.current = true;
+      setActivated(true);
+      attachRelayVideoSourceForPlayback(video, src);
+    }
+    const targetTime = Math.max(normalizedClip?.startSeconds ?? 0, remotePlayback.positionSeconds);
+    if (remotePlayback.action === "seek" || Math.abs(video.currentTime - targetTime) > 0.75) {
+      seekVideo(video, targetTime);
+      setCurrentTime(targetTime);
+    }
+    if (remotePlayback.playing) {
+      void video.play().catch(() => {
+        setIsLoading(false);
+        setIsPlaying(false);
+        setRemotePlaybackBlocked(true);
+      });
+    } else {
+      video.pause();
+      setIsLoading(false);
+      setIsPlaying(false);
+    }
+  }, [normalizedClip?.startSeconds, remotePlayback, src, sync?.clientId]);
+
+  useEffect(() => {
+    if (
+      !sync?.ready
+      || !isPlaying
+      || !remotePlayback
+      || remotePlayback.sourceClientId !== sync.clientId
+    ) {
+      return;
+    }
+    const heartbeat = window.setInterval(() => {
+      sync.publish(blockId, {
+        action: "play",
+        playing: true,
+        positionSeconds: currentTimeRef.current,
+      }, { heartbeat: true });
+    }, 2_000);
+    return () => window.clearInterval(heartbeat);
+  }, [blockId, isPlaying, remotePlayback, sync]);
+
   const displayDuration = relayClipDuration(normalizedClip, duration);
   const displayCurrentTime = displayTimeForRelayClip(normalizedClip, currentTime);
   const progressValue = displayDuration > 0 ? Math.min(displayCurrentTime, displayDuration) : 0;
@@ -127,6 +190,7 @@ export function PlaySayRelayVideoPlayer({
         seekVideo(video, startSeconds);
         setCurrentTime(startSeconds);
         playVideo(video);
+        publishPlayback("play", true, startSeconds);
       }
       return;
     }
@@ -135,12 +199,14 @@ export function PlaySayRelayVideoPlayer({
     }
     if (video.paused && !playRequestedRef.current) {
       playVideo(video);
+      publishPlayback("play", true, video.currentTime);
     } else {
       playRequestedRef.current = false;
       playPromisePendingRef.current = false;
       playRetryCountRef.current = 0;
       setIsLoading(false);
       video.pause();
+      publishPlayback("pause", false, video.currentTime);
     }
   }
 
@@ -151,6 +217,7 @@ export function PlaySayRelayVideoPlayer({
     if (video && Number.isFinite(nextTime)) {
       seekVideo(video, nextTime);
     }
+    publishPlayback("seek", Boolean(video && !video.paused), nextTime);
   }
 
   function toggleMute() {
@@ -184,6 +251,24 @@ export function PlaySayRelayVideoPlayer({
     setCurrentTime(startSeconds);
     setHasError(false);
     playVideo(video);
+    publishPlayback("play", true, startSeconds);
+  }
+
+  function publishPlayback(action: "pause" | "play" | "seek", playing: boolean, positionSeconds: number) {
+    if (!blockId || !sync?.ready) return;
+    sync.publish(blockId, { action, playing, positionSeconds });
+  }
+
+  function resumeRemotePlayback() {
+    const video = videoRef.current;
+    if (!video || !remotePlayback) return;
+    const targetTime = Math.max(normalizedClip?.startSeconds ?? 0, remotePlayback.positionSeconds);
+    attachRelayVideoSourceForPlayback(video, src);
+    seekVideo(video, targetTime);
+    setActivated(true);
+    setCurrentTime(targetTime);
+    setRemotePlaybackBlocked(false);
+    void video.play().catch(() => setRemotePlaybackBlocked(true));
   }
 
   function requestFullscreen() {
@@ -264,6 +349,9 @@ export function PlaySayRelayVideoPlayer({
           playRetryCountRef.current = 0;
           setIsLoading(false);
           setIsPlaying(false);
+          if (remotePlayback?.sourceClientId === sync?.clientId) {
+            publishPlayback("pause", false, currentTimeRef.current);
+          }
         }}
         onError={() => {
           playRequestedRef.current = false;
@@ -331,6 +419,13 @@ export function PlaySayRelayVideoPlayer({
         <div className="playsay-relay-player-loading" role="status">
           <span>{t("materials.renderer.videoLoading")}</span>
         </div>
+      ) : null}
+
+      {remotePlaybackBlocked ? (
+        <button className="playsay-video-sync-resume" onClick={resumeRemotePlayback} type="button">
+          <Play aria-hidden="true" />
+          <span>{t("materials.renderer.videoSyncResume")}</span>
+        </button>
       ) : null}
 
       {activated && !hasError ? (

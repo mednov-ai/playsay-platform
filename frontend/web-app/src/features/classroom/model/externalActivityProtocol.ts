@@ -63,6 +63,15 @@ export function externalActivityTrackName(sessionId: string, kind: "video" | "au
   return `${externalActivityTrackPrefix}${sessionId}-${kind}`;
 }
 
+export function isCurrentExternalActivityCapture(
+  generation: number,
+  sessionId: string,
+  currentGeneration: number,
+  current: Pick<ExternalActivityState, "sessionId"> | null,
+): boolean {
+  return generation === currentGeneration && current?.sessionId === sessionId;
+}
+
 export function participantCanHostExternalActivity(metadata: string | undefined): boolean {
   if (!metadata) return false;
   try {

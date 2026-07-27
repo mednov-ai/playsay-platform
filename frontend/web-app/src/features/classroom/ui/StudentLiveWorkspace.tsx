@@ -121,6 +121,7 @@ export function StudentLiveWorkspace({
         annotationSync={annotationSync}
         exerciseSync={groupAnnotationWorkspace.exerciseSync}
         htmlGameSync={htmlGameSync}
+        videoSync={groupAnnotationWorkspace.videoSync}
         externalActivitySync={externalActivitiesEnabled ? externalActivitySync : undefined}
         onSaveAnswers={onSaveAnswers}
         onPresentationModeChange={onPresentationModeChange}

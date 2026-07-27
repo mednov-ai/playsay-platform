@@ -12,6 +12,7 @@ import {
   externalActivityPageChannel,
   externalActivityTrackName,
   externalActivityTrackPrefix,
+  isCurrentExternalActivityCapture,
   parseExternalActivityMessage,
   parseExtensionEvent,
   participantCanHostExternalActivity,
@@ -46,6 +47,7 @@ export function useExternalActivitySession({
   const blocksRef = useRef(blocks);
   const handledInputEventsRef = useRef(new Set<string>());
   const stateResponseReceivedRef = useRef(false);
+  const sessionGenerationRef = useRef(0);
 
   useEffect(() => { blocksRef.current = blocks; }, [blocks]);
   useEffect(() => { activeRef.current = active; }, [active]);
@@ -87,6 +89,7 @@ export function useExternalActivitySession({
   const stopHostSession = useCallback(async (notify = true) => {
     const current = activeRef.current;
     if (!current || !isHost) return;
+    sessionGenerationRef.current += 1;
     clearTimers();
     const nonce = extensionNonceRef.current;
     if (nonce) postExtensionCommand({ version: 1, type: "STOP", sessionId: current.sessionId, nonce });
@@ -105,12 +108,8 @@ export function useExternalActivitySession({
     ));
     if (!block) return;
     const current = activeRef.current;
-    if (current?.blockId === blockId) {
-      clearTimers();
-      broadcastState({ ...current, visible: true });
-      return;
-    }
     if (current) await stopHostSession(false);
+    const generation = ++sessionGenerationRef.current;
     const nonce = crypto.randomUUID();
     extensionNonceRef.current = nonce;
     const next: ExternalActivityState = {
@@ -124,7 +123,11 @@ export function useExternalActivitySession({
     broadcastState(next);
     postExtensionCommand({ version: 1, type: "PREPARE", sessionId, nonce, url: block.url });
     extensionTimerRef.current = window.setTimeout(() => {
-      if (activeRef.current?.sessionId === sessionId && activeRef.current.phase === "AWAITING_EXTENSION") {
+      if (
+        sessionGenerationRef.current === generation
+        && activeRef.current?.sessionId === sessionId
+        && activeRef.current.phase === "AWAITING_EXTENSION"
+      ) {
         broadcastState({ ...next, phase: "ERROR", errorCode: "EXTENSION_NOT_AVAILABLE" });
       }
     }, 10_000);
@@ -283,29 +286,66 @@ export function useExternalActivitySession({
       const extensionEvent = parseExtensionEvent(event.data.event, current.sessionId);
       if (!extensionEvent) return;
       if (extensionEvent.type === "CAPTURE_READY") {
+        const generation = sessionGenerationRef.current;
         if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);
         extensionTimerRef.current = null;
         const next = { ...current, phase: "STARTING" as const };
         broadcastState(next);
         void consumeCapture(String(extensionEvent.streamId), current.sessionId)
           .then(async (stream) => {
+            if (!isCurrentExternalActivityCapture(
+              generation,
+              current.sessionId,
+              sessionGenerationRef.current,
+              activeRef.current,
+            )) {
+              stream.getTracks().forEach((track) => track.stop());
+              return;
+            }
             localStreamRef.current = stream;
             setMediaStream(stream);
             const video = stream.getVideoTracks()[0];
             const audio = stream.getAudioTracks()[0];
             if (video) await room.localParticipant.publishTrack(video, { name: externalActivityTrackName(current.sessionId, "video"), source: Track.Source.ScreenShare });
+            if (!isCurrentExternalActivityCapture(
+              generation,
+              current.sessionId,
+              sessionGenerationRef.current,
+              activeRef.current,
+            )) {
+              await unpublishLocalStream();
+              return;
+            }
             if (audio) await room.localParticipant.publishTrack(audio, { name: externalActivityTrackName(current.sessionId, "audio"), source: Track.Source.ScreenShareAudio });
+            if (!isCurrentExternalActivityCapture(
+              generation,
+              current.sessionId,
+              sessionGenerationRef.current,
+              activeRef.current,
+            )) {
+              await unpublishLocalStream();
+              return;
+            }
             if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);
             broadcastState({ ...next, phase: "ACTIVE" });
           })
-          .catch((error: unknown) => broadcastState({ ...next, phase: "ERROR", errorCode: externalActivityCaptureErrorCode(error) }));
+          .catch((error: unknown) => {
+            if (isCurrentExternalActivityCapture(
+              generation,
+              current.sessionId,
+              sessionGenerationRef.current,
+              activeRef.current,
+            )) {
+              broadcastState({ ...next, phase: "ERROR", errorCode: externalActivityCaptureErrorCode(error) });
+            }
+          });
       } else if (["TAB_CLOSED", "DEBUGGER_DETACHED", "ERROR"].includes(String(extensionEvent.type))) {
         broadcastState({ ...current, phase: "ERROR", errorCode: String(extensionEvent.type) });
       }
     };
     window.addEventListener("message", handleExtensionEvent);
     return () => window.removeEventListener("message", handleExtensionEvent);
-  }, [broadcastState, enabled, isHost, room.localParticipant]);
+  }, [broadcastState, enabled, isHost, room.localParticipant, unpublishLocalStream]);
 
   useEffect(() => {
     if (!enabled || isHost || !active) return undefined;
@@ -336,8 +376,7 @@ export function useExternalActivitySession({
 
   const open = useCallback((block: MaterialEditorBlock) => {
     if (!enabled || block.type !== "externalActivity" || !block.url) return;
-    const current = activeRef.current;
-    const sessionId = current?.blockId === block.id ? current.sessionId : crypto.randomUUID();
+    const sessionId = crypto.randomUUID();
     if (isHost) {
       void startHostSession(block.id, sessionId);
     } else {

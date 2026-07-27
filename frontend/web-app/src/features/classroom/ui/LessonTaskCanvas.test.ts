@@ -5,7 +5,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
-import type { MaterialExerciseSync, MaterialHtmlGameSync } from "../../materials/model/materialDocument";
+import type {
+  MaterialExerciseSync,
+  MaterialExternalActivitySync,
+  MaterialHtmlGameSync,
+} from "../../materials/model/materialDocument";
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
 
 const apiMocks = vi.hoisted(() => ({
@@ -183,6 +187,28 @@ const gameAndWorksheetMaterial = {
   blockCount: 2,
 } satisfies LessonMaterial;
 
+const externalActivityMaterial = {
+  ...material,
+  id: "material-external",
+  document: {
+    schemaVersion: 1,
+    pages: [{
+      id: "page-external",
+      title: "Shared worksheet",
+      layout: "FLOW",
+      blocks: [{
+        id: "external-1",
+        type: "externalActivity",
+        title: "Wordwall",
+        url: "https://wordwall.net/resource/123",
+        provider: "WORDWALL",
+        supportLevel: "GUARANTEED",
+      }],
+    }],
+  },
+  blockCount: 1,
+} satisfies LessonMaterial;
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.defineProperty(window, "PointerEvent", {
@@ -338,6 +364,51 @@ describe("LessonTaskCanvas", () => {
     expect(markup).toContain("Static worksheet");
     expect(markup).not.toContain("Отправить");
     expect(markup).not.toContain("Submit");
+  });
+
+  it("removes annotation tools and layers while a shared external activity fills the task area", async () => {
+    const externalActivitySync: MaterialExternalActivitySync = {
+      active: {
+        blockId: "external-1",
+        errorCode: undefined,
+        hostIdentity: "teacher",
+        phase: "ACTIVE",
+        sessionId: "session-1",
+        studentsLocked: false,
+        visible: true,
+      },
+      back: vi.fn(),
+      collapse: vi.fn(),
+      cursors: [],
+      isHost: true,
+      mediaStream: null,
+      open: vi.fn(),
+      reload: vi.fn(),
+      sendCursor: vi.fn(),
+      sendInput: vi.fn(),
+      setStudentsLocked: vi.fn(),
+      stop: vi.fn(),
+    };
+    const { container } = render(createElement(LessonTaskCanvas, {
+      externalActivitySync,
+      lessonId: "lesson-1",
+      material: externalActivityMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+
+    fireEvent.click(container.querySelector('[data-testid="external-activity-launch-external-1"]')!);
+    await waitFor(() => expect(
+      container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode"),
+    ).toBe("external-activity-focus"));
+    expect(container.querySelector(".playsay-external-activity-frame")).not.toBeNull();
+    expect(container.querySelector(".playsay-annotation-toolbar")).toBeNull();
+    expect(container.querySelector(".playsay-annotation-layer")).toBeNull();
+    expect(container.querySelector(".playsay-presence-layer")).toBeNull();
   });
 
   it("anchors annotations to the rendered static image instead of the material viewport", async () => {

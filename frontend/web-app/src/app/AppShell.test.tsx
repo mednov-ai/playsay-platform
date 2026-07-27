@@ -40,6 +40,26 @@ describe("AppShell", () => {
     expect(markup).toContain('aria-current="page"');
     expect(markup).not.toContain('aria-label="Рабочие разделы"');
   });
+
+  it("keeps global chat for an ADMIN + TEACHER profile but not for a pure admin", () => {
+    const combinedProps = appShellProps();
+    combinedProps.profile = { ...combinedProps.profile!, roles: ["ADMIN", "TEACHER"] };
+    const combinedMarkup = renderToStaticMarkup(createElement(
+      AppProviders,
+      null,
+      createElement(AppShell, combinedProps),
+    ));
+    expect(combinedMarkup).toContain('data-playsay-tools-layout="true"');
+
+    const adminProps = appShellProps();
+    adminProps.profile = { ...adminProps.profile!, roles: ["ADMIN"] };
+    const adminMarkup = renderToStaticMarkup(createElement(
+      AppProviders,
+      null,
+      createElement(AppShell, adminProps),
+    ));
+    expect(adminMarkup).not.toContain('data-playsay-tools-layout="true"');
+  });
 });
 
 function appShellProps(): AppShellProps {

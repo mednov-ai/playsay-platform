@@ -13,6 +13,7 @@ const authClientId = process.env.PLAY_SAY_SMOKE_AUTH_CLIENT_ID ?? "playsay-web";
 const playwrightPackageDir = process.env.PLAYWRIGHT_PACKAGE_DIR ?? "/Users/evgeniymednov/.codex/tools/playwright";
 const sshHost = process.env.PLAY_SAY_SMOKE_SSH_HOST ?? "root@146.103.126.15";
 const headless = process.env.PLAY_SAY_SMOKE_HEADLESS !== "false";
+const fakeMedia = process.env.PLAY_SAY_SMOKE_FAKE_MEDIA === "true";
 const timeoutMs = Number(process.env.PLAY_SAY_SMOKE_TIMEOUT_MS ?? 45_000);
 const annotationScreenshotPath = process.env.PLAY_SAY_SMOKE_ANNOTATION_SCREENSHOT_PATH?.trim() || null;
 const failureScreenshotDir = process.env.PLAY_SAY_SMOKE_FAILURE_SCREENSHOT_DIR?.trim()
@@ -63,7 +64,12 @@ const sessions = [];
 
 try {
   const { chromium } = loadPlaywright();
-  browser = await chromium.launch({ headless });
+  browser = await chromium.launch({
+    headless,
+    args: fakeMedia
+      ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
+      : [],
+  });
 
   const passwords = readDemoPasswords();
   const teacher = await createSession(browser, "teacher", passwords.teacher);
@@ -114,6 +120,10 @@ try {
     openClassroom(studentB.page, lesson.id, "[data-testid='lesson-material-surface']"),
   ]);
   addCheck("classroom-opened-for-teacher-and-two-students");
+  if (fakeMedia) {
+    await verifyLiveKitMedia(teacher.page, studentA.page, studentB.page);
+    addCheck("livekit-camera-and-microphone-media-connected");
+  }
 
   await Promise.all([
     assertStudentDocumentChromeHidden(studentA.page),
@@ -232,6 +242,9 @@ async function createSession(nextBrowser, role, credentials) {
     ignoreHTTPSErrors: true,
     viewport: role === "teacher" ? { width: 1440, height: 920 } : { width: 1180, height: 860 },
   });
+  if (fakeMedia) {
+    await context.grantPermissions(["camera", "microphone"], { origin: webBaseUrl });
+  }
   const page = await context.newPage();
   const tokens = await loginWithKeycloakUi(page, credentials);
 
@@ -657,17 +670,52 @@ async function completeClassroomPreJoin(page) {
   const checkedJoinButton = page.locator("[data-testid='classroom-prejoin-join']");
   const joinWithoutAudioButton = page.locator("[data-testid='classroom-prejoin-join-without-audio']");
   await checkedJoinButton.waitFor({ timeout: timeoutMs });
-  await page.waitForFunction(() => {
+  if (fakeMedia) {
+    const recordButton = page.locator(".playsay-prejoin-audio-actions button[data-recording]").first();
+    await recordButton.waitFor({ state: "visible", timeout: timeoutMs });
+    await recordButton.dispatchEvent("pointerdown", {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: "mouse",
+    });
+    await page.waitForTimeout(600);
+    await recordButton.dispatchEvent("pointerup", {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: "mouse",
+    });
+    const heardRecordingButton = page.locator(".playsay-prejoin-audio-confirm button").first();
+    await heardRecordingButton.waitFor({ state: "visible", timeout: timeoutMs });
+    await heardRecordingButton.click();
+  }
+  await page.waitForFunction((requireCheckedMedia) => {
     const checkedJoin = document.querySelector("[data-testid='classroom-prejoin-join']");
     const fallbackJoin = document.querySelector("[data-testid='classroom-prejoin-join-without-audio']");
-    return (checkedJoin instanceof HTMLButtonElement && !checkedJoin.disabled) ||
+    const checkedReady = checkedJoin instanceof HTMLButtonElement && !checkedJoin.disabled;
+    return requireCheckedMedia ? checkedReady : checkedReady ||
       (fallbackJoin instanceof HTMLButtonElement && !fallbackJoin.disabled);
-  }, null, { timeout: timeoutMs });
-  if (await joinWithoutAudioButton.isVisible()) {
+  }, fakeMedia, { timeout: timeoutMs });
+  if (fakeMedia) {
+    await checkedJoinButton.click();
+  } else if (await joinWithoutAudioButton.isVisible()) {
     await joinWithoutAudioButton.click();
   } else {
     await checkedJoinButton.click();
   }
+}
+
+async function verifyLiveKitMedia(...pages) {
+  await Promise.all(pages.map((page) => page.waitForFunction(() => {
+    const playableVideos = Array.from(document.querySelectorAll("video")).filter((video) => (
+      video instanceof HTMLVideoElement &&
+      video.srcObject instanceof MediaStream &&
+      video.srcObject.getVideoTracks().some((track) => track.readyState === "live") &&
+      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+    ));
+    return playableVideos.length >= 2;
+  }, null, { timeout: timeoutMs })));
 }
 
 async function assertStudentDocumentChromeHidden(page) {

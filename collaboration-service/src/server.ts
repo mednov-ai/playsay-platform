@@ -6,7 +6,12 @@ import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import { tokenFromRequestUrl, verifyCollaborationToken } from "./auth.js";
+import {
+  sendWithBackpressure,
+  type CollaborationBackpressurePolicy,
+} from "./backpressure.js";
 import { loadConfig } from "./config.js";
+import { CollaborationMetrics } from "./metrics.js";
 import { SnapshotQueue } from "./snapshots.js";
 import type { CollaborationClaims } from "./rooms.js";
 import { assertRoomMatchesClaims } from "./rooms.js";
@@ -29,12 +34,40 @@ const rooms = new Map<string, Promise<CollaborationRoom>>();
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const snapshots = new SnapshotQueue(config);
-  const server = http.createServer((_request, response) => {
-    response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ status: "ok" }));
+  const metrics = new CollaborationMetrics();
+  const snapshots = new SnapshotQueue(config, metrics);
+  const backpressurePolicy = {
+    hardLimitBytes: config.websocketHardLimitBytes,
+    softLimitBytes: config.websocketSoftLimitBytes,
+  };
+  const wss = new WebSocketServer({
+    maxPayload: config.websocketMaxPayloadBytes,
+    noServer: true,
   });
-  const wss = new WebSocketServer({ noServer: true });
+  const server = http.createServer((request, response) => {
+    if (request.url === "/healthz") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+    if (request.url === "/metrics") {
+      const bufferedBytes = [...wss.clients].reduce((total, client) => total + client.bufferedAmount, 0);
+      void metrics.render({
+        activeConnections: wss.clients.size,
+        activeRooms: rooms.size,
+        bufferedBytes,
+      }).then((body) => {
+        response.writeHead(200, { "content-type": metrics.contentType });
+        response.end(body);
+      }).catch(() => {
+        response.writeHead(500);
+        response.end();
+      });
+      return;
+    }
+    response.writeHead(404);
+    response.end();
+  });
 
   snapshots.start();
 
@@ -72,11 +105,11 @@ async function main(): Promise<void> {
       pendingMessages.push(message);
     };
     ws.on("message", queuePendingMessage);
-    void getRoom(claims, snapshots)
+    void getRoom(claims, snapshots, backpressurePolicy, metrics)
       .then((room) => {
         ws.off("message", queuePendingMessage);
         if (ws.readyState !== ws.OPEN) return;
-        bindWebSocket(room, ws, snapshots, pendingMessages);
+        bindWebSocket(room, ws, snapshots, backpressurePolicy, metrics, pendingMessages);
       })
       .catch(() => ws.close(1011, "room restore failed"));
   });
@@ -93,19 +126,29 @@ async function main(): Promise<void> {
   });
 }
 
-function getRoom(claims: CollaborationClaims, snapshots: SnapshotQueue): Promise<CollaborationRoom> {
+function getRoom(
+  claims: CollaborationClaims,
+  snapshots: SnapshotQueue,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): Promise<CollaborationRoom> {
   const existing = rooms.get(claims.yjsDocumentId);
   if (existing) {
     return existing;
   }
 
-  const roomPromise = createRoom(claims, snapshots);
+  const roomPromise = createRoom(claims, snapshots, backpressurePolicy, metrics);
   rooms.set(claims.yjsDocumentId, roomPromise);
   void roomPromise.catch(() => rooms.delete(claims.yjsDocumentId));
   return roomPromise;
 }
 
-async function createRoom(claims: CollaborationClaims, snapshots: SnapshotQueue): Promise<CollaborationRoom> {
+async function createRoom(
+  claims: CollaborationClaims,
+  snapshots: SnapshotQueue,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): Promise<CollaborationRoom> {
   const doc = new Y.Doc();
   const persistedSnapshot = await snapshots.load(claims);
   applyPersistedSnapshot(doc, persistedSnapshot);
@@ -121,7 +164,7 @@ async function createRoom(claims: CollaborationClaims, snapshots: SnapshotQueue)
     const originSocket = room.connections.has(origin as WebSocket) ? origin as WebSocket : null;
     room.connections.forEach((_controlledIds, connection) => {
       if (connection !== originSocket && connection.readyState === connection.OPEN) {
-        sendSyncUpdate(connection, update);
+        sendSyncUpdate(connection, update, backpressurePolicy, metrics);
       }
     });
     snapshots.markDirty(room.claims, room.doc);
@@ -142,7 +185,7 @@ async function createRoom(claims: CollaborationClaims, snapshots: SnapshotQueue)
       }
       room.connections.set(originSocket, controlledIds);
     }
-    broadcastAwareness(room, changedClients, originSocket);
+    broadcastAwareness(room, changedClients, originSocket, backpressurePolicy, metrics);
   };
   doc.on("update", updateHandler);
   room.awareness.on("update", awarenessHandler);
@@ -167,6 +210,8 @@ function bindWebSocket(
   room: CollaborationRoom,
   ws: WebSocket,
   snapshots: SnapshotQueue,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
   pendingMessages: RawData[] = [],
 ): void {
   if (room.idleTimer) {
@@ -176,7 +221,7 @@ function bindWebSocket(
   room.connections.set(ws, new Set());
 
   ws.on("message", (message) => {
-    processMessage(room, ws, message);
+    processMessage(room, ws, message, backpressurePolicy, metrics);
   });
 
   ws.on("close", () => {
@@ -199,20 +244,34 @@ function bindWebSocket(
     }
   });
 
-  sendSyncStep1(ws, room.doc);
-  sendCurrentAwareness(ws, room.awareness);
-  pendingMessages.forEach((message) => processMessage(room, ws, message));
+  sendSyncStep1(ws, room.doc, backpressurePolicy, metrics);
+  sendCurrentAwareness(ws, room.awareness, backpressurePolicy, metrics);
+  pendingMessages.forEach((message) => {
+    processMessage(room, ws, message, backpressurePolicy, metrics);
+  });
 }
 
-function processMessage(room: CollaborationRoom, ws: WebSocket, message: RawData): void {
+function processMessage(
+  room: CollaborationRoom,
+  ws: WebSocket,
+  message: RawData,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   try {
-    handleMessage(room, ws, message);
+    handleMessage(room, ws, message, backpressurePolicy, metrics);
   } catch {
     ws.close(1003, "invalid collaboration message");
   }
 }
 
-function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData): void {
+function handleMessage(
+  room: CollaborationRoom,
+  ws: WebSocket,
+  message: RawData,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   const bytes = rawDataToUint8Array(message);
   const decoder = decoding.createDecoder(bytes);
   const messageType = decoding.readVarUint(decoder);
@@ -222,7 +281,13 @@ function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData)
     encoding.writeVarUint(encoder, messageSync);
     syncProtocol.readSyncMessage(decoder, encoder, room.doc, ws);
     if (encoding.length(encoder) > 1) {
-      ws.send(encoding.toUint8Array(encoder));
+      sendWithBackpressure(
+        ws,
+        encoding.toUint8Array(encoder),
+        "sync",
+        backpressurePolicy,
+        metrics,
+      );
     }
     return;
   }
@@ -243,7 +308,7 @@ function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData)
     const encoded = encoding.toUint8Array(encoder);
     room.connections.forEach((_controlledIds, connection) => {
       if (connection !== ws && connection.readyState === connection.OPEN) {
-        connection.send(encoded);
+        sendWithBackpressure(connection, encoded, "ephemeral", backpressurePolicy, metrics);
       }
     });
     return;
@@ -252,21 +317,36 @@ function handleMessage(room: CollaborationRoom, ws: WebSocket, message: RawData)
   throw new Error("unsupported collaboration message");
 }
 
-function sendSyncStep1(ws: WebSocket, doc: Y.Doc): void {
+function sendSyncStep1(
+  ws: WebSocket,
+  doc: Y.Doc,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageSync);
   syncProtocol.writeSyncStep1(encoder, doc);
-  ws.send(encoding.toUint8Array(encoder));
+  sendWithBackpressure(ws, encoding.toUint8Array(encoder), "sync", backpressurePolicy, metrics);
 }
 
-function sendSyncUpdate(ws: WebSocket, update: Uint8Array): void {
+function sendSyncUpdate(
+  ws: WebSocket,
+  update: Uint8Array,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageSync);
   syncProtocol.writeUpdate(encoder, update);
-  ws.send(encoding.toUint8Array(encoder));
+  sendWithBackpressure(ws, encoding.toUint8Array(encoder), "sync", backpressurePolicy, metrics);
 }
 
-function sendCurrentAwareness(ws: WebSocket, awareness: awarenessProtocol.Awareness): void {
+function sendCurrentAwareness(
+  ws: WebSocket,
+  awareness: awarenessProtocol.Awareness,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   const states = [...awareness.getStates().keys()];
   if (states.length === 0) {
     return;
@@ -274,10 +354,22 @@ function sendCurrentAwareness(ws: WebSocket, awareness: awarenessProtocol.Awaren
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageAwareness);
   encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(awareness, states));
-  ws.send(encoding.toUint8Array(encoder));
+  sendWithBackpressure(
+    ws,
+    encoding.toUint8Array(encoder),
+    "awareness",
+    backpressurePolicy,
+    metrics,
+  );
 }
 
-function broadcastAwareness(room: CollaborationRoom, changedClients: number[], origin: WebSocket | null): void {
+function broadcastAwareness(
+  room: CollaborationRoom,
+  changedClients: number[],
+  origin: WebSocket | null,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
   if (changedClients.length === 0) {
     return;
   }
@@ -290,7 +382,7 @@ function broadcastAwareness(room: CollaborationRoom, changedClients: number[], o
   const payload = encoding.toUint8Array(encoder);
   room.connections.forEach((_controlledIds, connection) => {
     if (connection !== origin && connection.readyState === connection.OPEN) {
-      connection.send(payload);
+      sendWithBackpressure(connection, payload, "awareness", backpressurePolicy, metrics);
     }
   });
 }

@@ -862,6 +862,37 @@ async function drawTextAndMindMap(page) {
   const textEditor = page.locator(".playsay-annotation-text-text textarea");
   await textEditor.waitFor({ timeout: timeoutMs });
   await textEditor.fill("Friendly text");
+  const initialTextSize = await textEditor.evaluate((editor) => {
+    const frame = editor.closest("foreignObject");
+    return frame ? {
+      height: Number(frame.getAttribute("height")),
+      width: Number(frame.getAttribute("width")),
+    } : null;
+  });
+  if (
+    !initialTextSize
+    || initialTextSize.width < 230
+    || initialTextSize.width > 250
+    || initialTextSize.height < 50
+    || initialTextSize.height > 70
+  ) {
+    throw new Error(`Text did not start with wide readable bounds: ${JSON.stringify(initialTextSize)}`);
+  }
+  await textEditor.fill(
+    "Friendly text wraps automatically across several lines without manually stretching its frame downward.",
+  );
+  await page.waitForFunction(() => {
+    const editor = document.querySelector(".playsay-annotation-text-text textarea");
+    const frame = editor?.closest("foreignObject");
+    return Number(frame?.getAttribute("height")) > 56;
+  }, null, { timeout: timeoutMs });
+  const expandedTextHeight = await textEditor.evaluate((editor) => (
+    Number(editor.closest("foreignObject")?.getAttribute("height"))
+  ));
+  if (expandedTextHeight <= initialTextSize.height) {
+    throw new Error(`Text did not grow to fit wrapped content: ${expandedTextHeight}`);
+  }
+  await textEditor.fill("Friendly text");
   await textEditor.press("Control+Enter");
 
   await page.locator("[data-testid='annotation-tool-mind-map']").click();
@@ -891,8 +922,15 @@ async function drawTextAndMindMap(page) {
     .filter(Boolean));
   const textSize = sizes.find((size) => size.kind === "text");
   const mindMapSizes = sizes.filter((size) => size.kind === "mindMapNode");
-  if (!textSize || textSize.width >= 220 || textSize.height >= 90 || textSize.lineCount !== 1) {
-    throw new Error(`Text did not compact to its content: ${JSON.stringify(textSize)}`);
+  if (
+    !textSize
+    || textSize.width < 230
+    || textSize.width > 250
+    || textSize.height < 50
+    || textSize.height > 70
+    || textSize.lineCount !== 1
+  ) {
+    throw new Error(`Text did not retain its readable default bounds: ${JSON.stringify(textSize)}`);
   }
   if (mindMapSizes.length !== 2 || mindMapSizes.some((size) => size.width > 220 || size.height > 160)) {
     throw new Error(`Mind map nodes exceeded compact bounds: ${JSON.stringify(mindMapSizes)}`);

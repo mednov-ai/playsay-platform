@@ -980,11 +980,6 @@ export interface MaterialHtmlGameEnrichmentResponse {
   errorCode?: string | null;
 }
 
-export interface MaterialGameAdaptationRequest {
-  /** @maxLength 120 */
-  blockId: string;
-}
-
 export interface MaterialGameAdaptationResponse {
   id: string;
   materialId: string;
@@ -1002,6 +997,11 @@ export interface MaterialGameAdaptationResponse {
   errorCode?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MaterialGameAdaptationRequest {
+  /** @maxLength 120 */
+  blockId: string;
 }
 
 export interface MaterialAssetResponse {
@@ -5102,39 +5102,46 @@ export const requestMaterialGameAdaptation = async (materialId: string,
 
 
 
-export type getMaterialGameAdaptationResponse200 = {
+export type rollbackMaterialGameAdaptationResponse200 = {
   data: MaterialGameAdaptationResponse
   status: 200
 }
 
-export type getMaterialGameAdaptationResponseSuccess = (getMaterialGameAdaptationResponse200) & {
+export type rollbackMaterialGameAdaptationResponse409 = {
+  data: void
+  status: 409
+}
+
+export type rollbackMaterialGameAdaptationResponseSuccess = (rollbackMaterialGameAdaptationResponse200) & {
   headers: Headers;
 };
-;
+export type rollbackMaterialGameAdaptationResponseError = (rollbackMaterialGameAdaptationResponse409) & {
+  headers: Headers;
+};
 
-export type getMaterialGameAdaptationResponse = (getMaterialGameAdaptationResponseSuccess)
+export type rollbackMaterialGameAdaptationResponse = (rollbackMaterialGameAdaptationResponseSuccess | rollbackMaterialGameAdaptationResponseError)
 
-export const getGetMaterialGameAdaptationUrl = (materialId: string,
+export const getRollbackMaterialGameAdaptationUrl = (materialId: string,
     assetId: string,
     jobId: string,) => {
 
 
 
 
-  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}`
+  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}/rollback`
 }
 
 /**
- * @summary Get HTML game adaptation status
+ * @summary Restore the original HTML game asset
  */
-export const getMaterialGameAdaptation = async (materialId: string,
+export const rollbackMaterialGameAdaptation = async (materialId: string,
     assetId: string,
-    jobId: string, options?: RequestInit): Promise<getMaterialGameAdaptationResponse> => {
+    jobId: string, options?: RequestInit): Promise<rollbackMaterialGameAdaptationResponse> => {
 
-  const res = await fetch(getGetMaterialGameAdaptationUrl(materialId,assetId,jobId),
+  const res = await fetch(getRollbackMaterialGameAdaptationUrl(materialId,assetId,jobId),
   {
     ...options,
-    method: 'GET'
+    method: 'POST'
 
 
   }
@@ -5143,8 +5150,8 @@ export const getMaterialGameAdaptation = async (materialId: string,
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
 
-  const data: getMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getMaterialGameAdaptationResponse
+  const data: rollbackMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as rollbackMaterialGameAdaptationResponse
 }
 
 
@@ -5199,60 +5206,6 @@ export const applyMaterialGameAdaptation = async (materialId: string,
 
   const data: applyMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as applyMaterialGameAdaptationResponse
-}
-
-
-
-export type rollbackMaterialGameAdaptationResponse200 = {
-  data: MaterialGameAdaptationResponse
-  status: 200
-}
-
-export type rollbackMaterialGameAdaptationResponse409 = {
-  data: void
-  status: 409
-}
-
-export type rollbackMaterialGameAdaptationResponseSuccess = (rollbackMaterialGameAdaptationResponse200) & {
-  headers: Headers;
-};
-export type rollbackMaterialGameAdaptationResponseError = (rollbackMaterialGameAdaptationResponse409) & {
-  headers: Headers;
-};
-
-export type rollbackMaterialGameAdaptationResponse = (rollbackMaterialGameAdaptationResponseSuccess | rollbackMaterialGameAdaptationResponseError)
-
-export const getRollbackMaterialGameAdaptationUrl = (materialId: string,
-    assetId: string,
-    jobId: string,) => {
-
-
-
-
-  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}/rollback`
-}
-
-/**
- * @summary Restore the original HTML game
- */
-export const rollbackMaterialGameAdaptation = async (materialId: string,
-    assetId: string,
-    jobId: string, options?: RequestInit): Promise<rollbackMaterialGameAdaptationResponse> => {
-
-  const res = await fetch(getRollbackMaterialGameAdaptationUrl(materialId,assetId,jobId),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: rollbackMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as rollbackMaterialGameAdaptationResponse
 }
 
 
@@ -7657,6 +7610,53 @@ export const listMaterialAssets = async (materialId: string, options?: RequestIn
 
   const data: listMaterialAssetsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listMaterialAssetsResponse
+}
+
+
+
+export type getMaterialGameAdaptationResponse200 = {
+  data: MaterialGameAdaptationResponse
+  status: 200
+}
+
+export type getMaterialGameAdaptationResponseSuccess = (getMaterialGameAdaptationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMaterialGameAdaptationResponse = (getMaterialGameAdaptationResponseSuccess)
+
+export const getGetMaterialGameAdaptationUrl = (materialId: string,
+    assetId: string,
+    jobId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}`
+}
+
+/**
+ * @summary Get HTML game adaptation status
+ */
+export const getMaterialGameAdaptation = async (materialId: string,
+    assetId: string,
+    jobId: string, options?: RequestInit): Promise<getMaterialGameAdaptationResponse> => {
+
+  const res = await fetch(getGetMaterialGameAdaptationUrl(materialId,assetId,jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMaterialGameAdaptationResponse
 }
 
 

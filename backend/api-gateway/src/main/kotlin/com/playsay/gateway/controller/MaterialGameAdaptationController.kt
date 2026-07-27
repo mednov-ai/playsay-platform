@@ -4,6 +4,9 @@ import com.playsay.gateway.dto.MaterialGameAdaptationRequest
 import com.playsay.gateway.dto.MaterialGameAdaptationResponse
 import com.playsay.gateway.service.LessonMaterialStore
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import java.util.UUID
@@ -30,6 +33,18 @@ class MaterialGameAdaptationController(
         operationId = "requestMaterialGameAdaptation",
         summary = "Adapt an HTML game to Play&Say Game Sync",
         security = [SecurityRequirement(name = "bearerAuth")],
+        responses = [
+            ApiResponse(
+                responseCode = "202",
+                description = "Adaptation queued",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = MaterialGameAdaptationResponse::class),
+                    ),
+                ],
+            ),
+        ],
     )
     fun requestGameAdaptation(
         authentication: JwtAuthenticationToken,
@@ -64,6 +79,23 @@ class MaterialGameAdaptationController(
         operationId = "applyMaterialGameAdaptation",
         summary = "Apply a reviewed HTML game adaptation",
         security = [SecurityRequirement(name = "bearerAuth")],
+        responses = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Applied",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = MaterialGameAdaptationResponse::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "Material source changed or adaptation is not ready",
+                content = [Content()],
+            ),
+        ],
     )
     fun applyGameAdaptation(
         authentication: JwtAuthenticationToken,
@@ -81,6 +113,23 @@ class MaterialGameAdaptationController(
         operationId = "rollbackMaterialGameAdaptation",
         summary = "Restore the original HTML game asset",
         security = [SecurityRequirement(name = "bearerAuth")],
+        responses = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Original restored",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = MaterialGameAdaptationResponse::class),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "Material source changed",
+                content = [Content()],
+            ),
+        ],
     )
     fun rollbackGameAdaptation(
         authentication: JwtAuthenticationToken,

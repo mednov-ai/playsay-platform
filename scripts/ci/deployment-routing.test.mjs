@@ -72,6 +72,7 @@ test("image update helper pins dev and prod digests and matches release branches
   assert.match(helper, /cd "\$START_DIR"\s+rm -rf "\$WORK_DIR"\s+echo "Infra push race/);
   assert.match(routedHelper, /Missing image digest produced by Kaniko/);
   assert.match(routedHelper, /IMAGE_DIGEST=.*image-digest\.txt/);
+  assert.match(routedHelper, /game-adapter-service/);
 });
 
 test("release candidate lifecycle preserves a manual production gate", () => {

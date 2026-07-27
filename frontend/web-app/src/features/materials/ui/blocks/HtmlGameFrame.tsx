@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Gamepad2, Loader2 } from "lucide-react";
 import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
+  MaterialHtmlGameSnapshot,
   MaterialHtmlGameSync,
 } from "../../model/materialDocument";
 import { useAppTranslation } from "../../../../shared/i18n";
@@ -23,8 +24,12 @@ type BridgeMessage =
       sequence: number;
       type: "snapshot";
     }
+  | { channel: string; mirror: boolean; type: "ready" }
+  | { channel: string; runId?: string; sequence: number; type: "snapshotApplied" }
   | { channel: string; type: "input"; event: Omit<MaterialHtmlGameInputEvent, "id" | "at" | "blockId"> }
   | { channel: string; type: "effect"; effect: Omit<MaterialHtmlGameEffect, "id" | "at" | "blockId"> };
+
+const MIRROR_SNAPSHOT_RETRY_MS = 750;
 
 export function HtmlGameFrame({
   blockId,
@@ -48,14 +53,65 @@ export function HtmlGameFrame({
   const srcDoc = useMemo(() => html ? createSandboxedGameDocument(html, channel, isMirror) : "", [channel, html, isMirror]);
   const handledInputsRef = useRef<Set<string> | null>(null);
   const handledEffectsRef = useRef<Set<string> | null>(null);
+  const mirrorReadyRef = useRef(false);
+  const pendingMirrorSnapshotRef = useRef<MaterialHtmlGameSnapshot | null>(null);
+  const mirrorSnapshotRetryRef = useRef<number | null>(null);
+  const [appliedAuthorityRunId, setAppliedAuthorityRunId] = useState<string | null>(null);
   const activeSnapshot = sync?.snapshots[blockId];
   const authorityRunId = sync?.authorityRuns[blockId];
-  const authorityAvailable = !isMirror || Boolean(authorityRunId && activeSnapshot?.runId === authorityRunId);
+  const authorityAvailable = !isMirror || Boolean(
+    authorityRunId &&
+    activeSnapshot?.runId === authorityRunId &&
+    appliedAuthorityRunId === authorityRunId,
+  );
+
+  const clearMirrorSnapshotRetry = useCallback(() => {
+    if (mirrorSnapshotRetryRef.current !== null) {
+      window.clearTimeout(mirrorSnapshotRetryRef.current);
+      mirrorSnapshotRetryRef.current = null;
+    }
+  }, []);
+
+  const sendMirrorSnapshot = useCallback((snapshot: MaterialHtmlGameSnapshot | undefined) => {
+    if (
+      !isMirror ||
+      !mirrorReadyRef.current ||
+      !snapshot ||
+      !authorityRunId ||
+      snapshot.runId !== authorityRunId
+    ) {
+      return;
+    }
+
+    pendingMirrorSnapshotRef.current = snapshot;
+    iframeRef.current?.contentWindow?.postMessage({ channel, type: "applySnapshot", snapshot }, "*");
+    clearMirrorSnapshotRetry();
+    mirrorSnapshotRetryRef.current = window.setTimeout(() => {
+      if (pendingMirrorSnapshotRef.current?.sequence === snapshot.sequence) {
+        sendMirrorSnapshot(pendingMirrorSnapshotRef.current);
+      }
+    }, MIRROR_SNAPSHOT_RETRY_MS);
+  }, [authorityRunId, channel, clearMirrorSnapshotRetry, isMirror]);
 
   useEffect(() => {
     handledInputsRef.current = null;
     handledEffectsRef.current = null;
-  }, [blockId, channel, sync?.isAuthority]);
+    mirrorReadyRef.current = false;
+    pendingMirrorSnapshotRef.current = null;
+    clearMirrorSnapshotRetry();
+    setAppliedAuthorityRunId(null);
+  }, [blockId, channel, clearMirrorSnapshotRetry, sync?.isAuthority]);
+
+  useEffect(() => () => clearMirrorSnapshotRetry(), [clearMirrorSnapshotRetry]);
+
+  useEffect(() => {
+    if (!isMirror) {
+      return;
+    }
+    pendingMirrorSnapshotRef.current = null;
+    clearMirrorSnapshotRetry();
+    setAppliedAuthorityRunId(null);
+  }, [authorityRunId, clearMirrorSnapshotRetry, isMirror]);
 
   useEffect(() => {
     if (!html || !sync?.isAuthority || !sync.ready) {
@@ -81,6 +137,26 @@ export function HtmlGameFrame({
           sequence: message.sequence,
           updatedAt: Date.now(),
         });
+      } else if (message.type === "ready" && isMirror && message.mirror) {
+        mirrorReadyRef.current = true;
+        sendMirrorSnapshot(activeSnapshot);
+      } else if (message.type === "snapshotApplied" && isMirror) {
+        const pendingSnapshot = pendingMirrorSnapshotRef.current;
+        if (
+          authorityRunId &&
+          message.runId === authorityRunId &&
+          activeSnapshot?.runId === authorityRunId
+        ) {
+          setAppliedAuthorityRunId(authorityRunId);
+        }
+        if (
+          pendingSnapshot &&
+          pendingSnapshot.runId === message.runId &&
+          message.sequence >= pendingSnapshot.sequence
+        ) {
+          pendingMirrorSnapshotRef.current = null;
+          clearMirrorSnapshotRetry();
+        }
       } else if (message.type === "input" && sync) {
         const input = {
           ...message.event,
@@ -104,7 +180,7 @@ export function HtmlGameFrame({
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [blockId, channel, sync]);
+  }, [activeSnapshot, authorityRunId, blockId, channel, isMirror, sendMirrorSnapshot, sync]);
 
   useEffect(() => {
     if (!sync?.isAuthority) {
@@ -130,11 +206,8 @@ export function HtmlGameFrame({
     if (!sync || sync.isAuthority) {
       return;
     }
-    const snapshot = activeSnapshot;
-    if (snapshot) {
-      iframeRef.current?.contentWindow?.postMessage({ channel, type: "applySnapshot", snapshot }, "*");
-    }
-  }, [activeSnapshot, blockId, channel, sync]);
+    sendMirrorSnapshot(activeSnapshot);
+  }, [activeSnapshot, authorityRunId, blockId, channel, sendMirrorSnapshot, sync?.isAuthority]);
 
   useEffect(() => {
     if (!sync || sync.isAuthority) {
@@ -206,6 +279,11 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
     const mirror = ${mirror ? "true" : "false"};
     const nativePostMessage = window.parent.postMessage.bind(window.parent);
     const memory = new Map();
+    const canvasSnapshotIntervalMs = 250;
+    const maxCanvasDataUrlLength = 150 * 1024;
+    const maxCanvasWidth = 960;
+    const maxCanvasHeight = 540;
+    const pointerMoveIntervalMs = 1000 / 30;
     const storage = {
       get length() { return memory.size; },
       clear() { memory.clear(); },
@@ -218,9 +296,24 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
     let nextNodeId = 1;
     let snapshotSequence = 0;
     let snapshotDebounceTimer = 0;
+    let snapshotDebounceAt = 0;
     let snapshotMaxTimer = 0;
+    let snapshotMaxAt = 0;
     let lastSnapshotHtml = '';
     let lastSnapshotAt = 0;
+    let lastCanvasSnapshotAt = 0;
+    let lastCanvasSnapshot = {};
+    let snapshotInFlight = false;
+    let snapshotQueued = false;
+    let readyRetryTimer = 0;
+    let activePointerTargetId = null;
+    let pendingPointerMove = null;
+    let pointerMoveTimer = 0;
+    let lastPointerMoveAt = 0;
+    let replayingPointer = false;
+    let applyingSnapshotRunId = '';
+    let applyingSnapshotSequence = 0;
+    let appliedSnapshotSequence = 0;
     let dragTransfer = null;
     let pointerDragSourceId = null;
     let pointerDragStartX = 0;
@@ -259,35 +352,109 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       });
       return Object.fromEntries(entries);
     };
-    const serializeCanvases = () => Object.fromEntries(
-      [...document.querySelectorAll('canvas')].flatMap((canvas) => {
-        try { return [[targetId(canvas), canvas.toDataURL('image/png')]]; } catch (_) { return []; }
-      })
-    );
-    const flushSnapshot = () => {
+    const blobToDataUrl = (blob) => new Promise((resolve) => {
+      if (!blob) {
+        resolve('');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(blob);
+    });
+    const encodeCanvas = async (source) => {
+      try {
+        let width = Math.max(1, source.width);
+        let height = Math.max(1, source.height);
+        const initialScale = Math.min(1, maxCanvasWidth / width, maxCanvasHeight / height);
+        width = Math.max(1, Math.round(width * initialScale));
+        height = Math.max(1, Math.round(height * initialScale));
+        let dataUrl = '';
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          const copy = document.createElement('canvas');
+          copy.width = width;
+          copy.height = height;
+          copy.getContext('2d')?.drawImage(source, 0, 0, width, height);
+          const quality = Math.max(.35, .75 - attempt * .08);
+          dataUrl = typeof copy.toBlob === 'function'
+            ? await new Promise((resolve) => {
+                copy.toBlob(async (blob) => resolve(await blobToDataUrl(blob)), 'image/webp', quality);
+              })
+            : copy.toDataURL('image/webp', quality);
+          if (!dataUrl || dataUrl.length <= maxCanvasDataUrlLength) break;
+          width = Math.max(120, Math.round(width * .78));
+          height = Math.max(68, Math.round(height * .78));
+        }
+        return dataUrl.length <= maxCanvasDataUrlLength ? dataUrl : '';
+      } catch (_) {
+        return '';
+      }
+    };
+    const serializeCanvases = async () => {
+      const entries = await Promise.all(
+        [...document.querySelectorAll('canvas')].map(async (canvas) => [targetId(canvas), await encodeCanvas(canvas)])
+      );
+      return Object.fromEntries(entries.filter(([, dataUrl]) => Boolean(dataUrl)));
+    };
+    const canvasSnapshot = async () => {
+      const now = Date.now();
+      if (now - lastCanvasSnapshotAt < canvasSnapshotIntervalMs) return lastCanvasSnapshot;
+      lastCanvasSnapshot = await serializeCanvases();
+      lastCanvasSnapshotAt = Date.now();
+      return lastCanvasSnapshot;
+    };
+    const flushSnapshot = async () => {
       window.clearTimeout(snapshotDebounceTimer);
       window.clearTimeout(snapshotMaxTimer);
       snapshotDebounceTimer = 0;
+      snapshotDebounceAt = 0;
       snapshotMaxTimer = 0;
-      identify();
-      const html = document.body?.outerHTML ?? '<body></body>';
-      const controls = serializeControls();
-      const scroll = serializeScroll();
-      const canvases = serializeCanvases();
-      const signature = JSON.stringify([html, controls, scroll, canvases]);
-      if (signature === lastSnapshotHtml) return;
-      lastSnapshotHtml = signature;
-      lastSnapshotAt = Date.now();
-      send({ type: 'snapshot', canvases, controls, html, scroll, sequence: ++snapshotSequence });
+      snapshotMaxAt = 0;
+      if (snapshotInFlight) {
+        snapshotQueued = true;
+        return;
+      }
+      snapshotInFlight = true;
+      try {
+        identify();
+        const html = document.body?.outerHTML ?? '<body></body>';
+        const controls = serializeControls();
+        const scroll = serializeScroll();
+        const canvases = await canvasSnapshot();
+        const signature = JSON.stringify([html, controls, scroll, canvases]);
+        if (signature !== lastSnapshotHtml) {
+          lastSnapshotHtml = signature;
+          lastSnapshotAt = Date.now();
+          send({ type: 'snapshot', canvases, controls, html, scroll, sequence: ++snapshotSequence });
+        }
+      } finally {
+        snapshotInFlight = false;
+        if (snapshotQueued) {
+          snapshotQueued = false;
+          scheduleSnapshot(true);
+        }
+      }
     };
-    const scheduleSnapshot = (meaningfulInput = false) => {
+    const scheduleSnapshot = (meaningfulInput = false, continuousInput = false) => {
       if (mirror) return;
-      window.clearTimeout(snapshotDebounceTimer);
       const now = Date.now();
-      const minimumIntervalRemaining = lastSnapshotAt ? Math.max(0, (meaningfulInput ? 50 : 500) - (now - lastSnapshotAt)) : 0;
-      snapshotDebounceTimer = window.setTimeout(flushSnapshot, Math.max(meaningfulInput ? 0 : 250, minimumIntervalRemaining));
-      if (!snapshotMaxTimer) {
-        snapshotMaxTimer = window.setTimeout(flushSnapshot, Math.max(500, minimumIntervalRemaining));
+      const minimumInterval = meaningfulInput ? 50 : continuousInput ? canvasSnapshotIntervalMs : 500;
+      const debounceDelay = meaningfulInput ? 0 : continuousInput ? 50 : 250;
+      const maxDelay = continuousInput ? canvasSnapshotIntervalMs : 500;
+      const minimumIntervalRemaining = lastSnapshotAt ? Math.max(0, minimumInterval - (now - lastSnapshotAt)) : 0;
+      const desiredDebounceDelay = Math.max(debounceDelay, minimumIntervalRemaining);
+      const desiredDebounceAt = now + desiredDebounceDelay;
+      if (!snapshotDebounceTimer || desiredDebounceAt < snapshotDebounceAt) {
+        window.clearTimeout(snapshotDebounceTimer);
+        snapshotDebounceAt = desiredDebounceAt;
+        snapshotDebounceTimer = window.setTimeout(flushSnapshot, desiredDebounceDelay);
+      }
+      const desiredMaxDelay = Math.max(maxDelay, minimumIntervalRemaining);
+      const desiredMaxAt = now + desiredMaxDelay;
+      if (!snapshotMaxTimer || desiredMaxAt < snapshotMaxAt) {
+        window.clearTimeout(snapshotMaxTimer);
+        snapshotMaxAt = desiredMaxAt;
+        snapshotMaxTimer = window.setTimeout(flushSnapshot, desiredMaxDelay);
       }
     };
     const targetId = (target) => {
@@ -295,21 +462,76 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       const node = target.closest('[data-playsay-node-id]');
       return node?.dataset.playsayNodeId ?? '__document__';
     };
+    const targetById = (id) => id === '__document__'
+      ? document
+      : document.querySelector('[data-playsay-node-id="' + CSS.escape(id) + '"]');
+    const pointerState = (event, target) => {
+      if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return {};
+      const rect = target?.getBoundingClientRect?.();
+      const width = Number(rect?.width) || 0;
+      const height = Number(rect?.height) || 0;
+      return {
+        button: Number(event.button) || 0,
+        buttons: Number(event.buttons) || 0,
+        isPrimary: event.isPrimary === undefined ? undefined : Boolean(event.isPrimary),
+        pointerId: Number.isFinite(event.pointerId) ? Number(event.pointerId) : undefined,
+        pointerType: typeof event.pointerType === 'string' ? event.pointerType : undefined,
+        relativeX: width ? Math.max(0, Math.min(1, (event.clientX - rect.left) / width)) : undefined,
+        relativeY: height ? Math.max(0, Math.min(1, (event.clientY - rect.top) / height)) : undefined
+      };
+    };
+    const inputEvent = (type, target, targetIdentifier, event) => ({
+      type,
+      targetId: targetIdentifier,
+      key: event.key,
+      code: event.code,
+      altKey: Boolean(event.altKey),
+      ctrlKey: Boolean(event.ctrlKey),
+      metaKey: Boolean(event.metaKey),
+      shiftKey: Boolean(event.shiftKey),
+      ...pointerState(event, target),
+      ...formState(target),
+      data: event.data ?? null,
+      inputType: event.inputType
+    });
+    const flushPointerMove = () => {
+      if (pointerMoveTimer) {
+        window.clearTimeout(pointerMoveTimer);
+        pointerMoveTimer = 0;
+      }
+      const event = pendingPointerMove;
+      pendingPointerMove = null;
+      if (!event) return;
+      lastPointerMoveAt = performance.now();
+      send({ type: 'input', event });
+    };
+    const schedulePointerMove = (event) => {
+      const target = targetById(activePointerTargetId) ?? event.target;
+      const eventTargetId = targetId(target);
+      pendingPointerMove = inputEvent('pointermove', target, eventTargetId, event);
+      if (pointerMoveTimer) return;
+      const delay = Math.max(0, pointerMoveIntervalMs - (performance.now() - lastPointerMoveAt));
+      pointerMoveTimer = window.setTimeout(flushPointerMove, delay);
+    };
     const semanticInputTypes = new Set(['beforeinput', 'input', 'change', 'focus', 'blur', 'compositionstart', 'compositionupdate', 'compositionend']);
-    const inputTypes = ['click', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'dragstart', 'dragover', 'drop', ...semanticInputTypes];
+    const immediateSnapshotInputTypes = new Set(['click', 'pointerup', 'pointercancel', 'drop', ...semanticInputTypes]);
+    const inputTypes = ['click', 'pointerdown', 'pointerup', 'pointercancel', 'keydown', 'keyup', 'dragstart', 'dragover', 'drop', ...semanticInputTypes];
     inputTypes.forEach((type) => document.addEventListener(type, (event) => {
       if (event.__playsayReplay) return;
-      const resolvedTarget = mirror && type === 'pointerup' && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)
-        ? document.elementFromPoint(event.clientX, event.clientY) ?? event.target
-        : event.target;
+      if (mirror && (type === 'pointerup' || type === 'pointercancel')) flushPointerMove();
+      const activePointerTarget = mirror && type.startsWith('pointer') && activePointerTargetId
+        ? targetById(activePointerTargetId)
+        : null;
+      const resolvedTarget = activePointerTarget ?? event.target;
       const eventTargetId = targetId(resolvedTarget);
       if (mirror) {
         const editableTarget = Boolean(event.target?.closest?.('input, textarea, select, [contenteditable="true"]'));
-        const nativeDragEvent = type === 'pointerdown' || type === 'pointerup' || type === 'dragstart' || type === 'dragover' || type === 'drop';
+        const nativeDragEvent = type === 'pointerdown' || type === 'pointerup' || type === 'pointercancel' || type === 'dragstart' || type === 'dragover' || type === 'drop';
         const allowNativeEditing = semanticInputTypes.has(type) || (editableTarget && (type === 'keydown' || type === 'keyup'));
         if (!allowNativeEditing && (type === 'dragover' || !nativeDragEvent)) event.preventDefault();
         if (!nativeDragEvent) event.stopImmediatePropagation();
         if (type === 'pointerdown') {
+          activePointerTargetId = eventTargetId;
           const draggable = event.target?.closest?.('[draggable="true"]');
           pointerDragSourceId = draggable ? targetId(draggable) : null;
           pointerDragStartX = Number(event.clientX) || 0;
@@ -325,25 +547,23 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
           nativeDragStarted = false;
         }
       }
-      send({ type: 'input', event: {
-        type,
-        targetId: eventTargetId,
-        key: event.key,
-        code: event.code,
-        altKey: Boolean(event.altKey),
-        ctrlKey: Boolean(event.ctrlKey),
-        metaKey: Boolean(event.metaKey),
-        shiftKey: Boolean(event.shiftKey),
-        ...formState(resolvedTarget),
-        data: event.data ?? null,
-        inputType: event.inputType
-      }});
-      if (!mirror) scheduleSnapshot(semanticInputTypes.has(type));
+      send({ type: 'input', event: inputEvent(type, resolvedTarget, eventTargetId, event) });
+      if (mirror && (type === 'pointerup' || type === 'pointercancel')) activePointerTargetId = null;
+      if (!mirror) scheduleSnapshot(immediateSnapshotInputTypes.has(type));
     }, true));
     document.addEventListener('pointermove', (event) => {
-      if (!mirror || !pointerDragSourceId) return;
-      pointerDragLastX = Number(event.clientX) || pointerDragLastX;
-      pointerDragLastY = Number(event.clientY) || pointerDragLastY;
+      if (!mirror) {
+        if (event.buttons) scheduleSnapshot(false, true);
+        return;
+      }
+      if (activePointerTargetId) {
+        event.preventDefault();
+        schedulePointerMove(event);
+      }
+      if (pointerDragSourceId) {
+        pointerDragLastX = Number(event.clientX) || pointerDragLastX;
+        pointerDragLastY = Number(event.clientY) || pointerDragLastY;
+      }
     }, true);
     const finishPointerDrag = (event) => {
       if (!mirror || !pointerDragSourceId) return;
@@ -368,8 +588,37 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
     };
     document.addEventListener('mouseup', finishPointerDrag, true);
     document.addEventListener('dragend', finishPointerDrag, true);
-    const makeEvent = (input) => {
+    const elementPrototype = window.Element?.prototype;
+    const nativeSetPointerCapture = elementPrototype?.setPointerCapture;
+    const nativeReleasePointerCapture = elementPrototype?.releasePointerCapture;
+    if (nativeSetPointerCapture) {
+      try {
+        elementPrototype.setPointerCapture = function(pointerId) {
+          if (replayingPointer) return;
+          return nativeSetPointerCapture.call(this, pointerId);
+        };
+      } catch (_) {}
+    }
+    if (nativeReleasePointerCapture) {
+      try {
+        elementPrototype.releasePointerCapture = function(pointerId) {
+          if (replayingPointer) return;
+          return nativeReleasePointerCapture.call(this, pointerId);
+        };
+      } catch (_) {}
+    }
+    const replayCoordinates = (input, target) => {
+      const rect = target?.getBoundingClientRect?.();
+      const relativeX = Number(input.relativeX);
+      const relativeY = Number(input.relativeY);
+      return {
+        clientX: rect && Number.isFinite(relativeX) ? rect.left + rect.width * relativeX : 0,
+        clientY: rect && Number.isFinite(relativeY) ? rect.top + rect.height * relativeY : 0
+      };
+    };
+    const makeEvent = (input, target) => {
       const common = { bubbles: true, cancelable: true, composed: true };
+      const coordinates = replayCoordinates(input, target);
       let event;
       if (input.type === 'keydown' || input.type === 'keyup') {
         event = new KeyboardEvent(input.type, { ...common, key: input.key ?? '', code: input.code ?? '', altKey: input.altKey, ctrlKey: input.ctrlKey, metaKey: input.metaKey, shiftKey: input.shiftKey });
@@ -380,12 +629,20 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
       } else if (input.type === 'change' || input.type === 'focus' || input.type === 'blur') {
         event = new Event(input.type, common);
       } else if (input.type.startsWith('pointer')) {
-        event = new PointerEvent(input.type, common);
+        event = new PointerEvent(input.type, {
+          ...common,
+          ...coordinates,
+          button: Number(input.button) || 0,
+          buttons: Number(input.buttons) || 0,
+          isPrimary: input.isPrimary !== false,
+          pointerId: Number(input.pointerId) || 1,
+          pointerType: input.pointerType || 'mouse'
+        });
       } else if (input.type === 'dragstart' || input.type === 'dragover' || input.type === 'drop') {
         if (input.type === 'dragstart' || !dragTransfer) dragTransfer = new DataTransfer();
         event = new DragEvent(input.type, { ...common, dataTransfer: dragTransfer });
       } else {
-        event = new MouseEvent(input.type, common);
+        event = new MouseEvent(input.type, { ...common, ...coordinates, button: Number(input.button) || 0, buttons: Number(input.buttons) || 0 });
       }
       Object.defineProperty(event, '__playsayReplay', { value: true });
       return event;
@@ -403,7 +660,7 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         try { target.setSelectionRange(state.selectionStart, state.selectionEnd ?? state.selectionStart); } catch (_) {}
       }
     };
-    const applySnapshotState = (snapshot) => {
+    const applySnapshotState = async (snapshot, runId, sequence) => {
       Object.entries(snapshot.controls ?? {}).forEach(([id, state]) => {
         const target = document.querySelector('[data-playsay-node-id="' + CSS.escape(id) + '"]');
         applyFormState(target, state);
@@ -417,13 +674,24 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
           target.scrollTop = Number(state.top) || 0;
         }
       });
-      Object.entries(snapshot.canvases ?? {}).forEach(([id, dataUrl]) => {
+      await Promise.all(Object.entries(snapshot.canvases ?? {}).map(([id, dataUrl]) => new Promise((resolve) => {
         const canvas = document.querySelector('[data-playsay-node-id="' + CSS.escape(id) + '"]');
-        if (!(canvas instanceof HTMLCanvasElement) || !dataUrl) return;
+        if (!(canvas instanceof HTMLCanvasElement) || !dataUrl) {
+          resolve(undefined);
+          return;
+        }
         const image = new Image();
-        image.onload = () => canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        image.onload = () => {
+          if (applyingSnapshotRunId === runId && applyingSnapshotSequence === sequence) {
+            const context = canvas.getContext('2d');
+            context?.clearRect(0, 0, canvas.width, canvas.height);
+            context?.drawImage(image, 0, 0, canvas.width, canvas.height);
+          }
+          resolve(undefined);
+        };
+        image.onerror = () => resolve(undefined);
         image.src = dataUrl;
-      });
+      })));
     };
     const playEffect = (effect) => {
       if (effect.kind === 'speech' && 'speechSynthesis' in window) {
@@ -493,23 +761,48 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
         cursor = nextCursor;
       }
     };
-    window.addEventListener('message', (messageEvent) => {
+    window.addEventListener('message', async (messageEvent) => {
       const message = messageEvent.data;
       if (!message || message.channel !== channel) return;
       if (message.type === 'applySnapshot' && mirror) {
+        const runId = typeof message.snapshot.runId === 'string' ? message.snapshot.runId : '';
+        const sequence = Number(message.snapshot.sequence) || 0;
+        if (runId !== applyingSnapshotRunId) {
+          applyingSnapshotRunId = runId;
+          applyingSnapshotSequence = 0;
+          appliedSnapshotSequence = 0;
+        }
+        if (sequence <= appliedSnapshotSequence) {
+          send({ type: 'snapshotApplied', runId, sequence });
+          return;
+        }
+        if (sequence <= applyingSnapshotSequence) return;
+        applyingSnapshotSequence = sequence;
         const parsed = new DOMParser().parseFromString(message.snapshot.html, 'text/html');
         parsed.querySelectorAll('script').forEach((script) => script.type = 'application/playsay-disabled');
         if (document.body && parsed.body) patchNode(document.body, parsed.body);
         identify();
-        applySnapshotState(message.snapshot);
+        await applySnapshotState(message.snapshot, runId, sequence);
+        if (applyingSnapshotRunId === runId && applyingSnapshotSequence === sequence) {
+          appliedSnapshotSequence = sequence;
+          window.clearInterval(readyRetryTimer);
+          readyRetryTimer = 0;
+          send({ type: 'snapshotApplied', runId, sequence });
+        }
       } else if (message.type === 'applyInput' && !mirror) {
         const input = message.event;
-        const target = input.targetId === '__document__' ? document : document.querySelector('[data-playsay-node-id="' + CSS.escape(input.targetId) + '"]');
+        const target = targetById(input.targetId);
         applyFormState(target, input);
         if (input.type === 'focus') target?.focus?.();
         if (input.type === 'blur') target?.blur?.();
-        target?.dispatchEvent(makeEvent(input));
-        scheduleSnapshot(semanticInputTypes.has(input.type));
+        const pointerInput = input.type.startsWith('pointer');
+        try {
+          replayingPointer = pointerInput;
+          target?.dispatchEvent(makeEvent(input, target));
+        } finally {
+          replayingPointer = false;
+        }
+        scheduleSnapshot(immediateSnapshotInputTypes.has(input.type), input.type === 'pointermove');
       } else if (message.type === 'applyEffect' && mirror) {
         playEffect(message.effect);
       }
@@ -558,8 +851,12 @@ function gameBridgeSource(channel: string, mirror: boolean): string {
     }
     const start = () => {
       identify();
-      if (!mirror) {
-        new MutationObserver(scheduleSnapshot).observe(document.documentElement, { attributes: true, characterData: true, childList: true, subtree: true });
+      if (mirror) {
+        const announceReady = () => send({ type: 'ready', mirror: true });
+        announceReady();
+        readyRetryTimer = window.setInterval(announceReady, 500);
+      } else {
+        new MutationObserver(() => scheduleSnapshot(false, true)).observe(document.documentElement, { attributes: true, characterData: true, childList: true, subtree: true });
         scheduleSnapshot();
       }
     };

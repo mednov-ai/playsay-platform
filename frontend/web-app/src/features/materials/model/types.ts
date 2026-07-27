@@ -47,7 +47,9 @@ export type MaterialHtmlGameInputEvent = {
     | "input"
     | "keydown"
     | "keyup"
+    | "pointercancel"
     | "pointerdown"
+    | "pointermove"
     | "pointerup";
   targetId: string;
   key?: string;
@@ -56,9 +58,16 @@ export type MaterialHtmlGameInputEvent = {
   ctrlKey?: boolean;
   metaKey?: boolean;
   shiftKey?: boolean;
+  button?: number;
+  buttons?: number;
   checked?: boolean;
   data?: string | null;
   inputType?: string;
+  isPrimary?: boolean;
+  pointerId?: number;
+  pointerType?: string;
+  relativeX?: number;
+  relativeY?: number;
   selectedIndex?: number;
   selectionEnd?: number | null;
   selectionStart?: number | null;

@@ -305,13 +305,13 @@ export function LessonTaskCanvas({
     const handleScroll = () => {
       const expectedRemoteScroll = expectedRemoteScrollRef.current;
       if (expectedRemoteScroll?.node === node) {
-        expectedRemoteScrollRef.current = null;
         if (
           Math.abs(node.scrollLeft - expectedRemoteScroll.left) <= 1
           && Math.abs(node.scrollTop - expectedRemoteScroll.top) <= 1
         ) {
           return;
         }
+        expectedRemoteScrollRef.current = null;
       }
       if (applyingRemoteViewportRef.current || suppressTransitionScrollPublishRef.current) return;
       const elapsed = performance.now() - lastViewportPublishAtRef.current;

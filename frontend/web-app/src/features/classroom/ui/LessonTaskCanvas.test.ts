@@ -793,6 +793,7 @@ describe("LessonTaskCanvas", () => {
     });
 
     fireEvent.scroll(taskDocument);
+    fireEvent.scroll(taskDocument);
 
     expect(publish).not.toHaveBeenCalled();
   });

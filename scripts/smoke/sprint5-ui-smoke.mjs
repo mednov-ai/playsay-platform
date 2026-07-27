@@ -881,10 +881,20 @@ async function verifyAnchoredTextScroll(teacherPage, studentPage) {
   await assertAnchoredTextFollowsImageScroll(studentPage, "student");
 
   await studentPage.locator("[data-testid='material-focus-close']").click();
-  await Promise.all([
+  const closeResults = await Promise.allSettled([
     waitForFocusedSmokeImageClosed(teacherPage, "teacher"),
     waitForFocusedSmokeImageClosed(studentPage, "student"),
   ]);
+  if (closeResults.some((result) => result.status === "rejected")) {
+    const [teacherState, studentState] = await Promise.all([
+      focusedImageState(teacherPage),
+      focusedImageState(studentPage),
+    ]);
+    const failures = closeResults
+      .filter((result) => result.status === "rejected")
+      .map((result) => result.reason instanceof Error ? result.reason.message : String(result.reason));
+    throw new Error(`shared image close did not converge; teacher=${JSON.stringify(teacherState)}, student=${JSON.stringify(studentState)}: ${failures.join("; ")}`);
+  }
 }
 
 async function openFocusedSmokeImage(page) {
@@ -910,18 +920,24 @@ async function waitForFocusedSmokeImageClosed(page, role) {
     });
     await page.locator("[data-testid='material-focus-close']").waitFor({ state: "detached", timeout: timeoutMs });
   } catch (error) {
-    const state = await page.evaluate(() => {
-      const board = document.querySelector(".playsay-task-board");
-      const focusStack = document.querySelector(".playsay-material-focus-stack");
-      const focusedImage = document.querySelector(".playsay-material-focused-image");
-      return {
-        boardMode: board?.getAttribute("data-presentation-mode") ?? null,
-        focusActive: focusStack?.getAttribute("data-active") ?? null,
-        focusedImageScrollTop: focusedImage instanceof HTMLElement ? focusedImage.scrollTop : null,
-      };
-    }).catch(() => null);
+    const state = await focusedImageState(page);
     throw new Error(`${role} did not close shared image focus; state=${JSON.stringify(state)}: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+async function focusedImageState(page) {
+  return page.evaluate(() => {
+    const board = document.querySelector(".playsay-task-board");
+    const focusStack = document.querySelector(".playsay-material-focus-stack");
+    const focusedImage = document.querySelector(".playsay-material-focused-image");
+    const surface = document.querySelector("[data-testid='lesson-material-surface']");
+    return {
+      boardMode: board?.getAttribute("data-presentation-mode") ?? null,
+      collaborationReady: surface?.getAttribute("data-live-presence-ready") ?? null,
+      focusActive: focusStack?.getAttribute("data-active") ?? null,
+      focusedImageScrollTop: focusedImage instanceof HTMLElement ? focusedImage.scrollTop : null,
+    };
+  }).catch(() => null);
 }
 
 async function assertAnchoredTextFollowsImageScroll(page, role) {

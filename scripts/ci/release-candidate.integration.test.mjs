@@ -131,6 +131,49 @@ test(
           "",
         ].join("\n"),
       );
+      write(
+        infraWork,
+        "helm-charts/static/Chart.yaml",
+        "apiVersion: v2\nname: static\nversion: 0.1.0\n",
+      );
+      write(
+        infraWork,
+        "helm-charts/static/values.yaml",
+        [
+          "image:",
+          "  repository: example.invalid/static",
+          '  tag: "stable"',
+          "",
+        ].join("\n"),
+      );
+      write(
+        infraWork,
+        "helm-charts/static/values-prod.yaml",
+        "replicaCount: 1\n",
+      );
+      write(
+        infraWork,
+        "helm-charts/static/templates/deployment.yaml",
+        [
+          "apiVersion: apps/v1",
+          "kind: Deployment",
+          "metadata:",
+          "  name: static",
+          "spec:",
+          "  selector:",
+          "    matchLabels:",
+          "      app: static",
+          "  template:",
+          "    metadata:",
+          "      labels:",
+          "        app: static",
+          "    spec:",
+          "      containers:",
+          "        - name: static",
+          '          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"',
+          "",
+        ].join("\n"),
+      );
       git(infraWork, ["add", "."]);
       git(infraWork, ["commit", "-qm", "infra baseline"]);
       git(infraWork, ["branch", "-M", "develop"]);
@@ -191,6 +234,12 @@ test(
         run(yqBin, ["-r", ".image.digest", resolve(candidateWork, "helm-charts/web-app/values-prod.yaml")]),
         oldDigest,
       );
+      const staticValues = readFileSync(
+        resolve(candidateWork, "helm-charts/static/values-prod.yaml"),
+        "utf8",
+      );
+      assert.doesNotMatch(staticValues, /^image:\s*null$/m);
+      assert.doesNotMatch(staticValues, /^build:\s*null$/m);
 
       const incompleteFinalize = spawnSync(
         "sh",

@@ -114,9 +114,16 @@ for attempt in 1 2 3 4 5; do
         chart_name="$(basename "$(dirname "$target_values")")"
         base_values="$BASE_VALUES_DIR/${chart_name}.yaml"
         git show "origin/${BASE_RELEASE_BRANCH}:${target_values}" > "$base_values"
-        BASE_VALUES_FILE="$base_values" yq -i \
-          '.image = load(strenv(BASE_VALUES_FILE)).image | .build = load(strenv(BASE_VALUES_FILE)).build' \
-          "$target_values"
+        if [ "$(yq -o=json -I=0 '.image' "$base_values")" != "null" ]; then
+          BASE_VALUES_FILE="$base_values" yq -i \
+            '.image = load(strenv(BASE_VALUES_FILE)).image' \
+            "$target_values"
+        fi
+        if [ "$(yq -o=json -I=0 '.build' "$base_values")" != "null" ]; then
+          BASE_VALUES_FILE="$base_values" yq -i \
+            '.build = load(strenv(BASE_VALUES_FILE)).build' \
+            "$target_values"
+        fi
       fi
     done
   fi

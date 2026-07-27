@@ -79,7 +79,10 @@ test("release candidate lifecycle preserves a manual production gate", () => {
 
   assert.match(prepare, /status: building/);
   assert.match(prepare, /argocd-apps\/prod\/current-release\.txt/);
+  assert.match(prepare, /yq -o=json -I=0 '\.image'.*!= "null"/);
   assert.match(prepare, /\.image = load\(strenv\(BASE_VALUES_FILE\)\)\.image/);
+  assert.match(prepare, /yq -o=json -I=0 '\.build'.*!= "null"/);
+  assert.match(prepare, /\.build = load\(strenv\(BASE_VALUES_FILE\)\)\.build/);
   assert.match(prepare, /previous_status.*!= "ready"/);
   assert.match(prepare, /RELEASE_AFFECTED_TARGETS=/);
 

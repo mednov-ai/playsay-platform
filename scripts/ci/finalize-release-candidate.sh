@@ -95,8 +95,19 @@ for attempt in 1 2 3; do
   affected_targets="$(yq -r '.affectedTargets[]?' "$MANIFEST_PATH" | paste -sd, -)"
   base_infra_commit="$(yq -r '.baseInfraCommit // ""' "$MANIFEST_PATH")"
   base_release="$(yq -r '.baseRelease // ""' "$MANIFEST_PATH")"
+  accepted_dev_commit="$(yq -r '.acceptedDevCommit // ""' "$MANIFEST_PATH")"
   if ! printf '%s\n' "$base_infra_commit" | grep -Eq '^[0-9a-f]{40}$'; then
     echo "Candidate manifest has an invalid baseInfraCommit." >&2
+    exit 1
+  fi
+  if ! printf '%s\n' "$accepted_dev_commit" | grep -Eq '^[0-9a-f]{40}$'; then
+    echo "Candidate manifest has an invalid acceptedDevCommit." >&2
+    exit 1
+  fi
+  PLATFORM_DIR="$WORK_DIR/platform"
+  git clone --quiet --no-checkout --single-branch --branch "$CI_BRANCH" "$PLATFORM_REPO" "$PLATFORM_DIR"
+  if ! git -C "$PLATFORM_DIR" merge-base --is-ancestor "$accepted_dev_commit" "$GIT_COMMIT"; then
+    echo "Release $CI_BRANCH does not contain accepted dev commit $accepted_dev_commit." >&2
     exit 1
   fi
   if ! git cat-file -e "${base_infra_commit}^{commit}" 2>/dev/null; then

@@ -31,9 +31,13 @@ export function useCollaborationDocument({
   const requestGenerationRef = useRef(0);
 
   const scope = collaborationScopeForMode(mode);
-  const activeDocument = document?.scope === scope ? document : null;
+  const activeDocument = document?.scope === scope &&
+    document.lessonId === lessonId &&
+    document.materialId === materialId
+    ? document
+    : null;
 
-  const refresh = useCallback(async () => {
+  const loadCurrentDocument = useCallback(async (invalidDocumentId?: string) => {
     const requestGeneration = ++requestGenerationRef.current;
     if (!enabled || !materialId) {
       setDocument(null);
@@ -42,6 +46,7 @@ export function useCollaborationDocument({
       return null;
     }
 
+    setDocument(null);
     setLoading(true);
     setError(null);
     try {
@@ -51,6 +56,10 @@ export function useCollaborationDocument({
         scope: scope as CollaborationDocumentScope,
       });
       if (requestGenerationRef.current !== requestGeneration) return null;
+      if (invalidDocumentId && nextDocument.id === invalidDocumentId) {
+        setError(t("classroom.collaboration.loadFailed"));
+        return null;
+      }
       setDocument(nextDocument);
       return nextDocument;
     } catch (caught) {
@@ -63,6 +72,19 @@ export function useCollaborationDocument({
       if (requestGenerationRef.current === requestGeneration) setLoading(false);
     }
   }, [enabled, lessonId, materialId, scope, t]);
+
+  const refresh = useCallback(
+    () => loadCurrentDocument(),
+    [loadCurrentDocument],
+  );
+
+  const invalidateDocument = useCallback(
+    (documentId: string) => {
+      if (document?.id !== documentId) return;
+      void loadCurrentDocument(documentId);
+    },
+    [document?.id, loadCurrentDocument],
+  );
 
   useEffect(() => {
     void refresh();
@@ -110,6 +132,7 @@ export function useCollaborationDocument({
     finalize,
     loading,
     message,
+    invalidateDocument,
     refresh,
     saveSnapshot,
     scope,

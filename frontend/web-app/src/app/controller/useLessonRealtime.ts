@@ -64,6 +64,7 @@ export function useLessonRealtime({
   const reportedCheckingLessonIdRef = useRef<string | null>(null);
   const scheduleSyncInFlightRef = useRef(false);
   const scheduleSyncPendingRef = useRef(false);
+  const syncScheduleFromServerRef = useRef<(options?: { message?: string }) => Promise<void>>(async () => undefined);
   const roomSessionLessonId = roomSession?.lessonId ?? null;
   const activeLessonId = roomSessionLessonId ?? classroomLessonId;
   const checkingDevices = Boolean(
@@ -201,6 +202,20 @@ export function useLessonRealtime({
     if (checkingDevices && classroomLessonId) sendLessonPresenceUpdate(classroomLessonId, "CHECKING_DEVICES");
   }, [activeLessonId, checkingDevices, classroomLessonId, roomSessionLessonId]);
 
+  useEffect(() => {
+    if (status !== "authenticated" || !activeLessonId) return undefined;
+
+    const reconcileActiveLesson = () => {
+      void syncScheduleFromServerRef.current();
+    };
+    const intervalId = window.setInterval(reconcileActiveLesson, 15_000);
+    window.addEventListener("focus", reconcileActiveLesson);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", reconcileActiveLesson);
+    };
+  }, [activeLessonId, status]);
+
   async function syncScheduleFromServer(options: { message?: string } = {}) {
     if (scheduleSyncInFlightRef.current) {
       scheduleSyncPendingRef.current = true;
@@ -232,6 +247,7 @@ export function useLessonRealtime({
       scheduleSyncInFlightRef.current = false;
     }
   }
+  syncScheduleFromServerRef.current = syncScheduleFromServer;
 
   function handleLessonRealtimeMessage(rawPayload: string) {
     let message: LessonRealtimeMessage;

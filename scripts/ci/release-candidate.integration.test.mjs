@@ -199,6 +199,7 @@ test(
         GIT_COMMIT: candidatePlatformCommit,
         BASE_RELEASE_BRANCH: "release/1.001.06",
         BASE_PLATFORM_COMMIT: basePlatformCommit,
+        ACCEPTED_DEV_COMMIT: candidatePlatformCommit,
         AFFECTED_TARGETS: "web-app",
         VALIDATION_SUITES: "ci-contracts",
         GITHUB_USER: "test",

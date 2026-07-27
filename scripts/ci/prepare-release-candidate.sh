@@ -16,6 +16,7 @@ for name in \
   GIT_COMMIT \
   BASE_RELEASE_BRANCH \
   BASE_PLATFORM_COMMIT \
+  ACCEPTED_DEV_COMMIT \
   GITHUB_USER \
   GITHUB_TOKEN \
   JENKINS_JOB_NAME \
@@ -30,7 +31,7 @@ for branch in "$CI_BRANCH" "$BASE_RELEASE_BRANCH"; do
     exit 1
   fi
 done
-for commit in "$GIT_COMMIT" "$BASE_PLATFORM_COMMIT"; do
+for commit in "$GIT_COMMIT" "$BASE_PLATFORM_COMMIT" "$ACCEPTED_DEV_COMMIT"; do
   if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
     echo "Release candidate commits must be full Git SHAs: $commit" >&2
     exit 1
@@ -152,6 +153,7 @@ for attempt in 1 2 3 4 5; do
     printf 'releaseBranch: "%s"\n' "$CI_BRANCH"
     printf 'baseRelease: "%s"\n' "$BASE_RELEASE_BRANCH"
     printf 'basePlatformCommit: "%s"\n' "$BASE_PLATFORM_COMMIT"
+    printf 'acceptedDevCommit: "%s"\n' "$ACCEPTED_DEV_COMMIT"
     printf 'baseInfraCommit: "%s"\n' "$base_infra_commit"
     printf 'platformCommit: "%s"\n' "$GIT_COMMIT"
     echo "affectedTargets:"

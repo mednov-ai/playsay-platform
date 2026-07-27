@@ -51,6 +51,7 @@ export function StudentLiveWorkspace({
     color: participantColor,
     document: groupAnnotationDocumentState.document,
     enabled: Boolean(groupAnnotationDocumentState.document),
+    onDocumentInvalid: groupAnnotationDocumentState.invalidateDocument,
     participantName: displayName,
   });
   const annotationSync = useMemo(() => {

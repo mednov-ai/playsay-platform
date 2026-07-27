@@ -55,6 +55,7 @@ export function useLessonMaterial({
       return undefined;
     }
 
+    setMaterial((current) => current?.id === session.materialId ? current : null);
     let cancelled = false;
 
     async function loadMaterial() {
@@ -101,9 +102,6 @@ export function useLessonMaterial({
         return;
       }
 
-      const lessonMaterial = await fetchScheduledLessonMaterial(session.lessonId);
-      setMaterial(lessonMaterial);
-      setMaterialError(null);
       setAssignmentMessage(t("classroom.messages.materialAssigned"));
     } catch (caught) {
       setAssignmentMessage(caught instanceof Error ? caught.message : t("classroom.messages.materialAssignFailed"));

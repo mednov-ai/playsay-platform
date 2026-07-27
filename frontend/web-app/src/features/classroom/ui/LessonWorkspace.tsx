@@ -126,6 +126,7 @@ export function LessonWorkspace({
     color: collaborationParticipantColor(profile?.subject ?? displayName),
     document: teacherAnnotationDocumentState.document,
     enabled: canMonitorSubmissions && Boolean(teacherAnnotationDocumentState.document),
+    onDocumentInvalid: teacherAnnotationDocumentState.invalidateDocument,
     participantName: displayName,
   });
   const teacherAnnotationSync = useMemo(() => {

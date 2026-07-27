@@ -52,6 +52,33 @@ beforeEach(() => {
 });
 
 describe("useLessonMaterial live uploads", () => {
+  it("hides the previous material while a newly assigned material is loading", async () => {
+    let resolveSecond: ((value: LessonMaterial) => void) | undefined;
+    apiMocks.fetchMaterial
+      .mockResolvedValueOnce(material("material-1", "page-1"))
+      .mockImplementationOnce(() => new Promise<LessonMaterial>((resolve) => {
+        resolveSecond = resolve;
+      }));
+    const { result, rerender } = renderHook(
+      ({ materialId }) => useLessonMaterial({
+        onAssignMaterial: vi.fn(),
+        session: {
+          ...session,
+          lessonUpdatedAt: "2026-07-17T09:00:00Z",
+          materialId,
+        },
+      }),
+      { initialProps: { materialId: "material-1" } },
+    );
+
+    await waitFor(() => expect(result.current.material?.id).toBe("material-1"));
+    rerender({ materialId: "material-2" });
+
+    await waitFor(() => expect(result.current.material).toBeNull());
+    await act(async () => resolveSecond?.(material("material-2", "page-2")));
+    await waitFor(() => expect(result.current.material?.id).toBe("material-2"));
+  });
+
   it("reloads the same lesson-only material after every realtime lesson revision", async () => {
     const firstRevision = material("copy-live", "page-image-1");
     const secondRevision = {

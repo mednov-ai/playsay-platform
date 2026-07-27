@@ -75,6 +75,25 @@ spec:
           }
           env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
+          if (env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/) {
+            sh 'git fetch --no-tags origin +refs/heads/develop:refs/remotes/origin/develop'
+            env.ACCEPTED_DEV_COMMIT = params.ACCEPTED_DEV_COMMIT?.trim() ?: sh(
+              script: 'git rev-parse refs/remotes/origin/develop',
+              returnStdout: true
+            ).trim()
+            if (!(env.ACCEPTED_DEV_COMMIT ==~ /^[0-9a-f]{40}$/)) {
+              error 'ACCEPTED_DEV_COMMIT must be a full Git SHA.'
+            }
+            sh "git cat-file -e '${env.ACCEPTED_DEV_COMMIT}^{commit}'"
+            if (sh(
+              script: "git merge-base --is-ancestor '${env.ACCEPTED_DEV_COMMIT}' '${env.GIT_COMMIT}'",
+              returnStatus: true
+            ) != 0) {
+              error "Release ${env.CI_BRANCH} does not contain accepted dev commit ${env.ACCEPTED_DEV_COMMIT}."
+            }
+          } else {
+            env.ACCEPTED_DEV_COMMIT = ''
+          }
           currentBuild.displayName = "dispatch-${env.BUILD_NUMBER}"
           currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
         }
@@ -185,6 +204,7 @@ spec:
                   set -eu
                   apk add --no-cache git yq
                   BASE_PLATFORM_COMMIT="$DETECTION_BASE" \
+                  ACCEPTED_DEV_COMMIT="$ACCEPTED_DEV_COMMIT" \
                   JENKINS_JOB_NAME="$JOB_NAME" \
                   JENKINS_BUILD_NUMBER="$BUILD_NUMBER" \
                     ./scripts/ci/prepare-release-candidate.sh

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createCollaborationDocumentToken,
+  isApiStatus,
   type CollaborationDocument,
   type CollaborationDocumentToken,
   type LessonMaterialJson,
@@ -34,11 +35,13 @@ export function useYjsWorkspace({
   color,
   document,
   enabled = true,
+  onDocumentInvalid,
   participantName,
 }: {
   color: string;
   document: CollaborationDocument | null;
   enabled?: boolean;
+  onDocumentInvalid?: (documentId: string) => void;
   participantName: string;
 }) {
   const [participants, setParticipants] = useState<CollaborationParticipant[]>([]);
@@ -149,8 +152,13 @@ export function useYjsWorkspace({
           if (!disposed && socketRef.current === socket) setStatus("error");
           socket.close();
         };
-      } catch {
+      } catch (caught) {
         if (!disposed) {
+          if (isInvalidCollaborationDocumentError(caught)) {
+            setStatus("error");
+            onDocumentInvalid?.(document.id);
+            return;
+          }
           setStatus("error");
           scheduleReconnect();
         }
@@ -192,7 +200,7 @@ export function useYjsWorkspace({
       setAnnotationUndoState({ canRedo: false, canUndo: false });
       exerciseInteractionRef.current = null;
     };
-  }, [color, document?.id, enabled, participantName]);
+  }, [color, document?.id, enabled, onDocumentInvalid, participantName]);
 
   const updateText = useCallback((nextText: string) => {
     const runtime = runtimeRef.current;
@@ -324,6 +332,10 @@ export function useYjsWorkspace({
     updateText,
     undoAnnotation,
   };
+}
+
+export function isInvalidCollaborationDocumentError(caught: unknown): boolean {
+  return isApiStatus(caught, 404) || isApiStatus(caught, 410);
 }
 
 function collaborationWebSocketUrl(tokenResponse: CollaborationDocumentToken): string {

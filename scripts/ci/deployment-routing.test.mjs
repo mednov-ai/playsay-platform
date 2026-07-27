@@ -74,10 +74,15 @@ test("image update helper pins dev and prod digests and matches release branches
 });
 
 test("release candidate lifecycle preserves a manual production gate", () => {
+  const dispatcher = readFileSync(resolve(platformRoot, "Jenkinsfile.dispatcher"), "utf8");
   const prepare = readFileSync(resolve(platformRoot, "scripts/ci/prepare-release-candidate.sh"), "utf8");
   const finalize = readFileSync(resolve(platformRoot, "scripts/ci/finalize-release-candidate.sh"), "utf8");
 
+  assert.match(dispatcher, /ACCEPTED_DEV_COMMIT/);
+  assert.match(dispatcher, /git merge-base --is-ancestor/);
+  assert.match(dispatcher, /does not contain accepted dev commit/);
   assert.match(prepare, /status: building/);
+  assert.match(prepare, /acceptedDevCommit/);
   assert.match(prepare, /argocd-apps\/prod\/current-release\.txt/);
   assert.match(prepare, /yq -o=json -I=0 '\.image'.*!= "null"/);
   assert.match(prepare, /\.image = load\(strenv\(BASE_VALUES_FILE\)\)\.image/);
@@ -87,6 +92,8 @@ test("release candidate lifecycle preserves a manual production gate", () => {
   assert.match(prepare, /RELEASE_AFFECTED_TARGETS=/);
 
   assert.match(finalize, /manifest_status.*"building"/);
+  assert.match(finalize, /acceptedDevCommit/);
+  assert.match(finalize, /git -C "\$PLATFORM_DIR" merge-base --is-ancestor/);
   assert.match(finalize, /\.build\.commit/);
   assert.match(finalize, /Unaffected chart .* changed image\/build metadata/);
   assert.match(

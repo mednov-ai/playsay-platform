@@ -44,6 +44,7 @@ test(
       assert.match(dispatchJobXml, /<name>MAX_PARALLEL_MODULE_JOBS<\/name>/);
       assert.match(dispatchJobXml, /<defaultValue>4<\/defaultValue>/);
       assert.match(dispatchJobXml, /Maximum downstream module jobs/);
+      assert.match(dispatchJobXml, /<name>ACCEPTED_DEV_COMMIT<\/name>/);
     }
   },
 );
@@ -68,6 +69,7 @@ test(
     );
     assert.match(webhookXml, /playsay-platform-dispatch-develop/);
     assert.match(webhookXml, /playsay-platform-dispatch-release/);
+    assert.match(webhookXml, /string\(name: 'ACCEPTED_DEV_COMMIT', value: acceptedDevCommit\)/);
 
     assert.match(developXml, /<abortPrevious>true<\/abortPrevious>/);
     assert.match(releaseXml, /<abortPrevious>false<\/abortPrevious>/);

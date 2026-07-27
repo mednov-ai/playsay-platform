@@ -181,6 +181,10 @@ export function LessonTaskCanvas({
 
     const suppressTransitionScrollPublish = () => {
       suppressTransitionScrollPublishRef.current = true;
+      if (viewportPublishTimerRef.current !== null) {
+        window.clearTimeout(viewportPublishTimerRef.current);
+        viewportPublishTimerRef.current = null;
+      }
       if (transitionScrollFrameRef.current !== null) {
         window.cancelAnimationFrame(transitionScrollFrameRef.current);
       }

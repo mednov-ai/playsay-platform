@@ -724,6 +724,7 @@ describe("LessonTaskCanvas", () => {
   });
 
   it("does not publish a stale default viewport while entering image focus", async () => {
+    const performanceNow = vi.spyOn(performance, "now").mockReturnValue(1_000);
     const publish = vi.fn();
     const { container } = render(createElement(LessonTaskCanvas, {
       lessonId: "lesson-1",
@@ -746,15 +747,17 @@ describe("LessonTaskCanvas", () => {
     await waitFor(() => expect(publish).toHaveBeenCalled());
     publish.mockClear();
 
-    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-image-focus-image-1']")!);
     fireEvent.scroll(taskDocument);
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-image-focus-image-1']")!);
 
     await waitFor(() => expect(publish).toHaveBeenCalledWith(expect.objectContaining({
       focusedBlockId: "image-1",
       presentationMode: "image-focus",
       scrollContainer: "image",
     })));
+    await new Promise((resolve) => window.setTimeout(resolve, 70));
     expect(publish.mock.calls.some(([viewport]) => viewport.presentationMode === "default")).toBe(false);
+    performanceNow.mockRestore();
   });
 
   it("draws with the selected line width and returns one-shot shapes to the pointer", async () => {

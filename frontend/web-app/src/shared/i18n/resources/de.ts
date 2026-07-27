@@ -1291,10 +1291,12 @@ export const de = {
       screenStop: "Bildschirmfreigabe beenden",
       screenStarting: "Bildschirmfreigabe wird gestartet",
       screenStopping: "Bildschirmfreigabe wird beendet",
-      screenPickerHint: "Wähle nicht den Kurs-Tab, sondern einen anderen Bildschirm, ein Fenster oder einen Tab.",
+      screenPickerHint: "Aktiviere „Systemaudio teilen“ oder „Tab-Audio teilen“, um Ton zu übertragen. Wähle nicht den Kurs-Tab.",
       screenStopError: "Die Bildschirmfreigabe wurde nicht vollständig beendet. Drücke die Taste erneut.",
       screenAudioMissing: "Der Bildschirm wird ohne Ton geteilt. Beende die Freigabe, starte sie erneut und aktiviere die Audiofreigabe.",
+      screenAudioMissingMacOS: "Chrome hat kein Systemaudio erhalten. Erlaube Chrome die Aufnahme von Bildschirm und Systemaudio in macOS und aktiviere die Systemaudiofreigabe.",
       screenAudioMissingSafari: "Safari kann den Bildschirmton nicht übertragen. Der Bildschirm ist sichtbar; öffne die Lektion für Ton in Chrome oder Edge.",
+      screenReselect: "Mit Ton neu auswählen",
       startMedia: "Medien starten",
     },
     preJoin: {

@@ -9,24 +9,17 @@ import {
 } from "@livekit/components-react";
 import { getBrowser, Track, type LocalParticipant, type ScreenShareCaptureOptions } from "livekit-client";
 import { Languages, LoaderCircle, ScreenShare, ScreenShareOff, Volume2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { LessonTranslationController } from "../hooks/useLessonTranslation";
 import type { TranslationRole } from "../model/realtimeTranslation";
 
-type ScreenShareAudioCaptureOptions = Exclude<ScreenShareCaptureOptions["audio"], boolean | undefined> & {
-  restrictOwnAudio: ConstrainBoolean;
-};
+export type ClassroomScreenShareAudioWarning = "macos-system" | "missing" | "safari" | null;
 
-export type ClassroomScreenShareAudioWarning = "missing" | "safari" | null;
-
-const screenShareAudioCaptureOptions: ScreenShareAudioCaptureOptions = {
-  restrictOwnAudio: true,
-};
 const screenShareAudioSources: Track.Source[] = [Track.Source.ScreenShareAudio];
 
 export const classroomScreenShareCaptureOptions = {
-  audio: screenShareAudioCaptureOptions,
+  audio: true,
   preferCurrentTab: false,
   selfBrowserSurface: "exclude",
   surfaceSwitching: "include",
@@ -137,6 +130,7 @@ function ClassroomScreenShareToggle() {
   const { t } = useAppTranslation();
   const room = useRoomContext();
   const [captureState, setCaptureState] = useState<"idle" | "requesting" | "active" | "stopping" | "error">("idle");
+  const stopOperationRef = useRef<Promise<boolean> | null>(null);
   const screenShareAudioTracks = useTracks(screenShareAudioSources, { onlySubscribed: false, room });
   const screenShareVideoTracks = useTracks([Track.Source.ScreenShare], { onlySubscribed: false, room });
   const { buttonProps, enabled, toggle } = useTrackToggle({
@@ -149,28 +143,43 @@ function ClassroomScreenShareToggle() {
   const screenShareAudioPublished = screenShareAudioTracks.some(
     (trackRef) => trackRef.participant === room.localParticipant && Boolean(trackRef.publication.track),
   );
+  const localScreenTrack = screenShareVideoTracks.find(
+    (trackRef) => trackRef.participant === room.localParticipant && Boolean(trackRef.publication.track),
+  )?.publication.track?.mediaStreamTrack;
+  const browser = getBrowser();
+  const displaySurface = localScreenTrack?.getSettings().displaySurface;
   const warning = classroomScreenShareAudioWarning(
     captureState === "active" && room.localParticipant.isScreenShareEnabled,
     screenShareAudioPublished,
-    getBrowser()?.name,
+    browser?.name,
+    displaySurface,
+    browser?.os === "macOS" || isMacOSBrowser(),
   );
 
-  const stopScreenShare = useCallback(async () => {
-    setCaptureState("stopping");
-    try {
-      await room.localParticipant.setScreenShareEnabled(false);
-      await waitForLocalScreenShareToStop(room.localParticipant);
-      setCaptureState(localScreenSharePublished(room.localParticipant) ? "error" : "idle");
-    } catch {
-      setCaptureState(localScreenSharePublished(room.localParticipant) ? "error" : "idle");
-    }
+  const stopScreenShare = useCallback(() => {
+    if (stopOperationRef.current) return stopOperationRef.current;
+    const operation = (async () => {
+      setCaptureState("stopping");
+      try {
+        await room.localParticipant.setScreenShareEnabled(false);
+        await waitForLocalScreenShareToStop(room.localParticipant);
+        const stopped = !localScreenSharePublished(room.localParticipant);
+        setCaptureState(stopped ? "idle" : "error");
+        return stopped;
+      } catch {
+        const stopped = !localScreenSharePublished(room.localParticipant);
+        setCaptureState(stopped ? "idle" : "error");
+        return stopped;
+      }
+    })();
+    stopOperationRef.current = operation;
+    void operation.then(() => {
+      if (stopOperationRef.current === operation) stopOperationRef.current = null;
+    });
+    return operation;
   }, [room.localParticipant]);
 
-  async function handleScreenShareToggle() {
-    if (room.localParticipant.isScreenShareEnabled || captureState === "active" || captureState === "error") {
-      await stopScreenShare();
-      return;
-    }
+  const startScreenShare = useCallback(async () => {
     setCaptureState("requesting");
     try {
       await toggle(true);
@@ -178,6 +187,18 @@ function ClassroomScreenShareToggle() {
     } catch {
       setCaptureState(room.localParticipant.isScreenShareEnabled ? "active" : "error");
     }
+  }, [room.localParticipant, toggle]);
+
+  async function handleScreenShareToggle() {
+    if (room.localParticipant.isScreenShareEnabled || captureState === "active" || captureState === "error") {
+      await stopScreenShare();
+      return;
+    }
+    await startScreenShare();
+  }
+
+  async function reselectScreenShareWithAudio() {
+    if (await stopScreenShare()) await startScreenShare();
   }
 
   useEffect(() => {
@@ -185,9 +206,6 @@ function ClassroomScreenShareToggle() {
     if (!enabled && captureState === "active") setCaptureState("idle");
   }, [captureState, enabled]);
 
-  const localScreenTrack = screenShareVideoTracks.find(
-    (trackRef) => trackRef.participant === room.localParticipant && Boolean(trackRef.publication.track),
-  )?.publication.track?.mediaStreamTrack;
   useEffect(() => {
     if (!localScreenTrack) return undefined;
     const handleEnded = () => { void stopScreenShare(); };
@@ -204,7 +222,11 @@ function ClassroomScreenShareToggle() {
         : t("classroom.controls.screen");
 
   return (
-    <div className="playsay-screen-share-control">
+    <div
+      className="playsay-screen-share-control"
+      data-screen-audio-published={screenShareAudioPublished ? "true" : "false"}
+      data-screen-display-surface={displaySurface ?? "unknown"}
+    >
       <button
         {...buttonProps}
         aria-label={label}
@@ -232,9 +254,18 @@ function ClassroomScreenShareToggle() {
       ) : null}
       {warning ? (
         <div aria-live="polite" className="playsay-screen-share-audio-warning" role="status">
-          {t(warning === "safari"
-            ? "classroom.controls.screenAudioMissingSafari"
-            : "classroom.controls.screenAudioMissing")}
+          <span>
+            {t(warning === "safari"
+              ? "classroom.controls.screenAudioMissingSafari"
+              : warning === "macos-system"
+                ? "classroom.controls.screenAudioMissingMacOS"
+                : "classroom.controls.screenAudioMissing")}
+          </span>
+          {warning !== "safari" ? (
+            <button onClick={() => { void reselectScreenShareWithAudio(); }} type="button">
+              {t("classroom.controls.screenReselect")}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -261,9 +292,18 @@ export function classroomScreenShareAudioWarning(
   screenShareEnabled: boolean,
   screenShareAudioPublished: boolean,
   browserName?: string,
+  displaySurface?: MediaTrackSettings["displaySurface"],
+  macOS = false,
 ): ClassroomScreenShareAudioWarning {
   if (!screenShareEnabled || screenShareAudioPublished) return null;
-  return browserName === "Safari" ? "safari" : "missing";
+  if (browserName === "Safari") return "safari";
+  if (browserName === "Chrome" && macOS && displaySurface === "monitor") return "macos-system";
+  return "missing";
+}
+
+function isMacOSBrowser() {
+  if (typeof navigator === "undefined") return false;
+  return /Macintosh|Mac OS X/.test(navigator.userAgent) || /Mac/.test(navigator.platform);
 }
 
 function translationButtonLabel(

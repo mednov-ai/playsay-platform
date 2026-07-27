@@ -1291,10 +1291,12 @@ export const fr = {
       screenStop: "Arrêter le partage d’écran",
       screenStarting: "Démarrage du partage d’écran",
       screenStopping: "Arrêt du partage d’écran",
-      screenPickerHint: "Ne sélectionne pas l’onglet du cours. Choisis un autre écran, une fenêtre ou un onglet.",
+      screenPickerHint: "Pour partager le son, active « Partager l’audio du système » ou « Partager l’audio de l’onglet ». Ne sélectionne pas l’onglet du cours.",
       screenStopError: "Le partage d’écran ne s’est pas complètement arrêté. Appuie de nouveau sur le bouton.",
       screenAudioMissing: "L’écran est partagé sans son. Arrête le partage, relance-le et active le partage audio.",
+      screenAudioMissingMacOS: "Chrome n’a pas reçu l’audio du système. Autorise Chrome à enregistrer l’écran et l’audio système dans macOS, puis active le partage audio.",
       screenAudioMissingSafari: "Safari ne peut pas partager le son de l’écran. L’écran reste visible ; ouvre le cours dans Chrome ou Edge pour partager le son.",
+      screenReselect: "Resélectionner avec le son",
       startMedia: "Activer les médias",
     },
     preJoin: {

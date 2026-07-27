@@ -1291,10 +1291,12 @@ export const en = {
       screenStop: "Stop sharing screen",
       screenStarting: "Starting screen share",
       screenStopping: "Stopping screen share",
-      screenPickerHint: "Do not select the lesson tab. Choose another screen, window, or tab.",
+      screenPickerHint: "To share sound, enable “Share system audio” or “Share tab audio”. Do not select the lesson tab.",
       screenStopError: "Screen sharing did not stop completely. Press the button again.",
       screenAudioMissing: "Your screen is being shared without sound. Stop sharing, start again, and enable audio sharing.",
+      screenAudioMissingMacOS: "Chrome did not receive system audio. Allow Chrome to record screen and system audio in macOS settings, then enable system audio sharing.",
       screenAudioMissingSafari: "Safari cannot share screen audio. Your screen is visible; open the lesson in Chrome or Edge to share sound.",
+      screenReselect: "Choose again with sound",
       startMedia: "Start media",
     },
     preJoin: {

@@ -14,6 +14,7 @@ import {
 const mocks = vi.hoisted(() => ({
   audioTracks: [] as Array<{ participant: unknown; publication: { track?: unknown } }>,
   browserName: "Safari",
+  browserOS: undefined as "macOS" | undefined,
   canPlayAudio: true,
   canPlayVideo: true,
   captureOptions: undefined as unknown,
@@ -26,6 +27,10 @@ const mocks = vi.hoisted(() => ({
   saveAudioInputEnabled: vi.fn(),
   saveVideoInputEnabled: vi.fn(),
   toggle: vi.fn(),
+  videoTracks: [] as Array<{
+    participant: unknown;
+    publication: { track?: { mediaStreamTrack: MediaStreamTrack } };
+  }>,
 }));
 
 vi.mock("@livekit/components-react", () => ({
@@ -65,7 +70,9 @@ vi.mock("@livekit/components-react", () => ({
     canPlayVideo: mocks.canPlayVideo,
     mergedProps: props,
   }),
-  useTracks: () => mocks.audioTracks,
+  useTracks: (sources: string[]) => sources.includes("screen_share_audio")
+    ? mocks.audioTracks
+    : mocks.videoTracks,
   useTrackToggle: (options: {
     "aria-label"?: string;
     captureOptions?: unknown;
@@ -91,7 +98,7 @@ vi.mock("@livekit/components-react", () => ({
 }));
 
 vi.mock("livekit-client", () => ({
-  getBrowser: () => ({ name: mocks.browserName }),
+  getBrowser: () => ({ name: mocks.browserName, os: mocks.browserOS }),
   Track: {
     Source: {
       Camera: "camera",
@@ -114,7 +121,9 @@ vi.mock("../../../shared/i18n", () => ({
       "classroom.controls.microphone": "Микрофон",
       "classroom.controls.camera": "Камера",
       "classroom.controls.screenAudioMissing": "Экран передаётся без звука.",
+      "classroom.controls.screenAudioMissingMacOS": "Chrome не получил системный звук.",
       "classroom.controls.screenAudioMissingSafari": "Safari не передаёт звук демонстрации.",
+      "classroom.controls.screenReselect": "Перевыбрать со звуком",
       "classroom.controls.startMedia": "Включить медиа",
     })[key] ?? key,
   }),
@@ -125,6 +134,7 @@ afterEach(() => cleanup());
 beforeEach(() => {
   mocks.audioTracks = [];
   mocks.browserName = "Safari";
+  mocks.browserOS = undefined;
   mocks.canPlayAudio = true;
   mocks.canPlayVideo = true;
   mocks.captureOptions = undefined;
@@ -132,6 +142,7 @@ beforeEach(() => {
   mocks.saveAudioInputEnabled.mockReset();
   mocks.saveVideoInputEnabled.mockReset();
   mocks.toggle.mockReset();
+  mocks.videoTracks = [];
   mocks.room.localParticipant.setScreenShareEnabled.mockReset();
   mocks.room.localParticipant.setScreenShareEnabled.mockImplementation(async (enabled: boolean) => {
     mocks.room.localParticipant.isScreenShareEnabled = enabled;
@@ -175,12 +186,12 @@ describe("ClassroomControlBar compact controls", () => {
 });
 
 describe("ClassroomControlBar screen sharing", () => {
-  it("requests display audio and own-audio restriction from LiveKit", () => {
+  it("requests standard display audio from LiveKit without filtering teacher computer audio", () => {
     renderControlBar();
 
     expect(mocks.captureOptions).toEqual(classroomScreenShareCaptureOptions);
     expect(classroomScreenShareCaptureOptions).toEqual({
-      audio: { restrictOwnAudio: true },
+      audio: true,
       preferCurrentTab: false,
       selfBrowserSurface: "exclude",
       surfaceSwitching: "include",
@@ -213,13 +224,43 @@ describe("ClassroomControlBar screen sharing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Экран" }));
 
     expect(await screen.findByText("Экран передаётся без звука.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Перевыбрать со звуком" })).toBeInTheDocument();
   });
 
-  it("selects the generic warning outside Safari", () => {
+  it("selects an actionable macOS warning for full-screen Chrome capture", () => {
     expect(classroomScreenShareAudioWarning(true, false, "Chrome")).toBe("missing");
+    expect(classroomScreenShareAudioWarning(true, false, "Chrome", "monitor", true)).toBe("macos-system");
+    expect(classroomScreenShareAudioWarning(true, false, "Chrome", "browser", true)).toBe("missing");
     expect(classroomScreenShareAudioWarning(true, false, "Safari")).toBe("safari");
     expect(classroomScreenShareAudioWarning(true, true, "Safari")).toBeNull();
     expect(classroomScreenShareAudioWarning(false, false, "Chrome")).toBeNull();
+  });
+
+  it("stops current publications and opens the picker again from the no-audio action", async () => {
+    mocks.browserName = "Chrome";
+    mocks.browserOS = "macOS";
+    mocks.room.localParticipant.isScreenShareEnabled = true;
+    mocks.videoTracks = [{
+      participant: mocks.room.localParticipant,
+      publication: {
+        track: {
+          mediaStreamTrack: {
+            addEventListener: vi.fn(),
+            getSettings: () => ({ displaySurface: "monitor" }),
+            removeEventListener: vi.fn(),
+          } as unknown as MediaStreamTrack,
+        },
+      },
+    }];
+    renderControlBar();
+
+    expect(await screen.findByText("Chrome не получил системный звук.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Перевыбрать со звуком" }));
+
+    await waitFor(() => {
+      expect(mocks.room.localParticipant.setScreenShareEnabled).toHaveBeenCalledWith(false);
+      expect(mocks.toggle).toHaveBeenCalledWith(true);
+    });
   });
 });
 

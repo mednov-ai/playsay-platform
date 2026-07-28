@@ -1,4 +1,5 @@
 import { GAME_SYNC_PROTOCOL, type GameManifest } from "./types";
+import type { GameSyncCapability } from "./types";
 
 export type GameCompatibility =
   | "SDK_V1"
@@ -16,6 +17,42 @@ const NON_DETERMINISTIC_PATTERNS = [
   /\bXMLHttpRequest\b/i,
 ];
 
+const GAME_SYNC_CAPABILITIES = new Set<GameSyncCapability>([
+  "actions",
+  "completion",
+  "effects",
+  "score",
+]);
+
+export function validateGameManifest(value: unknown): GameManifest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("GAME_MANIFEST_INVALID: manifest must be an object");
+  }
+  const manifest = value as Partial<GameManifest>;
+  const stringFields = ["gameId", "stateVersion", "reducerVersion", "buildHash"] as const;
+  if (manifest.protocol !== GAME_SYNC_PROTOCOL) {
+    throw new Error(`GAME_MANIFEST_INVALID: protocol must be ${GAME_SYNC_PROTOCOL}`);
+  }
+  for (const field of stringFields) {
+    if (typeof manifest[field] !== "string" || !manifest[field]?.trim()) {
+      throw new Error(`GAME_MANIFEST_INVALID: ${field} must be a non-empty string`);
+    }
+  }
+  if (manifest.capabilities !== undefined) {
+    if (
+      !Array.isArray(manifest.capabilities) ||
+      manifest.capabilities.some((capability) => (
+        typeof capability !== "string" ||
+        !GAME_SYNC_CAPABILITIES.has(capability as GameSyncCapability)
+      )) ||
+      new Set(manifest.capabilities).size !== manifest.capabilities.length
+    ) {
+      throw new Error("GAME_MANIFEST_INVALID: capabilities must be a unique supported string array");
+    }
+  }
+  return manifest as GameManifest;
+}
+
 export function readGameManifest(html: string): GameManifest | null {
   const match = html.match(
     /<script[^>]+type=["']application\/playsay-game\+json["'][^>]*>([\s\S]*?)<\/script>/i,
@@ -24,14 +61,7 @@ export function readGameManifest(html: string): GameManifest | null {
     return null;
   }
   try {
-    const manifest = JSON.parse(match[1]) as Partial<GameManifest>;
-    return manifest.protocol === GAME_SYNC_PROTOCOL &&
-      typeof manifest.gameId === "string" &&
-      typeof manifest.reducerVersion === "string" &&
-      typeof manifest.stateVersion === "string" &&
-      typeof manifest.buildHash === "string"
-      ? manifest as GameManifest
-      : null;
+    return validateGameManifest(JSON.parse(match[1]));
   } catch {
     return null;
   }

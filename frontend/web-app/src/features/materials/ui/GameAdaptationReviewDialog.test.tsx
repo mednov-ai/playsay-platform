@@ -4,6 +4,11 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GameAdaptationReviewDialog } from "./GameAdaptationReviewDialog";
 
+const sdkHtml = `<html><head><script type="application/playsay-game+json">{
+  "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
+  "reducerVersion":"1","buildHash":"test"
+}</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>`;
+
 vi.mock("../../../shared/i18n", () => ({
   useAppTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -31,7 +36,7 @@ describe("GameAdaptationReviewDialog", () => {
     const onApply = vi.fn();
     render(
       <GameAdaptationReviewDialog
-        html="<html></html>"
+        html={sdkHtml}
         onApply={onApply}
         onClose={vi.fn()}
       />,
@@ -53,7 +58,7 @@ describe("GameAdaptationReviewDialog", () => {
   it("latches a runtime failure and keeps Apply disabled", () => {
     render(
       <GameAdaptationReviewDialog
-        html="<html></html>"
+        html={sdkHtml}
         onApply={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -70,7 +75,7 @@ describe("GameAdaptationReviewDialog", () => {
     vi.useFakeTimers();
     render(
       <GameAdaptationReviewDialog
-        html="<html></html>"
+        html={sdkHtml}
         onApply={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -80,6 +85,20 @@ describe("GameAdaptationReviewDialog", () => {
       vi.advanceTimersByTime(8_000);
     });
 
+    expect((screen.getByRole("button", { name: "materials.gameAdaptationReview.apply" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("status").textContent).toContain("materials.gameAdaptationReview.runtime.failed");
+  });
+
+  it("never enables Apply for a legacy preview even if it reports ready", () => {
+    render(
+      <GameAdaptationReviewDialog
+        html="<html><body><button>Legacy</button></body></html>"
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "runtime-ready" }));
     expect((screen.getByRole("button", { name: "materials.gameAdaptationReview.apply" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("status").textContent).toContain("materials.gameAdaptationReview.runtime.failed");
   });

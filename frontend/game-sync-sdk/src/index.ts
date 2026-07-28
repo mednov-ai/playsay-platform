@@ -1,4 +1,9 @@
-export { classifyGameHtml, readGameManifest, type GameCompatibility } from "./compatibility";
+export {
+  classifyGameHtml,
+  readGameManifest,
+  validateGameManifest,
+  type GameCompatibility,
+} from "./compatibility";
 export { checksumState, defineGame } from "./runtime";
 export {
   createMessagePortTransport,

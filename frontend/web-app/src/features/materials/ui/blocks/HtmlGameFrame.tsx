@@ -3,6 +3,8 @@ import { Gamepad2, Loader2 } from "lucide-react";
 import {
   classifyGameHtml,
   GAME_SYNC_LIMITS,
+  readGameManifest,
+  validateGameManifest,
   type GameActionRequest,
   type GameSyncInboundMessage,
   type GameSyncOutboundMessage,
@@ -61,6 +63,59 @@ function serializedMessageBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
+function sameGameManifest(
+  left: ReturnType<typeof validateGameManifest>,
+  right: ReturnType<typeof validateGameManifest>,
+): boolean {
+  return (
+    left.protocol === right.protocol &&
+    left.gameId === right.gameId &&
+    left.stateVersion === right.stateVersion &&
+    left.reducerVersion === right.reducerVersion &&
+    left.buildHash === right.buildHash &&
+    JSON.stringify(left.capabilities ?? []) === JSON.stringify(right.capabilities ?? [])
+  );
+}
+
+function validSdkActionRequest(
+  action: GameActionRequest | undefined,
+  manifest: ReturnType<typeof readGameManifest>,
+): action is GameActionRequest {
+  return Boolean(
+    action &&
+    manifest &&
+    typeof action.eventId === "string" &&
+    action.eventId &&
+    typeof action.actorId === "string" &&
+    action.actorId &&
+    Number.isSafeInteger(action.actorSequence) &&
+    action.actorSequence > 0 &&
+    typeof action.runId === "string" &&
+    action.runId &&
+    typeof action.type === "string" &&
+    action.type.trim() &&
+    action.type.length <= 120 &&
+    action.gameId === manifest.gameId &&
+    action.stateVersion === manifest.stateVersion
+  );
+}
+
+function recordSdkAction(timestamps: number[]): boolean {
+  const now = Date.now();
+  while (timestamps.length > 0 && now - (timestamps[0] ?? now) >= 3_000) {
+    timestamps.shift();
+  }
+  const oneSecondCount = timestamps.filter((at) => now - at < 1_000).length;
+  if (
+    oneSecondCount >= GAME_SYNC_LIMITS.actionBurstPerSecond ||
+    timestamps.length >= GAME_SYNC_LIMITS.actionSustainedPerThreeSeconds
+  ) {
+    return true;
+  }
+  timestamps.push(now);
+  return false;
+}
+
 function orderSdkAction(
   request: GameActionRequest & { at: number; blockId: string; id: string },
   revision: { current: number },
@@ -96,6 +151,7 @@ export function HtmlGameFrame({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useMemo(() => crypto.randomUUID(), [blockId, html]);
   const sdkRuntime = Boolean(html && classifyGameHtml(html) === "SDK_V1");
+  const embeddedManifest = useMemo(() => html ? readGameManifest(html) : null, [html]);
   const isMirror = Boolean(sync && !sync.isAuthority && !sdkRuntime);
   const authorityRunId = sync?.authorityRuns[blockId];
   const predictiveMirror = Boolean(isMirror && html && supportsPredictiveHtmlGame(html));
@@ -117,6 +173,8 @@ export function HtmlGameFrame({
   const handledSdkRequestsRef = useRef(new Set<string>());
   const sdkRevisionRef = useRef(0);
   const sdkLogicalTimeRef = useRef(0);
+  const sdkHelloAcceptedRef = useRef(false);
+  const sdkActionTimestampsRef = useRef<number[]>([]);
   const mirrorReadyRef = useRef(false);
   const pendingMirrorSnapshotRef = useRef<MaterialHtmlGameSnapshot | null>(null);
   const mirrorSnapshotRetryRef = useRef<number | null>(null);
@@ -171,6 +229,8 @@ export function HtmlGameFrame({
     handledSdkRequestsRef.current = new Set();
     sdkRevisionRef.current = 0;
     sdkLogicalTimeRef.current = 0;
+    sdkHelloAcceptedRef.current = false;
+    sdkActionTimestampsRef.current = [];
     sdkPortRef.current?.close();
     sdkPortRef.current = null;
     mirrorReadyRef.current = false;
@@ -290,7 +350,22 @@ export function HtmlGameFrame({
         sdkPortRef.current = ports.port1;
         ports.port1.onmessage = (event: MessageEvent<GameSyncOutboundMessage>) => {
           const outbound = event.data;
+          if (!outbound || typeof outbound !== "object" || typeof outbound.kind !== "string") {
+            setRuntimeStatus("failed");
+            return;
+          }
           if (outbound.kind === "hello") {
+            try {
+              const manifest = validateGameManifest(outbound.manifest);
+              if (!embeddedManifest || !sameGameManifest(manifest, embeddedManifest)) {
+                throw new Error("Runtime manifest does not match the embedded manifest");
+              }
+              sdkHelloAcceptedRef.current = true;
+            } catch {
+              sdkHelloAcceptedRef.current = false;
+              setRuntimeStatus("failed");
+              return;
+            }
             const checkpoint = sync?.sdkCheckpoints[blockId];
             const context: GameSyncInboundMessage = {
               actorId: String(sync?.clientId ?? channel),
@@ -300,8 +375,26 @@ export function HtmlGameFrame({
               seed: seedFromRunId(runtimeRunId),
             };
             ports.port1.postMessage(context);
-            setRuntimeStatus((current) => current === "failed" ? current : "ready");
           } else if (outbound.kind === "action-request") {
+            if (!sdkHelloAcceptedRef.current || !validSdkActionRequest(outbound.action, embeddedManifest)) {
+              ports.port1.postMessage({
+                code: "ACTION_CONTRACT_INVALID",
+                eventId: outbound.action?.eventId,
+                kind: "rejected",
+              } satisfies GameSyncInboundMessage);
+              setRuntimeStatus("failed");
+              return;
+            }
+            const actionRateError = recordSdkAction(sdkActionTimestampsRef.current);
+            if (actionRateError) {
+              ports.port1.postMessage({
+                code: "ACTION_RATE_EXCEEDED",
+                eventId: outbound.action.eventId,
+                kind: "rejected",
+              } satisfies GameSyncInboundMessage);
+              setRuntimeStatus("failed");
+              return;
+            }
             if (serializedMessageBytes(outbound.action) > GAME_SYNC_LIMITS.actionBytes) {
               ports.port1.postMessage({
                 code: "ACTION_TOO_LARGE",
@@ -350,6 +443,10 @@ export function HtmlGameFrame({
             if (sync) {
               sync.publishSdkCheckpoint(blockId, checkpoint);
             }
+          } else if (outbound.kind === "lifecycle" && outbound.event === "ready") {
+            if (sdkHelloAcceptedRef.current) {
+              setRuntimeStatus((current) => current === "failed" ? current : "ready");
+            }
           }
         };
         ports.port1.start();
@@ -362,7 +459,7 @@ export function HtmlGameFrame({
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [activeSnapshot, authorityRunId, blockId, channel, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
+  }, [activeSnapshot, authorityRunId, blockId, channel, embeddedManifest, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
 
   useEffect(() => {
     if (!sdkRuntime || !sync?.isAuthority) {

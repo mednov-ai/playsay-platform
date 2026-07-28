@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, Loader2, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
+import { classifyGameHtml } from "@playsay/game-sync";
 import {
   HtmlGameFrame,
   type HtmlGameRuntimeStatus,
@@ -21,11 +22,14 @@ export function GameAdaptationReviewDialog({
   report?: string | null;
 }) {
   const { t } = useAppTranslation();
-  const [runtimeStatus, setRuntimeStatus] = useState<HtmlGameRuntimeStatus>("checking");
+  const sdkCompatible = classifyGameHtml(html) === "SDK_V1";
+  const [runtimeStatus, setRuntimeStatus] = useState<HtmlGameRuntimeStatus>(
+    sdkCompatible ? "checking" : "failed",
+  );
 
   useEffect(() => {
-    setRuntimeStatus("checking");
-  }, [html]);
+    setRuntimeStatus(sdkCompatible ? "checking" : "failed");
+  }, [html, sdkCompatible]);
 
   useEffect(() => {
     if (runtimeStatus !== "checking") return undefined;
@@ -34,8 +38,9 @@ export function GameAdaptationReviewDialog({
   }, [html, runtimeStatus]);
 
   const handleRuntimeStatusChange = useCallback((status: HtmlGameRuntimeStatus) => {
+    if (!sdkCompatible) return;
     setRuntimeStatus((current) => current === "failed" ? current : status);
-  }, []);
+  }, [sdkCompatible]);
 
   const handleApply = useCallback(() => {
     if (runtimeStatus === "ready") onApply();

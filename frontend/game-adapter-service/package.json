@@ -13,5 +13,9 @@
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
     "vitest": "^4.1.5"
+  },
+  "dependencies": {
+    "@playsay/game-sync": "0.1.0",
+    "playwright-core": "1.61.0"
   }
 }

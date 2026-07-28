@@ -118,7 +118,14 @@ class MaterialGameAdaptationService(
             complete(jobId, adaptedAssetId, adapted)
         } catch (exception: Exception) {
             logger.warn("HTML game adaptation failed jobId={} materialId={} assetId={}", jobId, job.materialId, job.sourceAssetId, exception)
-            fail(jobId, (exception as? ProjectResponseException)?.errorCode ?: MetaData.ErrorCodes.GAME_ADAPTER_FAILED)
+            val adapterFailure = exception as? GameAdapterClientException
+            fail(
+                jobId,
+                adapterFailure?.adapterErrorCode
+                    ?: (exception as? ProjectResponseException)?.errorCode
+                    ?: MetaData.ErrorCodes.GAME_ADAPTER_FAILED,
+                retryable = adapterFailure?.retryable ?: false,
+            )
         }
     }
 
@@ -194,9 +201,9 @@ class MaterialGameAdaptationService(
     }
 
     @Transactional
-    fun fail(jobId: UUID, errorCode: String) {
+    fun fail(jobId: UUID, errorCode: String, retryable: Boolean = false) {
         val job = repo.findById(jobId).orElse(null) ?: return
-        val exhausted = job.attempts >= 3
+        val exhausted = !retryable || job.attempts >= 3
         job.status = if (exhausted) MaterialGameAdaptationStatuses.FAILED else MaterialGameAdaptationStatuses.RETRY
         job.nextAttemptAt = if (exhausted) null else Instant.now().plusSeconds(30L * job.attempts.coerceAtLeast(1))
         job.leaseUntil = null

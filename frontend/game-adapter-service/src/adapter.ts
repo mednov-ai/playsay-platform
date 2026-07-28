@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { readGameManifest } from "@playsay/game-sync";
+import {
+  validateGameRuntime,
+  validateRuntimePlan,
+  type RuntimeValidationPlan,
+  type RuntimeValidationSummary,
+} from "./runtime-validator.js";
 
 const MAX_HTML_BYTES = 5 * 1024 * 1024;
 const SDK_PLACEHOLDER = "<!-- PLAYSAY_GAME_SYNC_SDK -->";
@@ -26,11 +33,13 @@ export type AdaptationResult = {
   model: string;
   promptHash: string;
   report: string;
+  validation: RuntimeValidationSummary & { attempts: number };
 };
 
 type GeneratedAdaptation = {
   html: string;
   report: string;
+  validationPlan: RuntimeValidationPlan;
 };
 
 export function validateAdaptedHtml(html: string): void {
@@ -48,6 +57,9 @@ function validateAdaptedStructure(html: string): void {
   if (!SDK_MANIFEST_PATTERN.test(html) || !/PlaySayGameSync\.defineGame\s*\(/.test(html)) {
     throw new Error("ADAPTED_HTML_MISSING_SYNC_CONTRACT");
   }
+  if (!readGameManifest(html)) {
+    throw new Error("ADAPTED_HTML_INVALID_MANIFEST");
+  }
 }
 
 export async function adaptGameHtml(
@@ -59,6 +71,10 @@ export async function adaptGameHtml(
     model?: string;
     reasoningEffort?: string;
     sdkSource?: string;
+    validateRuntime?: (
+      html: string,
+      plan: RuntimeValidationPlan,
+    ) => Promise<RuntimeValidationSummary>;
   } = {},
 ): Promise<AdaptationResult> {
   if (Buffer.byteLength(sourceHtml, "utf8") > MAX_HTML_BYTES || !/<\s*html\b/i.test(sourceHtml)) {
@@ -71,32 +87,66 @@ export async function adaptGameHtml(
       model: "none",
       promptHash: hash("already-compatible"),
       report: "The game already implements Play&Say Game Sync v1.",
+      validation: {
+        actionCount: 0,
+        attempts: 0,
+        checks: ["manifest", "static-contract"],
+        durationMs: 0,
+        maximumActionsPerSecond: 0,
+      },
     };
   }
   const model = options.model?.trim() || process.env.OPENAI_MODEL?.trim() || "gpt-5.6-sol";
-  const prompt = adaptationPrompt(sourceHtml);
-  const generated = options.generate
-    ? await options.generate(prompt)
-    : await generateWithOpenAi(prompt, {
-      apiKey: options.apiKey ?? process.env.OPENAI_API_KEY ?? "",
-      baseUrl: options.baseUrl ?? process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
-      model,
-      reasoningEffort: options.reasoningEffort ?? process.env.OPENAI_REASONING_EFFORT ?? "medium",
-    });
-  validateAdaptedHtml(generated.html);
   const sdkSource = options.sdkSource ?? await readSdkSource();
-  const withSdk = generated.html.includes(SDK_PLACEHOLDER)
-    ? generated.html.replace(SDK_PLACEHOLDER, `<script data-playsay-game-sync-sdk>${sdkSource}</script>`)
-    : generated.html.replace(/<head\b[^>]*>/i, (head) => `${head}<script data-playsay-game-sync-sdk>${sdkSource}</script>`);
-  // The generated game was checked before insertion. The bundled SDK is trusted build
-  // output and intentionally contains compatibility-detector names such as WebSocket.
-  validateAdaptedStructure(withSdk);
-  return {
-    html: withSdk,
+  const basePrompt = adaptationPrompt(sourceHtml);
+  const generate = options.generate ?? ((prompt: string) => generateWithOpenAi(prompt, {
+    apiKey: options.apiKey ?? process.env.OPENAI_API_KEY ?? "",
+    baseUrl: options.baseUrl ?? process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
     model,
-    promptHash: hash(prompt),
-    report: generated.report.trim().slice(0, 8_000),
-  };
+    reasoningEffort: options.reasoningEffort ?? process.env.OPENAI_REASONING_EFFORT ?? "medium",
+  }));
+  const runtimeValidator = options.validateRuntime ?? validateGameRuntime;
+  let prompt = basePrompt;
+  let previousHtml = "";
+  let previousFailure = "";
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const generated = await generate(prompt);
+    previousHtml = generated.html;
+    try {
+      validateRuntimePlan(generated.validationPlan);
+      validateAdaptedHtml(generated.html);
+      const withSdk = injectSdk(generated.html, sdkSource);
+      // The generated game was checked before insertion. The bundled SDK is trusted build
+      // output and intentionally contains compatibility-detector names such as WebSocket.
+      validateAdaptedStructure(withSdk);
+      const validation = await runtimeValidator(withSdk, generated.validationPlan);
+      return {
+        html: withSdk,
+        model,
+        promptHash: hash(basePrompt),
+        report: `${generated.report.trim()}\n\nValidation passed: ${validation.checks.join(", ")}; attempts: ${attempt}; maximum action rate: ${validation.maximumActionsPerSecond}/s.`
+          .trim()
+          .slice(0, 8_000),
+        validation: { ...validation, attempts: attempt },
+      };
+    } catch (error) {
+      previousFailure = error instanceof Error ? error.message : String(error);
+      if (attempt >= 2 || previousFailure.startsWith("RUNTIME_VALIDATOR_UNAVAILABLE")) {
+        throw new Error(`ADAPTED_HTML_VALIDATION_FAILED: ${previousFailure.slice(0, 500)}`);
+      }
+      prompt = repairPrompt(basePrompt, previousHtml, previousFailure);
+    }
+  }
+  throw new Error(`ADAPTED_HTML_VALIDATION_FAILED: ${previousFailure || "unknown validation failure"}`);
+}
+
+function injectSdk(html: string, sdkSource: string): string {
+  return html.includes(SDK_PLACEHOLDER)
+    ? html.replace(SDK_PLACEHOLDER, `<script data-playsay-game-sync-sdk>${sdkSource}</script>`)
+    : html.replace(
+      /<head\b[^>]*>/i,
+      (head) => `${head}<script data-playsay-game-sync-sdk>${sdkSource}</script>`,
+    );
 }
 
 async function generateWithOpenAi(
@@ -129,8 +179,41 @@ async function generateWithOpenAi(
             properties: {
               html: { type: "string" },
               report: { maxLength: 8_000, type: "string" },
+              validationPlan: {
+                additionalProperties: false,
+                properties: {
+                  readySelector: { maxLength: 200, type: "string" },
+                  steps: {
+                    items: {
+                      additionalProperties: false,
+                      properties: {
+                        expectActionType: { maxLength: 120, type: "string" },
+                        expectDomChange: { type: "boolean" },
+                        name: { maxLength: 120, type: "string" },
+                        operation: {
+                          additionalProperties: false,
+                          properties: {
+                            key: { type: ["string", "null"] },
+                            kind: { enum: ["click", "pointerdown", "keydown"], type: "string" },
+                            selector: { type: ["string", "null"] },
+                          },
+                          required: ["kind", "selector", "key"],
+                          type: "object",
+                        },
+                      },
+                      required: ["name", "operation", "expectActionType", "expectDomChange"],
+                      type: "object",
+                    },
+                    maxItems: 4,
+                    minItems: 1,
+                    type: "array",
+                  },
+                },
+                required: ["readySelector", "steps"],
+                type: "object",
+              },
             },
-            required: ["html", "report"],
+            required: ["html", "report", "validationPlan"],
             type: "object",
           },
           strict: true,
@@ -158,10 +241,18 @@ async function generateWithOpenAi(
     throw new Error("OPENAI_RESPONSE_MISSING");
   }
   const parsed = JSON.parse(text) as Partial<GeneratedAdaptation>;
-  if (typeof parsed.html !== "string" || typeof parsed.report !== "string") {
+  if (
+    typeof parsed.html !== "string" ||
+    typeof parsed.report !== "string" ||
+    !parsed.validationPlan
+  ) {
     throw new Error("OPENAI_RESPONSE_INVALID");
   }
-  return { html: parsed.html, report: parsed.report };
+  return {
+    html: parsed.html,
+    report: parsed.report,
+    validationPlan: validateRuntimePlan(parsed.validationPlan),
+  };
 }
 
 async function readSdkSource(): Promise<string> {
@@ -180,19 +271,45 @@ Requirements:
 - Preserve the visible design, rules, controls, accessibility, text and sound behavior.
 - Put ${SDK_PLACEHOLDER} in <head>; do not include an external SDK URL.
 - Add <script type="application/playsay-game+json"> with protocol "playsay-game-sync/v1",
-  stable gameId, stateVersion, reducerVersion, buildHash and capabilities.
+  stable gameId, string stateVersion, string reducerVersion, string buildHash, and capabilities
+  as a unique array containing only "actions", "effects", "score", or "completion".
 - Use PlaySayGameSync.defineGame({manifest, initialState, reduce, onState}).
+- Always dispatch as controller.dispatch("ACTION_TYPE", payload). In the reducer read the action
+  name from action.type and all action data from action.payload.
 - Make the reducer pure. All shared state changes must be serializable actions.
-- Render only from reducer state. Use context.random() and context.logicalTime instead of
-  Math.random(), Date.now(), timers or other nondeterministic state inside transitions.
+- Render only from reducer state. context.logicalTime is an ordered revision clock, not milliseconds.
+  Never dispatch TICK or another action from every animation frame. CSS/requestAnimationFrame may
+  render locally; low-frequency timers outside the reducer may dispatch idempotent semantic actions.
+- Use context.random() instead of Math.random() for state transitions. Never put Date.now() or a
+  browser timer value into shared state.
 - Dispatch user intent immediately. Keep audio/speech/animation effects outside state and
   identify them with controller.emitEffect so remote clients execute each effect once.
 - Call ready/pause/resume/dispose lifecycle methods where appropriate.
 - Do not use network APIs, frames, external URLs, storage, service workers, WebRTC or WebSockets.
 - Do not invent telemetry, credentials, remote resources or hidden functionality.
+- Return validationPlan with one to four real interactions. Each step must target a visible control,
+  name the expected SDK action type, and at least one step must require a DOM state change after the
+  host orders the action. For a game with start and movement controls validate both.
+
+Exact manifest shape:
+{"protocol":"playsay-game-sync/v1","gameId":"stable-id","stateVersion":"1",
+"reducerVersion":"1","buildHash":"sha256-value","capabilities":["actions","effects"]}
 
 Source HTML:
 ${sourceHtml}`;
+}
+
+function repairPrompt(basePrompt: string, previousHtml: string, failure: string): string {
+  return `${basePrompt}
+
+The first adaptation failed Play&Say validation.
+Validation error: ${failure.slice(0, 500)}
+
+Repair the candidate below. Return the complete corrected HTML, report, and validationPlan.
+Do not weaken, bypass, catch, suppress, or fake the validator/SDK handshake.
+
+Failed candidate:
+${previousHtml}`;
 }
 
 function hash(value: string): string {

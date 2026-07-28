@@ -104,7 +104,7 @@ describe("HTML game sandbox", () => {
     expect(document).not.toContain('type="application/playsay-disabled"');
   });
 
-  it("reports an SDK game ready only after its hello handshake and latches runtime errors", () => {
+  it("reports an SDK game ready only after a matching hello and ready lifecycle, then latches errors", () => {
     const statuses: string[] = [];
     const port1 = {
       close: vi.fn(),
@@ -170,6 +170,13 @@ describe("HTML game sandbox", () => {
         },
       } as MessageEvent);
     });
+    expect(statuses.at(-1)).toBe("checking");
+
+    act(() => {
+      port1.onmessage?.({
+        data: { event: "ready", kind: "lifecycle" },
+      } as MessageEvent);
+    });
     expect(statuses.at(-1)).toBe("ready");
 
     act(() => {
@@ -195,6 +202,56 @@ describe("HTML game sandbox", () => {
       } as MessageEvent);
     });
     expect(statuses.at(-1)).toBe("failed");
+  });
+
+  it("rejects an SDK hello whose runtime manifest differs from the embedded manifest", () => {
+    const statuses: string[] = [];
+    const port1 = {
+      close: vi.fn(),
+      onmessage: null as ((event: MessageEvent) => void) | null,
+      postMessage: vi.fn(),
+      start: vi.fn(),
+    };
+    vi.stubGlobal("MessageChannel", class {
+      port1 = port1;
+      port2 = { close: vi.fn(), onmessage: null, postMessage: vi.fn(), start: vi.fn() };
+    });
+    const sdkGame = `<html><head><script type="application/playsay-game+json">{
+      "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
+      "reducerVersion":"1","buildHash":"expected"
+    }</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>`;
+    const { container } = render(
+      <HtmlGameFrame
+        blockId="game-invalid-manifest"
+        height={640}
+        html={sdkGame}
+        onRuntimeStatusChange={(status) => statuses.push(status)}
+        title="Game"
+      />,
+    );
+    const iframe = container.querySelector("iframe");
+    const channelMatch = iframe?.getAttribute("srcdoc")?.match(/const channel = ("[^"]+");/);
+    const channel = channelMatch ? JSON.parse(channelMatch[1]) as string : "";
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", {
+        data: { channel, type: "sdkReady" },
+        source: iframe?.contentWindow,
+      }));
+      port1.onmessage?.({
+        data: {
+          kind: "hello",
+          manifest: {
+            buildHash: "different",
+            gameId: "quiz",
+            protocol: "playsay-game-sync/v1",
+            reducerVersion: "1",
+            stateVersion: "1",
+          },
+        },
+      } as MessageEvent);
+    });
+    expect(statuses.at(-1)).toBe("failed");
+    expect(port1.postMessage).not.toHaveBeenCalled();
   });
 
   it("reports startup errors from the injected sandbox bridge", async () => {

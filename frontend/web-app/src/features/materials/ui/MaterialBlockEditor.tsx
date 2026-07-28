@@ -515,7 +515,9 @@ export function MaterialBlockEditor({
                     variant="outline"
                   >
                     <Sparkles className="h-4 w-4" />
-                    {t("materials.blockEditor.improveGameSync")}
+                    {t(htmlGameAdaptation?.status === "FAILED"
+                      ? "materials.blockEditor.retryGameAdaptation"
+                      : "materials.blockEditor.improveGameSync")}
                   </Button>
                 ) : null}
               </div>
@@ -665,7 +667,16 @@ function gameSyncStatusLabel(
   adaptation: MaterialGameAdaptation | undefined,
   t: (key: string, values?: Record<string, unknown>) => string,
 ): string {
-  if (adaptation?.status === "FAILED") return t("materials.blockEditor.gameSyncFailed");
+  if (adaptation?.status === "FAILED") {
+    const errorKey = adaptation.errorCode && {
+      GAME_ADAPTER_CONTRACT_INVALID: "gameSyncFailedContract",
+      GAME_ADAPTER_RUNTIME_INVALID: "gameSyncFailedRuntime",
+      GAME_ADAPTER_ACTION_RATE_EXCEEDED: "gameSyncFailedActionRate",
+      GAME_ADAPTER_UNSAFE: "gameSyncFailedUnsafe",
+      GAME_ADAPTER_UNAVAILABLE: "gameSyncFailedUnavailable",
+    }[adaptation.errorCode];
+    return t(`materials.blockEditor.${errorKey ?? "gameSyncFailed"}`);
+  }
   if (adaptation && ["PENDING", "ANALYZING", "PATCHING", "VALIDATING", "RETRY"].includes(adaptation.status)) {
     return t("materials.blockEditor.gameSyncAdapting");
   }

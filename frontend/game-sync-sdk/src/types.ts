@@ -2,6 +2,8 @@ export const GAME_SYNC_PROTOCOL = "playsay-game-sync/v1" as const;
 
 export const GAME_SYNC_LIMITS = {
   actionBytes: 16 * 1024,
+  actionBurstPerSecond: 30,
+  actionSustainedPerThreeSeconds: 60,
   checkpointBytes: 512 * 1024,
   checkpointIntervalMs: 2_000,
   checkpointIntervalRevisions: 20,

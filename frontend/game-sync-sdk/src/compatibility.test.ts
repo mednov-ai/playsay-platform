@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyGameHtml, readGameManifest } from "./compatibility";
+import { classifyGameHtml, readGameManifest, validateGameManifest } from "./compatibility";
 
 describe("game compatibility", () => {
   it("recognizes the v1 embedded manifest", () => {
@@ -9,6 +9,21 @@ describe("game compatibility", () => {
     }</script></html>`;
     expect(classifyGameHtml(html)).toBe("SDK_V1");
     expect(readGameManifest(html)?.gameId).toBe("quiz");
+  });
+
+  it("rejects manifest field types and unsupported capability shapes", () => {
+    expect(() => validateGameManifest({
+      buildHash: "abc",
+      capabilities: { actions: true },
+      gameId: "quiz",
+      protocol: "playsay-game-sync/v1",
+      reducerVersion: "1",
+      stateVersion: 1,
+    })).toThrow(/stateVersion/);
+    expect(readGameManifest(`<html><script type="application/playsay-game+json">{
+      "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":1,
+      "reducerVersion":"1","buildHash":"abc","capabilities":{"actions":true}
+    }</script></html>`)).toBeNull();
   });
 
   it("routes network-dependent games to authority mirror", () => {

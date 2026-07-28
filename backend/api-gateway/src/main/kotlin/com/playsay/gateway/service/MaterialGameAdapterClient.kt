@@ -2,7 +2,6 @@ package com.playsay.gateway.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData
 import java.net.URI
 import java.net.http.HttpClient
@@ -10,7 +9,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 
 data class GameAdapterResult(
@@ -19,6 +17,11 @@ data class GameAdapterResult(
     val model: String,
     val promptHash: String,
 )
+
+class GameAdapterClientException(
+    val adapterErrorCode: String,
+    val retryable: Boolean,
+) : RuntimeException(adapterErrorCode)
 
 @Component
 class MaterialGameAdapterClient(
@@ -31,10 +34,7 @@ class MaterialGameAdapterClient(
     fun adapt(html: String): GameAdapterResult {
         val token = serviceToken.trim()
         if (token.isEmpty()) {
-            throw ProjectResponseException.localized(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                MetaData.ErrorCodes.GAME_ADAPTER_UNAVAILABLE,
-            )
+            throw GameAdapterClientException(MetaData.ErrorCodes.GAME_ADAPTER_UNAVAILABLE, retryable = true)
         }
         val payload = objectMapper.createObjectNode().put("html", html)
         val request = HttpRequest.newBuilder(
@@ -48,22 +48,20 @@ class MaterialGameAdapterClient(
         val response = runCatching {
             httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         }.getOrElse {
-            throw ProjectResponseException.localized(
-                HttpStatus.BAD_GATEWAY,
-                MetaData.ErrorCodes.GAME_ADAPTER_UNAVAILABLE,
-            )
+            throw GameAdapterClientException(MetaData.ErrorCodes.GAME_ADAPTER_UNAVAILABLE, retryable = true)
         }
         if (response.statusCode() !in 200..299) {
-            throw ProjectResponseException.localized(
-                HttpStatus.BAD_GATEWAY,
-                MetaData.ErrorCodes.GAME_ADAPTER_FAILED,
-            )
+            val failure = runCatching { objectMapper.readTree(response.body()) }.getOrNull()
+            val adapterCode = failure?.path("code")?.asText().orEmpty()
+            val retryable = failure?.path("retryable")?.asBoolean(response.statusCode() >= 500)
+                ?: (response.statusCode() >= 500)
+            throw GameAdapterClientException(mapAdapterError(adapterCode), retryable)
         }
         val json = runCatching { objectMapper.readTree(response.body()) }.getOrNull()
-            ?: throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.GAME_ADAPTER_FAILED)
+            ?: throw GameAdapterClientException(MetaData.ErrorCodes.GAME_ADAPTER_FAILED, retryable = false)
         val adaptedHtml = json.path("html").asText()
         if (adaptedHtml.isBlank()) {
-            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.GAME_ADAPTER_FAILED)
+            throw GameAdapterClientException(MetaData.ErrorCodes.GAME_ADAPTER_FAILED, retryable = false)
         }
         return GameAdapterResult(
             html = adaptedHtml,
@@ -71,5 +69,14 @@ class MaterialGameAdapterClient(
             model = json.path("model").asText().take(120),
             promptHash = json.path("promptHash").asText().take(128),
         )
+    }
+
+    private fun mapAdapterError(code: String): String = when (code) {
+        "ADAPTED_HTML_CONTRACT_INVALID" -> MetaData.ErrorCodes.GAME_ADAPTER_CONTRACT_INVALID
+        "ADAPTED_HTML_RUNTIME_INVALID" -> MetaData.ErrorCodes.GAME_ADAPTER_RUNTIME_INVALID
+        "ADAPTED_HTML_ACTION_RATE_EXCEEDED" -> MetaData.ErrorCodes.GAME_ADAPTER_ACTION_RATE_EXCEEDED
+        "ADAPTED_HTML_UNSAFE" -> MetaData.ErrorCodes.GAME_ADAPTER_UNSAFE
+        "RUNTIME_VALIDATOR_UNAVAILABLE" -> MetaData.ErrorCodes.GAME_ADAPTER_UNAVAILABLE
+        else -> MetaData.ErrorCodes.GAME_ADAPTER_FAILED
     }
 }

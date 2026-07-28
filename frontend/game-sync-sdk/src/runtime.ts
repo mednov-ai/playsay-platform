@@ -8,6 +8,7 @@ import {
   type GameReducerContext,
   type OrderedGameAction,
 } from "./types";
+import { validateGameManifest } from "./compatibility";
 import { resolveDefaultTransport } from "./transport";
 
 function randomId(): string {
@@ -64,6 +65,7 @@ function reducerContext(seed: number, revision: number, logicalTime: number): Ga
 }
 
 export function defineGame<TState>(options: DefineGameOptions<TState>): GameController<TState> {
+  validateGameManifest(options.manifest);
   const transport = options.transport ?? resolveDefaultTransport();
   let actorId = `pending-${randomId()}`;
   let runId = `pending-${randomId()}`;
@@ -81,6 +83,22 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
   let pendingActions: GameActionRequest[] = [];
   let baseCheckpoint: GameCheckpoint<TState> = makeCheckpoint(canonicalState);
   const handledEffects = new Set<string>();
+  const dispatchedAt: number[] = [];
+
+  function assertActionRate(): void {
+    const now = Date.now();
+    while (dispatchedAt.length > 0 && now - (dispatchedAt[0] ?? now) >= 3_000) {
+      dispatchedAt.shift();
+    }
+    const oneSecondCount = dispatchedAt.filter((at) => now - at < 1_000).length;
+    if (
+      oneSecondCount >= GAME_SYNC_LIMITS.actionBurstPerSecond ||
+      dispatchedAt.length >= GAME_SYNC_LIMITS.actionSustainedPerThreeSeconds
+    ) {
+      throw new Error("ACTION_RATE_EXCEEDED");
+    }
+    dispatchedAt.push(now);
+  }
 
   function resolveInitialState(
     initialState: DefineGameOptions<TState>["initialState"],
@@ -271,6 +289,10 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
       if (disposed) {
         throw new Error("Game controller is disposed");
       }
+      if (typeof type !== "string" || !type.trim() || type.length > 120) {
+        throw new Error("Action type must be a non-empty string up to 120 characters");
+      }
+      assertActionRate();
       const action: GameActionRequest = {
         actorId,
         actorSequence: ++actorSequence,
@@ -279,7 +301,7 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
         payload,
         runId,
         stateVersion: options.manifest.stateVersion,
-        type,
+        type: type.trim(),
       };
       assertSize(action, GAME_SYNC_LIMITS.actionBytes, "Action");
       pendingActions.push(action);

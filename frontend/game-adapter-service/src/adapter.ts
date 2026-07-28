@@ -15,17 +15,26 @@ const SDK_MANIFEST_PATTERN =
   /<script[^>]+type=["']application\/playsay-game\+json["'][^>]*>[\s\S]*?playsay-game-sync\/v1[\s\S]*?<\/script>/i;
 
 const forbiddenPatterns = [
-  /<\s*(?:iframe|frame|object|embed|base)\b/i,
-  /<\s*script\b[^>]*\bsrc\s*=/i,
-  /<\s*link\b[^>]*\bhref\s*=/i,
-  /<\s*(?:img|audio|video|source)\b[^>]*\bsrc(?:set)?\s*=\s*["']\s*(?!data:|blob:)/i,
-  /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|RTCPeerConnection|sendBeacon)\b/i,
-  /\b(?:eval|Function)\s*\(/i,
-  /\bnew\s+Function\b/i,
-  /\b(?:localStorage|sessionStorage|indexedDB|serviceWorker)\b/i,
-  /<\s*(?:a|form)\b[^>]*\b(?:href|action)\s*=/i,
-  /\b(?:window\.)?location\s*(?:=|\.\s*(?:assign|replace)\s*\()/i,
-  /\bhttps?:\/\//i,
+  { name: "embedded-frame-or-object", pattern: /<\s*(?:iframe|frame|object|embed|base)\b/i },
+  { name: "external-script", pattern: /<\s*script\b[^>]*\bsrc\s*=/i },
+  { name: "external-stylesheet", pattern: /<\s*link\b[^>]*\bhref\s*=/i },
+  {
+    name: "external-media",
+    pattern: /<\s*(?:img|audio|video|source)\b[^>]*\bsrc(?:set)?\s*=\s*["']\s*(?!data:|blob:)/i,
+  },
+  {
+    name: "network-api",
+    pattern: /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|RTCPeerConnection|sendBeacon)\b/i,
+  },
+  { name: "dynamic-code", pattern: /\b(?:eval|Function)\s*\(/i },
+  { name: "dynamic-code", pattern: /\bnew\s+Function\b/i },
+  { name: "persistent-storage", pattern: /\b(?:localStorage|sessionStorage|indexedDB|serviceWorker)\b/i },
+  { name: "navigation-element", pattern: /<\s*(?:a|form)\b[^>]*\b(?:href|action)\s*=/i },
+  {
+    name: "scripted-navigation",
+    pattern: /\b(?:window\.)?location\s*(?:=|\.\s*(?:assign|replace)\s*\()/i,
+  },
+  { name: "external-url", pattern: /\bhttps?:\/\//i },
 ];
 
 export type AdaptationResult = {
@@ -44,8 +53,9 @@ type GeneratedAdaptation = {
 
 export function validateAdaptedHtml(html: string): void {
   validateAdaptedStructure(html);
-  if (forbiddenPatterns.some((pattern) => pattern.test(html))) {
-    throw new Error("ADAPTED_HTML_UNSAFE");
+  const forbidden = forbiddenPatterns.find(({ pattern }) => pattern.test(html));
+  if (forbidden) {
+    throw new Error(`ADAPTED_HTML_UNSAFE: ${forbidden.name}`);
   }
 }
 

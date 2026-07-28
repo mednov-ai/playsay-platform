@@ -81,16 +81,20 @@ describe("game adapter", () => {
       `<html><head>${manifest}</head><body><script>
         fetch('https://tracker.invalid'); PlaySayGameSync.defineGame({})
       </script></body></html>`,
-    )).toThrow("ADAPTED_HTML_UNSAFE");
+    )).toThrow("ADAPTED_HTML_UNSAFE: network-api");
   });
 
   it("rejects dynamic execution and persistent tracking APIs", () => {
-    for (const unsafe of ["eval('1')", "new Function('return 1')", "localStorage.setItem('x','1')"]) {
+    for (const [unsafe, reason] of [
+      ["eval('1')", "dynamic-code"],
+      ["new Function('return 1')", "dynamic-code"],
+      ["localStorage.setItem('x','1')", "persistent-storage"],
+    ]) {
       expect(() => validateAdaptedHtml(
         `<html><head>${manifest}</head><body><script>
           ${unsafe}; PlaySayGameSync.defineGame({})
         </script></body></html>`,
-      )).toThrow("ADAPTED_HTML_UNSAFE");
+      )).toThrow(`ADAPTED_HTML_UNSAFE: ${reason}`);
     }
   });
 

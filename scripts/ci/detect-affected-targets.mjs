@@ -203,6 +203,13 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path === "contracts/websocket-messages.schema.json") {
+      deployTargets.add("vocabulary-service");
+      deployTargets.add("web-app");
+      deployTargets.add("keyboard-app");
+      continue;
+    }
+
     if (path === "contracts/registration-openapi.yaml") {
       deployTargets.add("registration-service");
       deployTargets.add("web-app");

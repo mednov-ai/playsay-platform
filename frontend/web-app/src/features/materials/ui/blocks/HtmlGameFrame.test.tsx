@@ -34,6 +34,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("HTML game sandbox", () => {
@@ -101,6 +102,133 @@ describe("HTML game sandbox", () => {
     expect(document).toContain("__PLAY_SAY_GAME_SYNC_TRANSPORT__");
     expect(document).toContain("playsay-sdk-connect");
     expect(document).not.toContain('type="application/playsay-disabled"');
+  });
+
+  it("reports an SDK game ready only after its hello handshake and latches runtime errors", () => {
+    const statuses: string[] = [];
+    const port1 = {
+      close: vi.fn(),
+      onmessage: null as ((event: MessageEvent) => void) | null,
+      postMessage: vi.fn(),
+      start: vi.fn(),
+    };
+    const port2 = {
+      close: vi.fn(),
+      onmessage: null,
+      postMessage: vi.fn(),
+      start: vi.fn(),
+    };
+    vi.stubGlobal("MessageChannel", class {
+      port1 = port1;
+      port2 = port2;
+    });
+    const sdkGame = `<html><head><script type="application/playsay-game+json">{
+      "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
+      "reducerVersion":"1","buildHash":"test"
+    }</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>`;
+    const { container } = render(
+      <HtmlGameFrame
+        blockId="game-1"
+        height={640}
+        html={sdkGame}
+        onRuntimeStatusChange={(status) => statuses.push(status)}
+        title="Game"
+      />,
+    );
+    const iframe = container.querySelector("iframe");
+    const iframeWindow = iframe?.contentWindow;
+    const channelMatch = iframe?.getAttribute("srcdoc")?.match(/const channel = ("[^"]+");/);
+    const channel = channelMatch ? JSON.parse(channelMatch[1]) as string : "";
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", {
+        data: { channel, type: "runtimeReady" },
+        source: iframeWindow,
+      }));
+    });
+    expect(statuses.at(-1)).toBe("checking");
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", {
+        data: { channel, type: "sdkReady" },
+        source: iframeWindow,
+      }));
+    });
+    expect(port1.onmessage).not.toBeNull();
+
+    act(() => {
+      port1.onmessage?.({
+        data: {
+          kind: "hello",
+          manifest: {
+            buildHash: "test",
+            gameId: "quiz",
+            protocol: "playsay-game-sync/v1",
+            reducerVersion: "1",
+            stateVersion: "1",
+          },
+        },
+      } as MessageEvent);
+    });
+    expect(statuses.at(-1)).toBe("ready");
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", {
+        data: { channel, message: "startup failed", type: "runtimeError" },
+        source: iframeWindow,
+      }));
+    });
+    expect(statuses.at(-1)).toBe("failed");
+
+    act(() => {
+      port1.onmessage?.({
+        data: {
+          kind: "hello",
+          manifest: {
+            buildHash: "test",
+            gameId: "quiz",
+            protocol: "playsay-game-sync/v1",
+            reducerVersion: "1",
+            stateVersion: "1",
+          },
+        },
+      } as MessageEvent);
+    });
+    expect(statuses.at(-1)).toBe("failed");
+  });
+
+  it("reports startup errors from the injected sandbox bridge", async () => {
+    const channel = "runtime-error-test";
+    const messages: Array<Record<string, unknown>> = [];
+    const documentHtml = createSandboxedGameDocument(
+      "<html><head><title>Broken game</title></head><body><script>throw new Error('broken startup')</script></body></html>",
+      channel,
+      false,
+    );
+    const dom = new JSDOM(documentHtml, {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "http://localhost/",
+      beforeParse(window) {
+        window.addEventListener("message", (event) => {
+          const message = event.data as Record<string, unknown>;
+          if (message?.channel === channel) messages.push(message);
+        });
+        Object.defineProperty(window, "CSS", {
+          configurable: true,
+          value: { escape: (value: string) => value },
+        });
+      },
+    });
+
+    try {
+      await waitFor(() => expect(messages).toContainEqual(expect.objectContaining({
+        message: "broken startup",
+        type: "runtimeError",
+      })));
+    } finally {
+      dom.window.close();
+    }
   });
 
   it("renders srcdoc in a sandbox without same-origin or navigation permissions", () => {

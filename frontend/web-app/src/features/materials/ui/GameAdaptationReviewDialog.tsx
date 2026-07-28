@@ -1,8 +1,13 @@
-import { useEffect } from "react";
-import { Check, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, Check, CheckCircle2, Loader2, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
-import { HtmlGameFrame } from "./blocks/HtmlGameFrame";
+import {
+  HtmlGameFrame,
+  type HtmlGameRuntimeStatus,
+} from "./blocks/HtmlGameFrame";
+
+const STARTUP_TIMEOUT_MS = 8_000;
 
 export function GameAdaptationReviewDialog({
   html,
@@ -16,6 +21,25 @@ export function GameAdaptationReviewDialog({
   report?: string | null;
 }) {
   const { t } = useAppTranslation();
+  const [runtimeStatus, setRuntimeStatus] = useState<HtmlGameRuntimeStatus>("checking");
+
+  useEffect(() => {
+    setRuntimeStatus("checking");
+  }, [html]);
+
+  useEffect(() => {
+    if (runtimeStatus !== "checking") return undefined;
+    const timeout = window.setTimeout(() => setRuntimeStatus("failed"), STARTUP_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [html, runtimeStatus]);
+
+  const handleRuntimeStatusChange = useCallback((status: HtmlGameRuntimeStatus) => {
+    setRuntimeStatus((current) => current === "failed" ? current : status);
+  }, []);
+
+  const handleApply = useCallback(() => {
+    if (runtimeStatus === "ready") onApply();
+  }, [onApply, runtimeStatus]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -46,11 +70,32 @@ export function GameAdaptationReviewDialog({
               <X className="h-4 w-4" />
               {t("materials.gameAdaptationReview.close")}
             </Button>
-            <Button onClick={onApply} type="button">
+            <Button
+              aria-describedby="game-adaptation-runtime-status"
+              disabled={runtimeStatus !== "ready"}
+              onClick={handleApply}
+              type="button"
+            >
               <Check className="h-4 w-4" />
               {t("materials.gameAdaptationReview.apply")}
             </Button>
           </div>
+        </div>
+        <div
+          aria-live="polite"
+          className="flex items-center gap-2 border-b border-border bg-background/80 px-4 py-2 text-sm font-semibold"
+          data-status={runtimeStatus}
+          id="game-adaptation-runtime-status"
+          role="status"
+        >
+          {runtimeStatus === "checking" ? (
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          ) : runtimeStatus === "ready" ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+          )}
+          <span>{t(`materials.gameAdaptationReview.runtime.${runtimeStatus}`)}</span>
         </div>
         <div className="playsay-material-preview playsay-material-reader playsay-material-play-surface p-4">
           <HtmlGameFrame
@@ -58,6 +103,7 @@ export function GameAdaptationReviewDialog({
             fillAvailable
             height={640}
             html={html}
+            onRuntimeStatusChange={handleRuntimeStatusChange}
             title={t("materials.gameAdaptationReview.frameTitle")}
           />
         </div>

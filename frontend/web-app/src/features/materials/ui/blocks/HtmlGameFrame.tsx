@@ -38,11 +38,15 @@ type BridgeMessage =
   | { channel: string; operations: MaterialHtmlGamePatchOperation[]; sequence: number; type: "patch" }
   | { channel: string; runId?: string; sequence: number; type: "patchRejected" }
   | { channel: string; type: "sdkReady" }
+  | { channel: string; message: string; type: "runtimeError" }
+  | { channel: string; type: "runtimeReady" }
   | { channel: string; type: "input"; event: Omit<MaterialHtmlGameInputEvent, "id" | "at" | "blockId"> }
   | { channel: string; type: "effect"; effect: Omit<MaterialHtmlGameEffect, "id" | "at" | "blockId"> };
 
 const MIRROR_SNAPSHOT_RETRY_MS = 750;
 const MIRROR_RECOVERY_SNAPSHOT_MS = 5_000;
+
+export type HtmlGameRuntimeStatus = "checking" | "ready" | "failed";
 
 function seedFromRunId(runId: string): number {
   let seed = 0x811c9dc5;
@@ -76,6 +80,7 @@ export function HtmlGameFrame({
   fillAvailable = false,
   height,
   html,
+  onRuntimeStatusChange,
   sync,
   title,
 }: {
@@ -83,6 +88,7 @@ export function HtmlGameFrame({
   fillAvailable?: boolean;
   height: number;
   html?: string;
+  onRuntimeStatusChange?: (status: HtmlGameRuntimeStatus) => void;
   sync?: MaterialHtmlGameSync;
   title: string;
 }) {
@@ -116,6 +122,7 @@ export function HtmlGameFrame({
   const mirrorSnapshotRetryRef = useRef<number | null>(null);
   const lastMirrorSnapshotAppliedAtRef = useRef(0);
   const [appliedAuthorityRunId, setAppliedAuthorityRunId] = useState<string | null>(null);
+  const [runtimeStatus, setRuntimeStatus] = useState<HtmlGameRuntimeStatus>("checking");
   const activeSnapshot = sync?.snapshots[blockId];
   const authorityAvailable = sdkRuntime
     ? !sync || sync.isAuthority || Boolean(authorityRunId)
@@ -171,7 +178,12 @@ export function HtmlGameFrame({
     lastMirrorSnapshotAppliedAtRef.current = 0;
     clearMirrorSnapshotRetry();
     setAppliedAuthorityRunId(null);
+    setRuntimeStatus("checking");
   }, [blockId, channel, clearMirrorSnapshotRetry, sync?.isAuthority]);
+
+  useEffect(() => {
+    onRuntimeStatusChange?.(runtimeStatus);
+  }, [onRuntimeStatusChange, runtimeStatus]);
 
   useEffect(() => () => clearMirrorSnapshotRetry(), [clearMirrorSnapshotRetry]);
 
@@ -268,6 +280,10 @@ export function HtmlGameFrame({
           blockId,
           id: crypto.randomUUID(),
         });
+      } else if (message.type === "runtimeError") {
+        setRuntimeStatus("failed");
+      } else if (message.type === "runtimeReady" && !sdkRuntime) {
+        setRuntimeStatus((current) => current === "failed" ? current : "ready");
       } else if (message.type === "sdkReady" && sdkRuntime) {
         sdkPortRef.current?.close();
         const ports = new MessageChannel();
@@ -284,6 +300,7 @@ export function HtmlGameFrame({
               seed: seedFromRunId(runtimeRunId),
             };
             ports.port1.postMessage(context);
+            setRuntimeStatus((current) => current === "failed" ? current : "ready");
           } else if (outbound.kind === "action-request") {
             if (serializedMessageBytes(outbound.action) > GAME_SYNC_LIMITS.actionBytes) {
               ports.port1.postMessage({
@@ -709,6 +726,16 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
       });
     };
     const send = (value) => nativePostMessage({ channel, ...value }, '*');
+    const reportRuntimeError = (reason) => {
+      const message = reason instanceof Error
+        ? reason.message
+        : typeof reason === 'string'
+          ? reason
+          : String(reason?.message ?? reason ?? 'Runtime error');
+      send({ type: 'runtimeError', message: message.slice(0, 500) });
+    };
+    window.addEventListener('error', (event) => reportRuntimeError(event.error ?? event.message));
+    window.addEventListener('unhandledrejection', (event) => reportRuntimeError(event.reason));
     const compactPatchOperations = (operations) => {
       const deduplicated = [];
       const latestByKey = new Map();
@@ -1428,6 +1455,7 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         }).observe(document.documentElement, { attributes: true, characterData: true, childList: true, subtree: true });
         scheduleSnapshot();
       }
+      send({ type: 'runtimeReady' });
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
   })();`;

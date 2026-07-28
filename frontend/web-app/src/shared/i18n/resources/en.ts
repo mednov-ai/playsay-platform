@@ -902,6 +902,11 @@ export const en = {
       close: "Keep original",
       apply: "Apply version",
       frameTitle: "Adapted HTML game",
+      runtime: {
+        checking: "Checking that the game starts…",
+        ready: "The game started successfully.",
+        failed: "The game did not start. Keep the original and request a new adaptation.",
+      },
     },
     form: {
       title: "Title",

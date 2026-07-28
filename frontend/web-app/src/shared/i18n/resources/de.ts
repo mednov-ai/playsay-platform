@@ -902,6 +902,11 @@ export const de = {
       close: "Original behalten",
       apply: "Version anwenden",
       frameTitle: "Angepasstes HTML-Spiel",
+      runtime: {
+        checking: "Spielstart wird geprüft…",
+        ready: "Das Spiel wurde erfolgreich gestartet.",
+        failed: "Das Spiel konnte nicht gestartet werden. Behalten Sie das Original und fordern Sie eine neue Anpassung an.",
+      },
     },
     form: {
       title: "Titel",

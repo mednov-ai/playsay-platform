@@ -6,7 +6,7 @@ import com.playsay.vocabulary.entity.VocabularyOccurrenceEntity
 import com.playsay.vocabulary.mapper.toResponse
 import com.playsay.vocabulary.repo.VocabularyEntryRepo
 import com.playsay.vocabulary.repo.VocabularyUserRepo
-import com.playsay.vocabulary.repo.VocabularyLessonParticipantRepo
+import com.playsay.vocabulary.realtime.VocabularyEntryChangedEvent
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -15,9 +15,16 @@ import java.text.Normalizer
 import java.time.Instant
 import java.util.Locale
 import java.util.UUID
+import org.springframework.context.ApplicationEventPublisher
 
 @Service
-class VocabularyService(private val entries: VocabularyEntryRepo, private val users: VocabularyUserRepo, private val participants: VocabularyLessonParticipantRepo, private val translationProvider: TranslationProvider) {
+class VocabularyService(
+    private val entries: VocabularyEntryRepo,
+    private val users: VocabularyUserRepo,
+    private val access: VocabularyAccessService,
+    private val translationProvider: TranslationProvider,
+    private val eventPublisher: ApplicationEventPublisher,
+) {
     fun suggest(subject: String, request: TranslationSuggestionRequest): TranslationSuggestionResponse {
         val languages = languages(subject, request.sourceLanguage, request.targetLanguage)
         return translationProvider.suggest(
@@ -32,12 +39,17 @@ class VocabularyService(private val entries: VocabularyEntryRepo, private val us
 
     @Transactional
     fun create(subject: String, request: CreateVocabularyEntryRequest): VocabularyEntryResponse {
-        val ownerSubject = resolveOwner(subject, request)
+        val ownerSubject = access.requireOwnerAccess(
+            subject,
+            request.ownerSubject?.trim()?.takeIf(String::isNotEmpty) ?: subject,
+            request.lessonId,
+        )
         val sourceText = cleanSource(request.sourceText)
         val languages = languages(ownerSubject, request.sourceLanguage, request.targetLanguage)
         val normalized = normalize(sourceText)
         val now = Instant.now()
-        val entry = entries.findByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguage(ownerSubject, normalized, languages.first, languages.second)
+        val existing = entries.findByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguage(ownerSubject, normalized, languages.first, languages.second)
+        val entry = existing
             ?: VocabularyEntryEntity(ownerSubject = ownerSubject, sourceText = sourceText, normalizedSource = normalized, sourceLanguage = languages.first, targetLanguage = languages.second, createdBySubject = subject, createdAt = now, updatedAt = now)
         request.translation?.trim()?.takeIf { it.isNotEmpty() }?.let { entry.translation = it }
         entry.partOfSpeech = request.partOfSpeech?.trim()?.takeIf { it.isNotEmpty() } ?: entry.partOfSpeech
@@ -47,7 +59,17 @@ class VocabularyService(private val entries: VocabularyEntryRepo, private val us
         entry.status = EntryStatus.ACTIVE
         entry.updatedAt = now
         entry.occurrences.add(VocabularyOccurrenceEntity(entry = entry, sourceType = request.sourceType, lessonId = request.lessonId, assignmentId = request.assignmentId, materialId = request.materialId, blockId = request.blockId?.trim(), context = request.context?.trim(), addedBySubject = subject, createdAt = now))
-        return entries.save(entry).toResponse()
+        val response = entries.save(entry).toResponse()
+        eventPublisher.publishEvent(
+            VocabularyEntryChangedEvent(
+                type = if (existing == null) "vocabulary.entry.created" else "vocabulary.entry.updated",
+                ownerSubject = ownerSubject,
+                lessonId = request.lessonId,
+                actorSubject = subject,
+                entry = response,
+            ),
+        )
+        return response
     }
 
     @Transactional(readOnly = true)
@@ -55,10 +77,52 @@ class VocabularyService(private val entries: VocabularyEntryRepo, private val us
         .asSequence().filter { query.isNullOrBlank() || it.sourceText.contains(query, true) || it.translation?.contains(query, true) == true }.map { it.toResponse() }.toList()
 
     @Transactional(readOnly = true)
+    fun overview(
+        subject: String,
+        ownerSubject: String?,
+        lessonId: UUID?,
+        limit: Int,
+    ): VocabularyOverviewResponse {
+        val owner = access.requireOwnerAccess(
+            subject,
+            ownerSubject?.trim()?.takeIf(String::isNotEmpty) ?: subject,
+            lessonId,
+        )
+        val selection = selectVocabularyOverview(
+            entries.findAllByOwnerSubjectAndStatusOrderByUpdatedAtDesc(owner, EntryStatus.ACTIVE),
+            lessonId,
+            limit.coerceIn(1, 10),
+        )
+        return VocabularyOverviewResponse(
+            lessonEntries = selection.lessonEntries.map(VocabularyEntryEntity::toResponse),
+            recentEntries = selection.recentEntries.map(VocabularyEntryEntity::toResponse),
+        )
+    }
+
+    @Transactional(readOnly = true)
     fun practice(subject: String, limit: Int): VocabularyPracticeResponse = VocabularyPracticeResponse(list(subject, null).take(limit.coerceIn(1, 100)))
 
     @Transactional
     fun update(subject: String, id: UUID, request: UpdateVocabularyEntryRequest): VocabularyEntryResponse {
+        return updateEntry(subject, id, request, "vocabulary.entry.updated")
+    }
+
+    @Transactional
+    fun archive(subject: String, id: UUID) {
+        updateEntry(
+            subject,
+            id,
+            UpdateVocabularyEntryRequest(status = EntryStatus.ARCHIVED),
+            "vocabulary.entry.archived",
+        )
+    }
+
+    private fun updateEntry(
+        subject: String,
+        id: UUID,
+        request: UpdateVocabularyEntryRequest,
+        eventType: String,
+    ): VocabularyEntryResponse {
         val entry = entries.findByIdAndOwnerSubject(id, subject) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         request.translation?.trim()?.let { entry.translation = it.takeIf(String::isNotEmpty) }
         request.partOfSpeech?.trim()?.let { entry.partOfSpeech = it.takeIf(String::isNotEmpty) }
@@ -67,28 +131,61 @@ class VocabularyService(private val entries: VocabularyEntryRepo, private val us
         request.translationState?.let { entry.translationState = it }
         request.status?.let { entry.status = it }
         entry.updatedAt = Instant.now()
-        return entries.save(entry).toResponse()
+        val response = entries.save(entry).toResponse()
+        eventPublisher.publishEvent(
+            VocabularyEntryChangedEvent(
+                type = eventType,
+                ownerSubject = subject,
+                lessonId = null,
+                actorSubject = subject,
+                entry = response,
+            ),
+        )
+        return response
     }
-
-    fun archive(subject: String, id: UUID) { update(subject, id, UpdateVocabularyEntryRequest(status = EntryStatus.ARCHIVED)) }
 
     private fun languages(subject: String, source: String?, target: String?): Pair<String, String> {
         val locale = users.findByKeycloakSubject(subject)?.locale?.lowercase(Locale.ROOT)?.substringBefore('-')
         return cleanLanguage(source, "en") to cleanLanguage(target, locale?.takeIf { it in setOf("ru", "de", "fr") } ?: "ru")
     }
 
-    private fun resolveOwner(actorSubject: String, request: CreateVocabularyEntryRequest): String {
-        val owner = request.ownerSubject?.trim()?.takeIf { it.isNotEmpty() } ?: return actorSubject
-        if (owner == actorSubject) return owner
-        val actor = users.findByKeycloakSubject(actorSubject) ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
-        if (actor.roles?.split(',')?.map(String::trim)?.none { it == "TEACHER" || it == "ADMIN" } != false) throw ResponseStatusException(HttpStatus.FORBIDDEN)
-        val lessonId = request.lessonId ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
-        val target = users.findByKeycloakSubject(owner) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        if (!participants.existsByLessonIdAndStudentUserId(lessonId, target.id)) throw ResponseStatusException(HttpStatus.FORBIDDEN)
-        return owner
-    }
-
     private fun cleanSource(value: String) = value.trim().replace(Regex("\\s+"), " ").take(240).also { if (it.isBlank()) throw ResponseStatusException(HttpStatus.BAD_REQUEST) }
     private fun cleanLanguage(value: String?, fallback: String) = value?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.matches(Regex("[a-z]{2,3}(-[a-z]{2})?")) } ?: fallback
     private fun normalize(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKC).lowercase(Locale.ROOT).trim().replace(Regex("\\s+"), " ")
+}
+
+internal data class VocabularyOverviewSelection(
+    val lessonEntries: List<VocabularyEntryEntity>,
+    val recentEntries: List<VocabularyEntryEntity>,
+)
+
+internal fun selectVocabularyOverview(
+    entries: List<VocabularyEntryEntity>,
+    lessonId: UUID?,
+    limit: Int,
+): VocabularyOverviewSelection {
+    val safeLimit = limit.coerceIn(1, 10)
+    val lessonEntries = if (lessonId == null) {
+        emptyList()
+    } else {
+        entries
+            .mapNotNull { entry ->
+                entry.occurrences
+                    .asSequence()
+                    .filter { occurrence -> occurrence.lessonId == lessonId }
+                    .maxOfOrNull(VocabularyOccurrenceEntity::createdAt)
+                    ?.let { occurredAt -> entry to occurredAt }
+            }
+            .sortedByDescending(Pair<VocabularyEntryEntity, Instant>::second)
+            .map(Pair<VocabularyEntryEntity, Instant>::first)
+            .take(safeLimit)
+    }
+    val lessonIds = lessonEntries.mapTo(mutableSetOf(), VocabularyEntryEntity::id)
+    val recentEntries = entries
+        .asSequence()
+        .filterNot { entry -> entry.id in lessonIds }
+        .sortedByDescending(VocabularyEntryEntity::updatedAt)
+        .take(safeLimit - lessonEntries.size)
+        .toList()
+    return VocabularyOverviewSelection(lessonEntries, recentEntries)
 }

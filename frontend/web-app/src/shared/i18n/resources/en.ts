@@ -341,6 +341,7 @@ export const en = {
   },
   vocabulary: {
     title: "My vocabulary", description: "Words from lessons, homework, and independent practice.", search: "Find a word", empty: "No words yet — add your first one.", translationMissing: "Translation not added yet",
+    lessonMenu: { label: "Vocabulary", open: "Open vocabulary", add: "Add word", recent: "Recent words", back: "Back to vocabulary actions", empty: "No words from this lesson yet.", loadFailed: "Could not load recent words.", reconnecting: "Reconnecting" },
     quickAdd: { title: "Add to vocabulary" }, variants: { title: "Translation and usage options" }, fields: { word: "Word or phrase", translation: "Selected translation", aiInstruction: "Clarification for AI", aiInstructionPlaceholder: "For example: show the travel meaning or use it as a verb", allParticipants: "Add for all lesson participants" },
     actions: { add: "Add word", suggest: "Suggest translation", regenerate: "Other options", save: "Save", search: "Search", archive: "Archive" },
     messages: { translating: "AI is automatically finding translations and examples…", saved: "Word saved.", saveFailed: "Could not save the word.", translationUnavailable: "Translator is unavailable — enter a translation manually." },

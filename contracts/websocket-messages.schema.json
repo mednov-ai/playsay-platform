@@ -78,6 +78,109 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ownerSubject"],
+      "properties": {
+        "type": { "const": "vocabulary.subscribe" },
+        "ownerSubject": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "lessonId": { "type": ["string", "null"], "format": "uuid" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "connected" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ownerSubject"],
+      "properties": {
+        "type": { "const": "vocabulary.subscribed" },
+        "ownerSubject": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "lessonId": { "type": ["string", "null"], "format": "uuid" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ownerSubject", "actorSubject", "entry"],
+      "properties": {
+        "type": {
+          "enum": [
+            "vocabulary.entry.created",
+            "vocabulary.entry.updated",
+            "vocabulary.entry.archived"
+          ]
+        },
+        "ownerSubject": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "lessonId": { "type": ["string", "null"], "format": "uuid" },
+        "actorSubject": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "entry": { "$ref": "#/$defs/vocabularyEntry" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "message"],
+      "properties": {
+        "type": { "const": "error" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
     }
-  ]
+  ],
+  "$defs": {
+    "vocabularyEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sourceText",
+        "sourceLanguage",
+        "targetLanguage",
+        "translationState",
+        "status",
+        "occurrences",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "sourceText": { "type": "string", "maxLength": 240 },
+        "sourceLanguage": { "type": "string", "maxLength": 16 },
+        "targetLanguage": { "type": "string", "maxLength": 16 },
+        "translation": { "type": ["string", "null"], "maxLength": 500 },
+        "partOfSpeech": { "type": ["string", "null"], "maxLength": 80 },
+        "example": { "type": ["string", "null"], "maxLength": 1000 },
+        "exampleTranslation": { "type": ["string", "null"], "maxLength": 1000 },
+        "translationState": { "enum": ["MISSING", "SUGGESTED", "CONFIRMED"] },
+        "status": { "enum": ["ACTIVE", "ARCHIVED"] },
+        "occurrences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sourceType", "createdAt"],
+            "properties": {
+              "sourceType": { "enum": ["LESSON", "HOMEWORK", "MANUAL"] },
+              "lessonId": { "type": ["string", "null"], "format": "uuid" },
+              "assignmentId": { "type": ["string", "null"], "format": "uuid" },
+              "materialId": { "type": ["string", "null"], "format": "uuid" },
+              "blockId": { "type": ["string", "null"], "maxLength": 120 },
+              "context": { "type": ["string", "null"], "maxLength": 1000 },
+              "createdAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
 }

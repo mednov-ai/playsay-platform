@@ -15,6 +15,18 @@ paths:
     post:
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateEntry' } } } }
       responses: { '201': { description: Created or merged vocabulary entry } }
+  /overview:
+    get:
+      summary: Compact lesson and recent vocabulary preview
+      parameters:
+        - { in: query, name: ownerSubject, schema: { type: string, maxLength: 255 }, description: Learner subject; teachers must also provide lessonId }
+        - { in: query, name: lessonId, schema: { type: string, format: uuid }, description: Lesson used to authorize teacher access and prioritize lesson words }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
+      responses:
+        '200':
+          description: Lesson-first preview followed by recent entries, with no duplicates
+          content: { application/json: { schema: { $ref: '#/components/schemas/VocabularyOverview' } } }
+        '403': { description: Caller cannot access this learner in the requested lesson }
   /entries/{entryId}:
     parameters: [{ in: path, name: entryId, required: true, schema: { type: string, format: uuid } }]
     patch: { responses: { '200': { description: Updated entry } } }
@@ -26,6 +38,7 @@ components:
   schemas:
     SourceType: { type: string, enum: [LESSON, HOMEWORK, MANUAL] }
     TranslationState: { type: string, enum: [MISSING, SUGGESTED, CONFIRMED] }
+    EntryStatus: { type: string, enum: [ACTIVE, ARCHIVED] }
     SourceTerm:
       type: object
       required: [sourceText]
@@ -78,3 +91,45 @@ components:
             assignmentId: { type: string, format: uuid }
             materialId: { type: string, format: uuid }
             blockId: { type: string, maxLength: 120 }
+    VocabularyOccurrence:
+      type: object
+      required: [sourceType, createdAt]
+      properties:
+        sourceType: { $ref: '#/components/schemas/SourceType' }
+        lessonId: { type: [string, 'null'], format: uuid }
+        assignmentId: { type: [string, 'null'], format: uuid }
+        materialId: { type: [string, 'null'], format: uuid }
+        blockId: { type: [string, 'null'], maxLength: 120 }
+        context: { type: [string, 'null'], maxLength: 1000 }
+        createdAt: { type: string, format: date-time }
+    VocabularyEntry:
+      type: object
+      required: [id, sourceText, sourceLanguage, targetLanguage, translationState, status, occurrences, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        sourceText: { type: string, maxLength: 240 }
+        sourceLanguage: { type: string, maxLength: 16 }
+        targetLanguage: { type: string, maxLength: 16 }
+        translation: { type: [string, 'null'], maxLength: 500 }
+        partOfSpeech: { type: [string, 'null'], maxLength: 80 }
+        example: { type: [string, 'null'], maxLength: 1000 }
+        exampleTranslation: { type: [string, 'null'], maxLength: 1000 }
+        translationState: { $ref: '#/components/schemas/TranslationState' }
+        status: { $ref: '#/components/schemas/EntryStatus' }
+        occurrences:
+          type: array
+          items: { $ref: '#/components/schemas/VocabularyOccurrence' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    VocabularyOverview:
+      type: object
+      required: [lessonEntries, recentEntries]
+      properties:
+        lessonEntries:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/VocabularyEntry' }
+        recentEntries:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/VocabularyEntry' }

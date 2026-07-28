@@ -89,3 +89,8 @@ data class VocabularyEntryResponse(
 )
 
 data class VocabularyPracticeResponse(val entries: List<VocabularyEntryResponse>)
+
+data class VocabularyOverviewResponse(
+    val lessonEntries: List<VocabularyEntryResponse>,
+    val recentEntries: List<VocabularyEntryResponse>,
+)

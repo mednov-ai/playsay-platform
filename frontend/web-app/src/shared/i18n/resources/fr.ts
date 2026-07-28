@@ -341,6 +341,7 @@ export const fr = {
   },
   vocabulary: {
     title: "Mon vocabulaire", description: "Mots des cours, devoirs et exercices personnels.", search: "Chercher un mot", empty: "Aucun mot — ajoutez le premier.", translationMissing: "Traduction non renseignée",
+    lessonMenu: { label: "Vocabulaire", open: "Ouvrir le vocabulaire", add: "Ajouter un mot", recent: "Mots récents", back: "Retour aux actions du vocabulaire", empty: "Aucun mot de ce cours pour le moment.", loadFailed: "Impossible de charger les mots récents.", reconnecting: "Reconnexion en cours" },
     quickAdd: { title: "Ajouter au vocabulaire" }, variants: { title: "Variantes de traduction et d’usage" }, fields: { word: "Mot ou expression", translation: "Traduction choisie", aiInstruction: "Précision pour l’IA", aiInstructionPlaceholder: "Par exemple : sens lié au voyage ou emploi comme verbe", allParticipants: "Ajouter pour tous les participants" },
     actions: { add: "Ajouter", suggest: "Proposer une traduction", regenerate: "Autres variantes", save: "Enregistrer", search: "Chercher", archive: "Archiver" },
     messages: { translating: "L’IA recherche automatiquement des traductions et des exemples…", saved: "Mot enregistré.", saveFailed: "Impossible d’enregistrer le mot.", translationUnavailable: "Le traducteur est indisponible — saisissez la traduction manuellement." },

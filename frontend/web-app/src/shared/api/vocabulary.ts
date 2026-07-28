@@ -1,4 +1,4 @@
-import { authConfig } from "./auth";
+import { authConfig, getValidAccessToken } from "./auth";
 import { apiJson } from "./http";
 
 export type VocabularySourceType = "LESSON" | "HOMEWORK" | "MANUAL";
@@ -37,6 +37,20 @@ export interface VocabularyEntry {
   updatedAt: string;
 }
 
+export interface VocabularyOverview {
+  lessonEntries: VocabularyEntry[];
+  recentEntries: VocabularyEntry[];
+}
+
+export interface VocabularyRealtimeMessage {
+  type?: "connected" | "vocabulary.subscribed" | "vocabulary.entry.created" | "vocabulary.entry.updated" | "vocabulary.entry.archived" | "error";
+  ownerSubject?: string;
+  lessonId?: string;
+  actorSubject?: string;
+  entry?: VocabularyEntry;
+  message?: string;
+}
+
 export interface CreateVocabularyEntry {
   ownerSubject?: string;
   sourceText: string;
@@ -64,6 +78,20 @@ export function createVocabularyEntry(input: CreateVocabularyEntry): Promise<Voc
 export function fetchVocabularyEntries(query = ""): Promise<VocabularyEntry[]> {
   const suffix = query ? `?query=${encodeURIComponent(query)}` : "";
   return apiJson(`/api/vocabulary/entries${suffix}`, { method: "GET" }, authConfig);
+}
+
+export function fetchVocabularyOverview(ownerSubject: string | undefined, lessonId: string | undefined, limit = 5): Promise<VocabularyOverview> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (ownerSubject) params.set("ownerSubject", ownerSubject);
+  if (lessonId) params.set("lessonId", lessonId);
+  return apiJson(`/api/vocabulary/overview?${params.toString()}`, { method: "GET" }, authConfig);
+}
+
+export async function openVocabularySocket(): Promise<WebSocket | null> {
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) return null;
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return new WebSocket(`${protocol}//${window.location.host}/api/vocabulary/ws`, ["playsay", accessToken]);
 }
 
 export function archiveVocabularyEntry(id: string): Promise<void> {

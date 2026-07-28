@@ -60,3 +60,10 @@ class VocabularyLessonParticipantProjection(
     @Column(name = "lesson_id", nullable = false) var lessonId: UUID = UUID.randomUUID(),
     @Column(name = "student_user_id", nullable = false) var studentUserId: UUID = UUID.randomUUID(),
 )
+
+@Entity
+@Table(name = "lesson")
+class VocabularyLessonAccessProjection(
+    @Id var id: UUID = UUID.randomUUID(),
+    @Column(name = "teacher_user_id") var teacherUserId: UUID? = null,
+)

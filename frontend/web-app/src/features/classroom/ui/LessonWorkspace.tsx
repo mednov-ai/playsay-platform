@@ -32,7 +32,7 @@ import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
 import { TeacherLessonToolbar } from "./TeacherLessonToolbar";
 import { useAppTranslation } from "../../../shared/i18n";
-import { VocabularyQuickAdd } from "../../vocabulary/ui/VocabularyQuickAdd";
+import { VocabularyLessonMenu } from "../../vocabulary/ui/VocabularyLessonMenu";
 
 export function LessonWorkspace({
   displayName,
@@ -244,7 +244,9 @@ export function LessonWorkspace({
           uploadingHtmlGamePage={uploadingHtmlGamePage}
           uploadingImagePage={uploadingImagePage}
           vocabularyAction={(
-            <VocabularyQuickAdd
+            <VocabularyLessonMenu
+              ownerLabel={activeParticipantLabel}
+              ownerSubject={activeParticipant?.subject}
               recipientSubjects={session.participants.map((participant) => participant.subject)}
               source={{
                 sourceType: "LESSON",
@@ -266,12 +268,15 @@ export function LessonWorkspace({
           </nav>
 
           <div className="playsay-workbench-tools">
-            <VocabularyQuickAdd
+            <VocabularyLessonMenu
+              ownerSubject={profile?.subject}
               source={{
                 sourceType: "LESSON",
                 lessonId: session.lessonId,
                 materialId: visibleMaterial?.id,
               }}
+              triggerClassName="playsay-vocabulary-trigger"
+              triggerLabelClassName="playsay-vocabulary-trigger-label"
             />
             <div className="playsay-lesson-statusline">
               <span className="inline-flex items-center gap-1.5">

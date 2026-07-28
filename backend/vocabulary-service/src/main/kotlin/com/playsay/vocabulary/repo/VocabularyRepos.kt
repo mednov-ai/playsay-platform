@@ -58,7 +58,7 @@ interface VocabularyUserRepo : JpaRepository<VocabularyUserProjection, UUID> {
 
     @Query(
         value = """
-            select distinct learner.*
+            select learner.*
               from app_user learner
               join app_user actor on actor.keycloak_subject = :actorSubject
              where learner.deleted_at is null

@@ -23,6 +23,7 @@ class SecurityConfig {
                     "/actuator/health",
                     "/actuator/health/**",
                     "/internal/user-data/**",
+                    "/internal/vocabulary/**",
                     "/api/vocabulary/ws",
                 ).permitAll()
                     .anyRequest().authenticated()

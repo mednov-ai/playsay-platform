@@ -404,6 +404,10 @@ spec:
                 sh '''
                   if [ "$DEPLOY_TO_DEV" = "true" ]; then
                     export VITE_EXTERNAL_ACTIVITY_ENABLED=true
+                    export VITE_VOCABULARY_PRACTICE_ENABLED=true
+                    export VITE_VOCABULARY_HOMEWORK_ENABLED=true
+                    export VITE_VOCABULARY_LIVE_ENABLED=true
+                    export VITE_VOCABULARY_KEY_ENABLED=true
                   fi
                   npm --workspace web-app run build
                 '''

@@ -39,6 +39,9 @@ logging:
 playsay:
   user-data:
     service-token: ${PLAYSAY_USER_DATA_SERVICE_TOKEN:}
+  vocabulary-integration:
+    base-url: ${PLAYSAY_VOCABULARY_SERVICE_BASE_URL:http://vocabulary-service.playsay-dev.svc.cluster.local}
+    retry-delay-ms: ${PLAYSAY_VOCABULARY_RESULT_RETRY_DELAY_MS:10000}
   keyboard:
     anonymous:
       fingerprint-secret: ${PLAYSAY_KEYBOARD_ANONYMOUS_FINGERPRINT_SECRET:dev-keyboard-anonymous}

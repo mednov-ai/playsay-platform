@@ -21,6 +21,7 @@ import type {
   SubmitTrainingResultResponse,
   UpdateAnonymousProfileRequest,
   VocabularyPracticeResponse,
+  VocabularySessionPracticeResponse,
 } from "../types";
 
 const apiBaseUrl = import.meta.env.VITE_KEYBOARD_API_BASE_URL ?? "";
@@ -115,6 +116,13 @@ export function fetchProgress(): Promise<Progress> {
 
 export function fetchVocabularyPractice(): Promise<VocabularyPracticeResponse> {
   return apiJson<VocabularyPracticeResponse>(`${apiBaseUrl}/api/vocabulary/practice?limit=32`, { method: "GET" });
+}
+
+export function fetchVocabularySessionPractice(sessionId: string): Promise<VocabularySessionPracticeResponse> {
+  return apiJson<VocabularySessionPracticeResponse>(
+    `${apiBaseUrl}/api/vocabulary/practice-sessions/${encodeURIComponent(sessionId)}/key-set`,
+    { method: "GET" },
+  );
 }
 
 export function claimAnonymousProgress(body: ClaimAnonymousProgressRequest): Promise<ClaimAnonymousProgressResponse> {

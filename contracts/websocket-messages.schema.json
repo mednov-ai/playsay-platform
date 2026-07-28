@@ -92,6 +92,15 @@
     {
       "type": "object",
       "additionalProperties": false,
+      "required": ["type", "practiceId"],
+      "properties": {
+        "type": { "const": "vocabulary.practice.subscribe" },
+        "practiceId": { "type": "string", "format": "uuid" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
       "required": ["type"],
       "properties": {
         "type": { "const": "connected" }
@@ -104,6 +113,16 @@
       "properties": {
         "type": { "const": "vocabulary.subscribed" },
         "ownerSubject": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "lessonId": { "type": ["string", "null"], "format": "uuid" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "practiceId"],
+      "properties": {
+        "type": { "const": "vocabulary.practice.subscribed" },
+        "practiceId": { "type": "string", "format": "uuid" },
         "lessonId": { "type": ["string", "null"], "format": "uuid" }
       }
     },
@@ -128,6 +147,27 @@
     {
       "type": "object",
       "additionalProperties": false,
+      "required": ["type", "practiceId", "actorSubject", "practice"],
+      "properties": {
+        "type": {
+          "enum": [
+            "vocabulary.practice.started",
+            "vocabulary.practice.paused",
+            "vocabulary.practice.completed",
+            "vocabulary.session.updated",
+            "vocabulary.attempt.recorded"
+          ]
+        },
+        "practiceId": { "type": "string", "format": "uuid" },
+        "lessonId": { "type": ["string", "null"], "format": "uuid" },
+        "sessionId": { "type": ["string", "null"], "format": "uuid" },
+        "actorSubject": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "practice": { "$ref": "#/$defs/vocabularyPractice" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
       "required": ["type", "message"],
       "properties": {
         "type": { "const": "error" },
@@ -146,6 +186,7 @@
         "targetLanguage",
         "translationState",
         "status",
+        "practicePaused",
         "occurrences",
         "createdAt",
         "updatedAt"
@@ -161,6 +202,7 @@
         "exampleTranslation": { "type": ["string", "null"], "maxLength": 1000 },
         "translationState": { "enum": ["MISSING", "SUGGESTED", "CONFIRMED"] },
         "status": { "enum": ["ACTIVE", "ARCHIVED"] },
+        "practicePaused": { "type": "boolean" },
         "occurrences": {
           "type": "array",
           "items": {
@@ -175,6 +217,46 @@
               "blockId": { "type": ["string", "null"], "maxLength": 120 },
               "context": { "type": ["string", "null"], "maxLength": 1000 },
               "createdAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "vocabularyPractice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "delivery", "mode", "status", "sessions", "createdAt", "updatedAt"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "delivery": { "enum": ["SELF", "HOMEWORK", "LIVE"] },
+        "mode": { "enum": ["QUICK", "BALANCED", "WRITING", "KEYBOARD"] },
+        "status": { "enum": ["PREPARING", "PUBLISHED", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED", "FAILED"] },
+        "lessonId": { "type": ["string", "null"], "format": "uuid" },
+        "assignmentId": { "type": ["string", "null"], "format": "uuid" },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "ownerSubject", "status", "revision", "completedItems", "totalItems", "correctCount", "attemptCount", "helpRequested", "updatedAt"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "ownerSubject": { "type": "string", "maxLength": 255 },
+              "ownerName": { "type": ["string", "null"] },
+              "status": { "enum": ["NOT_STARTED", "IN_PROGRESS", "PAUSED", "COMPLETED", "CANCELLED"] },
+              "revision": { "type": "integer", "minimum": 0 },
+              "completedItems": { "type": "integer", "minimum": 0 },
+              "totalItems": { "type": "integer", "minimum": 0 },
+              "correctCount": { "type": "integer", "minimum": 0 },
+              "attemptCount": { "type": "integer", "minimum": 0 },
+              "accuracy": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+              "currentItem": { "type": ["object", "null"] },
+              "teacherHint": { "type": ["string", "null"] },
+              "helpRequested": { "type": "boolean" },
+              "startedAt": { "type": ["string", "null"], "format": "date-time" },
+              "completedAt": { "type": ["string", "null"], "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" }
             }
           }
         },

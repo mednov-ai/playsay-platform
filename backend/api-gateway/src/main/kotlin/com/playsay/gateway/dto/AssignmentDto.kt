@@ -30,10 +30,33 @@ data class LessonHomeworkRequest(
     val dueAt: Instant? = null,
 )
 
+data class VocabularyHomeworkRequest(
+    @field:ArraySchema(minItems = 1, maxItems = 100, schema = Schema(maxLength = 255))
+    val studentSubjects: List<String>,
+    @field:Schema(maxLength = 160, nullable = true)
+    val title: String? = null,
+    @field:Schema(maxLength = 2_000, nullable = true)
+    val instructions: String? = null,
+    @field:Schema(nullable = true)
+    val dueAt: Instant? = null,
+    @field:Schema(allowableValues = ["QUICK", "BALANCED", "WRITING", "KEYBOARD"])
+    val mode: String = "BALANCED",
+    val wordLimit: Int = 10,
+    @field:ArraySchema(maxItems = 100)
+    val pinnedEntryIds: List<UUID> = emptyList(),
+    @field:ArraySchema(maxItems = 100)
+    val excludedEntryIds: List<UUID> = emptyList(),
+    @field:Schema(nullable = true, description = "Completed LIVE practice whose unfinished immutable items must be continued at home")
+    val sourcePracticeId: UUID? = null,
+)
+
 data class AssignmentSummaryResponse(
     val id: UUID,
-    val materialId: UUID,
-    val materialTitle: String,
+    val materialId: UUID?,
+    val materialTitle: String?,
+    @field:Schema(allowableValues = ["MATERIAL", "VOCABULARY_PRACTICE"])
+    val contentKind: String = "MATERIAL",
+    val activityRef: UUID? = null,
     val lessonId: UUID?,
     val sourceLessonId: UUID?,
     val title: String,
@@ -57,6 +80,14 @@ data class AssignmentSummaryResponse(
     val mySubmittedAt: Instant? = null,
     @field:Schema(nullable = true)
     val mySubmissionUpdatedAt: Instant? = null,
+    @field:Schema(nullable = true, allowableValues = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"])
+    val myActivityState: String? = null,
+    @field:Schema(nullable = true)
+    val myCompletionRatio: BigDecimal? = null,
+    @field:Schema(nullable = true)
+    val myAccuracy: BigDecimal? = null,
+    @field:Schema(nullable = true)
+    val myDifficultWordCount: Int? = null,
 )
 
 data class AssignmentRecipientProgressResponse(
@@ -79,6 +110,12 @@ data class AssignmentRecipientProgressResponse(
     val relativeErrorsDelta: BigDecimal?,
     val submittedAt: Instant?,
     val updatedAt: Instant?,
+    val activityRef: UUID? = null,
+    @field:Schema(allowableValues = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"])
+    val activityState: String? = null,
+    val completionRatio: BigDecimal? = null,
+    val accuracy: BigDecimal? = null,
+    val difficultWordCount: Int? = null,
 )
 
 data class TeacherAssignmentDetailResponse(
@@ -106,5 +143,45 @@ data class AssignmentSubmissionResponse(
     val progressTone: Int?,
     val submittedAt: Instant?,
     val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+data class StudentVocabularyAssignmentDetailResponse(
+    val assignment: AssignmentSummaryResponse,
+    val practiceId: UUID,
+    val sessionId: UUID,
+)
+
+data class VocabularyAssignmentPreparationResponse(
+    val practiceId: UUID,
+    val sessions: List<VocabularyAssignmentSessionRef>,
+)
+
+data class VocabularyAssignmentPreparationRequest(
+    val actorSubject: String,
+    val assignmentId: UUID,
+    val ownerSubjects: List<String>,
+    val mode: String,
+    val wordLimit: Int,
+    val pinnedEntryIds: List<UUID>,
+    val excludedEntryIds: List<UUID>,
+    val sourcePracticeId: UUID?,
+)
+
+data class VocabularyAssignmentSessionRef(
+    val sessionId: UUID,
+    val ownerSubject: String,
+)
+
+data class VocabularyAssignmentProgressUpdateRequest(
+    val eventId: UUID,
+    val sessionId: UUID,
+    val ownerSubject: String,
+    val revision: Long,
+    @field:Schema(allowableValues = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"])
+    val state: String,
+    val completionRatio: BigDecimal?,
+    val accuracy: BigDecimal?,
+    val difficultWordCount: Int?,
     val updatedAt: Instant,
 )

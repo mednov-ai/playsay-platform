@@ -2,8 +2,14 @@ package com.playsay.vocabulary.realtime
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.vocabulary.dto.EntryStatus
+import com.playsay.vocabulary.dto.PracticeDelivery
+import com.playsay.vocabulary.dto.PracticeMode
+import com.playsay.vocabulary.dto.PracticeStatus
+import com.playsay.vocabulary.dto.SessionStatus
 import com.playsay.vocabulary.dto.TranslationState
 import com.playsay.vocabulary.dto.VocabularyEntryResponse
+import com.playsay.vocabulary.dto.VocabularyPracticeResponse
+import com.playsay.vocabulary.dto.VocabularyPracticeSessionSummaryResponse
 import java.time.Instant
 import java.util.UUID
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -48,6 +54,38 @@ class VocabularyRealtimeHubTest {
         assertEquals(false, sentTypes(outsider).contains("vocabulary.entry.created"))
     }
 
+    @Test
+    fun `practice events expose only the learners own session`() {
+        val practiceId = UUID.randomUUID()
+        val lessonId = UUID.randomUUID()
+        val student = session("practice-student")
+        val teacher = session("practice-teacher")
+        val partialTeacher = session("practice-partial-teacher")
+        hub.register(student, "student-a")
+        hub.register(teacher, "teacher-subject")
+        hub.register(partialTeacher, "partial-teacher-subject")
+        hub.subscribePractice(student, practiceId, lessonId)
+        hub.subscribePractice(teacher, practiceId, lessonId)
+        hub.subscribe(partialTeacher, "student-a", lessonId)
+        val practice = practice(practiceId, lessonId)
+
+        hub.publish(
+            VocabularyPracticeChangedEvent(
+                type = "vocabulary.session.updated",
+                actorSubject = "student-a",
+                practiceId = practiceId,
+                lessonId = lessonId,
+                ownerSubjects = setOf("student-a", "student-b"),
+                sessionId = practice.sessions.first().id,
+                practice = practice,
+            ),
+        )
+
+        assertEquals(listOf("student-a"), practiceOwners(student))
+        assertEquals(listOf("student-a", "student-b"), practiceOwners(teacher))
+        assertEquals(false, sentTypes(partialTeacher).contains("vocabulary.session.updated"))
+    }
+
     private fun session(id: String): WebSocketSession =
         mock(WebSocketSession::class.java).also { session ->
             `when`(session.id).thenReturn(id)
@@ -58,6 +96,51 @@ class VocabularyRealtimeHubTest {
         val captor = ArgumentCaptor.forClass(TextMessage::class.java)
         verify(session, atLeastOnce()).sendMessage(captor.capture())
         return captor.allValues.map { message -> objectMapper.readTree(message.payload)["type"].asText() }
+    }
+
+    private fun practiceOwners(session: WebSocketSession): List<String> {
+        val captor = ArgumentCaptor.forClass(TextMessage::class.java)
+        verify(session, atLeastOnce()).sendMessage(captor.capture())
+        return captor.allValues
+            .map { message -> objectMapper.readTree(message.payload) }
+            .last { message -> message["type"].asText() == "vocabulary.session.updated" }
+            .path("practice")
+            .path("sessions")
+            .map { item -> item["ownerSubject"].asText() }
+    }
+
+    private fun practice(practiceId: UUID, lessonId: UUID): VocabularyPracticeResponse {
+        val now = Instant.parse("2026-07-28T09:00:00Z")
+        return VocabularyPracticeResponse(
+            id = practiceId,
+            delivery = PracticeDelivery.LIVE,
+            mode = PracticeMode.BALANCED,
+            status = PracticeStatus.ACTIVE,
+            lessonId = lessonId,
+            assignmentId = null,
+            sessions = listOf("student-a", "student-b").map { owner ->
+                VocabularyPracticeSessionSummaryResponse(
+                    id = UUID.randomUUID(),
+                    ownerSubject = owner,
+                    ownerName = owner,
+                    status = SessionStatus.IN_PROGRESS,
+                    revision = 1,
+                    completedItems = 1,
+                    totalItems = 3,
+                    correctCount = 1,
+                    attemptCount = 1,
+                    accuracy = 1.0,
+                    currentItem = null,
+                    teacherHint = null,
+                    helpRequested = false,
+                    startedAt = now,
+                    completedAt = null,
+                    updatedAt = now,
+                )
+            },
+            createdAt = now,
+            updatedAt = now,
+        )
     }
 
     private fun entry() = VocabularyEntryResponse(

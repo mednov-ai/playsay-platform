@@ -25,4 +25,7 @@ playsay.vocabulary.translation:
   model: ${PLAYSAY_VOCABULARY_OPENAI_MODEL:gpt-5.4-mini}
   reasoning-effort: ${PLAYSAY_VOCABULARY_OPENAI_REASONING_EFFORT:none}
 playsay.user-data.service-token: ${PLAYSAY_USER_DATA_SERVICE_TOKEN:}
+playsay.assignment-integration:
+  gateway-base-url: ${PLAYSAY_API_GATEWAY_SERVICE_BASE_URL:http://api-gateway.playsay-dev.svc.cluster.local}
+  retry-delay-ms: ${PLAYSAY_VOCABULARY_PROGRESS_RETRY_DELAY_MS:10000}
 playsay.websocket.allowed-origin-patterns: ${PLAYSAY_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:[*],http://127.0.0.1:[*]}

@@ -91,6 +91,8 @@ playsay:
     ai-tutor-base-url: ${PLAYSAY_AI_TUTOR_SERVICE_BASE_URL:http://ai-tutor-service.playsay-dev.svc.cluster.local}
     vocabulary-base-url: ${PLAYSAY_VOCABULARY_SERVICE_BASE_URL:http://vocabulary-service.playsay-dev.svc.cluster.local}
     keyboard-base-url: ${PLAYSAY_KEYBOARD_SERVICE_BASE_URL:http://keyboard-service.playsay-dev.svc.cluster.local}
+  vocabulary-assignments:
+    retry-delay-ms: ${PLAYSAY_VOCABULARY_ASSIGNMENT_RETRY_DELAY_MS:10000}
   email-service:
     base-url: ${PLAYSAY_EMAIL_SERVICE_BASE_URL:http://email-service.playsay-dev.svc.cluster.local}
     service-token: ${PLAYSAY_EMAIL_SERVICE_TOKEN:}

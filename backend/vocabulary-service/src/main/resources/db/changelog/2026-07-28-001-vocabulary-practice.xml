@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-28-001-vocabulary-practice" author="codex">
+        <addColumn tableName="vocabulary_entries">
+            <column name="practice_paused" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <createTable tableName="vocabulary_skill_states">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="entry_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_entries" referencedColumnNames="id" foreignKeyName="fk_vocabulary_skill_entry" deleteCascade="true"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="skill" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="stage" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="interval_index" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="due_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="success_streak" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="lapse_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="last_rating" type="VARCHAR(16)"/>
+            <column name="last_practiced_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_skill_states" columnNames="entry_id,skill" constraintName="uq_vocabulary_entry_skill"/>
+        <createIndex tableName="vocabulary_skill_states" indexName="idx_vocabulary_owner_due"><column name="owner_subject"/><column name="due_at"/></createIndex>
+
+        <createTable tableName="vocabulary_practices">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="created_by_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="delivery" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="lesson_id" type="UUID"/>
+            <column name="assignment_id" type="UUID"/>
+            <column name="mode" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="settings_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="started_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="completed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="vocabulary_practices" indexName="idx_vocabulary_practice_lesson_status"><column name="lesson_id"/><column name="status"/></createIndex>
+        <createIndex tableName="vocabulary_practices" indexName="idx_vocabulary_practice_assignment"><column name="assignment_id"/></createIndex>
+        <addUniqueConstraint tableName="vocabulary_practices" columnNames="assignment_id" constraintName="uq_vocabulary_practice_assignment"/>
+
+        <createTable tableName="vocabulary_practice_sessions">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="practice_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_practices" referencedColumnNames="id" foreignKeyName="fk_vocabulary_session_practice" deleteCascade="true"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="current_item_position" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="attempt_sequence" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="revision" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="correct_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="attempt_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="teacher_hint" type="TEXT"/>
+            <column name="help_requested" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="started_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="completed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_practice_sessions" columnNames="practice_id,owner_subject" constraintName="uq_vocabulary_practice_owner"/>
+        <createIndex tableName="vocabulary_practice_sessions" indexName="idx_vocabulary_session_owner_status"><column name="owner_subject"/><column name="status"/><column name="updated_at"/></createIndex>
+
+        <createTable tableName="vocabulary_practice_items">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_practice_sessions" referencedColumnNames="id" foreignKeyName="fk_vocabulary_item_session" deleteCascade="true"/></column>
+            <column name="entry_id" type="UUID"/>
+            <column name="position" type="INT"><constraints nullable="false"/></column>
+            <column name="skill" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="exercise_type" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="prompt" type="TEXT"><constraints nullable="false"/></column>
+            <column name="answer" type="TEXT"><constraints nullable="false"/></column>
+            <column name="options_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="snapshot_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="attempt_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="retry_after_sequence" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="completed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_practice_items" columnNames="session_id,position" constraintName="uq_vocabulary_session_position"/>
+        <createIndex tableName="vocabulary_practice_items" indexName="idx_vocabulary_item_session_pending"><column name="session_id"/><column name="completed_at"/><column name="retry_after_sequence"/></createIndex>
+
+        <createTable tableName="vocabulary_practice_attempts">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_practice_sessions" referencedColumnNames="id" foreignKeyName="fk_vocabulary_attempt_session" deleteCascade="true"/></column>
+            <column name="item_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_practice_items" referencedColumnNames="id" foreignKeyName="fk_vocabulary_attempt_item" deleteCascade="true"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="client_attempt_id" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="rating" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="answer_text" type="TEXT"/>
+            <column name="correct" type="BOOLEAN"><constraints nullable="false"/></column>
+            <column name="hints_used" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="duration_ms" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_practice_attempts" columnNames="owner_subject,client_attempt_id" constraintName="uq_vocabulary_owner_attempt"/>
+        <createIndex tableName="vocabulary_practice_attempts" indexName="idx_vocabulary_attempt_session_created"><column name="session_id"/><column name="created_at"/></createIndex>
+
+        <createTable tableName="vocabulary_integration_outbox">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="assignment_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_practice_sessions" referencedColumnNames="id" foreignKeyName="fk_vocabulary_outbox_session" deleteCascade="true"/></column>
+            <column name="session_revision" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="payload" type="TEXT"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="attempt_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="last_error" type="VARCHAR(240)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_integration_outbox" columnNames="session_id,session_revision" constraintName="uq_vocabulary_outbox_session_revision"/>
+        <createIndex tableName="vocabulary_integration_outbox" indexName="idx_vocabulary_outbox_due"><column name="status"/><column name="next_attempt_at"/></createIndex>
+    </changeSet>
+</databaseChangeLog>

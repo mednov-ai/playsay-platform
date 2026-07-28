@@ -12,4 +12,9 @@ class VocabularyRealtimeEventListener(
     fun onEntryChanged(event: VocabularyEntryChangedEvent) {
         hub.publish(event)
     }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun onPracticeChanged(event: VocabularyPracticeChangedEvent) {
+        hub.publish(event)
+    }
 }

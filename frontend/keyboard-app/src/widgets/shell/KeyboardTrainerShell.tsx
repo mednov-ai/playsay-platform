@@ -64,11 +64,22 @@ import {
 } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
 import { computeActiveDurationMs, useTypingStore, type StreamItem } from "../../features/typing/typingStore";
-import { claimAnonymousProgress, fetchProgress, fetchVocabularyPractice, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
+import { claimAnonymousProgress, fetchProgress, fetchVocabularyPractice, fetchVocabularySessionPractice, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
-import type { ChordSet, FocusLesson, GamificationEvent, GamificationProfile, LayoutId, Me, Progress, TrainingResult } from "../../shared/types";
+import type {
+  ChordSet,
+  FocusLesson,
+  GamificationEvent,
+  GamificationProfile,
+  LayoutId,
+  Me,
+  Progress,
+  TrainingResult,
+  VocabularyPracticeResponse,
+  VocabularySessionPracticeResponse,
+} from "../../shared/types";
 import { FINGER_ORDER } from "../../shared/types";
 import { escapeActionForTrainerState } from "./keyboardShortcuts";
 import { shouldBlockDeferredPrompts, shouldShowDeferredPrompt } from "./promptFlow";
@@ -318,6 +329,8 @@ function measureTypingTextWithElement(styles: CSSStyleDeclaration, text: string)
 export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, onLogout, onSignIn }: Props) {
   const { t, i18n } = useTranslation();
   const isAuthenticated = me != null;
+  const vocabularySessionId = vocabularySessionIdFromLocation();
+  const returnTarget = validatedReturnTarget() ?? publicSiteUrl;
   const [anonymousDeviceId, setAnonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const ownerKey = practiceOwnerKey({ subject: me?.subject, anonymousDeviceId });
   const [layoutId, setLayoutId] = useState<LayoutId>(() => readPracticeState(ownerKey)?.layoutId ?? "EN");
@@ -507,19 +520,37 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         : persistedSet;
     setSets(loadedSets);
     if (isAuthenticated && layoutId === "EN" && !advancedMode) {
-      void fetchVocabularyPractice().then(({ entries }) => {
-        if (cancelled || entries.length === 0) return;
+      const vocabularyRequest = vocabularySessionId
+        ? fetchVocabularySessionPractice(vocabularySessionId)
+        : fetchVocabularyPractice();
+      void vocabularyRequest.then((response) => {
+        const entries = response.entries;
+        const sessionResponse = isVocabularySessionPractice(response) ? response : null;
+        const sessionItems = sessionResponse?.items ?? [];
+        if (cancelled || (sessionItems.length === 0 && entries.length === 0)) return;
+        const vocabularyTitle = sessionResponse?.title ?? t("trainer.vocabularySet");
         const vocabularySet: ChordSet = {
           id: -900,
+          sourceChordSetId: loadedSets.find((item) => item.id > 0)?.id,
           layout: "EN",
-          title: t("trainer.vocabularySet"),
+          title: vocabularyTitle,
           difficulty: 1,
           tier: "beginner",
-          chords: entries.map((entry) => entry.sourceText),
+          chords: sessionItems.length > 0 ? sessionItems.map((item) => item.sourceText) : entries.map((entry) => entry.sourceText),
           practiceKind: "VOCABULARY",
-          practiceContext: { practiceKind: "VOCABULARY", title: t("trainer.vocabularySet"), vocabularyEntryIds: entries.map((entry) => entry.id) },
+          practiceContext: {
+            practiceKind: "VOCABULARY",
+            title: vocabularyTitle,
+            vocabularyEntryIds: sessionItems.length > 0 ? sessionItems.map((item) => item.entryId) : entries.map((entry) => entry.id),
+            vocabularyItemIds: sessionItems.map((item) => item.itemId),
+            vocabularyWords: sessionItems.map((item) => item.sourceText),
+            vocabularySessionId: sessionResponse?.sessionId,
+          },
         };
         setSets((current) => [...current.filter((item) => item.practiceKind !== "VOCABULARY"), vocabularySet]);
+        if (vocabularySessionId) {
+          loadSet("EN", vocabularySet, visibleCapacityRef.current);
+        }
       }).catch(() => undefined);
     }
     if (restoredSet || loadedSets.length > 0) {
@@ -1441,7 +1472,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   return (
     <main className="keyboard-app">
       <header className="app-header">
-        <a className="brand-lockup" href={publicSiteUrl} aria-label={t("app.publicSiteAria")}>
+        <a className="brand-lockup" href={returnTarget} aria-label={t("app.publicSiteAria")}>
           <span>{t("app.wordmark")}</span>
           <strong>{t("app.product")}</strong>
         </a>
@@ -1875,6 +1906,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                     <span>{t("trainer.saveProgress")}</span>
                   </button>
                 ) : null}
+                {vocabularySessionId ? (
+                  <a className="secondary-button result-card__save-progress" href={returnTarget}>
+                    <span>{t("app.returnToSite")}</span>
+                  </a>
+                ) : null}
                 <span>{t("trainer.startShortcut")}</span>
               </div>
             </div>
@@ -2098,7 +2134,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               <button type="button" className="secondary-button" onClick={dismissPrompt}>
                 <span>{t("trainer.continueGuest")}</span>
               </button>
-              <a className="registration-modal__site-link" href={publicSiteUrl}>
+              <a className="registration-modal__site-link" href={returnTarget}>
                 {t("app.returnToSite")}
               </a>
             </div>
@@ -2107,6 +2143,31 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       ) : null}
     </main>
   );
+}
+
+function vocabularySessionIdFromLocation(): string | null {
+  const value = new URLSearchParams(window.location.search).get("vocabularySessionId");
+  return value && /^[0-9a-f-]{36}$/i.test(value) ? value : null;
+}
+
+function isVocabularySessionPractice(
+  response: VocabularyPracticeResponse | VocabularySessionPracticeResponse,
+): response is VocabularySessionPracticeResponse {
+  return "sessionId" in response && Array.isArray(response.items);
+}
+
+function validatedReturnTarget(): string | null {
+  const value = new URLSearchParams(window.location.search).get("returnTo");
+  if (!value) return null;
+  try {
+    const target = new URL(value);
+    const allowedHosts = new Set(["online.honey.school", "dev.online.honey.school", "online.play-and-say.ru", "online.honeyschool.ru", "honeyschool.ru", "localhost", "127.0.0.1"]);
+    const secure = target.protocol === "https:";
+    const localDevelopment = target.protocol === "http:" && (target.hostname === "localhost" || target.hostname === "127.0.0.1");
+    return (secure || localDevelopment) && allowedHosts.has(target.hostname) ? target.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

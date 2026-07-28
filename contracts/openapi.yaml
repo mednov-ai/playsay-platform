@@ -2089,6 +2089,32 @@ paths:
           description: Current user cannot manage materials
       security:
       - bearerAuth: []
+  /internal/vocabulary/assignments/{assignmentId}/progress:
+    post:
+      tags:
+      - vocabulary-assignment-internal-controller
+      operationId: updateProgress
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-PlaySay-Service-Token
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VocabularyAssignmentProgressUpdateRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
   /courses:
     get:
       tags:
@@ -2389,6 +2415,29 @@ paths:
           description: Current user cannot create assignments
         "404":
           description: Material not found
+      security:
+      - bearerAuth: []
+  /assignments/vocabulary:
+    post:
+      tags:
+      - Assignments
+      summary: Create vocabulary homework assignment
+      description: Creates an assignment envelope and immutable personal vocabulary
+        session for every selected student.
+      operationId: createVocabularyHomeworkAssignment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VocabularyHomeworkRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAssignmentDetailResponse"
       security:
       - bearerAuth: []
   /student-invites/consume:
@@ -3037,6 +3086,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StudentAssignmentDetailResponse"
+      security:
+      - bearerAuth: []
+  /me/assignments/{assignmentId}/vocabulary:
+    get:
+      tags:
+      - Assignments
+      summary: Get my vocabulary homework session
+      description: Returns the immutable personal vocabulary session reference for
+        this assignment.
+      operationId: getMyVocabularyHomeworkAssignment
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentVocabularyAssignmentDetailResponse"
       security:
       - bearerAuth: []
   /me/assignments/{assignmentId}/material:
@@ -4844,6 +4917,33 @@ components:
           - string
           - "null"
           format: date-time
+        activityRef:
+          type:
+          - string
+          - "null"
+          format: uuid
+        activityState:
+          type:
+          - string
+          - "null"
+          enum:
+          - NOT_STARTED
+          - IN_PROGRESS
+          - COMPLETED
+          - FAILED
+        completionRatio:
+          type:
+          - number
+          - "null"
+        accuracy:
+          type:
+          - number
+          - "null"
+        difficultWordCount:
+          type:
+          - integer
+          - "null"
+          format: int32
       required:
       - assignmentId
       - hasSubmission
@@ -4858,10 +4958,24 @@ components:
           type: string
           format: uuid
         materialId:
-          type: string
+          type:
+          - string
+          - "null"
           format: uuid
         materialTitle:
+          type:
+          - string
+          - "null"
+        contentKind:
           type: string
+          enum:
+          - MATERIAL
+          - VOCABULARY_PRACTICE
+        activityRef:
+          type:
+          - string
+          - "null"
+          format: uuid
         lessonId:
           type:
           - string
@@ -4936,11 +5050,32 @@ components:
           - string
           - "null"
           format: date-time
+        myActivityState:
+          type:
+          - string
+          - "null"
+          enum:
+          - NOT_STARTED
+          - IN_PROGRESS
+          - COMPLETED
+          - FAILED
+        myCompletionRatio:
+          type:
+          - number
+          - "null"
+        myAccuracy:
+          type:
+          - number
+          - "null"
+        myDifficultWordCount:
+          type:
+          - integer
+          - "null"
+          format: int32
       required:
+      - contentKind
       - createdAt
       - id
-      - materialId
-      - materialTitle
       - recipientCount
       - scoredCount
       - status
@@ -5625,6 +5760,50 @@ components:
       required:
       - language
       - prompt
+    VocabularyAssignmentProgressUpdateRequest:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        ownerSubject:
+          type: string
+        revision:
+          type: integer
+          format: int64
+        state:
+          type: string
+          enum:
+          - NOT_STARTED
+          - IN_PROGRESS
+          - COMPLETED
+          - FAILED
+        completionRatio:
+          type:
+          - number
+          - "null"
+        accuracy:
+          type:
+          - number
+          - "null"
+        difficultWordCount:
+          type:
+          - integer
+          - "null"
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - eventId
+      - ownerSubject
+      - revision
+      - sessionId
+      - state
+      - updatedAt
     CreateChatConversationRequest:
       type: object
       properties:
@@ -5748,6 +5927,66 @@ components:
       required:
       - materialId
       - studentSubjects
+    VocabularyHomeworkRequest:
+      type: object
+      properties:
+        studentSubjects:
+          type: array
+          items:
+            type: string
+            maxLength: 255
+          maxItems: 100
+          minItems: 1
+        title:
+          type:
+          - string
+          - "null"
+          maxLength: 160
+        instructions:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+        dueAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        mode:
+          type: string
+          enum:
+          - QUICK
+          - BALANCED
+          - WRITING
+          - KEYBOARD
+        wordLimit:
+          type: integer
+          format: int32
+        pinnedEntryIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+        excludedEntryIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+        sourcePracticeId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Completed LIVE practice whose unfinished immutable items must
+            be continued at home
+      required:
+      - excludedEntryIds
+      - mode
+      - pinnedEntryIds
+      - studentSubjects
+      - wordLimit
     StudentInviteConsumeRequest:
       type: object
       properties:
@@ -6132,6 +6371,21 @@ components:
       - assignment
       - material
       - submission
+    StudentVocabularyAssignmentDetailResponse:
+      type: object
+      properties:
+        assignment:
+          $ref: "#/components/schemas/AssignmentSummaryResponse"
+        practiceId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+      required:
+      - assignment
+      - practiceId
+      - sessionId
     HelloResponse:
       type: object
       properties:

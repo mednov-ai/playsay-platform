@@ -2,6 +2,7 @@ package com.playsay.gateway.repo
 
 import com.playsay.gateway.entity.AssignmentEntity
 import com.playsay.gateway.entity.AssignmentRecipientEntity
+import com.playsay.gateway.entity.AssignmentIntegrationOutboxEntity
 import com.playsay.gateway.entity.SubmissionEntity
 import java.math.BigDecimal
 import java.time.Instant
@@ -86,6 +87,15 @@ interface AssignmentRecipientRepo : JpaRepository<AssignmentRecipientEntity, UUI
         type: String,
         archivedStatus: String,
     ): Long
+}
+
+interface AssignmentIntegrationOutboxRepo : JpaRepository<AssignmentIntegrationOutboxEntity, UUID> {
+    fun findByAssignmentIdAndEventType(assignmentId: UUID, eventType: String): AssignmentIntegrationOutboxEntity?
+
+    fun findTop50ByStatusAndNextAttemptAtLessThanEqualOrderByCreatedAtAsc(
+        status: String,
+        nextAttemptAt: Instant,
+    ): List<AssignmentIntegrationOutboxEntity>
 }
 
 interface SubmissionRepo : JpaRepository<SubmissionEntity, UUID> {

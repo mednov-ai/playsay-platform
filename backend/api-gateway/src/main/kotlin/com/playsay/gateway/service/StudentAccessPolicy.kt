@@ -55,6 +55,19 @@ class StudentAccessPolicy(
             evaluate(actorUserId, studentUserId, at) != StudentAccessDecision.DENIED
         }
 
+    @Transactional(readOnly = true)
+    fun canManageVocabularyEveryStudent(actorUserId: UUID, studentUserIds: Collection<UUID>): Boolean {
+        val at = Instant.now(clock)
+        return studentUserIds.isNotEmpty() && studentUserIds.all { studentUserId ->
+            val student = appUserRepo.findById(studentUserId).orElse(null) ?: return@all false
+            student.deletedAt == null && (
+                student.managedByTeacherUserId == actorUserId ||
+                    delegationRepo.findActiveAccess(actorUserId, student.id, at)
+                        .any { it.sourceKind == MetaData.DelegationSourceKinds.MANUAL }
+                )
+        }
+    }
+
     private fun evaluate(actorUserId: UUID, student: AppUserEntity, at: Instant): StudentAccessDecision =
         when {
             student.deletedAt != null -> StudentAccessDecision.DENIED

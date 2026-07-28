@@ -18,7 +18,13 @@ class VocabularyAccessService(
     @Transactional(readOnly = true)
     fun requireOwnerAccess(actorSubject: String, ownerSubject: String, lessonId: UUID?): String {
         if (actorSubject == ownerSubject) return ownerSubject
-        val validLessonId = lessonId ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        if (lessonId == null) {
+            if (!users.canManageVocabulary(actorSubject, ownerSubject)) {
+                throw ResponseStatusException(HttpStatus.FORBIDDEN)
+            }
+            return ownerSubject
+        }
+        val validLessonId = lessonId
         val actor = users.findByKeycloakSubject(actorSubject)
             ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
         val owner = users.findByKeycloakSubject(ownerSubject)
@@ -30,5 +36,31 @@ class VocabularyAccessService(
             throw ResponseStatusException(HttpStatus.FORBIDDEN)
         }
         return ownerSubject
+    }
+
+    @Transactional(readOnly = true)
+    fun requireLessonOwnerAccess(actorSubject: String, ownerSubject: String, lessonId: UUID): String {
+        if (actorSubject == ownerSubject) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        val actor = users.findByKeycloakSubject(actorSubject)
+            ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        val owner = users.findByKeycloakSubject(ownerSubject)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        if (
+            !participants.existsByLessonIdAndStudentUserId(lessonId, owner.id) ||
+            !lessons.canTeacherAccessLessonStudent(lessonId, actor.id, owner.id)
+        ) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        }
+        return ownerSubject
+    }
+
+    @Transactional(readOnly = true)
+    fun manageableLearners(actorSubject: String) = users.findManageableLearners(actorSubject)
+
+    @Transactional
+    fun lockLesson(lessonId: UUID) {
+        if (lessons.lockById(lessonId) == null) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        }
     }
 }

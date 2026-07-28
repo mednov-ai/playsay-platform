@@ -4,10 +4,12 @@ import { Button } from "../../../components/ui/button";
 import {
   createHomeworkAssignment,
   createHomeworkFromScheduledLesson,
+  createVocabularyHomeworkAssignment,
   type AdminUserProfile,
   type LessonMaterial,
   type MeProfile,
   type ScheduledLesson,
+  type VocabularyPracticeMode,
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import { useHomeworkAssignments } from "../hooks/useHomeworkAssignments";
@@ -15,6 +17,7 @@ import { localDateTimeToIso, studentSearchText } from "../model/homeworkUtils";
 import { HomeworkAssignmentList } from "./HomeworkAssignmentList";
 import { HomeworkCreateForm } from "./HomeworkCreateForm";
 import { StudentHomeworkDetailView } from "./StudentHomeworkDetailView";
+import { StudentVocabularyHomeworkView } from "./StudentVocabularyHomeworkView";
 import { TeacherHomeworkDetail } from "./TeacherHomeworkDetail";
 
 export function HomeworkPanel({
@@ -39,6 +42,9 @@ export function HomeworkPanel({
   const [instructions, setInstructions] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
   const [title, setTitle] = useState("");
+  const [contentKind, setContentKind] = useState<"MATERIAL" | "VOCABULARY_PRACTICE">("MATERIAL");
+  const [vocabularyMode, setVocabularyMode] = useState<VocabularyPracticeMode>("BALANCED");
+  const [vocabularyWordLimit, setVocabularyWordLimit] = useState(10);
   const {
     answers,
     assignments,
@@ -58,6 +64,7 @@ export function HomeworkPanel({
     setSaving,
     setSelectedAssignmentId,
     studentDetail,
+    studentVocabularyDetail,
     studentHasUnsavedChanges,
     studentScore,
     submitStudentHomework,
@@ -134,6 +141,32 @@ export function HomeworkPanel({
     }
   }
 
+  async function createVocabularyHomework() {
+    if (selectedSubjects.length === 0) {
+      setMessage(t("homework.messages.selectStudents"));
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await createVocabularyHomeworkAssignment({
+        dueAt: localDateTimeToIso(dueAt),
+        instructions: instructions.trim() || null,
+        mode: vocabularyMode,
+        studentSubjects: selectedSubjects,
+        title: title.trim() || t("homework.create.defaultVocabularyTitle"),
+        wordLimit: vocabularyWordLimit,
+      });
+      await refreshAssignments();
+      setSelectedAssignmentId(created.assignment.id);
+      setDetail(created);
+      setMessage(t("homework.messages.createdVocabulary"));
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : t("homework.messages.createFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function toggleSubject(subject: string) {
     setSelectedSubjects((current) => (
       current.includes(subject)
@@ -192,6 +225,7 @@ export function HomeworkPanel({
           <div className="grid gap-4">
             <HomeworkCreateForm
               assignableMaterials={assignableMaterials}
+              contentKind={contentKind}
               disabled={disabled}
               dueAt={dueAt}
               filteredStudentUsers={filteredStudentUsers}
@@ -200,6 +234,7 @@ export function HomeworkPanel({
               onClearVisibleStudents={clearVisibleStudents}
               onCreateFromLesson={() => void createFromLesson()}
               onCreateStandaloneHomework={() => void createStandaloneHomework()}
+              onCreateVocabularyHomework={() => void createVocabularyHomework()}
               onSelectVisibleStudents={selectVisibleStudents}
               onToggleSubject={toggleSubject}
               saving={saving}
@@ -207,14 +242,19 @@ export function HomeworkPanel({
               selectedMaterialId={selectedMaterialId}
               selectedSubjects={selectedSubjects}
               setDueAt={setDueAt}
+              setContentKind={setContentKind}
               setInstructions={setInstructions}
               setSelectedLessonId={setSelectedLessonId}
               setSelectedMaterialId={setSelectedMaterialId}
               setStudentSearch={setStudentSearch}
               setTitle={setTitle}
+              setVocabularyMode={setVocabularyMode}
+              setVocabularyWordLimit={setVocabularyWordLimit}
               studentSearch={studentSearch}
               studentUsers={studentUsers}
               title={title}
+              vocabularyMode={vocabularyMode}
+              vocabularyWordLimit={vocabularyWordLimit}
             />
 
             {message ? (
@@ -242,10 +282,12 @@ export function HomeworkPanel({
               {message}
             </div>
           ) : null}
-          {loading && !studentDetail ? (
+          {loading && !studentDetail && !studentVocabularyDetail ? (
             <div className="flex min-h-48 items-center justify-center text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
+          ) : studentVocabularyDetail ? (
+            <StudentVocabularyHomeworkView detail={studentVocabularyDetail} onBack={closeStudentAssignment} />
           ) : studentDetail ? (
             <StudentHomeworkDetailView
               answers={answers}

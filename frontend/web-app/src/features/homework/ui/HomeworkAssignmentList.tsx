@@ -51,7 +51,14 @@ export function HomeworkAssignmentList({
             type="button"
           >
             <span className="block text-sm font-extrabold text-foreground">{assignment.title}</span>
-            <span className="mt-1 block text-xs font-bold text-muted-foreground">{assignment.materialTitle}</span>
+            <span className="mt-1 flex items-center gap-2 text-xs font-bold text-muted-foreground">
+              {assignment.contentKind === "VOCABULARY_PRACTICE" ? (
+                <span className="rounded-full bg-[#fff3eb] px-2 py-1 text-primary">{t("homework.contentKind.words")}</span>
+              ) : assignment.materialTitle}
+              {!canManage && assignment.contentKind === "VOCABULARY_PRACTICE" && typeof assignment.myCompletionRatio === "number"
+                ? <span>{Math.round(assignment.myCompletionRatio * 100)}%</span>
+                : null}
+            </span>
             {canManage ? (
               <span className="mt-2 flex flex-wrap gap-2">
                 <span className="inline-flex rounded-full bg-muted px-2 py-1 text-xs font-extrabold text-muted-foreground">

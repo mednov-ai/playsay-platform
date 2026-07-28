@@ -25,4 +25,5 @@
     <include file="2026-07-19-001-create-chat.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-19-002-add-chat-delivery-email-digests.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-28-001-create-material-game-adaptation.xml" relativeToChangelogFile="true"/>
+    <include file="2026-07-28-002-add-vocabulary-practice-assignments.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -22,6 +22,7 @@ class VocabularyEntryEntity(
     @Column(name = "example_translation", length = 1000) var exampleTranslation: String? = null,
     @Enumerated(EnumType.STRING) @Column(name = "translation_state", nullable = false, length = 16) var translationState: TranslationState = TranslationState.MISSING,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) var status: EntryStatus = EntryStatus.ACTIVE,
+    @Column(name = "practice_paused", nullable = false) var practicePaused: Boolean = false,
     @Column(name = "created_by_subject", nullable = false, length = 255) var createdBySubject: String = "",
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now(),
@@ -49,8 +50,11 @@ class VocabularyOccurrenceEntity(
 class VocabularyUserProjection(
     @Id var id: UUID = UUID.randomUUID(),
     @Column(name = "keycloak_subject", nullable = false) var keycloakSubject: String = "",
+    @Column(name = "username", length = 255) var username: String? = null,
+    @Column(name = "display_name", length = 120) var displayName: String? = null,
     @Column(length = 16) var locale: String? = null,
     @Column(length = 255) var roles: String? = null,
+    @Column(name = "managed_by_teacher_user_id") var managedByTeacherUserId: UUID? = null,
 )
 
 @Entity

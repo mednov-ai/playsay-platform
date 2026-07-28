@@ -7,6 +7,7 @@ import {
   type LessonMaterial,
   type MeProfile,
   type ScheduledLesson,
+  createVocabularyPractice,
 } from "../../../shared/api/playsay";
 import { useCollaborationDocument } from "../hooks/useCollaborationDocument";
 import { useLessonMaterial } from "../hooks/useLessonMaterial";
@@ -33,6 +34,9 @@ import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
 import { TeacherLessonToolbar } from "./TeacherLessonToolbar";
 import { useAppTranslation } from "../../../shared/i18n";
 import { VocabularyLessonMenu } from "../../vocabulary/ui/VocabularyLessonMenu";
+import { VocabularyLiveStage } from "../../vocabulary/ui/VocabularyLiveStage";
+import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
+import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
 
 export function LessonWorkspace({
   displayName,
@@ -65,6 +69,11 @@ export function LessonWorkspace({
     uploadingHtmlGamePage,
   } = useLessonMaterial({ onAssignMaterial, session });
   const canMonitorSubmissions = canAssignLessons(profile);
+  const liveVocabulary = useLiveVocabularyPractice({
+    enabled: vocabularyFeatures.live,
+    lessonId: session.lessonId,
+    ownerSubject: canMonitorSubmissions ? undefined : profile?.subject,
+  });
   const assignedParticipants = session.participants.filter((participant) => Boolean(participant.materialId));
   const isParallelWork = session.workMode === "PARALLEL" &&
     session.participants.length > 1 &&
@@ -80,6 +89,23 @@ export function LessonWorkspace({
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
   const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
+  const [startingVocabularyPractice, setStartingVocabularyPractice] = useState(false);
+
+  async function startVocabularyPractice() {
+    if (!canMonitorSubmissions || startingVocabularyPractice || session.participants.length === 0) return;
+    setStartingVocabularyPractice(true);
+    try {
+      liveVocabulary.setPractice(await createVocabularyPractice({
+        delivery: "LIVE",
+        lessonId: session.lessonId,
+        mode: "BALANCED",
+        ownerSubjects: session.participants.map((participant) => participant.subject),
+        wordLimit: 10,
+      }));
+    } finally {
+      setStartingVocabularyPractice(false);
+    }
+  }
 
   useEffect(() => {
     setTeacherTaskVisible((current) => teacherTaskVisibilityAfterLiveUpload(
@@ -247,6 +273,7 @@ export function LessonWorkspace({
             <VocabularyLessonMenu
               ownerLabel={activeParticipantLabel}
               ownerSubject={activeParticipant?.subject}
+              onStartPractice={vocabularyFeatures.live ? () => void startVocabularyPractice() : undefined}
               recipientSubjects={session.participants.map((participant) => participant.subject)}
               source={{
                 sourceType: "LESSON",
@@ -317,6 +344,21 @@ export function LessonWorkspace({
           </div>
         )}
 
+        {vocabularyFeatures.live && liveVocabulary.practice ? (
+          <VocabularyLiveStage
+            activeStudentSubject={activeParticipant?.subject}
+            canManage={canMonitorSubmissions}
+            onClose={() => liveVocabulary.setPractice(null)}
+            onPracticeChange={liveVocabulary.setPractice}
+            practice={liveVocabulary.practice}
+            profileSubject={profile?.subject}
+          />
+        ) : null}
+
+        <div
+          aria-hidden={liveVocabulary.practice ? "true" : undefined}
+          className={liveVocabulary.practice ? "hidden" : "contents"}
+        >
         {canMonitorSubmissions && visibleMaterial ? (
           <MaterialSubmissionsMonitor
             activeStudentSubject={activeParticipant?.subject ?? null}
@@ -425,6 +467,7 @@ export function LessonWorkspace({
             />
           </>
         )}
+        </div>
       </div>
     </section>
   );

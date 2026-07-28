@@ -184,7 +184,7 @@ function VocabularyOwnerWorkspace({
             <input className="playsay-input min-w-0 flex-1" onChange={(event) => setQuery(event.target.value)} placeholder={t("vocabulary.search")} value={query} />
             <Button aria-label={t("vocabulary.actions.search")} type="submit" variant="outline"><Search className="h-4 w-4" /></Button>
           </form>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          <div className="mt-3 flex flex-wrap gap-2 pb-1">
             {(["ALL", "NEW", "LEARNING", "REVIEW", "MASTERED", "PAUSED", "MISSING"] as EntryFilter[]).map((value) => (
               <Button className="shrink-0" key={value} onClick={() => setFilter(value)} type="button" variant={filter === value ? "default" : "outline"}>{t(`vocabulary.filters.${value}`)}</Button>
             ))}
@@ -263,7 +263,7 @@ function StudentVocabularyPanel() {
         </div>
         <VocabularyQuickAdd source={{ sourceType: "MANUAL" }}><span /></VocabularyQuickAdd>
       </header>
-      <div className="mt-5 flex gap-2 overflow-x-auto border-b border-border pb-3">
+      <div className="mt-5 flex flex-wrap gap-2 border-b border-border pb-3">
         {(["TODAY", "WORDS", "HISTORY"] as VocabularyTab[])
           .filter((value) => value !== "TODAY" || vocabularyFeatures.practice)
           .map((value) => (

@@ -445,7 +445,7 @@ export function AppShell(props: AppShellProps) {
             />
           </Suspense>
         ) : (
-          <div className="grid flex-1 gap-5">
+          <div className="grid min-w-0 flex-1 gap-5">
             <Suspense fallback={<PanelFallback />}>
               {workspaceTabs.length > 1 && !materialAuthoringState.focused ? (
                 <WorkspaceTabs activeTab={workspaceTab} onSelect={selectWorkspaceTab} tabs={workspaceTabs} />

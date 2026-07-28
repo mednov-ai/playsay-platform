@@ -221,7 +221,7 @@ function sanitizeFocusSet(value: unknown, layoutId: LayoutId): ChordSet | undefi
     title: typeof candidate.title === "string" && candidate.title.length > 0 ? candidate.title : "Focus",
     difficulty: typeof candidate.difficulty === "number" ? candidate.difficulty : 0,
     tier: candidate.tier === "professional" || candidate.tier === "middle" || candidate.tier === "confident" ? candidate.tier : "beginner",
-    practiceKind: candidate.practiceKind === "CODE_COMBO" || candidate.practiceKind === "CODE" ? candidate.practiceKind : undefined,
+    practiceKind: candidate.practiceKind === "CODE_COMBO" || candidate.practiceKind === "CODE" || candidate.practiceKind === "VOCABULARY" ? candidate.practiceKind : undefined,
     codeLanguages: Array.isArray(candidate.codeLanguages)
       ? candidate.codeLanguages.filter((language): language is string => typeof language === "string" && language.length > 0)
       : undefined,
@@ -235,6 +235,19 @@ function sanitizePracticeContext(value: unknown): ChordSet["practiceContext"] | 
     return undefined;
   }
   const candidate = value as Partial<NonNullable<ChordSet["practiceContext"]>>;
+  if (candidate.practiceKind === "VOCABULARY") {
+    if (typeof candidate.title !== "string" || candidate.title.length === 0 || typeof candidate.vocabularySessionId !== "string") {
+      return undefined;
+    }
+    return {
+      practiceKind: "VOCABULARY",
+      title: candidate.title,
+      vocabularyEntryIds: stringArray(candidate.vocabularyEntryIds),
+      vocabularyItemIds: stringArray(candidate.vocabularyItemIds),
+      vocabularyWords: stringArray(candidate.vocabularyWords),
+      vocabularySessionId: candidate.vocabularySessionId,
+    };
+  }
   if (candidate.practiceKind !== "CODE" && candidate.practiceKind !== "CODE_COMBO") {
     return undefined;
   }
@@ -254,4 +267,10 @@ function sanitizePracticeContext(value: unknown): ChordSet["practiceContext"] | 
     title: candidate.title,
     numberRowEnabled: candidate.numberRowEnabled === true,
   };
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.length > 0)
+    : [];
 }

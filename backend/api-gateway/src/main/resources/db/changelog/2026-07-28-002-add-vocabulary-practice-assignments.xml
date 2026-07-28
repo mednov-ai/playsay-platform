@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-28-002-vocabulary-practice-assignments" author="codex">
+        <addColumn tableName="assignment">
+            <column name="content_kind" type="VARCHAR(32)" defaultValue="MATERIAL"><constraints nullable="false"/></column>
+            <column name="activity_ref" type="UUID"/>
+        </addColumn>
+        <addColumn tableName="assignment_recipient">
+            <column name="activity_ref" type="UUID"/>
+            <column name="activity_state" type="VARCHAR(24)" defaultValue="NOT_STARTED"><constraints nullable="false"/></column>
+            <column name="completion_ratio" type="DECIMAL(7,4)"/>
+            <column name="accuracy" type="DECIMAL(7,4)"/>
+            <column name="difficult_word_count" type="INT"/>
+            <column name="activity_revision" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="activity_updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+        <createIndex tableName="assignment" indexName="idx_assignment_content_activity"><column name="content_kind"/><column name="activity_ref"/></createIndex>
+        <createIndex tableName="assignment_recipient" indexName="idx_assignment_recipient_activity"><column name="activity_ref"/></createIndex>
+
+        <createTable tableName="assignment_integration_outbox">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="assignment_id" type="UUID"><constraints nullable="false" referencedTableName="assignment" referencedColumnNames="id" foreignKeyName="fk_assignment_outbox_assignment" deleteCascade="true"/></column>
+            <column name="event_type" type="VARCHAR(48)"><constraints nullable="false"/></column>
+            <column name="payload" type="TEXT"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="attempt_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="last_error" type="VARCHAR(240)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="assignment_integration_outbox" columnNames="assignment_id,event_type" constraintName="uq_assignment_outbox_event"/>
+        <createIndex tableName="assignment_integration_outbox" indexName="idx_assignment_outbox_due"><column name="status"/><column name="next_attempt_at"/></createIndex>
+    </changeSet>
+</databaseChangeLog>

@@ -44,6 +44,10 @@ class AssignmentEntity(
     var material: LessonMaterialEntity? = null,
     @Column(name = "material_block_id", length = 120)
     var materialBlockId: String? = null,
+    @Column(name = "content_kind", nullable = false, length = 32)
+    var contentKind: String = "MATERIAL",
+    @Column(name = "activity_ref")
+    var activityRef: UUID? = null,
     @Column(name = "title", nullable = false, length = 160)
     var title: String = "",
     @Column(name = "instructions", columnDefinition = "TEXT")

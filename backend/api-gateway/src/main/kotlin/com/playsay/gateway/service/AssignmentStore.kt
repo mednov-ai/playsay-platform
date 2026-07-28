@@ -11,15 +11,21 @@ import com.playsay.gateway.dto.LessonHomeworkRequest
 import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.StudentAssignmentDetailResponse
+import com.playsay.gateway.dto.StudentVocabularyAssignmentDetailResponse
 import com.playsay.gateway.dto.TeacherAssignmentDetailResponse
+import com.playsay.gateway.dto.VocabularyAssignmentPreparationResponse
+import com.playsay.gateway.dto.VocabularyAssignmentProgressUpdateRequest
+import com.playsay.gateway.dto.VocabularyHomeworkRequest
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.AssignmentEntity
+import com.playsay.gateway.entity.AssignmentIntegrationOutboxEntity
 import com.playsay.gateway.entity.AssignmentRecipientEntity
 import com.playsay.gateway.entity.SubmissionEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.mapper.LessonMaterialResponseMapper
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.AssignmentRecipientRepo
+import com.playsay.gateway.repo.AssignmentIntegrationOutboxRepo
 import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.LessonMaterialRow
@@ -49,6 +55,7 @@ private typealias StoredHomeworkMaterial = LessonMaterialRow
 class AssignmentStore(
     private val assignmentRepo: AssignmentRepo,
     private val assignmentRecipientRepo: AssignmentRecipientRepo,
+    private val assignmentIntegrationOutboxRepo: AssignmentIntegrationOutboxRepo,
     private val submissionRepo: SubmissionRepo,
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
@@ -91,6 +98,70 @@ class AssignmentStore(
         )
         ensureRecipients(assignment.id, recipients, request.dueAt, now)
         publishAssignmentChanged(authentication, assignment.id, recipients, "CREATED")
+        return teacherDetail(authentication, assignment.id)
+    }
+
+    @Transactional
+    fun createVocabularyHomework(
+        authentication: JwtAuthenticationToken,
+        request: VocabularyHomeworkRequest,
+    ): TeacherAssignmentDetailResponse {
+        authentication.requireAssignmentManager()
+        if (request.mode !in vocabularyPracticeModes || request.wordLimit !in 1..30) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.INVALID_REQUEST)
+        }
+        val teacherUserId = userProfileStore.currentUserId(authentication)
+        val recipients = resolveRecipientUsers(request.studentSubjects)
+        val recipientIds = recipients.map(AppUserEntity::id)
+        val canAccessRecipients = if (request.sourcePracticeId == null) {
+            studentAccessPolicy.canManageVocabularyEveryStudent(teacherUserId, recipientIds)
+        } else {
+            studentAccessPolicy.canAccessEveryStudent(teacherUserId, recipientIds)
+        }
+        if (!canAccessRecipients) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.STUDENT_ACCESS_DENIED)
+        }
+        val now = Instant.now()
+        val assignment = assignmentRepo.saveAndFlush(
+            AssignmentEntity(
+                id = UUID.randomUUID(),
+                teacherUserId = teacherUserId,
+                contentKind = MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE,
+                title = request.title.optionalClean("title", 160) ?: "Vocabulary practice",
+                instructions = request.instructions.optionalClean("instructions", 2_000),
+                type = MetaData.AssignmentTypes.HOMEWORK,
+                payload = objectMapper.writeValueAsString(
+                    objectMapper.createObjectNode().apply {
+                        put("source", "vocabulary")
+                        put("mode", request.mode)
+                        put("wordLimit", request.wordLimit)
+                    },
+                ),
+                dueAt = request.dueAt,
+                status = MetaData.AssignmentStatuses.PREPARING,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        ensureRecipients(assignment.id, recipients, request.dueAt, now)
+        assignmentIntegrationOutboxRepo.save(
+            AssignmentIntegrationOutboxEntity(
+                id = UUID.randomUUID(),
+                assignmentId = assignment.id,
+                eventType = VOCABULARY_ASSIGNMENT_PREPARE_EVENT,
+                payload = objectMapper.writeValueAsString(
+                    VocabularyAssignmentOutboxPayload(
+                        actorSubject = authentication.token.subject,
+                        ownerSubjects = recipients.map(AppUserEntity::keycloakSubject),
+                        request = request,
+                    ),
+                ),
+                status = OUTBOX_PENDING,
+                nextAttemptAt = now,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
         return teacherDetail(authentication, assignment.id)
     }
 
@@ -191,6 +262,7 @@ class AssignmentStore(
                     status = MetaData.AssignmentStatuses.ARCHIVED,
                 )
             }
+            .filter { assignment -> assignment.status == MetaData.AssignmentStatuses.ACTIVE }
             .mapNotNull { assignment -> summaryIfMaterialAvailable(assignment, userId) }
     }
 
@@ -198,6 +270,7 @@ class AssignmentStore(
     fun studentDetail(authentication: JwtAuthenticationToken, assignmentId: UUID): StudentAssignmentDetailResponse {
         val userId = userProfileStore.currentUserId(authentication)
         val assignment = studentAssignment(assignmentId, userId)
+        requireMaterialAssignment(assignment)
         val material = materialById(requireNotNull(assignment.materialId))
         val submission = findHomeworkSubmission(assignment.id, userId)
             ?: createEmptyHomeworkSubmission(assignment, material.id, userId)
@@ -212,6 +285,7 @@ class AssignmentStore(
     fun studentMaterial(authentication: JwtAuthenticationToken, assignmentId: UUID): LessonMaterialResponse {
         val userId = userProfileStore.currentUserId(authentication)
         val assignment = studentAssignment(assignmentId, userId)
+        requireMaterialAssignment(assignment)
         return lessonMaterialResponseMapper.toResponse(materialById(requireNotNull(assignment.materialId)))
     }
 
@@ -219,6 +293,7 @@ class AssignmentStore(
     fun studentSubmission(authentication: JwtAuthenticationToken, assignmentId: UUID): AssignmentSubmissionResponse {
         val userId = userProfileStore.currentUserId(authentication)
         val assignment = studentAssignment(assignmentId, userId)
+        requireMaterialAssignment(assignment)
         val material = materialById(requireNotNull(assignment.materialId))
         val submission = findHomeworkSubmission(assignment.id, userId)
             ?: createEmptyHomeworkSubmission(assignment, material.id, userId)
@@ -233,6 +308,7 @@ class AssignmentStore(
     ): AssignmentSubmissionResponse {
         val userId = userProfileStore.currentUserId(authentication)
         val assignment = studentAssignment(assignmentId, userId)
+        requireMaterialAssignment(assignment)
         val materialId = requireNotNull(assignment.materialId)
         val material = materialById(materialId)
         validateJsonSize("content", request.content, objectMapper, 1_000_000)
@@ -281,6 +357,105 @@ class AssignmentStore(
             .toResponse(objectMapper, recipientCount(assignment.id), assignment.maxScore, progressCalculator)
     }
 
+    @Transactional(readOnly = true)
+    fun studentVocabularyDetail(
+        authentication: JwtAuthenticationToken,
+        assignmentId: UUID,
+    ): StudentVocabularyAssignmentDetailResponse {
+        val userId = userProfileStore.currentUserId(authentication)
+        val assignment = studentAssignment(assignmentId, userId)
+        if (assignment.contentKind != MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
+        }
+        val recipient = assignmentRecipientRepo.findByAssignmentIdAndStudentUserId(assignmentId, userId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
+        return StudentVocabularyAssignmentDetailResponse(
+            assignment = summary(assignment, userId),
+            practiceId = assignment.activityRef
+                ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.ASSIGNMENT_NOT_READY),
+            sessionId = recipient.activityRef
+                ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.ASSIGNMENT_NOT_READY),
+        )
+    }
+
+    @Transactional
+    fun applyVocabularyPreparation(
+        assignmentId: UUID,
+        response: VocabularyAssignmentPreparationResponse,
+        actorSubject: String,
+    ) {
+        val assignment = assignmentRepo.findById(assignmentId).orElseThrow()
+        if (assignment.status == MetaData.AssignmentStatuses.ACTIVE && assignment.activityRef == response.practiceId) {
+            completeOutbox(assignmentId)
+            return
+        }
+        val recipients = assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignmentId)
+        val subjectsByUserId = appUserRepo.findByIdIn(recipients.map(AssignmentRecipientEntity::studentUserId))
+            .associate { user -> user.id to user.keycloakSubject }
+        val sessionsBySubject = response.sessions.associateBy { it.ownerSubject }
+        if (recipients.any { recipient -> subjectsByUserId[recipient.studentUserId] !in sessionsBySubject }) {
+            error("Vocabulary service did not prepare every assignment recipient")
+        }
+        val now = Instant.now()
+        recipients.forEach { recipient ->
+            recipient.activityRef = sessionsBySubject[subjectsByUserId[recipient.studentUserId]]?.sessionId
+            recipient.activityState = "NOT_STARTED"
+            recipient.updatedAt = now
+        }
+        assignmentRecipientRepo.saveAll(recipients)
+        assignment.activityRef = response.practiceId
+        assignment.status = MetaData.AssignmentStatuses.ACTIVE
+        assignment.updatedAt = now
+        assignmentRepo.save(assignment)
+        completeOutbox(assignmentId)
+        eventPublisher.publishEvent(
+            AssignmentChangedEvent(
+                assignmentId = assignment.id,
+                visibleSubjects = recipients.mapNotNullTo(mutableSetOf()) { recipient ->
+                    subjectsByUserId[recipient.studentUserId]
+                }.apply { add(actorSubject) },
+                change = "CREATED",
+            ),
+        )
+    }
+
+    @Transactional
+    fun updateVocabularyProgress(
+        assignmentId: UUID,
+        request: VocabularyAssignmentProgressUpdateRequest,
+    ) {
+        val assignment = assignmentRepo.findById(assignmentId).orElseThrow {
+            ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
+        }
+        if (assignment.contentKind != MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
+        }
+        val user = appUserRepo.findByKeycloakSubject(request.ownerSubject)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
+        val recipient = assignmentRecipientRepo.findByAssignmentIdAndStudentUserId(assignmentId, user.id)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
+        if (recipient.activityRef != request.sessionId || request.revision <= recipient.activityRevision) return
+        recipient.activityRevision = request.revision
+        recipient.activityState = request.state
+        recipient.completionRatio = request.completionRatio
+        recipient.accuracy = request.accuracy
+        recipient.difficultWordCount = request.difficultWordCount
+        recipient.activityUpdatedAt = request.updatedAt
+        recipient.updatedAt = Instant.now()
+        assignmentRecipientRepo.save(recipient)
+        assignment.updatedAt = recipient.updatedAt
+        assignmentRepo.save(assignment)
+        val teacherSubject = assignment.teacherUserId
+            ?.let { teacherUserId -> appUserRepo.findById(teacherUserId).orElse(null)?.keycloakSubject }
+        eventPublisher.publishEvent(
+            AssignmentChangedEvent(
+                assignmentId = assignment.id,
+                visibleSubjects = listOfNotNull(request.ownerSubject, teacherSubject).toSet(),
+                change = "UPDATED",
+            ),
+        )
+    }
+
     private fun teacherAssignment(authentication: JwtAuthenticationToken, assignmentId: UUID): StoredAssignment {
         val assignment = assignmentRepo.findByIdAndTypeAndStatusNot(
             id = assignmentId,
@@ -304,10 +479,27 @@ class AssignmentStore(
             id = assignmentId,
             type = MetaData.AssignmentTypes.HOMEWORK,
             status = MetaData.AssignmentStatuses.ARCHIVED,
-        ) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
+        )?.takeIf { assignment -> assignment.status == MetaData.AssignmentStatuses.ACTIVE }
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
     }
 
-    private fun summary(assignment: StoredAssignment): AssignmentSummaryResponse {
+    private fun summary(assignment: StoredAssignment): AssignmentSummaryResponse =
+        if (assignment.contentKind == MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
+            vocabularySummary(assignment)
+        } else {
+            materialSummary(assignment)
+        }
+
+    private fun summary(assignment: StoredAssignment, studentUserId: UUID): AssignmentSummaryResponse =
+        if (assignment.contentKind == MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
+            vocabularySummary(assignment, studentUserId)
+        } else {
+            val materialId = assignment.materialId
+                ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+            summary(assignment, materialById(materialId), studentUserId)
+        }
+
+    private fun materialSummary(assignment: StoredAssignment): AssignmentSummaryResponse {
         val materialId = assignment.materialId
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val material = materialById(materialId)
@@ -318,6 +510,9 @@ class AssignmentStore(
         assignment: StoredAssignment,
         studentUserId: UUID? = null,
     ): AssignmentSummaryResponse? {
+        if (assignment.contentKind == MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
+            return vocabularySummary(assignment, studentUserId)
+        }
         val materialId = assignment.materialId ?: return null
         val material = availableMaterialById(materialId) ?: return null
         return summary(assignment, material, studentUserId)
@@ -338,6 +533,8 @@ class AssignmentStore(
             id = assignment.id,
             materialId = material.id,
             materialTitle = material.title,
+            contentKind = MetaData.AssignmentContentKinds.MATERIAL,
+            activityRef = null,
             lessonId = assignment.lessonId,
             sourceLessonId = assignment.sourceLessonId,
             title = assignment.title,
@@ -369,6 +566,37 @@ class AssignmentStore(
         val recipients = assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignment.id)
         val users = appUserRepo.findByIdIn(recipients.map { recipient -> recipient.studentUserId })
             .associateBy { user -> user.id }
+        if (assignment.contentKind == MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
+            return recipients.map { recipient ->
+                val user = users[recipient.studentUserId]
+                AssignmentRecipientProgressResponse(
+                    assignmentId = assignment.id,
+                    studentUserId = recipient.studentUserId,
+                    studentSubject = user?.keycloakSubject.orEmpty(),
+                    studentName = user?.displayLabel(),
+                    submissionId = null,
+                    hasSubmission = false,
+                    submitted = recipient.activityState == "COMPLETED",
+                    score = null,
+                    maxScore = null,
+                    scoreRatio = null,
+                    errorsCount = null,
+                    progressTone = null,
+                    showGroupIndicator = false,
+                    groupAverageScore = null,
+                    groupAverageErrorsCount = null,
+                    relativeScoreDelta = null,
+                    relativeErrorsDelta = null,
+                    submittedAt = recipient.activityUpdatedAt.takeIf { recipient.activityState == "COMPLETED" },
+                    updatedAt = recipient.activityUpdatedAt ?: recipient.updatedAt,
+                    activityRef = recipient.activityRef,
+                    activityState = recipient.activityState,
+                    completionRatio = recipient.completionRatio,
+                    accuracy = recipient.accuracy,
+                    difficultWordCount = recipient.difficultWordCount,
+                )
+            }
+        }
         val latestByStudent = latestSubmissionsByStudent(assignment.id)
         val scoredSubmissions = latestByStudent.values.filter { submission -> submission.score != null }
         val scoredErrors = latestByStudent.values.mapNotNull { submission -> submission.errorsCount?.let(::BigDecimal) }
@@ -412,6 +640,50 @@ class AssignmentStore(
                 updatedAt = submission?.updatedAt,
             )
         }
+    }
+
+    private fun vocabularySummary(
+        assignment: StoredAssignment,
+        studentUserId: UUID? = null,
+    ): AssignmentSummaryResponse {
+        val recipients = assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignment.id)
+        val studentRecipient = studentUserId?.let { id -> recipients.firstOrNull { it.studentUserId == id } }
+        val completed = recipients.count { it.activityState == "COMPLETED" }
+        val difficultCounts = recipients.mapNotNull { it.difficultWordCount?.let(::BigDecimal) }
+        return AssignmentSummaryResponse(
+            id = assignment.id,
+            materialId = null,
+            materialTitle = null,
+            contentKind = MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE,
+            activityRef = assignment.activityRef,
+            lessonId = assignment.lessonId,
+            sourceLessonId = assignment.sourceLessonId,
+            title = assignment.title,
+            instructions = assignment.instructions,
+            type = assignment.type,
+            maxScore = null,
+            dueAt = assignment.dueAt,
+            status = assignment.status,
+            recipientCount = recipients.size,
+            submittedCount = completed,
+            scoredCount = recipients.count { it.accuracy != null },
+            averageScore = null,
+            averageErrorsCount = progressCalculator.average(difficultCounts),
+            createdAt = assignment.createdAt,
+            updatedAt = assignment.updatedAt,
+            mySubmissionState = when (studentRecipient?.activityState) {
+                null, "NOT_STARTED" -> if (studentUserId == null) null else MetaData.HomeworkSubmissionStates.NOT_STARTED
+                "COMPLETED" -> MetaData.HomeworkSubmissionStates.SUBMITTED
+                else -> MetaData.HomeworkSubmissionStates.DRAFT
+            },
+            myScore = null,
+            mySubmittedAt = studentRecipient?.activityUpdatedAt?.takeIf { studentRecipient.activityState == "COMPLETED" },
+            mySubmissionUpdatedAt = studentRecipient?.activityUpdatedAt,
+            myActivityState = studentRecipient?.activityState,
+            myCompletionRatio = studentRecipient?.completionRatio,
+            myAccuracy = studentRecipient?.accuracy,
+            myDifficultWordCount = studentRecipient?.difficultWordCount,
+        )
     }
 
     private fun latestSubmissionsByStudent(assignmentId: UUID): Map<UUID, StoredHomeworkSubmission> {
@@ -585,6 +857,23 @@ class AssignmentStore(
         lessonMaterialRepo.findRowById(materialId)
             ?.takeIf { material -> material.status != MetaData.MaterialStatuses.ARCHIVED }
 
+    private fun requireMaterialAssignment(assignment: StoredAssignment) {
+        if (assignment.contentKind != MetaData.AssignmentContentKinds.MATERIAL || assignment.materialId == null) {
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        }
+    }
+
+    private fun completeOutbox(assignmentId: UUID) {
+        val event = assignmentIntegrationOutboxRepo.findByAssignmentIdAndEventType(
+            assignmentId,
+            VOCABULARY_ASSIGNMENT_PREPARE_EVENT,
+        ) ?: return
+        event.status = OUTBOX_COMPLETED
+        event.lastError = null
+        event.updatedAt = Instant.now()
+        assignmentIntegrationOutboxRepo.save(event)
+    }
+
     private fun recipientCount(assignmentId: UUID): Int =
         assignmentRecipientRepo.countByAssignmentId(assignmentId).toInt()
 
@@ -597,6 +886,11 @@ class AssignmentStore(
             },
         )
 }
+
+private val vocabularyPracticeModes = setOf("QUICK", "BALANCED", "WRITING", "KEYBOARD")
+internal const val VOCABULARY_ASSIGNMENT_PREPARE_EVENT = "VOCABULARY_ASSIGNMENT_PREPARE"
+internal const val OUTBOX_PENDING = "PENDING"
+internal const val OUTBOX_COMPLETED = "COMPLETED"
 
 private fun StoredHomeworkSubmission.toResponse(
     objectMapper: ObjectMapper,

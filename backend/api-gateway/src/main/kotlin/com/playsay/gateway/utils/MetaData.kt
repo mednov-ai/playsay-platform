@@ -86,8 +86,15 @@ object MetaData {
     }
 
     object AssignmentStatuses {
+        const val PREPARING = "PREPARING"
         const val ACTIVE = "ACTIVE"
+        const val FAILED = "FAILED"
         const val ARCHIVED = "ARCHIVED"
+    }
+
+    object AssignmentContentKinds {
+        const val MATERIAL = "MATERIAL"
+        const val VOCABULARY_PRACTICE = "VOCABULARY_PRACTICE"
     }
 
     object HomeworkSubmissionStates {
@@ -232,6 +239,8 @@ object MetaData {
         const val ASSIGNMENT_NOT_FOUND = "ASSIGNMENT_NOT_FOUND"
         const val ASSIGNMENT_ACCESS_DENIED = "ASSIGNMENT_ACCESS_DENIED"
         const val ASSIGNMENT_RECIPIENTS_REQUIRED = "ASSIGNMENT_RECIPIENTS_REQUIRED"
+        const val ASSIGNMENT_NOT_READY = "ASSIGNMENT_NOT_READY"
+        const val INTERNAL_SERVICE_ACCESS_DENIED = "INTERNAL_SERVICE_ACCESS_DENIED"
         const val EXTERNAL_URL_REDIRECT_LOCATION_MISSING = "EXTERNAL_URL_REDIRECT_LOCATION_MISSING"
         const val EXTERNAL_URL_TOO_MANY_REDIRECTS = "EXTERNAL_URL_TOO_MANY_REDIRECTS"
         const val EXTERNAL_URL_HTTP_ERROR = "EXTERNAL_URL_HTTP_ERROR"

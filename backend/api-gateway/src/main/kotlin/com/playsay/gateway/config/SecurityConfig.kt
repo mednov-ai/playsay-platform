@@ -37,6 +37,7 @@ class SecurityConfig {
                         "/webhooks/unisender",
                         "/webhooks/mailjet",
                         "/schedule/lessons/*/collaboration-documents/*/snapshot",
+                        "/internal/vocabulary/**",
                         "/ws/lessons",
                         "/ws/chat",
                     ).permitAll()

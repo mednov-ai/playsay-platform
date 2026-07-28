@@ -3,6 +3,7 @@ import {
   fetchHomeworkAssignment,
   fetchHomeworkAssignments,
   fetchMyHomeworkAssignment,
+  fetchMyVocabularyHomeworkAssignment,
   fetchMyHomeworkAssignments,
   saveMyHomeworkAssignmentSubmission,
   type HomeworkAssignment,
@@ -11,6 +12,7 @@ import {
   type LessonMaterialJson,
   type MeProfile,
   type StudentHomeworkDetail,
+  type StudentVocabularyHomeworkDetail,
 } from "../../../shared/api/playsay";
 import {
   materialAnswersFromSubmission,
@@ -32,6 +34,7 @@ export function useHomeworkAssignments({
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
   const [detail, setDetail] = useState<HomeworkAssignmentDetail | null>(null);
   const [studentDetail, setStudentDetail] = useState<StudentHomeworkDetail | null>(null);
+  const [studentVocabularyDetail, setStudentVocabularyDetail] = useState<StudentVocabularyHomeworkDetail | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
   const [loading, setLoading] = useState(false);
@@ -51,6 +54,7 @@ export function useHomeworkAssignments({
       setAssignments([]);
       setDetail(null);
       setStudentDetail(null);
+      setStudentVocabularyDetail(null);
       setSelectedAssignmentId(null);
       return undefined;
     }
@@ -94,6 +98,7 @@ export function useHomeworkAssignments({
     if (!selectedAssignmentId) {
       setDetail(null);
       setStudentDetail(null);
+      setStudentVocabularyDetail(null);
       setAnswers({});
       setDraftSaveState("idle");
       return undefined;
@@ -112,10 +117,19 @@ export function useHomeworkAssignments({
             setStudentDetail(null);
             setLastLoadedAt(new Date().toISOString());
           }
+        } else if (selectedAssignment?.contentKind === "VOCABULARY_PRACTICE") {
+          const loaded = await fetchMyVocabularyHomeworkAssignment(assignmentId);
+          if (!cancelled) {
+            setStudentVocabularyDetail(loaded);
+            setStudentDetail(null);
+            setDetail(null);
+            setLastLoadedAt(new Date().toISOString());
+          }
         } else {
           const loaded = await fetchMyHomeworkAssignment(assignmentId);
           if (!cancelled) {
             setStudentDetail(loaded);
+            setStudentVocabularyDetail(null);
             setDetail(null);
             setAnswers(materialAnswersFromSubmission(loaded.submission));
             setAssignments((current) => current.map((assignment) => (
@@ -153,7 +167,7 @@ export function useHomeworkAssignments({
     return () => {
       cancelled = true;
     };
-  }, [canManage, selectedAssignmentId]);
+  }, [canManage, selectedAssignment?.contentKind, selectedAssignmentId]);
 
   useEffect(() => {
     if (!canManage || !profile || !selectedAssignmentId) {
@@ -310,10 +324,12 @@ export function useHomeworkAssignments({
         const loaded = await fetchHomeworkAssignment(nextSelectedId);
         setDetail(loaded);
         setStudentDetail(null);
+        setStudentVocabularyDetail(null);
       } else {
         setDetail(null);
         if (!nextSelectedId) {
           setStudentDetail(null);
+          setStudentVocabularyDetail(null);
         }
       }
       setLastLoadedAt(new Date().toISOString());
@@ -384,6 +400,7 @@ export function useHomeworkAssignments({
     setSaving,
     setSelectedAssignmentId,
     studentDetail,
+    studentVocabularyDetail,
     studentHasUnsavedChanges,
     studentScore,
     submitStudentHomework,

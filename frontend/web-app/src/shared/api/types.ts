@@ -293,6 +293,17 @@ export type HomeworkAssignmentInput = {
   studentSubjects: string[];
   title?: string | null;
 };
+export type VocabularyHomeworkInput = {
+  dueAt?: string | null;
+  instructions?: string | null;
+  studentSubjects: string[];
+  title?: string | null;
+  mode?: "QUICK" | "BALANCED" | "WRITING" | "KEYBOARD";
+  wordLimit?: number;
+  pinnedEntryIds?: string[];
+  excludedEntryIds?: string[];
+  sourcePracticeId?: string | null;
+};
 export type LessonHomeworkInput = {
   dueAt?: string | null;
   instructions?: string | null;
@@ -301,8 +312,10 @@ export type LessonHomeworkInput = {
 };
 export type HomeworkAssignment = {
   id: string;
-  materialId: string;
-  materialTitle: string;
+  materialId?: string | null;
+  materialTitle?: string | null;
+  contentKind?: "MATERIAL" | "VOCABULARY_PRACTICE";
+  activityRef?: string | null;
   lessonId?: string | null;
   sourceLessonId?: string | null;
   title: string;
@@ -322,6 +335,10 @@ export type HomeworkAssignment = {
   myScore?: number | null;
   mySubmittedAt?: string | null;
   mySubmissionUpdatedAt?: string | null;
+  myActivityState?: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | null;
+  myCompletionRatio?: number | null;
+  myAccuracy?: number | null;
+  myDifficultWordCount?: number | null;
 };
 export type HomeworkRecipientProgress = {
   assignmentId: string;
@@ -343,6 +360,11 @@ export type HomeworkRecipientProgress = {
   relativeErrorsDelta?: number | null;
   submittedAt?: string | null;
   updatedAt?: string | null;
+  activityRef?: string | null;
+  activityState?: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | null;
+  completionRatio?: number | null;
+  accuracy?: number | null;
+  difficultWordCount?: number | null;
 };
 export type HomeworkAssignmentDetail = {
   assignment: HomeworkAssignment;
@@ -356,6 +378,11 @@ export type StudentHomeworkDetail = {
   assignment: HomeworkAssignment;
   material: LessonMaterial;
   submission: HomeworkSubmission;
+};
+export type StudentVocabularyHomeworkDetail = {
+  assignment: HomeworkAssignment;
+  practiceId: string;
+  sessionId: string;
 };
 export type LessonMaterialAnnotation = {
   id: string;

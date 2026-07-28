@@ -46,7 +46,9 @@ export function TeacherHomeworkDetail({
     <div className="grid gap-4 rounded-2xl border border-border bg-white p-4">
       <div>
         <h3 className="text-lg font-extrabold">{active.title}</h3>
-        <p className="mt-1 text-sm font-semibold text-muted-foreground">{active.materialTitle}</p>
+        <p className="mt-1 text-sm font-semibold text-muted-foreground">
+          {active.contentKind === "VOCABULARY_PRACTICE" ? t("homework.contentKind.words") : active.materialTitle}
+        </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-extrabold text-muted-foreground">
           <span className="rounded-full bg-muted px-2 py-1">
             {t("homework.summary.recipients", { count: active.recipientCount })}
@@ -123,12 +125,18 @@ export function TeacherHomeworkDetail({
 function RecipientProgressRow({ recipient }: { recipient: HomeworkRecipientProgress }) {
   const { t } = useAppTranslation();
   const tone = recipient.progressTone ?? 0;
+  const vocabularyProgress = recipient.activityState !== null && recipient.activityState !== undefined;
   return (
     <div className="rounded-xl border border-border bg-muted/35 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-extrabold">{recipient.studentName ?? recipient.studentSubject}</span>
         <span className="text-xs font-extrabold text-muted-foreground">
-          {recipient.score === null || recipient.score === undefined
+          {vocabularyProgress
+            ? t("homework.progress.vocabulary", {
+                accuracy: recipient.accuracy === null || recipient.accuracy === undefined ? "—" : `${Math.round(recipient.accuracy * 100)}%`,
+                progress: recipient.completionRatio === null || recipient.completionRatio === undefined ? 0 : Math.round(recipient.completionRatio * 100),
+              })
+            : recipient.score === null || recipient.score === undefined
             ? t("homework.progress.notScored")
             : t("homework.progress.score", {
                 errors: recipient.errorsCount ?? 0,
@@ -136,7 +144,11 @@ function RecipientProgressRow({ recipient }: { recipient: HomeworkRecipientProgr
               })}
         </span>
       </div>
-      {recipient.showGroupIndicator ? (
+      {vocabularyProgress ? (
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((recipient.completionRatio ?? 0) * 100)}%` }} />
+        </div>
+      ) : recipient.showGroupIndicator ? (
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
           <div
             className="h-full rounded-full"

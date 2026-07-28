@@ -8,6 +8,8 @@ import type {
   LessonHomeworkInput,
   LessonMaterialSubmissionInput,
   StudentHomeworkDetail,
+  StudentVocabularyHomeworkDetail,
+  VocabularyHomeworkInput,
 } from "./types";
 
 export async function fetchHomeworkAssignments(config = authConfig): Promise<HomeworkAssignment[]> {
@@ -52,6 +54,18 @@ export async function createHomeworkFromScheduledLesson(
   );
 }
 
+export async function createVocabularyHomeworkAssignment(
+  input: VocabularyHomeworkInput,
+  config = authConfig,
+): Promise<HomeworkAssignmentDetail> {
+  return apiJson<HomeworkAssignmentDetail>(
+    "/api/assignments/vocabulary",
+    { method: "POST", body: JSON.stringify(input) },
+    config,
+    201,
+  );
+}
+
 export async function fetchMyHomeworkAssignments(config = authConfig): Promise<HomeworkAssignment[]> {
   return apiJson<HomeworkAssignment[]>("/api/me/assignments", { method: "GET" }, config);
 }
@@ -61,6 +75,17 @@ export async function fetchMyHomeworkAssignment(
   config = authConfig,
 ): Promise<StudentHomeworkDetail> {
   return apiJson<StudentHomeworkDetail>(`/api/me/assignments/${assignmentId}`, { method: "GET" }, config);
+}
+
+export async function fetchMyVocabularyHomeworkAssignment(
+  assignmentId: string,
+  config = authConfig,
+): Promise<StudentVocabularyHomeworkDetail> {
+  return apiJson<StudentVocabularyHomeworkDetail>(
+    `/api/me/assignments/${assignmentId}/vocabulary`,
+    { method: "GET" },
+    config,
+  );
 }
 
 export async function saveMyHomeworkAssignmentSubmission(

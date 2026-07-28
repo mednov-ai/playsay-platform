@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, BookPlus, ChevronDown, History, RotateCw, WifiOff } from "lucide-react";
+import { ArrowLeft, BookOpen, BookPlus, ChevronDown, History, Play, RotateCw, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -16,6 +16,7 @@ type MenuView = "actions" | "recent";
 export function VocabularyLessonMenu({
   ownerLabel,
   ownerSubject,
+  onStartPractice,
   recipientSubjects = [],
   source,
   triggerClassName = "mt-2",
@@ -23,6 +24,7 @@ export function VocabularyLessonMenu({
 }: {
   ownerLabel?: string;
   ownerSubject?: string;
+  onStartPractice?: () => void;
   recipientSubjects?: string[];
   source: Omit<CreateVocabularyEntry, "sourceText">;
   triggerClassName?: string;
@@ -165,6 +167,11 @@ export function VocabularyLessonMenu({
     setView("recent");
   }
 
+  function startPractice() {
+    closeMenu();
+    onStartPractice?.();
+  }
+
   function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -221,6 +228,12 @@ export function VocabularyLessonMenu({
                 <History aria-hidden="true" />
                 {t("vocabulary.lessonMenu.recent")}
               </button>
+              {onStartPractice ? (
+                <button aria-label={t("vocabulary.lessonMenu.practice")} onClick={startPractice} role="menuitem" type="button">
+                  <Play aria-hidden="true" />
+                  {t("vocabulary.lessonMenu.practice")}
+                </button>
+              ) : null}
             </div>
           ) : (
             <section aria-label={t("vocabulary.lessonMenu.recent")}>

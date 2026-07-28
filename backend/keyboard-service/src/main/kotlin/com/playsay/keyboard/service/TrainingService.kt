@@ -55,6 +55,7 @@ class TrainingService(
     private val masteryService: MasteryService,
     private val gamificationService: GamificationService,
     private val techniqueAdviceService: TechniqueAdviceService,
+    private val vocabularyResults: KeyboardVocabularyResultOutbox,
 ) {
     @Transactional
     fun submit(
@@ -102,6 +103,7 @@ class TrainingService(
             ),
         )
         val events = gamificationService.eventsAfterSave(profile, layoutProfile, saved)
+        vocabularyResults.enqueue(saved, request)
         val recent = trainingResultRepo.findByKeycloakSubjectOrderByCreatedAtDesc(subject)
         return submitResponse(saved, subject, null, events, chordSet, recent, locale)
     }

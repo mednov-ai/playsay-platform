@@ -9,6 +9,7 @@ import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.Instant
 import java.util.UUID
+import java.math.BigDecimal
 
 @Entity
 @Table(name = "assignment_recipient")
@@ -32,6 +33,20 @@ class AssignmentRecipientEntity(
     var dueAt: Instant? = null,
     @Column(name = "archived_at")
     var archivedAt: Instant? = null,
+    @Column(name = "activity_ref")
+    var activityRef: UUID? = null,
+    @Column(name = "activity_state", nullable = false, length = 24)
+    var activityState: String = "NOT_STARTED",
+    @Column(name = "completion_ratio", precision = 7, scale = 4)
+    var completionRatio: BigDecimal? = null,
+    @Column(precision = 7, scale = 4)
+    var accuracy: BigDecimal? = null,
+    @Column(name = "difficult_word_count")
+    var difficultWordCount: Int? = null,
+    @Column(name = "activity_revision", nullable = false)
+    var activityRevision: Long = 0,
+    @Column(name = "activity_updated_at")
+    var activityUpdatedAt: Instant? = null,
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)

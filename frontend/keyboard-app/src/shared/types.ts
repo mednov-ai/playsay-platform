@@ -65,10 +65,19 @@ export interface PracticeContext {
   title: string;
   numberRowEnabled?: boolean;
   vocabularyEntryIds?: string[];
+  vocabularyItemIds?: string[];
+  vocabularyWords?: string[];
+  vocabularySessionId?: string;
 }
 
 export interface VocabularyPracticeEntry { id: string; sourceText: string; }
 export interface VocabularyPracticeResponse { entries: VocabularyPracticeEntry[]; }
+export interface VocabularySessionPracticeResponse {
+  sessionId: string;
+  title: string;
+  entries: VocabularyPracticeEntry[];
+  items: Array<{ itemId: string; entryId: string; sourceText: string }>;
+}
 
 export type TrainingLessonKind = "CALIBRATION" | "STANDARD" | "FOCUS";
 

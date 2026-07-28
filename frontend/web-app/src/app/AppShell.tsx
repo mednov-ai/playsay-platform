@@ -494,7 +494,7 @@ export function AppShell(props: AppShellProps) {
                 <AiTutorPanel appProfile={appProfile} onOpenProfile={openProfile} />
               ) : null}
 
-              {workspaceTab === "vocabulary" ? <VocabularyPanel /> : null}
+              {workspaceTab === "vocabulary" ? <VocabularyPanel profile={profile} /> : null}
 
               {workspaceTab === "students" ? <TeacherStudentsPanel /> : null}
 

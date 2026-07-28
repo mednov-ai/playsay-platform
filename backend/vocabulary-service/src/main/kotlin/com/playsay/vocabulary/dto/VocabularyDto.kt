@@ -1,6 +1,8 @@
 package com.playsay.vocabulary.dto
 
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
 import java.time.Instant
 import java.util.UUID
@@ -8,6 +10,22 @@ import java.util.UUID
 enum class VocabularySourceType { LESSON, HOMEWORK, MANUAL }
 enum class TranslationState { MISSING, SUGGESTED, CONFIRMED }
 enum class EntryStatus { ACTIVE, ARCHIVED }
+enum class VocabularySkill { MEANING, FORM, SPELLING, CONTEXT }
+enum class LearningStage { NEW, LEARNING, REVIEW, MASTERED }
+enum class PracticeRating { AGAIN, HARD, GOOD }
+enum class PracticeDelivery { SELF, HOMEWORK, LIVE }
+enum class PracticeMode { QUICK, BALANCED, WRITING, KEYBOARD }
+enum class PracticeStatus { PREPARING, PUBLISHED, ACTIVE, PAUSED, COMPLETED, CANCELLED, FAILED }
+enum class SessionStatus { NOT_STARTED, IN_PROGRESS, PAUSED, COMPLETED, CANCELLED }
+enum class PracticeExerciseType {
+    FLASHCARD,
+    MATCHING,
+    MEANING_CHOICE,
+    PHRASE_BUILDER,
+    FORM_INPUT,
+    CONTEXT_GAP,
+    KEYBOARD,
+}
 
 data class TranslationSuggestionRequest(
     @field:NotBlank @field:Size(max = 240) val sourceText: String,
@@ -60,6 +78,7 @@ data class UpdateVocabularyEntryRequest(
     @field:Size(max = 1_000) val exampleTranslation: String? = null,
     val translationState: TranslationState? = null,
     val status: EntryStatus? = null,
+    val practicePaused: Boolean? = null,
 )
 
 data class VocabularyOccurrenceResponse(
@@ -83,14 +102,199 @@ data class VocabularyEntryResponse(
     val exampleTranslation: String?,
     val translationState: TranslationState,
     val status: EntryStatus,
+    val practicePaused: Boolean = false,
     val occurrences: List<VocabularyOccurrenceResponse>,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
 
-data class VocabularyPracticeResponse(val entries: List<VocabularyEntryResponse>)
+data class VocabularyEntryPracticeResponse(val entries: List<VocabularyEntryResponse>)
 
 data class VocabularyOverviewResponse(
     val lessonEntries: List<VocabularyEntryResponse>,
     val recentEntries: List<VocabularyEntryResponse>,
+)
+
+data class VocabularySkillStateResponse(
+    val skill: VocabularySkill,
+    val stage: LearningStage,
+    val intervalIndex: Int,
+    val dueAt: Instant,
+    val successStreak: Int,
+    val lapseCount: Int,
+    val lastRating: PracticeRating?,
+    val lastPracticedAt: Instant?,
+)
+
+data class VocabularyLearningEntryResponse(
+    val entry: VocabularyEntryResponse,
+    val stage: LearningStage,
+    val dueAt: Instant,
+    val overdue: Boolean,
+    val skills: List<VocabularySkillStateResponse>,
+)
+
+data class VocabularyDashboardResponse(
+    val ownerSubject: String,
+    val ownerName: String?,
+    val totalCount: Int,
+    val dueCount: Int,
+    val learningCount: Int,
+    val masteredCount: Int,
+    val needsTranslationCount: Int,
+    val difficultCount: Int,
+    val lastPracticedAt: Instant?,
+    val entries: List<VocabularyLearningEntryResponse>,
+)
+
+data class VocabularyLearnerSummaryResponse(
+    val ownerSubject: String,
+    val ownerName: String,
+    val totalCount: Int,
+    val dueCount: Int,
+    val learningCount: Int,
+    val masteredCount: Int,
+    val needsTranslationCount: Int,
+    val difficultCount: Int,
+    val lastPracticedAt: Instant?,
+)
+
+data class VocabularyPracticeSettingsRequest(
+    @field:Size(max = 100) val ownerSubjects: List<@Size(max = 255) String> = emptyList(),
+    val delivery: PracticeDelivery = PracticeDelivery.SELF,
+    val mode: PracticeMode = PracticeMode.BALANCED,
+    val lessonId: UUID? = null,
+    val assignmentId: UUID? = null,
+    @field:Min(1) @field:Max(30) val wordLimit: Int = 10,
+    @field:Size(max = 100) val pinnedEntryIds: List<UUID> = emptyList(),
+    @field:Size(max = 100) val excludedEntryIds: List<UUID> = emptyList(),
+)
+
+data class VocabularyPracticeOwnerPreviewResponse(
+    val ownerSubject: String,
+    val ownerName: String?,
+    val selectedCount: Int,
+    val estimatedItemCount: Int,
+    val dueCount: Int,
+    val newCount: Int,
+    val needsTranslationCount: Int,
+    val entries: List<VocabularyEntryResponse>,
+)
+
+data class VocabularyPracticePreviewResponse(
+    val mode: PracticeMode,
+    val delivery: PracticeDelivery,
+    val estimatedMinutes: Int,
+    val owners: List<VocabularyPracticeOwnerPreviewResponse>,
+)
+
+data class VocabularyPracticeItemResponse(
+    val id: UUID,
+    val position: Int,
+    val entryId: UUID?,
+    val skill: VocabularySkill,
+    val exerciseType: PracticeExerciseType,
+    val prompt: String,
+    val options: List<String>,
+    val sourceText: String?,
+    val translation: String?,
+    val example: String?,
+)
+
+data class VocabularyPracticeSessionSummaryResponse(
+    val id: UUID,
+    val ownerSubject: String,
+    val ownerName: String?,
+    val status: SessionStatus,
+    val revision: Long,
+    val completedItems: Int,
+    val totalItems: Int,
+    val correctCount: Int,
+    val attemptCount: Int,
+    val accuracy: Double?,
+    val currentItem: VocabularyPracticeItemResponse?,
+    val teacherHint: String?,
+    val helpRequested: Boolean,
+    val startedAt: Instant?,
+    val completedAt: Instant?,
+    val updatedAt: Instant,
+)
+
+data class VocabularyPracticeResponse(
+    val id: UUID,
+    val delivery: PracticeDelivery,
+    val mode: PracticeMode,
+    val status: PracticeStatus,
+    val lessonId: UUID?,
+    val assignmentId: UUID?,
+    val sessions: List<VocabularyPracticeSessionSummaryResponse>,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+data class VocabularyActivePracticeResponse(val practice: VocabularyPracticeResponse?)
+
+data class VocabularyAttemptRequest(
+    @field:NotBlank @field:Size(max = 128) val clientAttemptId: String,
+    val itemId: UUID,
+    val sessionRevision: Long,
+    @field:Size(max = 2_000) val answer: String? = null,
+    val rating: PracticeRating? = null,
+    val hintsUsed: Int = 0,
+    val durationMs: Long = 0,
+)
+
+data class VocabularyAttemptResponse(
+    val attemptId: UUID,
+    val rating: PracticeRating,
+    val correct: Boolean,
+    val expectedAnswer: String,
+    val session: VocabularyPracticeSessionSummaryResponse,
+)
+
+data class VocabularyPracticeStatusRequest(val status: PracticeStatus)
+
+data class VocabularyKeySetResponse(
+    val sessionId: UUID,
+    val title: String,
+    val entries: List<VocabularyEntryResponse>,
+    val items: List<VocabularyKeyItemResponse>,
+)
+
+data class VocabularyKeyItemResponse(
+    val itemId: UUID,
+    val entryId: UUID,
+    val sourceText: String,
+)
+
+data class VocabularyKeyResultRequest(
+    @field:NotBlank @field:Size(max = 128) val clientResultId: String,
+    @field:Size(min = 1, max = 100) val attempts: List<VocabularyKeyWordAttemptRequest>,
+)
+
+data class VocabularyKeyWordAttemptRequest(
+    val itemId: UUID,
+    val entryId: UUID,
+    @field:Min(0) val errors: Int,
+)
+
+data class VocabularyHomeworkPreparationRequest(
+    @field:NotBlank @field:Size(max = 255) val actorSubject: String,
+    val assignmentId: UUID,
+    @field:Size(min = 1, max = 100) val ownerSubjects: List<@Size(max = 255) String>,
+    val mode: PracticeMode = PracticeMode.BALANCED,
+    @field:Min(1) @field:Max(30) val wordLimit: Int = 10,
+    @field:Size(max = 100) val pinnedEntryIds: List<UUID> = emptyList(),
+    @field:Size(max = 100) val excludedEntryIds: List<UUID> = emptyList(),
+    val sourcePracticeId: UUID? = null,
+)
+
+data class VocabularyHomeworkPreparationResponse(
+    val practiceId: UUID,
+    val sessions: List<VocabularyHomeworkSessionRef>,
+)
+
+data class VocabularyHomeworkSessionRef(
+    val sessionId: UUID,
+    val ownerSubject: String,
 )

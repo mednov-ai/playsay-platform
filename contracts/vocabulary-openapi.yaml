@@ -1,44 +1,297 @@
 openapi: 3.1.0
-info: { title: Play&Say Vocabulary API, version: 0.1.0 }
-servers: [{ url: /api/vocabulary }]
-security: [{ bearerAuth: [] }]
+info:
+  title: Play&Say Vocabulary API
+  version: 0.2.0
+servers:
+  - url: /
+security:
+  - bearerAuth: []
 paths:
-  /translation-suggestions:
+  /api/vocabulary/translation-suggestions:
     post:
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TranslationSuggestionRequest' } } } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TranslationSuggestionRequest' }
       responses:
         '200':
           description: Editable translation and usage variants
-          content: { application/json: { schema: { $ref: '#/components/schemas/TranslationSuggestion' } } }
-  /entries:
-    get: { responses: { '200': { description: Active vocabulary entries } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TranslationSuggestion' }
+  /api/vocabulary/entries:
+    get:
+      parameters:
+        - { in: query, name: ownerSubject, schema: { type: string, maxLength: 255 } }
+        - { in: query, name: lessonId, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Active entries belonging to the authorized learner
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/VocabularyEntry' } }
     post:
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateEntry' } } } }
-      responses: { '201': { description: Created or merged vocabulary entry } }
-  /overview:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEntry' }
+      responses:
+        '201':
+          description: Created or merged vocabulary entry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VocabularyEntry' }
+  /api/vocabulary/entries/{entryId}:
+    parameters:
+      - { in: path, name: entryId, required: true, schema: { type: string, format: uuid } }
+    patch:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateEntry' }
+      responses:
+        '200':
+          description: Updated owner-aware entry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VocabularyEntry' }
+    delete:
+      responses:
+        '204': { description: Archived owner-aware entry }
+  /api/vocabulary/overview:
     get:
       summary: Compact lesson and recent vocabulary preview
       parameters:
-        - { in: query, name: ownerSubject, schema: { type: string, maxLength: 255 }, description: Learner subject; teachers must also provide lessonId }
-        - { in: query, name: lessonId, schema: { type: string, format: uuid }, description: Lesson used to authorize teacher access and prioritize lesson words }
+        - { in: query, name: ownerSubject, schema: { type: string, maxLength: 255 } }
+        - { in: query, name: lessonId, schema: { type: string, format: uuid } }
         - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
       responses:
         '200':
-          description: Lesson-first preview followed by recent entries, with no duplicates
-          content: { application/json: { schema: { $ref: '#/components/schemas/VocabularyOverview' } } }
-        '403': { description: Caller cannot access this learner in the requested lesson }
-  /entries/{entryId}:
-    parameters: [{ in: path, name: entryId, required: true, schema: { type: string, format: uuid } }]
-    patch: { responses: { '200': { description: Updated entry } } }
-    delete: { responses: { '204': { description: Archived entry } } }
-  /practice:
-    get: { responses: { '200': { description: Current learner vocabulary practice set } } }
+          description: Lesson-first preview followed by recent entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VocabularyOverview' }
+        '403': { description: Caller cannot access the learner }
+  /api/vocabulary/practice:
+    get:
+      deprecated: true
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 32 } }
+      responses:
+        '200':
+          description: Legacy current learner word set
+          content:
+            application/json:
+              schema: { type: object, required: [entries], properties: { entries: { type: array, items: { $ref: '#/components/schemas/VocabularyEntry' } } } }
+  /api/vocabulary/learners:
+    get:
+      summary: Learners whose vocabulary the teacher may manage globally
+      parameters:
+        - { in: query, name: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Primary-teacher and active MANUAL-delegate learners only
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/LearnerSummary' } }
+  /api/vocabulary/dashboard:
+    get:
+      parameters:
+        - { in: query, name: ownerSubject, schema: { type: string, maxLength: 255 } }
+        - { in: query, name: lessonId, schema: { type: string, format: uuid } }
+        - { in: query, name: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Owner-aware vocabulary and skill-state dashboard
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VocabularyDashboard' }
+  /api/vocabulary/practices/preview:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeSettings' }
+      responses:
+        '200':
+          description: Deterministic queue preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticePreview' }
+  /api/vocabulary/practices:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeSettings' }
+      responses:
+        '201':
+          description: Published immutable personal sessions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practice' }
+  /api/vocabulary/practices/self:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeSettings' }
+      responses:
+        '200':
+          description: Existing covering assignment/self session or a new Today practice
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practice' }
+  /api/vocabulary/practices/active:
+    get:
+      parameters:
+        - { in: query, name: lessonId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Active live practice, if any
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [practice]
+                properties:
+                  practice: { anyOf: [{ $ref: '#/components/schemas/Practice' }, { type: 'null' }] }
+  /api/vocabulary/practices/{practiceId}/status:
+    patch:
+      parameters:
+        - { in: path, name: practiceId, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/PracticeStatus' }
+      responses:
+        '200':
+          description: Practice status changed by its creator
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practice' }
+  /api/vocabulary/practice-sessions:
+    get:
+      parameters:
+        - { in: query, name: ownerSubject, schema: { type: string, maxLength: 255 } }
+        - { in: query, name: lessonId, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Authorized personal practice history
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/PracticeSession' } }
+  /api/vocabulary/practice-sessions/{sessionId}:
+    get:
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Immutable session snapshot and current item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticeSession' }
+  /api/vocabulary/practice-sessions/{sessionId}/attempts:
+    post:
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttemptRequest' }
+      responses:
+        '201':
+          description: Idempotently committed attempt and next snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttemptResponse' }
+        '409': { description: Stale revision or non-current item; reload session snapshot }
+  /api/vocabulary/practice-sessions/{sessionId}/key-set:
+    get:
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Exact immutable spelling set for the owning learner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KeySet' }
+  /api/vocabulary/practice-sessions/{sessionId}/hint:
+    post:
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Creator-provided masked hint for the current LIVE item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticeSession' }
+        '403': { description: Only the LIVE practice creator may give a hint }
+  /api/vocabulary/practice-sessions/{sessionId}/help-request:
+    post:
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Learner requested help for the current LIVE item
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticeSession' }
+        '403': { description: Only the session owner may request help during an active LIVE practice }
+  /internal/vocabulary/assignments:
+    post:
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HomeworkPreparation' }
+      responses:
+        '200': { description: Idempotently prepared sessions for an assignment }
+        '403': { description: Invalid service token }
+  /internal/vocabulary/practice-sessions/{sessionId}/key-results:
+    post:
+      security:
+        - serviceToken: []
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KeyResult' }
+      responses:
+        '204': { description: Idempotently committed SPELLING-only results }
+        '403': { description: Invalid service token }
 components:
-  securitySchemes: { bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT } }
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+    serviceToken: { type: apiKey, in: header, name: X-PlaySay-Service-Token }
   schemas:
     SourceType: { type: string, enum: [LESSON, HOMEWORK, MANUAL] }
     TranslationState: { type: string, enum: [MISSING, SUGGESTED, CONFIRMED] }
     EntryStatus: { type: string, enum: [ACTIVE, ARCHIVED] }
+    Skill: { type: string, enum: [MEANING, FORM, SPELLING, CONTEXT] }
+    LearningStage: { type: string, enum: [NEW, LEARNING, REVIEW, MASTERED] }
+    Rating: { type: string, enum: [AGAIN, HARD, GOOD] }
+    Delivery: { type: string, enum: [SELF, HOMEWORK, LIVE] }
+    PracticeMode: { type: string, enum: [QUICK, BALANCED, WRITING, KEYBOARD] }
+    PracticeStatus: { type: string, enum: [PREPARING, PUBLISHED, ACTIVE, PAUSED, COMPLETED, CANCELLED, FAILED] }
+    SessionStatus: { type: string, enum: [NOT_STARTED, IN_PROGRESS, PAUSED, COMPLETED, CANCELLED] }
+    ExerciseType: { type: string, enum: [FLASHCARD, MATCHING, MEANING_CHOICE, PHRASE_BUILDER, FORM_INPUT, CONTEXT_GAP, KEYBOARD] }
     SourceTerm:
       type: object
       required: [sourceText]
@@ -53,10 +306,7 @@ components:
         - type: object
           properties:
             instruction: { type: string, maxLength: 500 }
-            previousTranslations:
-              type: array
-              maxItems: 8
-              items: { type: string, maxLength: 500 }
+            previousTranslations: { type: array, maxItems: 8, items: { type: string, maxLength: 500 } }
     TranslationVariant:
       type: object
       required: [translation]
@@ -69,12 +319,9 @@ components:
       type: object
       required: [variants, source, translation]
       properties:
-        variants:
-          type: array
-          maxItems: 3
-          items: { $ref: '#/components/schemas/TranslationVariant' }
+        variants: { type: array, maxItems: 3, items: { $ref: '#/components/schemas/TranslationVariant' } }
         source: { type: string, enum: [OPENAI, UNAVAILABLE] }
-        translation: { type: string, maxLength: 500, description: First variant for backward compatibility }
+        translation: { type: string, maxLength: 500 }
         partOfSpeech: { type: [string, 'null'], maxLength: 80 }
         example: { type: [string, 'null'], maxLength: 1000 }
         exampleTranslation: { type: [string, 'null'], maxLength: 1000 }
@@ -91,6 +338,16 @@ components:
             assignmentId: { type: string, format: uuid }
             materialId: { type: string, format: uuid }
             blockId: { type: string, maxLength: 120 }
+    UpdateEntry:
+      type: object
+      properties:
+        translation: { type: [string, 'null'], maxLength: 500 }
+        partOfSpeech: { type: [string, 'null'], maxLength: 80 }
+        example: { type: [string, 'null'], maxLength: 1000 }
+        exampleTranslation: { type: [string, 'null'], maxLength: 1000 }
+        translationState: { $ref: '#/components/schemas/TranslationState' }
+        status: { $ref: '#/components/schemas/EntryStatus' }
+        practicePaused: { type: boolean }
     VocabularyOccurrence:
       type: object
       required: [sourceType, createdAt]
@@ -104,7 +361,7 @@ components:
         createdAt: { type: string, format: date-time }
     VocabularyEntry:
       type: object
-      required: [id, sourceText, sourceLanguage, targetLanguage, translationState, status, occurrences, createdAt, updatedAt]
+      required: [id, sourceText, sourceLanguage, targetLanguage, translationState, status, practicePaused, occurrences, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         sourceText: { type: string, maxLength: 240 }
@@ -116,20 +373,197 @@ components:
         exampleTranslation: { type: [string, 'null'], maxLength: 1000 }
         translationState: { $ref: '#/components/schemas/TranslationState' }
         status: { $ref: '#/components/schemas/EntryStatus' }
-        occurrences:
-          type: array
-          items: { $ref: '#/components/schemas/VocabularyOccurrence' }
+        practicePaused: { type: boolean }
+        occurrences: { type: array, items: { $ref: '#/components/schemas/VocabularyOccurrence' } }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     VocabularyOverview:
       type: object
       required: [lessonEntries, recentEntries]
       properties:
-        lessonEntries:
+        lessonEntries: { type: array, maxItems: 10, items: { $ref: '#/components/schemas/VocabularyEntry' } }
+        recentEntries: { type: array, maxItems: 10, items: { $ref: '#/components/schemas/VocabularyEntry' } }
+    SkillState:
+      type: object
+      required: [skill, stage, intervalIndex, dueAt, successStreak, lapseCount]
+      properties:
+        skill: { $ref: '#/components/schemas/Skill' }
+        stage: { $ref: '#/components/schemas/LearningStage' }
+        intervalIndex: { type: integer, minimum: 0 }
+        dueAt: { type: string, format: date-time }
+        successStreak: { type: integer, minimum: 0 }
+        lapseCount: { type: integer, minimum: 0 }
+        lastRating: { anyOf: [{ $ref: '#/components/schemas/Rating' }, { type: 'null' }] }
+        lastPracticedAt: { type: [string, 'null'], format: date-time }
+    LearningEntry:
+      type: object
+      required: [entry, stage, dueAt, overdue, skills]
+      properties:
+        entry: { $ref: '#/components/schemas/VocabularyEntry' }
+        stage: { $ref: '#/components/schemas/LearningStage' }
+        dueAt: { type: string, format: date-time }
+        overdue: { type: boolean }
+        skills: { type: array, items: { $ref: '#/components/schemas/SkillState' } }
+    LearnerSummary:
+      type: object
+      required: [ownerSubject, ownerName, totalCount, dueCount, learningCount, masteredCount, needsTranslationCount, difficultCount]
+      properties:
+        ownerSubject: { type: string }
+        ownerName: { type: string }
+        totalCount: { type: integer }
+        dueCount: { type: integer }
+        learningCount: { type: integer }
+        masteredCount: { type: integer }
+        needsTranslationCount: { type: integer }
+        difficultCount: { type: integer }
+        lastPracticedAt: { type: [string, 'null'], format: date-time }
+    VocabularyDashboard:
+      allOf:
+        - { $ref: '#/components/schemas/LearnerSummary' }
+        - type: object
+          required: [entries]
+          properties:
+            entries: { type: array, items: { $ref: '#/components/schemas/LearningEntry' } }
+    PracticeSettings:
+      type: object
+      properties:
+        ownerSubjects: { type: array, maxItems: 100, items: { type: string, maxLength: 255 } }
+        delivery: { $ref: '#/components/schemas/Delivery' }
+        mode: { $ref: '#/components/schemas/PracticeMode' }
+        lessonId: { type: [string, 'null'], format: uuid }
+        assignmentId: { type: [string, 'null'], format: uuid }
+        wordLimit: { type: integer, minimum: 1, maximum: 30, default: 10 }
+        pinnedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        excludedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+    PracticePreview:
+      type: object
+      required: [mode, delivery, estimatedMinutes, owners]
+      properties:
+        mode: { $ref: '#/components/schemas/PracticeMode' }
+        delivery: { $ref: '#/components/schemas/Delivery' }
+        estimatedMinutes: { type: integer }
+        owners:
           type: array
-          maxItems: 10
-          items: { $ref: '#/components/schemas/VocabularyEntry' }
-        recentEntries:
+          items:
+            type: object
+            required: [ownerSubject, selectedCount, estimatedItemCount, dueCount, newCount, needsTranslationCount, entries]
+            properties:
+              ownerSubject: { type: string }
+              ownerName: { type: [string, 'null'] }
+              selectedCount: { type: integer }
+              estimatedItemCount: { type: integer }
+              dueCount: { type: integer }
+              newCount: { type: integer }
+              needsTranslationCount: { type: integer }
+              entries: { type: array, items: { $ref: '#/components/schemas/VocabularyEntry' } }
+    PracticeItem:
+      type: object
+      required: [id, position, skill, exerciseType, prompt, options]
+      properties:
+        id: { type: string, format: uuid }
+        position: { type: integer }
+        entryId: { type: [string, 'null'], format: uuid }
+        skill: { $ref: '#/components/schemas/Skill' }
+        exerciseType: { $ref: '#/components/schemas/ExerciseType' }
+        prompt: { type: string }
+        options: { type: array, items: { type: string } }
+        sourceText: { type: [string, 'null'] }
+        translation: { type: [string, 'null'] }
+        example: { type: [string, 'null'] }
+    PracticeSession:
+      type: object
+      required: [id, ownerSubject, status, revision, completedItems, totalItems, correctCount, attemptCount, helpRequested, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        ownerSubject: { type: string }
+        ownerName: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/SessionStatus' }
+        revision: { type: integer, format: int64 }
+        completedItems: { type: integer }
+        totalItems: { type: integer }
+        correctCount: { type: integer }
+        attemptCount: { type: integer }
+        accuracy: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        currentItem: { anyOf: [{ $ref: '#/components/schemas/PracticeItem' }, { type: 'null' }] }
+        teacherHint: { type: [string, 'null'] }
+        helpRequested: { type: boolean }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Practice:
+      type: object
+      required: [id, delivery, mode, status, sessions, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        delivery: { $ref: '#/components/schemas/Delivery' }
+        mode: { $ref: '#/components/schemas/PracticeMode' }
+        status: { $ref: '#/components/schemas/PracticeStatus' }
+        lessonId: { type: [string, 'null'], format: uuid }
+        assignmentId: { type: [string, 'null'], format: uuid }
+        sessions: { type: array, items: { $ref: '#/components/schemas/PracticeSession' } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AttemptRequest:
+      type: object
+      required: [clientAttemptId, itemId, sessionRevision]
+      properties:
+        clientAttemptId: { type: string, maxLength: 128 }
+        itemId: { type: string, format: uuid }
+        sessionRevision: { type: integer, format: int64 }
+        answer: { type: [string, 'null'], maxLength: 2000 }
+        rating: { anyOf: [{ $ref: '#/components/schemas/Rating' }, { type: 'null' }] }
+        hintsUsed: { type: integer, minimum: 0 }
+        durationMs: { type: integer, format: int64, minimum: 0 }
+    AttemptResponse:
+      type: object
+      required: [attemptId, rating, correct, expectedAnswer, session]
+      properties:
+        attemptId: { type: string, format: uuid }
+        rating: { $ref: '#/components/schemas/Rating' }
+        correct: { type: boolean }
+        expectedAnswer: { type: string }
+        session: { $ref: '#/components/schemas/PracticeSession' }
+    KeySet:
+      type: object
+      required: [sessionId, title, entries, items]
+      properties:
+        sessionId: { type: string, format: uuid }
+        title: { type: string }
+        entries: { type: array, items: { $ref: '#/components/schemas/VocabularyEntry' } }
+        items:
           type: array
-          maxItems: 10
-          items: { $ref: '#/components/schemas/VocabularyEntry' }
+          items:
+            type: object
+            required: [itemId, entryId, sourceText]
+            properties:
+              itemId: { type: string, format: uuid }
+              entryId: { type: string, format: uuid }
+              sourceText: { type: string }
+    HomeworkPreparation:
+      type: object
+      required: [actorSubject, assignmentId, ownerSubjects]
+      properties:
+        actorSubject: { type: string, maxLength: 255 }
+        assignmentId: { type: string, format: uuid }
+        ownerSubjects: { type: array, minItems: 1, maxItems: 100, items: { type: string, maxLength: 255 } }
+        mode: { $ref: '#/components/schemas/PracticeMode' }
+        wordLimit: { type: integer, minimum: 1, maximum: 30 }
+        pinnedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        excludedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        sourcePracticeId: { type: [string, 'null'], format: uuid }
+    KeyResult:
+      type: object
+      required: [clientResultId, attempts]
+      properties:
+        clientResultId: { type: string, maxLength: 128 }
+        attempts:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [itemId, entryId, errors]
+            properties:
+              itemId: { type: string, format: uuid }
+              entryId: { type: string, format: uuid }
+              errors: { type: integer, minimum: 0 }

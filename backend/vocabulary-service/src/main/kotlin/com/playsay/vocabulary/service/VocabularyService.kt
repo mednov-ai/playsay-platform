@@ -73,8 +73,20 @@ class VocabularyService(
     }
 
     @Transactional(readOnly = true)
-    fun list(subject: String, query: String?): List<VocabularyEntryResponse> = entries.findAllByOwnerSubjectAndStatusOrderByUpdatedAtDesc(subject, EntryStatus.ACTIVE)
+    fun list(
+        subject: String,
+        query: String?,
+        ownerSubject: String? = null,
+        lessonId: UUID? = null,
+    ): List<VocabularyEntryResponse> {
+        val owner = access.requireOwnerAccess(
+            subject,
+            ownerSubject?.trim()?.takeIf(String::isNotEmpty) ?: subject,
+            lessonId,
+        )
+        return entries.findAllByOwnerSubjectAndStatusOrderByUpdatedAtDesc(owner, EntryStatus.ACTIVE)
         .asSequence().filter { query.isNullOrBlank() || it.sourceText.contains(query, true) || it.translation?.contains(query, true) == true }.map { it.toResponse() }.toList()
+    }
 
     @Transactional(readOnly = true)
     fun overview(
@@ -100,7 +112,8 @@ class VocabularyService(
     }
 
     @Transactional(readOnly = true)
-    fun practice(subject: String, limit: Int): VocabularyPracticeResponse = VocabularyPracticeResponse(list(subject, null).take(limit.coerceIn(1, 100)))
+    fun practice(subject: String, limit: Int): VocabularyEntryPracticeResponse =
+        VocabularyEntryPracticeResponse(list(subject, null).take(limit.coerceIn(1, 100)))
 
     @Transactional
     fun update(subject: String, id: UUID, request: UpdateVocabularyEntryRequest): VocabularyEntryResponse {
@@ -123,19 +136,21 @@ class VocabularyService(
         request: UpdateVocabularyEntryRequest,
         eventType: String,
     ): VocabularyEntryResponse {
-        val entry = entries.findByIdAndOwnerSubject(id, subject) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val entry = entries.findById(id).orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
+        access.requireOwnerAccess(subject, entry.ownerSubject, null)
         request.translation?.trim()?.let { entry.translation = it.takeIf(String::isNotEmpty) }
         request.partOfSpeech?.trim()?.let { entry.partOfSpeech = it.takeIf(String::isNotEmpty) }
         request.example?.trim()?.let { entry.example = it.takeIf(String::isNotEmpty) }
         request.exampleTranslation?.trim()?.let { entry.exampleTranslation = it.takeIf(String::isNotEmpty) }
         request.translationState?.let { entry.translationState = it }
         request.status?.let { entry.status = it }
+        request.practicePaused?.let { entry.practicePaused = it }
         entry.updatedAt = Instant.now()
         val response = entries.save(entry).toResponse()
         eventPublisher.publishEvent(
             VocabularyEntryChangedEvent(
                 type = eventType,
-                ownerSubject = subject,
+                ownerSubject = entry.ownerSubject,
                 lessonId = null,
                 actorSubject = subject,
                 entry = response,

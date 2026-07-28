@@ -675,6 +675,19 @@ export interface LessonHomeworkRequest {
   dueAt?: string | null;
 }
 
+/**
+ * @nullable
+ */
+export type AssignmentRecipientProgressResponseActivityState = typeof AssignmentRecipientProgressResponseActivityState[keyof typeof AssignmentRecipientProgressResponseActivityState] | null;
+
+
+export const AssignmentRecipientProgressResponseActivityState = {
+  NOT_STARTED: 'NOT_STARTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+} as const;
+
 export interface AssignmentRecipientProgressResponse {
   assignmentId: string;
   studentUserId: string;
@@ -708,7 +721,25 @@ export interface AssignmentRecipientProgressResponse {
   submittedAt?: string | null;
   /** @nullable */
   updatedAt?: string | null;
+  /** @nullable */
+  activityRef?: string | null;
+  /** @nullable */
+  activityState?: AssignmentRecipientProgressResponseActivityState;
+  /** @nullable */
+  completionRatio?: number | null;
+  /** @nullable */
+  accuracy?: number | null;
+  /** @nullable */
+  difficultWordCount?: number | null;
 }
+
+export type AssignmentSummaryResponseContentKind = typeof AssignmentSummaryResponseContentKind[keyof typeof AssignmentSummaryResponseContentKind];
+
+
+export const AssignmentSummaryResponseContentKind = {
+  MATERIAL: 'MATERIAL',
+  VOCABULARY_PRACTICE: 'VOCABULARY_PRACTICE',
+} as const;
 
 /**
  * @nullable
@@ -722,10 +753,28 @@ export const AssignmentSummaryResponseMySubmissionState = {
   SUBMITTED: 'SUBMITTED',
 } as const;
 
+/**
+ * @nullable
+ */
+export type AssignmentSummaryResponseMyActivityState = typeof AssignmentSummaryResponseMyActivityState[keyof typeof AssignmentSummaryResponseMyActivityState] | null;
+
+
+export const AssignmentSummaryResponseMyActivityState = {
+  NOT_STARTED: 'NOT_STARTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+} as const;
+
 export interface AssignmentSummaryResponse {
   id: string;
-  materialId: string;
-  materialTitle: string;
+  /** @nullable */
+  materialId?: string | null;
+  /** @nullable */
+  materialTitle?: string | null;
+  contentKind: AssignmentSummaryResponseContentKind;
+  /** @nullable */
+  activityRef?: string | null;
   /** @nullable */
   lessonId?: string | null;
   /** @nullable */
@@ -756,6 +805,14 @@ export interface AssignmentSummaryResponse {
   mySubmittedAt?: string | null;
   /** @nullable */
   mySubmissionUpdatedAt?: string | null;
+  /** @nullable */
+  myActivityState?: AssignmentSummaryResponseMyActivityState;
+  /** @nullable */
+  myCompletionRatio?: number | null;
+  /** @nullable */
+  myAccuracy?: number | null;
+  /** @nullable */
+  myDifficultWordCount?: number | null;
 }
 
 export interface TeacherAssignmentDetailResponse {
@@ -1150,6 +1207,31 @@ export interface MaterialAiDraftRequest {
   sourceFileName?: string | null;
 }
 
+export type VocabularyAssignmentProgressUpdateRequestState = typeof VocabularyAssignmentProgressUpdateRequestState[keyof typeof VocabularyAssignmentProgressUpdateRequestState];
+
+
+export const VocabularyAssignmentProgressUpdateRequestState = {
+  NOT_STARTED: 'NOT_STARTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+} as const;
+
+export interface VocabularyAssignmentProgressUpdateRequest {
+  eventId: string;
+  sessionId: string;
+  ownerSubject: string;
+  revision: number;
+  state: VocabularyAssignmentProgressUpdateRequestState;
+  /** @nullable */
+  completionRatio?: number | null;
+  /** @nullable */
+  accuracy?: number | null;
+  /** @nullable */
+  difficultWordCount?: number | null;
+  updatedAt: string;
+}
+
 export interface CreateChatConversationRequest {
   /** @minLength 1 */
   participantSubject: string;
@@ -1208,6 +1290,48 @@ export interface HomeworkAssignmentRequest {
   instructions?: string | null;
   /** @nullable */
   dueAt?: string | null;
+}
+
+export type VocabularyHomeworkRequestMode = typeof VocabularyHomeworkRequestMode[keyof typeof VocabularyHomeworkRequestMode];
+
+
+export const VocabularyHomeworkRequestMode = {
+  QUICK: 'QUICK',
+  BALANCED: 'BALANCED',
+  WRITING: 'WRITING',
+  KEYBOARD: 'KEYBOARD',
+} as const;
+
+export interface VocabularyHomeworkRequest {
+  /**
+     * @minItems 1
+     * @maxItems 100
+     * @items.maxLength 255
+     */
+  studentSubjects: string[];
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  title?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  instructions?: string | null;
+  /** @nullable */
+  dueAt?: string | null;
+  mode: VocabularyHomeworkRequestMode;
+  wordLimit: number;
+  /** @maxItems 100 */
+  pinnedEntryIds: string[];
+  /** @maxItems 100 */
+  excludedEntryIds: string[];
+  /**
+     * Completed LIVE practice whose unfinished immutable items must be continued at home
+     * @nullable
+     */
+  sourcePracticeId?: string | null;
 }
 
 export interface StudentInviteConsumeRequest {
@@ -1447,6 +1571,12 @@ export interface StudentAssignmentDetailResponse {
   assignment: AssignmentSummaryResponse;
   material: LessonMaterialResponse;
   submission: AssignmentSubmissionResponse;
+}
+
+export interface StudentVocabularyAssignmentDetailResponse {
+  assignment: AssignmentSummaryResponse;
+  practiceId: string;
+  sessionId: string;
 }
 
 export interface HelloResponse {
@@ -5553,6 +5683,47 @@ export const draftMaterialWithAi = async (materialAiDraftRequest: MaterialAiDraf
 
 
 
+export type updateProgressResponse204 = {
+  data: void
+  status: 204
+}
+
+export type updateProgressResponseSuccess = (updateProgressResponse204) & {
+  headers: Headers;
+};
+;
+
+export type updateProgressResponse = (updateProgressResponseSuccess)
+
+export const getUpdateProgressUrl = (assignmentId: string,) => {
+
+
+
+
+  return `/api/internal/vocabulary/assignments/${assignmentId}/progress`
+}
+
+export const updateProgress = async (assignmentId: string,
+    vocabularyAssignmentProgressUpdateRequest: VocabularyAssignmentProgressUpdateRequest, options?: RequestInit): Promise<updateProgressResponse> => {
+
+  const res = await fetch(getUpdateProgressUrl(assignmentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vocabularyAssignmentProgressUpdateRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateProgressResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as updateProgressResponse
+}
+
+
+
 export type listCoursesResponse200 = {
   data: CourseResponse[]
   status: 200
@@ -6153,6 +6324,50 @@ export const createHomeworkAssignment = async (homeworkAssignmentRequest: Homewo
 
   const data: createHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createHomeworkAssignmentResponse
+}
+
+
+
+export type createVocabularyHomeworkAssignmentResponse200 = {
+  data: TeacherAssignmentDetailResponse
+  status: 200
+}
+
+export type createVocabularyHomeworkAssignmentResponseSuccess = (createVocabularyHomeworkAssignmentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type createVocabularyHomeworkAssignmentResponse = (createVocabularyHomeworkAssignmentResponseSuccess)
+
+export const getCreateVocabularyHomeworkAssignmentUrl = () => {
+
+
+
+
+  return `/api/assignments/vocabulary`
+}
+
+/**
+ * Creates an assignment envelope and immutable personal vocabulary session for every selected student.
+ * @summary Create vocabulary homework assignment
+ */
+export const createVocabularyHomeworkAssignment = async (vocabularyHomeworkRequest: VocabularyHomeworkRequest, options?: RequestInit): Promise<createVocabularyHomeworkAssignmentResponse> => {
+
+  const res = await fetch(getCreateVocabularyHomeworkAssignmentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vocabularyHomeworkRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createVocabularyHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createVocabularyHomeworkAssignmentResponse
 }
 
 
@@ -7523,6 +7738,50 @@ export const getMyHomeworkAssignment = async (assignmentId: string, options?: Re
 
   const data: getMyHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getMyHomeworkAssignmentResponse
+}
+
+
+
+export type getMyVocabularyHomeworkAssignmentResponse200 = {
+  data: StudentVocabularyAssignmentDetailResponse
+  status: 200
+}
+
+export type getMyVocabularyHomeworkAssignmentResponseSuccess = (getMyVocabularyHomeworkAssignmentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMyVocabularyHomeworkAssignmentResponse = (getMyVocabularyHomeworkAssignmentResponseSuccess)
+
+export const getGetMyVocabularyHomeworkAssignmentUrl = (assignmentId: string,) => {
+
+
+
+
+  return `/api/me/assignments/${assignmentId}/vocabulary`
+}
+
+/**
+ * Returns the immutable personal vocabulary session reference for this assignment.
+ * @summary Get my vocabulary homework session
+ */
+export const getMyVocabularyHomeworkAssignment = async (assignmentId: string, options?: RequestInit): Promise<getMyVocabularyHomeworkAssignmentResponse> => {
+
+  const res = await fetch(getGetMyVocabularyHomeworkAssignmentUrl(assignmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMyVocabularyHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMyVocabularyHomeworkAssignmentResponse
 }
 
 

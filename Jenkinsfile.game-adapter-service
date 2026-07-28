@@ -34,8 +34,8 @@ spec:
         - name: kaniko-docker-config
           mountPath: /kaniko/.docker
       resources:
-        requests: { cpu: 150m, memory: 256Mi }
-        limits: { cpu: "1", memory: 1024Mi }
+        requests: { cpu: 150m, memory: 512Mi }
+        limits: { cpu: "1", memory: 2Gi }
     - name: tools
       image: alpine:3.20
       command: ["cat"]

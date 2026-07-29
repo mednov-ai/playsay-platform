@@ -7,6 +7,7 @@ export const ru = {
       refresh: "Обновить",
       reset: "Сбросить",
       save: "Сохранить",
+      undo: "Отменить",
     },
     status: {
       loading: "Загрузка...",
@@ -348,10 +349,12 @@ export const ru = {
     stage: { NEW: "новое", LEARNING: "изучается", REVIEW: "повторение", MASTERED: "освоено" },
     sessionStatus: { NOT_STARTED: "Не начато", IN_PROGRESS: "В процессе", PAUSED: "Пауза", COMPLETED: "Завершено", CANCELLED: "Отменено" },
     today: { title: "На сегодня", ready: "Готово к повторению: {{count}}", empty: "Очередь свободна — можно сделать контрольное повторение.", start: "Начать практику" },
-    history: { empty: "Завершённых тренировок пока нет." },
+    history: { empty: "Тренировок пока нет.", continue: "Продолжить", delivery: { SELF: "Самостоятельно", HOMEWORK: "Домашка", LIVE: "Урок" } },
     lessonMenu: { label: "Словарик", open: "Открыть словарик", add: "Добавить слово", recent: "Последние слова", practice: "Начать практику", back: "Назад к действиям словарика", empty: "На этом уроке слов пока нет.", loadFailed: "Не удалось загрузить последние слова.", reconnecting: "Восстанавливаем связь" },
     quickAdd: { title: "Добавить в словарик" }, editDialog: { title: "Исправить карточку", partOfSpeech: "Часть речи", example: "Пример с точной формой", exampleTranslation: "Перевод примера" }, variants: { title: "Варианты перевода и использования" }, fields: { word: "Слово или фраза", translation: "Выбранный перевод", aiInstruction: "Уточнение для ИИ", aiInstructionPlaceholder: "Например: покажи значение для путешествий или вариант как глагол", allParticipants: "Добавить всем участникам урока" },
     actions: { add: "В словарик", suggest: "Предложить перевод", regenerate: "Другие варианты", save: "Сохранить", edit: "Исправить", search: "Найти", archive: "Архивировать", pause: "Приостановить повторение", resume: "Вернуть в повторение" },
+    archive: { confirm: "Архивировать «{{word}}»?", done: "«{{word}}» перемещено в архив." },
+    readiness: { noTranslation: "Нужен перевод", noExample: "Нет точного примера" },
     messages: { translating: "ИИ автоматически подбирает перевод и примеры…", saved: "Слово сохранено.", saveFailed: "Не удалось сохранить слово.", loadFailed: "Не удалось загрузить словарики.", translationUnavailable: "Переводчик сейчас недоступен — перевод можно ввести вручную." },
     practice: {
       create: "Создать тренировку", homeworkTitle: "Слова · {{name}}", progress: "{{current}} из {{total}}", answerLabel: "Ваш ответ", answerPlaceholder: "Введите ответ", teacherHint: "Подсказка учителя: {{hint}}",
@@ -360,12 +363,17 @@ export const ru = {
       rating: { AGAIN: "Не вспомнил", HARD: "С трудом", GOOD: "Вспомнил" },
       feedback: { correct: "Верно", again: "Попробуем это слово ещё раз", answer: "Правильный ответ:" },
       complete: { title: "Практика завершена", result: "Верных ответов: {{correct}} из {{total}}" },
-      phrase: { placeholder: "Нажимайте на слова по порядку", reset: "Собрать заново" }, keyHint: "Key откроется отдельно; урок останется подключённым.",
+      phrase: { placeholder: "Нажимайте на слова по порядку", reset: "Собрать заново", remove: "Убрать {{word}}" },
+      matching: { label: "Сопоставление слов и переводов", connect: "Соединить выбранные", remove: "Убрать пару {{left}} — {{right}}" },
+      keyHint: "Key откроется отдельно; урок останется подключённым.",
       mode: { QUICK: "Быстро", BALANCED: "Сбалансированно", WRITING: "Больше письма", KEYBOARD: "Key" },
-      builder: { eyebrow: "Персональная практика", title: "Создать тренировку", suggestion: "{{words}} слов · около {{minutes}} мин", suggestionHint: "Просроченные, назначенные и новые слова.", words: "Слова", wordLimit: "Количество слов", pin: "Закрепить слово", exclude: "Исключить слово", mode: "Режим", delivery: "Доставка", homeworkDelivery: "Появится в Домашке после подготовки всех персональных наборов.", publish: "Назначить в Домашку" },
+      builder: { eyebrow: "Персональная практика", title: "Создать тренировку", suggestion: "{{words}} слов · около {{minutes}} мин", suggestionHint: "Просроченные, назначенные и новые слова.", compactRecommendation: "К повторению: {{count}}", words: "Слова", wordLimit: "Количество слов", pin: "Закрепить слово", exclude: "Исключить слово", mode: "Режим", delivery: "Доставка", homeworkDelivery: "Появится в Домашке после подготовки всех персональных наборов.", publish: "Назначить в Домашку" },
+      composer: { recommendation: "{{words}} слов · {{items}} заданий · около {{minutes}} мин", groupRecommendation: "До {{words}} слов · до {{items}} заданий · около {{minutes}} мин на ученика", snapshot: "Опубликованный набор будет точно таким же", learners: "Ученики", absent: "Не подключён", composition: "Состав тренировки", added: "Добавлено учителем", excluded: "Исключённые", word: "Слово", search: "Найти другое слово", settings: "Количество и режим", previewTasks: "Первые задания", matchingPrompt: "Несколько пар слов и переводов", startNow: "Начать сейчас" },
+      reason: { OVERDUE: "Просрочено", PINNED: "Закреплено", DUE_TODAY: "На сегодня", RECENT_LESSON: "Из урока", NEW: "Новое", CONTROL_REVIEW: "Контрольное повторение" },
+      warning: { MISSING_TRANSLATION: "Нужен перевод", MISSING_EXACT_EXAMPLE: "Контекстное задание недоступно: нужен точный пример", INSUFFICIENT_DISTRACTORS: "Будет ввод вместо выбора" },
       errors: { preview: "Не удалось собрать предложение.", publish: "Не удалось назначить тренировку.", save: "Не удалось сохранить ответ." },
     },
-    live: { eyebrow: "Этап урока", title: "Персональная практика слов", completed: "Завершили {{completed}} из {{total}}", studentProgress: "{{completed}}/{{total}} · точность {{accuracy}}", pause: "Пауза", resume: "Продолжить", stop: "Завершить", giveHint: "Дать подсказку", requestHelp: "Нужна помощь", helpRequested: "Ждёт помощи", pausedForStudent: "Учитель поставил практику на паузу.", continueHome: "Продолжить дома", continuedHome: "Добавлено в Домашку", returnToLesson: "Вернуться к уроку", homeworkTitle: "Продолжение словарной практики", joining: "Подключаем персональное задание…" },
+    live: { eyebrow: "Этап урока", title: "Персональная практика слов", supervision: "Ход практики", completed: "Завершили {{completed}} из {{total}}", studentProgress: "{{completed}}/{{total}} · точность {{accuracy}}", pause: "Пауза", resume: "Продолжить", stop: "Завершить", giveHint: "Дать подсказку", requestHelp: "Нужна помощь", helpRequested: "Ждёт помощи", pausedForStudent: "Учитель поставил практику на паузу.", continueHome: "Продолжить дома", continuedHome: "Добавлено в Домашку", returnToLesson: "Вернуться к уроку", homeworkTitle: "Продолжение словарной практики", joining: "Подключаем персональное задание…" },
   },
   aiTutor: {
     eyebrow: "Самостоятельная практика", title: "Разговор с AI-преподавателем", subtitle: "Выберите тему, голос и частоту исправлений.",
@@ -710,7 +718,9 @@ export const ru = {
       groupOnly: "Индикатор нужен только для группы.",
       notStarted: "ещё не открыто",
       vocabulary: "{{progress}}% · точность {{accuracy}}",
+      vocabularyDetail: "{{state}} · трудных слов: {{difficult}}",
     },
+    activityState: { NOT_STARTED: "не начато", IN_PROGRESS: "в процессе", COMPLETED: "завершено", FAILED: "ошибка" },
     studentStatus: {
       notStarted: "Не начато",
       draft: "Черновик",
@@ -726,6 +736,7 @@ export const ru = {
       resubmit: "Пересдать",
       submitting: "Сдаём...",
       retrySave: "Повторить",
+      openVocabularyResult: "Результат",
     },
     submission: {
       draft: "Черновик ещё не сдан",
@@ -1362,6 +1373,7 @@ export const ru = {
   classroom: {
     live: "В эфире",
     participantFallback: "Участник",
+    activityRail: { aria: "Материалы и индивидуальные задания", title: "Работа на уроке", open: "Открыть задания", materials: "Материалы", personal: "Индивидуально" },
     presence: {
       offline: "Ещё не подключился",
       online: "В сети",

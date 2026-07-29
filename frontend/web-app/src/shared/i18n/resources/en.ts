@@ -7,6 +7,7 @@ export const en = {
       refresh: "Refresh",
       reset: "Reset",
       save: "Save",
+      undo: "Undo",
     },
     status: {
       loading: "Loading...",
@@ -348,10 +349,12 @@ export const en = {
     stage: { NEW: "new", LEARNING: "learning", REVIEW: "review", MASTERED: "mastered" },
     sessionStatus: { NOT_STARTED: "Not started", IN_PROGRESS: "In progress", PAUSED: "Paused", COMPLETED: "Completed", CANCELLED: "Cancelled" },
     today: { title: "Today", ready: "{{count}} ready to review", empty: "Nothing is due — a check-up review is still available.", start: "Start practice" },
-    history: { empty: "No completed practice sessions yet." },
+    history: { empty: "No practice yet.", continue: "Continue", delivery: { SELF: "Self-study", HOMEWORK: "Homework", LIVE: "Lesson" } },
     lessonMenu: { label: "Vocabulary", open: "Open vocabulary", add: "Add word", recent: "Recent words", practice: "Start practice", back: "Back to vocabulary actions", empty: "No words from this lesson yet.", loadFailed: "Could not load recent words.", reconnecting: "Reconnecting" },
     quickAdd: { title: "Add to vocabulary" }, editDialog: { title: "Edit card", partOfSpeech: "Part of speech", example: "Example with the exact form", exampleTranslation: "Example translation" }, variants: { title: "Translation and usage options" }, fields: { word: "Word or phrase", translation: "Selected translation", aiInstruction: "Clarification for AI", aiInstructionPlaceholder: "For example: show the travel meaning or use it as a verb", allParticipants: "Add for all lesson participants" },
     actions: { add: "Add word", suggest: "Suggest translation", regenerate: "Other options", save: "Save", edit: "Edit", search: "Search", archive: "Archive", pause: "Pause reviews", resume: "Resume reviews" },
+    archive: { confirm: "Archive “{{word}}”?", done: "“{{word}}” was moved to the archive." },
+    readiness: { noTranslation: "Translation needed", noExample: "No exact example" },
     messages: { translating: "AI is automatically finding translations and examples…", saved: "Word saved.", saveFailed: "Could not save the word.", loadFailed: "Could not load vocabularies.", translationUnavailable: "Translator is unavailable — enter a translation manually." },
     practice: {
       create: "Create practice", homeworkTitle: "Words · {{name}}", progress: "{{current}} of {{total}}", answerLabel: "Your answer", answerPlaceholder: "Type your answer", teacherHint: "Teacher hint: {{hint}}",
@@ -360,12 +363,17 @@ export const en = {
       rating: { AGAIN: "Could not recall", HARD: "With difficulty", GOOD: "Recalled" },
       feedback: { correct: "Correct", again: "We will revisit this word", answer: "Correct answer:" },
       complete: { title: "Practice complete", result: "{{correct}} correct out of {{total}}" },
-      phrase: { placeholder: "Tap the words in order", reset: "Start again" }, keyHint: "Key opens separately while the lesson stays connected.",
+      phrase: { placeholder: "Tap the words in order", reset: "Start again", remove: "Remove {{word}}" },
+      matching: { label: "Match words and translations", connect: "Connect selected cards", remove: "Remove pair {{left}} — {{right}}" },
+      keyHint: "Key opens separately while the lesson stays connected.",
       mode: { QUICK: "Quick", BALANCED: "Balanced", WRITING: "More writing", KEYBOARD: "Key" },
-      builder: { eyebrow: "Personal practice", title: "Create practice", suggestion: "{{words}} words · about {{minutes}} min", suggestionHint: "Overdue, assigned and new words.", words: "Words", wordLimit: "Number of words", pin: "Pin word", exclude: "Exclude word", mode: "Mode", delivery: "Delivery", homeworkDelivery: "It appears in Homework after every personal set is ready.", publish: "Assign as homework" },
+      builder: { eyebrow: "Personal practice", title: "Create practice", suggestion: "{{words}} words · about {{minutes}} min", suggestionHint: "Overdue, assigned and new words.", compactRecommendation: "{{count}} due for review", words: "Words", wordLimit: "Number of words", pin: "Pin word", exclude: "Exclude word", mode: "Mode", delivery: "Delivery", homeworkDelivery: "It appears in Homework after every personal set is ready.", publish: "Assign as homework" },
+      composer: { recommendation: "{{words}} words · {{items}} tasks · about {{minutes}} min", groupRecommendation: "Up to {{words}} words · {{items}} tasks · about {{minutes}} min per student", snapshot: "The published set will match this preview", learners: "Students", absent: "Not connected", composition: "Practice set", added: "Added by teacher", excluded: "Excluded", word: "Word", search: "Find another word", settings: "Amount and mode", previewTasks: "First tasks", matchingPrompt: "Several word and translation pairs", startNow: "Start now" },
+      reason: { OVERDUE: "Overdue", PINNED: "Pinned", DUE_TODAY: "Due today", RECENT_LESSON: "From this lesson", NEW: "New", CONTROL_REVIEW: "Check-up review" },
+      warning: { MISSING_TRANSLATION: "Translation needed", MISSING_EXACT_EXAMPLE: "Context task unavailable: add an exact example", INSUFFICIENT_DISTRACTORS: "Input will replace multiple choice" },
       errors: { preview: "Could not prepare a suggestion.", publish: "Could not assign the practice.", save: "Could not save the answer." },
     },
-    live: { eyebrow: "Lesson stage", title: "Personal word practice", completed: "{{completed}} of {{total}} completed", studentProgress: "{{completed}}/{{total}} · accuracy {{accuracy}}", pause: "Pause", resume: "Resume", stop: "Finish", giveHint: "Give a hint", requestHelp: "I need help", helpRequested: "Needs help", pausedForStudent: "Your teacher paused the practice.", continueHome: "Continue at home", continuedHome: "Added to homework", returnToLesson: "Return to lesson", homeworkTitle: "Vocabulary practice continuation", joining: "Opening your personal task…" },
+    live: { eyebrow: "Lesson stage", title: "Personal word practice", supervision: "Practice progress", completed: "{{completed}} of {{total}} completed", studentProgress: "{{completed}}/{{total}} · accuracy {{accuracy}}", pause: "Pause", resume: "Resume", stop: "Finish", giveHint: "Give a hint", requestHelp: "I need help", helpRequested: "Needs help", pausedForStudent: "Your teacher paused the practice.", continueHome: "Continue at home", continuedHome: "Added to homework", returnToLesson: "Return to lesson", homeworkTitle: "Vocabulary practice continuation", joining: "Opening your personal task…" },
   },
   aiTutor: {
     eyebrow: "Independent practice", title: "Talk with an AI tutor", subtitle: "Choose a topic, voice, and how often you want corrections.",
@@ -698,7 +706,9 @@ export const en = {
       groupOnly: "Indicator is shown only for groups.",
       notStarted: "not opened yet",
       vocabulary: "{{progress}}% · accuracy {{accuracy}}",
+      vocabularyDetail: "{{state}} · difficult words: {{difficult}}",
     },
+    activityState: { NOT_STARTED: "not started", IN_PROGRESS: "in progress", COMPLETED: "completed", FAILED: "failed" },
     studentStatus: {
       notStarted: "Not started",
       draft: "Draft",
@@ -714,6 +724,7 @@ export const en = {
       resubmit: "Resubmit",
       submitting: "Submitting...",
       retrySave: "Try again",
+      openVocabularyResult: "Result",
     },
     submission: {
       draft: "Draft not submitted",
@@ -1334,6 +1345,7 @@ export const en = {
   classroom: {
     live: "Live",
     participantFallback: "Participant",
+    activityRail: { aria: "Materials and individual tasks", title: "Lesson activities", open: "Open activities", materials: "Materials", personal: "Individual" },
     presence: {
       offline: "Not connected yet",
       online: "Online",

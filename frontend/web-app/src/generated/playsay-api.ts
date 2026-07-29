@@ -1332,6 +1332,13 @@ export interface VocabularyHomeworkRequest {
      * @nullable
      */
   sourcePracticeId?: string | null;
+  /**
+     * Immutable vocabulary preview plan to publish without regeneration
+     * @nullable
+     */
+  planId?: string | null;
+  /** @nullable */
+  planRevision?: number | null;
 }
 
 export interface StudentInviteConsumeRequest {

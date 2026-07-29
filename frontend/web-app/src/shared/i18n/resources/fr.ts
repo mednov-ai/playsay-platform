@@ -7,6 +7,7 @@ export const fr = {
       refresh: "Actualiser",
       reset: "Réinitialiser",
       save: "Enregistrer",
+      undo: "Annuler",
     },
     status: {
       loading: "Chargement...",
@@ -348,10 +349,12 @@ export const fr = {
     stage: { NEW: "nouveau", LEARNING: "en cours", REVIEW: "révision", MASTERED: "acquis" },
     sessionStatus: { NOT_STARTED: "Non commencé", IN_PROGRESS: "En cours", PAUSED: "En pause", COMPLETED: "Terminé", CANCELLED: "Annulé" },
     today: { title: "Aujourd’hui", ready: "{{count}} mots à revoir", empty: "Rien n’est dû — une révision reste possible.", start: "Commencer" },
-    history: { empty: "Aucun entraînement terminé." },
+    history: { empty: "Aucun entraînement.", continue: "Continuer", delivery: { SELF: "En autonomie", HOMEWORK: "Devoir", LIVE: "Cours" } },
     lessonMenu: { label: "Vocabulaire", open: "Ouvrir le vocabulaire", add: "Ajouter un mot", recent: "Mots récents", practice: "Commencer l’exercice", back: "Retour aux actions du vocabulaire", empty: "Aucun mot de ce cours pour le moment.", loadFailed: "Impossible de charger les mots récents.", reconnecting: "Reconnexion en cours" },
     quickAdd: { title: "Ajouter au vocabulaire" }, editDialog: { title: "Modifier la fiche", partOfSpeech: "Nature du mot", example: "Exemple avec la forme exacte", exampleTranslation: "Traduction de l’exemple" }, variants: { title: "Variantes de traduction et d’usage" }, fields: { word: "Mot ou expression", translation: "Traduction choisie", aiInstruction: "Précision pour l’IA", aiInstructionPlaceholder: "Par exemple : sens lié au voyage ou emploi comme verbe", allParticipants: "Ajouter pour tous les participants" },
     actions: { add: "Ajouter", suggest: "Proposer une traduction", regenerate: "Autres variantes", save: "Enregistrer", edit: "Modifier", search: "Chercher", archive: "Archiver", pause: "Suspendre les révisions", resume: "Reprendre les révisions" },
+    archive: { confirm: "Archiver « {{word}} » ?", done: "« {{word}} » a été archivé." },
+    readiness: { noTranslation: "Traduction requise", noExample: "Aucun exemple exact" },
     messages: { translating: "L’IA recherche automatiquement des traductions et des exemples…", saved: "Mot enregistré.", saveFailed: "Impossible d’enregistrer le mot.", loadFailed: "Impossible de charger les vocabulaires.", translationUnavailable: "Le traducteur est indisponible — saisissez la traduction manuellement." },
     practice: {
       create: "Créer un exercice", homeworkTitle: "Mots · {{name}}", progress: "{{current}} sur {{total}}", answerLabel: "Votre réponse", answerPlaceholder: "Saisissez la réponse", teacherHint: "Indice du professeur : {{hint}}",
@@ -360,12 +363,17 @@ export const fr = {
       rating: { AGAIN: "Pas retrouvé", HARD: "Avec difficulté", GOOD: "Retrouvé" },
       feedback: { correct: "Correct", again: "Ce mot reviendra plus tard", answer: "Bonne réponse :" },
       complete: { title: "Exercice terminé", result: "{{correct}} bonnes réponses sur {{total}}" },
-      phrase: { placeholder: "Touchez les mots dans l’ordre", reset: "Recommencer" }, keyHint: "Key s’ouvre séparément ; le cours reste connecté.",
+      phrase: { placeholder: "Touchez les mots dans l’ordre", reset: "Recommencer", remove: "Retirer {{word}}" },
+      matching: { label: "Associer mots et traductions", connect: "Relier la sélection", remove: "Retirer la paire {{left}} — {{right}}" },
+      keyHint: "Key s’ouvre séparément ; le cours reste connecté.",
       mode: { QUICK: "Rapide", BALANCED: "Équilibré", WRITING: "Plus d’écriture", KEYBOARD: "Key" },
-      builder: { eyebrow: "Exercice personnel", title: "Créer un exercice", suggestion: "{{words}} mots · env. {{minutes}} min", suggestionHint: "Mots en retard, assignés et nouveaux.", words: "Mots", wordLimit: "Nombre de mots", pin: "Épingler le mot", exclude: "Exclure le mot", mode: "Mode", delivery: "Envoi", homeworkDelivery: "Apparaît dans les devoirs quand tous les lots sont prêts.", publish: "Donner en devoir" },
+      builder: { eyebrow: "Exercice personnel", title: "Créer un exercice", suggestion: "{{words}} mots · env. {{minutes}} min", suggestionHint: "Mots en retard, assignés et nouveaux.", compactRecommendation: "{{count}} à réviser", words: "Mots", wordLimit: "Nombre de mots", pin: "Épingler le mot", exclude: "Exclure le mot", mode: "Mode", delivery: "Envoi", homeworkDelivery: "Apparaît dans les devoirs quand tous les lots sont prêts.", publish: "Donner en devoir" },
+      composer: { recommendation: "{{words}} mots · {{items}} exercices · env. {{minutes}} min", groupRecommendation: "Jusqu’à {{words}} mots · {{items}} exercices · env. {{minutes}} min par élève", snapshot: "Le lot publié correspondra à cet aperçu", learners: "Élèves", absent: "Non connecté", composition: "Contenu", added: "Ajouté par l’enseignant", excluded: "Exclus", word: "Mot", search: "Chercher un autre mot", settings: "Quantité et mode", previewTasks: "Premiers exercices", matchingPrompt: "Plusieurs paires mot-traduction", startNow: "Commencer" },
+      reason: { OVERDUE: "En retard", PINNED: "Épinglé", DUE_TODAY: "Pour aujourd’hui", RECENT_LESSON: "Du cours", NEW: "Nouveau", CONTROL_REVIEW: "Révision de contrôle" },
+      warning: { MISSING_TRANSLATION: "Traduction requise", MISSING_EXACT_EXAMPLE: "Exercice en contexte indisponible : ajoutez un exemple exact", INSUFFICIENT_DISTRACTORS: "La saisie remplace le choix" },
       errors: { preview: "Impossible de préparer la suggestion.", publish: "Impossible d’assigner l’exercice.", save: "Impossible d’enregistrer la réponse." },
     },
-    live: { eyebrow: "Étape du cours", title: "Exercice personnel de mots", completed: "{{completed}} sur {{total}} terminés", studentProgress: "{{completed}}/{{total}} · précision {{accuracy}}", pause: "Pause", resume: "Reprendre", stop: "Terminer", giveHint: "Donner un indice", requestHelp: "J’ai besoin d’aide", helpRequested: "Demande de l’aide", pausedForStudent: "Le professeur a mis l’exercice en pause.", continueHome: "Continuer à la maison", continuedHome: "Ajouté aux devoirs", returnToLesson: "Revenir au cours", homeworkTitle: "Suite de l’entraînement vocabulaire", joining: "Ouverture de votre exercice…" },
+    live: { eyebrow: "Étape du cours", title: "Exercice personnel de mots", supervision: "Progression de l’exercice", completed: "{{completed}} sur {{total}} terminés", studentProgress: "{{completed}}/{{total}} · précision {{accuracy}}", pause: "Pause", resume: "Reprendre", stop: "Terminer", giveHint: "Donner un indice", requestHelp: "J’ai besoin d’aide", helpRequested: "Demande de l’aide", pausedForStudent: "Le professeur a mis l’exercice en pause.", continueHome: "Continuer à la maison", continuedHome: "Ajouté aux devoirs", returnToLesson: "Revenir au cours", homeworkTitle: "Suite de l’entraînement vocabulaire", joining: "Ouverture de votre exercice…" },
   },
   aiTutor: {
     eyebrow: "Pratique autonome", title: "Conversation avec un professeur IA", subtitle: "Choisissez le sujet, la voix et la fréquence des corrections.",
@@ -698,7 +706,9 @@ export const fr = {
       groupOnly: "L'indicateur s'affiche seulement pour les groupes.",
       notStarted: "pas encore ouvert",
       vocabulary: "{{progress}} % · précision {{accuracy}}",
+      vocabularyDetail: "{{state}} · mots difficiles : {{difficult}}",
     },
+    activityState: { NOT_STARTED: "non commencé", IN_PROGRESS: "en cours", COMPLETED: "terminé", FAILED: "erreur" },
     studentStatus: {
       notStarted: "Non commencé",
       draft: "Brouillon",
@@ -714,6 +724,7 @@ export const fr = {
       resubmit: "Rendre à nouveau",
       submitting: "Envoi...",
       retrySave: "Réessayer",
+      openVocabularyResult: "Résultat",
     },
     submission: {
       draft: "Brouillon non rendu",
@@ -1334,6 +1345,7 @@ export const fr = {
   classroom: {
     live: "En direct",
     participantFallback: "Participant",
+    activityRail: { aria: "Supports et exercices individuels", title: "Activités du cours", open: "Ouvrir les activités", materials: "Supports", personal: "Individuel" },
     presence: {
       offline: "Pas encore connecté",
       online: "En ligne",

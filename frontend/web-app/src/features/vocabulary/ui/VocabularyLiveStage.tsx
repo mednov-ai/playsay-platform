@@ -19,6 +19,8 @@ export function VocabularyLiveStage({
   onPracticeChange,
   practice,
   profileSubject,
+  selectedStudentSubject,
+  teacherPlayerOnly = false,
 }: {
   activeStudentSubject?: string | null;
   canManage: boolean;
@@ -26,14 +28,17 @@ export function VocabularyLiveStage({
   onPracticeChange: (practice: VocabularyPractice) => void;
   practice: VocabularyPractice;
   profileSubject?: string;
+  selectedStudentSubject?: string | null;
+  teacherPlayerOnly?: boolean;
 }) {
   const { t } = useAppTranslation();
   const initialSubject = canManage ? activeStudentSubject : profileSubject;
-  const [selectedSubject, setSelectedSubject] = useState(initialSubject ?? practice.sessions[0]?.ownerSubject ?? "");
+  const [selectedSubject, setSelectedSubject] = useState(selectedStudentSubject ?? initialSubject ?? practice.sessions[0]?.ownerSubject ?? "");
+  const effectiveSelectedSubject = selectedStudentSubject ?? selectedSubject;
   const [saving, setSaving] = useState(false);
   const [continuedHome, setContinuedHome] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
-  const selected = practice.sessions.find((session) => session.ownerSubject === selectedSubject) ?? practice.sessions[0] ?? null;
+  const selected = practice.sessions.find((session) => session.ownerSubject === effectiveSelectedSubject) ?? practice.sessions[0] ?? null;
   const own = practice.sessions.find((session) => session.ownerSubject === profileSubject) ?? null;
 
   async function changeStatus(status: "ACTIVE" | "PAUSED" | "COMPLETED") {
@@ -118,6 +123,15 @@ export function VocabularyLiveStage({
     ) : (
       <div className="playsay-task-board playsay-material-loading"><Loader2 className="h-5 w-5 animate-spin text-primary" /><span>{t("vocabulary.live.joining")}</span></div>
     );
+  }
+
+  if (teacherPlayerOnly) {
+    return selected ? (
+      <div className="grid gap-3">
+        <p className="text-center text-sm font-black text-muted-foreground">{selected.ownerName ?? selected.ownerSubject}</p>
+        <VocabularyPracticePlayer initialSession={selected} readOnly />
+      </div>
+    ) : null;
   }
 
   const completed = practice.sessions.filter((session) => session.status === "COMPLETED").length;

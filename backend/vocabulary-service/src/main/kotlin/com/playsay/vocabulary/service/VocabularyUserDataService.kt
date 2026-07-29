@@ -2,6 +2,7 @@ package com.playsay.vocabulary.service
 
 import com.playsay.vocabulary.repo.VocabularyEntryRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeAttemptRepo
+import com.playsay.vocabulary.repo.VocabularyPracticePlanRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeSessionRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeRepo
 import com.playsay.vocabulary.repo.VocabularySkillStateRepo
@@ -17,6 +18,7 @@ class VocabularyUserDataService(
     private val skillStates: VocabularySkillStateRepo,
     private val sessions: VocabularyPracticeSessionRepo,
     private val practices: VocabularyPracticeRepo,
+    private val plans: VocabularyPracticePlanRepo,
     private val attempts: VocabularyPracticeAttemptRepo,
     @param:Value("\${playsay.user-data.service-token:}") private val serviceToken: String,
 ) {
@@ -25,8 +27,10 @@ class VocabularyUserDataService(
         if (serviceToken.isBlank() || presentedToken != serviceToken) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN)
         }
+        plans.deleteContainingSubject(subject)
         attempts.deleteByOwnerSubject(subject)
         sessions.deleteByOwnerSubject(subject)
+        practices.clearSettingsContainingSubject(subject)
         practices.deleteByCreatedBySubject(subject)
         skillStates.deleteByEntryOwnerSubject(subject)
         entries.deleteByOwnerSubject(subject)

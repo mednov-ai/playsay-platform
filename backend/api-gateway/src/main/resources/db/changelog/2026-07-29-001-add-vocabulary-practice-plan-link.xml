@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-07-29-001-add-vocabulary-practice-plan-link" author="codex">
+        <addColumn tableName="assignment">
+            <column name="practice_plan_id" type="UUID"/>
+            <column name="source_vocabulary_practice_id" type="UUID"/>
+        </addColumn>
+        <addUniqueConstraint
+            tableName="assignment"
+            columnNames="teacher_user_id,practice_plan_id"
+            constraintName="uq_assignment_teacher_practice_plan"/>
+        <addUniqueConstraint
+            tableName="assignment"
+            columnNames="teacher_user_id,source_vocabulary_practice_id"
+            constraintName="uq_assignment_teacher_source_vocabulary_practice"/>
+        <rollback>
+            <dropUniqueConstraint
+                tableName="assignment"
+                constraintName="uq_assignment_teacher_source_vocabulary_practice"/>
+            <dropUniqueConstraint
+                tableName="assignment"
+                constraintName="uq_assignment_teacher_practice_plan"/>
+            <dropColumn tableName="assignment" columnName="source_vocabulary_practice_id"/>
+            <dropColumn tableName="assignment" columnName="practice_plan_id"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

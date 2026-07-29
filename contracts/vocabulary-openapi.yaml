@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Play&Say Vocabulary API
-  version: 0.2.0
+  version: 0.3.0
 servers:
   - url: /
 security:
@@ -186,6 +186,8 @@ paths:
       parameters:
         - { in: query, name: ownerSubject, schema: { type: string, maxLength: 255 } }
         - { in: query, name: lessonId, schema: { type: string, format: uuid } }
+        - { in: query, name: page, schema: { type: integer, minimum: 0, default: 0 } }
+        - { in: query, name: size, schema: { type: integer, minimum: 1, maximum: 50, default: 25 } }
       responses:
         '200':
           description: Authorized personal practice history
@@ -218,6 +220,18 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AttemptResponse' }
         '409': { description: Stale revision or non-current item; reload session snapshot }
+  /api/vocabulary/practice-sessions/{sessionId}/items/{itemId}/reveal:
+    post:
+      summary: Reveal the current self-rated flashcard without exposing other answers
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: itemId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Expected answer for the current flashcard only
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticeReveal' }
   /api/vocabulary/practice-sessions/{sessionId}/key-set:
     get:
       parameters:
@@ -292,6 +306,8 @@ components:
     PracticeStatus: { type: string, enum: [PREPARING, PUBLISHED, ACTIVE, PAUSED, COMPLETED, CANCELLED, FAILED] }
     SessionStatus: { type: string, enum: [NOT_STARTED, IN_PROGRESS, PAUSED, COMPLETED, CANCELLED] }
     ExerciseType: { type: string, enum: [FLASHCARD, MATCHING, MEANING_CHOICE, PHRASE_BUILDER, FORM_INPUT, CONTEXT_GAP, KEYBOARD] }
+    SelectionReason: { type: string, enum: [OVERDUE, PINNED, DUE_TODAY, RECENT_LESSON, NEW, CONTROL_REVIEW] }
+    ReadinessWarning: { type: string, enum: [MISSING_TRANSLATION, MISSING_EXACT_EXAMPLE, INSUFFICIENT_DISTRACTORS] }
     SourceTerm:
       type: object
       required: [sourceText]
@@ -333,6 +349,10 @@ components:
           properties:
             ownerSubject: { type: string, maxLength: 255 }
             translation: { type: string, maxLength: 500 }
+            partOfSpeech: { type: string, maxLength: 80 }
+            example: { type: string, maxLength: 1000 }
+            exampleTranslation: { type: string, maxLength: 1000 }
+            translationState: { $ref: '#/components/schemas/TranslationState' }
             sourceType: { $ref: '#/components/schemas/SourceType' }
             lessonId: { type: string, format: uuid }
             assignmentId: { type: string, format: uuid }
@@ -410,6 +430,7 @@ components:
       properties:
         ownerSubject: { type: string }
         ownerName: { type: string }
+        ownerUsername: { type: [string, 'null'] }
         totalCount: { type: integer }
         dueCount: { type: integer }
         learningCount: { type: integer }
@@ -435,10 +456,25 @@ components:
         wordLimit: { type: integer, minimum: 1, maximum: 30, default: 10 }
         pinnedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
         excludedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        ownerOverrides:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [ownerSubject]
+            properties:
+              ownerSubject: { type: string, maxLength: 255 }
+              pinnedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+              excludedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        planId: { type: [string, 'null'], format: uuid }
+        planRevision: { type: [integer, 'null'], format: int64 }
     PracticePreview:
       type: object
-      required: [mode, delivery, estimatedMinutes, owners]
+      required: [planId, revision, expiresAt, mode, delivery, estimatedMinutes, owners]
       properties:
+        planId: { type: string, format: uuid }
+        revision: { type: integer, format: int64 }
+        expiresAt: { type: string, format: date-time }
         mode: { $ref: '#/components/schemas/PracticeMode' }
         delivery: { $ref: '#/components/schemas/Delivery' }
         estimatedMinutes: { type: integer }
@@ -450,12 +486,40 @@ components:
             properties:
               ownerSubject: { type: string }
               ownerName: { type: [string, 'null'] }
+              ownerUsername: { type: [string, 'null'] }
               selectedCount: { type: integer }
               estimatedItemCount: { type: integer }
               dueCount: { type: integer }
               newCount: { type: integer }
               needsTranslationCount: { type: integer }
               entries: { type: array, items: { $ref: '#/components/schemas/VocabularyEntry' } }
+              selection:
+                type: array
+                items:
+                  type: object
+                  required: [entry, reason, readinessWarnings]
+                  properties:
+                    entry: { $ref: '#/components/schemas/VocabularyEntry' }
+                    reason: { $ref: '#/components/schemas/SelectionReason' }
+                    readinessWarnings: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/ReadinessWarning' } }
+              exerciseDistribution:
+                type: array
+                items:
+                  type: object
+                  required: [exerciseType, count]
+                  properties:
+                    exerciseType: { $ref: '#/components/schemas/ExerciseType' }
+                    count: { type: integer }
+              sampleItems:
+                type: array
+                maxItems: 3
+                items:
+                  type: object
+                  required: [exerciseType, prompt]
+                  properties:
+                    entryId: { type: [string, 'null'], format: uuid }
+                    exerciseType: { $ref: '#/components/schemas/ExerciseType' }
+                    prompt: { type: string }
     PracticeItem:
       type: object
       required: [id, position, skill, exerciseType, prompt, options]
@@ -470,6 +534,37 @@ components:
         sourceText: { type: [string, 'null'] }
         translation: { type: [string, 'null'] }
         example: { type: [string, 'null'] }
+        schemaVersion: { type: integer, minimum: 1, default: 1 }
+        affectsSchedule: { type: boolean, default: true }
+        content:
+          oneOf:
+            - type: object
+              required: [type, left, right]
+              properties:
+                type: { type: string, const: MATCHING }
+                left: { type: array, minItems: 2, items: { $ref: '#/components/schemas/PracticeCard' } }
+                right: { type: array, minItems: 2, items: { $ref: '#/components/schemas/PracticeCard' } }
+            - type: object
+              required: [type, tokens]
+              properties:
+                type: { type: string, const: PHRASE_BUILDER }
+                tokens: { type: array, minItems: 2, items: { $ref: '#/components/schemas/PracticeCard' } }
+            - type: object
+              required: [type]
+              properties:
+                type: { $ref: '#/components/schemas/ExerciseType' }
+    PracticeCard:
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: string }
+        label: { type: string }
+    PracticeReveal:
+      type: object
+      required: [itemId, expectedAnswer]
+      properties:
+        itemId: { type: string, format: uuid }
+        expectedAnswer: { type: string }
     PracticeSession:
       type: object
       required: [id, ownerSubject, status, revision, completedItems, totalItems, correctCount, attemptCount, helpRequested, updatedAt]
@@ -490,6 +585,11 @@ components:
         startedAt: { type: [string, 'null'], format: date-time }
         completedAt: { type: [string, 'null'], format: date-time }
         updatedAt: { type: string, format: date-time }
+        practiceId: { type: [string, 'null'], format: uuid }
+        delivery: { anyOf: [{ $ref: '#/components/schemas/Delivery' }, { type: 'null' }] }
+        mode: { anyOf: [{ $ref: '#/components/schemas/PracticeMode' }, { type: 'null' }] }
+        lessonId: { type: [string, 'null'], format: uuid }
+        assignmentId: { type: [string, 'null'], format: uuid }
     Practice:
       type: object
       required: [id, delivery, mode, status, sessions, createdAt, updatedAt]
@@ -551,6 +651,8 @@ components:
         pinnedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
         excludedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
         sourcePracticeId: { type: [string, 'null'], format: uuid }
+        planId: { type: [string, 'null'], format: uuid }
+        planRevision: { type: [integer, 'null'], format: int64 }
     KeyResult:
       type: object
       required: [clientResultId, attempts]

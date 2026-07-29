@@ -17,6 +17,8 @@ enum class PracticeDelivery { SELF, HOMEWORK, LIVE }
 enum class PracticeMode { QUICK, BALANCED, WRITING, KEYBOARD }
 enum class PracticeStatus { PREPARING, PUBLISHED, ACTIVE, PAUSED, COMPLETED, CANCELLED, FAILED }
 enum class SessionStatus { NOT_STARTED, IN_PROGRESS, PAUSED, COMPLETED, CANCELLED }
+enum class PracticeSelectionReason { OVERDUE, PINNED, DUE_TODAY, RECENT_LESSON, NEW, CONTROL_REVIEW }
+enum class PracticeReadinessWarning { MISSING_TRANSLATION, MISSING_EXACT_EXAMPLE, INSUFFICIENT_DISTRACTORS }
 enum class PracticeExerciseType {
     FLASHCARD,
     MATCHING,
@@ -150,6 +152,7 @@ data class VocabularyDashboardResponse(
 data class VocabularyLearnerSummaryResponse(
     val ownerSubject: String,
     val ownerName: String,
+    val ownerUsername: String? = null,
     val totalCount: Int,
     val dueCount: Int,
     val learningCount: Int,
@@ -157,6 +160,12 @@ data class VocabularyLearnerSummaryResponse(
     val needsTranslationCount: Int,
     val difficultCount: Int,
     val lastPracticedAt: Instant?,
+)
+
+data class VocabularyPracticeOwnerOverrideRequest(
+    @field:NotBlank @field:Size(max = 255) val ownerSubject: String,
+    @field:Size(max = 100) val pinnedEntryIds: List<UUID> = emptyList(),
+    @field:Size(max = 100) val excludedEntryIds: List<UUID> = emptyList(),
 )
 
 data class VocabularyPracticeSettingsRequest(
@@ -168,20 +177,47 @@ data class VocabularyPracticeSettingsRequest(
     @field:Min(1) @field:Max(30) val wordLimit: Int = 10,
     @field:Size(max = 100) val pinnedEntryIds: List<UUID> = emptyList(),
     @field:Size(max = 100) val excludedEntryIds: List<UUID> = emptyList(),
+    @field:Size(max = 100) val ownerOverrides: List<VocabularyPracticeOwnerOverrideRequest> = emptyList(),
+    val planId: UUID? = null,
+    val planRevision: Long? = null,
+)
+
+data class VocabularyPracticeEntryPreviewResponse(
+    val entry: VocabularyEntryResponse,
+    val reason: PracticeSelectionReason,
+    val readinessWarnings: Set<PracticeReadinessWarning> = emptySet(),
+)
+
+data class VocabularyPracticeExerciseDistributionResponse(
+    val exerciseType: PracticeExerciseType,
+    val count: Int,
+)
+
+data class VocabularyPracticeItemPreviewResponse(
+    val entryId: UUID?,
+    val exerciseType: PracticeExerciseType,
+    val prompt: String,
 )
 
 data class VocabularyPracticeOwnerPreviewResponse(
     val ownerSubject: String,
     val ownerName: String?,
+    val ownerUsername: String? = null,
     val selectedCount: Int,
     val estimatedItemCount: Int,
     val dueCount: Int,
     val newCount: Int,
     val needsTranslationCount: Int,
     val entries: List<VocabularyEntryResponse>,
+    val selection: List<VocabularyPracticeEntryPreviewResponse> = emptyList(),
+    val exerciseDistribution: List<VocabularyPracticeExerciseDistributionResponse> = emptyList(),
+    val sampleItems: List<VocabularyPracticeItemPreviewResponse> = emptyList(),
 )
 
 data class VocabularyPracticePreviewResponse(
+    val planId: UUID,
+    val revision: Long,
+    val expiresAt: Instant,
     val mode: PracticeMode,
     val delivery: PracticeDelivery,
     val estimatedMinutes: Int,
@@ -199,6 +235,14 @@ data class VocabularyPracticeItemResponse(
     val sourceText: String?,
     val translation: String?,
     val example: String?,
+    val schemaVersion: Int = 1,
+    val content: Map<String, Any?> = emptyMap(),
+    val affectsSchedule: Boolean = true,
+)
+
+data class VocabularyPracticeRevealResponse(
+    val itemId: UUID,
+    val expectedAnswer: String,
 )
 
 data class VocabularyPracticeSessionSummaryResponse(
@@ -218,6 +262,11 @@ data class VocabularyPracticeSessionSummaryResponse(
     val startedAt: Instant?,
     val completedAt: Instant?,
     val updatedAt: Instant,
+    val practiceId: UUID? = null,
+    val delivery: PracticeDelivery? = null,
+    val mode: PracticeMode? = null,
+    val lessonId: UUID? = null,
+    val assignmentId: UUID? = null,
 )
 
 data class VocabularyPracticeResponse(
@@ -287,6 +336,8 @@ data class VocabularyHomeworkPreparationRequest(
     @field:Size(max = 100) val pinnedEntryIds: List<UUID> = emptyList(),
     @field:Size(max = 100) val excludedEntryIds: List<UUID> = emptyList(),
     val sourcePracticeId: UUID? = null,
+    val planId: UUID? = null,
+    val planRevision: Long? = null,
 )
 
 data class VocabularyHomeworkPreparationResponse(

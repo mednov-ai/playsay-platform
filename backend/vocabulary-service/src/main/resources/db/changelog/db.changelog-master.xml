@@ -2,4 +2,5 @@
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
     <include file="2026-07-11-001-vocabulary.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-28-001-vocabulary-practice.xml" relativeToChangelogFile="true"/>
+    <include file="2026-07-29-001-personal-practice-v2.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

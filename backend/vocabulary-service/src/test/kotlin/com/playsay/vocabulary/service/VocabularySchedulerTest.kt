@@ -20,6 +20,7 @@ class VocabularySchedulerTest {
         val state = state()
 
         val expected = listOf(
+            Triple(0, LearningStage.LEARNING, 1L),
             Triple(1, LearningStage.LEARNING, 3L),
             Triple(2, LearningStage.REVIEW, 7L),
             Triple(3, LearningStage.REVIEW, 14L),
@@ -57,13 +58,27 @@ class VocabularySchedulerTest {
         val state = state().apply {
             intervalIndex = 2
             stage = LearningStage.REVIEW
+            successStreak = 2
         }
 
         applyPracticeRating(state, PracticeRating.HARD, now)
 
         assertEquals(2, state.intervalIndex)
+        assertEquals(2, state.successStreak)
         assertEquals(LearningStage.REVIEW, state.stage)
         assertEquals(now.plus(3, ChronoUnit.DAYS), state.dueAt)
+    }
+
+    @Test
+    fun `hard before first good does not skip the one day interval`() {
+        val state = state()
+
+        applyPracticeRating(state, PracticeRating.HARD, now)
+        applyPracticeRating(state, PracticeRating.GOOD, now.plus(1, ChronoUnit.DAYS))
+
+        assertEquals(0, state.intervalIndex)
+        assertEquals(1, state.successStreak)
+        assertEquals(now.plus(2, ChronoUnit.DAYS), state.dueAt)
     }
 
     @Test

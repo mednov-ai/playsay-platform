@@ -303,6 +303,8 @@ export type VocabularyHomeworkInput = {
   pinnedEntryIds?: string[];
   excludedEntryIds?: string[];
   sourcePracticeId?: string | null;
+  planId?: string | null;
+  planRevision?: number | null;
 };
 export type LessonHomeworkInput = {
   dueAt?: string | null;

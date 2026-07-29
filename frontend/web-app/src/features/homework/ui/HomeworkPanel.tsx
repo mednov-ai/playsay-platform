@@ -10,6 +10,8 @@ import {
   type MeProfile,
   type ScheduledLesson,
   type VocabularyPracticeMode,
+  type VocabularyPracticePreview,
+  type VocabularyPracticeSettings,
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import { useHomeworkAssignments } from "../hooks/useHomeworkAssignments";
@@ -19,6 +21,7 @@ import { HomeworkCreateForm } from "./HomeworkCreateForm";
 import { StudentHomeworkDetailView } from "./StudentHomeworkDetailView";
 import { StudentVocabularyHomeworkView } from "./StudentVocabularyHomeworkView";
 import { TeacherHomeworkDetail } from "./TeacherHomeworkDetail";
+import { PersonalPracticeComposer } from "../../vocabulary/ui/PersonalPracticeComposer";
 
 export function HomeworkPanel({
   disabled,
@@ -167,6 +170,36 @@ export function HomeworkPanel({
     }
   }
 
+  async function createVocabularyHomeworkFromPlan(
+    preview: VocabularyPracticePreview,
+    settings: VocabularyPracticeSettings,
+  ) {
+    const recipients = settings.ownerSubjects ?? selectedSubjects;
+    if (recipients.length === 0) {
+      setMessage(t("homework.messages.selectStudents"));
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await createVocabularyHomeworkAssignment({
+        dueAt: localDateTimeToIso(dueAt),
+        instructions: instructions.trim() || null,
+        mode: settings.mode,
+        planId: preview.planId,
+        planRevision: preview.revision,
+        studentSubjects: recipients,
+        title: title.trim() || t("homework.create.defaultVocabularyTitle"),
+        wordLimit: settings.wordLimit,
+      });
+      await refreshAssignments();
+      setSelectedAssignmentId(created.assignment.id);
+      setDetail(created);
+      setMessage(t("homework.messages.createdVocabulary"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function toggleSubject(subject: string) {
     setSelectedSubjects((current) => (
       current.includes(subject)
@@ -255,6 +288,25 @@ export function HomeworkPanel({
               title={title}
               vocabularyMode={vocabularyMode}
               vocabularyWordLimit={vocabularyWordLimit}
+              vocabularyComposer={selectedSubjects.length > 0 ? (
+                <PersonalPracticeComposer
+                  actionLabel={t("homework.create.assignVocabulary")}
+                  delivery="HOMEWORK"
+                  disabled={disabled || saving}
+                  onPublish={createVocabularyHomeworkFromPlan}
+                  owners={studentUsers
+                    .filter((student) => selectedSubjects.includes(student.subject))
+                    .map((student) => ({
+                      name: student.displayName ?? student.username ?? student.subject,
+                      subject: student.subject,
+                      username: student.username,
+                    }))}
+                />
+              ) : (
+                <p className="rounded-xl border border-dashed border-border p-3 text-sm font-bold text-muted-foreground">
+                  {t("homework.messages.selectStudents")}
+                </p>
+              )}
             />
 
             {message ? (

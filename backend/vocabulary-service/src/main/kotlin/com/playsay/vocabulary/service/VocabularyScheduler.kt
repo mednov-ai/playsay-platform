@@ -15,6 +15,7 @@ internal fun applyPracticeRating(
     rating: PracticeRating,
     now: Instant,
 ) {
+    val hadSuccessfulPractice = state.successStreak > 0
     state.lastRating = rating
     state.lastPracticedAt = now
     when (rating) {
@@ -27,12 +28,15 @@ internal fun applyPracticeRating(
         }
         PracticeRating.HARD -> {
             val currentDays = vocabularyIntervalsDays[state.intervalIndex.coerceIn(vocabularyIntervalsDays.indices)]
-            state.successStreak += 1
             state.stage = stageForInterval(state.intervalIndex)
             state.dueAt = now.plus((currentDays / 2).coerceAtLeast(1).toLong(), ChronoUnit.DAYS)
         }
         PracticeRating.GOOD -> {
-            state.intervalIndex = (state.intervalIndex + 1).coerceAtMost(vocabularyIntervalsDays.lastIndex)
+            // A freshly created state starts at index 0 but has not earned the one-day
+            // interval yet. Only subsequent sessions advance to 3, 7, 14, 30 and 60.
+            if (hadSuccessfulPractice) {
+                state.intervalIndex = (state.intervalIndex + 1).coerceAtMost(vocabularyIntervalsDays.lastIndex)
+            }
             state.successStreak += 1
             state.stage = stageForInterval(state.intervalIndex)
             state.dueAt = now.plus(vocabularyIntervalsDays[state.intervalIndex].toLong(), ChronoUnit.DAYS)
@@ -65,6 +69,7 @@ internal data class VocabularySelectionCandidate(
     val dueAt: Instant,
     val stage: LearningStage,
     val updatedAt: Instant,
+    val priority: Int = 0,
 )
 
 internal fun selectPracticeEntryIds(
@@ -87,6 +92,7 @@ internal fun selectPracticeEntryIds(
         .filterNot { it.id in selectedIds }
         .sortedWith(
             compareBy<VocabularySelectionCandidate>(
+                { it.priority },
                 { it.dueAt.isAfter(now) },
                 { it.dueAt },
             ).thenByDescending { it.updatedAt }.thenBy { it.id },

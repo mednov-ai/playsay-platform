@@ -124,9 +124,9 @@ export function VocabularyEntryDialog({
         ownerSubject,
         sourceText,
         translation,
-        partOfSpeech: selectedVariant?.partOfSpeech,
-        example: selectedVariant?.example,
-        exampleTranslation: selectedVariant?.exampleTranslation,
+        partOfSpeech: selectedVariant?.partOfSpeech ?? undefined,
+        example: selectedVariant?.example ?? undefined,
+        exampleTranslation: selectedVariant?.exampleTranslation ?? undefined,
         translationState: translation ? "CONFIRMED" : "MISSING",
       })));
       changeSourceText("");

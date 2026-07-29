@@ -7,4 +7,5 @@ export const vocabularyFeatures = {
   homework: enabled(import.meta.env.VITE_VOCABULARY_HOMEWORK_ENABLED),
   live: enabled(import.meta.env.VITE_VOCABULARY_LIVE_ENABLED),
   key: enabled(import.meta.env.VITE_VOCABULARY_KEY_ENABLED),
+  personalPracticeV2: enabled(import.meta.env.VITE_PERSONAL_PRACTICE_V2_ENABLED),
 } as const;

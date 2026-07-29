@@ -4,6 +4,7 @@ import { Button } from "../../../components/ui/button";
 import {
   fetchVocabularyPracticeSession,
   recordVocabularyAttempt,
+  revealVocabularyPracticeItem,
   type VocabularyAttemptResult,
   type VocabularyPracticeRating,
   type VocabularyPracticeSession,
@@ -22,19 +23,27 @@ export function VocabularyPracticePlayer({
   const { t } = useAppTranslation();
   const [session, setSession] = useState(initialSession);
   const [answer, setAnswer] = useState("");
-  const [phrase, setPhrase] = useState<string[]>([]);
+  const [phrase, setPhrase] = useState<Array<{ id: string; label: string }>>([]);
+  const [matchingPairs, setMatchingPairs] = useState<Array<{ leftId: string; leftLabel: string; rightId: string; rightLabel: string }>>([]);
+  const [matchingSelection, setMatchingSelection] = useState<{ left?: { id: string; label: string }; right?: { id: string; label: string } }>({});
   const [revealed, setRevealed] = useState(false);
+  const [revealedAnswer, setRevealedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<VocabularyAttemptResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const item = session.currentItem;
+  const matchingContent = item?.content && "left" in item.content && "right" in item.content ? item.content : null;
+  const phraseContent = item?.content && "tokens" in item.content ? item.content : null;
 
   useEffect(() => {
     setSession(initialSession);
     setAnswer("");
     setPhrase([]);
+    setMatchingPairs([]);
+    setMatchingSelection({});
     setFeedback(null);
     setRevealed(false);
+    setRevealedAnswer(null);
   }, [initialSession.id, initialSession.revision]);
 
   useEffect(() => {
@@ -100,7 +109,25 @@ export function VocabularyPracticePlayer({
     setFeedback(null);
     setAnswer("");
     setPhrase([]);
+    setMatchingPairs([]);
+    setMatchingSelection({});
     setRevealed(false);
+    setRevealedAnswer(null);
+  }
+
+  async function revealFlashcard() {
+    if (!item || readOnly || item.exerciseType !== "FLASHCARD") return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const result = await revealVocabularyPracticeItem(session.id, item.id);
+      setRevealedAnswer(result.expectedAnswer);
+      setRevealed(true);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : t("vocabulary.practice.errors.save"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (session.status === "COMPLETED" || (!item && session.totalItems === session.completedItems)) {
@@ -161,10 +188,11 @@ export function VocabularyPracticePlayer({
             <div className="mt-6 grid gap-4">
               {revealed ? (
                 <div className="rounded-2xl border border-primary/25 bg-[#fff8f3] p-5 text-center text-xl font-extrabold text-primary">
-                  {item.translation ?? item.sourceText}
+                  {revealedAnswer}
                 </div>
               ) : (
-                <Button disabled={readOnly} onClick={() => setRevealed(true)} type="button" variant="outline">
+                <Button disabled={saving || readOnly} onClick={() => void revealFlashcard()} type="button" variant="outline">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   {t("vocabulary.practice.actions.reveal")}
                 </Button>
               )}
@@ -176,7 +204,7 @@ export function VocabularyPracticePlayer({
                 </div>
               ) : null}
             </div>
-          ) : item.exerciseType === "MEANING_CHOICE" || item.exerciseType === "MATCHING" ? (
+          ) : item.exerciseType === "MEANING_CHOICE" ? (
             <div className="mt-6 grid gap-2 sm:grid-cols-2">
               {item.options.map((option) => (
                 <Button className="min-h-12 whitespace-normal" disabled={saving || readOnly} key={option} onClick={() => void submit(undefined, option)} type="button" variant="outline">
@@ -184,18 +212,128 @@ export function VocabularyPracticePlayer({
                 </Button>
               ))}
             </div>
+          ) : item.exerciseType === "MATCHING" && matchingContent ? (
+            <div className="mt-6 grid gap-4">
+              <div className="grid grid-cols-2 gap-3" role="group" aria-label={t("vocabulary.practice.matching.label")}>
+                <div className="grid content-start gap-2">
+                  {matchingContent.left.map((option) => {
+                    const used = matchingPairs.some((pair) => pair.leftId === option.id);
+                    const selected = matchingSelection.left?.id === option.id;
+                    return (
+                      <Button
+                        aria-pressed={selected}
+                        className="min-h-12 whitespace-normal"
+                        disabled={readOnly || used}
+                        key={option.id}
+                        onClick={() => setMatchingSelection((current) => ({ ...current, left: option }))}
+                        type="button"
+                        variant={selected ? "default" : "outline"}
+                      >
+                        {option.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <div className="grid content-start gap-2">
+                  {matchingContent.right.map((option) => {
+                    const used = matchingPairs.some((pair) => pair.rightId === option.id);
+                    const selected = matchingSelection.right?.id === option.id;
+                    return (
+                      <Button
+                        aria-pressed={selected}
+                        className="min-h-12 whitespace-normal"
+                        disabled={readOnly || used}
+                        key={option.id}
+                        onClick={() => setMatchingSelection((current) => ({ ...current, right: option }))}
+                        type="button"
+                        variant={selected ? "default" : "outline"}
+                      >
+                        {option.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+              <Button
+                disabled={readOnly || !matchingSelection.left || !matchingSelection.right}
+                onClick={() => {
+                  const left = matchingSelection.left;
+                  const right = matchingSelection.right;
+                  if (!left || !right) return;
+                  setMatchingPairs((current) => [...current, {
+                    leftId: left.id,
+                    leftLabel: left.label,
+                    rightId: right.id,
+                    rightLabel: right.label,
+                  }]);
+                  setMatchingSelection({});
+                }}
+                type="button"
+                variant="outline"
+              >
+                {t("vocabulary.practice.matching.connect")}
+              </Button>
+              {matchingPairs.length ? (
+                <div className="grid gap-2">
+                  {matchingPairs.map((pair) => (
+                    <button
+                      aria-label={t("vocabulary.practice.matching.remove", { left: pair.leftLabel, right: pair.rightLabel })}
+                      className="flex items-center justify-between gap-2 rounded-xl bg-muted p-3 text-left text-sm font-bold"
+                      key={pair.leftId}
+                      onClick={() => setMatchingPairs((current) => current.filter((itemPair) => itemPair.leftId !== pair.leftId))}
+                      type="button"
+                    >
+                      <span>{pair.leftLabel} ↔ {pair.rightLabel}</span><X className="h-4 w-4" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <Button
+                disabled={saving || readOnly || matchingPairs.length !== matchingContent.left.length}
+                onClick={() => void submit(undefined, matchingPairs
+                  .slice()
+                  .sort((first, second) => first.leftId.localeCompare(second.leftId))
+                  .map((pair) => `${pair.leftId}:${pair.rightId}`)
+                  .join("|"))}
+                type="button"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{t("vocabulary.practice.actions.check")}
+              </Button>
+            </div>
           ) : item.exerciseType === "PHRASE_BUILDER" ? (
             <div className="mt-6 grid gap-4">
               <div className="min-h-14 rounded-2xl border border-border bg-muted/50 p-3 text-center font-extrabold">
-                {phrase.length ? phrase.join(" ") : t("vocabulary.practice.phrase.placeholder")}
+                {phrase.length ? (
+                  <span className="flex flex-wrap justify-center gap-2">
+                    {phrase.map((part) => (
+                      <button
+                        aria-label={t("vocabulary.practice.phrase.remove", { word: part.label })}
+                        className="rounded-lg bg-white px-2 py-1 shadow-sm"
+                        key={part.id}
+                        onClick={() => setPhrase((current) => current.filter((itemPart) => itemPart.id !== part.id))}
+                        type="button"
+                      >
+                        {part.label} <X className="inline h-3.5 w-3.5" />
+                      </button>
+                    ))}
+                  </span>
+                ) : t("vocabulary.practice.phrase.placeholder")}
               </div>
               <div className="flex flex-wrap justify-center gap-2">
-                {item.options.map((part, index) => (
-                  <Button disabled={readOnly} key={`${part}-${index}`} onClick={() => setPhrase((current) => [...current, part])} type="button" variant="outline">{part}</Button>
+                {(phraseContent?.tokens ?? item.options.map((label, index) => ({ id: `legacy-${index}`, label }))).map((part) => (
+                  <Button
+                    disabled={readOnly || phrase.some((selected) => selected.id === part.id)}
+                    key={part.id}
+                    onClick={() => setPhrase((current) => [...current, part])}
+                    type="button"
+                    variant="outline"
+                  >
+                    {part.label}
+                  </Button>
                 ))}
                 <Button aria-label={t("vocabulary.practice.phrase.reset")} disabled={readOnly || phrase.length === 0} onClick={() => setPhrase([])} type="button" variant="outline"><RotateCcw className="h-4 w-4" /></Button>
               </div>
-              <Button disabled={saving || readOnly || phrase.length === 0} onClick={() => void submit(undefined, phrase.join(" "))} type="button">
+              <Button disabled={saving || readOnly || phrase.length === 0} onClick={() => void submit(undefined, phrase.map((part) => part.label).join(" "))} type="button">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{t("vocabulary.practice.actions.check")}
               </Button>
             </div>
@@ -238,5 +376,17 @@ export function VocabularyPracticePlayer({
 function keyPracticeUrl(sessionId: string): string {
   const returnTo = window.location.href;
   const params = new URLSearchParams({ vocabularySessionId: sessionId, returnTo });
-  return `https://key.honey.school/?${params.toString()}`;
+  return `${keyboardOrigin()}/?${params.toString()}`;
+}
+
+function keyboardOrigin(): string {
+  const configured = import.meta.env.VITE_KEYBOARD_ORIGIN?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  const current = new URL(window.location.origin);
+  const localDevelopment = current.hostname === "localhost" || current.hostname === "127.0.0.1";
+  if (current.hostname.startsWith("dev.online.")) current.hostname = current.hostname.replace(/^dev\.online\./, "dev.key.");
+  else if (current.hostname.startsWith("online.")) current.hostname = current.hostname.replace(/^online\./, "key.");
+  current.port = localDevelopment ? "5175" : "";
+  current.pathname = "";
+  return current.origin;
 }

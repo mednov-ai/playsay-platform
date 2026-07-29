@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-07-29-001-personal-practice-v2" author="codex">
+        <createTable tableName="vocabulary_practice_plans">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="created_by_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="revision" type="BIGINT" defaultValueNumeric="1"><constraints nullable="false"/></column>
+            <column name="delivery" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="mode" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="lesson_id" type="UUID"/>
+            <column name="payload_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="published_practice_id" type="UUID"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="vocabulary_practice_plans" indexName="idx_vocabulary_plan_actor_expires">
+            <column name="created_by_subject"/>
+            <column name="expires_at"/>
+        </createIndex>
+
+        <addColumn tableName="vocabulary_practice_items">
+            <column name="schema_version" type="INT" defaultValueNumeric="1"><constraints nullable="false"/></column>
+            <column name="accepted_answers_json" type="TEXT" defaultValue="[]"><constraints nullable="false"/></column>
+            <column name="content_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+            <column name="affects_schedule" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+        </addColumn>
+        <addColumn tableName="vocabulary_practice_attempts">
+            <column name="schedule_credit_applied" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+        </addColumn>
+        <createIndex tableName="vocabulary_practice_attempts" indexName="idx_vocabulary_attempt_schedule_credit">
+            <column name="session_id"/>
+            <column name="schedule_credit_applied"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

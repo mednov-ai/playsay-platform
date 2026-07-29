@@ -251,17 +251,99 @@
               "correctCount": { "type": "integer", "minimum": 0 },
               "attemptCount": { "type": "integer", "minimum": 0 },
               "accuracy": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-              "currentItem": { "type": ["object", "null"] },
+              "currentItem": {
+                "anyOf": [
+                  { "$ref": "#/$defs/vocabularyPracticeItem" },
+                  { "type": "null" }
+                ]
+              },
               "teacherHint": { "type": ["string", "null"] },
               "helpRequested": { "type": "boolean" },
               "startedAt": { "type": ["string", "null"], "format": "date-time" },
               "completedAt": { "type": ["string", "null"], "format": "date-time" },
+              "practiceId": { "type": ["string", "null"], "format": "uuid" },
+              "delivery": { "enum": ["SELF", "HOMEWORK", "LIVE", null] },
+              "mode": { "enum": ["QUICK", "BALANCED", "WRITING", "KEYBOARD", null] },
+              "lessonId": { "type": ["string", "null"], "format": "uuid" },
+              "assignmentId": { "type": ["string", "null"], "format": "uuid" },
               "updatedAt": { "type": "string", "format": "date-time" }
             }
           }
         },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "vocabularyPracticeItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "position",
+        "skill",
+        "exerciseType",
+        "prompt",
+        "options",
+        "schemaVersion",
+        "content",
+        "affectsSchedule"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "position": { "type": "integer", "minimum": 0 },
+        "entryId": { "type": ["string", "null"], "format": "uuid" },
+        "skill": { "enum": ["MEANING", "FORM", "SPELLING", "CONTEXT"] },
+        "exerciseType": {
+          "enum": ["FLASHCARD", "MATCHING", "MEANING_CHOICE", "PHRASE_BUILDER", "FORM_INPUT", "CONTEXT_GAP", "KEYBOARD"]
+        },
+        "prompt": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "sourceText": { "type": ["string", "null"] },
+        "translation": { "type": ["string", "null"] },
+        "example": { "type": ["string", "null"] },
+        "schemaVersion": { "type": "integer", "minimum": 1 },
+        "affectsSchedule": { "type": "boolean" },
+        "content": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "left", "right"],
+              "properties": {
+                "type": { "const": "MATCHING" },
+                "left": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/vocabularyPracticeCard" } },
+                "right": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/vocabularyPracticeCard" } }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "tokens"],
+              "properties": {
+                "type": { "const": "PHRASE_BUILDER" },
+                "tokens": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/vocabularyPracticeCard" } }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["type"],
+              "properties": {
+                "type": {
+                  "enum": ["FLASHCARD", "MEANING_CHOICE", "FORM_INPUT", "CONTEXT_GAP", "KEYBOARD"]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "vocabularyPracticeCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" }
       }
     }
   }

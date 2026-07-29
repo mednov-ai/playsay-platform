@@ -111,6 +111,16 @@ class AssignmentStore(
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.INVALID_REQUEST)
         }
         val teacherUserId = userProfileStore.currentUserId(authentication)
+        request.planId?.let { planId ->
+            assignmentRepo.findByTeacherUserIdAndPracticePlanId(teacherUserId, planId)?.let { existing ->
+                return teacherDetail(authentication, existing.id)
+            }
+        }
+        request.sourcePracticeId?.let { sourcePracticeId ->
+            assignmentRepo.findByTeacherUserIdAndSourceVocabularyPracticeId(teacherUserId, sourcePracticeId)?.let { existing ->
+                return teacherDetail(authentication, existing.id)
+            }
+        }
         val recipients = resolveRecipientUsers(request.studentSubjects)
         val recipientIds = recipients.map(AppUserEntity::id)
         val canAccessRecipients = if (request.sourcePracticeId == null) {
@@ -127,6 +137,8 @@ class AssignmentStore(
                 id = UUID.randomUUID(),
                 teacherUserId = teacherUserId,
                 contentKind = MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE,
+                practicePlanId = request.planId,
+                sourceVocabularyPracticeId = request.sourcePracticeId,
                 title = request.title.optionalClean("title", 160) ?: "Vocabulary practice",
                 instructions = request.instructions.optionalClean("instructions", 2_000),
                 type = MetaData.AssignmentTypes.HOMEWORK,
@@ -135,6 +147,8 @@ class AssignmentStore(
                         put("source", "vocabulary")
                         put("mode", request.mode)
                         put("wordLimit", request.wordLimit)
+                        request.planId?.let { planId -> put("planId", planId.toString()) }
+                        request.sourcePracticeId?.let { practiceId -> put("sourcePracticeId", practiceId.toString()) }
                     },
                 ),
                 dueAt = request.dueAt,
@@ -162,6 +176,31 @@ class AssignmentStore(
                 updatedAt = now,
             ),
         )
+        return teacherDetail(authentication, assignment.id)
+    }
+
+    @Transactional(readOnly = true)
+    fun findVocabularyHomeworkByPlan(
+        authentication: JwtAuthenticationToken,
+        planId: UUID,
+    ): TeacherAssignmentDetailResponse? {
+        authentication.requireAssignmentManager()
+        val teacherUserId = userProfileStore.currentUserId(authentication)
+        val assignment = assignmentRepo.findByTeacherUserIdAndPracticePlanId(teacherUserId, planId) ?: return null
+        return teacherDetail(authentication, assignment.id)
+    }
+
+    @Transactional(readOnly = true)
+    fun findVocabularyHomeworkBySourcePractice(
+        authentication: JwtAuthenticationToken,
+        sourcePracticeId: UUID,
+    ): TeacherAssignmentDetailResponse? {
+        authentication.requireAssignmentManager()
+        val teacherUserId = userProfileStore.currentUserId(authentication)
+        val assignment = assignmentRepo.findByTeacherUserIdAndSourceVocabularyPracticeId(
+            teacherUserId,
+            sourcePracticeId,
+        ) ?: return null
         return teacherDetail(authentication, assignment.id)
     }
 

@@ -28,6 +28,12 @@ data class MaterialSubmissionRow(
 
 interface AssignmentRepo : JpaRepository<AssignmentEntity, UUID> {
     fun findByTeacherUserId(teacherUserId: UUID): List<AssignmentEntity>
+    fun findByTeacherUserIdAndPracticePlanId(teacherUserId: UUID, practicePlanId: UUID): AssignmentEntity?
+    fun findByTeacherUserIdAndSourceVocabularyPracticeId(
+        teacherUserId: UUID,
+        sourceVocabularyPracticeId: UUID,
+    ): AssignmentEntity?
+
     fun findFirstByLessonIdAndMaterialIdAndMaterialBlockIdIsNullAndTypeOrderByCreatedAtAsc(
         lessonId: UUID,
         materialId: UUID,

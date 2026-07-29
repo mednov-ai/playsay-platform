@@ -1,4 +1,4 @@
-import { BookOpen, Clock3, Eye, Loader2, Users } from "lucide-react";
+import { BookOpen, Clock3, Eye, Loader2, PanelRight, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { canAssignLessons } from "../../../entities/workspace/model";
@@ -37,6 +37,7 @@ import { VocabularyLessonMenu } from "../../vocabulary/ui/VocabularyLessonMenu";
 import { VocabularyLiveStage } from "../../vocabulary/ui/VocabularyLiveStage";
 import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
+import { LessonActivityRail } from "./LessonActivityRail";
 
 export function LessonWorkspace({
   displayName,
@@ -90,6 +91,12 @@ export function LessonWorkspace({
   const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const [startingVocabularyPractice, setStartingVocabularyPractice] = useState(false);
+  const [activityRailOpen, setActivityRailOpen] = useState(() => (
+    vocabularyFeatures.personalPracticeV2
+    && typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia("(min-width: 1024px)").matches
+  ));
 
   async function startVocabularyPractice() {
     if (!canMonitorSubmissions || startingVocabularyPractice || session.participants.length === 0) return;
@@ -255,10 +262,23 @@ export function LessonWorkspace({
     <section className="playsay-workbench" data-presentation-mode={presentationMode}>
       {canMonitorSubmissions ? (
         <TeacherLessonToolbar
+          activityRailAction={vocabularyFeatures.personalPracticeV2 ? (
+            <Button
+              aria-expanded={activityRailOpen}
+              aria-label={t("classroom.activityRail.open")}
+              onClick={() => setActivityRailOpen((current) => !current)}
+              type="button"
+              variant="outline"
+            >
+              <PanelRight className="h-4 w-4" />
+              <span className="playsay-teacher-toolbar-action-label">{t("classroom.activityRail.open")}</span>
+            </Button>
+          ) : undefined}
           activeStudentSubject={activeParticipant?.subject ?? null}
           assigningMaterial={assigningMaterial}
           canManageMaterial={canManageMaterial}
           currentMaterialId={session.materialId}
+          compact={vocabularyFeatures.personalPracticeV2}
           materials={selectableMaterials}
           onAssignMaterial={() => void assignMaterial()}
           onSelectMaterial={setSelectedMaterialId}
@@ -319,6 +339,7 @@ export function LessonWorkspace({
         </header>
       )}
 
+      <div className="playsay-workbench-layout">
       <div className="playsay-workbench-body">
 
         {assignmentMessage ? (
@@ -352,6 +373,8 @@ export function LessonWorkspace({
             onPracticeChange={liveVocabulary.setPractice}
             practice={liveVocabulary.practice}
             profileSubject={profile?.subject}
+            selectedStudentSubject={activeParticipant?.subject}
+            teacherPlayerOnly={canMonitorSubmissions && vocabularyFeatures.personalPracticeV2}
           />
         ) : null}
 
@@ -468,6 +491,37 @@ export function LessonWorkspace({
           </>
         )}
         </div>
+      </div>
+      {canMonitorSubmissions && vocabularyFeatures.personalPracticeV2 ? (
+        <LessonActivityRail
+          assigningMaterial={assigningMaterial}
+          currentMaterialId={session.materialId}
+          lessonId={session.lessonId}
+          materials={selectableMaterials}
+          onAssignMaterial={() => void assignMaterial()}
+          onClose={() => setActivityRailOpen(false)}
+          onPracticeChange={(practice) => {
+            liveVocabulary.setPractice(practice);
+            if (practice) setActivityRailOpen(true);
+          }}
+          onSelectMaterial={setSelectedMaterialId}
+          onSelectStudent={selectStudentWork}
+          onUploadHtmlGamePage={(file) => void uploadHtmlGamePage(file)}
+          onUploadImagePage={(file) => void uploadImagePage(file)}
+          open={activityRailOpen}
+          owners={session.participants.map((participant) => ({
+            name: participant.displayName ?? participant.username ?? participant.subject,
+            presence: session.participantPresence[participant.subject] === "ONLINE" ? "PRESENT" : "ABSENT",
+            subject: participant.subject,
+            username: participant.username,
+          }))}
+          practice={liveVocabulary.practice}
+          selectedMaterialId={selectedMaterialId}
+          selectedStudentSubject={activeParticipant?.subject ?? null}
+          uploadingHtmlGamePage={uploadingHtmlGamePage}
+          uploadingImagePage={uploadingImagePage}
+        />
+      ) : null}
       </div>
     </section>
   );

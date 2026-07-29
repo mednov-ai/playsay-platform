@@ -2,10 +2,12 @@ package com.playsay.vocabulary.repo
 
 import com.playsay.vocabulary.dto.EntryStatus
 import com.playsay.vocabulary.entity.VocabularyEntryEntity
+import com.playsay.vocabulary.entity.VocabularyOccurrenceEntity
 import com.playsay.vocabulary.entity.VocabularyLessonAccessProjection
 import com.playsay.vocabulary.entity.VocabularyPracticeAttemptEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeItemEntity
+import com.playsay.vocabulary.entity.VocabularyPracticePlanEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeSessionEntity
 import com.playsay.vocabulary.entity.VocabularySkillStateEntity
 import com.playsay.vocabulary.entity.VocabularyIntegrationOutboxEntity
@@ -16,6 +18,8 @@ import com.playsay.vocabulary.dto.SessionStatus
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.domain.Pageable
 import jakarta.persistence.LockModeType
 import java.util.UUID
 import java.time.Instant
@@ -25,6 +29,15 @@ interface VocabularyEntryRepo : JpaRepository<VocabularyEntryEntity, UUID> {
     fun findByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguage(ownerSubject: String, normalizedSource: String, sourceLanguage: String, targetLanguage: String): VocabularyEntryEntity?
     fun findAllByOwnerSubjectAndStatusOrderByUpdatedAtDesc(ownerSubject: String, status: EntryStatus): List<VocabularyEntryEntity>
     fun findByIdAndOwnerSubject(id: UUID, ownerSubject: String): VocabularyEntryEntity?
+    fun findAllByOwnerSubjectInAndStatus(ownerSubjects: Collection<String>, status: EntryStatus): List<VocabularyEntryEntity>
+}
+
+interface VocabularyOccurrenceRepo : JpaRepository<VocabularyOccurrenceEntity, Long> {
+    @Query(
+        "select distinct occurrence.entry.id from VocabularyOccurrenceEntity occurrence " +
+            "where occurrence.entry.id in :entryIds and occurrence.lessonId = :lessonId",
+    )
+    fun findEntryIdsByLessonId(entryIds: Collection<UUID>, lessonId: UUID): List<UUID>
 }
 
 interface VocabularyUserRepo : JpaRepository<VocabularyUserProjection, UUID> {
@@ -156,7 +169,39 @@ interface VocabularyPracticeRepo : JpaRepository<VocabularyPracticeEntity, UUID>
     )
     fun findLivePracticesForClosedLessons(): List<VocabularyPracticeEntity>
 
+    @Modifying
+    @Query(
+        value = """
+            update vocabulary_practices
+               set settings_json = '{}'
+             where settings_json like concat('%', :subject, '%')
+        """,
+        nativeQuery = true,
+    )
+    fun clearSettingsContainingSubject(subject: String): Int
+
     fun deleteByCreatedBySubject(subject: String): Long
+}
+
+interface VocabularyPracticePlanRepo : JpaRepository<VocabularyPracticePlanEntity, UUID> {
+    fun findByIdAndCreatedBySubject(id: UUID, createdBySubject: String): VocabularyPracticePlanEntity?
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        "select plan from VocabularyPracticePlanEntity plan where plan.id = :id and plan.createdBySubject = :createdBySubject",
+    )
+    fun lockByIdAndCreatedBySubject(id: UUID, createdBySubject: String): VocabularyPracticePlanEntity?
+    fun deleteByExpiresAtBeforeAndPublishedPracticeIdIsNull(expiresAt: Instant): Long
+
+    @Modifying
+    @Query(
+        value = """
+            delete from vocabulary_practice_plans
+             where created_by_subject = :subject
+                or payload_json like concat('%"ownerSubject":"', :subject, '"%')
+        """,
+        nativeQuery = true,
+    )
+    fun deleteContainingSubject(subject: String): Int
 }
 
 interface VocabularyPracticeSessionRepo : JpaRepository<VocabularyPracticeSessionEntity, UUID> {
@@ -171,17 +216,35 @@ interface VocabularyPracticeSessionRepo : JpaRepository<VocabularyPracticeSessio
         statuses: Collection<SessionStatus>,
     ): VocabularyPracticeSessionEntity?
     fun findAllByOwnerSubjectOrderByUpdatedAtDesc(ownerSubject: String): List<VocabularyPracticeSessionEntity>
+    fun findAllByOwnerSubjectOrderByUpdatedAtDesc(ownerSubject: String, pageable: Pageable): List<VocabularyPracticeSessionEntity>
     fun deleteByOwnerSubject(ownerSubject: String): Long
 }
 
 interface VocabularyPracticeItemRepo : JpaRepository<VocabularyPracticeItemEntity, UUID> {
     fun findAllBySessionIdOrderByPositionAsc(sessionId: UUID): List<VocabularyPracticeItemEntity>
     fun findByIdAndSessionId(id: UUID, sessionId: UUID): VocabularyPracticeItemEntity?
+    fun findAllBySessionIdInOrderBySessionIdAscPositionAsc(sessionIds: Collection<UUID>): List<VocabularyPracticeItemEntity>
 }
 
 interface VocabularyPracticeAttemptRepo : JpaRepository<VocabularyPracticeAttemptEntity, UUID> {
     fun findByOwnerSubjectAndClientAttemptId(ownerSubject: String, clientAttemptId: String): VocabularyPracticeAttemptEntity?
     fun findAllBySessionIdOrderByCreatedAtAsc(sessionId: UUID): List<VocabularyPracticeAttemptEntity>
+    @Query(
+        """
+            select case when count(attempt) > 0 then true else false end
+              from VocabularyPracticeAttemptEntity attempt
+              join VocabularyPracticeItemEntity item on item.id = attempt.itemId
+             where attempt.sessionId = :sessionId
+               and item.entryId = :entryId
+               and item.skill = :skill
+               and attempt.scheduleCreditApplied = true
+        """,
+    )
+    fun hasScheduleCredit(
+        sessionId: UUID,
+        entryId: UUID,
+        skill: com.playsay.vocabulary.dto.VocabularySkill,
+    ): Boolean
     fun deleteByOwnerSubject(ownerSubject: String): Long
 }
 

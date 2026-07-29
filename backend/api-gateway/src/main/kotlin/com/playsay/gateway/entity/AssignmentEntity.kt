@@ -48,6 +48,10 @@ class AssignmentEntity(
     var contentKind: String = "MATERIAL",
     @Column(name = "activity_ref")
     var activityRef: UUID? = null,
+    @Column(name = "practice_plan_id")
+    var practicePlanId: UUID? = null,
+    @Column(name = "source_vocabulary_practice_id")
+    var sourceVocabularyPracticeId: UUID? = null,
     @Column(name = "title", nullable = false, length = 160)
     var title: String = "",
     @Column(name = "instructions", columnDefinition = "TEXT")

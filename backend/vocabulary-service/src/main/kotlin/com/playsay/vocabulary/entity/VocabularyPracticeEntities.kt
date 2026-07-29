@@ -63,6 +63,22 @@ class VocabularyPracticeEntity(
 )
 
 @Entity
+@Table(name = "vocabulary_practice_plans")
+class VocabularyPracticePlanEntity(
+    @Id var id: UUID = UUID.randomUUID(),
+    @Column(name = "created_by_subject", nullable = false, length = 255) var createdBySubject: String = "",
+    @Column(nullable = false) var revision: Long = 1,
+    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 24) var delivery: PracticeDelivery = PracticeDelivery.SELF,
+    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 24) var mode: PracticeMode = PracticeMode.BALANCED,
+    @Column(name = "lesson_id") var lessonId: UUID? = null,
+    @Column(name = "payload_json", nullable = false, columnDefinition = "TEXT") var payloadJson: String = "{}",
+    @Column(name = "expires_at", nullable = false) var expiresAt: Instant = Instant.now(),
+    @Column(name = "published_practice_id") var publishedPracticeId: UUID? = null,
+    @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.now(),
+    @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now(),
+)
+
+@Entity
 @Table(
     name = "vocabulary_practice_sessions",
     uniqueConstraints = [UniqueConstraint(name = "uq_vocabulary_practice_owner", columnNames = ["practice_id", "owner_subject"])],
@@ -103,6 +119,10 @@ class VocabularyPracticeItemEntity(
     @Column(nullable = false, columnDefinition = "TEXT") var prompt: String = "",
     @Column(nullable = false, columnDefinition = "TEXT") var answer: String = "",
     @Column(name = "options_json", nullable = false, columnDefinition = "TEXT") var optionsJson: String = "[]",
+    @Column(name = "schema_version", nullable = false) var schemaVersion: Int = 1,
+    @Column(name = "accepted_answers_json", nullable = false, columnDefinition = "TEXT") var acceptedAnswersJson: String = "[]",
+    @Column(name = "content_json", nullable = false, columnDefinition = "TEXT") var contentJson: String = "{}",
+    @Column(name = "affects_schedule", nullable = false) var affectsSchedule: Boolean = true,
     @Column(name = "snapshot_json", nullable = false, columnDefinition = "TEXT") var snapshotJson: String = "{}",
     @Column(name = "attempt_count", nullable = false) var attemptCount: Int = 0,
     @Column(name = "retry_after_sequence", nullable = false) var retryAfterSequence: Int = 0,
@@ -127,5 +147,6 @@ class VocabularyPracticeAttemptEntity(
     @Column(nullable = false) var correct: Boolean = false,
     @Column(name = "hints_used", nullable = false) var hintsUsed: Int = 0,
     @Column(name = "duration_ms", nullable = false) var durationMs: Long = 0,
+    @Column(name = "schedule_credit_applied", nullable = false) var scheduleCreditApplied: Boolean = false,
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.now(),
 )

@@ -5981,6 +5981,17 @@ components:
           format: uuid
           description: Completed LIVE practice whose unfinished immutable items must
             be continued at home
+        planId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: Immutable vocabulary preview plan to publish without regeneration
+        planRevision:
+          type:
+          - integer
+          - "null"
+          format: int64
       required:
       - excludedEntryIds
       - mode

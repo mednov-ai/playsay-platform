@@ -41,6 +41,8 @@ class VocabularyAssignmentClient(
                 pinnedEntryIds = request.pinnedEntryIds,
                 excludedEntryIds = request.excludedEntryIds,
                 sourcePracticeId = request.sourcePracticeId,
+                planId = request.planId,
+                planRevision = request.planRevision,
             ),
         )
         val httpRequest = HttpRequest.newBuilder(

@@ -1,4 +1,5 @@
 import { BookOpenCheck, ClipboardList, Loader2 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { AdminUserProfile, LessonMaterial, ScheduledLesson, VocabularyPracticeMode } from "../../../shared/api/playsay";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
@@ -37,6 +38,7 @@ export function HomeworkCreateForm({
   title,
   vocabularyMode,
   vocabularyWordLimit,
+  vocabularyComposer,
 }: {
   assignableMaterials: LessonMaterial[];
   contentKind: "MATERIAL" | "VOCABULARY_PRACTICE";
@@ -69,6 +71,7 @@ export function HomeworkCreateForm({
   title: string;
   vocabularyMode: VocabularyPracticeMode;
   vocabularyWordLimit: number;
+  vocabularyComposer?: ReactNode;
 }) {
   const { t } = useAppTranslation();
 
@@ -119,7 +122,7 @@ export function HomeworkCreateForm({
             </option>
           ))}
         </select>
-      </FormField> : (
+      </FormField> : !vocabularyFeatures.personalPracticeV2 ? (
         <div className="grid gap-3 rounded-2xl border border-primary/15 bg-[#fff7f0] p-3">
           <FormField label={t("homework.create.vocabularyMode")}>
             <select className="playsay-input" disabled={disabled || saving} onChange={(event) => setVocabularyMode(event.target.value as VocabularyPracticeMode)} value={vocabularyMode}>
@@ -133,7 +136,7 @@ export function HomeworkCreateForm({
             <span className="text-xs font-extrabold text-muted-foreground">{vocabularyWordLimit}</span>
           </FormField>
         </div>
-      )}
+      ) : null}
       <div className="grid gap-1 text-xs font-extrabold text-muted-foreground">
         <span>{t("homework.create.students")}</span>
         <div className="grid gap-2 rounded-2xl border border-border bg-white p-2">
@@ -183,10 +186,12 @@ export function HomeworkCreateForm({
           </div>
         </div>
       </div>
+      {contentKind === "VOCABULARY_PRACTICE" && vocabularyFeatures.personalPracticeV2 ? vocabularyComposer : (
       <Button disabled={disabled || saving} onClick={contentKind === "MATERIAL" ? onCreateStandaloneHomework : onCreateVocabularyHomework} type="button">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
         {contentKind === "MATERIAL" ? t("homework.create.assign") : t("homework.create.assignVocabulary")}
       </Button>
+      )}
       {contentKind === "MATERIAL" ? <div className="grid gap-2 border-t border-border pt-3">
         <FormField label={t("homework.create.lesson")}>
           <select

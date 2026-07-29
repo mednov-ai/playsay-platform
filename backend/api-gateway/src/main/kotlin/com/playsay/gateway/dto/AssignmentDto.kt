@@ -48,6 +48,10 @@ data class VocabularyHomeworkRequest(
     val excludedEntryIds: List<UUID> = emptyList(),
     @field:Schema(nullable = true, description = "Completed LIVE practice whose unfinished immutable items must be continued at home")
     val sourcePracticeId: UUID? = null,
+    @field:Schema(nullable = true, description = "Immutable vocabulary preview plan to publish without regeneration")
+    val planId: UUID? = null,
+    @field:Schema(nullable = true)
+    val planRevision: Long? = null,
 )
 
 data class AssignmentSummaryResponse(
@@ -166,6 +170,8 @@ data class VocabularyAssignmentPreparationRequest(
     val pinnedEntryIds: List<UUID>,
     val excludedEntryIds: List<UUID>,
     val sourcePracticeId: UUID?,
+    val planId: UUID?,
+    val planRevision: Long?,
 )
 
 data class VocabularyAssignmentSessionRef(

@@ -239,6 +239,17 @@ class RepositoryQueryCoverageTest @Autowired constructor(
             type = "MATERIAL_WORK",
             createdAt = now.minusSeconds(60),
         )
+        val practicePlanId = UUID.randomUUID()
+        val sourcePracticeId = UUID.randomUUID()
+        val vocabularyAssignment = assignment(
+            lesson = scheduledLesson,
+            material = material,
+            type = "HOMEWORK",
+            createdAt = now.minusSeconds(30),
+            teacher = teacher,
+            practicePlanId = practicePlanId,
+            sourcePracticeId = sourcePracticeId,
+        )
         assignment(
             lesson = scheduledLesson,
             material = material,
@@ -280,6 +291,14 @@ class RepositoryQueryCoverageTest @Autowired constructor(
                 material.id,
                 "MATERIAL_WORK",
             )?.id,
+        )
+        assertEquals(
+            vocabularyAssignment.id,
+            assignmentRepo.findByTeacherUserIdAndPracticePlanId(teacher.id, practicePlanId)?.id,
+        )
+        assertEquals(
+            vocabularyAssignment.id,
+            assignmentRepo.findByTeacherUserIdAndSourceVocabularyPracticeId(teacher.id, sourcePracticeId)?.id,
         )
         assertEquals(
             latestSubmission.id,
@@ -500,13 +519,19 @@ class RepositoryQueryCoverageTest @Autowired constructor(
         material: LessonMaterialEntity,
         type: String,
         createdAt: Instant,
+        teacher: AppUserEntity? = null,
+        practicePlanId: UUID? = null,
+        sourcePracticeId: UUID? = null,
     ): AssignmentEntity =
         assignmentRepo.saveAndFlush(
             AssignmentEntity(
                 id = UUID.randomUUID(),
                 lessonId = lesson.id,
+                teacherUserId = teacher?.id,
                 materialId = material.id,
                 materialBlockId = null,
+                practicePlanId = practicePlanId,
+                sourceVocabularyPracticeId = sourcePracticeId,
                 title = "Material work",
                 instructions = null,
                 type = type,

@@ -17,7 +17,21 @@ export function useLiveVocabularyPractice({
 }) {
   const [practice, setPractice] = useState<VocabularyPractice | null>(null);
   const practiceRef = useRef<VocabularyPractice | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const subscribedPracticeRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const subscribePractice = useCallback((practiceId: string | undefined) => {
+    const socket = socketRef.current;
+    if (
+      !practiceId
+      || !socket
+      || socket.readyState !== WebSocket.OPEN
+      || subscribedPracticeRef.current === practiceId
+    ) return;
+    socket.send(JSON.stringify({ type: "vocabulary.practice.subscribe", practiceId }));
+    subscribedPracticeRef.current = practiceId;
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!enabled) {
@@ -28,15 +42,18 @@ export function useLiveVocabularyPractice({
       const active = await fetchActiveVocabularyPractice(lessonId);
       practiceRef.current = active;
       setPractice(active);
+      subscribePractice(active?.id);
       return active;
     } finally {
       setLoading(false);
     }
-  }, [enabled, lessonId]);
+  }, [enabled, lessonId, subscribePractice]);
 
   useEffect(() => {
     if (!enabled) {
       practiceRef.current = null;
+      socketRef.current = null;
+      subscribedPracticeRef.current = null;
       setPractice(null);
       setLoading(false);
       return undefined;
@@ -50,14 +67,12 @@ export function useLiveVocabularyPractice({
       const nextSocket = await openVocabularySocket();
       if (stopped || !nextSocket) return;
       socket = nextSocket;
+      socketRef.current = nextSocket;
       nextSocket.onopen = () => {
         if (ownerSubject) {
           nextSocket.send(JSON.stringify({ type: "vocabulary.subscribe", ownerSubject, lessonId }));
         }
-        const activeId = active?.id ?? practiceRef.current?.id;
-        if (activeId) {
-          nextSocket.send(JSON.stringify({ type: "vocabulary.practice.subscribe", practiceId: activeId }));
-        }
+        subscribePractice(active?.id ?? practiceRef.current?.id);
       };
       nextSocket.onmessage = (event) => {
         let message: VocabularyRealtimeMessage;
@@ -69,13 +84,13 @@ export function useLiveVocabularyPractice({
         if (message.practice) {
           practiceRef.current = message.practice;
           setPractice(message.practice);
-          if (message.practiceId && message.practiceId !== active?.id) {
-            nextSocket.send(JSON.stringify({ type: "vocabulary.practice.subscribe", practiceId: message.practiceId }));
-          }
+          subscribePractice(message.practiceId ?? message.practice.id);
         }
       };
       nextSocket.onerror = () => nextSocket.close();
       nextSocket.onclose = () => {
+        if (socketRef.current === nextSocket) socketRef.current = null;
+        subscribedPracticeRef.current = null;
         if (stopped) return;
         reconnectTimer = window.setTimeout(() => { void connect(); }, 2_000);
       };
@@ -88,12 +103,15 @@ export function useLiveVocabularyPractice({
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       window.clearInterval(fallback);
       socket?.close();
+      socketRef.current = null;
+      subscribedPracticeRef.current = null;
     };
-  }, [enabled, lessonId, ownerSubject, refresh]);
+  }, [enabled, lessonId, ownerSubject, refresh, subscribePractice]);
 
   function update(next: VocabularyPractice | null) {
     practiceRef.current = next;
     setPractice(next);
+    subscribePractice(next?.id);
   }
 
   return { loading, practice, refresh, setPractice: update };

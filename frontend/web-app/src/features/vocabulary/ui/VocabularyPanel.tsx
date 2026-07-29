@@ -1,5 +1,6 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, ArrowLeft, BookOpen, CalendarClock, Loader2, Pause, Pencil, Play, Search, UserRound } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   archiveVocabularyEntry,
@@ -32,25 +33,15 @@ export function VocabularyPanel({ profile }: { profile: MeProfile | null }) {
 
 function TeacherVocabularyPanel() {
   const { t } = useAppTranslation();
-  const [learners, setLearners] = useState<VocabularyLearnerSummary[]>([]);
   const [selected, setSelected] = useState<VocabularyLearnerSummary | null>(null);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadLearners = useCallback(async (search = query) => {
-    setLoading(true);
-    setError(null);
-    try {
-      setLearners(await fetchVocabularyLearners(search));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("vocabulary.messages.loadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [query, t]);
-
-  useEffect(() => { void loadLearners(""); }, []);
+  const [submittedQuery, setSubmittedQuery] = useState("");
+  const learnersQuery = useQuery({
+    queryFn: ({ signal }) => fetchVocabularyLearners(submittedQuery, signal),
+    queryKey: ["vocabulary-learners", submittedQuery],
+    staleTime: 20_000,
+  });
+  const learners = learnersQuery.data ?? [];
 
   if (selected) {
     return (
@@ -58,7 +49,7 @@ function TeacherVocabularyPanel() {
         learner={selected}
         onBack={() => {
           setSelected(null);
-          void loadLearners();
+          void learnersQuery.refetch();
         }}
       />
     );
@@ -70,13 +61,19 @@ function TeacherVocabularyPanel() {
         <h1 className="flex items-center gap-2 text-2xl font-black"><BookOpen className="h-6 w-6 text-primary" />{t("vocabulary.teacher.title")}</h1>
         <p className="mt-1 text-sm font-semibold text-muted-foreground">{t("vocabulary.teacher.description")}</p>
       </header>
-      <form className="mt-5 flex gap-2" onSubmit={(event) => { event.preventDefault(); void loadLearners(); }}>
+      <form className="mt-5 flex gap-2" onSubmit={(event) => {
+        event.preventDefault();
+        if (submittedQuery === query.trim()) void learnersQuery.refetch();
+        else setSubmittedQuery(query.trim());
+      }}>
         <label className="sr-only" htmlFor="vocabulary-learner-search">{t("vocabulary.teacher.search")}</label>
         <input className="playsay-input min-w-0 flex-1" id="vocabulary-learner-search" onChange={(event) => setQuery(event.target.value)} placeholder={t("vocabulary.teacher.search")} value={query} />
         <Button aria-label={t("vocabulary.actions.search")} type="submit" variant="outline"><Search className="h-4 w-4" /></Button>
       </form>
-      {loading ? <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-primary" /> : error ? (
-        <p className="mt-6 rounded-2xl border border-destructive/25 bg-destructive/5 p-4 font-semibold text-destructive">{error}</p>
+      {learnersQuery.isPending ? <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-primary" /> : learnersQuery.isError ? (
+        <p className="mt-6 rounded-2xl border border-destructive/25 bg-destructive/5 p-4 font-semibold text-destructive">
+          {learnersQuery.error instanceof Error ? learnersQuery.error.message : t("vocabulary.messages.loadFailed")}
+        </p>
       ) : learners.length === 0 ? (
         <p className="mt-8 text-center font-semibold text-muted-foreground">{t("vocabulary.teacher.empty")}</p>
       ) : (
@@ -84,6 +81,7 @@ function TeacherVocabularyPanel() {
           {learners.map((learner) => (
             <button className="rounded-2xl border border-border bg-background p-4 text-left transition hover:border-primary/40 hover:shadow-sm" key={learner.ownerSubject} onClick={() => setSelected(learner)} type="button">
               <span className="flex items-center gap-2 text-lg font-black"><UserRound className="h-5 w-5 text-primary" />{learner.ownerName}</span>
+              {learner.ownerUsername ? <span className="mt-1 block text-xs font-bold text-muted-foreground">@{learner.ownerUsername}</span> : null}
               <span className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <Metric value={learner.dueCount} label={t("vocabulary.stats.due")} tone="primary" />
                 <Metric value={learner.learningCount} label={t("vocabulary.stats.learning")} />
@@ -115,29 +113,28 @@ function VocabularyOwnerWorkspace({
   onBack: () => void;
 }) {
   const { t } = useAppTranslation();
-  const [dashboard, setDashboard] = useState<VocabularyDashboard | null>(null);
-  const [history, setHistory] = useState<VocabularyPracticeSession[]>([]);
-  const [tab, setTab] = useState<"WORDS" | "HISTORY">("WORDS");
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<EntryFilter>("ALL");
   const [query, setQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [nextDashboard, nextHistory] = await Promise.all([
-        fetchVocabularyDashboard(learner.ownerSubject, query),
-        fetchVocabularyPracticeHistory(learner.ownerSubject),
-      ]);
-      setDashboard(nextDashboard);
-      setHistory(nextHistory);
-    } finally {
-      setLoading(false);
-    }
-  }, [learner.ownerSubject, query]);
-
-  useEffect(() => { void load(); }, [learner.ownerSubject]);
+  const dashboardKey = ["vocabulary-dashboard", learner.ownerSubject, submittedQuery] as const;
+  const historyKey = ["vocabulary-history", learner.ownerSubject] as const;
+  const dashboardQuery = useQuery({
+    queryFn: ({ signal }) => fetchVocabularyDashboard(learner.ownerSubject, submittedQuery, undefined, signal),
+    queryKey: dashboardKey,
+  });
+  const historyQuery = useQuery({
+    queryFn: ({ signal }) => fetchVocabularyPracticeHistory(learner.ownerSubject, undefined, signal),
+    queryKey: historyKey,
+  });
+  const dashboard = dashboardQuery.data ?? null;
+  const history = historyQuery.data ?? [];
+  function refreshOwner() {
+    void queryClient.invalidateQueries({ queryKey: ["vocabulary-dashboard", learner.ownerSubject] });
+    void queryClient.invalidateQueries({ queryKey: historyKey });
+    void queryClient.invalidateQueries({ queryKey: ["vocabulary-learners"] });
+  }
 
   const entries = useMemo(() => dashboard?.entries.filter((item) => {
     if (filter === "ALL") return true;
@@ -153,14 +150,13 @@ function VocabularyOwnerWorkspace({
           <Button aria-label={t("vocabulary.practice.actions.back")} onClick={onBack} type="button" variant="outline"><ArrowLeft className="h-4 w-4" /></Button>
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-black">{learner.ownerName}</h1>
-            <p className="text-sm font-semibold text-muted-foreground">{t("vocabulary.teacher.studentVocabulary")}</p>
+            <p className="text-sm font-semibold text-muted-foreground">
+              {learner.ownerUsername ? `@${learner.ownerUsername} · ` : ""}{t("vocabulary.teacher.studentVocabulary")}
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <VocabularyQuickAdd source={{ sourceType: "MANUAL", ownerSubject: learner.ownerSubject }}><span /></VocabularyQuickAdd>
-          {vocabularyFeatures.homework ? (
-            <Button onClick={() => setDrawerOpen(true)} type="button"><Play className="h-4 w-4" />{t("vocabulary.practice.create")}</Button>
-          ) : null}
         </div>
       </header>
 
@@ -170,40 +166,45 @@ function VocabularyOwnerWorkspace({
         <Metric value={dashboard?.masteredCount ?? learner.masteredCount} label={t("vocabulary.stats.mastered")} />
       </div>
 
-      <div className="mt-5 flex gap-2 border-b border-border pb-3">
-        {(["WORDS", "HISTORY"] as const).map((value) => (
-          <Button key={value} onClick={() => setTab(value)} type="button" variant={tab === value ? "default" : "outline"}>
-            {value === "HISTORY" ? t("vocabulary.teacher.practiceTab") : t("vocabulary.tabs.WORDS")}
-          </Button>
-        ))}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/15 bg-[#fff7f0] p-4">
+        <div>
+          <strong>{t("vocabulary.practice.builder.compactRecommendation", { count: dashboard?.dueCount ?? learner.dueCount })}</strong>
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">{t("vocabulary.practice.builder.suggestionHint")}</p>
+        </div>
+        {vocabularyFeatures.homework ? (
+          <Button onClick={() => setDrawerOpen(true)} type="button"><Play className="h-4 w-4" />{t("vocabulary.practice.create")}</Button>
+        ) : null}
       </div>
 
-      {tab === "WORDS" ? (
-        <>
-          <form className="mt-4 flex gap-2" onSubmit={(event) => { event.preventDefault(); void load(); }}>
-            <input className="playsay-input min-w-0 flex-1" onChange={(event) => setQuery(event.target.value)} placeholder={t("vocabulary.search")} value={query} />
-            <Button aria-label={t("vocabulary.actions.search")} type="submit" variant="outline"><Search className="h-4 w-4" /></Button>
-          </form>
-          <div className="mt-3 flex flex-wrap gap-2 pb-1">
-            {(["ALL", "NEW", "LEARNING", "REVIEW", "MASTERED", "PAUSED", "MISSING"] as EntryFilter[]).map((value) => (
-              <Button className="shrink-0" key={value} onClick={() => setFilter(value)} type="button" variant={filter === value ? "default" : "outline"}>{t(`vocabulary.filters.${value}`)}</Button>
-            ))}
-          </div>
-          {loading ? <Loader2 className="mx-auto mt-8 h-6 w-6 animate-spin text-primary" /> : (
-            <VocabularyWordGrid dashboard={dashboard} entries={entries} onChanged={() => void load()} />
-          )}
-        </>
-      ) : (
-        <VocabularyHistory sessions={history} />
+      <form className="mt-5 flex gap-2 border-t border-border pt-4" onSubmit={(event) => {
+        event.preventDefault();
+        if (submittedQuery === query.trim()) void dashboardQuery.refetch();
+        else setSubmittedQuery(query.trim());
+      }}>
+        <input className="playsay-input min-w-0 flex-1" onChange={(event) => setQuery(event.target.value)} placeholder={t("vocabulary.search")} value={query} />
+        <Button aria-label={t("vocabulary.actions.search")} type="submit" variant="outline"><Search className="h-4 w-4" /></Button>
+      </form>
+      <div className="mt-3 flex flex-wrap gap-2 pb-1">
+        {(["ALL", "NEW", "LEARNING", "REVIEW", "MASTERED", "PAUSED", "MISSING"] as EntryFilter[]).map((value) => (
+          <Button className="shrink-0" key={value} onClick={() => setFilter(value)} type="button" variant={filter === value ? "default" : "outline"}>{t(`vocabulary.filters.${value}`)}</Button>
+        ))}
+      </div>
+      {dashboardQuery.isPending ? <Loader2 className="mx-auto mt-8 h-6 w-6 animate-spin text-primary" /> : (
+        <VocabularyWordGrid dashboard={dashboard} entries={entries} onChanged={refreshOwner} />
       )}
+      <details className="mt-6 rounded-2xl border border-border bg-background p-4">
+        <summary className="cursor-pointer font-black">{t("vocabulary.teacher.practiceTab")}</summary>
+        <VocabularyHistory sessions={history} />
+      </details>
 
       {vocabularyFeatures.homework ? (
         <VocabularyPracticeDrawer
           onClose={() => setDrawerOpen(false)}
-          onCreated={() => void load()}
+          onCreated={refreshOwner}
           open={drawerOpen}
           ownerName={learner.ownerName}
           ownerSubject={learner.ownerSubject}
+          ownerUsername={learner.ownerUsername}
         />
       ) : null}
     </section>
@@ -212,27 +213,25 @@ function VocabularyOwnerWorkspace({
 
 function StudentVocabularyPanel() {
   const { t } = useAppTranslation();
-  const [dashboard, setDashboard] = useState<VocabularyDashboard | null>(null);
-  const [history, setHistory] = useState<VocabularyPracticeSession[]>([]);
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<VocabularyTab>(vocabularyFeatures.practice ? "TODAY" : "WORDS");
   const [session, setSession] = useState<VocabularyPracticeSession | null>(null);
-  const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const dashboardQuery = useQuery({
+    queryFn: ({ signal }) => fetchVocabularyDashboard(undefined, "", undefined, signal),
+    queryKey: ["vocabulary-dashboard", "self"],
+  });
+  const historyQuery = useQuery({
+    queryFn: ({ signal }) => fetchVocabularyPracticeHistory(undefined, undefined, signal),
+    queryKey: ["vocabulary-history", "self"],
+  });
+  const dashboard = dashboardQuery.data ?? null;
+  const history = historyQuery.data ?? [];
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [nextDashboard, nextHistory] = await Promise.all([
-        fetchVocabularyDashboard(),
-        fetchVocabularyPracticeHistory(),
-      ]);
-      setDashboard(nextDashboard);
-      setHistory(nextHistory);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-  useEffect(() => { void load(); }, []);
+  function refreshSelf() {
+    void queryClient.invalidateQueries({ queryKey: ["vocabulary-dashboard", "self"] });
+    void queryClient.invalidateQueries({ queryKey: ["vocabulary-history", "self"] });
+  }
 
   async function startToday() {
     setStarting(true);
@@ -248,7 +247,7 @@ function StudentVocabularyPanel() {
   if (session) {
     return (
       <section>
-        <Button className="mb-3" onClick={() => { setSession(null); void load(); }} type="button" variant="outline"><ArrowLeft className="h-4 w-4" />{t("vocabulary.practice.actions.back")}</Button>
+        <Button className="mb-3" onClick={() => { setSession(null); refreshSelf(); }} type="button" variant="outline"><ArrowLeft className="h-4 w-4" />{t("vocabulary.practice.actions.back")}</Button>
         <VocabularyPracticePlayer initialSession={session} onSessionChange={setSession} />
       </section>
     );
@@ -270,7 +269,7 @@ function StudentVocabularyPanel() {
           <Button className="shrink-0" key={value} onClick={() => setTab(value)} type="button" variant={tab === value ? "default" : "outline"}>{t(`vocabulary.tabs.${value}`)}</Button>
           ))}
       </div>
-      {loading ? <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-primary" /> : tab === "TODAY" ? (
+      {dashboardQuery.isPending || historyQuery.isPending ? <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-primary" /> : tab === "TODAY" ? (
         <div className="mx-auto mt-6 max-w-2xl rounded-3xl border border-primary/20 bg-[#fff7f0] p-6 text-center">
           <CalendarClock className="mx-auto h-8 w-8 text-primary" />
           <h2 className="mt-3 text-2xl font-black">{t("vocabulary.today.title")}</h2>
@@ -289,9 +288,12 @@ function StudentVocabularyPanel() {
           </Button>
         </div>
       ) : tab === "WORDS" ? (
-        <VocabularyWordGrid dashboard={dashboard} entries={dashboard?.entries ?? []} onChanged={() => void load()} />
+        <VocabularyWordGrid dashboard={dashboard} entries={dashboard?.entries ?? []} onChanged={refreshSelf} />
       ) : (
-        <VocabularyHistory sessions={history} />
+        <VocabularyHistory
+          onContinue={(historySession) => setSession(historySession)}
+          sessions={history}
+        />
       )}
     </section>
   );
@@ -308,9 +310,18 @@ function VocabularyWordGrid({
 }) {
   const { t } = useAppTranslation();
   const [editingEntry, setEditingEntry] = useState<VocabularyEntry | null>(null);
+  const [archivedEntry, setArchivedEntry] = useState<VocabularyEntry | null>(null);
   if (!dashboard || entries.length === 0) return <p className="mt-8 text-center font-semibold text-muted-foreground">{t("vocabulary.empty")}</p>;
   return (
     <>
+      {archivedEntry ? (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-[#fff7f0] p-3 text-sm font-bold">
+          <span>{t("vocabulary.archive.done", { word: archivedEntry.sourceText })}</span>
+          <Button className="min-h-9 px-3 py-1.5 text-sm" onClick={async () => { await updateVocabularyEntry(archivedEntry.id, { status: "ACTIVE" }); setArchivedEntry(null); onChanged(); }} type="button" variant="outline">
+            {t("common.actions.undo")}
+          </Button>
+        </div>
+      ) : null}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {entries.map(({ entry, stage, overdue }) => (
         <article className="rounded-2xl border border-border bg-background p-4" key={entry.id}>
@@ -322,6 +333,12 @@ function VocabularyWordGrid({
             <span className={`rounded-full px-2 py-1 text-[0.68rem] font-black ${overdue ? "bg-[#fff0e7] text-primary" : "bg-muted text-muted-foreground"}`}>{t(`vocabulary.stage.${stage}`)}</span>
           </div>
           {entry.example ? <p className="mt-3 text-sm text-muted-foreground">{entry.example}</p> : null}
+          {!entry.translation || !hasExactExample(entry) ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {!entry.translation ? <span className="rounded-full bg-[#fff0ed] px-2 py-1 text-xs font-black text-[#a52a20]">{t("vocabulary.readiness.noTranslation")}</span> : null}
+              {!hasExactExample(entry) ? <span className="rounded-full bg-[#fff7e5] px-2 py-1 text-xs font-black text-[#8a5b17]">{t("vocabulary.readiness.noExample")}</span> : null}
+            </div>
+          ) : null}
           <div className="mt-3 flex justify-end gap-2">
             <Button aria-label={t("vocabulary.actions.edit")} onClick={() => setEditingEntry(entry)} type="button" variant="outline"><Pencil className="h-4 w-4" /></Button>
             <Button
@@ -335,7 +352,19 @@ function VocabularyWordGrid({
             >
               {entry.practicePaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
             </Button>
-            <Button aria-label={t("vocabulary.actions.archive")} onClick={async () => { await archiveVocabularyEntry(entry.id); onChanged(); }} type="button" variant="outline"><Archive className="h-4 w-4" /></Button>
+            <Button
+              aria-label={t("vocabulary.actions.archive")}
+              onClick={async () => {
+                if (!window.confirm(t("vocabulary.archive.confirm", { word: entry.sourceText }))) return;
+                await archiveVocabularyEntry(entry.id);
+                setArchivedEntry(entry);
+                onChanged();
+              }}
+              type="button"
+              variant="outline"
+            >
+              <Archive className="h-4 w-4" />
+            </Button>
           </div>
         </article>
         ))}
@@ -345,7 +374,24 @@ function VocabularyWordGrid({
   );
 }
 
-function VocabularyHistory({ sessions }: { sessions: VocabularyPracticeSession[] }) {
+function hasExactExample(entry: VocabularyEntry): boolean {
+  const source = entry.sourceText.trim().toLocaleLowerCase();
+  const example = entry.example?.trim().toLocaleLowerCase() ?? "";
+  if (!source || !example) return false;
+  const index = example.indexOf(source);
+  if (index < 0) return false;
+  const before = example[index - 1];
+  const after = example[index + source.length];
+  return (!before || /[^\p{L}\p{N}'’-]/u.test(before)) && (!after || /[^\p{L}\p{N}'’-]/u.test(after));
+}
+
+function VocabularyHistory({
+  onContinue,
+  sessions,
+}: {
+  onContinue?: (session: VocabularyPracticeSession) => void;
+  sessions: VocabularyPracticeSession[];
+}) {
   const { t } = useAppTranslation();
   if (sessions.length === 0) return <p className="mt-8 text-center font-semibold text-muted-foreground">{t("vocabulary.history.empty")}</p>;
   return (
@@ -353,12 +399,21 @@ function VocabularyHistory({ sessions }: { sessions: VocabularyPracticeSession[]
       {sessions.map((session) => (
         <article className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-background p-4" key={session.id}>
           <div>
-            <strong>{t(`vocabulary.sessionStatus.${session.status}`)}</strong>
-            <p className="text-sm font-semibold text-muted-foreground">{formatVocabularyDate(session.updatedAt)}</p>
+            <strong>{session.delivery ? t(`vocabulary.history.delivery.${session.delivery}`) : t(`vocabulary.sessionStatus.${session.status}`)}</strong>
+            <p className="text-sm font-semibold text-muted-foreground">
+              {session.mode ? `${t(`vocabulary.practice.mode.${session.mode}`)} · ` : ""}{formatVocabularyDate(session.updatedAt)}
+            </p>
           </div>
-          <span className="rounded-full bg-muted px-3 py-1 text-sm font-black">
-            {session.completedItems}/{session.totalItems} · {session.accuracy === null || session.accuracy === undefined ? "—" : `${Math.round(session.accuracy * 100)}%`}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-muted px-3 py-1 text-sm font-black">
+              {session.completedItems}/{session.totalItems} · {session.accuracy === null || session.accuracy === undefined ? "—" : `${Math.round(session.accuracy * 100)}%`}
+            </span>
+            {onContinue && session.status !== "COMPLETED" && session.status !== "CANCELLED" ? (
+              <Button className="min-h-9 px-3 py-1.5 text-sm" onClick={() => onContinue(session)} type="button" variant="outline">
+                <Play className="h-4 w-4" />{t("vocabulary.history.continue")}
+              </Button>
+            ) : null}
+          </div>
         </article>
       ))}
     </div>

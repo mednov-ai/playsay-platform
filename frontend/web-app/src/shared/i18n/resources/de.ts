@@ -7,6 +7,7 @@ export const de = {
       refresh: "Aktualisieren",
       reset: "Zurücksetzen",
       save: "Speichern",
+      undo: "Rückgängig",
     },
     status: {
       loading: "Laden...",
@@ -348,10 +349,12 @@ export const de = {
     stage: { NEW: "neu", LEARNING: "lernen", REVIEW: "wiederholen", MASTERED: "gelernt" },
     sessionStatus: { NOT_STARTED: "Nicht begonnen", IN_PROGRESS: "In Arbeit", PAUSED: "Pausiert", COMPLETED: "Fertig", CANCELLED: "Abgebrochen" },
     today: { title: "Heute", ready: "{{count}} Wörter sind fällig", empty: "Nichts ist fällig — eine Kontrollrunde ist möglich.", start: "Übung starten" },
-    history: { empty: "Noch keine abgeschlossenen Übungen." },
+    history: { empty: "Noch keine Übungen.", continue: "Fortsetzen", delivery: { SELF: "Selbstständig", HOMEWORK: "Hausaufgabe", LIVE: "Unterricht" } },
     lessonMenu: { label: "Wörterbuch", open: "Wörterbuch öffnen", add: "Wort hinzufügen", recent: "Letzte Wörter", practice: "Übung starten", back: "Zurück zu den Wörterbuchaktionen", empty: "Noch keine Wörter aus dieser Stunde.", loadFailed: "Letzte Wörter konnten nicht geladen werden.", reconnecting: "Verbindung wird wiederhergestellt" },
     quickAdd: { title: "Zum Wörterbuch hinzufügen" }, editDialog: { title: "Karte bearbeiten", partOfSpeech: "Wortart", example: "Beispiel mit genauer Form", exampleTranslation: "Beispielübersetzung" }, variants: { title: "Übersetzungs- und Verwendungsvarianten" }, fields: { word: "Wort oder Ausdruck", translation: "Ausgewählte Übersetzung", aiInstruction: "Präzisierung für die KI", aiInstructionPlaceholder: "Zum Beispiel: Bedeutung für Reisen oder Verwendung als Verb", allParticipants: "Für alle Teilnehmenden hinzufügen" },
     actions: { add: "Hinzufügen", suggest: "Übersetzung vorschlagen", regenerate: "Andere Varianten", save: "Speichern", edit: "Bearbeiten", search: "Suchen", archive: "Archivieren", pause: "Wiederholung pausieren", resume: "Wiederholung fortsetzen" },
+    archive: { confirm: "„{{word}}“ archivieren?", done: "„{{word}}“ wurde archiviert." },
+    readiness: { noTranslation: "Übersetzung fehlt", noExample: "Kein genaues Beispiel" },
     messages: { translating: "Die KI sucht automatisch Übersetzungen und Beispiele…", saved: "Wort gespeichert.", saveFailed: "Wort konnte nicht gespeichert werden.", loadFailed: "Wörterbücher konnten nicht geladen werden.", translationUnavailable: "Der Übersetzer ist nicht verfügbar — bitte manuell eingeben." },
     practice: {
       create: "Übung erstellen", homeworkTitle: "Wörter · {{name}}", progress: "{{current}} von {{total}}", answerLabel: "Deine Antwort", answerPlaceholder: "Antwort eingeben", teacherHint: "Hinweis der Lehrkraft: {{hint}}",
@@ -360,12 +363,17 @@ export const de = {
       rating: { AGAIN: "Nicht gewusst", HARD: "Mit Mühe", GOOD: "Gewusst" },
       feedback: { correct: "Richtig", again: "Dieses Wort kommt noch einmal", answer: "Richtige Antwort:" },
       complete: { title: "Übung beendet", result: "{{correct}} von {{total}} richtig" },
-      phrase: { placeholder: "Wörter der Reihe nach antippen", reset: "Neu beginnen" }, keyHint: "Key öffnet separat; der Unterricht bleibt verbunden.",
+      phrase: { placeholder: "Wörter der Reihe nach antippen", reset: "Neu beginnen", remove: "{{word}} entfernen" },
+      matching: { label: "Wörter und Übersetzungen zuordnen", connect: "Auswahl verbinden", remove: "Paar {{left}} — {{right}} entfernen" },
+      keyHint: "Key öffnet separat; der Unterricht bleibt verbunden.",
       mode: { QUICK: "Kurz", BALANCED: "Ausgewogen", WRITING: "Mehr Schreiben", KEYBOARD: "Key" },
-      builder: { eyebrow: "Persönliche Übung", title: "Übung erstellen", suggestion: "{{words}} Wörter · ca. {{minutes}} Min.", suggestionHint: "Fällige, zugewiesene und neue Wörter.", words: "Wörter", wordLimit: "Wortanzahl", pin: "Wort anheften", exclude: "Wort ausschließen", mode: "Modus", delivery: "Zustellung", homeworkDelivery: "Erscheint in Hausaufgaben, sobald alle Sets bereit sind.", publish: "Als Hausaufgabe geben" },
+      builder: { eyebrow: "Persönliche Übung", title: "Übung erstellen", suggestion: "{{words}} Wörter · ca. {{minutes}} Min.", suggestionHint: "Fällige, zugewiesene und neue Wörter.", compactRecommendation: "{{count}} zur Wiederholung", words: "Wörter", wordLimit: "Wortanzahl", pin: "Wort anheften", exclude: "Wort ausschließen", mode: "Modus", delivery: "Zustellung", homeworkDelivery: "Erscheint in Hausaufgaben, sobald alle Sets bereit sind.", publish: "Als Hausaufgabe geben" },
+      composer: { recommendation: "{{words}} Wörter · {{items}} Aufgaben · ca. {{minutes}} Min.", groupRecommendation: "Bis {{words}} Wörter · {{items}} Aufgaben · ca. {{minutes}} Min. pro Person", snapshot: "Das veröffentlichte Set entspricht dieser Vorschau", learners: "Lernende", absent: "Nicht verbunden", composition: "Trainingsinhalt", added: "Von der Lehrkraft ergänzt", excluded: "Ausgeschlossen", word: "Wort", search: "Weiteres Wort suchen", settings: "Anzahl und Modus", previewTasks: "Erste Aufgaben", matchingPrompt: "Mehrere Wort-Übersetzungs-Paare", startNow: "Jetzt starten" },
+      reason: { OVERDUE: "Überfällig", PINNED: "Angeheftet", DUE_TODAY: "Heute fällig", RECENT_LESSON: "Aus der Stunde", NEW: "Neu", CONTROL_REVIEW: "Kontrollwiederholung" },
+      warning: { MISSING_TRANSLATION: "Übersetzung fehlt", MISSING_EXACT_EXAMPLE: "Kontextaufgabe nicht möglich: genaues Beispiel ergänzen", INSUFFICIENT_DISTRACTORS: "Eingabe ersetzt die Auswahl" },
       errors: { preview: "Vorschlag konnte nicht erstellt werden.", publish: "Übung konnte nicht zugewiesen werden.", save: "Antwort konnte nicht gespeichert werden." },
     },
-    live: { eyebrow: "Unterrichtsphase", title: "Persönliches Worttraining", completed: "{{completed}} von {{total}} fertig", studentProgress: "{{completed}}/{{total}} · Genauigkeit {{accuracy}}", pause: "Pause", resume: "Weiter", stop: "Beenden", giveHint: "Hinweis geben", requestHelp: "Ich brauche Hilfe", helpRequested: "Braucht Hilfe", pausedForStudent: "Die Lehrkraft hat das Training pausiert.", continueHome: "Zu Hause fortsetzen", continuedHome: "Als Hausaufgabe hinzugefügt", returnToLesson: "Zurück zum Unterricht", homeworkTitle: "Wortschatztraining fortsetzen", joining: "Persönliche Aufgabe wird geöffnet…" },
+    live: { eyebrow: "Unterrichtsphase", title: "Persönliches Worttraining", supervision: "Trainingsfortschritt", completed: "{{completed}} von {{total}} fertig", studentProgress: "{{completed}}/{{total}} · Genauigkeit {{accuracy}}", pause: "Pause", resume: "Weiter", stop: "Beenden", giveHint: "Hinweis geben", requestHelp: "Ich brauche Hilfe", helpRequested: "Braucht Hilfe", pausedForStudent: "Die Lehrkraft hat das Training pausiert.", continueHome: "Zu Hause fortsetzen", continuedHome: "Als Hausaufgabe hinzugefügt", returnToLesson: "Zurück zum Unterricht", homeworkTitle: "Wortschatztraining fortsetzen", joining: "Persönliche Aufgabe wird geöffnet…" },
   },
   aiTutor: {
     eyebrow: "Selbstständiges Üben", title: "Gespräch mit einem KI-Tutor", subtitle: "Wähle Thema, Stimme und Korrekturhäufigkeit.",
@@ -698,7 +706,9 @@ export const de = {
       groupOnly: "Der Indikator wird nur für Gruppen angezeigt.",
       notStarted: "noch nicht geöffnet",
       vocabulary: "{{progress}} % · Genauigkeit {{accuracy}}",
+      vocabularyDetail: "{{state}} · schwierige Wörter: {{difficult}}",
     },
+    activityState: { NOT_STARTED: "nicht begonnen", IN_PROGRESS: "in Bearbeitung", COMPLETED: "abgeschlossen", FAILED: "Fehler" },
     studentStatus: {
       notStarted: "Nicht begonnen",
       draft: "Entwurf",
@@ -714,6 +724,7 @@ export const de = {
       resubmit: "Erneut abgeben",
       submitting: "Wird abgegeben...",
       retrySave: "Erneut versuchen",
+      openVocabularyResult: "Ergebnis",
     },
     submission: {
       draft: "Entwurf nicht abgegeben",
@@ -1334,6 +1345,7 @@ export const de = {
   classroom: {
     live: "Live",
     participantFallback: "Teilnehmer",
+    activityRail: { aria: "Materialien und Einzelaufgaben", title: "Unterrichtsaktivitäten", open: "Aufgaben öffnen", materials: "Materialien", personal: "Individuell" },
     presence: {
       offline: "Noch nicht verbunden",
       online: "Online",

@@ -75,7 +75,9 @@ class VocabularyPracticeController(
         auth: JwtAuthenticationToken,
         @RequestParam(required = false) ownerSubject: String?,
         @RequestParam(required = false) lessonId: UUID?,
-    ) = practice.history(auth.token.subject, ownerSubject, lessonId)
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "25") size: Int,
+    ) = practice.history(auth.token.subject, ownerSubject, lessonId, page, size)
 
     @GetMapping("/practice-sessions/{sessionId}")
     fun session(
@@ -90,6 +92,13 @@ class VocabularyPracticeController(
         @PathVariable sessionId: UUID,
         @Valid @RequestBody request: VocabularyAttemptRequest,
     ) = practice.attempt(auth.token.subject, sessionId, request)
+
+    @PostMapping("/practice-sessions/{sessionId}/items/{itemId}/reveal")
+    fun reveal(
+        auth: JwtAuthenticationToken,
+        @PathVariable sessionId: UUID,
+        @PathVariable itemId: UUID,
+    ) = practice.reveal(auth.token.subject, sessionId, itemId)
 
     @PostMapping("/practice-sessions/{sessionId}/hint")
     fun giveHint(

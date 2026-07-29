@@ -1212,6 +1212,17 @@
   justify-content: end;
 }
 
+.playsay-teacher-toolbar[data-compact="true"][data-has-target="true"] {
+  grid-template-areas: "target actions";
+  grid-template-columns: minmax(9rem, 1fr) auto;
+}
+
+.playsay-teacher-toolbar[data-compact="true"][data-has-target="false"] {
+  grid-template-areas: "actions";
+  grid-template-columns: auto;
+  justify-content: end;
+}
+
 .playsay-teacher-toolbar-target {
   display: grid;
   min-width: 0;
@@ -1603,13 +1614,92 @@
   }
 }
 
+.playsay-workbench-layout {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
 .playsay-workbench-body {
   display: flex;
   min-height: 0;
   flex: 1 1 auto;
+  min-width: 0;
   flex-direction: column;
   gap: 0.625rem;
   padding: 0.75rem 0.875rem 0.75rem;
+}
+
+.playsay-activity-rail {
+  display: none;
+  width: 22rem;
+  min-width: 22rem;
+  min-height: 0;
+  flex-direction: column;
+  border-left: 1px solid hsl(var(--border));
+  background: #fffdfa;
+  box-shadow: -10px 0 28px rgb(43 28 17 / 0.06);
+}
+
+.playsay-activity-rail[data-open="true"] {
+  display: flex;
+}
+
+.playsay-activity-rail > div:last-child {
+  min-height: 0;
+}
+
+.playsay-activity-rail button[data-active="true"] {
+  border-color: hsl(var(--primary) / 0.45);
+  background: hsl(var(--primary) / 0.055);
+}
+
+.playsay-activity-rail-backdrop {
+  display: none;
+}
+
+@media (max-width: 64rem) {
+  .playsay-activity-rail-backdrop {
+    position: fixed;
+    z-index: 79;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgb(17 17 17 / 0.34);
+  }
+
+  .playsay-activity-rail {
+    position: fixed;
+    z-index: 80;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(28rem, 100vw);
+    min-width: 0;
+    transform: translateX(100%);
+    transition: transform 180ms ease;
+  }
+
+  .playsay-activity-rail[data-open="true"] {
+    display: flex;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 40rem) {
+  .playsay-activity-rail {
+    top: auto;
+    width: 100vw;
+    height: min(88dvh, 48rem);
+    border-top: 1px solid hsl(var(--border));
+    border-left: 0;
+    border-radius: 1.25rem 1.25rem 0 0;
+    transform: translateY(100%);
+  }
+
+  .playsay-activity-rail[data-open="true"] {
+    transform: translateY(0);
+  }
 }
 
 .playsay-material-header {

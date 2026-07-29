@@ -37,6 +37,8 @@ export function TeacherLessonToolbar({
   uploadingHtmlGamePage,
   uploadingImagePage,
   vocabularyAction,
+  activityRailAction,
+  compact = false,
 }: {
   activeStudentSubject: string | null;
   assigningMaterial: boolean;
@@ -53,6 +55,8 @@ export function TeacherLessonToolbar({
   uploadingHtmlGamePage: boolean;
   uploadingImagePage: boolean;
   vocabularyAction: ReactNode;
+  activityRailAction?: ReactNode;
+  compact?: boolean;
 }) {
   const { t } = useAppTranslation();
   const activeParticipant = participants.find(({ subject }) => subject === activeStudentSubject) ?? participants[0] ?? null;
@@ -65,6 +69,7 @@ export function TeacherLessonToolbar({
       aria-label={t("classroom.teacherToolbar.aria")}
       className="playsay-workbench-topbar playsay-teacher-toolbar"
       data-can-manage-material={canManageMaterial ? "true" : "false"}
+      data-compact={compact ? "true" : "false"}
       data-has-target={hasTarget ? "true" : "false"}
     >
       {activeParticipant ? (
@@ -92,7 +97,7 @@ export function TeacherLessonToolbar({
         </div>
       ) : null}
 
-      {canManageMaterial ? (
+      {canManageMaterial && !compact ? (
         <div className="playsay-teacher-toolbar-material">
           <select
             aria-label={t("classroom.material.pickerLabel")}
@@ -123,7 +128,8 @@ export function TeacherLessonToolbar({
 
       <div className="playsay-teacher-toolbar-actions">
         {vocabularyAction}
-        {canManageMaterial ? (
+        {activityRailAction}
+        {canManageMaterial && !compact ? (
           <TeacherAddMaterialMenu
             onUploadHtmlGamePage={onUploadHtmlGamePage}
             onUploadImagePage={onUploadImagePage}
@@ -136,7 +142,7 @@ export function TeacherLessonToolbar({
   );
 }
 
-function TeacherAddMaterialMenu({
+export function TeacherAddMaterialMenu({
   onUploadHtmlGamePage,
   onUploadImagePage,
   uploadingHtmlGamePage,

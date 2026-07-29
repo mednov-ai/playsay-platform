@@ -1,9 +1,17 @@
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
-import type { HomeworkAssignment, HomeworkAssignmentDetail, HomeworkRecipientProgress } from "../../../shared/api/playsay";
+import {
+  fetchVocabularyPracticeSession,
+  type HomeworkAssignment,
+  type HomeworkAssignmentDetail,
+  type HomeworkRecipientProgress,
+  type VocabularyPracticeSession,
+} from "../../../shared/api/playsay";
 import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
 import { formatMaterialScore, formatSubmissionTime } from "../../materials";
 import { formatHomeworkDate, progressToneColor, recipientSearchText, type HomeworkProgressFilter } from "../model/homeworkUtils";
+import { VocabularyPracticePlayer } from "../../vocabulary/ui/VocabularyPracticePlayer";
 
 export function TeacherHomeworkDetail({
   assignment,
@@ -17,6 +25,9 @@ export function TeacherHomeworkDetail({
   const { t } = useAppTranslation();
   const [recipientSearch, setRecipientSearch] = useState("");
   const [progressFilter, setProgressFilter] = useState<HomeworkProgressFilter>("all");
+  const [openedSession, setOpenedSession] = useState<VocabularyPracticeSession | null>(null);
+  const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
+  const [resultError, setResultError] = useState<string | null>(null);
   const active = detail?.assignment ?? assignment;
   if (!active) {
     return (
@@ -41,6 +52,19 @@ export function TeacherHomeworkDetail({
     }
     return true;
   });
+
+  async function openVocabularyResult(recipient: HomeworkRecipientProgress) {
+    if (!recipient.activityRef) return;
+    setOpeningSessionId(recipient.activityRef);
+    setResultError(null);
+    try {
+      setOpenedSession(await fetchVocabularyPracticeSession(recipient.activityRef));
+    } catch (caught) {
+      setResultError(caught instanceof Error ? caught.message : t("homework.messages.detailLoadFailed"));
+    } finally {
+      setOpeningSessionId(null);
+    }
+  }
 
   return (
     <div className="grid gap-4 rounded-2xl border border-border bg-white p-4">
@@ -81,6 +105,18 @@ export function TeacherHomeworkDetail({
       </div>
 
       <div className="grid gap-2">
+        {resultError ? <p className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm font-bold text-destructive">{resultError}</p> : null}
+        {openedSession ? (
+          <div className="grid gap-2 rounded-2xl border border-primary/20 bg-[#fff8f3] p-3">
+            <div className="flex items-center justify-between gap-2">
+              <strong>{openedSession.ownerName ?? openedSession.ownerSubject}</strong>
+              <Button className="min-h-9 px-3 py-1.5 text-sm" onClick={() => setOpenedSession(null)} type="button" variant="outline">
+                {t("common.actions.close")}
+              </Button>
+            </div>
+            <VocabularyPracticePlayer initialSession={openedSession} readOnly />
+          </div>
+        ) : null}
         {recipients.length > 0 ? (
           <div className="grid gap-2 rounded-xl border border-border bg-muted/35 p-2">
             <input
@@ -114,7 +150,12 @@ export function TeacherHomeworkDetail({
           </div>
         ) : (
           visibleRecipients.map((recipient) => (
-            <RecipientProgressRow key={recipient.studentUserId} recipient={recipient} />
+            <RecipientProgressRow
+              key={recipient.studentUserId}
+              onOpenResult={() => void openVocabularyResult(recipient)}
+              opening={openingSessionId === recipient.activityRef}
+              recipient={recipient}
+            />
           ))
         )}
       </div>
@@ -122,7 +163,15 @@ export function TeacherHomeworkDetail({
   );
 }
 
-function RecipientProgressRow({ recipient }: { recipient: HomeworkRecipientProgress }) {
+function RecipientProgressRow({
+  onOpenResult,
+  opening,
+  recipient,
+}: {
+  onOpenResult: () => void;
+  opening: boolean;
+  recipient: HomeworkRecipientProgress;
+}) {
   const { t } = useAppTranslation();
   const tone = recipient.progressTone ?? 0;
   const vocabularyProgress = recipient.activityState !== null && recipient.activityState !== undefined;
@@ -145,9 +194,24 @@ function RecipientProgressRow({ recipient }: { recipient: HomeworkRecipientProgr
         </span>
       </div>
       {vocabularyProgress ? (
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
-          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((recipient.completionRatio ?? 0) * 100)}%` }} />
-        </div>
+        <>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((recipient.completionRatio ?? 0) * 100)}%` }} />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-bold text-muted-foreground">
+              {t("homework.progress.vocabularyDetail", {
+                difficult: recipient.difficultWordCount ?? 0,
+                state: t(`homework.activityState.${recipient.activityState ?? "NOT_STARTED"}`),
+              })}
+            </span>
+            {recipient.activityRef ? (
+              <Button className="min-h-8 px-2.5 py-1 text-xs" disabled={opening} onClick={onOpenResult} type="button" variant="outline">
+                {opening ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}{t("homework.actions.openVocabularyResult")}
+              </Button>
+            ) : null}
+          </div>
+        </>
       ) : recipient.showGroupIndicator ? (
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
           <div

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import java.util.UUID
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -40,7 +41,15 @@ class VocabularyHomeworkController(
         authentication: JwtAuthenticationToken,
         @RequestBody request: VocabularyHomeworkRequest,
     ): ResponseEntity<TeacherAssignmentDetailResponse> {
-        val created = store.createVocabularyHomework(authentication, request)
+        val created = try {
+            store.createVocabularyHomework(authentication, request)
+        } catch (error: DataIntegrityViolationException) {
+            request.planId?.let { planId -> store.findVocabularyHomeworkByPlan(authentication, planId) }
+                ?: request.sourcePracticeId?.let { practiceId ->
+                    store.findVocabularyHomeworkBySourcePractice(authentication, practiceId)
+                }
+                ?: throw error
+        }
         vocabularyAssignments.processAssignment(created.assignment.id)
         return ResponseEntity.status(HttpStatus.CREATED).body(
             store.teacherDetail(authentication, created.assignment.id),

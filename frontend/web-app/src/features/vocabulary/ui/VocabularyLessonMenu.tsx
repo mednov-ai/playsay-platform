@@ -10,6 +10,7 @@ import {
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import { VocabularyEntryDialog } from "./VocabularyEntryDialog";
+import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
 
 type MenuView = "actions" | "recent";
 
@@ -228,7 +229,7 @@ export function VocabularyLessonMenu({
                 <History aria-hidden="true" />
                 {t("vocabulary.lessonMenu.recent")}
               </button>
-              {onStartPractice ? (
+              {onStartPractice && !vocabularyFeatures.personalPracticeV2 ? (
                 <button aria-label={t("vocabulary.lessonMenu.practice")} onClick={startPractice} role="menuitem" type="button">
                   <Play aria-hidden="true" />
                   {t("vocabulary.lessonMenu.practice")}

@@ -2958,6 +2958,11 @@
   pointer-events: none;
 }
 
+.playsay-annotation-layer[data-read-only="true"],
+.playsay-annotation-layer[data-read-only="true"] .playsay-annotation-element {
+  pointer-events: none;
+}
+
 .playsay-annotation-layer[data-tool="pointer"] {
   pointer-events: none;
 }

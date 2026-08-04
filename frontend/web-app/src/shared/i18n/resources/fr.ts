@@ -725,6 +725,7 @@ export const fr = {
       submitting: "Envoi...",
       retrySave: "Réessayer",
       openVocabularyResult: "Résultat",
+      openMaterialResult: "Ouvrir le travail rendu",
     },
     submission: {
       draft: "Brouillon non rendu",

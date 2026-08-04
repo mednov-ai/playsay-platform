@@ -39,6 +39,12 @@ type LiveAnnotationSync = {
   undo?: () => void;
 };
 
+type ControlledAnnotationSync = {
+  elements: AnnotationElement[];
+  key: string;
+  setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
+};
+
 type AnnotationHistoryEntry = {
   after: AnnotationElement[];
   before: AnnotationElement[];
@@ -64,11 +70,13 @@ type ActiveInteraction =
     };
 
 export function useLessonAnnotation({
+  controlledAnnotation,
   initialPageId,
   liveAnnotation,
   lessonId,
   materialId,
 }: {
+  controlledAnnotation?: ControlledAnnotationSync | null;
   initialPageId?: string | null;
   liveAnnotation?: LiveAnnotationSync | null;
   lessonId: string;
@@ -98,8 +106,8 @@ export function useLessonAnnotation({
   const redoHistoryRef = useRef<AnnotationHistoryEntry[]>([]);
   const textEditBeforeRef = useRef<AnnotationElement | null>(null);
   const undoHistoryRef = useRef<AnnotationHistoryEntry[]>([]);
-  const annotationElements = liveAnnotation?.elements ?? localAnnotationElements;
-  const setAnnotationElements = liveAnnotation?.setElements ?? setLocalAnnotationElements;
+  const annotationElements = controlledAnnotation?.elements ?? liveAnnotation?.elements ?? localAnnotationElements;
+  const setAnnotationElements = controlledAnnotation?.setElements ?? liveAnnotation?.setElements ?? setLocalAnnotationElements;
   const normalizedInitialPageId = initialPageId?.trim() || defaultAnnotationPageId;
   const selectedFontElement = selectedElementId
     ? annotationElements.find((element): element is Extract<AnnotationElement, { kind: "mindMapNode" | "text" }> => (
@@ -128,6 +136,17 @@ export function useLessonAnnotation({
   }, []);
 
   useEffect(() => {
+    if (controlledAnnotation) {
+      setAnnotationReady(true);
+      setActivePageId(normalizedInitialPageId);
+      lastSyncedAnnotationRef.current = "";
+      pendingInteractionPointRef.current = null;
+      cancelPointerFrame();
+      resetHistory();
+      setSelectedElementId(null);
+      setEditingElementId(null);
+      return undefined;
+    }
     if (!materialId) {
       setAnnotationReady(false);
       setActivePageId(normalizedInitialPageId);
@@ -199,10 +218,17 @@ export function useLessonAnnotation({
       cancelled = true;
       if (intervalId !== null) window.clearInterval(intervalId);
     };
-  }, [lessonId, liveAnnotation?.ready, liveAnnotation?.setElements, materialId, normalizedInitialPageId]);
+  }, [
+    controlledAnnotation?.key,
+    lessonId,
+    liveAnnotation?.ready,
+    liveAnnotation?.setElements,
+    materialId,
+    normalizedInitialPageId,
+  ]);
 
   useEffect(() => {
-    if (!materialId || !annotationReady || liveAnnotationRef.current) {
+    if (!materialId || !annotationReady || liveAnnotationRef.current || controlledAnnotation) {
       return undefined;
     }
 
@@ -223,7 +249,7 @@ export function useLessonAnnotation({
     }, 500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [activePageId, annotationElements, annotationReady, lessonId, materialId]);
+  }, [activePageId, annotationElements, annotationReady, controlledAnnotation, lessonId, materialId]);
 
   function replaceLocalElements(elements: AnnotationElement[]) {
     elementsRef.current = elements;

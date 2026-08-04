@@ -50,6 +50,7 @@ export function HomeworkPanel({
   const [vocabularyWordLimit, setVocabularyWordLimit] = useState(10);
   const {
     answers,
+    annotations,
     assignments,
     detail,
     draftSaveState,
@@ -66,6 +67,7 @@ export function HomeworkPanel({
     setMessage,
     setSaving,
     setSelectedAssignmentId,
+    setAnnotations,
     studentDetail,
     studentVocabularyDetail,
     studentHasUnsavedChanges,
@@ -343,12 +345,14 @@ export function HomeworkPanel({
           ) : studentDetail ? (
             <StudentHomeworkDetailView
               answers={answers}
+              annotations={annotations}
               detail={studentDetail}
               disabled={disabled || saving}
               draftSaveState={draftSaveState}
               draftSaving={draftSaving}
               hasUnsavedChanges={studentHasUnsavedChanges}
               onAnswerChange={updateAnswer}
+              onAnnotationsChange={setAnnotations}
               onBack={closeStudentAssignment}
               onRetryDraftSave={retryStudentDraftSave}
               onSubmit={() => void submitStudentHomework()}

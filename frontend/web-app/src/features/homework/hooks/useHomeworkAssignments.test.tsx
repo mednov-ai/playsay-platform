@@ -150,4 +150,71 @@ describe("useHomeworkAssignments student flow", () => {
     expect(result.current.studentHasUnsavedChanges).toBe(true);
     expect(apiMocks.saveMyHomeworkAssignmentSubmission).not.toHaveBeenCalled();
   });
+
+  it("autosaves controlled annotations in the same draft payload and restores them", async () => {
+    const annotatedDetail = {
+      ...detail,
+      submission: {
+        ...submission,
+        content: {
+          ...submission.content,
+          annotations: {
+            activePageId: "page-1",
+            coordinateSpace: "material-page",
+            elements: [{
+              anchorId: "image-1",
+              color: "#ff5c00",
+              createdAt: 1,
+              id: "stroke-restored",
+              kind: "stroke",
+              pageId: "page-1",
+              points: [{ anchorId: "image-1", pageId: "page-1", x: 10, y: 20 }],
+              strokeWidth: 8,
+            }],
+            schemaVersion: 7,
+          },
+        },
+      },
+    } satisfies StudentHomeworkDetail;
+    apiMocks.fetchMyHomeworkAssignment.mockResolvedValue(annotatedDetail);
+    const { result } = renderHook(() => useHomeworkAssignments({ canManage: false, profile }));
+
+    await waitFor(() => expect(result.current.assignments).toHaveLength(1));
+    act(() => result.current.setSelectedAssignmentId(assignment.id));
+    await waitFor(() => expect(result.current.annotations.elements[0]?.id).toBe("stroke-restored"));
+
+    vi.useFakeTimers();
+    act(() => result.current.setAnnotations({
+      ...result.current.annotations,
+      elements: [
+        ...result.current.annotations.elements,
+        {
+          anchorId: "image-1",
+          color: "#00a878",
+          createdAt: 2,
+          id: "stroke-new",
+          kind: "stroke",
+          pageId: "page-1",
+          points: [{ anchorId: "image-1", pageId: "page-1", x: 30, y: 40 }],
+          strokeWidth: 4,
+        },
+      ],
+    }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(apiMocks.saveMyHomeworkAssignmentSubmission).toHaveBeenCalledWith(
+      assignment.id,
+      expect.objectContaining({
+        content: expect.objectContaining({
+          annotations: expect.objectContaining({
+            schemaVersion: 7,
+            elements: expect.arrayContaining([expect.objectContaining({ id: "stroke-new" })]),
+          }),
+        }),
+        submitted: false,
+      }),
+    );
+  });
 });

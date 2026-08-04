@@ -8,6 +8,7 @@ import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.StudentAssignmentDetailResponse
 import com.playsay.gateway.dto.TeacherAssignmentDetailResponse
+import com.playsay.gateway.dto.TeacherAssignmentSubmissionDetailResponse
 import com.playsay.gateway.service.AssignmentStore
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -107,6 +108,30 @@ class AssignmentController(
         @PathVariable assignmentId: UUID,
     ): TeacherAssignmentDetailResponse =
         store.teacherDetail(authentication, assignmentId)
+
+    @GetMapping(
+        "/assignments/{assignmentId}/submissions/{submissionId}",
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "getSubmittedHomeworkResult",
+        summary = "Get a submitted homework result",
+        description = "Returns submitted material work to the assignment owner, an administrator, or an active delegate.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Submitted homework result"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Assignment or submitted result not found", content = [Content()]),
+        ],
+    )
+    fun getSubmittedHomeworkResult(
+        authentication: JwtAuthenticationToken,
+        @PathVariable assignmentId: UUID,
+        @PathVariable submissionId: UUID,
+    ): TeacherAssignmentSubmissionDetailResponse =
+        store.teacherSubmissionDetail(authentication, assignmentId, submissionId)
 
     @GetMapping("/me/assignments", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(

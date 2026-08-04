@@ -15,6 +15,12 @@ import {
   type StudentVocabularyHomeworkDetail,
 } from "../../../shared/api/playsay";
 import {
+  annotationContentFromJson,
+  emptyAnnotationContent,
+  type AnnotationContent,
+} from "../../classroom/model/annotation";
+import {
+  editorDocumentFromJson,
   materialAnswersFromSubmission,
   materialLiveScore,
   type MaterialAnswerBlock,
@@ -37,6 +43,7 @@ export function useHomeworkAssignments({
   const [studentVocabularyDetail, setStudentVocabularyDetail] = useState<StudentVocabularyHomeworkDetail | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
+  const [annotations, setAnnotations] = useState<AnnotationContent>(() => emptyAnnotationContent());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
@@ -100,6 +107,7 @@ export function useHomeworkAssignments({
       setStudentDetail(null);
       setStudentVocabularyDetail(null);
       setAnswers({});
+      setAnnotations(emptyAnnotationContent());
       setDraftSaveState("idle");
       return undefined;
     }
@@ -132,6 +140,7 @@ export function useHomeworkAssignments({
             setStudentVocabularyDetail(null);
             setDetail(null);
             setAnswers(materialAnswersFromSubmission(loaded.submission));
+            setAnnotations(homeworkAnnotationsFromSubmission(loaded));
             setAssignments((current) => current.map((assignment) => (
               assignment.id === assignmentId
                 ? {
@@ -236,8 +245,15 @@ export function useHomeworkAssignments({
     () => studentDetail ? materialAnswersFromSubmission(studentDetail.submission) : {},
     [studentDetail?.assignment.id, studentDetail?.submission.updatedAt],
   );
+  const savedStudentAnnotations = useMemo(
+    () => studentDetail ? homeworkAnnotationsFromSubmission(studentDetail) : emptyAnnotationContent(),
+    [studentDetail?.assignment.id, studentDetail?.submission.updatedAt],
+  );
   const studentHasUnsavedChanges = studentDetail !== null
-    && JSON.stringify(answers) !== JSON.stringify(savedStudentAnswers);
+    && (
+      JSON.stringify(answers) !== JSON.stringify(savedStudentAnswers)
+      || JSON.stringify(annotations) !== JSON.stringify(savedStudentAnnotations)
+    );
 
   useEffect(() => {
     if (
@@ -257,7 +273,7 @@ export function useHomeworkAssignments({
       setDraftSaving(true);
       setDraftSaveState("idle");
       const request = saveMyHomeworkAssignmentSubmission(assignmentId, {
-        content: homeworkSubmissionContent(materialId, answers),
+        content: homeworkSubmissionContent(materialId, answers, annotations),
         submitted: false,
       });
       pendingDraftSaveRef.current = request;
@@ -300,6 +316,7 @@ export function useHomeworkAssignments({
     };
   }, [
     answers,
+    annotations,
     canManage,
     draftSaveNonce,
     saving,
@@ -351,7 +368,7 @@ export function useHomeworkAssignments({
     try {
       await pendingDraftSaveRef.current?.catch(() => undefined);
       const saved = await saveMyHomeworkAssignmentSubmission(studentDetail.assignment.id, {
-        content: homeworkSubmissionContent(studentDetail.material.id, answers),
+        content: homeworkSubmissionContent(studentDetail.material.id, answers, annotations),
         submitted: true,
       });
       setStudentDetail({ ...studentDetail, submission: saved });
@@ -384,6 +401,7 @@ export function useHomeworkAssignments({
 
   return {
     answers,
+    annotations,
     assignments,
     detail,
     draftSaveState,
@@ -399,6 +417,7 @@ export function useHomeworkAssignments({
     setMessage,
     setSaving,
     setSelectedAssignmentId,
+    setAnnotations,
     studentDetail,
     studentVocabularyDetail,
     studentHasUnsavedChanges,
@@ -409,10 +428,24 @@ export function useHomeworkAssignments({
   };
 }
 
-function homeworkSubmissionContent(materialId: string, answers: MaterialAnswerState): LessonMaterialJson {
+function homeworkSubmissionContent(
+  materialId: string,
+  answers: MaterialAnswerState,
+  annotations: AnnotationContent,
+): LessonMaterialJson {
   return {
     schemaVersion: 1,
     materialId,
     answers,
+    annotations,
   };
+}
+
+function homeworkAnnotationsFromSubmission(detail: StudentHomeworkDetail): AnnotationContent {
+  const content = detail.submission.content;
+  const root = content && typeof content === "object" && !Array.isArray(content)
+    ? content
+    : {};
+  const firstPageId = editorDocumentFromJson(detail.material.document, detail.material.title).pages[0]?.id;
+  return annotationContentFromJson(root.annotations, firstPageId);
 }

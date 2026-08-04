@@ -725,6 +725,7 @@ export const en = {
       submitting: "Submitting...",
       retrySave: "Try again",
       openVocabularyResult: "Result",
+      openMaterialResult: "Open submitted work",
     },
     submission: {
       draft: "Draft not submitted",

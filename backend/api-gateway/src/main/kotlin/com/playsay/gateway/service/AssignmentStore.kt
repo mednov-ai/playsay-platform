@@ -13,6 +13,7 @@ import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.StudentAssignmentDetailResponse
 import com.playsay.gateway.dto.StudentVocabularyAssignmentDetailResponse
 import com.playsay.gateway.dto.TeacherAssignmentDetailResponse
+import com.playsay.gateway.dto.TeacherAssignmentSubmissionDetailResponse
 import com.playsay.gateway.dto.VocabularyAssignmentPreparationResponse
 import com.playsay.gateway.dto.VocabularyAssignmentProgressUpdateRequest
 import com.playsay.gateway.dto.VocabularyHomeworkRequest
@@ -66,6 +67,7 @@ class AssignmentStore(
     private val materialScoringService: MaterialScoringService,
     private val progressCalculator: AssignmentProgressCalculator,
     private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
+    private val assignmentAccessPolicy: AssignmentAccessPolicy,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
@@ -291,6 +293,30 @@ class AssignmentStore(
     }
 
     @Transactional(readOnly = true)
+    fun teacherSubmissionDetail(
+        authentication: JwtAuthenticationToken,
+        assignmentId: UUID,
+        submissionId: UUID,
+    ): TeacherAssignmentSubmissionDetailResponse {
+        authentication.requireAssignmentManager()
+        val assignment = teacherAssignment(authentication, assignmentId)
+        requireMaterialAssignment(assignment)
+        val submission = findSubmissionById(submissionId)
+            ?.takeIf { row -> row.assignmentId == assignment.id && row.submittedAt != null }
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
+        val material = materialById(requireNotNull(assignment.materialId))
+        return TeacherAssignmentSubmissionDetailResponse(
+            material = lessonMaterialResponseMapper.toResponse(material),
+            submission = submission.toResponse(
+                objectMapper,
+                recipientCount(assignment.id),
+                assignment.maxScore,
+                progressCalculator,
+            ),
+        )
+    }
+
+    @Transactional(readOnly = true)
     fun listStudentAssignments(authentication: JwtAuthenticationToken): List<AssignmentSummaryResponse> {
         val userId = userProfileStore.currentUserId(authentication)
         return assignmentRecipientRepo.findByStudentUserIdAndArchivedAtIsNullOrderByUpdatedAtDesc(userId)
@@ -496,18 +522,7 @@ class AssignmentStore(
     }
 
     private fun teacherAssignment(authentication: JwtAuthenticationToken, assignmentId: UUID): StoredAssignment {
-        val assignment = assignmentRepo.findByIdAndTypeAndStatusNot(
-            id = assignmentId,
-            type = MetaData.AssignmentTypes.HOMEWORK,
-            status = MetaData.AssignmentStatuses.ARCHIVED,
-        ) ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
-        if (!authentication.isAssignmentAdmin()) {
-            val currentUserId = userProfileStore.currentUserId(authentication)
-            if (assignment.teacherUserId != currentUserId && !canAccessEveryRecipient(currentUserId, assignment.id)) {
-                throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.ASSIGNMENT_NOT_FOUND)
-            }
-        }
-        return assignment
+        return assignmentAccessPolicy.requireManagedHomework(authentication, assignmentId)
     }
 
     private fun studentAssignment(assignmentId: UUID, studentUserId: UUID): StoredAssignment {

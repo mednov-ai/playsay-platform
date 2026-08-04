@@ -1815,6 +1815,45 @@
   backdrop-filter: blur(12px);
 }
 
+.playsay-controlled-annotation-canvas {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: #ffffff;
+}
+
+.playsay-controlled-annotation-canvas[data-has-toolbar="true"] {
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+}
+
+.playsay-controlled-annotation-canvas > .playsay-annotation-toolbar {
+  grid-row: 1;
+  max-height: min(70vh, 52rem);
+}
+
+.playsay-controlled-annotation-surface {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+}
+
+.playsay-controlled-annotation-canvas[data-presentation-mode="image-focus"] {
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+}
+
+.playsay-controlled-annotation-canvas[data-presentation-mode="image-focus"] .playsay-controlled-annotation-surface {
+  min-height: min(72vh, 54rem);
+  padding: 0;
+}
+
+.playsay-controlled-annotation-canvas[data-read-only="true"][data-presentation-mode="image-focus"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .dark .playsay-homework-status-badge[data-homework-status="SUBMITTED"] {
   background: rgb(20 117 61 / 0.22);
   color: #83e6a7;

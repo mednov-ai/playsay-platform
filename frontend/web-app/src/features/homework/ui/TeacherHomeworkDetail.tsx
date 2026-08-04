@@ -2,14 +2,18 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import {
   fetchVocabularyPracticeSession,
+  fetchHomeworkSubmissionResult,
   type HomeworkAssignment,
   type HomeworkAssignmentDetail,
   type HomeworkRecipientProgress,
   type VocabularyPracticeSession,
+  type TeacherHomeworkSubmissionDetail,
 } from "../../../shared/api/playsay";
 import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
-import { formatMaterialScore, formatSubmissionTime } from "../../materials";
+import { formatMaterialScore, formatSubmissionTime, materialAnswersFromSubmission } from "../../materials";
+import { ControlledAnnotationCanvas } from "../../classroom";
+import { annotationContentFromJson } from "../../classroom/model/annotation";
 import { formatHomeworkDate, progressToneColor, recipientSearchText, type HomeworkProgressFilter } from "../model/homeworkUtils";
 import { VocabularyPracticePlayer } from "../../vocabulary/ui/VocabularyPracticePlayer";
 
@@ -26,6 +30,7 @@ export function TeacherHomeworkDetail({
   const [recipientSearch, setRecipientSearch] = useState("");
   const [progressFilter, setProgressFilter] = useState<HomeworkProgressFilter>("all");
   const [openedSession, setOpenedSession] = useState<VocabularyPracticeSession | null>(null);
+  const [openedMaterialResult, setOpenedMaterialResult] = useState<TeacherHomeworkSubmissionDetail | null>(null);
   const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
   const [resultError, setResultError] = useState<string | null>(null);
   const active = detail?.assignment ?? assignment;
@@ -59,6 +64,20 @@ export function TeacherHomeworkDetail({
     setResultError(null);
     try {
       setOpenedSession(await fetchVocabularyPracticeSession(recipient.activityRef));
+    } catch (caught) {
+      setResultError(caught instanceof Error ? caught.message : t("homework.messages.detailLoadFailed"));
+    } finally {
+      setOpeningSessionId(null);
+    }
+  }
+
+  async function openMaterialResult(recipient: HomeworkRecipientProgress) {
+    if (!active || !recipient.submissionId || !recipient.submitted) return;
+    const assignmentId = active.id;
+    setOpeningSessionId(recipient.submissionId);
+    setResultError(null);
+    try {
+      setOpenedMaterialResult(await fetchHomeworkSubmissionResult(assignmentId, recipient.submissionId));
     } catch (caught) {
       setResultError(caught instanceof Error ? caught.message : t("homework.messages.detailLoadFailed"));
     } finally {
@@ -117,6 +136,24 @@ export function TeacherHomeworkDetail({
             <VocabularyPracticePlayer initialSession={openedSession} readOnly />
           </div>
         ) : null}
+        {openedMaterialResult ? (
+          <div className="grid gap-2 rounded-2xl border border-primary/20 bg-[#fff8f3] p-3">
+            <div className="flex items-center justify-between gap-2">
+              <strong>{openedMaterialResult.submission.userName ?? openedMaterialResult.submission.userSubject}</strong>
+              <Button className="min-h-9 px-3 py-1.5 text-sm" onClick={() => setOpenedMaterialResult(null)} type="button" variant="outline">
+                {t("common.actions.close")}
+              </Button>
+            </div>
+            <ControlledAnnotationCanvas
+              answers={materialAnswersFromSubmission(openedMaterialResult.submission)}
+              content={annotationContentFromJson(openedMaterialResult.submission.content.annotations)}
+              material={openedMaterialResult.material}
+              onChange={() => undefined}
+              readOnly
+              score={openedMaterialResult.submission.score}
+            />
+          </div>
+        ) : null}
         {recipients.length > 0 ? (
           <div className="grid gap-2 rounded-xl border border-border bg-muted/35 p-2">
             <input
@@ -152,8 +189,12 @@ export function TeacherHomeworkDetail({
           visibleRecipients.map((recipient) => (
             <RecipientProgressRow
               key={recipient.studentUserId}
-              onOpenResult={() => void openVocabularyResult(recipient)}
-              opening={openingSessionId === recipient.activityRef}
+              onOpenResult={() => void (
+                active.contentKind === "VOCABULARY_PRACTICE"
+                  ? openVocabularyResult(recipient)
+                  : openMaterialResult(recipient)
+              )}
+              opening={openingSessionId === (recipient.activityRef ?? recipient.submissionId)}
               recipient={recipient}
             />
           ))
@@ -212,18 +253,29 @@ function RecipientProgressRow({
             ) : null}
           </div>
         </>
-      ) : recipient.showGroupIndicator ? (
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
-          <div
-            className="h-full rounded-full"
-            style={{
-              backgroundColor: progressToneColor(tone),
-              width: `${tone}%`,
-            }}
-          />
-        </div>
       ) : (
-        <p className="mt-2 text-xs font-bold text-muted-foreground">{t("homework.progress.groupOnly")}</p>
+        <>
+          {recipient.showGroupIndicator ? (
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  backgroundColor: progressToneColor(tone),
+                  width: `${tone}%`,
+                }}
+              />
+            </div>
+          ) : (
+            <p className="mt-2 text-xs font-bold text-muted-foreground">{t("homework.progress.groupOnly")}</p>
+          )}
+          {recipient.submitted && recipient.submissionId ? (
+            <div className="mt-2 flex justify-end">
+              <Button className="min-h-8 px-2.5 py-1 text-xs" disabled={opening} onClick={onOpenResult} type="button" variant="outline">
+                {opening ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}{t("homework.actions.openMaterialResult")}
+              </Button>
+            </div>
+          ) : null}
+        </>
       )}
       <div className="mt-2 text-xs font-bold text-muted-foreground">
         {recipient.updatedAt ? formatSubmissionTime(recipient.updatedAt) : t("homework.progress.notStarted")}

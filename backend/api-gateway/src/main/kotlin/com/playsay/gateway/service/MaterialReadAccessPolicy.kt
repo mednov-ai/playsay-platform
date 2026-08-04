@@ -16,6 +16,7 @@ class MaterialReadAccessPolicy(
     private val materialCatalogService: LessonMaterialCatalogService,
     private val userProfileStore: UserProfileStore,
     private val assignmentRecipientRepo: AssignmentRecipientRepo,
+    private val assignmentAccessPolicy: AssignmentAccessPolicy,
     private val lessonRepo: LessonRepo,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -35,6 +36,9 @@ class MaterialReadAccessPolicy(
         }
         if (material.status == MetaData.MaterialStatuses.ARCHIVED) {
             return false
+        }
+        if (assignmentAccessPolicy.canManageMaterial(authentication, material.id)) {
+            return true
         }
 
         val studentUserId = userProfileStore.currentUserId(authentication)

@@ -11,6 +11,11 @@ import com.playsay.gateway.dto.LessonHomeworkRequest
 import com.playsay.gateway.dto.LessonMaterialRequest
 import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.ScheduledLessonRequest
+import com.playsay.gateway.dto.VocabularyAssignmentPreparationResponse
+import com.playsay.gateway.dto.VocabularyAssignmentSessionRef
+import com.playsay.gateway.dto.VocabularyHomeworkRequest
+import com.playsay.gateway.entity.TeacherDelegationEntity
+import com.playsay.gateway.entity.TeacherDelegationStudentEntity
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
@@ -21,8 +26,13 @@ import com.playsay.gateway.repo.LessonRepo
 import com.playsay.gateway.repo.LessonTemplateRepo
 import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.repo.SubmissionRepo
+import com.playsay.gateway.repo.AssignmentIntegrationOutboxRepo
+import com.playsay.gateway.repo.TeacherDelegationRepo
+import com.playsay.gateway.repo.TeacherDelegationStudentRepo
+import com.playsay.gateway.service.AssignmentStore
 import com.playsay.gateway.service.UserProfileStore
 import java.math.BigDecimal
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -58,11 +68,13 @@ import liquibase.integration.spring.SpringLiquibase
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AssignmentControllerTest @Autowired constructor(
     private val assignmentController: AssignmentController,
+    private val assignmentStore: AssignmentStore,
     private val materialAssetController: MaterialAssetController,
     private val materialCrudController: MaterialCrudController,
     private val scheduleController: ScheduledLessonController,
     private val userProfileStore: UserProfileStore,
     private val submissionRepo: SubmissionRepo,
+    private val assignmentIntegrationOutboxRepo: AssignmentIntegrationOutboxRepo,
     private val assignmentRecipientRepo: AssignmentRecipientRepo,
     private val assignmentRepo: AssignmentRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
@@ -72,6 +84,8 @@ class AssignmentControllerTest @Autowired constructor(
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val materialAssetRepo: MaterialAssetRepo,
     private val appUserRepo: AppUserRepo,
+    private val teacherDelegationRepo: TeacherDelegationRepo,
+    private val teacherDelegationStudentRepo: TeacherDelegationStudentRepo,
     private val dataSource: DataSource,
 ) {
     private val objectMapper = jacksonObjectMapper()
@@ -86,6 +100,7 @@ class AssignmentControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
+        assignmentIntegrationOutboxRepo.deleteAllInBatch()
         submissionRepo.deleteAllInBatch()
         assignmentRecipientRepo.deleteAllInBatch()
         assignmentRepo.deleteAllInBatch()
@@ -95,6 +110,8 @@ class AssignmentControllerTest @Autowired constructor(
         courseRepo.deleteAllInBatch()
         materialAssetRepo.deleteAllInBatch()
         lessonMaterialRepo.deleteAllInBatch()
+        teacherDelegationStudentRepo.deleteAllInBatch()
+        teacherDelegationRepo.deleteAllInBatch()
         appUserRepo.deleteAllInBatch()
         appUserRepo.seedPrimaryTeacherWithStudents()
     }
@@ -346,6 +363,161 @@ class AssignmentControllerTest @Autowired constructor(
         }
 
         assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
+    }
+
+    @Test
+    fun `expanded assignment status constraint accepts vocabulary lifecycle statuses`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+
+        val preparing = assignmentStore.createVocabularyHomework(
+            teacher,
+            VocabularyHomeworkRequest(
+                studentSubjects = listOf("student-1"),
+                wordLimit = 3,
+            ),
+        )
+
+        assertEquals("PREPARING", preparing.assignment.status)
+        val assignmentId = preparing.assignment.id
+        listOf("FAILED", "ARCHIVED", "ACTIVE", "PREPARING").forEach { status ->
+            dataSource.connection.use { connection ->
+                connection.prepareStatement("update assignment set status = ? where id = ?").use { statement ->
+                    statement.setString(1, status)
+                    statement.setObject(2, assignmentId)
+                    assertEquals(1, statement.executeUpdate())
+                }
+            }
+        }
+        assignmentStore.applyVocabularyPreparation(
+            assignmentId,
+            VocabularyAssignmentPreparationResponse(
+                practiceId = UUID.randomUUID(),
+                sessions = listOf(
+                    VocabularyAssignmentSessionRef(
+                        sessionId = UUID.randomUUID(),
+                        ownerSubject = "student-1",
+                    ),
+                ),
+            ),
+            actorSubject = "teacher-1",
+        )
+        assertEquals("ACTIVE", assignmentController.getHomeworkAssignment(teacher, assignmentId).assignment.status)
+    }
+
+    @Test
+    fun `submitted homework result preserves annotations and is visible only to assignment managers`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val delegate = authentication(subject = "delegate-1", username = "delegate.one", role = "ROLE_TEACHER")
+        val unrelated = authentication(subject = "unrelated-1", username = "unrelated.one", role = "ROLE_TEACHER")
+        val studentId = userProfileStore.currentUserId(student)
+        val delegateId = userProfileStore.currentUserId(delegate)
+        userProfileStore.currentUserId(unrelated)
+        val teacherId = appUserRepo.findByKeycloakSubject("teacher-1")!!.id
+        val now = Instant.now()
+        val delegation = teacherDelegationRepo.saveAndFlush(
+            TeacherDelegationEntity(
+                primaryTeacherUserId = teacherId,
+                delegateTeacherUserId = delegateId,
+                startsAt = now.minus(Duration.ofHours(1)),
+                endsAt = now.plus(Duration.ofDays(1)),
+                createdByUserId = teacherId,
+                createdAt = now,
+            ),
+        )
+        teacherDelegationStudentRepo.saveAndFlush(
+            TeacherDelegationStudentEntity(
+                delegationId = delegation.id,
+                studentUserId = studentId,
+                createdAt = now,
+            ),
+        )
+        val material = fillGapMaterial(teacher)
+        val uploaded = materialAssetController.uploadImageAsset(
+            teacher,
+            material.id,
+            MockMultipartFile(
+                "file",
+                "annotated.svg",
+                "image/svg+xml",
+                """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="40"/>""".toByteArray(),
+            ),
+        ).body!!
+        val assignmentId = assignmentController.createHomeworkAssignment(
+            teacher,
+            HomeworkAssignmentRequest(materialId = material.id, studentSubjects = listOf("student-1")),
+        ).body!!.assignment.id
+        val content = fillGapAnswer(material.id, "cat", correct = true).deepCopy<JsonNode>()
+        (content as com.fasterxml.jackson.databind.node.ObjectNode).set<JsonNode>(
+            "annotations",
+            objectMapper.readTree(
+                """
+                {
+                  "schemaVersion": 7,
+                  "activePageId": "page-1",
+                  "coordinateSpace": "material-page",
+                  "elements": [
+                    {
+                      "id": "stroke-1",
+                      "kind": "stroke",
+                      "pageId": "page-1",
+                      "anchorId": "image-1",
+                      "color": "#ff5c00",
+                      "strokeWidth": 8,
+                      "createdAt": 1,
+                      "points": [
+                        {"pageId":"page-1","anchorId":"image-1","x":100,"y":200},
+                        {"pageId":"page-1","anchorId":"image-1","x":300,"y":400}
+                      ]
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+
+        val draft = assignmentController.saveMyHomeworkAssignmentSubmission(
+            student,
+            assignmentId,
+            MaterialSubmissionRequest(content = content, submitted = false),
+        )
+        assertEquals(
+            HttpStatus.NOT_FOUND,
+            assertFailsWith<ResponseStatusException> {
+                assignmentController.getSubmittedHomeworkResult(teacher, assignmentId, draft.id)
+            }.statusCode,
+        )
+
+        val submitted = assignmentController.saveMyHomeworkAssignmentSubmission(
+            student,
+            assignmentId,
+            MaterialSubmissionRequest(content = content, submitted = true),
+        )
+        val ownerResult = assignmentController.getSubmittedHomeworkResult(teacher, assignmentId, submitted.id)
+        assertEquals(7, ownerResult.submission.content["annotations"]["schemaVersion"].asInt())
+        assertEquals("stroke-1", ownerResult.submission.content["annotations"]["elements"][0]["id"].asText())
+        assertEquals(material.id, ownerResult.material.id)
+        assertEquals(submitted.id, assignmentController.getSubmittedHomeworkResult(delegate, assignmentId, submitted.id).submission.id)
+        assertEquals(listOf(uploaded.id), materialAssetController.listAssets(delegate, material.id).map { asset -> asset.id })
+        assertEquals(
+            HttpStatus.NOT_FOUND,
+            assertFailsWith<ResponseStatusException> {
+                assignmentController.getSubmittedHomeworkResult(unrelated, assignmentId, submitted.id)
+            }.statusCode,
+        )
+
+        val foreignAssignmentId = assignmentController.createHomeworkAssignment(
+            teacher,
+            HomeworkAssignmentRequest(materialId = material.id, studentSubjects = listOf("student-1")),
+        ).body!!.assignment.id
+        assertEquals(
+            HttpStatus.NOT_FOUND,
+            assertFailsWith<ResponseStatusException> {
+                assignmentController.getSubmittedHomeworkResult(teacher, foreignAssignmentId, submitted.id)
+            }.statusCode,
+        )
     }
 
     private fun fillGapMaterial(teacher: JwtAuthenticationToken) =

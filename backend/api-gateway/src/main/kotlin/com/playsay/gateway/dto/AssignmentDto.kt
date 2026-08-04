@@ -133,6 +133,11 @@ data class StudentAssignmentDetailResponse(
     val submission: AssignmentSubmissionResponse,
 )
 
+data class TeacherAssignmentSubmissionDetailResponse(
+    val material: LessonMaterialResponse,
+    val submission: AssignmentSubmissionResponse,
+)
+
 data class AssignmentSubmissionResponse(
     val id: UUID,
     val assignmentId: UUID,

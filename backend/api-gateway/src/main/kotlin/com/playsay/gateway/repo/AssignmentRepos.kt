@@ -57,6 +57,12 @@ interface AssignmentRepo : JpaRepository<AssignmentEntity, UUID> {
         status: String,
     ): AssignmentEntity?
 
+    fun findByMaterialIdAndTypeAndStatusNot(
+        materialId: UUID,
+        type: String,
+        status: String,
+    ): List<AssignmentEntity>
+
     fun findFirstBySourceLessonIdAndTypeAndStatusNotOrderByCreatedAtAsc(
         sourceLessonId: UUID,
         type: String,

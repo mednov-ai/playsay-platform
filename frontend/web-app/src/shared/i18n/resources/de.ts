@@ -725,6 +725,7 @@ export const de = {
       submitting: "Wird abgegeben...",
       retrySave: "Erneut versuchen",
       openVocabularyResult: "Ergebnis",
+      openMaterialResult: "Abgegebene Arbeit öffnen",
     },
     submission: {
       draft: "Entwurf nicht abgegeben",

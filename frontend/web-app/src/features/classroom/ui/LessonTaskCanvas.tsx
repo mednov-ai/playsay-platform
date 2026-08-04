@@ -9,23 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import {
-  ArrowRight,
-  Circle,
-  Eraser,
-  FileText,
-  Loader2,
-  Minus,
-  MousePointer2,
-  Network,
-  PenLine,
-  RectangleHorizontal,
-  Redo2,
-  Send,
-  StickyNote,
-  Type as TypeIcon,
-  Undo2,
-} from "lucide-react";
+import { FileText, Loader2, Send } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
   type LessonMaterial,
@@ -34,7 +18,6 @@ import {
 } from "../../../shared/api/playsay";
 import { useLessonAnnotation } from "../hooks/useLessonAnnotation";
 import {
-  AnnotationToolButton,
   LessonMaterialDocumentView,
   editorDocumentFromJson,
   materialAnswersFromSubmission,
@@ -47,17 +30,12 @@ import {
   type MaterialExerciseSync,
   type MaterialVideoSync,
 } from "../../materials";
-import {
-  annotationFontSizePresets,
-  annotationElementsForPage,
-  type AnnotationElement,
-  type AnnotationFontSize,
-  type AnnotationStrokeWidth,
-} from "../model/annotation";
+import { annotationElementsForPage, type AnnotationElement } from "../model/annotation";
 import type { CollaborationCursor, CollaborationParticipant } from "../hooks/useYjsWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
 import { PresenceCursorLayer } from "./PresenceCursorLayer";
 import { AnnotationLayer, type AnnotationLayerBounds } from "./AnnotationLayer";
+import { AnnotationToolbar } from "./AnnotationToolbar";
 import {
   isMaterialViewportNewer,
   type MaterialViewportPublishOptions,
@@ -177,6 +155,7 @@ export function LessonTaskCanvas({
   const taskDocumentRef = useRef<HTMLDivElement>(null);
   const documentScrollBeforeImageFocusRef = useRef<{ left: number; top: number } | null>(null);
   const previousPresentationModeRef = useRef<LessonPresentationMode>("default");
+  const annotationToolBeforeGameRef = useRef<typeof annotationTool | null>(null);
   const applyingRemoteViewportRef = useRef(false);
   const appliedRemoteViewportRef = useRef<MaterialViewportState | null>(null);
   const expectedRemoteScrollRef = useRef<{
@@ -188,6 +167,16 @@ export function LessonTaskCanvas({
   const transitionScrollFrameRef = useRef<number | null>(null);
   const lastViewportPublishAtRef = useRef(0);
   const viewportPublishTimerRef = useRef<number | null>(null);
+  const viewportReapplyFrameRef = useRef<number | null>(null);
+  const scrollIntentRef = useRef<{
+    activePointerId: number | null;
+    expiresAt: number;
+    node: HTMLElement | null;
+  }>({ activePointerId: null, expiresAt: 0, node: null });
+  const lastNormalizedViewportRef = useRef<Pick<
+    MaterialViewportUpdate,
+    "materialId" | "pageId" | "presentationMode" | "scrollContainer" | "x" | "y"
+  > | null>(null);
 
   useLayoutEffect(() => {
     const taskDocument = taskDocumentRef.current;
@@ -237,6 +226,10 @@ export function LessonTaskCanvas({
       window.cancelAnimationFrame(transitionScrollFrameRef.current);
       transitionScrollFrameRef.current = null;
     }
+    if (viewportReapplyFrameRef.current !== null) {
+      window.cancelAnimationFrame(viewportReapplyFrameRef.current);
+      viewportReapplyFrameRef.current = null;
+    }
   }, []);
 
   const annotationAnchors = useAnnotationAnchors(
@@ -254,12 +247,6 @@ export function LessonTaskCanvas({
   const selectedAnnotationElement = selectedElementId
     ? visibleAnnotationElements.find((element) => element.id === selectedElementId) ?? null
     : null;
-  const showFontSizeControls = annotationTool === "text"
-    || annotationTool === "mindMap"
-    || selectedAnnotationElement?.kind === "text"
-    || selectedAnnotationElement?.kind === "mindMapNode";
-  const smallerFontSize = [...annotationFontSizePresets].reverse().find((fontSize) => fontSize < annotationFontSize);
-  const largerFontSize = annotationFontSizePresets.find((fontSize) => fontSize > annotationFontSize);
   const activePageAcceptsAnswers = materialPageAcceptsAnswers(activePage);
 
   useEffect(() => {
@@ -281,10 +268,24 @@ export function LessonTaskCanvas({
   }, [onPresentationModeChange, presentationMode]);
 
   useEffect(() => {
+    if (presentationMode === "html-game-focus") {
+      if (annotationToolBeforeGameRef.current === null) {
+        annotationToolBeforeGameRef.current = annotationTool;
+      }
+      if (annotationTool !== "pointer") {
+        setAnnotationTool("pointer");
+      }
+      annotationSync?.updateCursor(null);
+      return;
+    }
+    if (annotationToolBeforeGameRef.current !== null) {
+      setAnnotationTool(annotationToolBeforeGameRef.current);
+      annotationToolBeforeGameRef.current = null;
+    }
     if (presentationMode === "external-activity-focus") {
       annotationSync?.updateCursor(null);
     }
-  }, [annotationSync?.updateCursor, presentationMode]);
+  }, [annotationSync?.updateCursor, presentationMode, setAnnotationTool]);
 
   useEffect(() => () => onPresentationModeChange?.("default"), [onPresentationModeChange]);
 
@@ -302,7 +303,7 @@ export function LessonTaskCanvas({
     if (!node) return;
     const maxLeft = Math.max(0, node.scrollWidth - node.clientWidth);
     const maxTop = Math.max(0, node.scrollHeight - node.clientHeight);
-    viewportSync.publish({
+    const nextViewport = {
       ...(blockId ? { focusedBlockId: blockId } : {}),
       materialId: material.id,
       pageId,
@@ -310,7 +311,9 @@ export function LessonTaskCanvas({
       scrollContainer,
       x: maxLeft > 0 ? node.scrollLeft / maxLeft : 0,
       y: maxTop > 0 ? node.scrollTop / maxTop : 0,
-    }, options);
+    } satisfies MaterialViewportUpdate;
+    lastNormalizedViewportRef.current = nextViewport;
+    viewportSync.publish(nextViewport, options);
     lastViewportPublishAtRef.current = performance.now();
   }, [activePageId, focusedBlockId, material, presentationMode, viewportSync?.publish, viewportSync?.ready]);
 
@@ -320,6 +323,37 @@ export function LessonTaskCanvas({
       : taskDocumentRef.current;
     if (!node || !viewportSync) return undefined;
 
+    const markScrollIntent = (duration = 500) => {
+      scrollIntentRef.current.node = node;
+      scrollIntentRef.current.expiresAt = performance.now() + duration;
+    };
+    const handleWheelOrTouch = () => markScrollIntent();
+    const handlePointerDown = (event: globalThis.PointerEvent) => {
+      const verticalScrollbar = node.scrollHeight > node.clientHeight
+        && event.clientX >= node.getBoundingClientRect().right - Math.max(16, node.offsetWidth - node.clientWidth);
+      const horizontalScrollbar = node.scrollWidth > node.clientWidth
+        && event.clientY >= node.getBoundingClientRect().bottom - Math.max(16, node.offsetHeight - node.clientHeight);
+      if (verticalScrollbar || horizontalScrollbar) {
+        scrollIntentRef.current.activePointerId = event.pointerId;
+        markScrollIntent(2_000);
+      }
+    };
+    const handlePointerMove = (event: globalThis.PointerEvent) => {
+      if (scrollIntentRef.current.activePointerId === event.pointerId) {
+        markScrollIntent(2_000);
+      }
+    };
+    const handlePointerUp = (event: globalThis.PointerEvent) => {
+      if (scrollIntentRef.current.activePointerId === event.pointerId) {
+        scrollIntentRef.current.activePointerId = null;
+        markScrollIntent(150);
+      }
+    };
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (scrollIntentKeys.has(event.key)) {
+        markScrollIntent();
+      }
+    };
     const handleScroll = () => {
       const expectedRemoteScroll = expectedRemoteScrollRef.current;
       if (expectedRemoteScroll?.node === node) {
@@ -332,6 +366,10 @@ export function LessonTaskCanvas({
         expectedRemoteScrollRef.current = null;
       }
       if (applyingRemoteViewportRef.current || suppressTransitionScrollPublishRef.current) return;
+      const intent = scrollIntentRef.current;
+      if (intent.node !== node || (intent.activePointerId === null && performance.now() > intent.expiresAt)) {
+        return;
+      }
       const elapsed = performance.now() - lastViewportPublishAtRef.current;
       if (elapsed >= 50) {
         publishViewport();
@@ -343,15 +381,65 @@ export function LessonTaskCanvas({
         publishViewport();
       }, Math.max(0, 50 - elapsed));
     };
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => {
+          if (viewportReapplyFrameRef.current !== null) return;
+          viewportReapplyFrameRef.current = window.requestAnimationFrame(() => {
+            viewportReapplyFrameRef.current = null;
+            const viewport = lastNormalizedViewportRef.current;
+            if (
+              !viewport
+              || viewport.materialId !== material?.id
+              || viewport.presentationMode !== presentationMode
+              || viewport.scrollContainer !== (presentationMode === "image-focus" ? "image" : "document")
+            ) {
+              return;
+            }
+            const left = viewport.x * Math.max(0, node.scrollWidth - node.clientWidth);
+            const top = viewport.y * Math.max(0, node.scrollHeight - node.clientHeight);
+            if (Math.abs(node.scrollLeft - left) <= 1 && Math.abs(node.scrollTop - top) <= 1) return;
+            applyingRemoteViewportRef.current = true;
+            expectedRemoteScrollRef.current = { left, node, top };
+            node.scrollLeft = left;
+            node.scrollTop = top;
+            window.requestAnimationFrame(() => {
+              applyingRemoteViewportRef.current = false;
+            });
+          });
+        });
+    resizeObserver?.observe(node);
+    if (node.firstElementChild) resizeObserver?.observe(node.firstElementChild);
+    node.addEventListener("wheel", handleWheelOrTouch, { passive: true });
+    node.addEventListener("touchstart", handleWheelOrTouch, { passive: true });
+    node.addEventListener("touchmove", handleWheelOrTouch, { passive: true });
+    node.addEventListener("pointerdown", handlePointerDown, { passive: true });
+    node.addEventListener("keydown", handleKeyDown);
     node.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("pointerup", handlePointerUp, { passive: true });
+    window.addEventListener("pointercancel", handlePointerUp, { passive: true });
     return () => {
+      resizeObserver?.disconnect();
+      node.removeEventListener("wheel", handleWheelOrTouch);
+      node.removeEventListener("touchstart", handleWheelOrTouch);
+      node.removeEventListener("touchmove", handleWheelOrTouch);
+      node.removeEventListener("pointerdown", handlePointerDown);
+      node.removeEventListener("keydown", handleKeyDown);
       node.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
       if (viewportPublishTimerRef.current !== null) {
         window.clearTimeout(viewportPublishTimerRef.current);
         viewportPublishTimerRef.current = null;
       }
+      if (viewportReapplyFrameRef.current !== null) {
+        window.cancelAnimationFrame(viewportReapplyFrameRef.current);
+        viewportReapplyFrameRef.current = null;
+      }
     };
-  }, [presentationMode, publishViewport, viewportSync]);
+  }, [material?.id, presentationMode, publishViewport, viewportSync]);
 
   useEffect(() => {
     const viewport = viewportSync?.state;
@@ -379,6 +467,7 @@ export function LessonTaskCanvas({
         expectedRemoteScrollRef.current = { left, node, top };
         node.scrollLeft = left;
         node.scrollTop = top;
+        lastNormalizedViewportRef.current = viewport;
         appliedRemoteViewportRef.current = viewport;
         window.requestAnimationFrame(() => {
           if (!cancelled) applyingRemoteViewportRef.current = false;
@@ -492,122 +581,34 @@ export function LessonTaskCanvas({
 
   return (
     <div className="playsay-task-board" data-presentation-mode={presentationMode}>
-      {presentationMode !== "external-activity-focus" ? (
-        <aside className="playsay-annotation-toolbar" aria-label={t("classroom.annotation.toolbar")}>
-        <AnnotationToolButton active={annotationTool === "pointer"} label={t("classroom.annotation.pointer")} onClick={() => setAnnotationTool("pointer")} testId="annotation-tool-pointer">
-          <MousePointer2 className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "pen"} label={t("classroom.annotation.pen")} onClick={() => setAnnotationTool("pen")} testId="annotation-tool-pen">
-          <PenLine className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "eraser"} label={t("classroom.annotation.eraser")} onClick={() => setAnnotationTool("eraser")} testId="annotation-tool-eraser">
-          <Eraser className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "line"} label={t("classroom.annotation.line")} onClick={() => setAnnotationTool("line")} testId="annotation-tool-line">
-          <Minus className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "arrow"} label={t("classroom.annotation.arrow")} onClick={() => setAnnotationTool("arrow")} testId="annotation-tool-arrow">
-          <ArrowRight className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "rectangle"} label={t("classroom.annotation.rectangle")} onClick={() => setAnnotationTool("rectangle")} testId="annotation-tool-rectangle">
-          <RectangleHorizontal className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "ellipse"} label={t("classroom.annotation.ellipse")} onClick={() => setAnnotationTool("ellipse")} testId="annotation-tool-ellipse">
-          <Circle className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "text"} label={t("classroom.annotation.text")} onClick={() => { setSelectedElementId(null); setAnnotationTool("text"); }} testId="annotation-tool-text">
-          <TypeIcon className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "stickyNote"} label={t("classroom.annotation.stickyNote")} onClick={() => setAnnotationTool("stickyNote")} testId="annotation-tool-sticky-note">
-          <StickyNote className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton active={annotationTool === "mindMap"} label={t("classroom.annotation.mindMap")} onClick={() => { setSelectedElementId(null); setAnnotationTool("mindMap"); }} testId="annotation-tool-mind-map">
-          <Network className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton
-          active={false}
-          disabled={!canUndo}
-          label={t("classroom.annotation.undo")}
-          onClick={undo}
-          testId="annotation-tool-undo"
-        >
-          <Undo2 className="h-4 w-4" />
-        </AnnotationToolButton>
-        <AnnotationToolButton
-          active={false}
-          disabled={!canRedo}
-          label={t("classroom.annotation.redo")}
-          onClick={redo}
-          testId="annotation-tool-redo"
-        >
-          <Redo2 className="h-4 w-4" />
-        </AnnotationToolButton>
-        <div className="playsay-line-widths" aria-label={t("classroom.annotation.lineWidth")}>
-          {([4, 8, 16] satisfies AnnotationStrokeWidth[]).map((strokeWidth) => (
-            <button
-              aria-label={t("classroom.annotation.lineWidthValue", { value: strokeWidth })}
-              className="playsay-line-width"
-              data-active={annotationStrokeWidth === strokeWidth ? "true" : "false"}
-              key={strokeWidth}
-              onClick={() => updateSelectedStrokeWidth(strokeWidth)}
-              type="button"
-            >
-              <span style={{ height: Math.max(2, strokeWidth / 2) }} />
-            </button>
-          ))}
-        </div>
-        {showFontSizeControls ? (
-          <div className="playsay-font-size-controls" aria-label={t("classroom.annotation.fontSize")}>
-            <button
-              aria-label={t("classroom.annotation.fontSizeDecrease")}
-              className="playsay-font-size-button"
-              data-testid="annotation-font-size-decrease"
-              disabled={!smallerFontSize}
-              onClick={() => smallerFontSize && updateSelectedFontSize(smallerFontSize as AnnotationFontSize)}
-              title={t("classroom.annotation.fontSizeDecrease")}
-              type="button"
-            >
-              A−
-            </button>
-            <output aria-label={t("classroom.annotation.fontSizeValue", { value: annotationFontSize })}>{annotationFontSize}</output>
-            <button
-              aria-label={t("classroom.annotation.fontSizeIncrease")}
-              className="playsay-font-size-button"
-              data-testid="annotation-font-size-increase"
-              disabled={!largerFontSize}
-              onClick={() => largerFontSize && updateSelectedFontSize(largerFontSize as AnnotationFontSize)}
-              title={t("classroom.annotation.fontSizeIncrease")}
-              type="button"
-            >
-              A+
-            </button>
-          </div>
-        ) : null}
-        <div className="playsay-color-swatches" aria-label={t("classroom.annotation.color")}>
-          {["#ff5c00", "#00a878", "#2574ff"].map((color) => (
-            <button
-              aria-label={color}
-              className="playsay-color-swatch"
-              data-active={annotationColor === color ? "true" : "false"}
-              key={color}
-              onClick={() => updateSelectedColor(color)}
-              style={{ backgroundColor: color }}
-              type="button"
-            />
-          ))}
-        </div>
-        </aside>
+      {presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? (
+        <AnnotationToolbar
+          annotationColor={annotationColor}
+          annotationFontSize={annotationFontSize}
+          annotationStrokeWidth={annotationStrokeWidth}
+          annotationTool={annotationTool}
+          canRedo={canRedo}
+          canUndo={canUndo}
+          onClearSelection={() => setSelectedElementId(null)}
+          onRedo={redo}
+          onSelectColor={updateSelectedColor}
+          onSelectFontSize={updateSelectedFontSize}
+          onSelectStrokeWidth={updateSelectedStrokeWidth}
+          onSelectTool={setAnnotationTool}
+          onUndo={undo}
+          selectedElement={selectedAnnotationElement}
+        />
       ) : null}
 
       <div className="playsay-task-page">
         <div className="playsay-task-document" ref={taskDocumentRef}>
           <div
             className="playsay-task-document-surface"
-            data-live-presence={annotationSync && presentationMode !== "external-activity-focus" ? "true" : "false"}
-            data-live-presence-ready={annotationSync?.ready && presentationMode !== "external-activity-focus" ? "true" : "false"}
+            data-live-presence={annotationSync && presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? "true" : "false"}
+            data-live-presence-ready={annotationSync?.ready && presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? "true" : "false"}
             data-testid="lesson-material-surface"
-            onPointerLeave={presentationMode === "external-activity-focus" ? undefined : clearMaterialCursor}
-            onPointerMove={presentationMode === "external-activity-focus" ? undefined : updateMaterialCursor}
+            onPointerLeave={presentationMode === "external-activity-focus" || presentationMode === "html-game-focus" ? undefined : clearMaterialCursor}
+            onPointerMove={presentationMode === "external-activity-focus" || presentationMode === "html-game-focus" ? undefined : updateMaterialCursor}
             ref={materialSurfaceRef}
           >
             {material ? (
@@ -660,7 +661,7 @@ export function LessonTaskCanvas({
             ) : (
               <UnassignedLessonMaterial />
             )}
-            {presentationMode !== "external-activity-focus" ? (
+            {presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? (
               <>
                 <AnnotationLayer
               editingElementId={editingElementId}
@@ -764,13 +765,25 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-type AnnotationAnchor = {
+const scrollIntentKeys = new Set([
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "End",
+  "Home",
+  "PageDown",
+  "PageUp",
+  " ",
+]);
+
+export type AnnotationAnchor = {
   bounds: AnnotationLayerBounds;
   focused: boolean;
   id: string;
 };
 
-function useAnnotationAnchors(
+export function useAnnotationAnchors(
   surfaceRef: RefObject<HTMLDivElement | null>,
   pageId: string | null,
   presentationMode: LessonPresentationMode,

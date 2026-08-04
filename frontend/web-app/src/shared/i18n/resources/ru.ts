@@ -737,6 +737,7 @@ export const ru = {
       submitting: "Сдаём...",
       retrySave: "Повторить",
       openVocabularyResult: "Результат",
+      openMaterialResult: "Открыть сданную работу",
     },
     submission: {
       draft: "Черновик ещё не сдан",

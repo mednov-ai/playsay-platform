@@ -27,4 +27,5 @@
     <include file="2026-07-28-001-create-material-game-adaptation.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-28-002-add-vocabulary-practice-assignments.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-29-001-add-vocabulary-practice-plan-link.xml" relativeToChangelogFile="true"/>
+    <include file="2026-08-04-001-expand-assignment-status.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

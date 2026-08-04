@@ -5,21 +5,24 @@ import { useAppTranslation } from "../../../shared/i18n";
 import {
   formatMaterialScore,
   formatSubmissionTime,
-  LessonMaterialDocumentView,
   type MaterialAnswerBlock,
   type MaterialAnswerState,
 } from "../../materials";
+import { ControlledAnnotationCanvas } from "../../classroom";
+import type { AnnotationContent } from "../../classroom/model/annotation";
 import { formatHomeworkDate } from "../model/homeworkUtils";
 import { VocabularyQuickAdd } from "../../vocabulary/ui/VocabularyQuickAdd";
 
 export function StudentHomeworkDetailView({
   answers,
+  annotations,
   detail,
   disabled,
   draftSaveState,
   draftSaving,
   hasUnsavedChanges,
   onAnswerChange,
+  onAnnotationsChange,
   onBack,
   onRetryDraftSave,
   onSubmit,
@@ -27,12 +30,14 @@ export function StudentHomeworkDetailView({
   score,
 }: {
   answers: MaterialAnswerState;
+  annotations: AnnotationContent;
   detail: StudentHomeworkDetail | null;
   disabled: boolean;
   draftSaveState: "idle" | "saved" | "error";
   draftSaving: boolean;
   hasUnsavedChanges: boolean;
   onAnswerChange: (blockId: string, answer: MaterialAnswerBlock) => void;
+  onAnnotationsChange: (content: AnnotationContent) => void;
   onBack: () => void;
   onRetryDraftSave: () => void;
   onSubmit: () => void;
@@ -84,14 +89,13 @@ export function StudentHomeworkDetailView({
           </div>
         ) : null}
         <VocabularyQuickAdd source={{ sourceType: "HOMEWORK", assignmentId: detail.assignment.id, materialId: detail.material.id }}>
-          <LessonMaterialDocumentView
+          <ControlledAnnotationCanvas
             answers={answers}
-            key={detail.assignment.id}
+            content={annotations}
             material={detail.material}
-            mode="classroom"
             onAnswerChange={onAnswerChange}
+            onChange={onAnnotationsChange}
             score={score}
-            showScoreBadge={false}
           />
         </VocabularyQuickAdd>
       </div>

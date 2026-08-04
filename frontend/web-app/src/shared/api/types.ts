@@ -381,6 +381,10 @@ export type StudentHomeworkDetail = {
   material: LessonMaterial;
   submission: HomeworkSubmission;
 };
+export type TeacherHomeworkSubmissionDetail = {
+  material: LessonMaterial;
+  submission: HomeworkSubmission;
+};
 export type StudentVocabularyHomeworkDetail = {
   assignment: HomeworkAssignment;
   practiceId: string;

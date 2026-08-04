@@ -9,6 +9,7 @@ import type {
   LessonMaterialSubmissionInput,
   StudentHomeworkDetail,
   StudentVocabularyHomeworkDetail,
+  TeacherHomeworkSubmissionDetail,
   VocabularyHomeworkInput,
 } from "./types";
 
@@ -21,6 +22,18 @@ export async function fetchHomeworkAssignment(
   config = authConfig,
 ): Promise<HomeworkAssignmentDetail> {
   return apiJson<HomeworkAssignmentDetail>(`/api/assignments/${assignmentId}`, { method: "GET" }, config);
+}
+
+export async function fetchHomeworkSubmissionResult(
+  assignmentId: string,
+  submissionId: string,
+  config = authConfig,
+): Promise<TeacherHomeworkSubmissionDetail> {
+  return apiJson<TeacherHomeworkSubmissionDetail>(
+    `/api/assignments/${assignmentId}/submissions/${submissionId}`,
+    { method: "GET" },
+    config,
+  );
 }
 
 export async function createHomeworkAssignment(

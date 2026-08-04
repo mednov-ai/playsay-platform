@@ -693,16 +693,22 @@ describe("LessonTaskCanvas", () => {
 
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
     expect(container.querySelector(".playsay-html-game iframe")).toBeNull();
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-pen']")!);
+    expect(container.querySelector("[data-testid='annotation-tool-pen']")?.getAttribute("data-active")).toBe("true");
 
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
     await waitFor(() => expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus"));
     await waitFor(() => expect(container.querySelector(".playsay-html-game iframe")).not.toBeNull());
+    expect(container.querySelector(".playsay-annotation-toolbar")).toBeNull();
+    expect(container.querySelector(".playsay-annotation-layer")).toBeNull();
+    expect(container.querySelector(".playsay-presence-layer")).toBeNull();
     const iframe = container.querySelector(".playsay-html-game iframe");
     expect(container.querySelector(".playsay-html-game")?.getAttribute("data-fill-available")).toBe("true");
 
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
 
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("default");
+    expect(container.querySelector("[data-testid='annotation-tool-pen']")?.getAttribute("data-active")).toBe("true");
     expect(container.querySelector(".playsay-html-game iframe")).toBe(iframe);
     expect(container.querySelector(".playsay-material-focused-game")?.getAttribute("data-active")).toBe("false");
     expect(onPresentationModeChange).toHaveBeenLastCalledWith("default");
@@ -868,6 +874,43 @@ describe("LessonTaskCanvas", () => {
     fireEvent.scroll(taskDocument);
 
     expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("publishes scroll only after explicit local scroll intent", async () => {
+    const publish = vi.fn();
+    const { container } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1",
+      material: staticImageMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+      viewportSync: {
+        clientId: 7,
+        publish,
+        ready: true,
+        state: null,
+      },
+    }));
+    const taskDocument = container.querySelector<HTMLElement>(".playsay-task-document")!;
+    Object.defineProperty(taskDocument, "clientHeight", { configurable: true, value: 100 });
+    Object.defineProperty(taskDocument, "scrollHeight", { configurable: true, value: 1_000 });
+    await waitFor(() => expect(publish).toHaveBeenCalled());
+    publish.mockClear();
+
+    taskDocument.scrollTop = 200;
+    fireEvent.scroll(taskDocument);
+    expect(publish).not.toHaveBeenCalled();
+
+    fireEvent.wheel(taskDocument, { deltaY: 80 });
+    fireEvent.scroll(taskDocument);
+    await waitFor(() => expect(publish).toHaveBeenCalledWith(expect.objectContaining({
+      presentationMode: "default",
+      scrollContainer: "document",
+      y: expect.any(Number),
+    }), undefined));
   });
 
   it("publishes an explicit focus close while a remote scroll is still applying", async () => {

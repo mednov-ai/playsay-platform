@@ -31,6 +31,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   onSelectElement,
   onTextChange,
   onUndo,
+  readOnly = false,
   selectedElementId,
   tool,
 }: {
@@ -58,6 +59,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   onSelectElement: (elementId: string | null) => void;
   onTextChange: (elementId: string, text: string) => void;
   onUndo: () => void;
+  readOnly?: boolean;
   selectedElementId: string | null;
   tool: AnnotationTool;
 }) {
@@ -83,6 +85,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   ));
 
   useEffect(() => {
+    if (readOnly) {
+      return undefined;
+    }
     function handleKeyboard(event: globalThis.KeyboardEvent) {
       if (isEditableTarget(event.target)) {
         return;
@@ -114,7 +119,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
 
     window.addEventListener("keydown", handleKeyboard);
     return () => window.removeEventListener("keydown", handleKeyboard);
-  }, [onDeleteSelected, onDeselect, onFinishTextEditing, onRedo, onUndo, selectedElementId]);
+  }, [onDeleteSelected, onDeselect, onFinishTextEditing, onRedo, onUndo, readOnly, selectedElementId]);
 
   return (
     <svg
@@ -124,11 +129,12 @@ export const AnnotationLayer = memo(function AnnotationLayer({
       data-anchor-pending={anchorPending ? "true" : "false"}
       data-anchored={anchored ? "true" : "false"}
       data-editing={editingElementId ? "true" : "false"}
+      data-read-only={readOnly ? "true" : "false"}
       data-tool={tool}
-      onPointerCancel={onEnd}
-      onPointerDown={onBegin}
-      onPointerMove={onMove}
-      onPointerUp={onEnd}
+      onPointerCancel={readOnly ? undefined : onEnd}
+      onPointerDown={readOnly ? undefined : onBegin}
+      onPointerMove={readOnly ? undefined : onMove}
+      onPointerUp={readOnly ? undefined : onEnd}
       preserveAspectRatio="none"
       style={anchorStyle}
       viewBox="0 0 1000 1000"
@@ -164,6 +170,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
           onMindMapKey={onMindMapKey}
           onSelectElement={onSelectElement}
           onTextChange={onTextChange}
+          readOnly={readOnly}
           selected={selectedElementId === element.id}
           tool={tool}
         />
@@ -193,6 +200,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
   onMindMapKey,
   onSelectElement,
   onTextChange,
+  readOnly,
   selected,
   tool,
 }: {
@@ -206,6 +214,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
   onMindMapKey: (elementId: string, key: "ArrowDown" | "ArrowLeft" | "ArrowRight" | "ArrowUp" | "Enter" | "Tab") => void;
   onSelectElement: (elementId: string | null) => void;
   onTextChange: (elementId: string, text: string) => void;
+  readOnly: boolean;
   selected: boolean;
   tool: AnnotationTool;
 }) {
@@ -309,9 +318,9 @@ const AnnotationElementView = memo(function AnnotationElementView({
         }
       }
     },
-    onPointerDown: (event: PointerEvent<SVGElement>) => onMoveElement(event, element.id),
-    role: "button",
-    tabIndex: tool === "pointer" ? 0 : -1,
+    onPointerDown: readOnly ? undefined : (event: PointerEvent<SVGElement>) => onMoveElement(event, element.id),
+    role: readOnly ? "img" : "button",
+    tabIndex: !readOnly && tool === "pointer" ? 0 : -1,
   };
 
   if (element.kind === "stroke") {
@@ -377,7 +386,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
       {...commonProps}
       height={element.height}
       onDoubleClick={(event) => {
-        if (tool !== "pointer") {
+        if (readOnly || tool !== "pointer") {
           return;
         }
         event.preventDefault();

@@ -1598,6 +1598,11 @@ export interface ChatMessagePageResponse {
   nextCursor?: string | null;
 }
 
+export interface TeacherAssignmentSubmissionDetailResponse {
+  material: LessonMaterialResponse;
+  submission: AssignmentSubmissionResponse;
+}
+
 export interface UserDeletionOperationResponse {
   operationId: string;
   targetSubject: string;
@@ -8114,6 +8119,64 @@ export const getHomeworkAssignment = async (assignmentId: string, options?: Requ
 
   const data: getHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getHomeworkAssignmentResponse
+}
+
+
+
+export type getSubmittedHomeworkResultResponse200 = {
+  data: TeacherAssignmentSubmissionDetailResponse
+  status: 200
+}
+
+export type getSubmittedHomeworkResultResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getSubmittedHomeworkResultResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getSubmittedHomeworkResultResponseSuccess = (getSubmittedHomeworkResultResponse200) & {
+  headers: Headers;
+};
+export type getSubmittedHomeworkResultResponseError = (getSubmittedHomeworkResultResponse401 | getSubmittedHomeworkResultResponse404) & {
+  headers: Headers;
+};
+
+export type getSubmittedHomeworkResultResponse = (getSubmittedHomeworkResultResponseSuccess | getSubmittedHomeworkResultResponseError)
+
+export const getGetSubmittedHomeworkResultUrl = (assignmentId: string,
+    submissionId: string,) => {
+
+
+
+
+  return `/api/assignments/${assignmentId}/submissions/${submissionId}`
+}
+
+/**
+ * Returns submitted material work to the assignment owner, an administrator, or an active delegate.
+ * @summary Get a submitted homework result
+ */
+export const getSubmittedHomeworkResult = async (assignmentId: string,
+    submissionId: string, options?: RequestInit): Promise<getSubmittedHomeworkResultResponse> => {
+
+  const res = await fetch(getGetSubmittedHomeworkResultUrl(assignmentId,submissionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getSubmittedHomeworkResultResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getSubmittedHomeworkResultResponse
 }
 
 

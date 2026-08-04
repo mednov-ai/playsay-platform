@@ -3283,6 +3283,40 @@ paths:
                 $ref: "#/components/schemas/TeacherAssignmentDetailResponse"
       security:
       - bearerAuth: []
+  /assignments/{assignmentId}/submissions/{submissionId}:
+    get:
+      tags:
+      - Assignments
+      summary: Get a submitted homework result
+      description: "Returns submitted material work to the assignment owner, an administrator,\
+        \ or an active delegate."
+      operationId: getSubmittedHomeworkResult
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: submissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Submitted homework result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAssignmentSubmissionDetailResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Assignment or submitted result not found
+      security:
+      - bearerAuth: []
   /admin/users:
     get:
       tags:
@@ -6424,6 +6458,16 @@ components:
           - "null"
       required:
       - items
+    TeacherAssignmentSubmissionDetailResponse:
+      type: object
+      properties:
+        material:
+          $ref: "#/components/schemas/LessonMaterialResponse"
+        submission:
+          $ref: "#/components/schemas/AssignmentSubmissionResponse"
+      required:
+      - material
+      - submission
     UserDeletionOperationResponse:
       type: object
       properties:

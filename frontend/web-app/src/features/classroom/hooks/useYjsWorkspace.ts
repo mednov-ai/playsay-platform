@@ -39,6 +39,7 @@ import type {
   MaterialViewportUpdate,
 } from "../model/materialViewport";
 import { realtimeReconnectDelayMs } from "../model/realtimeLifecycle";
+import { createGameRealtimeClient } from "../model/gameRealtimeClient";
 
 export type { CollaborationCursor, CollaborationParticipant };
 
@@ -78,6 +79,7 @@ export function useYjsWorkspace({
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const gameRealtimeRef = useRef<ReturnType<typeof createGameRealtimeClient> | null>(null);
 
   useEffect(() => {
     if (!enabled || !document) {
@@ -128,6 +130,22 @@ export function useYjsWorkspace({
       snapshot: document.snapshot,
     });
     runtimeRef.current = runtime;
+    const gameRealtime = createGameRealtimeClient({
+      fallback: (message) => {
+        if (message.kind === "action-request") {
+          runtime.publishHtmlGameSdkRequest(message.request);
+        } else if (message.kind === "ordered-action") {
+          runtime.publishHtmlGameSdkAction(message.action);
+        } else if (message.kind === "effect") {
+          runtime.publishHtmlGameSdkEffect(message.effect);
+        }
+      },
+      getActorId: () => String(runtime.getClientId()),
+      getUrl: async () => collaborationWebSocketUrl(
+        await createCollaborationDocumentToken(document.lessonId, document.id),
+      ),
+    });
+    gameRealtimeRef.current = gameRealtime;
     setWorkspaceClientId(runtime.getClientId());
     setStatus("connecting");
 
@@ -218,6 +236,8 @@ export function useYjsWorkspace({
       socketRef.current = null;
       runtime.setSocket(null);
       runtime.destroy();
+      gameRealtime.close();
+      gameRealtimeRef.current = null;
       runtimeRef.current = null;
       setAnnotationElementsState([]);
       setParticipants([]);
@@ -358,6 +378,7 @@ export function useYjsWorkspace({
     effects: htmlGameEffects,
     inputs: htmlGameInputs,
     isAuthority,
+    gameRealtime: gameRealtimeRef.current ?? undefined,
     patches: htmlGamePatches,
     presentedBlockId: presentedHtmlGameBlockId,
     ready: status === "connected",

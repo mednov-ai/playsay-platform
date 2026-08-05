@@ -150,10 +150,18 @@ try {
     adaptedMedianMs: percentile(summary.adapted.teacherToStudent.latenciesMs, 0.5),
     adaptedP95Ms: percentile(summary.adapted.teacherToStudent.latenciesMs, 0.95),
     adaptedP99Ms: percentile(summary.adapted.teacherToStudent.latenciesMs, 0.99),
+    originalLoadedP95Ms: percentile(summary.original.loadedTeacherToStudent.latenciesMs, 0.95),
+    adaptedLoadedP95Ms: percentile(summary.adapted.loadedTeacherToStudent.latenciesMs, 0.95),
   };
   summary.latency.p95DeltaMs = summary.latency.adaptedP95Ms - summary.latency.originalP95Ms;
   summary.latency.p95Ratio = Number(
     (summary.latency.adaptedP95Ms / Math.max(1, summary.latency.originalP95Ms)).toFixed(2),
+  );
+  summary.latency.loadedP95Ratio = Number(
+    (
+      summary.latency.adaptedLoadedP95Ms
+      / Math.max(1, summary.latency.originalLoadedP95Ms)
+    ).toFixed(2),
   );
 } catch (error) {
   summary.error = error instanceof Error ? error.message : String(error);
@@ -342,11 +350,17 @@ async function createLesson(token, materialId, studentSubject) {
 }
 
 async function measureLesson(teacherPage, studentPage, studentToken, lessonId, label) {
-  await apiRequest(studentToken, "POST", `/schedule/lessons/${lessonId}/collaboration-documents/current`, 200, {
+  const collaborationDocument = await apiRequest(
+    studentToken,
+    "POST",
+    `/schedule/lessons/${lessonId}/collaboration-documents/current`,
+    200,
+    {
     documentKind: "MATERIAL_WORK",
     materialId: summary.materialId,
     scope: "GROUP",
-  });
+    },
+  );
   await Promise.all([
     openClassroom(teacherPage, lessonId, true),
     openClassroom(studentPage, lessonId, false),
@@ -406,18 +420,99 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
     waitForFrameText(studentFrame, "#position", "0", timeoutMs),
   ]);
   const studentToTeacher = await measureDirection(studentFrame, teacherFrame, sampleCount);
+  await studentFrame.locator("#reset").click();
+  await Promise.all([
+    waitForFrameText(teacherFrame, "#position", "0", timeoutMs),
+    waitForFrameText(studentFrame, "#position", "0", timeoutMs),
+  ]);
+  const loadToken = await apiRequest(
+    studentToken,
+    "POST",
+    `/schedule/lessons/${lessonId}/collaboration-documents/${collaborationDocument.id}/token`,
+    200,
+  );
+  await startCollaborationLoad(studentPage, loadToken);
+  const loadedTeacherToStudent = await measureDirection(
+    teacherFrame,
+    studentFrame,
+    sampleCount,
+  );
+  await teacherFrame.locator("#reset").click();
+  await Promise.all([
+    waitForFrameText(teacherFrame, "#position", "0", timeoutMs),
+    waitForFrameText(studentFrame, "#position", "0", timeoutMs),
+  ]);
+  const loadedStudentToTeacher = await measureDirection(
+    studentFrame,
+    teacherFrame,
+    sampleCount,
+  );
+  await stopCollaborationLoad(studentPage);
   return {
     runtime,
     diagnostics: {
       teacher: await teacherPage.evaluate(() => window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? []),
       student: await studentPage.evaluate(() => window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? []),
     },
+    gameRealtime: {
+      teacher: await teacherPage.evaluate(() => window.__PLAY_SAY_GAME_REALTIME__ ?? null),
+      student: await studentPage.evaluate(() => window.__PLAY_SAY_GAME_REALTIME__ ?? null),
+    },
     domFingerprint,
     screenshotPath,
     screenshotSha256: createHash("sha256").update(screenshot).digest("hex"),
+    loadedStudentToTeacher,
+    loadedTeacherToStudent,
     studentToTeacher,
     teacherToStudent,
   };
+}
+
+async function startCollaborationLoad(page, tokenResponse) {
+  await page.evaluate(({ response }) => {
+    const base = response.websocketUrl.startsWith("ws")
+      ? new URL(response.websocketUrl)
+      : new URL(response.websocketUrl, window.location.origin.replace(/^http/, "ws"));
+    base.searchParams.set("room", response.yjsDocumentId);
+    base.searchParams.set("token", response.token);
+    const socket = new WebSocket(base.toString());
+    socket.binaryType = "arraybuffer";
+    const writeVarUint = (value, output) => {
+      let remaining = value;
+      while (remaining > 127) {
+        output.push((remaining & 127) | 128);
+        remaining >>>= 7;
+      }
+      output.push(remaining);
+    };
+    const payload = new TextEncoder().encode(JSON.stringify({
+      kind: "game-sync-load-test",
+      payload: { id: crypto.randomUUID(), padding: "x".repeat(16 * 1024) },
+    }));
+    const frame = [];
+    writeVarUint(2, frame);
+    writeVarUint(payload.byteLength, frame);
+    frame.push(...payload);
+    const encoded = new Uint8Array(frame);
+    window.__PLAY_SAY_LOAD_SOCKET__ = socket;
+    window.__PLAY_SAY_LOAD_TIMER__ = window.setInterval(() => {
+      if (socket.readyState === WebSocket.OPEN && socket.bufferedAmount < 256 * 1024) {
+        socket.send(encoded);
+      }
+    }, 50);
+  }, { response: tokenResponse });
+  await page.waitForFunction(() => window.__PLAY_SAY_LOAD_SOCKET__?.readyState === WebSocket.OPEN, null, {
+    timeout: timeoutMs,
+  });
+}
+
+async function stopCollaborationLoad(page) {
+  await page.evaluate(() => {
+    window.clearInterval(window.__PLAY_SAY_LOAD_TIMER__);
+    window.__PLAY_SAY_LOAD_SOCKET__?.close();
+    delete window.__PLAY_SAY_LOAD_TIMER__;
+    delete window.__PLAY_SAY_LOAD_SOCKET__;
+  });
 }
 
 async function openClassroom(page, lessonId, teacher) {
@@ -446,10 +541,17 @@ async function openClassroom(page, lessonId, teacher) {
 
 async function measureDirection(sourceFrame, targetFrame, count) {
   const latenciesMs = [];
-  for (let index = 1; index <= count; index += 1) {
+  let position = 0;
+  for (let index = 0; index < count; index += 1) {
+    if (position === 10) {
+      await sourceFrame.locator("#reset").click();
+      await waitForFrameText(targetFrame, "#position", "0", timeoutMs);
+      position = 0;
+    }
     const startedAt = performance.now();
     await sourceFrame.locator("#move").click();
-    await waitForFrameText(targetFrame, "#position", String(index), timeoutMs);
+    position += 1;
+    await waitForFrameText(targetFrame, "#position", String(position), timeoutMs);
     latenciesMs.push(Number((performance.now() - startedAt).toFixed(2)));
   }
   return {

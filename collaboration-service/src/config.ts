@@ -1,3 +1,5 @@
+import type { GameRealtimeMode } from "./gameProtocol.js";
+
 export interface CollaborationServiceConfig {
   port: number;
   keycloakJwksUrl: string;
@@ -8,6 +10,7 @@ export interface CollaborationServiceConfig {
   websocketHardLimitBytes: number;
   websocketMaxPayloadBytes: number;
   websocketSoftLimitBytes: number;
+  gameRealtimeMode: GameRealtimeMode;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CollaborationServiceConfig {
@@ -21,11 +24,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CollaborationS
     websocketHardLimitBytes: numberEnv(env.WEBSOCKET_HARD_LIMIT_BYTES, 4 * 1024 * 1024),
     websocketMaxPayloadBytes: numberEnv(env.WEBSOCKET_MAX_PAYLOAD_BYTES, 4 * 1024 * 1024),
     websocketSoftLimitBytes: numberEnv(env.WEBSOCKET_SOFT_LIMIT_BYTES, 1024 * 1024),
+    gameRealtimeMode: gameRealtimeModeEnv(env.GAME_REALTIME_MODE),
   };
   if (config.websocketHardLimitBytes <= config.websocketSoftLimitBytes) {
     throw new Error("websocket hard limit must exceed the soft limit");
   }
   return config;
+}
+
+function gameRealtimeModeEnv(value: string | undefined): GameRealtimeMode {
+  const normalized = value?.trim().toLowerCase() || "off";
+  if (normalized === "off" || normalized === "shadow" || normalized === "primary") {
+    return normalized;
+  }
+  throw new Error(`invalid GAME_REALTIME_MODE: ${value}`);
 }
 
 function requiredEnv(env: NodeJS.ProcessEnv, key: string): string {

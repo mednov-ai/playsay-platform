@@ -36,6 +36,15 @@ describe("sendWithBackpressure", () => {
     expect(metrics.recordDropped).not.toHaveBeenCalled();
   });
 
+  it("keeps ordered game actions reliable until the hard limit", () => {
+    const ws = socket(2048);
+    const metrics = observer();
+
+    expect(sendWithBackpressure(ws, new Uint8Array([1]), "game", policy, metrics)).toBe(true);
+    expect(ws.send).toHaveBeenCalledOnce();
+    expect(metrics.recordDropped).not.toHaveBeenCalled();
+  });
+
   it("drops awareness and ephemeral traffic at the soft limit", () => {
     const ws = socket(1024);
     const metrics = observer();

@@ -7,12 +7,12 @@ import {
 } from "prom-client";
 import type {
   CollaborationBackpressureObserver,
-  CollaborationDeliveryClass,
 } from "./backpressure.js";
 import type { SnapshotMetrics } from "./snapshots.js";
 
 interface RealtimeMetricSnapshot {
   activeConnections: number;
+  activeGameConnections: number;
   activeRooms: number;
   bufferedBytes: number;
 }
@@ -22,6 +22,11 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
   private readonly activeConnections = new Gauge({
     help: "Number of active collaboration websocket connections.",
     name: "playsay_collaboration_active_connections",
+    registers: [this.registry],
+  });
+  private readonly activeGameConnections = new Gauge({
+    help: "Number of active low-latency game websocket connections.",
+    name: "playsay_collaboration_game_active_connections",
     registers: [this.registry],
   });
   private readonly activeRooms = new Gauge({
@@ -61,6 +66,23 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     name: "playsay_collaboration_ephemeral_relay_duration_seconds",
     registers: [this.registry],
   });
+  private readonly gameMessages = new Counter({
+    help: "Low-latency game messages relayed between room participants.",
+    labelNames: ["message_type"] as const,
+    name: "playsay_collaboration_game_messages_total",
+    registers: [this.registry],
+  });
+  private readonly gameBytes = new Counter({
+    help: "Low-latency game payload bytes accepted for relay.",
+    name: "playsay_collaboration_game_bytes_total",
+    registers: [this.registry],
+  });
+  private readonly gameRelayDuration = new Histogram({
+    buckets: [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025],
+    help: "In-process low-latency game relay duration in seconds.",
+    name: "playsay_collaboration_game_relay_duration_seconds",
+    registers: [this.registry],
+  });
   private readonly snapshotQueueSize = new Gauge({
     help: "Number of collaboration documents waiting for snapshot persistence.",
     name: "playsay_collaboration_snapshot_queue_size",
@@ -85,7 +107,7 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     return this.registry.contentType;
   }
 
-  recordDropped(deliveryClass: Exclude<CollaborationDeliveryClass, "sync">): void {
+  recordDropped(deliveryClass: "awareness" | "ephemeral"): void {
     this.droppedMessages.inc({ delivery_class: deliveryClass });
   }
 
@@ -99,6 +121,12 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     this.ephemeralRelayDuration.observe(durationSeconds);
   }
 
+  recordGameRelay(messageType: number, payloadBytes: number, durationSeconds: number): void {
+    this.gameMessages.inc({ message_type: String(messageType) });
+    this.gameBytes.inc(payloadBytes);
+    this.gameRelayDuration.observe(durationSeconds);
+  }
+
   recordSnapshotFlush(outcome: "saved" | "discard" | "retry", durationSeconds: number): void {
     this.snapshotFlushDuration.observe({ outcome }, durationSeconds);
   }
@@ -109,6 +137,7 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
 
   async render(snapshot: RealtimeMetricSnapshot): Promise<string> {
     this.activeConnections.set(snapshot.activeConnections);
+    this.activeGameConnections.set(snapshot.activeGameConnections);
     this.activeRooms.set(snapshot.activeRooms);
     this.bufferedBytes.set(snapshot.bufferedBytes);
     return this.registry.metrics();

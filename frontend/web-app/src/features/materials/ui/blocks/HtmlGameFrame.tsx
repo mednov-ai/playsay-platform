@@ -186,6 +186,11 @@ export function HtmlGameFrame({
   const [appliedAuthorityRunId, setAppliedAuthorityRunId] = useState<string | null>(null);
   const [runtimeStatus, setRuntimeStatus] = useState<HtmlGameRuntimeStatus>("checking");
   const activeSnapshot = sync?.snapshots[blockId];
+  const gameRealtime = sync?.gameRealtime;
+  const sdkCheckpoint = sync?.sdkCheckpoints[blockId];
+  const syncClientId = sync?.clientId;
+  const syncIsAuthority = sync?.isAuthority ?? true;
+  const presentedBlockId = sync?.presentedBlockId ?? null;
   const authorityAvailable = sdkRuntime
     ? !sync || sync.isAuthority || Boolean(authorityRunId)
     : !isMirror || Boolean(
@@ -390,6 +395,20 @@ export function HtmlGameFrame({
               blockId,
               runId: runtimeRunId,
             });
+            if (
+              outbound.diagnostic.stage === "ordered-confirmed"
+              && outbound.diagnostic.eventId
+              && sync?.gameRealtime
+            ) {
+              sync.gameRealtime.publish({
+                actorId: String(sync.clientId ?? channel),
+                blockId,
+                eventId: outbound.diagnostic.eventId,
+                kind: "ack",
+                revision: outbound.diagnostic.revision,
+                runId: runtimeRunId,
+              });
+            }
           } else if (outbound.kind === "action-request") {
             recordGameSyncDiagnostic({
               blockId,
@@ -442,9 +461,17 @@ export function HtmlGameFrame({
                 runId: runtimeRunId,
                 stage: "socket-queued",
               });
-              sync?.publishSdkAction(action);
+              if (sync?.gameRealtime) {
+                sync.gameRealtime.publish({ action, kind: "ordered-action" });
+              } else {
+                sync?.publishSdkAction(action);
+              }
             } else {
-              sync.publishSdkRequest(request);
+              if (sync.gameRealtime) {
+                sync.gameRealtime.publish({ kind: "action-request", request });
+              } else {
+                sync.publishSdkRequest(request);
+              }
             }
           } else if (outbound.kind === "effect") {
             if (serializedMessageBytes(outbound.effect) > GAME_SYNC_LIMITS.effectBytes) {
@@ -458,7 +485,11 @@ export function HtmlGameFrame({
               runId: runtimeRunId,
             };
             handledSdkEffectsRef.current.add(effect.id);
-            sync?.publishSdkEffect(effect);
+            if (sync?.gameRealtime) {
+              sync.gameRealtime.publish({ effect, kind: "effect" });
+            } else {
+              sync?.publishSdkEffect(effect);
+            }
           } else if (outbound.kind === "checkpoint" && (!sync || sync.isAuthority)) {
             if (serializedMessageBytes(outbound.checkpoint) > GAME_SYNC_LIMITS.checkpointBytes) {
               return;
@@ -531,7 +562,11 @@ export function HtmlGameFrame({
         runId: runtimeRunId,
         stage: "socket-queued",
       });
-      sync.publishSdkAction(action);
+      if (sync.gameRealtime) {
+        sync.gameRealtime.publish({ action, kind: "ordered-action" });
+      } else {
+        sync.publishSdkAction(action);
+      }
     });
   }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.isAuthority, sync?.sdkRequests]);
 
@@ -556,6 +591,7 @@ export function HtmlGameFrame({
           return;
         }
         handledSdkActionsRef.current.add(action.id);
+        sync.gameRealtime?.acknowledge(action.eventId);
         recordGameSyncDiagnostic({
           blockId,
           eventId: action.eventId,
@@ -566,6 +602,102 @@ export function HtmlGameFrame({
         sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
       });
   }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.sdkActions, sync?.sdkCheckpoints]);
+
+  useEffect(() => {
+    if (
+      !sdkRuntime
+      || !gameRealtime
+      || presentedBlockId !== blockId
+    ) {
+      return;
+    }
+    return gameRealtime.acquire({
+      blockId,
+      getRevision: () => sdkRevisionRef.current,
+      isAuthority: syncIsAuthority,
+      onMessage: (message) => {
+        if (message.kind === "action-request") {
+          if (
+            !syncIsAuthority
+            || handledSdkRequestsRef.current.has(message.request.id)
+            || !validSdkActionRequest(message.request, embeddedManifest)
+          ) {
+            return;
+          }
+          handledSdkRequestsRef.current.add(message.request.id);
+          const action = orderSdkAction(
+            message.request,
+            sdkRevisionRef,
+            sdkLogicalTimeRef,
+          );
+          handledSdkActionsRef.current.add(action.id);
+          sdkPortRef.current?.postMessage({
+            action,
+            kind: "ordered-action",
+          } satisfies GameSyncInboundMessage);
+          gameRealtime.publish({ action, kind: "ordered-action" });
+        } else if (message.kind === "ordered-action") {
+          const { action } = message;
+          if (action.authorityRevision > sdkRevisionRef.current + 1) {
+            gameRealtime.publish({
+              blockId,
+              kind: "resume",
+              lastRevision: sdkRevisionRef.current,
+              requesterId: String(syncClientId ?? channel),
+              runId: runtimeRunId,
+            });
+            return;
+          }
+          sdkRevisionRef.current = Math.max(
+            sdkRevisionRef.current,
+            action.authorityRevision,
+          );
+          sdkLogicalTimeRef.current = Math.max(
+            sdkLogicalTimeRef.current,
+            action.logicalTime,
+          );
+          gameRealtime.acknowledge(action.eventId);
+          if (handledSdkActionsRef.current.has(action.id)) {
+            return;
+          }
+          handledSdkActionsRef.current.add(action.id);
+          sdkPortRef.current?.postMessage({
+            action,
+            kind: "ordered-action",
+          } satisfies GameSyncInboundMessage);
+        } else if (message.kind === "effect") {
+          if (handledSdkEffectsRef.current.has(message.effect.id)) {
+            return;
+          }
+          handledSdkEffectsRef.current.add(message.effect.id);
+          sdkPortRef.current?.postMessage({
+            effect: message.effect,
+            kind: "effect",
+          } satisfies GameSyncInboundMessage);
+        } else if (message.kind === "recovery-required") {
+          if (sdkCheckpoint?.runId === runtimeRunId) {
+            sdkRevisionRef.current = sdkCheckpoint.revision;
+            sdkLogicalTimeRef.current = sdkCheckpoint.logicalTime;
+            sdkPortRef.current?.postMessage({
+              checkpoint: sdkCheckpoint,
+              kind: "checkpoint",
+            } satisfies GameSyncInboundMessage);
+          }
+        }
+      },
+      runId: runtimeRunId,
+    });
+  }, [
+    blockId,
+    embeddedManifest,
+    gameRealtime,
+    presentedBlockId,
+    runtimeRunId,
+    sdkRuntime,
+    sdkCheckpoint,
+    syncClientId,
+    syncIsAuthority,
+  ]);
 
   useEffect(() => {
     if (!sdkRuntime || !sync) {

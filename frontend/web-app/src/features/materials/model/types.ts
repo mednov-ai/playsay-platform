@@ -161,12 +161,53 @@ export type MaterialHtmlGameSdkCheckpoint = GameCheckpoint & {
   updatedAt: number;
 };
 
+export type MaterialHtmlGameRealtimeMessage =
+  | { kind: "action-request"; request: MaterialHtmlGameSdkActionRequest }
+  | { action: MaterialHtmlGameSdkOrderedAction; kind: "ordered-action" }
+  | { effect: MaterialHtmlGameSdkEffect; kind: "effect" }
+  | {
+      actorId: string;
+      blockId: string;
+      eventId: string;
+      kind: "ack";
+      revision?: number;
+      runId: string;
+    }
+  | {
+      blockId: string;
+      kind: "resume";
+      lastRevision: number;
+      requesterId: string;
+      runId: string;
+    }
+  | {
+      blockId: string;
+      kind: "recovery-required";
+      requesterId: string;
+      runId: string;
+    };
+
+export type MaterialHtmlGameRealtimeRegistration = {
+  blockId: string;
+  getRevision: () => number;
+  isAuthority: boolean;
+  onMessage: (message: MaterialHtmlGameRealtimeMessage) => void;
+  runId: string;
+};
+
+export type MaterialHtmlGameRealtime = {
+  acquire: (registration: MaterialHtmlGameRealtimeRegistration) => () => void;
+  acknowledge: (eventId: string) => void;
+  publish: (message: MaterialHtmlGameRealtimeMessage) => void;
+};
+
 export type MaterialHtmlGameSync = {
   authorityRuns: Record<string, string>;
   clientId: number | null;
   effects: MaterialHtmlGameEffect[];
   inputs: MaterialHtmlGameInputEvent[];
   isAuthority: boolean;
+  gameRealtime?: MaterialHtmlGameRealtime;
   patches?: MaterialHtmlGamePatch[];
   presentedBlockId: string | null;
   publishPatch?: (patch: MaterialHtmlGamePatch) => void;

@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 
-export type CollaborationDeliveryClass = "sync" | "awareness" | "ephemeral";
+export type CollaborationDeliveryClass = "sync" | "awareness" | "ephemeral" | "game";
 
 export interface CollaborationBackpressurePolicy {
   softLimitBytes: number;
@@ -8,7 +8,7 @@ export interface CollaborationBackpressurePolicy {
 }
 
 export interface CollaborationBackpressureObserver {
-  recordDropped(deliveryClass: Exclude<CollaborationDeliveryClass, "sync">): void;
+  recordDropped(deliveryClass: "awareness" | "ephemeral"): void;
   recordForcedClose(): void;
 }
 
@@ -29,7 +29,10 @@ export function sendWithBackpressure(
     return false;
   }
 
-  if (deliveryClass !== "sync" && ws.bufferedAmount >= policy.softLimitBytes) {
+  if (
+    (deliveryClass === "awareness" || deliveryClass === "ephemeral")
+    && ws.bufferedAmount >= policy.softLimitBytes
+  ) {
     observer.recordDropped(deliveryClass);
     return false;
   }

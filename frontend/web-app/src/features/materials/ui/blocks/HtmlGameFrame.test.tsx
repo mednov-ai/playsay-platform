@@ -149,6 +149,55 @@ describe("HTML game sandbox", () => {
     expect(publishInput).not.toHaveBeenCalled();
   });
 
+  it("acquires the fast lane only while this SDK game is presented", () => {
+    const release = vi.fn();
+    const acquire = vi.fn(() => release);
+    const sdkGame = `<html><head><script type="application/playsay-game+json">{
+      "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
+      "reducerVersion":"1","buildHash":"test"
+    }</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>`;
+    const sync = {
+      ...sdkSyncFields(),
+      authorityRuns: {},
+      effects: [],
+      gameRealtime: {
+        acknowledge: vi.fn(),
+        acquire,
+        publish: vi.fn(),
+      },
+      inputs: [],
+      isAuthority: true,
+      presentedBlockId: null,
+      publishEffect: vi.fn(),
+      publishInput: vi.fn(),
+      publishSnapshot: vi.fn(),
+      ready: true,
+      setAuthorityRun: vi.fn(),
+      setPresentedBlock: vi.fn(),
+      snapshots: {},
+    } satisfies MaterialHtmlGameSync;
+    const view = render(
+      <HtmlGameFrame blockId="game-sdk" height={640} html={sdkGame} sync={sync} title="Game" />,
+    );
+    expect(acquire).not.toHaveBeenCalled();
+
+    view.rerender(
+      <HtmlGameFrame
+        blockId="game-sdk"
+        height={640}
+        html={sdkGame}
+        sync={{ ...sync, presentedBlockId: "game-sdk" }}
+        title="Game"
+      />,
+    );
+    expect(acquire).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <HtmlGameFrame blockId="game-sdk" height={640} html={sdkGame} sync={sync} title="Game" />,
+    );
+    expect(release).toHaveBeenCalledOnce();
+  });
+
   it("reports an SDK game ready only after a matching hello and ready lifecycle, then latches errors", () => {
     const statuses: string[] = [];
     const port1 = {

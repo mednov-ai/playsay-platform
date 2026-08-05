@@ -11,6 +11,12 @@ import {
   type CollaborationBackpressurePolicy,
 } from "./backpressure.js";
 import { loadConfig } from "./config.js";
+import {
+  encodeGameWelcome,
+  gameRealtimeSubprotocol,
+  validateGameFrame,
+  type GameRealtimeMode,
+} from "./gameProtocol.js";
 import { CollaborationMetrics } from "./metrics.js";
 import { SnapshotQueue } from "./snapshots.js";
 import type { CollaborationClaims } from "./rooms.js";
@@ -41,6 +47,11 @@ async function main(): Promise<void> {
     softLimitBytes: config.websocketSoftLimitBytes,
   };
   const wss = new WebSocketServer({
+    handleProtocols: (protocols) => (
+      config.gameRealtimeMode !== "off" && protocols.has(gameRealtimeSubprotocol)
+        ? gameRealtimeSubprotocol
+        : false
+    ),
     maxPayload: config.websocketMaxPayloadBytes,
     noServer: true,
   });
@@ -54,6 +65,7 @@ async function main(): Promise<void> {
       const bufferedBytes = [...wss.clients].reduce((total, client) => total + client.bufferedAmount, 0);
       void metrics.render({
         activeConnections: wss.clients.size,
+        activeGameConnections: [...wss.clients].filter(isGameSocket).length,
         activeRooms: rooms.size,
         bufferedBytes,
       }).then((body) => {
@@ -74,6 +86,13 @@ async function main(): Promise<void> {
   server.on("upgrade", (request, socket, head) => {
     const requestUrl = new URL(request.url ?? "/", "http://localhost");
     const roomName = requestUrl.searchParams.get("room")?.trim();
+    const requestsGameRealtime = requestedSubprotocols(request)
+      .includes(gameRealtimeSubprotocol);
+    if (requestsGameRealtime && config.gameRealtimeMode === "off") {
+      socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n");
+      socket.destroy();
+      return;
+    }
     const token = runCatching(() => tokenFromRequestUrl(requestUrl));
     if (!roomName || token.error) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
@@ -109,7 +128,15 @@ async function main(): Promise<void> {
       .then((room) => {
         ws.off("message", queuePendingMessage);
         if (ws.readyState !== ws.OPEN) return;
-        bindWebSocket(room, ws, snapshots, backpressurePolicy, metrics, pendingMessages);
+        bindWebSocket(
+          room,
+          ws,
+          snapshots,
+          backpressurePolicy,
+          metrics,
+          config.gameRealtimeMode,
+          pendingMessages,
+        );
       })
       .catch(() => ws.close(1011, "room restore failed"));
   });
@@ -163,7 +190,11 @@ async function createRoom(
   const updateHandler = (update: Uint8Array, origin: unknown) => {
     const originSocket = room.connections.has(origin as WebSocket) ? origin as WebSocket : null;
     room.connections.forEach((_controlledIds, connection) => {
-      if (connection !== originSocket && connection.readyState === connection.OPEN) {
+      if (
+        connection !== originSocket
+        && !isGameSocket(connection)
+        && connection.readyState === connection.OPEN
+      ) {
         sendSyncUpdate(connection, update, backpressurePolicy, metrics);
       }
     });
@@ -212,6 +243,7 @@ function bindWebSocket(
   snapshots: SnapshotQueue,
   backpressurePolicy: CollaborationBackpressurePolicy,
   metrics: CollaborationMetrics,
+  gameRealtimeMode: GameRealtimeMode,
   pendingMessages: RawData[] = [],
 ): void {
   if (room.idleTimer) {
@@ -244,8 +276,22 @@ function bindWebSocket(
     }
   });
 
-  sendSyncStep1(ws, room.doc, backpressurePolicy, metrics);
-  sendCurrentAwareness(ws, room.awareness, backpressurePolicy, metrics);
+  if (isGameSocket(ws)) {
+    if (gameRealtimeMode === "off") {
+      ws.close(1008, "game realtime is disabled");
+      return;
+    }
+    sendWithBackpressure(
+      ws,
+      encodeGameWelcome(gameRealtimeMode),
+      "game",
+      backpressurePolicy,
+      metrics,
+    );
+  } else {
+    sendSyncStep1(ws, room.doc, backpressurePolicy, metrics);
+    sendCurrentAwareness(ws, room.awareness, backpressurePolicy, metrics);
+  }
   pendingMessages.forEach((message) => {
     processMessage(room, ws, message, backpressurePolicy, metrics);
   });
@@ -259,7 +305,11 @@ function processMessage(
   metrics: CollaborationMetrics,
 ): void {
   try {
-    handleMessage(room, ws, message, backpressurePolicy, metrics);
+    if (isGameSocket(ws)) {
+      handleGameMessage(room, ws, message, backpressurePolicy, metrics);
+    } else {
+      handleMessage(room, ws, message, backpressurePolicy, metrics);
+    }
   } catch {
     ws.close(1003, "invalid collaboration message");
   }
@@ -308,7 +358,11 @@ function handleMessage(
     encoding.writeVarUint8Array(encoder, payload);
     const encoded = encoding.toUint8Array(encoder);
     room.connections.forEach((_controlledIds, connection) => {
-      if (connection !== ws && connection.readyState === connection.OPEN) {
+      if (
+        connection !== ws
+        && !isGameSocket(connection)
+        && connection.readyState === connection.OPEN
+      ) {
         sendWithBackpressure(connection, encoded, "ephemeral", backpressurePolicy, metrics);
       }
     });
@@ -317,6 +371,32 @@ function handleMessage(
   }
 
   throw new Error("unsupported collaboration message");
+}
+
+function handleGameMessage(
+  room: CollaborationRoom,
+  ws: WebSocket,
+  message: RawData,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
+  const relayStartedAt = performance.now();
+  const bytes = rawDataToUint8Array(message);
+  const validated = validateGameFrame(bytes);
+  room.connections.forEach((_controlledIds, connection) => {
+    if (
+      connection !== ws
+      && isGameSocket(connection)
+      && connection.readyState === connection.OPEN
+    ) {
+      sendWithBackpressure(connection, bytes, "game", backpressurePolicy, metrics);
+    }
+  });
+  metrics.recordGameRelay(
+    validated.type,
+    validated.payloadBytes,
+    (performance.now() - relayStartedAt) / 1000,
+  );
 }
 
 function sendSyncStep1(
@@ -383,10 +463,25 @@ function broadcastAwareness(
   );
   const payload = encoding.toUint8Array(encoder);
   room.connections.forEach((_controlledIds, connection) => {
-    if (connection !== origin && connection.readyState === connection.OPEN) {
+    if (
+      connection !== origin
+      && !isGameSocket(connection)
+      && connection.readyState === connection.OPEN
+    ) {
       sendWithBackpressure(connection, payload, "awareness", backpressurePolicy, metrics);
     }
   });
+}
+
+function isGameSocket(ws: WebSocket): boolean {
+  return ws.protocol === gameRealtimeSubprotocol;
+}
+
+function requestedSubprotocols(request: http.IncomingMessage): string[] {
+  const header = request.headers["sec-websocket-protocol"];
+  return typeof header === "string"
+    ? header.split(",").map((value) => value.trim()).filter(Boolean)
+    : [];
 }
 
 function rawDataToUint8Array(data: RawData): Uint8Array {

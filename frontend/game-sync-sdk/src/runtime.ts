@@ -7,6 +7,7 @@ import {
   type GameEffect,
   type GameReducerContext,
   type GameSessionContext,
+  type GameSyncDiagnosticStage,
   type OrderedGameAction,
 } from "./types";
 import { validateGameManifest } from "./compatibility";
@@ -86,6 +87,33 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
   let baseCheckpoint: GameCheckpoint<TState> = makeCheckpoint(canonicalState);
   const handledEffects = new Set<string>();
   const dispatchedAt: number[] = [];
+  let diagnosticsEnabled = false;
+
+  function diagnostic(
+    stage: GameSyncDiagnosticStage,
+    eventId?: string,
+    revision?: number,
+  ): void {
+    if (!diagnosticsEnabled) {
+      return;
+    }
+    transport.send({
+      diagnostic: {
+        at: performance.now(),
+        eventId,
+        revision,
+        stage,
+      },
+      kind: "diagnostic",
+    });
+  }
+
+  function diagnosticAfterPaint(eventId?: string, revision?: number): void {
+    if (!diagnosticsEnabled || typeof requestAnimationFrame !== "function") {
+      return;
+    }
+    requestAnimationFrame(() => diagnostic("painted", eventId, revision));
+  }
 
   function assertActionRate(): void {
     const now = Date.now();
@@ -201,6 +229,9 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
     logicalTime = action.logicalTime;
     pendingActions = pendingActions.filter((candidate) => candidate.eventId !== action.eventId);
     rebuildRenderedState();
+    diagnostic("ordered-applied", action.eventId, action.authorityRevision);
+    diagnostic("ordered-confirmed", action.eventId, action.authorityRevision);
+    diagnosticAfterPaint(action.eventId, action.authorityRevision);
     maybePublishCheckpoint();
   }
 
@@ -232,10 +263,12 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
         seed = message.seed;
         session = {
           actorId,
+          diagnostics: message.diagnostics,
           isAuthority: message.isAuthority,
           runId,
           seed,
         };
+        diagnosticsEnabled = message.diagnostics === true;
         connected = true;
         pendingActions = pendingActions.map((action) => ({
           ...action,
@@ -312,9 +345,12 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
         stateVersion: options.manifest.stateVersion,
         type: type.trim(),
       };
+      diagnostic("action-created", action.eventId);
       assertSize(action, GAME_SYNC_LIMITS.actionBytes, "Action");
       pendingActions.push(action);
       rebuildRenderedState();
+      diagnostic("optimistic-applied", action.eventId);
+      diagnosticAfterPaint(action.eventId);
       if (connected) {
         transport.send({ action, kind: "action-request" });
       }

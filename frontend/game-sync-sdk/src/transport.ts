@@ -63,6 +63,8 @@ export function createStandaloneTransport(options: {
     send(message: GameSyncOutboundMessage) {
       if (message.kind === "hello") {
         emit({ actorId, isAuthority, kind: "context", runId, seed });
+      } else if (message.kind === "diagnostic") {
+        return;
       } else if (message.kind === "action-request") {
         const action: GameActionRequest = message.action;
         revision += 1;

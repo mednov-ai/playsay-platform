@@ -17,6 +17,10 @@ import type {
   MaterialHtmlGameSnapshot,
   MaterialHtmlGameSync,
 } from "../../model/materialDocument";
+import {
+  gameSyncDiagnosticsEnabled,
+  recordGameSyncDiagnostic,
+} from "../../model/gameSyncDiagnostics";
 import { useAppTranslation } from "../../../../shared/i18n";
 
 type BridgeMessage =
@@ -373,13 +377,26 @@ export function HtmlGameFrame({
             const context: GameSyncInboundMessage = {
               actorId: String(sync?.clientId ?? channel),
               checkpoint: checkpoint?.runId === runtimeRunId ? checkpoint : undefined,
+              diagnostics: gameSyncDiagnosticsEnabled(),
               isAuthority: sync?.isAuthority ?? true,
               kind: "context",
               runId: runtimeRunId,
               seed: seedFromRunId(runtimeRunId),
             };
             ports.port1.postMessage(context);
+          } else if (outbound.kind === "diagnostic") {
+            recordGameSyncDiagnostic({
+              ...outbound.diagnostic,
+              blockId,
+              runId: runtimeRunId,
+            });
           } else if (outbound.kind === "action-request") {
+            recordGameSyncDiagnostic({
+              blockId,
+              eventId: outbound.action.eventId,
+              runId: runtimeRunId,
+              stage: "host-received",
+            });
             if (!sdkHelloAcceptedRef.current || !validSdkActionRequest(outbound.action, embeddedManifest)) {
               ports.port1.postMessage({
                 code: "ACTION_CONTRACT_INVALID",
@@ -418,6 +435,13 @@ export function HtmlGameFrame({
               const action = orderSdkAction(request, sdkRevisionRef, sdkLogicalTimeRef);
               handledSdkActionsRef.current.add(action.id);
               ports.port1.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
+              recordGameSyncDiagnostic({
+                blockId,
+                eventId: action.eventId,
+                revision: action.authorityRevision,
+                runId: runtimeRunId,
+                stage: "socket-queued",
+              });
               sync?.publishSdkAction(action);
             } else {
               sync.publishSdkRequest(request);
@@ -491,9 +515,22 @@ export function HtmlGameFrame({
         return;
       }
       handledSdkRequestsRef.current.add(request.id);
+      recordGameSyncDiagnostic({
+        blockId,
+        eventId: request.eventId,
+        runId: runtimeRunId,
+        stage: "socket-received",
+      });
       const action = orderSdkAction(request, sdkRevisionRef, sdkLogicalTimeRef);
       handledSdkActionsRef.current.add(action.id);
       sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
+      recordGameSyncDiagnostic({
+        blockId,
+        eventId: action.eventId,
+        revision: action.authorityRevision,
+        runId: runtimeRunId,
+        stage: "socket-queued",
+      });
       sync.publishSdkAction(action);
     });
   }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.isAuthority, sync?.sdkRequests]);
@@ -519,6 +556,13 @@ export function HtmlGameFrame({
           return;
         }
         handledSdkActionsRef.current.add(action.id);
+        recordGameSyncDiagnostic({
+          blockId,
+          eventId: action.eventId,
+          revision: action.authorityRevision,
+          runId: runtimeRunId,
+          stage: "socket-received",
+        });
         sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
       });
   }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.sdkActions, sync?.sdkCheckpoints]);

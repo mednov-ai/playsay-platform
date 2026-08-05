@@ -298,6 +298,7 @@ function handleMessage(
   }
 
   if (messageType === messageEphemeral) {
+    const relayStartedAt = performance.now();
     const payload = decoding.readVarUint8Array(decoder);
     if (payload.byteLength > maxEphemeralPayloadBytes) {
       throw new Error("ephemeral payload is too large");
@@ -311,6 +312,7 @@ function handleMessage(
         sendWithBackpressure(connection, encoded, "ephemeral", backpressurePolicy, metrics);
       }
     });
+    metrics.recordEphemeralRelay(payload.byteLength, (performance.now() - relayStartedAt) / 1000);
     return;
   }
 

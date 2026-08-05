@@ -36,6 +36,44 @@ describe("defineGame", () => {
     game.dispose();
   });
 
+  it("emits payload-free diagnostics only when the host enables tracing", () => {
+    let receive: ((message: GameSyncInboundMessage) => void) | undefined;
+    const sent: GameSyncOutboundMessage[] = [];
+    const game = defineGame({
+      initialState: 0,
+      manifest,
+      onState: () => undefined,
+      reduce: (state, action) => state + Number(action.payload),
+      transport: {
+        send: (message) => sent.push(message),
+        subscribe: (listener) => {
+          receive = listener;
+          return () => undefined;
+        },
+      },
+    });
+    receive?.({
+      actorId: "student",
+      diagnostics: true,
+      isAuthority: false,
+      kind: "context",
+      runId: "run",
+      seed: 7,
+    });
+
+    const eventId = game.dispatch("increment", { privateAnswer: "not-recorded" });
+    const diagnostics = sent.flatMap((message) => message.kind === "diagnostic"
+      ? [message.diagnostic]
+      : []);
+
+    expect(diagnostics.map((diagnostic) => diagnostic.stage)).toEqual([
+      "action-created",
+      "optimistic-applied",
+    ]);
+    expect(diagnostics.every((diagnostic) => diagnostic.eventId === eventId)).toBe(true);
+    expect(JSON.stringify(diagnostics)).not.toContain("privateAnswer");
+  });
+
   it("provides deterministic random values for the same seed and revision", async () => {
     const run = (values: number[]) => defineGame<number[]>({
       initialState: [],

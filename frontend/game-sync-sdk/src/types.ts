@@ -71,9 +71,24 @@ export type GameReducerContext = {
 
 export type GameSessionContext = {
   actorId: string;
+  diagnostics?: boolean;
   isAuthority: boolean;
   runId: string;
   seed: number;
+};
+
+export type GameSyncDiagnosticStage =
+  | "action-created"
+  | "optimistic-applied"
+  | "ordered-applied"
+  | "ordered-confirmed"
+  | "painted";
+
+export type GameSyncDiagnostic = {
+  at: number;
+  eventId?: string;
+  revision?: number;
+  stage: GameSyncDiagnosticStage;
 };
 
 export type GameReducer<TState> = (
@@ -87,6 +102,7 @@ export type GameLifecycleEvent = "ready" | "pause" | "resume" | "dispose";
 export type GameSyncOutboundMessage =
   | { kind: "hello"; manifest: GameManifest }
   | { kind: "action-request"; action: GameActionRequest }
+  | { diagnostic: GameSyncDiagnostic; kind: "diagnostic" }
   | { kind: "effect"; effect: GameEffect }
   | { kind: "checkpoint"; checkpoint: GameCheckpoint }
   | { kind: "lifecycle"; event: GameLifecycleEvent }
@@ -97,6 +113,7 @@ export type GameSyncInboundMessage =
   | {
       actorId: string;
       checkpoint?: GameCheckpoint;
+      diagnostics?: boolean;
       isAuthority: boolean;
       kind: "context";
       runId: string;

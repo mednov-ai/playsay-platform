@@ -45,6 +45,22 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     name: "playsay_collaboration_backpressure_forced_closes_total",
     registers: [this.registry],
   });
+  private readonly ephemeralMessages = new Counter({
+    help: "Ephemeral collaboration messages relayed between room participants.",
+    name: "playsay_collaboration_ephemeral_messages_total",
+    registers: [this.registry],
+  });
+  private readonly ephemeralBytes = new Counter({
+    help: "Ephemeral collaboration payload bytes accepted for relay.",
+    name: "playsay_collaboration_ephemeral_bytes_total",
+    registers: [this.registry],
+  });
+  private readonly ephemeralRelayDuration = new Histogram({
+    buckets: [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025],
+    help: "In-process ephemeral room relay duration in seconds.",
+    name: "playsay_collaboration_ephemeral_relay_duration_seconds",
+    registers: [this.registry],
+  });
   private readonly snapshotQueueSize = new Gauge({
     help: "Number of collaboration documents waiting for snapshot persistence.",
     name: "playsay_collaboration_snapshot_queue_size",
@@ -75,6 +91,12 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
 
   recordForcedClose(): void {
     this.forcedCloses.inc();
+  }
+
+  recordEphemeralRelay(payloadBytes: number, durationSeconds: number): void {
+    this.ephemeralMessages.inc();
+    this.ephemeralBytes.inc(payloadBytes);
+    this.ephemeralRelayDuration.observe(durationSeconds);
   }
 
   recordSnapshotFlush(outcome: "saved" | "discard" | "retry", durationSeconds: number): void {

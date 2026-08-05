@@ -41,6 +41,7 @@ export function MaterialBlockEditor({
   onApplyGameAdaptation,
   onPreviewGameAdaptation,
   onRequestGameAdaptation,
+  onRevalidateGameAdaptation,
   onRollbackGameAdaptation,
   onPreview,
   onPreviewEnd,
@@ -69,6 +70,7 @@ export function MaterialBlockEditor({
   onApplyGameAdaptation: () => void;
   onPreviewGameAdaptation: () => void;
   onRequestGameAdaptation: () => void;
+  onRevalidateGameAdaptation: () => void;
   onRollbackGameAdaptation: () => void;
   onPreview: () => void;
   onPreviewEnd: () => void;
@@ -494,7 +496,9 @@ export function MaterialBlockEditor({
                 <small>{gameSyncStatusLabel(block.gameSyncCompatibility, htmlGameAdaptation, t)}</small>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
-                {htmlGameAdaptation?.status === "READY_FOR_REVIEW" && htmlGameAdaptation.adaptedAssetId ? (
+                {htmlGameAdaptation?.status === "READY_FOR_REVIEW" &&
+                htmlGameAdaptation.adaptedAssetId &&
+                htmlGameAdaptation.mechanicsValidation === "PASSED" ? (
                   <>
                     <Button disabled={disabled} onClick={onPreviewGameAdaptation} type="button" variant="outline">
                       {t("materials.blockEditor.previewGameAdaptation")}
@@ -502,6 +506,20 @@ export function MaterialBlockEditor({
                     <Button disabled={disabled} onClick={onApplyGameAdaptation} type="button">
                       {t("materials.blockEditor.applyGameAdaptation")}
                     </Button>
+                  </>
+                ) : htmlGameAdaptation &&
+                  ["READY_FOR_REVIEW", "APPLIED"].includes(htmlGameAdaptation.status) &&
+                  htmlGameAdaptation.mechanicsValidation !== "PASSED" ? (
+                  <>
+                    <Button disabled={disabled} onClick={onRevalidateGameAdaptation} type="button" variant="outline">
+                      <RefreshCw className="h-4 w-4" />
+                      {t("materials.blockEditor.revalidateGameAdaptation")}
+                    </Button>
+                    {htmlGameAdaptation.status === "APPLIED" ? (
+                      <Button disabled={disabled} onClick={onRollbackGameAdaptation} type="button" variant="outline">
+                        {t("materials.blockEditor.rollbackGameAdaptation")}
+                      </Button>
+                    ) : null}
                   </>
                 ) : htmlGameAdaptation?.status === "APPLIED" ? (
                   <Button disabled={disabled} onClick={onRollbackGameAdaptation} type="button" variant="outline">
@@ -672,6 +690,7 @@ function gameSyncStatusLabel(
       GAME_ADAPTER_CONTRACT_INVALID: "gameSyncFailedContract",
       GAME_ADAPTER_RUNTIME_INVALID: "gameSyncFailedRuntime",
       GAME_ADAPTER_ACTION_RATE_EXCEEDED: "gameSyncFailedActionRate",
+      GAME_ADAPTER_MECHANICS_CHANGED: "gameSyncFailedMechanics",
       GAME_ADAPTER_UNSAFE: "gameSyncFailedUnsafe",
       GAME_ADAPTER_UNAVAILABLE: "gameSyncFailedUnavailable",
     }[adaptation.errorCode];
@@ -679,6 +698,13 @@ function gameSyncStatusLabel(
   }
   if (adaptation && ["PENDING", "ANALYZING", "PATCHING", "VALIDATING", "RETRY"].includes(adaptation.status)) {
     return t("materials.blockEditor.gameSyncAdapting");
+  }
+  if (
+    adaptation &&
+    ["READY_FOR_REVIEW", "APPLIED"].includes(adaptation.status) &&
+    adaptation.mechanicsValidation !== "PASSED"
+  ) {
+    return t("materials.blockEditor.gameSyncRevalidationRequired");
   }
   if (adaptation?.status === "READY_FOR_REVIEW") return t("materials.blockEditor.gameSyncReview");
   if (adaptation?.status === "APPLIED" || compatibility === "SDK_V1") return t("materials.blockEditor.gameSyncSdk");

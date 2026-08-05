@@ -4,6 +4,8 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.Instant
 import java.util.UUID
 
@@ -20,6 +22,13 @@ class MaterialGameAdaptationEntity(
     @Column(name = "report", columnDefinition = "TEXT") var report: String? = null,
     @Column(name = "model", length = 120) var model: String? = null,
     @Column(name = "prompt_hash", length = 128) var promptHash: String? = null,
+    @Column(name = "mechanics_validation", nullable = false, length = 32)
+    var mechanicsValidation: String = "REVALIDATION_REQUIRED",
+    @Column(name = "validator_version", length = 64) var validatorVersion: String? = null,
+    @Column(name = "source_hash", length = 64) var sourceHash: String? = null,
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "validation_report", columnDefinition = "jsonb")
+    var validationReport: String? = null,
     @Column(name = "attempts", nullable = false) var attempts: Int = 0,
     @Column(name = "next_attempt_at") var nextAttemptAt: Instant? = null,
     @Column(name = "lease_until") var leaseUntil: Instant? = null,

@@ -331,6 +331,17 @@ class LessonMaterialStore(
     }
 
     @Transactional
+    fun revalidateGameAdaptation(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        assetId: UUID,
+        jobId: UUID,
+    ): MaterialGameAdaptationResponse {
+        lessonMaterialCatalogService.requireEditable(authentication, materialId, MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN)
+        return materialGameAdaptationService.revalidate(materialId, assetId, jobId)
+    }
+
+    @Transactional
     fun rollbackGameAdaptation(
         authentication: JwtAuthenticationToken,
         materialId: UUID,

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-08-05-001-add-game-mechanics-validation" author="codex">
+        <addColumn tableName="material_game_adaptation">
+            <column name="mechanics_validation" type="VARCHAR(32)" defaultValue="REVALIDATION_REQUIRED">
+                <constraints nullable="false"/>
+            </column>
+            <column name="validator_version" type="VARCHAR(64)"/>
+            <column name="source_hash" type="VARCHAR(64)"/>
+            <column name="validation_report" type="JSONB"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="material_game_adaptation" columnName="validation_report"/>
+            <dropColumn tableName="material_game_adaptation" columnName="source_hash"/>
+            <dropColumn tableName="material_game_adaptation" columnName="validator_version"/>
+            <dropColumn tableName="material_game_adaptation" columnName="mechanics_validation"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

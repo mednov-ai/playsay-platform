@@ -9,6 +9,7 @@ import {
   applyMaterialGameAdaptation,
   requestMaterialHtmlGameEnrichment,
   requestMaterialGameAdaptation,
+  revalidateMaterialGameAdaptation,
   rollbackMaterialGameAdaptation,
   uploadMaterialHtmlGameAsset,
   uploadMaterialImageAsset,
@@ -124,7 +125,13 @@ export function MaterialLibraryPanel({
   const [assetUploadMessage, setAssetUploadMessage] = useState<string | null>(null);
   const [htmlGameEnrichments, setHtmlGameEnrichments] = useState<Record<string, MaterialHtmlGameEnrichment>>({});
   const [htmlGameAdaptations, setHtmlGameAdaptations] = useState<Record<string, MaterialGameAdaptation>>({});
-  const [gameAdaptationPreview, setGameAdaptationPreview] = useState<{ blockId: string; html: string; report?: string | null } | null>(null);
+  const [gameAdaptationPreview, setGameAdaptationPreview] = useState<{
+    blockId: string;
+    html: string;
+    mechanicsValidation?: string;
+    report?: string | null;
+    validationReport?: MaterialGameAdaptation["validationReport"];
+  } | null>(null);
   const enrichmentPollTokensRef = useRef<Record<string, number>>({});
   const adaptationPollTokensRef = useRef<Record<string, number>>({});
   const adaptationHydrationKeyRef = useRef("");
@@ -737,9 +744,36 @@ export function MaterialLibraryPanel({
     if (!form.id || !adaptation?.adaptedAssetId) return;
     try {
       const html = await fetchMaterialAssetText(form.id, adaptation.adaptedAssetId);
-      setGameAdaptationPreview({ blockId, html, report: adaptation.report });
+      setGameAdaptationPreview({
+        blockId,
+        html,
+        mechanicsValidation: adaptation.mechanicsValidation,
+        report: adaptation.report,
+        validationReport: adaptation.validationReport,
+      });
     } catch (caught) {
       setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.gameAdaptationPreviewFailed"));
+    }
+  }
+
+  async function revalidateGameAdaptation(blockId: string) {
+    const adaptation = htmlGameAdaptations[blockId];
+    const materialId = formRef.current.id;
+    if (!materialId || !adaptation) return;
+    try {
+      const revalidation = await revalidateMaterialGameAdaptation(
+        materialId,
+        adaptation.sourceAssetId,
+        adaptation.id,
+      );
+      setHtmlGameAdaptations((current) => ({ ...current, [blockId]: revalidation }));
+      setGameAdaptationPreview(null);
+      setAssetUploadMessage(t("materials.messages.gameAdaptationRevalidationStarted"));
+      if (revalidation.status !== "READY_FOR_REVIEW") {
+        void pollGameAdaptation(materialId, adaptation.sourceAssetId, blockId, revalidation.id);
+      }
+    } catch (caught) {
+      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.gameAdaptationFailed"));
     }
   }
 
@@ -886,9 +920,11 @@ export function MaterialLibraryPanel({
       {gameAdaptationPreview ? (
         <GameAdaptationReviewDialog
           html={gameAdaptationPreview.html}
+          mechanicsValidation={gameAdaptationPreview.mechanicsValidation}
           onApply={() => void applyGameAdaptation(gameAdaptationPreview.blockId)}
           onClose={() => setGameAdaptationPreview(null)}
           report={gameAdaptationPreview.report}
+          validationReport={gameAdaptationPreview.validationReport}
         />
       ) : null}
       {!canManage ? (
@@ -1004,6 +1040,7 @@ export function MaterialLibraryPanel({
                   onApplyGameAdaptation={(blockId) => void applyGameAdaptation(blockId)}
                   onPreviewGameAdaptation={(blockId) => void previewGameAdaptation(blockId)}
                   onRequestGameAdaptation={(blockId) => void requestGameAdaptation(blockId)}
+                  onRevalidateGameAdaptation={(blockId) => void revalidateGameAdaptation(blockId)}
                   onRollbackGameAdaptation={(blockId) => void rollbackGameAdaptation(blockId)}
                   onRemoveBlock={removeBlock}
                   onRequestPalette={requestPalette}

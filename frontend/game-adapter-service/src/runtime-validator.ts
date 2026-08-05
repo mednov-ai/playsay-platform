@@ -6,8 +6,10 @@ import {
 } from "@playsay/game-sync";
 
 const VALIDATION_URL = "http://validation.local/game";
+const SOURCE_VALIDATION_URL = "http://validation.local/source";
 const VALIDATION_TIMEOUT_MS = 12_000;
 const STEP_TIMEOUT_MS = 2_500;
+export const MECHANICS_VALIDATOR_VERSION = "mechanics-v2";
 
 export type RuntimeValidationOperation =
   | { kind: "click"; selector: string }
@@ -30,7 +32,9 @@ export type RuntimeValidationSummary = {
   actionCount: number;
   checks: string[];
   durationMs: number;
+  mechanicsEquivalent: boolean;
   maximumActionsPerSecond: number;
+  validatorVersion: typeof MECHANICS_VALIDATOR_VERSION;
 };
 
 let browserPromise: Promise<Browser> | null = null;
@@ -43,8 +47,8 @@ export function validateRuntimePlan(value: unknown): RuntimeValidationPlan {
   if (typeof plan.readySelector !== "string" || !validSelectorText(plan.readySelector)) {
     throw validationError("VALIDATION_PLAN_INVALID", "readySelector must be a non-empty bounded selector");
   }
-  if (!Array.isArray(plan.steps) || plan.steps.length < 1 || plan.steps.length > 4) {
-    throw validationError("VALIDATION_PLAN_INVALID", "validationPlan must contain between one and four steps");
+  if (!Array.isArray(plan.steps) || plan.steps.length < 1 || plan.steps.length > 12) {
+    throw validationError("VALIDATION_PLAN_INVALID", "validationPlan must contain between one and twelve steps");
   }
   const steps = plan.steps.map((candidate, index) => {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
@@ -78,6 +82,7 @@ export function validateRuntimePlan(value: unknown): RuntimeValidationPlan {
 export async function validateGameRuntime(
   html: string,
   planValue: unknown,
+  sourceHtml?: string,
 ): Promise<RuntimeValidationSummary> {
   const startedAt = performance.now();
   const plan = validateRuntimePlan(planValue);
@@ -106,13 +111,20 @@ export async function validateGameRuntime(
       error instanceof Error ? error.message : String(error),
     );
   });
+  const sourcePage = sourceHtml ? await context.newPage() : null;
   const runtimeErrors: string[] = [];
   const networkAttempts: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message.slice(0, 500)));
+  sourcePage?.on("pageerror", (error) => runtimeErrors.push(`source: ${error.message.slice(0, 500)}`));
   page.on("console", (message) => {
     if (message.type() === "error") runtimeErrors.push(message.text().slice(0, 500));
   });
+  sourcePage?.on("console", (message) => {
+    if (message.type() === "error") runtimeErrors.push(`source: ${message.text().slice(0, 500)}`);
+  });
+  await page.addInitScript(deterministicRuntimeSource());
   await page.addInitScript(validationTransportSource());
+  await sourcePage?.addInitScript(deterministicRuntimeSource());
   await page.route("**/*", async (route) => {
     if (route.request().url() === VALIDATION_URL) {
       await route.fulfill({
@@ -125,10 +137,29 @@ export async function validateGameRuntime(
     networkAttempts.push(route.request().url().slice(0, 300));
     await route.abort("blockedbyclient");
   });
+  await sourcePage?.route("**/*", async (route) => {
+    if (route.request().url() === SOURCE_VALIDATION_URL && sourceHtml) {
+      await route.fulfill({
+        body: withValidationCsp(sourceHtml),
+        contentType: "text/html; charset=utf-8",
+        status: 200,
+      });
+      return;
+    }
+    networkAttempts.push(`source: ${route.request().url().slice(0, 300)}`);
+    await route.abort("blockedbyclient");
+  });
 
   try {
     return await withTimeout(async () => {
       await page.goto(VALIDATION_URL, { waitUntil: "domcontentloaded" });
+      if (sourcePage) {
+        await sourcePage.goto(SOURCE_VALIDATION_URL, { waitUntil: "domcontentloaded" });
+        await sourcePage.locator(plan.readySelector).first().waitFor({
+          state: "visible",
+          timeout: STEP_TIMEOUT_MS,
+        });
+      }
       await page.locator(plan.readySelector).first().waitFor({ state: "visible", timeout: STEP_TIMEOUT_MS });
       await page.waitForFunction(
         () => {
@@ -150,11 +181,21 @@ export async function validateGameRuntime(
         throw validationError("GAME_MANIFEST_MISMATCH", "runtime manifest differs from embedded manifest");
       }
       assertRuntimeClean(runtimeErrors, networkAttempts);
+      if (sourcePage) {
+        assertMechanicsEquivalent(
+          await semanticFingerprint(sourcePage),
+          await semanticFingerprint(page),
+          "initial state",
+        );
+      }
 
       for (const step of plan.steps) {
         const before = await domFingerprint(page);
         const actionCountBefore = await actionCount(page);
-        await performOperation(page, step.operation);
+        await Promise.all([
+          performOperation(page, step.operation),
+          sourcePage ? performOperation(sourcePage, step.operation) : Promise.resolve(),
+        ]);
         await page.waitForFunction(
           ({ expectedType, previousCount }) => {
             const trace = (window as unknown as {
@@ -168,6 +209,17 @@ export async function validateGameRuntime(
           { expectedType: step.expectActionType, previousCount: actionCountBefore },
           { timeout: STEP_TIMEOUT_MS },
         );
+        await page.waitForTimeout(100);
+        const emittedActions = await actionsSince(page, actionCountBefore);
+        if (
+          emittedActions.length !== 1 ||
+          emittedActions[0]?.action?.type !== step.expectActionType
+        ) {
+          throw validationError(
+            "ACTION_CARDINALITY_INVALID",
+            `${step.name} emitted ${emittedActions.length} actions instead of one ${step.expectActionType}`,
+          );
+        }
         if (step.expectDomChange) {
           await page.waitForFunction(
             (previous) => {
@@ -184,6 +236,13 @@ export async function validateGameRuntime(
             },
             before,
             { timeout: STEP_TIMEOUT_MS },
+          );
+        }
+        if (sourcePage) {
+          assertMechanicsEquivalent(
+            await semanticFingerprint(sourcePage),
+            await semanticFingerprint(page),
+            step.name,
           );
         }
         assertRuntimeClean(runtimeErrors, networkAttempts);
@@ -216,12 +275,16 @@ export async function validateGameRuntime(
           "hello",
           "lifecycle-ready",
           "interactive-actions",
+          "one-action-per-intent",
           "dom-state-change",
+          ...(sourcePage ? ["source-differential"] : []),
           "offline-runtime",
           "action-rate",
         ],
         durationMs: Math.round(performance.now() - startedAt),
+        mechanicsEquivalent: true,
         maximumActionsPerSecond,
+        validatorVersion: MECHANICS_VALIDATOR_VERSION,
       };
     }, VALIDATION_TIMEOUT_MS);
   } finally {
@@ -315,6 +378,19 @@ async function actionCount(page: Page): Promise<number> {
   ));
 }
 
+async function actionsSince(
+  page: Page,
+  start: number,
+): Promise<Array<{ action?: { type?: unknown } }>> {
+  return page.evaluate((from) => (
+    (window as unknown as {
+      __PLAYSAY_RUNTIME_VALIDATION__: {
+        actions: Array<{ action?: { type?: unknown } }>;
+      };
+    }).__PLAYSAY_RUNTIME_VALIDATION__.actions.slice(from)
+  ), start);
+}
+
 async function domFingerprint(page: Page): Promise<string> {
   return page.evaluate(() => {
     const controls = [...document.querySelectorAll("input,select,textarea")]
@@ -327,6 +403,52 @@ async function domFingerprint(page: Page): Promise<string> {
       .join("|");
     return `${document.body.innerText}|${document.body.className}|${controls}|${document.body.innerHTML}`;
   });
+}
+
+async function semanticFingerprint(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const normalized = [...document.body.querySelectorAll("*")]
+      .filter((element) => !["SCRIPT", "STYLE", "NOSCRIPT"].includes(element.tagName))
+      .map((element) => {
+        const html = element as HTMLElement;
+        const attributes = [...element.attributes]
+          .filter((attribute) => (
+            !attribute.name.startsWith("data-playsay-") &&
+            !attribute.name.startsWith("on") &&
+            attribute.name !== "style"
+          ))
+          .map((attribute) => [attribute.name, attribute.value] as const)
+          .sort(([left], [right]) => left.localeCompare(right));
+        const control = element as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+        return {
+          attributes,
+          checked: element instanceof HTMLInputElement ? element.checked : undefined,
+          className: html.className,
+          directText: [...element.childNodes]
+            .filter((node) => node.nodeType === Node.TEXT_NODE)
+            .map((node) => node.textContent?.replace(/\s+/g, " ").trim())
+            .filter(Boolean)
+            .join(" "),
+          selectedIndex: element instanceof HTMLSelectElement ? element.selectedIndex : undefined,
+          tag: element.tagName.toLowerCase(),
+          value: element.matches("input,select,textarea") ? control.value : undefined,
+        };
+      });
+    return JSON.stringify({
+      bodyClass: document.body.className,
+      bodyText: document.body.innerText.replace(/\s+/g, " ").trim(),
+      elements: normalized,
+    });
+  });
+}
+
+function assertMechanicsEquivalent(source: string, candidate: string, step: string): void {
+  if (source !== candidate) {
+    throw validationError(
+      "GAME_MECHANICS_CHANGED",
+      `candidate differs from the source after ${step}`,
+    );
+  }
 }
 
 function maximumRate(timestamps: number[]): number {
@@ -422,6 +544,7 @@ function validationTransportSource(): () => void {
             trace.hello = message;
             queueMicrotask(() => listeners.forEach((listener) => listener({
               actorId: "runtime-validator",
+              isAuthority: true,
               kind: "context",
               runId: "runtime-validation",
               seed: 7,
@@ -446,6 +569,23 @@ function validationTransportSource(): () => void {
           return () => listeners.delete(listener);
         },
       },
+    });
+  };
+}
+
+function deterministicRuntimeSource(): () => void {
+  return () => {
+    let state = 0x6d2b79f5;
+    const random = () => {
+      state += 0x6d2b79f5;
+      let value = state;
+      value = Math.imul(value ^ (value >>> 15), value | 1);
+      value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+      return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+    };
+    Object.defineProperty(Math, "random", {
+      configurable: false,
+      value: random,
     });
   };
 }

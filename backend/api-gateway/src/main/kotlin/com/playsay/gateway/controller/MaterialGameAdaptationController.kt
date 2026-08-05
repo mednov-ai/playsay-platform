@@ -106,6 +106,37 @@ class MaterialGameAdaptationController(
         store.applyGameAdaptation(authentication, materialId, assetId, jobId)
 
     @PostMapping(
+        "/materials/{materialId}/assets/{assetId}/game-adaptations/{jobId}/revalidate",
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "revalidateMaterialGameAdaptation",
+        summary = "Revalidate an HTML game adaptation against its original mechanics",
+        security = [SecurityRequirement(name = "bearerAuth")],
+        responses = [
+            ApiResponse(
+                responseCode = "202",
+                description = "Revalidation queued",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = MaterialGameAdaptationResponse::class),
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun revalidateGameAdaptation(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @PathVariable assetId: UUID,
+        @PathVariable jobId: UUID,
+    ): ResponseEntity<MaterialGameAdaptationResponse> =
+        ResponseEntity.accepted().body(
+            store.revalidateGameAdaptation(authentication, materialId, assetId, jobId),
+        )
+
+    @PostMapping(
         "/materials/{materialId}/assets/{assetId}/game-adaptations/{jobId}/rollback",
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )

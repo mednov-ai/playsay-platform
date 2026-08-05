@@ -1850,6 +1850,40 @@ paths:
           description: Material source changed
       security:
       - bearerAuth: []
+  /materials/{materialId}/assets/{assetId}/game-adaptations/{jobId}/revalidate:
+    post:
+      tags:
+      - Materials
+      summary: Revalidate an HTML game adaptation against its original mechanics
+      operationId: revalidateMaterialGameAdaptation
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "202":
+          description: Revalidation queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialGameAdaptationResponse"
+      security:
+      - bearerAuth: []
   /materials/{materialId}/assets/{assetId}/game-adaptations/{jobId}/apply:
     post:
       tags:
@@ -5534,6 +5568,20 @@ components:
           type:
           - string
           - "null"
+        mechanicsValidation:
+          type: string
+        validatorVersion:
+          type:
+          - string
+          - "null"
+        sourceHash:
+          type:
+          - string
+          - "null"
+        validationReport:
+          oneOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
         errorCode:
           type:
           - string
@@ -5550,6 +5598,7 @@ components:
       - createdAt
       - id
       - materialId
+      - mechanicsValidation
       - sourceAssetId
       - status
       - updatedAt

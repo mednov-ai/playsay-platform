@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
-import { adaptGameHtml, validateAdaptedHtml } from "./adapter.js";
+import {
+  adaptGameHtml,
+  assertStaticMechanicsPreserved,
+  validateAdaptedHtml,
+} from "./adapter.js";
 import { closeRuntimeValidator } from "./runtime-validator.js";
 
 const manifest = `<script type="application/playsay-game+json">{
@@ -20,7 +24,9 @@ const runtimeValidation = {
   actionCount: 1,
   checks: ["manifest", "hello", "interactive-actions"],
   durationMs: 12,
+  mechanicsEquivalent: true,
   maximumActionsPerSecond: 1,
+  validatorVersion: "mechanics-v2" as const,
 };
 
 describe("game adapter", () => {
@@ -98,6 +104,13 @@ describe("game adapter", () => {
     }
   });
 
+  it("rejects an adaptation that changes original CSS mechanics", () => {
+    expect(() => assertStaticMechanicsPreserved(
+      "<html><head><style>.gate{animation:move 10s linear}</style></head><body></body></html>",
+      "<html><head><style>.gate{animation:move 4s linear}</style></head><body></body></html>",
+    )).toThrow("GAME_MECHANICS_CHANGED");
+  });
+
   it.runIf(Boolean(process.env.CHROMIUM_EXECUTABLE_PATH))(
     "passes a generated interactive game through the real adapter and Chromium validator",
     async () => {
@@ -131,7 +144,11 @@ describe("game adapter", () => {
 
       try {
         const result = await adaptGameHtml(
-          "<html><body><button>Legacy start</button></body></html>",
+          `<html><body><button id="go">Go</button><output id="state">idle</output><script>
+            document.querySelector("#go").addEventListener("click", () => {
+              document.querySelector("#state").textContent = "running";
+            });
+          </script></body></html>`,
           {
             generate: async () => ({
               html: adaptedHtml,

@@ -22,6 +22,7 @@ export {
   type GameManifest,
   type GameReducer,
   type GameReducerContext,
+  type GameSessionContext,
   type GameSyncCapability,
   type GameSyncInboundMessage,
   type GameSyncOutboundMessage,

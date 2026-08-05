@@ -278,6 +278,9 @@ export function HtmlGameFrame({
         return;
       }
       const message = messageEvent.data;
+      if (sdkRuntime && message.type !== "sdkReady" && message.type !== "runtimeError") {
+        return;
+      }
       if (message.type === "snapshot" && sync?.isAuthority) {
         sync.publishSnapshot(blockId, {
           canvases: message.canvases,
@@ -370,6 +373,7 @@ export function HtmlGameFrame({
             const context: GameSyncInboundMessage = {
               actorId: String(sync?.clientId ?? channel),
               checkpoint: checkpoint?.runId === runtimeRunId ? checkpoint : undefined,
+              isAuthority: sync?.isAuthority ?? true,
               kind: "context",
               runId: runtimeRunId,
               seed: seedFromRunId(runtimeRunId),
@@ -668,8 +672,13 @@ export function createSandboxedGameDocument(
   const sdkBridge = sdkRuntime
     ? `<script data-playsay-game-sdk-host>${sdkHostBridgeSource(channel)}</script>`
     : "";
-  const bridge = `<script data-playsay-game-bridge>${gameBridgeSource(channel, mirror, runId, predictive)}</script>`;
-  const headContent = `${csp}${sdkBridge}${bridge}`;
+  const diagnosticsBridge = sdkRuntime
+    ? `<script data-playsay-game-sdk-diagnostics>${sdkDiagnosticsBridgeSource(channel)}</script>`
+    : "";
+  const legacyBridge = sdkRuntime
+    ? ""
+    : `<script data-playsay-game-bridge>${gameBridgeSource(channel, mirror, runId, predictive)}</script>`;
+  const headContent = `${csp}${sdkBridge}${diagnosticsBridge}${legacyBridge}`;
   const withHead = /<head\b[^>]*>/i.test(html)
     ? html.replace(/<head\b[^>]*>/i, (head) => `${head}${headContent}`)
     : html.replace(/<html\b[^>]*>/i, (root) => `${root}<head>${headContent}</head>`);
@@ -726,6 +735,18 @@ function sdkHostBridgeSource(channel: string): string {
     const announceReady = () => window.parent.postMessage({ channel, type: 'sdkReady' }, '*');
     announceReady();
     readyTimer = window.setInterval(announceReady, 500);
+  })();`;
+}
+
+function sdkDiagnosticsBridgeSource(channel: string): string {
+  return `(() => {
+    const channel = ${JSON.stringify(channel)};
+    const report = (reason) => {
+      const message = reason instanceof Error ? reason.message : String(reason ?? 'runtime error');
+      window.parent.postMessage({ channel, message: message.slice(0, 500), type: 'runtimeError' }, '*');
+    };
+    window.addEventListener('error', (event) => report(event.error ?? event.message));
+    window.addEventListener('unhandledrejection', (event) => report(event.reason));
   })();`;
 }
 

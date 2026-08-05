@@ -101,7 +101,7 @@ describe("defineGame", () => {
 
     game.dispatch("increment", 2);
     expect(game.getState()).toBe(3);
-    receive?.({ actorId: "student", kind: "context", runId: "run", seed: 7 });
+    receive?.({ actorId: "student", isAuthority: false, kind: "context", runId: "run", seed: 7 });
     expect(game.getState()).toBe(9);
     expect(sent.filter((message) => message.kind === "action-request")).toHaveLength(1);
   });
@@ -114,6 +114,7 @@ describe("defineGame", () => {
         if (message.kind === "hello") {
           listeners.get(actorId)?.({
             actorId,
+            isAuthority: actorId === "teacher",
             kind: "context",
             runId: "shared-run",
             seed: 17,
@@ -151,5 +152,35 @@ describe("defineGame", () => {
     expect(revision).toBe(1);
     teacher.dispose();
     student.dispose();
+  });
+
+  it("exposes authority through the session contract", async () => {
+    const sessions: Array<{ actorId: string; isAuthority: boolean }> = [];
+    const game = defineGame({
+      initialState: 0,
+      manifest,
+      onSession: (session) => sessions.push({
+        actorId: session.actorId,
+        isAuthority: session.isAuthority,
+      }),
+      onState: () => undefined,
+      reduce: (state) => state,
+      transport: createStandaloneTransport({
+        actorId: "teacher",
+        isAuthority: true,
+        runId: "run",
+        seed: 7,
+      }),
+    });
+
+    await Promise.resolve();
+    expect(game.getSession()).toMatchObject({
+      actorId: "teacher",
+      isAuthority: true,
+      runId: "run",
+      seed: 7,
+    });
+    expect(sessions).toEqual([{ actorId: "teacher", isAuthority: true }]);
+    game.dispose();
   });
 });

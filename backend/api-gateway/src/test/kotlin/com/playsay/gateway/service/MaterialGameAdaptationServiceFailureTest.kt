@@ -1,6 +1,7 @@
 package com.playsay.gateway.service
 
 import com.playsay.gateway.entity.MaterialGameAdaptationEntity
+import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.MaterialGameAdaptationRepo
 import java.time.Instant
@@ -8,6 +9,7 @@ import java.util.Optional
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import org.mockito.Mockito.mock
@@ -61,6 +63,23 @@ class MaterialGameAdaptationServiceFailureTest {
 
         assertEquals(MaterialGameAdaptationStatuses.FAILED, job.status)
         assertNull(job.nextAttemptAt)
+    }
+
+    @Test
+    fun `apply rejects a result created by an old mechanics validator`() {
+        val job = job(attempts = 1).apply {
+            status = MaterialGameAdaptationStatuses.READY_FOR_REVIEW
+            adaptedAssetId = UUID.randomUUID()
+            mechanicsValidation = MaterialGameMechanicsValidation.REVALIDATION_REQUIRED
+            validatorVersion = null
+        }
+        `when`(repo.findById(job.id)).thenReturn(Optional.of(job))
+
+        val failure = assertFailsWith<ProjectResponseException> {
+            service.apply(job.materialId, job.sourceAssetId, job.id)
+        }
+
+        assertEquals("GAME_ADAPTER_NOT_READY", failure.errorCode)
     }
 
     private fun job(attempts: Int) = MaterialGameAdaptationEntity(

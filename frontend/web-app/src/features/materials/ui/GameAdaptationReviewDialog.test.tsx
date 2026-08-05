@@ -37,6 +37,7 @@ describe("GameAdaptationReviewDialog", () => {
     render(
       <GameAdaptationReviewDialog
         html={sdkHtml}
+        mechanicsValidation="PASSED"
         onApply={onApply}
         onClose={vi.fn()}
       />,
@@ -49,7 +50,8 @@ describe("GameAdaptationReviewDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "runtime-ready" }));
     expect(apply.disabled).toBe(false);
-    expect(screen.getByRole("status").textContent).toContain("materials.gameAdaptationReview.runtime.ready");
+    expect(document.getElementById("game-adaptation-runtime-status")?.textContent)
+      .toContain("materials.gameAdaptationReview.runtime.ready");
 
     fireEvent.click(apply);
     expect(onApply).toHaveBeenCalledTimes(1);
@@ -59,6 +61,7 @@ describe("GameAdaptationReviewDialog", () => {
     render(
       <GameAdaptationReviewDialog
         html={sdkHtml}
+        mechanicsValidation="PASSED"
         onApply={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -68,7 +71,8 @@ describe("GameAdaptationReviewDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "runtime-ready" }));
 
     expect((screen.getByRole("button", { name: "materials.gameAdaptationReview.apply" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByRole("status").textContent).toContain("materials.gameAdaptationReview.runtime.failed");
+    expect(document.getElementById("game-adaptation-runtime-status")?.textContent)
+      .toContain("materials.gameAdaptationReview.runtime.failed");
   });
 
   it("fails the startup gate when no handshake arrives within eight seconds", () => {
@@ -76,6 +80,7 @@ describe("GameAdaptationReviewDialog", () => {
     render(
       <GameAdaptationReviewDialog
         html={sdkHtml}
+        mechanicsValidation="PASSED"
         onApply={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -86,7 +91,8 @@ describe("GameAdaptationReviewDialog", () => {
     });
 
     expect((screen.getByRole("button", { name: "materials.gameAdaptationReview.apply" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByRole("status").textContent).toContain("materials.gameAdaptationReview.runtime.failed");
+    expect(document.getElementById("game-adaptation-runtime-status")?.textContent)
+      .toContain("materials.gameAdaptationReview.runtime.failed");
   });
 
   it("never enables Apply for a legacy preview even if it reports ready", () => {
@@ -100,6 +106,22 @@ describe("GameAdaptationReviewDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "runtime-ready" }));
     expect((screen.getByRole("button", { name: "materials.gameAdaptationReview.apply" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByRole("status").textContent).toContain("materials.gameAdaptationReview.runtime.failed");
+    expect(document.getElementById("game-adaptation-runtime-status")?.textContent)
+      .toContain("materials.gameAdaptationReview.runtime.failed");
+  });
+
+  it("keeps Apply disabled for an adaptation that requires mechanics revalidation", () => {
+    render(
+      <GameAdaptationReviewDialog
+        html={sdkHtml}
+        mechanicsValidation="REVALIDATION_REQUIRED"
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "runtime-ready" }));
+    expect((screen.getByRole("button", { name: "materials.gameAdaptationReview.apply" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("materials.gameAdaptationReview.mechanics.revalidation")).not.toBeNull();
   });
 });

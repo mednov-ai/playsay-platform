@@ -14,7 +14,7 @@ class MaterialGameAdapterClientTest {
     fun `returns validated adapter response and sends internal token`() {
         withAdapterServer(
             status = 200,
-            response = """{"html":"<html>adapted</html>","report":"validated","model":"gpt-test","promptHash":"abc"}""",
+            response = """{"html":"<html>adapted</html>","report":"validated","model":"gpt-test","promptHash":"abc","sourceHash":"def","validation":{"mechanicsEquivalent":true,"validatorVersion":"mechanics-v2","checks":["source-differential"]}}""",
         ) { baseUrl ->
             val result = client(baseUrl).adapt("<html>source</html>")
 
@@ -22,6 +22,9 @@ class MaterialGameAdapterClientTest {
             assertEquals("validated", result.report)
             assertEquals("gpt-test", result.model)
             assertEquals("abc", result.promptHash)
+            assertEquals("def", result.sourceHash)
+            assertEquals("mechanics-v2", result.validatorVersion)
+            assertTrue(result.mechanicsEquivalent)
         }
     }
 
@@ -36,6 +39,21 @@ class MaterialGameAdapterClientTest {
             }
 
             assertEquals(MetaData.ErrorCodes.GAME_ADAPTER_CONTRACT_INVALID, failure.adapterErrorCode)
+            assertEquals(false, failure.retryable)
+        }
+    }
+
+    @Test
+    fun `maps mechanics divergence to a terminal localized error`() {
+        withAdapterServer(
+            status = 422,
+            response = """{"code":"ADAPTED_HTML_MECHANICS_CHANGED","retryable":false}""",
+        ) { baseUrl ->
+            val failure = assertFailsWith<GameAdapterClientException> {
+                client(baseUrl).adapt("<html>source</html>")
+            }
+
+            assertEquals(MetaData.ErrorCodes.GAME_ADAPTER_MECHANICS_CHANGED, failure.adapterErrorCode)
             assertEquals(false, failure.retryable)
         }
     }

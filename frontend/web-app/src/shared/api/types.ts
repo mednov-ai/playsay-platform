@@ -246,6 +246,17 @@ export type MaterialGameAdaptation = {
   blockId: string;
   status: "PENDING" | "ANALYZING" | "PATCHING" | "VALIDATING" | "READY_FOR_REVIEW" | "APPLIED" | "ROLLED_BACK" | "RETRY" | "FAILED" | string;
   compatibility: "SDK_V1" | "LEGACY_PREDICTIVE" | "LEGACY_MIRROR" | "UNSUPPORTED" | string;
+  mechanicsValidation?: "PASSED" | "FAILED" | "REVALIDATION_REQUIRED" | string;
+  validatorVersion?: string | null;
+  sourceHash?: string | null;
+  validationReport?: {
+    actionCount?: number;
+    checks?: string[];
+    durationMs?: number;
+    mechanicsEquivalent?: boolean;
+    maximumActionsPerSecond?: number;
+    validatorVersion?: string;
+  } | null;
   report?: string | null;
   model?: string | null;
   errorCode?: string | null;

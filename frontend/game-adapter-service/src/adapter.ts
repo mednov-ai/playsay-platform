@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { readGameManifest } from "@playsay/game-sync";
 import {
+  MECHANICS_VALIDATOR_VERSION,
   validateGameRuntime,
   validateRuntimePlan,
   type RuntimeValidationPlan,
@@ -42,6 +43,7 @@ export type AdaptationResult = {
   model: string;
   promptHash: string;
   report: string;
+  sourceHash: string;
   validation: RuntimeValidationSummary & { attempts: number };
 };
 
@@ -84,6 +86,7 @@ export async function adaptGameHtml(
     validateRuntime?: (
       html: string,
       plan: RuntimeValidationPlan,
+      sourceHtml?: string,
     ) => Promise<RuntimeValidationSummary>;
   } = {},
 ): Promise<AdaptationResult> {
@@ -97,12 +100,15 @@ export async function adaptGameHtml(
       model: "none",
       promptHash: hash("already-compatible"),
       report: "The game already implements Play&Say Game Sync v1.",
+      sourceHash: hash(sourceHtml),
       validation: {
         actionCount: 0,
         attempts: 0,
         checks: ["manifest", "static-contract"],
         durationMs: 0,
+        mechanicsEquivalent: true,
         maximumActionsPerSecond: 0,
+        validatorVersion: MECHANICS_VALIDATOR_VERSION,
       },
     };
   }
@@ -125,11 +131,12 @@ export async function adaptGameHtml(
     try {
       validateRuntimePlan(generated.validationPlan);
       validateAdaptedHtml(generated.html);
+      assertStaticMechanicsPreserved(sourceHtml, generated.html);
       const withSdk = injectSdk(generated.html, sdkSource);
       // The generated game was checked before insertion. The bundled SDK is trusted build
       // output and intentionally contains compatibility-detector names such as WebSocket.
       validateAdaptedStructure(withSdk);
-      const validation = await runtimeValidator(withSdk, generated.validationPlan);
+      const validation = await runtimeValidator(withSdk, generated.validationPlan, sourceHtml);
       return {
         html: withSdk,
         model,
@@ -137,6 +144,7 @@ export async function adaptGameHtml(
         report: `${generated.report.trim()}\n\nValidation passed: ${validation.checks.join(", ")}; attempts: ${attempt}; maximum action rate: ${validation.maximumActionsPerSecond}/s.`
           .trim()
           .slice(0, 8_000),
+        sourceHash: hash(sourceHtml),
         validation: { ...validation, attempts: attempt },
       };
     } catch (error) {
@@ -157,6 +165,20 @@ function injectSdk(html: string, sdkSource: string): string {
       /<head\b[^>]*>/i,
       (head) => `${head}<script data-playsay-game-sync-sdk>${sdkSource}</script>`,
     );
+}
+
+export function assertStaticMechanicsPreserved(sourceHtml: string, candidateHtml: string): void {
+  const sourceStyles = extractedStyles(sourceHtml);
+  const candidateStyles = extractedStyles(candidateHtml);
+  if (sourceStyles !== candidateStyles) {
+    throw new Error("GAME_MECHANICS_CHANGED: stylesheet declarations differ from source");
+  }
+}
+
+function extractedStyles(html: string): string {
+  return [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)]
+    .map((match) => (match[1] ?? "").replace(/\s+/g, " ").trim())
+    .join("\n");
 }
 
 async function generateWithOpenAi(
@@ -214,7 +236,7 @@ async function generateWithOpenAi(
                       required: ["name", "operation", "expectActionType", "expectDomChange"],
                       type: "object",
                     },
-                    maxItems: 4,
+                    maxItems: 12,
                     minItems: 1,
                     type: "array",
                   },
@@ -297,9 +319,17 @@ Requirements:
 - Call ready/pause/resume/dispose lifecycle methods where appropriate.
 - Do not use network APIs, frames, external URLs, storage, service workers, WebRTC or WebSockets.
 - Do not invent telemetry, credentials, remote resources or hidden functionality.
-- Return validationPlan with one to four real interactions. Each step must target a visible control,
-  name the expected SDK action type, and at least one step must require a DOM state change after the
-  host orders the action. For a game with start and movement controls validate both.
+- Preserve every original style declaration, DOM element, visible string, control selector, timer,
+  animation duration, collision condition and ordering of visible phases. Add only the manifest,
+  SDK wiring and state synchronization needed by the host.
+- Return validationPlan with one to twelve real interactions. Cover every visible control and every
+  registered keyboard control, plus start/restart, correct/incorrect outcomes and timer-driven
+  transitions when those mechanics exist. Each physical interaction must dispatch exactly one
+  named SDK action and at least one step must require a DOM state change after authority ordering.
+- Semantic timers, collision resolution, automatic answers and round completion may dispatch only
+  while controller.getSession()?.isAuthority is true. Cancel them when onSession reports a replica.
+- Do not replace geometry-driven or requestAnimationFrame behavior with fixed CSS durations or
+  unrelated wall-clock timeouts.
 
 Exact manifest shape:
 {"protocol":"playsay-game-sync/v1","gameId":"stable-id","stateVersion":"1",

@@ -30,6 +30,7 @@ export function MaterialEditorForm({
   onApplyGameAdaptation,
   onPreviewGameAdaptation,
   onRequestGameAdaptation,
+  onRevalidateGameAdaptation,
   onRollbackGameAdaptation,
   onRemoveBlock,
   onRequestPalette,
@@ -52,6 +53,7 @@ export function MaterialEditorForm({
   onApplyGameAdaptation: (blockId: string) => void;
   onPreviewGameAdaptation: (blockId: string) => void;
   onRequestGameAdaptation: (blockId: string) => void;
+  onRevalidateGameAdaptation: (blockId: string) => void;
   onRollbackGameAdaptation: (blockId: string) => void;
   onRemoveBlock: (blockId: string) => void;
   onRequestPalette: () => void;
@@ -138,6 +140,7 @@ export function MaterialEditorForm({
                   onApplyGameAdaptation={() => onApplyGameAdaptation(block.id)}
                   onPreviewGameAdaptation={() => onPreviewGameAdaptation(block.id)}
                   onRequestGameAdaptation={() => onRequestGameAdaptation(block.id)}
+                  onRevalidateGameAdaptation={() => onRevalidateGameAdaptation(block.id)}
                   onRollbackGameAdaptation={() => onRollbackGameAdaptation(block.id)}
                   onRemove={() => onRemoveBlock(block.id)}
                   onSuggestAcceptedAnswers={onSuggestAcceptedAnswers}

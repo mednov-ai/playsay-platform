@@ -16,6 +16,10 @@ data class GameAdapterResult(
     val report: String,
     val model: String,
     val promptHash: String,
+    val sourceHash: String,
+    val validatorVersion: String,
+    val mechanicsEquivalent: Boolean,
+    val validationReport: String,
 )
 
 class GameAdapterClientException(
@@ -68,6 +72,10 @@ class MaterialGameAdapterClient(
             report = json.path("report").asText().take(8_000),
             model = json.path("model").asText().take(120),
             promptHash = json.path("promptHash").asText().take(128),
+            sourceHash = json.path("sourceHash").asText().take(64),
+            validatorVersion = json.path("validation").path("validatorVersion").asText().take(64),
+            mechanicsEquivalent = json.path("validation").path("mechanicsEquivalent").asBoolean(false),
+            validationReport = objectMapper.writeValueAsString(json.path("validation")),
         )
     }
 
@@ -75,6 +83,7 @@ class MaterialGameAdapterClient(
         "ADAPTED_HTML_CONTRACT_INVALID" -> MetaData.ErrorCodes.GAME_ADAPTER_CONTRACT_INVALID
         "ADAPTED_HTML_RUNTIME_INVALID" -> MetaData.ErrorCodes.GAME_ADAPTER_RUNTIME_INVALID
         "ADAPTED_HTML_ACTION_RATE_EXCEEDED" -> MetaData.ErrorCodes.GAME_ADAPTER_ACTION_RATE_EXCEEDED
+        "ADAPTED_HTML_MECHANICS_CHANGED" -> MetaData.ErrorCodes.GAME_ADAPTER_MECHANICS_CHANGED
         "ADAPTED_HTML_UNSAFE" -> MetaData.ErrorCodes.GAME_ADAPTER_UNSAFE
         "RUNTIME_VALIDATOR_UNAVAILABLE" -> MetaData.ErrorCodes.GAME_ADAPTER_UNAVAILABLE
         else -> MetaData.ErrorCodes.GAME_ADAPTER_FAILED

@@ -102,6 +102,12 @@ function classifyFailure(raw: string): { code: string; retryable: boolean; statu
   if (raw.includes("ACTION_RATE_EXCEEDED")) {
     return { code: "ADAPTED_HTML_ACTION_RATE_EXCEEDED", retryable: false, status: 422 };
   }
+  if (
+    raw.includes("GAME_MECHANICS_CHANGED") ||
+    raw.includes("ACTION_CARDINALITY_INVALID")
+  ) {
+    return { code: "ADAPTED_HTML_MECHANICS_CHANGED", retryable: false, status: 422 };
+  }
   if (raw.includes("UNSAFE") || raw.includes("NETWORK_ACCESS_ATTEMPTED")) {
     return { code: "ADAPTED_HTML_UNSAFE", retryable: false, status: 422 };
   }

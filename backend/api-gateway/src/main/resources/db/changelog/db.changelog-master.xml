@@ -28,4 +28,5 @@
     <include file="2026-07-28-002-add-vocabulary-practice-assignments.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-29-001-add-vocabulary-practice-plan-link.xml" relativeToChangelogFile="true"/>
     <include file="2026-08-04-001-expand-assignment-status.xml" relativeToChangelogFile="true"/>
+    <include file="2026-08-05-001-add-game-mechanics-validation.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

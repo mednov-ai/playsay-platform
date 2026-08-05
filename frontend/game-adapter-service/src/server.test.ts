@@ -17,12 +17,15 @@ describe("game adapter HTTP service", () => {
       model: "test",
       promptHash: "hash",
       report: "validated",
+      sourceHash: "source-hash",
       validation: {
         actionCount: 1,
         attempts: 1,
         checks: ["manifest", "lifecycle-ready"],
         durationMs: 10,
+        mechanicsEquivalent: true,
         maximumActionsPerSecond: 1,
+        validatorVersion: "mechanics-v2" as const,
       },
     }));
     const server = createGameAdapterServer(adapt).listen(0, "127.0.0.1");
@@ -72,6 +75,35 @@ describe("game adapter HTTP service", () => {
       expect(response.status).toBe(422);
       expect(await response.json()).toEqual({
         code: "ADAPTED_HTML_CONTRACT_INVALID",
+        retryable: false,
+      });
+    } finally {
+      server.close();
+      await once(server, "close");
+    }
+  });
+
+  it("returns terminal mechanics divergence without retry", async () => {
+    process.env.PLAY_SAY_GAME_ADAPTER_SERVICE_TOKEN = token;
+    const server = createGameAdapterServer(async () => {
+      throw new Error("ADAPTED_HTML_VALIDATION_FAILED: GAME_MECHANICS_CHANGED");
+    }).listen(0, "127.0.0.1");
+    await once(server, "listening");
+    try {
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("server address unavailable");
+      const response = await fetch(`http://127.0.0.1:${address.port}/internal/game-adaptations`, {
+        body: JSON.stringify({ html: "<html>source</html>" }),
+        headers: {
+          "Content-Type": "application/json",
+          "X-PlaySay-Game-Adapter-Token": token,
+        },
+        method: "POST",
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toEqual({
+        code: "ADAPTED_HTML_MECHANICS_CHANGED",
         retryable: false,
       });
     } finally {

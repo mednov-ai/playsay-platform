@@ -69,6 +69,13 @@ export type GameReducerContext = {
   seed: number;
 };
 
+export type GameSessionContext = {
+  actorId: string;
+  isAuthority: boolean;
+  runId: string;
+  seed: number;
+};
+
 export type GameReducer<TState> = (
   state: Readonly<TState>,
   action: Readonly<OrderedGameAction>,
@@ -90,6 +97,7 @@ export type GameSyncInboundMessage =
   | {
       actorId: string;
       checkpoint?: GameCheckpoint;
+      isAuthority: boolean;
       kind: "context";
       runId: string;
       seed: number;
@@ -110,6 +118,7 @@ export type DefineGameOptions<TState> = {
   manifest: GameManifest;
   onEffect?: (effect: GameEffect) => void;
   onError?: (error: Error) => void;
+  onSession?: (context: Readonly<GameSessionContext>) => void;
   onState: (state: Readonly<TState>) => void;
   reduce: GameReducer<TState>;
   transport?: GameSyncTransport;
@@ -120,6 +129,7 @@ export interface GameController<TState> {
   dispatch<TPayload = unknown>(type: string, payload: TPayload): string;
   dispose(): void;
   emitEffect<TPayload = unknown>(kind: string, payload: TPayload): string;
+  getSession(): Readonly<GameSessionContext> | null;
   getState(): Readonly<TState>;
   pause(): void;
   ready(): void;

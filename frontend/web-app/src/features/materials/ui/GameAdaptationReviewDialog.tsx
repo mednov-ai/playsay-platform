@@ -12,17 +12,26 @@ const STARTUP_TIMEOUT_MS = 8_000;
 
 export function GameAdaptationReviewDialog({
   html,
+  mechanicsValidation,
   onApply,
   onClose,
   report,
+  validationReport,
 }: {
   html: string;
+  mechanicsValidation?: string;
   onApply: () => void;
   onClose: () => void;
   report?: string | null;
+  validationReport?: {
+    actionCount?: number;
+    checks?: string[];
+    durationMs?: number;
+  } | null;
 }) {
   const { t } = useAppTranslation();
   const sdkCompatible = classifyGameHtml(html) === "SDK_V1";
+  const mechanicsPassed = mechanicsValidation === "PASSED";
   const [runtimeStatus, setRuntimeStatus] = useState<HtmlGameRuntimeStatus>(
     sdkCompatible ? "checking" : "failed",
   );
@@ -43,8 +52,8 @@ export function GameAdaptationReviewDialog({
   }, [sdkCompatible]);
 
   const handleApply = useCallback(() => {
-    if (runtimeStatus === "ready") onApply();
-  }, [onApply, runtimeStatus]);
+    if (runtimeStatus === "ready" && mechanicsPassed) onApply();
+  }, [mechanicsPassed, onApply, runtimeStatus]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -77,7 +86,7 @@ export function GameAdaptationReviewDialog({
             </Button>
             <Button
               aria-describedby="game-adaptation-runtime-status"
-              disabled={runtimeStatus !== "ready"}
+              disabled={runtimeStatus !== "ready" || !mechanicsPassed}
               onClick={handleApply}
               type="button"
             >
@@ -101,6 +110,23 @@ export function GameAdaptationReviewDialog({
             <AlertTriangle className="h-4 w-4 text-destructive" />
           )}
           <span>{t(`materials.gameAdaptationReview.runtime.${runtimeStatus}`)}</span>
+        </div>
+        <div
+          aria-live="polite"
+          className="flex items-center gap-2 border-b border-border bg-background/80 px-4 py-2 text-sm font-semibold"
+          data-status={mechanicsPassed ? "passed" : "revalidation"}
+          role="status"
+        >
+          {mechanicsPassed ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+          )}
+          <span>
+            {t(`materials.gameAdaptationReview.mechanics.${mechanicsPassed ? "passed" : "revalidation"}`, {
+              actions: validationReport?.actionCount ?? 0,
+            })}
+          </span>
         </div>
         <div className="playsay-material-preview playsay-material-reader playsay-material-play-surface p-4">
           <HtmlGameFrame

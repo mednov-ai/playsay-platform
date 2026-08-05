@@ -1050,6 +1050,12 @@ export interface MaterialGameAdaptationResponse {
   report?: string | null;
   /** @nullable */
   model?: string | null;
+  mechanicsValidation: string;
+  /** @nullable */
+  validatorVersion?: string | null;
+  /** @nullable */
+  sourceHash?: string | null;
+  validationReport?: JsonNode | null;
   /** @nullable */
   errorCode?: string | null;
   createdAt: string;
@@ -5294,6 +5300,53 @@ export const rollbackMaterialGameAdaptation = async (materialId: string,
 
   const data: rollbackMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as rollbackMaterialGameAdaptationResponse
+}
+
+
+
+export type revalidateMaterialGameAdaptationResponse202 = {
+  data: MaterialGameAdaptationResponse
+  status: 202
+}
+
+export type revalidateMaterialGameAdaptationResponseSuccess = (revalidateMaterialGameAdaptationResponse202) & {
+  headers: Headers;
+};
+;
+
+export type revalidateMaterialGameAdaptationResponse = (revalidateMaterialGameAdaptationResponseSuccess)
+
+export const getRevalidateMaterialGameAdaptationUrl = (materialId: string,
+    assetId: string,
+    jobId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}/revalidate`
+}
+
+/**
+ * @summary Revalidate an HTML game adaptation against its original mechanics
+ */
+export const revalidateMaterialGameAdaptation = async (materialId: string,
+    assetId: string,
+    jobId: string, options?: RequestInit): Promise<revalidateMaterialGameAdaptationResponse> => {
+
+  const res = await fetch(getRevalidateMaterialGameAdaptationUrl(materialId,assetId,jobId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: revalidateMaterialGameAdaptationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as revalidateMaterialGameAdaptationResponse
 }
 
 

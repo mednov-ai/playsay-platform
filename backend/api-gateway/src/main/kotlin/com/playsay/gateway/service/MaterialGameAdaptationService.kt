@@ -14,6 +14,7 @@ import com.playsay.gateway.repo.MaterialGameAdaptationRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Duration
 import java.time.Instant
+import java.security.MessageDigest
 import java.util.UUID
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
@@ -31,6 +32,13 @@ object MaterialGameAdaptationStatuses {
     const val ROLLED_BACK = "ROLLED_BACK"
     const val RETRY = "RETRY"
     const val FAILED = "FAILED"
+}
+
+object MaterialGameMechanicsValidation {
+    const val PASSED = "PASSED"
+    const val FAILED = "FAILED"
+    const val REVALIDATION_REQUIRED = "REVALIDATION_REQUIRED"
+    const val CURRENT_VALIDATOR_VERSION = "mechanics-v2"
 }
 
 @Component
@@ -59,21 +67,7 @@ class MaterialGameAdaptationService(
         val html = materialAssetService.storedAssetBytes(materialId, sourceAssetId).toString(Charsets.UTF_8)
         val compatibility = classifyHtmlGameCompatibility(html)
         val now = Instant.now()
-        return repo.save(
-            MaterialGameAdaptationEntity(
-                id = UUID.randomUUID(),
-                materialId = materialId,
-                sourceAssetId = sourceAssetId,
-                blockId = blockId,
-                status = if (compatibility == "SDK_V1") MaterialGameAdaptationStatuses.READY_FOR_REVIEW else MaterialGameAdaptationStatuses.PENDING,
-                compatibility = compatibility,
-                report = if (compatibility == "SDK_V1") "The game already uses Play&Say Game Sync v1." else null,
-                attempts = 0,
-                nextAttemptAt = if (compatibility == "SDK_V1") null else now,
-                createdAt = now,
-                updatedAt = now,
-            ),
-        ).toResponse()
+        return repo.save(newJob(materialId, sourceAssetId, blockId, compatibility, html, now)).toResponse()
     }
 
     @Transactional(readOnly = true)
@@ -106,6 +100,16 @@ class MaterialGameAdaptationService(
             updateStage(jobId, MaterialGameAdaptationStatuses.PATCHING)
             val source = materialAssetService.storedAssetBytes(job.materialId, job.sourceAssetId).toString(Charsets.UTF_8)
             val adapted = adapterClient.adapt(source)
+            if (
+                !adapted.mechanicsEquivalent ||
+                adapted.validatorVersion != MaterialGameMechanicsValidation.CURRENT_VALIDATOR_VERSION ||
+                adapted.sourceHash != sha256(source)
+            ) {
+                throw GameAdapterClientException(
+                    MetaData.ErrorCodes.GAME_ADAPTER_MECHANICS_CHANGED,
+                    retryable = false,
+                )
+            }
             updateStage(jobId, MaterialGameAdaptationStatuses.VALIDATING)
             val adaptedAssetId = materialAssetUploadService.insertAdaptedHtmlGameAsset(
                 materialId = job.materialId,
@@ -133,15 +137,29 @@ class MaterialGameAdaptationService(
     fun apply(materialId: UUID, sourceAssetId: UUID, jobId: UUID): MaterialGameAdaptationResponse {
         val job = requireJob(materialId, sourceAssetId, jobId)
         val adaptedAssetId = job.adaptedAssetId
-        if (job.status != MaterialGameAdaptationStatuses.READY_FOR_REVIEW || adaptedAssetId == null) {
+        if (
+            job.status != MaterialGameAdaptationStatuses.READY_FOR_REVIEW ||
+            adaptedAssetId == null ||
+            job.mechanicsValidation != MaterialGameMechanicsValidation.PASSED ||
+            job.validatorVersion != MaterialGameMechanicsValidation.CURRENT_VALIDATOR_VERSION
+        ) {
             throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.GAME_ADAPTER_NOT_READY)
         }
         val material = lessonMaterialRepo.lockById(materialId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         val document = objectMapper.readTree(material.document).deepCopy<ObjectNode>()
         val block = findBlock(document, job.blockId)
-            ?.takeIf { it.path("url").asText() == "material-asset:$sourceAssetId" }
             ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.GAME_ADAPTER_SOURCE_CHANGED)
+        val sourceReference = "material-asset:$sourceAssetId"
+        val replacedJob = if (block.path("url").asText() == sourceReference) {
+            null
+        } else {
+            verifiedAppliedJobBeingReplaced(block, job)
+                ?: throw ProjectResponseException.localized(
+                    HttpStatus.CONFLICT,
+                    MetaData.ErrorCodes.GAME_ADAPTER_SOURCE_CHANGED,
+                )
+        }
         block.put("url", "material-asset:$adaptedAssetId")
         block.put("gameSyncCompatibility", "SDK_V1")
         block.put("gameAdaptationSourceAssetId", sourceAssetId.toString())
@@ -151,7 +169,43 @@ class MaterialGameAdaptationService(
         lessonMaterialRepo.save(material)
         job.status = MaterialGameAdaptationStatuses.APPLIED
         job.updatedAt = Instant.now()
+        replacedJob?.let {
+            it.status = MaterialGameAdaptationStatuses.ROLLED_BACK
+            it.updatedAt = job.updatedAt
+            repo.save(it)
+        }
         return repo.save(job).toResponse()
+    }
+
+    @Transactional
+    fun revalidate(materialId: UUID, sourceAssetId: UUID, jobId: UUID): MaterialGameAdaptationResponse {
+        val previous = requireJob(materialId, sourceAssetId, jobId)
+        materialAssetService.requireHtmlGameAsset(materialId, sourceAssetId)
+        val material = lessonMaterialRepo.lockById(materialId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        val block = findBlock(objectMapper.readTree(material.document), previous.blockId)
+            ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.GAME_ADAPTER_SOURCE_CHANGED)
+        val currentAsset = block.path("url").asText()
+        val sourceReference = "material-asset:$sourceAssetId"
+        val adaptedReference = previous.adaptedAssetId?.let { "material-asset:$it" }
+        if (
+            currentAsset != sourceReference &&
+            (adaptedReference == null || currentAsset != adaptedReference)
+        ) {
+            throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.GAME_ADAPTER_SOURCE_CHANGED)
+        }
+        val html = materialAssetService.storedAssetBytes(materialId, sourceAssetId).toString(Charsets.UTF_8)
+        val compatibility = classifyHtmlGameCompatibility(html)
+        return repo.save(
+            newJob(
+                materialId = materialId,
+                sourceAssetId = sourceAssetId,
+                blockId = previous.blockId,
+                compatibility = compatibility,
+                html = html,
+                now = Instant.now(),
+            ),
+        ).toResponse()
     }
 
     @Transactional
@@ -193,6 +247,14 @@ class MaterialGameAdaptationService(
         job.report = result.report
         job.model = result.model
         job.promptHash = result.promptHash
+        job.mechanicsValidation = if (result.mechanicsEquivalent) {
+            MaterialGameMechanicsValidation.PASSED
+        } else {
+            MaterialGameMechanicsValidation.FAILED
+        }
+        job.validatorVersion = result.validatorVersion
+        job.sourceHash = result.sourceHash
+        job.validationReport = result.validationReport
         job.nextAttemptAt = null
         job.leaseUntil = null
         job.lastErrorCode = null
@@ -225,6 +287,68 @@ class MaterialGameAdaptationService(
         }
     }
 
+    private fun verifiedAppliedJobBeingReplaced(
+        block: ObjectNode,
+        replacement: MaterialGameAdaptationEntity,
+    ): MaterialGameAdaptationEntity? {
+        val previousJobId = runCatching {
+            UUID.fromString(block.path("gameAdaptationJobId").asText())
+        }.getOrNull() ?: return null
+        val previous = repo.findById(previousJobId).orElse(null) ?: return null
+        return previous.takeIf {
+            it.id != replacement.id &&
+                it.materialId == replacement.materialId &&
+                it.sourceAssetId == replacement.sourceAssetId &&
+                it.blockId == replacement.blockId &&
+                it.status == MaterialGameAdaptationStatuses.APPLIED &&
+                block.path("url").asText() == it.adaptedAssetId?.let { assetId -> "material-asset:$assetId" }
+        }
+    }
+
+    private fun newJob(
+        materialId: UUID,
+        sourceAssetId: UUID,
+        blockId: String,
+        compatibility: String,
+        html: String,
+        now: Instant,
+    ): MaterialGameAdaptationEntity {
+        val alreadyCompatible = compatibility == "SDK_V1"
+        return MaterialGameAdaptationEntity(
+            id = UUID.randomUUID(),
+            materialId = materialId,
+            sourceAssetId = sourceAssetId,
+            blockId = blockId,
+            status = if (alreadyCompatible) {
+                MaterialGameAdaptationStatuses.READY_FOR_REVIEW
+            } else {
+                MaterialGameAdaptationStatuses.PENDING
+            },
+            compatibility = compatibility,
+            report = if (alreadyCompatible) "The game already uses Play&Say Game Sync v1." else null,
+            mechanicsValidation = if (alreadyCompatible) {
+                MaterialGameMechanicsValidation.PASSED
+            } else {
+                MaterialGameMechanicsValidation.REVALIDATION_REQUIRED
+            },
+            validatorVersion = if (alreadyCompatible) {
+                MaterialGameMechanicsValidation.CURRENT_VALIDATOR_VERSION
+            } else {
+                null
+            },
+            sourceHash = sha256(html),
+            validationReport = if (alreadyCompatible) {
+                """{"checks":["source-identical"],"mechanicsEquivalent":true,"validatorVersion":"${MaterialGameMechanicsValidation.CURRENT_VALIDATOR_VERSION}"}"""
+            } else {
+                null
+            },
+            attempts = 0,
+            nextAttemptAt = if (alreadyCompatible) null else now,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
     private fun findBlock(document: JsonNode, blockId: String): ObjectNode? {
         val pages = document.path("pages") as? ArrayNode ?: return null
         pages.forEach { page ->
@@ -251,7 +375,16 @@ private fun MaterialGameAdaptationEntity.toResponse() = MaterialGameAdaptationRe
     compatibility = compatibility,
     report = report,
     model = model,
+    mechanicsValidation = mechanicsValidation,
+    validatorVersion = validatorVersion,
+    sourceHash = sourceHash,
+    validationReport = validationReport?.let { runCatching { jacksonObjectMapper().readTree(it) }.getOrNull() },
     errorCode = lastErrorCode,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
+
+private fun sha256(value: String): String =
+    MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }

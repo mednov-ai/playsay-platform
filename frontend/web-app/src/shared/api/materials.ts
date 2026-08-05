@@ -270,6 +270,20 @@ export async function applyMaterialGameAdaptation(
   );
 }
 
+export async function revalidateMaterialGameAdaptation(
+  materialId: string,
+  assetId: string,
+  jobId: string,
+  config = authConfig,
+): Promise<MaterialGameAdaptation> {
+  return apiJson<MaterialGameAdaptation>(
+    `/api/materials/${materialId}/assets/${assetId}/game-adaptations/${jobId}/revalidate`,
+    { method: "POST" },
+    config,
+    202,
+  );
+}
+
 export async function rollbackMaterialGameAdaptation(
   materialId: string,
   assetId: string,

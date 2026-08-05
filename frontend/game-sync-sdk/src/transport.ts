@@ -39,10 +39,12 @@ export function createMessagePortTransport(port: MessagePort): GameSyncTransport
 
 export function createStandaloneTransport(options: {
   actorId?: string;
+  isAuthority?: boolean;
   runId?: string;
   seed?: number;
 } = {}): GameSyncTransport {
   const actorId = options.actorId ?? `local-${randomId()}`;
+  const isAuthority = options.isAuthority ?? true;
   const runId = options.runId ?? `run-${randomId()}`;
   const seed = options.seed ?? Math.floor(Math.random() * 0x7fffffff);
   const listeners = new Set<(message: GameSyncInboundMessage) => void>();
@@ -60,7 +62,7 @@ export function createStandaloneTransport(options: {
   return {
     send(message: GameSyncOutboundMessage) {
       if (message.kind === "hello") {
-        emit({ actorId, kind: "context", runId, seed });
+        emit({ actorId, isAuthority, kind: "context", runId, seed });
       } else if (message.kind === "action-request") {
         const action: GameActionRequest = message.action;
         revision += 1;

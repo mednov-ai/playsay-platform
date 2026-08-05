@@ -6,6 +6,7 @@ import {
   type GameController,
   type GameEffect,
   type GameReducerContext,
+  type GameSessionContext,
   type OrderedGameAction,
 } from "./types";
 import { validateGameManifest } from "./compatibility";
@@ -75,6 +76,7 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
   let logicalTime = 0;
   let disposed = false;
   let connected = false;
+  let session: GameSessionContext | null = null;
   let checkpointRevision = 0;
   let lastCheckpointAt = Date.now();
   let canonicalState = resolveInitialState(options.initialState, seed);
@@ -228,6 +230,12 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
         actorId = message.actorId;
         runId = message.runId;
         seed = message.seed;
+        session = {
+          actorId,
+          isAuthority: message.isAuthority,
+          runId,
+          seed,
+        };
         connected = true;
         pendingActions = pendingActions.map((action) => ({
           ...action,
@@ -245,6 +253,7 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
         pendingActions.forEach((action) => {
           transport.send({ action, kind: "action-request" });
         });
+        options.onSession?.(Object.freeze({ ...session }));
       } else if (message.kind === "ordered-action") {
         acceptAction(message.action);
       } else if (message.kind === "checkpoint") {
@@ -333,6 +342,9 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
       handledEffects.add(effect.effectId);
       transport.send({ effect, kind: "effect" });
       return effect.effectId;
+    },
+    getSession() {
+      return session ? Object.freeze({ ...session }) : null;
     },
     getState() {
       return renderedState;

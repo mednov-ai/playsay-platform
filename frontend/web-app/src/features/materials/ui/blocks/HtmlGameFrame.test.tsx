@@ -99,9 +99,54 @@ describe("HTML game sandbox", () => {
     const document = createSandboxedGameDocument(sdkGame, "sdk-channel", true, "teacher-run", false);
 
     expect(document).toContain("data-playsay-game-sdk-host");
+    expect(document).toContain("data-playsay-game-sdk-diagnostics");
     expect(document).toContain("__PLAY_SAY_GAME_SYNC_TRANSPORT__");
     expect(document).toContain("playsay-sdk-connect");
+    expect(document).not.toContain("data-playsay-game-bridge");
+    expect(document).not.toContain("const inputTypes =");
     expect(document).not.toContain('type="application/playsay-disabled"');
+  });
+
+  it("ignores legacy input messages from an SDK v1 frame", () => {
+    const publishInput = vi.fn();
+    const sdkGame = `<html><head><script type="application/playsay-game+json">{
+      "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
+      "reducerVersion":"1","buildHash":"test"
+    }</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>`;
+    const sync: MaterialHtmlGameSync = {
+      ...sdkSyncFields(),
+      authorityRuns: {},
+      effects: [],
+      inputs: [],
+      isAuthority: true,
+      presentedBlockId: null,
+      publishEffect: vi.fn(),
+      publishInput,
+      publishSnapshot: vi.fn(),
+      ready: true,
+      setAuthorityRun: vi.fn(),
+      setPresentedBlock: vi.fn(),
+      snapshots: {},
+    };
+    const { container } = render(
+      <HtmlGameFrame blockId="game-sdk" height={640} html={sdkGame} sync={sync} title="Game" />,
+    );
+    const iframe = container.querySelector("iframe");
+    const channelMatch = iframe?.getAttribute("srcdoc")?.match(/const channel = ("[^"]+");/);
+    const channel = channelMatch ? JSON.parse(channelMatch[1]) as string : "";
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", {
+        data: {
+          channel,
+          event: { targetId: "__document__", type: "pointerdown" },
+          type: "input",
+        },
+        source: iframe?.contentWindow,
+      }));
+    });
+
+    expect(publishInput).not.toHaveBeenCalled();
   });
 
   it("reports an SDK game ready only after a matching hello and ready lifecycle, then latches errors", () => {

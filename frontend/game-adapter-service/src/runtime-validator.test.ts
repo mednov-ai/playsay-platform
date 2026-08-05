@@ -99,6 +99,65 @@ describe("runtime validation plan", () => {
         });
         expect(result.actionCount).toBe(1);
         expect(result.checks).toContain("lifecycle-ready");
+        expect(result.mechanicsEquivalent).toBe(true);
+      } finally {
+        await closeRuntimeValidator();
+      }
+    },
+    20_000,
+  );
+
+  it.runIf(Boolean(process.env.CHROMIUM_EXECUTABLE_PATH))(
+    "rejects a candidate whose state transition differs from the source game",
+    async () => {
+      const sdk = await readFile(new URL("../../game-sync-sdk/dist/game-sync.iife.js", import.meta.url), "utf8");
+      const gameManifest = {
+        buildHash: "mechanics-test",
+        capabilities: ["actions"] as const,
+        gameId: "mechanics-test",
+        protocol: "playsay-game-sync/v1" as const,
+        reducerVersion: "1",
+        stateVersion: "1",
+      };
+      const source = `<html><body>
+        <button id="move">Move</button><output id="position">0</output>
+        <script>
+          document.querySelector("#move").addEventListener("click", () => {
+            const output = document.querySelector("#position");
+            output.textContent = String(Number(output.textContent) + 1);
+          });
+        </script>
+      </body></html>`;
+      const candidate = `<html><head>
+        <script type="application/playsay-game+json">${JSON.stringify(gameManifest)}</script>
+      </head><body>
+        <button id="move">Move</button><output id="position">0</output>
+        <script>${sdk}</script>
+        <script>
+          const output = document.querySelector("#position");
+          const controller = PlaySayGameSync.defineGame({
+            initialState: 0,
+            manifest: ${JSON.stringify(gameManifest)},
+            onState(state) { output.textContent = String(state); },
+            reduce(state, action) { return action.type === "MOVE" ? state + 2 : state; }
+          });
+          document.querySelector("#move").addEventListener("click", () => controller.dispatch("MOVE", {}));
+          controller.ready();
+        </script>
+      </body></html>`;
+      const plan = {
+        readySelector: "#move",
+        steps: [{
+          expectActionType: "MOVE",
+          expectDomChange: true,
+          name: "move",
+          operation: { kind: "click" as const, selector: "#move" },
+        }],
+      };
+
+      try {
+        await expect(validateGameRuntime(candidate, plan, source))
+          .rejects.toThrow("GAME_MECHANICS_CHANGED");
       } finally {
         await closeRuntimeValidator();
       }

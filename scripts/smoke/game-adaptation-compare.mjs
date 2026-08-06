@@ -21,6 +21,8 @@ const runId = `game-compare-${new Date().toISOString().replace(/[-:.TZ]/g, "").s
 const tokenStorageKey = "playsay.auth.tokens";
 const blockId = "game-compare-racing";
 const gameTitle = "English Racing";
+const activeGameIframeSelector =
+  ".playsay-material-focused-game[data-active='true'] .playsay-html-game[data-paused='false'] iframe";
 
 const credentials = {
   teacher: {
@@ -462,21 +464,27 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   // state and authority run use separate shared updates; opening both frames in
   // the same task can otherwise boot the replica with its temporary fallback ID.
   await teacherLaunch.click();
-  await teacherPage.locator(".playsay-html-game[data-paused='false'] iframe").waitFor({
-    timeout: timeoutMs,
-  });
+  try {
+    await teacherPage.locator(activeGameIframeSelector).waitFor({ timeout: timeoutMs });
+  } catch {
+    throw new Error(`Teacher game did not focus: ${JSON.stringify(await gameMountState(teacherPage))}`);
+  }
   await teacherPage.waitForTimeout(750);
-  const activeStudentIframe = studentPage.locator(".playsay-html-game[data-paused='false'] iframe");
-  if (!await activeStudentIframe.isVisible() && await studentLaunch.isVisible()) {
+  const activeStudentIframe = studentPage.locator(activeGameIframeSelector);
+  const studentFocusActive = await studentPage.locator(
+    ".playsay-material-focus-stack[data-active='true']",
+  ).isVisible();
+  if (!studentFocusActive && !await activeStudentIframe.isVisible() && await studentLaunch.isVisible()) {
     await studentLaunch.click();
   }
-  await Promise.all([
-    teacherPage.locator(".playsay-html-game[data-paused='false'] iframe").waitFor({ timeout: timeoutMs }),
-    studentPage.locator(".playsay-html-game[data-paused='false'] iframe").waitFor({ timeout: timeoutMs }),
-  ]);
+  try {
+    await studentPage.locator(activeGameIframeSelector).waitFor({ timeout: timeoutMs });
+  } catch {
+    throw new Error(`Student game did not focus: ${JSON.stringify(await gameMountState(studentPage))}`);
+  }
 
-  const teacherFrame = teacherPage.frameLocator(".playsay-html-game[data-paused='false'] iframe");
-  const studentFrame = studentPage.frameLocator(".playsay-html-game[data-paused='false'] iframe");
+  const teacherFrame = teacherPage.frameLocator(activeGameIframeSelector);
+  const studentFrame = studentPage.frameLocator(activeGameIframeSelector);
   await Promise.all([
     teacherFrame.locator("#move").waitFor({ timeout: timeoutMs }),
     studentFrame.locator("#move").waitFor({ timeout: timeoutMs }),
@@ -522,7 +530,7 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   });
 
   const screenshotPath = path.join(outputDir, `${label}.png`);
-  const activeTeacherIframe = teacherPage.locator(".playsay-html-game[data-paused='false'] iframe");
+  const activeTeacherIframe = teacherPage.locator(activeGameIframeSelector);
   await activeTeacherIframe.screenshot({ path: screenshotPath });
   const screenshot = await activeTeacherIframe.screenshot();
   const teacherToStudent = await measureDirection(teacherFrame, studentFrame, sampleCount);
@@ -626,7 +634,7 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   const studentDiagnostics = await studentPage.evaluate(
     () => window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? [],
   );
-  return {
+  const result = {
     runtime,
     diagnostics: {
       summary: summarizeDiagnostics([...teacherDiagnostics, ...studentDiagnostics]),
@@ -653,6 +661,39 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
     studentToTeacher,
     teacherToStudent,
   };
+  const closeGame = teacherPage.locator("[data-testid='material-focus-close']");
+  if (await closeGame.isVisible()) {
+    await closeGame.click();
+    await Promise.all([
+      teacherPage.waitForFunction(
+        () => document.querySelector(".playsay-material-focus-stack")?.getAttribute("data-active") === "false",
+        null,
+        { timeout: timeoutMs },
+      ),
+      studentPage.waitForFunction(
+        () => document.querySelector(".playsay-material-focus-stack")?.getAttribute("data-active") === "false",
+        null,
+        { timeout: timeoutMs },
+      ),
+    ]);
+  }
+  return result;
+}
+
+async function gameMountState(page) {
+  return page.evaluate(() => ({
+    focusStack: [...document.querySelectorAll(".playsay-material-focus-stack")].map((element) => ({
+      active: element.getAttribute("data-active"),
+      kind: element.getAttribute("data-kind"),
+    })),
+    games: [...document.querySelectorAll(".playsay-material-focused-game")].map((element) => ({
+      active: element.getAttribute("data-active"),
+      hasIframe: Boolean(element.querySelector("iframe")),
+      paused: element.querySelector(".playsay-html-game")?.getAttribute("data-paused"),
+      runtime: element.querySelector(".playsay-html-game")?.getAttribute("data-runtime"),
+      waiting: Boolean(element.querySelector(".playsay-html-game-waiting")),
+    })),
+  }));
 }
 
 function summarizeDiagnostics(entries) {

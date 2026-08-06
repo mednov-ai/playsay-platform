@@ -757,6 +757,36 @@ describe("LessonTaskCanvas", () => {
     expect(setPresentedBlock).toHaveBeenCalledWith(null);
   });
 
+  it("keeps a locally reopened game focused while the shared presentation echo is pending", () => {
+    const setPresentedBlock = vi.fn();
+    const baseProps = {
+      lessonId: "lesson-1",
+      material: htmlGameMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    };
+    const { container, rerender } = render(createElement(LessonTaskCanvas, {
+      ...baseProps,
+      htmlGameSync: htmlGameSync({ setPresentedBlock }),
+    }));
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
+    expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
+    expect(setPresentedBlock).toHaveBeenCalledWith("game-1");
+
+    rerender(createElement(LessonTaskCanvas, {
+      ...baseProps,
+      htmlGameSync: htmlGameSync({ setPresentedBlock }),
+    }));
+
+    expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
+    expect(container.querySelector(".playsay-material-focus-stack")?.getAttribute("data-active")).toBe("true");
+  });
+
   it("does not auto-launch a legacy HTML game after returning to its page", async () => {
     const { container } = render(createElement(LessonTaskCanvas, {
       canControlPages: true,

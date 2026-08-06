@@ -96,6 +96,7 @@ export function LessonMaterialDocumentView({
   const isHtmlGamePage = page.layout === "HTML_GAME";
   const allBlocks = useMemo(() => document.pages.flatMap((item) => item.blocks), [document.pages]);
   const focusedBlockValue = focusedBlock ? allBlocks.find((block) => block.id === focusedBlock.blockId) ?? null : null;
+  const hasHtmlGameSync = Boolean(htmlGameSync);
   const presentedHtmlGameBlockId = htmlGameSync?.presentedBlockId ?? null;
   const presentedExternalActivityBlockId = externalActivitySync?.active?.visible ? externalActivitySync.active.blockId : null;
   onPresentationModeChangeRef.current = onPresentationModeChange;
@@ -113,7 +114,7 @@ export function LessonMaterialDocumentView({
   }, [focusedBlock, page.blocks]);
 
   useEffect(() => {
-    if (!htmlGameSync) {
+    if (!hasHtmlGameSync) {
       return;
     }
     if (!presentedHtmlGameBlockId) {
@@ -130,7 +131,7 @@ export function LessonMaterialDocumentView({
     setFocusedBlock((current) => current?.kind === "htmlGame" && current.blockId === presentedHtmlGameBlockId
       ? current
       : { kind: "htmlGame", blockId: presentedHtmlGameBlockId });
-  }, [allBlocks, htmlGameSync, presentedHtmlGameBlockId]);
+  }, [allBlocks, hasHtmlGameSync, presentedHtmlGameBlockId]);
 
   useEffect(() => {
     if (!presentedExternalActivityBlockId) {

@@ -92,7 +92,7 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
     const targetWindow = await chrome.windows.create({
       focused: true,
       height: 800,
-      type: "popup",
+      type: "normal",
       url: command.url,
       width: 1280,
     });

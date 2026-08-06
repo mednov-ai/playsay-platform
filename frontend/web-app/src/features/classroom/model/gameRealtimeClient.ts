@@ -37,6 +37,7 @@ export function createGameRealtimeClient({
   getUrl: () => Promise<string>;
 }): MaterialHtmlGameRealtime & { close: () => void } {
   const registrations = new Map<symbol, Registration>();
+  const registrationsBySession = new Map<string, Set<Registration>>();
   const pendingRequests = new Map<string, MaterialHtmlGameRealtimeMessage>();
   const actionHistory = new Map<string, MaterialHtmlGameSdkOrderedAction[]>();
   let socket: WebSocket | null = null;
@@ -55,6 +56,7 @@ export function createGameRealtimeClient({
   reportStatus("closed", "fallback");
 
   const historyKey = (blockId: string, runId: string) => `${blockId}\u0000${runId}`;
+  const registrationKey = historyKey;
 
   const fallbackDataMessage = (message: MaterialHtmlGameRealtimeMessage) => {
     if (
@@ -142,7 +144,9 @@ export function createGameRealtimeClient({
       recordGameSyncDiagnostic({
         blockId: action.blockId,
         eventId: action.eventId,
-        revision: "authorityRevision" in action ? action.authorityRevision : undefined,
+        revision: message.kind === "ordered-action"
+          ? message.action.authorityRevision
+          : undefined,
         runId: action.runId,
         stage: "client-outbound-complete",
       });
@@ -164,9 +168,7 @@ export function createGameRealtimeClient({
         : message.kind === "ordered-action"
           ? message.action.runId
           : message.effect.runId;
-    return [...registrations.values()].filter((registration) => (
-      registration.blockId === blockId && registration.runId === runId
-    ));
+    return [...(registrationsBySession.get(registrationKey(blockId, runId)) ?? [])];
   };
 
   const respondToResume = (message: Extract<MaterialHtmlGameRealtimeMessage, { kind: "resume" }>) => {
@@ -196,21 +198,7 @@ export function createGameRealtimeClient({
 
   const dispatch = (message: MaterialHtmlGameRealtimeMessage) => {
     if (message.kind === "ordered-action") {
-      recordGameSyncDiagnostic({
-        blockId: message.action.blockId,
-        eventId: message.action.eventId,
-        revision: message.action.authorityRevision,
-        runId: message.action.runId,
-        stage: "client-inbound-start",
-      });
       rememberAction(message.action);
-      recordGameSyncDiagnostic({
-        blockId: message.action.blockId,
-        eventId: message.action.eventId,
-        revision: message.action.authorityRevision,
-        runId: message.action.runId,
-        stage: "socket-received",
-      });
     } else if (message.kind === "resume") {
       respondToResume(message);
       return;
@@ -313,6 +301,10 @@ export function createGameRealtimeClient({
       const id = Symbol(registration.blockId);
       const stored = { ...registration, id };
       registrations.set(id, stored);
+      const key = registrationKey(stored.blockId, stored.runId);
+      const matching = registrationsBySession.get(key) ?? new Set<Registration>();
+      matching.add(stored);
+      registrationsBySession.set(key, matching);
       if (closeTimer !== null) {
         window.clearTimeout(closeTimer);
         closeTimer = null;
@@ -324,6 +316,10 @@ export function createGameRealtimeClient({
       }
       return () => {
         registrations.delete(id);
+        matching.delete(stored);
+        if (matching.size === 0) {
+          registrationsBySession.delete(key);
+        }
         if (registrations.size === 0 && closeTimer === null) {
           closeTimer = window.setTimeout(() => {
             closeTimer = null;
@@ -344,6 +340,7 @@ export function createGameRealtimeClient({
       mode = null;
       reportStatus("closed", null);
       registrations.clear();
+      registrationsBySession.clear();
       pendingRequests.clear();
       actionHistory.clear();
     },

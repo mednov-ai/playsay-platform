@@ -3,6 +3,7 @@ import type {
   GameActionRequest,
   GameCheckpoint,
   GameEffect,
+  GameSyncOutboundMessage,
   OrderedGameAction,
 } from "@playsay/game-sync";
 
@@ -203,13 +204,37 @@ export type MaterialHtmlGameRealtime = {
   publish: (message: MaterialHtmlGameRealtimeMessage) => void;
 };
 
+export type MaterialHtmlGameSdkSessionRegistration = {
+  actorId: string;
+  blockId: string;
+  getCheckpoint: () => MaterialHtmlGameSdkCheckpoint | undefined;
+  getPort: () => MessagePort | null;
+  isAuthority: boolean;
+  onFailure: () => void;
+  runId: string;
+  validateRequest: (request: MaterialHtmlGameSdkActionRequest | GameActionRequest) => boolean;
+};
+
+export type MaterialHtmlGameSdkSessionAttachment = {
+  handleOutbound: (message: GameSyncOutboundMessage) => void;
+  release: () => void;
+};
+
+export type MaterialHtmlGameSdkChannel = {
+  acknowledge: (eventId: string) => void;
+  attach: (
+    registration: MaterialHtmlGameSdkSessionRegistration,
+  ) => MaterialHtmlGameSdkSessionAttachment;
+  publish: (message: MaterialHtmlGameRealtimeMessage) => void;
+};
+
 export type MaterialHtmlGameSync = {
   authorityRuns: Record<string, string>;
   clientId: number | null;
   effects: MaterialHtmlGameEffect[];
   inputs: MaterialHtmlGameInputEvent[];
   isAuthority: boolean;
-  gameRealtime?: MaterialHtmlGameRealtime;
+  sdkChannel?: MaterialHtmlGameSdkChannel;
   patches?: MaterialHtmlGamePatch[];
   presentedBlockId: string | null;
   publishPatch?: (patch: MaterialHtmlGamePatch) => void;
@@ -217,14 +242,7 @@ export type MaterialHtmlGameSync = {
   publishEffect: (effect: MaterialHtmlGameEffect) => void;
   publishInput: (event: MaterialHtmlGameInputEvent) => void;
   publishSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
-  publishSdkAction: (action: MaterialHtmlGameSdkOrderedAction) => void;
-  publishSdkCheckpoint: (blockId: string, checkpoint: MaterialHtmlGameSdkCheckpoint) => void;
-  publishSdkEffect: (effect: MaterialHtmlGameSdkEffect) => void;
-  publishSdkRequest: (request: MaterialHtmlGameSdkActionRequest) => void;
-  sdkActions: MaterialHtmlGameSdkOrderedAction[];
   sdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint>;
-  sdkEffects: MaterialHtmlGameSdkEffect[];
-  sdkRequests: MaterialHtmlGameSdkActionRequest[];
   setAuthorityRun: (blockId: string, runId: string | null) => void;
   setPresentedBlock: (blockId: string | null) => void;
   snapshots: Record<string, MaterialHtmlGameSnapshot>;

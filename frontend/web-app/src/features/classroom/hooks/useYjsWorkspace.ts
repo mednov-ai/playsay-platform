@@ -17,10 +17,7 @@ import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
   MaterialHtmlGamePatch,
-  MaterialHtmlGameSdkActionRequest,
   MaterialHtmlGameSdkCheckpoint,
-  MaterialHtmlGameSdkEffect,
-  MaterialHtmlGameSdkOrderedAction,
   MaterialHtmlGameSnapshot,
   MaterialHtmlGameSync,
 } from "../../materials/model/materialDocument";
@@ -40,6 +37,7 @@ import type {
 } from "../model/materialViewport";
 import { realtimeReconnectDelayMs } from "../model/realtimeLifecycle";
 import { createGameRealtimeClient } from "../model/gameRealtimeClient";
+import { createGameSyncSessionController } from "../model/gameSyncSessionController";
 
 export type { CollaborationCursor, CollaborationParticipant };
 
@@ -66,10 +64,7 @@ export function useYjsWorkspace({
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
   const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
   const [htmlGamePatches, setHtmlGamePatches] = useState<MaterialHtmlGamePatch[]>([]);
-  const [htmlGameSdkActions, setHtmlGameSdkActions] = useState<MaterialHtmlGameSdkOrderedAction[]>([]);
   const [htmlGameSdkCheckpoints, setHtmlGameSdkCheckpoints] = useState<Record<string, MaterialHtmlGameSdkCheckpoint>>({});
-  const [htmlGameSdkEffects, setHtmlGameSdkEffects] = useState<MaterialHtmlGameSdkEffect[]>([]);
-  const [htmlGameSdkRequests, setHtmlGameSdkRequests] = useState<MaterialHtmlGameSdkActionRequest[]>([]);
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
   const [materialViewport, setMaterialViewportState] = useState<MaterialViewportState | null>(null);
@@ -79,7 +74,7 @@ export function useYjsWorkspace({
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  const gameRealtimeRef = useRef<ReturnType<typeof createGameRealtimeClient> | null>(null);
+  const gameSyncControllerRef = useRef<ReturnType<typeof createGameSyncSessionController> | null>(null);
 
   useEffect(() => {
     if (!enabled || !document) {
@@ -91,10 +86,7 @@ export function useYjsWorkspace({
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
       setHtmlGamePatches([]);
-      setHtmlGameSdkActions([]);
       setHtmlGameSdkCheckpoints({});
-      setHtmlGameSdkEffects([]);
-      setHtmlGameSdkRequests([]);
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
@@ -108,6 +100,7 @@ export function useYjsWorkspace({
     let disposed = false;
     let reconnectTimer: number | null = null;
     let reconnectAttempt = 0;
+    let gameSyncController: ReturnType<typeof createGameSyncSessionController> | null = null;
     const runtime = createYjsWorkspaceRuntime({
       color,
       onAnnotationChange: setAnnotationElementsState,
@@ -116,10 +109,8 @@ export function useYjsWorkspace({
       onHtmlGameInputsChange: setHtmlGameInputs,
       onHtmlGamePatchesChange: setHtmlGamePatches,
       onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
-      onHtmlGameSdkActionsChange: setHtmlGameSdkActions,
       onHtmlGameSdkCheckpointsChange: setHtmlGameSdkCheckpoints,
-      onHtmlGameSdkEffectsChange: setHtmlGameSdkEffects,
-      onHtmlGameSdkRequestsChange: setHtmlGameSdkRequests,
+      onHtmlGameSdkMessage: (message) => gameSyncController?.receiveFallback(message),
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onMaterialAnswersChange: setMaterialAnswers,
       onMaterialViewportChange: setMaterialViewportState,
@@ -145,7 +136,13 @@ export function useYjsWorkspace({
         await createCollaborationDocumentToken(document.lessonId, document.id),
       ),
     });
-    gameRealtimeRef.current = gameRealtime;
+    gameSyncController = createGameSyncSessionController({
+      publishCheckpoint: (blockId, checkpoint) => {
+        runtime.setHtmlGameSdkCheckpoint(blockId, checkpoint);
+      },
+      realtime: gameRealtime,
+    });
+    gameSyncControllerRef.current = gameSyncController;
     setWorkspaceClientId(runtime.getClientId());
     setStatus("connecting");
 
@@ -236,8 +233,9 @@ export function useYjsWorkspace({
       socketRef.current = null;
       runtime.setSocket(null);
       runtime.destroy();
+      gameSyncController.close();
       gameRealtime.close();
-      gameRealtimeRef.current = null;
+      gameSyncControllerRef.current = null;
       runtimeRef.current = null;
       setAnnotationElementsState([]);
       setParticipants([]);
@@ -245,10 +243,7 @@ export function useYjsWorkspace({
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
       setHtmlGamePatches([]);
-      setHtmlGameSdkActions([]);
       setHtmlGameSdkCheckpoints({});
-      setHtmlGameSdkEffects([]);
-      setHtmlGameSdkRequests([]);
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
@@ -313,25 +308,6 @@ export function useYjsWorkspace({
     runtimeRef.current?.setHtmlGameSnapshot(blockId, gameSnapshot);
   }, []);
 
-  const publishHtmlGameSdkAction = useCallback((action: MaterialHtmlGameSdkOrderedAction) => {
-    runtimeRef.current?.publishHtmlGameSdkAction(action);
-  }, []);
-
-  const publishHtmlGameSdkCheckpoint = useCallback((
-    blockId: string,
-    checkpoint: MaterialHtmlGameSdkCheckpoint,
-  ) => {
-    runtimeRef.current?.setHtmlGameSdkCheckpoint(blockId, checkpoint);
-  }, []);
-
-  const publishHtmlGameSdkEffect = useCallback((effect: MaterialHtmlGameSdkEffect) => {
-    runtimeRef.current?.publishHtmlGameSdkEffect(effect);
-  }, []);
-
-  const publishHtmlGameSdkRequest = useCallback((request: MaterialHtmlGameSdkActionRequest) => {
-    runtimeRef.current?.publishHtmlGameSdkRequest(request);
-  }, []);
-
   const setHtmlGameAuthorityRun = useCallback((blockId: string, runId: string | null) => {
     runtimeRef.current?.updateHtmlGameAuthority(blockId, runId);
   }, []);
@@ -371,33 +347,37 @@ export function useYjsWorkspace({
     runtimeRef.current?.setVideoPlayback(blockId, state, options);
   }, []);
 
-  const htmlGameSync = useCallback((isAuthority: boolean): MaterialHtmlGameSync => ({
-    authorityRuns: Object.fromEntries(participants
-      .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))),
-    clientId: workspaceClientId,
-    effects: htmlGameEffects,
-    inputs: htmlGameInputs,
-    isAuthority,
-    gameRealtime: gameRealtimeRef.current ?? undefined,
-    patches: htmlGamePatches,
-    presentedBlockId: presentedHtmlGameBlockId,
-    ready: status === "connected",
-    publishEffect: publishHtmlGameEffect,
-    publishInput: publishHtmlGameInput,
-    publishPatch: publishHtmlGamePatch,
-    publishSnapshot: publishHtmlGameSnapshot,
-    publishSdkAction: publishHtmlGameSdkAction,
-    publishSdkCheckpoint: publishHtmlGameSdkCheckpoint,
-    publishSdkEffect: publishHtmlGameSdkEffect,
-    publishSdkRequest: publishHtmlGameSdkRequest,
-    sdkActions: htmlGameSdkActions,
-    sdkCheckpoints: htmlGameSdkCheckpoints,
-    sdkEffects: htmlGameSdkEffects,
-    sdkRequests: htmlGameSdkRequests,
-    setAuthorityRun: setHtmlGameAuthorityRun,
-    setPresentedBlock: setPresentedHtmlGameBlock,
-    snapshots: htmlGameSnapshots,
-  }), [htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSdkActions, htmlGameSdkCheckpoints, htmlGameSdkEffects, htmlGameSdkRequests, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSdkAction, publishHtmlGameSdkCheckpoint, publishHtmlGameSdkEffect, publishHtmlGameSdkRequest, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status, workspaceClientId]);
+  const htmlGameSyncByRole = useMemo(() => {
+    const shared = {
+      authorityRuns: Object.fromEntries(participants
+        .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))),
+      clientId: workspaceClientId,
+      effects: htmlGameEffects,
+      inputs: htmlGameInputs,
+      patches: htmlGamePatches,
+      presentedBlockId: presentedHtmlGameBlockId,
+      ready: status === "connected",
+      publishEffect: publishHtmlGameEffect,
+      publishInput: publishHtmlGameInput,
+      publishPatch: publishHtmlGamePatch,
+      publishSnapshot: publishHtmlGameSnapshot,
+      sdkChannel: gameSyncControllerRef.current ?? undefined,
+      sdkCheckpoints: htmlGameSdkCheckpoints,
+      setAuthorityRun: setHtmlGameAuthorityRun,
+      setPresentedBlock: setPresentedHtmlGameBlock,
+      snapshots: htmlGameSnapshots,
+    };
+    return {
+      authority: { ...shared, isAuthority: true } satisfies MaterialHtmlGameSync,
+      replica: { ...shared, isAuthority: false } satisfies MaterialHtmlGameSync,
+    };
+  }, [htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSdkCheckpoints, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status, workspaceClientId]);
+  const htmlGameSync = useCallback(
+    (isAuthority: boolean): MaterialHtmlGameSync => (
+      isAuthority ? htmlGameSyncByRole.authority : htmlGameSyncByRole.replica
+    ),
+    [htmlGameSyncByRole],
+  );
 
   const exerciseSync = useMemo<MaterialExerciseSync>(() => ({
     answers: materialAnswers,

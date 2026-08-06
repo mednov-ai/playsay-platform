@@ -12,6 +12,7 @@ import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
   MaterialHtmlGamePatch,
+  MaterialHtmlGameRealtimeMessage,
   MaterialHtmlGameSdkActionRequest,
   MaterialHtmlGameSdkCheckpoint,
   MaterialHtmlGameSdkEffect,
@@ -87,6 +88,7 @@ export function createYjsWorkspaceRuntime(options: {
   onHtmlGameInputsChange: (events: MaterialHtmlGameInputEvent[]) => void;
   onHtmlGamePatchesChange?: (patches: MaterialHtmlGamePatch[]) => void;
   onHtmlGamePresentationChange?: (blockId: string | null) => void;
+  onHtmlGameSdkMessage?: (message: MaterialHtmlGameRealtimeMessage) => void;
   onHtmlGameSdkActionsChange?: (actions: MaterialHtmlGameSdkOrderedAction[]) => void;
   onHtmlGameSdkCheckpointsChange?: (
     checkpoints: Record<string, MaterialHtmlGameSdkCheckpoint>,

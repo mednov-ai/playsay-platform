@@ -20,14 +20,7 @@ const gameHtml = "<html><head><title>Game</title></head><body><button id=\"start
 
 const sdkSyncFields = () => ({
   clientId: 1,
-  publishSdkAction: vi.fn(),
-  publishSdkCheckpoint: vi.fn(),
-  publishSdkEffect: vi.fn(),
-  publishSdkRequest: vi.fn(),
-  sdkActions: [],
   sdkCheckpoints: {},
-  sdkEffects: [],
-  sdkRequests: [],
 });
 
 afterEach(() => {
@@ -307,7 +300,7 @@ describe("HTML game sandbox", () => {
 
   it("acquires the fast lane only while this SDK game is presented", () => {
     const release = vi.fn();
-    const acquire = vi.fn(() => release);
+    const attach = vi.fn(() => ({ handleOutbound: vi.fn(), release }));
     const sdkGame = `<html><head><script type="application/playsay-game+json">{
       "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
       "reducerVersion":"1","buildHash":"test"
@@ -316,9 +309,9 @@ describe("HTML game sandbox", () => {
       ...sdkSyncFields(),
       authorityRuns: {},
       effects: [],
-      gameRealtime: {
+      sdkChannel: {
         acknowledge: vi.fn(),
-        acquire,
+        attach,
         publish: vi.fn(),
       },
       inputs: [],
@@ -335,7 +328,7 @@ describe("HTML game sandbox", () => {
     const view = render(
       <HtmlGameFrame blockId="game-sdk" height={640} html={sdkGame} sync={sync} title="Game" />,
     );
-    expect(acquire).not.toHaveBeenCalled();
+    expect(attach).not.toHaveBeenCalled();
 
     view.rerender(
       <HtmlGameFrame
@@ -346,12 +339,47 @@ describe("HTML game sandbox", () => {
         title="Game"
       />,
     );
-    expect(acquire).toHaveBeenCalledOnce();
+    expect(attach).toHaveBeenCalledOnce();
 
     view.rerender(
       <HtmlGameFrame blockId="game-sdk" height={640} html={sdkGame} sync={sync} title="Game" />,
     );
     expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("keeps one bridge listener while collaboration props change", () => {
+    const addEventListener = vi.spyOn(window, "addEventListener");
+    const createSync = (clientId: number): MaterialHtmlGameSync => ({
+      ...sdkSyncFields(),
+      authorityRuns: {},
+      clientId,
+      effects: [],
+      inputs: [],
+      isAuthority: true,
+      presentedBlockId: null,
+      publishEffect: vi.fn(),
+      publishInput: vi.fn(),
+      publishSnapshot: vi.fn(),
+      ready: true,
+      setAuthorityRun: vi.fn(),
+      setPresentedBlock: vi.fn(),
+      snapshots: {},
+    });
+    const view = render(
+      <HtmlGameFrame blockId="game-1" height={640} html={gameHtml} sync={createSync(1)} title="Game" />,
+    );
+    for (let clientId = 2; clientId <= 101; clientId += 1) {
+      view.rerender(
+        <HtmlGameFrame
+          blockId="game-1"
+          height={640}
+          html={gameHtml}
+          sync={createSync(clientId)}
+          title="Game"
+        />,
+      );
+    }
+    expect(addEventListener.mock.calls.filter(([type]) => type === "message")).toHaveLength(1);
   });
 
   it("reports an SDK game ready only after a matching hello and ready lifecycle, then latches errors", () => {

@@ -14,6 +14,7 @@ import type {
   MaterialHtmlGameEffect,
   MaterialHtmlGameInputEvent,
   MaterialHtmlGamePatchOperation,
+  MaterialHtmlGameSdkSessionAttachment,
   MaterialHtmlGameSnapshot,
   MaterialHtmlGameSync,
 } from "../../model/materialDocument";
@@ -175,9 +176,10 @@ export function HtmlGameFrame({
   const handledEffectsRef = useRef<Set<string> | null>(null);
   const handledPatchesRef = useRef<Set<string> | null>(null);
   const sdkPortRef = useRef<MessagePort | null>(null);
-  const handledSdkActionsRef = useRef(new Set<string>());
-  const handledSdkEffectsRef = useRef(new Set<string>());
-  const handledSdkRequestsRef = useRef(new Set<string>());
+  const sdkSessionRef = useRef<MaterialHtmlGameSdkSessionAttachment | null>(null);
+  const bridgeMessageHandlerRef = useRef<(event: MessageEvent<BridgeMessage>) => void>(
+    () => undefined,
+  );
   const sdkRevisionRef = useRef(0);
   const sdkLogicalTimeRef = useRef(0);
   const sdkHelloAcceptedRef = useRef(false);
@@ -189,8 +191,10 @@ export function HtmlGameFrame({
   const [appliedAuthorityRunId, setAppliedAuthorityRunId] = useState<string | null>(null);
   const [runtimeStatus, setRuntimeStatus] = useState<HtmlGameRuntimeStatus>("checking");
   const activeSnapshot = sync?.snapshots[blockId];
-  const gameRealtime = sync?.gameRealtime;
+  const sdkChannel = sync?.sdkChannel;
   const sdkCheckpoint = sync?.sdkCheckpoints[blockId];
+  const sdkCheckpointRef = useRef(sdkCheckpoint);
+  sdkCheckpointRef.current = sdkCheckpoint;
   const syncClientId = sync?.clientId;
   const syncIsAuthority = sync?.isAuthority ?? true;
   const presentedBlockId = sync?.presentedBlockId ?? null;
@@ -243,9 +247,6 @@ export function HtmlGameFrame({
     nextInputSequenceRef.current = 0;
     handledEffectsRef.current = null;
     handledPatchesRef.current = null;
-    handledSdkActionsRef.current = new Set();
-    handledSdkEffectsRef.current = new Set();
-    handledSdkRequestsRef.current = new Set();
     sdkRevisionRef.current = 0;
     sdkLogicalTimeRef.current = 0;
     sdkHelloAcceptedRef.current = false;
@@ -267,6 +268,8 @@ export function HtmlGameFrame({
   useEffect(() => () => clearMirrorSnapshotRetry(), [clearMirrorSnapshotRetry]);
 
   useEffect(() => () => {
+    sdkSessionRef.current?.release();
+    sdkSessionRef.current = null;
     sdkPortRef.current?.close();
     sdkPortRef.current = null;
   }, []);
@@ -412,6 +415,10 @@ export function HtmlGameFrame({
               runId: runtimeRunId,
               stage: "host-received",
             });
+            if (sync?.sdkChannel && sdkSessionRef.current) {
+              sdkSessionRef.current.handleOutbound(outbound);
+              return;
+            }
             if (!sdkHelloAcceptedRef.current || !validSdkActionRequest(outbound.action, embeddedManifest)) {
               ports.port1.postMessage({
                 code: "ACTION_CONTRACT_INVALID",
@@ -446,9 +453,8 @@ export function HtmlGameFrame({
               id: outbound.action.eventId,
               runId: runtimeRunId,
             };
-            if (!sync || sync.isAuthority) {
+            if (!sync) {
               const action = orderSdkAction(request, sdkRevisionRef, sdkLogicalTimeRef);
-              handledSdkActionsRef.current.add(action.id);
               recordGameSyncDiagnostic({
                 blockId,
                 eventId: action.eventId,
@@ -464,53 +470,22 @@ export function HtmlGameFrame({
                 runId: runtimeRunId,
                 stage: "iframe-delivered",
               });
-              recordGameSyncDiagnostic({
-                blockId,
-                eventId: action.eventId,
-                revision: action.authorityRevision,
-                runId: runtimeRunId,
-                stage: "socket-queued",
-              });
-              if (sync?.gameRealtime) {
-                sync.gameRealtime.publish({ action, kind: "ordered-action" });
-              } else {
-                sync?.publishSdkAction(action);
-              }
-            } else {
-              if (sync.gameRealtime) {
-                sync.gameRealtime.publish({ kind: "action-request", request });
-              } else {
-                sync.publishSdkRequest(request);
-              }
             }
           } else if (outbound.kind === "effect") {
+            if (sync?.sdkChannel && sdkSessionRef.current) {
+              sdkSessionRef.current.handleOutbound(outbound);
+              return;
+            }
             if (serializedMessageBytes(outbound.effect) > GAME_SYNC_LIMITS.effectBytes) {
               return;
             }
-            const effect = {
-              ...outbound.effect,
-              at: Date.now(),
-              blockId,
-              id: outbound.effect.effectId,
-              runId: runtimeRunId,
-            };
-            handledSdkEffectsRef.current.add(effect.id);
-            if (sync?.gameRealtime) {
-              sync.gameRealtime.publish({ effect, kind: "effect" });
-            } else {
-              sync?.publishSdkEffect(effect);
-            }
           } else if (outbound.kind === "checkpoint" && (!sync || sync.isAuthority)) {
-            if (serializedMessageBytes(outbound.checkpoint) > GAME_SYNC_LIMITS.checkpointBytes) {
+            if (sync?.sdkChannel && sdkSessionRef.current) {
+              sdkSessionRef.current.handleOutbound(outbound);
               return;
             }
-            const checkpoint = {
-              ...outbound.checkpoint,
-              runId: runtimeRunId,
-              updatedAt: Date.now(),
-            };
-            if (sync) {
-              sync.publishSdkCheckpoint(blockId, checkpoint);
+            if (serializedMessageBytes(outbound.checkpoint) > GAME_SYNC_LIMITS.checkpointBytes) {
+              return;
             }
           } else if (outbound.kind === "lifecycle" && outbound.event === "ready") {
             if (sdkHelloAcceptedRef.current) {
@@ -526,249 +501,64 @@ export function HtmlGameFrame({
         );
       }
     }
+    bridgeMessageHandlerRef.current = handleMessage;
+    return () => {
+      if (bridgeMessageHandlerRef.current === handleMessage) {
+        bridgeMessageHandlerRef.current = () => undefined;
+      }
+    };
+  }, [activeSnapshot, authorityRunId, blockId, channel, embeddedManifest, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent<BridgeMessage>) => {
+      bridgeMessageHandlerRef.current(event);
+    };
     recordGameSyncCounter("htmlGameWindowListenerAdds");
     window.addEventListener("message", handleMessage);
     return () => {
       recordGameSyncCounter("htmlGameWindowListenerRemoves");
       window.removeEventListener("message", handleMessage);
     };
-  }, [activeSnapshot, authorityRunId, blockId, channel, embeddedManifest, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
-
-  useEffect(() => {
-    if (!sdkRuntime || !sync?.isAuthority) {
-      return;
-    }
-    const existingActions = sync.sdkActions
-      .filter((action) => action.blockId === blockId && action.runId === runtimeRunId);
-    const checkpoint = sync.sdkCheckpoints[blockId];
-    sdkRevisionRef.current = Math.max(
-      sdkRevisionRef.current,
-      checkpoint?.runId === runtimeRunId ? checkpoint.revision : 0,
-      ...existingActions.map((action) => action.authorityRevision),
-    );
-    sdkLogicalTimeRef.current = Math.max(
-      sdkLogicalTimeRef.current,
-      checkpoint?.runId === runtimeRunId ? checkpoint.logicalTime : 0,
-      ...existingActions.map((action) => action.logicalTime),
-    );
-    const orderedEventIds = new Set(existingActions.map((action) => action.eventId));
-    const requests = sync.sdkRequests
-      .filter((request) => request.blockId === blockId && request.runId === runtimeRunId)
-      .sort((left, right) => left.at - right.at || left.actorSequence - right.actorSequence);
-    requests.forEach((request) => {
-      if (handledSdkRequestsRef.current.has(request.id) || orderedEventIds.has(request.eventId)) {
-        return;
-      }
-      handledSdkRequestsRef.current.add(request.id);
-      recordGameSyncDiagnostic({
-        blockId,
-        eventId: request.eventId,
-        runId: runtimeRunId,
-        stage: "socket-received",
-      });
-      const action = orderSdkAction(request, sdkRevisionRef, sdkLogicalTimeRef);
-      handledSdkActionsRef.current.add(action.id);
-      recordGameSyncDiagnostic({
-        blockId,
-        eventId: action.eventId,
-        revision: action.authorityRevision,
-        runId: runtimeRunId,
-        stage: "authority-ordered",
-      });
-      sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
-      recordGameSyncDiagnostic({
-        blockId,
-        eventId: action.eventId,
-        revision: action.authorityRevision,
-        runId: runtimeRunId,
-        stage: "iframe-delivered",
-      });
-      recordGameSyncDiagnostic({
-        blockId,
-        eventId: action.eventId,
-        revision: action.authorityRevision,
-        runId: runtimeRunId,
-        stage: "socket-queued",
-      });
-      if (sync.gameRealtime) {
-        sync.gameRealtime.publish({ action, kind: "ordered-action" });
-      } else {
-        sync.publishSdkAction(action);
-      }
-    });
-  }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.isAuthority, sync?.sdkRequests]);
-
-  useEffect(() => {
-    if (!sdkRuntime || !sync) {
-      return;
-    }
-    const checkpointRevision = sync.sdkCheckpoints[blockId]?.runId === runtimeRunId
-      ? sync.sdkCheckpoints[blockId]?.revision ?? 0
-      : 0;
-    sync.sdkActions
-      .filter((action) => (
-        action.blockId === blockId &&
-        action.runId === runtimeRunId &&
-        action.authorityRevision > checkpointRevision
-      ))
-      .sort((left, right) => left.authorityRevision - right.authorityRevision)
-      .forEach((action) => {
-        sdkRevisionRef.current = Math.max(sdkRevisionRef.current, action.authorityRevision);
-        sdkLogicalTimeRef.current = Math.max(sdkLogicalTimeRef.current, action.logicalTime);
-        if (handledSdkActionsRef.current.has(action.id)) {
-          return;
-        }
-        handledSdkActionsRef.current.add(action.id);
-        sync.gameRealtime?.acknowledge(action.eventId);
-        recordGameSyncDiagnostic({
-          blockId,
-          eventId: action.eventId,
-          revision: action.authorityRevision,
-          runId: runtimeRunId,
-          stage: "socket-received",
-        });
-        sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
-        recordGameSyncDiagnostic({
-          blockId,
-          eventId: action.eventId,
-          revision: action.authorityRevision,
-          runId: runtimeRunId,
-          stage: "iframe-delivered",
-        });
-      });
-  }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.sdkActions, sync?.sdkCheckpoints]);
+  }, []);
 
   useEffect(() => {
     if (
       !sdkRuntime
-      || !gameRealtime
+      || !sdkChannel
       || presentedBlockId !== blockId
     ) {
       return;
     }
-    return gameRealtime.acquire({
+    const attachment = sdkChannel.attach({
+      actorId: String(syncClientId ?? channel),
       blockId,
-      getRevision: () => sdkRevisionRef.current,
+      getCheckpoint: () => sdkCheckpointRef.current,
+      getPort: () => sdkPortRef.current,
       isAuthority: syncIsAuthority,
-      onMessage: (message) => {
-        if (message.kind === "action-request") {
-          if (
-            !syncIsAuthority
-            || handledSdkRequestsRef.current.has(message.request.id)
-            || !validSdkActionRequest(message.request, embeddedManifest)
-          ) {
-            return;
-          }
-          handledSdkRequestsRef.current.add(message.request.id);
-          const action = orderSdkAction(
-            message.request,
-            sdkRevisionRef,
-            sdkLogicalTimeRef,
-          );
-          handledSdkActionsRef.current.add(action.id);
-          recordGameSyncDiagnostic({
-            blockId,
-            eventId: action.eventId,
-            revision: action.authorityRevision,
-            runId: runtimeRunId,
-            stage: "authority-ordered",
-          });
-          sdkPortRef.current?.postMessage({
-            action,
-            kind: "ordered-action",
-          } satisfies GameSyncInboundMessage);
-          recordGameSyncDiagnostic({
-            blockId,
-            eventId: action.eventId,
-            revision: action.authorityRevision,
-            runId: runtimeRunId,
-            stage: "iframe-delivered",
-          });
-          gameRealtime.publish({ action, kind: "ordered-action" });
-        } else if (message.kind === "ordered-action") {
-          const { action } = message;
-          if (action.authorityRevision > sdkRevisionRef.current + 1) {
-            gameRealtime.publish({
-              blockId,
-              kind: "resume",
-              lastRevision: sdkRevisionRef.current,
-              requesterId: String(syncClientId ?? channel),
-              runId: runtimeRunId,
-            });
-            return;
-          }
-          sdkRevisionRef.current = Math.max(
-            sdkRevisionRef.current,
-            action.authorityRevision,
-          );
-          sdkLogicalTimeRef.current = Math.max(
-            sdkLogicalTimeRef.current,
-            action.logicalTime,
-          );
-          gameRealtime.acknowledge(action.eventId);
-          if (handledSdkActionsRef.current.has(action.id)) {
-            return;
-          }
-          handledSdkActionsRef.current.add(action.id);
-          sdkPortRef.current?.postMessage({
-            action,
-            kind: "ordered-action",
-          } satisfies GameSyncInboundMessage);
-          recordGameSyncDiagnostic({
-            blockId,
-            eventId: action.eventId,
-            revision: action.authorityRevision,
-            runId: runtimeRunId,
-            stage: "iframe-delivered",
-          });
-        } else if (message.kind === "effect") {
-          if (handledSdkEffectsRef.current.has(message.effect.id)) {
-            return;
-          }
-          handledSdkEffectsRef.current.add(message.effect.id);
-          sdkPortRef.current?.postMessage({
-            effect: message.effect,
-            kind: "effect",
-          } satisfies GameSyncInboundMessage);
-        } else if (message.kind === "recovery-required") {
-          if (sdkCheckpoint?.runId === runtimeRunId) {
-            sdkRevisionRef.current = sdkCheckpoint.revision;
-            sdkLogicalTimeRef.current = sdkCheckpoint.logicalTime;
-            sdkPortRef.current?.postMessage({
-              checkpoint: sdkCheckpoint,
-              kind: "checkpoint",
-            } satisfies GameSyncInboundMessage);
-          }
-        }
-      },
+      onFailure: () => setRuntimeStatus("failed"),
       runId: runtimeRunId,
+      validateRequest: (request) => (
+        sdkHelloAcceptedRef.current
+        && validSdkActionRequest(request, embeddedManifest)
+      ),
     });
+    sdkSessionRef.current = attachment;
+    return () => {
+      if (sdkSessionRef.current === attachment) {
+        sdkSessionRef.current = null;
+      }
+      attachment.release();
+    };
   }, [
     blockId,
     embeddedManifest,
-    gameRealtime,
     presentedBlockId,
     runtimeRunId,
+    sdkChannel,
     sdkRuntime,
-    sdkCheckpoint,
     syncClientId,
     syncIsAuthority,
   ]);
-
-  useEffect(() => {
-    if (!sdkRuntime || !sync) {
-      return;
-    }
-    sync.sdkEffects
-      .filter((effect) => effect.blockId === blockId && effect.runId === runtimeRunId)
-      .forEach((effect) => {
-        if (handledSdkEffectsRef.current.has(effect.id)) {
-          return;
-        }
-        handledSdkEffectsRef.current.add(effect.id);
-        sdkPortRef.current?.postMessage({ effect, kind: "effect" } satisfies GameSyncInboundMessage);
-      });
-  }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.sdkEffects]);
 
   useEffect(() => {
     if (!sync) {

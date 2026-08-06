@@ -746,6 +746,7 @@ describe("yjs workspace runtime annotations", () => {
     withWindowBase64(() => {
       const actions: Array<Array<{ id: string }>> = [];
       const requests: Array<Array<{ id: string }>> = [];
+      const directMessages: Array<{ kind: string }> = [];
       const checkpoints: Array<Record<string, { revision: number }>> = [];
       const runtime = createYjsWorkspaceRuntime({
         color: "#ff5c00",
@@ -754,6 +755,7 @@ describe("yjs workspace runtime annotations", () => {
         onHtmlGameInputsChange: () => undefined,
         onHtmlGameSdkActionsChange: (items) => actions.push(items),
         onHtmlGameSdkCheckpointsChange: (items) => checkpoints.push(items),
+        onHtmlGameSdkMessage: (message) => directMessages.push(message),
         onHtmlGameSdkRequestsChange: (items) => requests.push(items),
         onHtmlGameSnapshotsChange: () => undefined,
         onParticipantsChange: () => undefined,
@@ -795,6 +797,10 @@ describe("yjs workspace runtime annotations", () => {
 
       expect(requests.at(-1)?.at(-1)?.id).toBe("event-1");
       expect(actions.at(-1)?.at(-1)?.id).toBe("event-1:ordered");
+      expect(directMessages.map((message) => message.kind)).toEqual([
+        "action-request",
+        "ordered-action",
+      ]);
       expect(checkpoints.at(-1)?.["game-a"]?.revision).toBe(1);
       const snapshot = runtime.snapshot();
       runtime.destroy();

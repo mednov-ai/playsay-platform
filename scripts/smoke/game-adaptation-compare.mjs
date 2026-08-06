@@ -457,11 +457,6 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
     openClassroom(teacherPage, lessonId, true),
     openClassroom(studentPage, lessonId, false),
   ]);
-  await Promise.all([teacherPage, studentPage].map((page) => page.evaluate(() => {
-    window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ = [];
-    window.__PLAY_SAY_GAME_SYNC_COUNTERS__ = {};
-  })));
-
   const teacherLaunch = teacherPage.locator(`[data-testid="html-game-launch-${blockId}"]`);
   const studentLaunch = studentPage.locator(`[data-testid="html-game-launch-${blockId}"]`);
   await Promise.all([
@@ -541,6 +536,36 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   const activeTeacherIframe = teacherPage.locator(activeGameIframeSelector);
   await activeTeacherIframe.screenshot({ path: screenshotPath });
   const screenshot = await activeTeacherIframe.screenshot();
+  await Promise.all([teacherPage, studentPage].map((page) => page.evaluate(() => {
+    window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ = [];
+    window.__PLAY_SAY_GAME_SYNC_COUNTERS__ = {};
+    window.__PLAY_SAY_GAME_SYNC_LONG_TASKS__ = [];
+    window.__PLAY_SAY_GAME_SYNC_EVENT_LOOP_DELAYS__ = [];
+    window.__PLAY_SAY_GAME_SYNC_PERFORMANCE_OBSERVER__?.disconnect();
+    window.clearInterval(window.__PLAY_SAY_GAME_SYNC_EVENT_LOOP_TIMER__);
+    if (typeof PerformanceObserver === "function") {
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          window.__PLAY_SAY_GAME_SYNC_LONG_TASKS__.push(entry.duration);
+        }
+      });
+      try {
+        observer.observe({ entryTypes: ["longtask"] });
+        window.__PLAY_SAY_GAME_SYNC_PERFORMANCE_OBSERVER__ = observer;
+      } catch {
+        observer.disconnect();
+      }
+    }
+    let expected = performance.now() + 16;
+    window.__PLAY_SAY_GAME_SYNC_EVENT_LOOP_TIMER__ = window.setInterval(() => {
+      const now = performance.now();
+      const delay = Math.max(0, now - expected);
+      const samples = window.__PLAY_SAY_GAME_SYNC_EVENT_LOOP_DELAYS__;
+      samples.push(delay);
+      if (samples.length > 4_000) samples.shift();
+      expected = now + 16;
+    }, 16);
+  })));
   const teacherToStudent = await measureDirection(teacherFrame, studentFrame, sampleCount);
   await teacherFrame.locator("#reset").click();
   await Promise.all([
@@ -648,10 +673,32 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   const studentCounters = await studentPage.evaluate(
     () => window.__PLAY_SAY_GAME_SYNC_COUNTERS__ ?? {},
   );
+  const performanceSamples = await Promise.all([teacherPage, studentPage].map((page) => (
+    page.evaluate(() => {
+      window.__PLAY_SAY_GAME_SYNC_PERFORMANCE_OBSERVER__?.disconnect();
+      window.clearInterval(window.__PLAY_SAY_GAME_SYNC_EVENT_LOOP_TIMER__);
+      return {
+        eventLoopDelays: window.__PLAY_SAY_GAME_SYNC_EVENT_LOOP_DELAYS__ ?? [],
+        longTasks: window.__PLAY_SAY_GAME_SYNC_LONG_TASKS__ ?? [],
+      };
+    })
+  )));
   const result = {
     runtime,
     diagnostics: {
       counters: { student: studentCounters, teacher: teacherCounters },
+      performance: {
+        eventLoopDelayP95Ms: percentile(
+          performanceSamples.flatMap((sample) => sample.eventLoopDelays),
+          0.95,
+        ) ?? 0,
+        longTaskCount: performanceSamples
+          .reduce((total, sample) => total + sample.longTasks.length, 0),
+        longTaskP95Ms: percentile(
+          performanceSamples.flatMap((sample) => sample.longTasks),
+          0.95,
+        ) ?? 0,
+      },
       summary: summarizeDiagnostics(
         teacherDiagnostics,
         studentDiagnostics,
@@ -797,7 +844,7 @@ function summarizeDiagnostics(teacherEntries, studentEntries, teacherCounters, s
     localOptimisticP95Ms: percentile(localOptimisticMs, 0.95) ?? 0,
     remoteRenderP95Ms: percentile(remoteRenderMs, 0.95) ?? 0,
     reactCommitsPerTransientAction: transientActions > 0
-      ? Math.max(0, renderCount - 2) / transientActions
+      ? renderCount / transientActions
       : 0,
     revisionConflicts,
     stageCounts,

@@ -28,6 +28,7 @@ export function createYjsWorkspaceRuntime({
   onHtmlGameInputsChange,
   onHtmlGamePatchesChange = () => undefined,
   onHtmlGamePresentationChange = () => undefined,
+  onHtmlGameSdkMessage = () => undefined,
   onHtmlGameSdkActionsChange = () => undefined,
   onHtmlGameSdkCheckpointsChange = () => undefined,
   onHtmlGameSdkEffectsChange = () => undefined,
@@ -138,12 +139,15 @@ export function createYjsWorkspaceRuntime({
     } else if (message.kind === "html-game-sdk-request") {
       transientHtmlGameSdkRequests = appendBounded(transientHtmlGameSdkRequests, message.payload, 200);
       onHtmlGameSdkRequestsChange(transientHtmlGameSdkRequests);
+      onHtmlGameSdkMessage({ kind: "action-request", request: message.payload });
     } else if (message.kind === "html-game-sdk-action") {
       transientHtmlGameSdkActions = appendBounded(transientHtmlGameSdkActions, message.payload, 200);
       onHtmlGameSdkActionsChange(transientHtmlGameSdkActions);
+      onHtmlGameSdkMessage({ action: message.payload, kind: "ordered-action" });
     } else if (message.kind === "html-game-sdk-effect") {
       transientHtmlGameSdkEffects = appendBounded(transientHtmlGameSdkEffects, message.payload, 120);
       onHtmlGameSdkEffectsChange(transientHtmlGameSdkEffects);
+      onHtmlGameSdkMessage({ effect: message.payload, kind: "effect" });
     }
   };
   const publishEphemeral = (kind, payload) => {

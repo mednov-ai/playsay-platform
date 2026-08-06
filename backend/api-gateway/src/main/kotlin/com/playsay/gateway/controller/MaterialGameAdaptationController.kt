@@ -31,7 +31,7 @@ class MaterialGameAdaptationController(
     )
     @Operation(
         operationId = "requestMaterialGameAdaptation",
-        summary = "Adapt an HTML game to Play&Say Game Sync",
+        summary = "Adapt an HTML game to Honey School Game Sync",
         security = [SecurityRequirement(name = "bearerAuth")],
         responses = [
             ApiResponse(

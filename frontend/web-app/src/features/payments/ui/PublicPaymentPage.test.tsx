@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { PublicPaymentReturnLink } from "./PublicPaymentPage";
 
 describe("PublicPaymentReturnLink", () => {
-  it("links failed public payment states back to the public Play&Say website", () => {
+  it("links failed public payment states back to the public Honey School website", () => {
     const markup = renderToStaticMarkup(createElement(PublicPaymentReturnLink, {
       label: "Back to website",
     }));

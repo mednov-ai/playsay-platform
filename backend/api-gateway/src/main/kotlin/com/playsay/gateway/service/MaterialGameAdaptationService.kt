@@ -336,7 +336,7 @@ class MaterialGameAdaptationService(
                 MaterialGameAdaptationStatuses.PENDING
             },
             compatibility = compatibility,
-            report = if (alreadyCompatible) "The game already uses Play&Say Game Sync v1." else null,
+            report = if (alreadyCompatible) "The game already uses Honey School Game Sync v1." else null,
             mechanicsValidation = if (alreadyCompatible) {
                 MaterialGameMechanicsValidation.PASSED
             } else {

@@ -1,1 +1,1 @@
-export const publicSiteUrl = "https://play-and-say.ru/";
+export const publicSiteUrl = "https://honey.school/";

@@ -1,6 +1,6 @@
 export const de = {
   common: {
-    appName: "Play&Say",
+    appName: "Honey School",
     actions: {
       cancel: "Abbrechen",
       close: "Schließen",
@@ -27,7 +27,7 @@ export const de = {
   registration: {
     start: {
       title: "Registrierung",
-      subtitle: "Erstellen Sie ein Play&Say Schülerkonto per E-Mail.",
+      subtitle: "Erstellen Sie ein Honey School Schülerkonto per E-Mail.",
     },
     "check-email": {
       title: "E-Mail prüfen",
@@ -83,7 +83,7 @@ export const de = {
     password: {
       tooShort: "Mindestens 8 Zeichen",
       tooLong: "Höchstens 128 Zeichen",
-      tooCommon: "Keine offensichtlichen Wörter und kein Play&Say",
+      tooCommon: "Keine offensichtlichen Wörter und kein Honey School",
       containsEmail: "Enthält keinen Teil der E-Mail",
       containsName: "Enthält nicht den Unterrichtsnamen",
       needsVariety: "Verwendet Groß-/Kleinbuchstaben, Ziffern oder Symbole",
@@ -110,7 +110,7 @@ export const de = {
     },
   },
   welcome: {
-    logoLinkAria: "Hauptwebsite von Play&Say öffnen",
+    logoLinkAria: "Hauptwebsite von Honey School öffnen",
     returnToSite: "Zur Website zurück",
   },
   chat: {
@@ -166,14 +166,14 @@ export const de = {
     page: {
       eyebrow: "Kontoeinstellungen",
       title: "Profil",
-      subtitle: "Verwalte deine persönlichen Daten und Play&Say-Einstellungen.",
+      subtitle: "Verwalte deine persönlichen Daten und Honey School-Einstellungen.",
     },
     actions: {
       backToWorkspace: "Zum Arbeitsbereich",
     },
     sections: {
       user: "Benutzer",
-      account: "Play&Say Profil",
+      account: "Honey School Profil",
       adminUsers: "Admin-Benutzer",
     },
     fields: {
@@ -264,7 +264,7 @@ export const de = {
       open: "Alle Bereiche",
       openShort: "Bereiche",
       close: "Bereiche schließen",
-      menuTitle: "Play&Say Bereiche",
+      menuTitle: "Honey School Bereiche",
       menuDescription: "Wählen Sie Ihren Arbeitsbereich",
     },
   },
@@ -1014,7 +1014,7 @@ export const de = {
       validatingExternalActivity: "Wird geprüft…",
       externalActivityGuaranteed: "Unterstützter Anbieter: {{provider}}",
       externalActivityExperimental: "Experimentelle Website: Kompatibilität nicht garantiert",
-      externalActivityHint: "Im Live-Unterricht teilt die Lehrkraft diese Seite über die Play&Say-Erweiterung. Alle sehen denselben Stand und die Cursor.",
+      externalActivityHint: "Im Live-Unterricht teilt die Lehrkraft diese Seite über die Honey School-Erweiterung. Alle sehen denselben Stand und die Cursor.",
       externalActivityPrivacy: "Der Tab verwendet das aktuelle Browserprofil der Lehrkraft. Bestehende Anmeldungen und Seiteninhalte können sichtbar sein.",
       externalActivityInvalid: "Dieser Link konnte nicht geprüft werden",
       imageUrl: "Bildlink",
@@ -1149,8 +1149,8 @@ export const de = {
       preparedForAi: "für AI vorbereitet",
       generate: "Entwurf vorbereiten",
       fromUrl: "Entwurf aus Link",
-      defaultPrompt: "Erstelle ein bearbeitbares Play&Say-Material aus dem angehängten Scan oder Arbeitsblattfoto.",
-      defaultScanPrompt: "Erstelle ein bearbeitbares Play&Say-Material aus dem angehängten Scan: erkenne Übungen, Antworten und füge eine Sprechaufgabe hinzu.",
+      defaultPrompt: "Erstelle ein bearbeitbares Honey School-Material aus dem angehängten Scan oder Arbeitsblattfoto.",
+      defaultScanPrompt: "Erstelle ein bearbeitbares Honey School-Material aus dem angehängten Scan: erkenne Übungen, Antworten und füge eine Sprechaufgabe hinzu.",
       imagePrepareFailed: "Bild konnte nicht vorbereitet werden.",
     },
     linkPanel: {
@@ -1200,14 +1200,14 @@ export const de = {
       videoVolume: "Lautstärke {{value}}%",
       videoQuality: "Videoqualität",
       videoRetry: "Erneut laden",
-      videoLoading: "Wir bereiten die Videowiedergabe in Play&Say vor.",
+      videoLoading: "Wir bereiten die Videowiedergabe in Honey School vor.",
       videoSyncResume: "Synchronisierte Wiedergabe fortsetzen",
       videoLoadFailed: "Video konnte nicht geladen werden",
       videoProgress: "{{current}} von {{duration}}",
       videoCopyright: "© Rechteinhaber des Videos auf {{provider}}.",
       videoOriginalLink: "Originalvideo",
       videoProviderFallback: "Video",
-      videoRelayUnavailable: "Video ist über Play&Say nicht verfügbar",
+      videoRelayUnavailable: "Video ist über Honey School nicht verfügbar",
       videoRelayReasonCode: "Code: {{reason}}",
       videoRelayReasons: {
         RF_RELAY_DISABLED: "Relay ist für diese Umgebung deaktiviert.",
@@ -1259,7 +1259,7 @@ export const de = {
       returnToLesson: "Zurück zum Unterricht",
       interactionSurface: "Gemeinsame externe Aktivität",
       mobileKeyboard: "Eingabe in die gemeinsame Aktivität",
-      clickExtension: "Klicken Sie im geöffneten Aktivitäts-Tab auf die Play&Say-Erweiterung",
+      clickExtension: "Klicken Sie im geöffneten Aktivitäts-Tab auf die Honey School-Erweiterung",
       waitingForTeacher: "Die Lehrkraft teilt die Aktivität gleich",
       waitingHint: "Lassen Sie dieses Fenster geöffnet. Die gemeinsame Seite erscheint hier für alle.",
       error: "Die gemeinsame Aktivität wurde beendet",
@@ -1460,7 +1460,7 @@ export const de = {
     translation: {
       enable: "Übersetzung aktivieren",
       enableHint: "Aktivieren Sie die Übersetzung, damit die andere Person zustimmen kann",
-      disclosure: "Sprache wird während des Haltens und bis zu 0,3 Sekunden nach dem Loslassen an einen externen KI-Dienst gesendet und nicht von Play&Say gespeichert.",
+      disclosure: "Sprache wird während des Haltens und bis zu 0,3 Sekunden nach dem Loslassen an einen externen KI-Dienst gesendet und nicht von Honey School gespeichert.",
       waitingPeer: "Warten, bis die andere Person die Übersetzung aktiviert",
       waiting: "Übersetzung wird vorbereitet",
       connecting: "Übersetzung wird verbunden",
@@ -1647,7 +1647,7 @@ export const de = {
       granted: "Erstellte Delegierungen · {{count}}",
     },
     admin: {
-      eyebrow: "Play&Say-Administration",
+      eyebrow: "Honey School-Administration",
       title: "Benutzer",
       subtitle: "Konten erstellen, Rollen ändern, Lehrkräfte zuweisen und Delegierungen verwalten.",
       createUser: "Benutzer erstellen",
@@ -1738,7 +1738,7 @@ export const de = {
     form: {
       amount: "Betrag, RUB",
       description: "Beschreibung",
-      defaultDescription: "Play&Say-Unterrichtspaket",
+      defaultDescription: "Honey School-Unterrichtspaket",
       student: "Schüler",
       noStudent: "Keine Verknüpfung",
       payerName: "Name des Zahlers",
@@ -1771,7 +1771,7 @@ export const de = {
       checkoutFailed: "Weiterleitung zur Zahlung fehlgeschlagen",
     },
     public: {
-      title: "Play&Say-Zahlung",
+      title: "Honey School-Zahlung",
       subtitle: "Prüfen Sie die Details und fahren Sie mit der sicheren Zahlungsseite fort.",
       invoice: "Rechnung",
       amount: "Betrag",

@@ -1,4 +1,5 @@
 import { publicSiteUrl } from "@playsay/shared-ui";
+import { HoneySchoolLockup } from "../../shared/ui/HoneySchoolLockup";
 import { LogIn, LogOut, Pencil, Play, RotateCcw, Save, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -1473,8 +1474,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     <main className="keyboard-app">
       <header className="app-header">
         <a className="brand-lockup" href={returnTarget} aria-label={t("app.publicSiteAria")}>
-          <span>{t("app.wordmark")}</span>
-          <strong>{t("app.product")}</strong>
+          <HoneySchoolLockup ariaLabel={t("app.title")} product={t("app.product")} />
         </a>
         <div className="topbar-actions">
           <label className="language-select">

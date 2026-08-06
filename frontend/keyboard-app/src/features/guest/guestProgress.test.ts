@@ -35,7 +35,7 @@ class MemoryStorage implements Pick<Storage, "getItem" | "setItem" | "removeItem
 }
 
 describe("guest keyboard progress", () => {
-  it("uses the Play&Say key guest session storage contract", () => {
+  it("uses the Honey School key guest session storage contract", () => {
     expect(guestSessionStorageKey).toBe("playsay.key.guestSessions");
     expect(guestPromptDismissedStorageKey).toBe("playsay.key.registrationPromptDismissedAt");
     expect(anonymousDeviceIdStorageKey).toBe("playsay.key.anonymousDeviceId");

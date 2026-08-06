@@ -2,17 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Quicksand";
+  src: url("/brand/fonts/quicksand-latin-400.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Quicksand";
+  src: url("/brand/fonts/quicksand-latin-500.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Quicksand";
+  src: url("/brand/fonts/quicksand-latin-600.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
 :root {
-  --background: 24 100% 99%;
-  --foreground: 0 0% 7%;
-  --muted: 21 100% 96%;
-  --muted-foreground: 224 6% 41%;
-  --border: 28 43% 90%;
-  --primary: 22 100% 50%;
-  --primary-foreground: 0 0% 100%;
+  --background: 42 100% 96%;
+  --foreground: 227 23% 16%;
+  --muted: 42 100% 96%;
+  --muted-foreground: 221 13% 46%;
+  --border: 38 35% 86%;
+  --primary: 34 100% 30%;
+  --primary-foreground: 42 100% 96%;
+  --brand-honey: #e99500;
+  --brand-honey-bright: #ffc24a;
+  --brand-honey-accessible: #9a5700;
   --surface: 0 0% 100%;
-  --surface-muted: 21 100% 97%;
-  --surface-strong: 24 100% 99%;
+  --surface-muted: 42 100% 97%;
+  --surface-strong: 42 100% 96%;
 }
 
 html {
@@ -25,8 +52,8 @@ html.dark {
   --muted: 24 24% 13%;
   --muted-foreground: 29 18% 72%;
   --border: 26 18% 24%;
-  --primary: 22 100% 50%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 40 100% 65%;
+  --primary-foreground: 227 23% 16%;
   --surface: 24 24% 11%;
   --surface-muted: 24 22% 15%;
   --surface-strong: 25 21% 18%;
@@ -66,6 +93,15 @@ button,
 input,
 textarea {
   font: inherit;
+}
+
+h1,
+h2,
+h3,
+.honey-brand,
+.playsay-welcome-login,
+.playsay-welcome-register {
+  font-family: "Quicksand", ui-rounded, system-ui, sans-serif;
 }
 
 .playsay-input {
@@ -215,48 +251,57 @@ textarea {
 }
 
 .playsay-welcome-logo-link:focus-visible {
-  box-shadow: 0 0 0 4px rgb(255 92 0 / 0.16);
+  box-shadow: 0 0 0 4px rgb(154 87 0 / 0.2);
 }
 
-.playsay-welcome-logo {
+.honey-brand {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.honey-brand__logo {
+  display: block;
+  width: auto;
+  height: 48px;
+}
+
+.honey-brand__logo--dark,
+.honey-brand__mark {
+  display: none;
+}
+
+.dark .honey-brand__logo--light {
+  display: none;
+}
+
+.dark .honey-brand__logo--dark {
+  display: block;
+}
+
+.honey-brand--welcome .honey-brand__logo {
   width: min(78vw, 26rem);
   height: auto;
-  overflow: visible;
-  filter: drop-shadow(0 24px 28px rgb(255 92 0 / 0.18));
-  transform: rotate(-1.4deg);
-  animation: playsay-logo-breathe 5.8s ease-in-out infinite;
 }
 
-.playsay-welcome-logo-paper {
-  fill: rgb(255 253 248 / 0.82);
+@media (max-width: 640px) {
+  .honey-brand--header .honey-brand__logo {
+    height: 38px;
+  }
 }
 
-.dark .playsay-welcome-logo-paper {
-  fill: rgb(43 31 24 / 0.9);
-}
+@media (max-width: 359px) {
+  .honey-brand--header .honey-brand__logo,
+  .dark .honey-brand--header .honey-brand__logo--dark {
+    display: none;
+  }
 
-.playsay-welcome-logo-art {
-  mix-blend-mode: multiply;
-}
-
-.dark .playsay-welcome-logo-art {
-  mix-blend-mode: normal;
-  opacity: 0.92;
-}
-
-.playsay-welcome-logo-shine {
-  mix-blend-mode: screen;
-  opacity: 0.72;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: playsay-logo-shine 4.8s ease-in-out infinite;
-}
-
-.playsay-welcome-logo-outline {
-  fill: none;
-  stroke: rgb(255 92 0 / 0.14);
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
+  .honey-brand--header .honey-brand__mark {
+    display: block;
+    width: 38px;
+    height: 38px;
+  }
 }
 
 .playsay-welcome-actions {
@@ -588,32 +633,6 @@ textarea {
   animation-delay: -3.6s;
 }
 
-@keyframes playsay-logo-breathe {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-1.4deg) scale(1);
-  }
-
-  50% {
-    transform: translateY(-0.4rem) rotate(1deg) scale(1.015);
-  }
-}
-
-@keyframes playsay-logo-shine {
-  0%,
-  15% {
-    transform: translateX(0) rotate(12deg);
-  }
-
-  70% {
-    transform: translateX(38rem) rotate(12deg);
-  }
-
-  100% {
-    transform: translateX(38rem) rotate(12deg);
-  }
-}
-
 @keyframes playsay-login-invite {
   0%,
   68%,
@@ -787,7 +806,7 @@ textarea {
     border-radius: 1.25rem;
   }
 
-  .playsay-welcome-logo {
+  .honey-brand--welcome .honey-brand__logo {
     width: min(80vw, 18.5rem);
   }
 
@@ -831,8 +850,6 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .playsay-floating-ball,
   .playsay-handprint,
-  .playsay-welcome-logo,
-  .playsay-welcome-logo-shine,
   .playsay-welcome-login,
   .playsay-welcome-login:hover,
   .playsay-welcome-login:focus-visible,

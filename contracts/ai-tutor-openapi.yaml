@@ -1,5 +1,5 @@
 openapi: 3.1.0
-info: { title: Play&Say AI Tutor API, version: 0.1.0 }
+info: { title: Honey School AI Tutor API, version: 0.1.0 }
 servers: [{ url: /api/ai-tutor }]
 security: [{ bearerAuth: [] }]
 paths:

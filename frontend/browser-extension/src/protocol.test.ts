@@ -7,7 +7,7 @@ import {
 } from "./protocol";
 
 describe("extension protocol", () => {
-  it("accepts current HoneySchool and local Play&Say origins only", () => {
+  it("accepts current HoneySchool and local Honey School origins only", () => {
     expect(isTrustedPlaySayOrigin("https://dev.online.honey.school")).toBe(true);
     expect(isTrustedPlaySayOrigin("https://online.honey.school")).toBe(true);
     expect(isTrustedPlaySayOrigin("https://online.honeyschool.ru")).toBe(true);

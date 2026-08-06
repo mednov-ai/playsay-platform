@@ -2,10 +2,10 @@ import type { TranslationResource } from "./ru";
 
 export const de: TranslationResource = {
   app: {
-    title: "Play&Say Key",
-    wordmark: "Play&Say",
+    title: "Honey School Key",
+    wordmark: "Honey School",
     product: "Key",
-    publicSiteAria: "Hauptwebsite von Play&Say öffnen",
+    publicSiteAria: "Hauptwebsite von Honey School öffnen",
     returnToSite: "Zur Website zurück",
   },
   auth: {
@@ -188,7 +188,7 @@ export const de: TranslationResource = {
     achievement_UNKNOWN_description: "Eine neue Belohnung ist im Profil gespeichert.",
   },
   trainerIntro: {
-    ariaLabel: "Einführung in den Play&Say Key Trainer",
+    ariaLabel: "Einführung in den Honey School Key Trainer",
     eyebrow: "Buchstabenakkorde",
     title: "Trainiere Schreibtempo mit Buchstabenakkorden",
     body: "Statt langer Texte zeigt der Trainer häufige Buchstabenkombinationen. Deine Finger lernen sie als fertige Bewegungen — und Tippen wird leichter.",

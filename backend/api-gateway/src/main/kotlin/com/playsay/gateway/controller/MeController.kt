@@ -21,7 +21,7 @@ class MeController {
     @Operation(
         operationId = "getMe",
         summary = "Current user profile",
-        description = "Returns the current JWT profile and Play&Say application roles.",
+        description = "Returns the current JWT profile and Honey School application roles.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(

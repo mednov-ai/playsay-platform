@@ -39,14 +39,14 @@ class UnisenderApiOutboundEmailSenderTest {
                 .build(),
             apiKey = "test-api-key",
             userId = 8236338,
-            fromName = "Play&Say",
+            fromName = "Honey School",
         )
 
         val result = sender.send(
             OutboundEmail(
                 from = "no-reply@play-and-say.ru",
                 to = "student@example.com",
-                subject = "Confirm your Play&Say account",
+                subject = "Confirm your Honey School account",
                 textBody = "Hello!\nConfirm here: https://online.play-and-say.ru/register/confirm?token=token-1",
                 htmlBody = "<p>Hello!</p><p><a href=\"https://online.play-and-say.ru/register/confirm?token=token-1\">Confirm email</a></p>",
                 deliveryId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"),
@@ -58,7 +58,7 @@ class UnisenderApiOutboundEmailSenderTest {
         assertTrue(body.contains(""""api_key":"test-api-key""""))
         assertTrue(body.contains(""""user_id":8236338"""))
         assertTrue(body.contains(""""from_email":"no-reply@play-and-say.ru""""))
-        assertTrue(body.contains(""""from_name":"Play&Say""""))
+        assertTrue(body.contains(""""from_name":"Honey School""""))
         assertTrue(body.contains(""""email":"student@example.com""""))
         assertTrue(body.contains(""""template_engine":"velocity""""))
         assertTrue(body.contains(""""plaintext":"Hello!\nConfirm here: https://online.play-and-say.ru/register/confirm?token=token-1""""))

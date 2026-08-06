@@ -278,7 +278,7 @@ class LessonReminderScheduler(
 
         return mapOf(
             "displayName" to recipient.displayName(),
-            "lessonTitle" to (lesson?.lessonTitle ?: lesson?.courseTitle ?: lesson?.materialTitle ?: "Play&Say lesson"),
+            "lessonTitle" to (lesson?.lessonTitle ?: lesson?.courseTitle ?: lesson?.materialTitle ?: "Honey School lesson"),
             "startsAt" to startsAt,
             "teacherName" to lesson?.teacherName,
             "studentNames" to studentNames.joinToString(", "),
@@ -297,7 +297,7 @@ class LessonReminderScheduler(
             .withZone(zoneId(recipient.timezone))
         return mapOf(
             "displayName" to recipient.displayName(),
-            "lessonTitle" to (lesson?.lessonTitle ?: lesson?.courseTitle ?: lesson?.materialTitle ?: "Play&Say lesson"),
+            "lessonTitle" to (lesson?.lessonTitle ?: lesson?.courseTitle ?: lesson?.materialTitle ?: "Honey School lesson"),
             "previousStartsAt" to reminder.previousScheduledStart?.let(formatter::format),
             "previousEndsAt" to reminder.previousScheduledEnd?.let(formatter::format),
             "startsAt" to reminder.scheduledStartSnapshot?.let(formatter::format),

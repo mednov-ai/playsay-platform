@@ -88,7 +88,6 @@ export function App() {
           dark: t("theme.dark"),
         } as Record<ThemeMode, string>}
         title={t("app.title")}
-        wordmark={t("app.wordmark")}
         product={t("app.product")}
         publicSiteAriaLabel={t("app.publicSiteAria")}
         signInLabel={t("auth.signIn")}

@@ -3,6 +3,7 @@ import { LogIn, RefreshCw } from "lucide-react";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
 import type { SupportedLanguage } from "../../shared/i18n";
+import { HoneySchoolLockup } from "../../shared/ui/HoneySchoolLockup";
 
 interface Props {
   status: "checking" | "callback" | "error" | "idle";
@@ -13,7 +14,6 @@ interface Props {
   themeMode: ThemeMode;
   themeLabels: Record<ThemeMode, string>;
   title: string;
-  wordmark: string;
   product: string;
   publicSiteAriaLabel: string;
   signInLabel: string;
@@ -35,7 +35,6 @@ export function AuthGate({
   themeMode,
   themeLabels,
   title,
-  wordmark,
   product,
   publicSiteAriaLabel,
   signInLabel,
@@ -53,8 +52,7 @@ export function AuthGate({
     <main className="auth-page">
       <div className="auth-page__topbar">
         <a className="brand-lockup" href={publicSiteUrl} aria-label={publicSiteAriaLabel}>
-          <span>{wordmark}</span>
-          <strong>{product}</strong>
+          <HoneySchoolLockup ariaLabel={title} product={product} />
         </a>
         <div className="topbar-actions">
           <label className="language-select">
@@ -72,7 +70,14 @@ export function AuthGate({
       </div>
 
       <section className="auth-panel" aria-busy={busy}>
-        <div className="auth-panel__mark">K</div>
+        <img
+          alt=""
+          aria-hidden="true"
+          className="auth-panel__mark"
+          height="512"
+          src="/brand/logo/honey-school-mark.svg"
+          width="512"
+        />
         <h1>{title}</h1>
         {status === "error" ? (
           <>

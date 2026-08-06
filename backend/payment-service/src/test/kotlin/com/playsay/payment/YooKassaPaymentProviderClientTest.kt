@@ -42,7 +42,7 @@ class YooKassaPaymentProviderClientTest {
                 invoiceId = invoiceId,
                 amountMinor = 350_000,
                 currency = "RUB",
-                description = "Play&Say lesson package",
+                description = "Honey School lesson package",
                 returnUrl = "https://online.play-and-say.ru/pay/token",
                 idempotenceKey = "idem-1",
                 metadata = mapOf(

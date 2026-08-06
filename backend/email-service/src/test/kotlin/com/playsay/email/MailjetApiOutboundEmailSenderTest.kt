@@ -44,7 +44,7 @@ class MailjetApiOutboundEmailSenderTest {
         val sender = MailjetApiOutboundEmailSender(
             restClient = restClient,
             objectMapper = jacksonObjectMapper(),
-            fromName = "Play&Say",
+            fromName = "Honey School",
             environment = "dev",
         )
 
@@ -52,7 +52,7 @@ class MailjetApiOutboundEmailSenderTest {
             OutboundEmail(
                 from = "no-reply@dev.honey.school",
                 to = "student@example.com",
-                subject = "Confirm your Play&Say account",
+                subject = "Confirm your Honey School account",
                 textBody = "Confirm your account",
                 htmlBody = "<p>Confirm your account</p>",
                 deliveryId = UUID.fromString("00000000-0000-0000-0000-000000000001"),

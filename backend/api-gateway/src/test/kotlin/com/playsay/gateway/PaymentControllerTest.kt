@@ -36,7 +36,7 @@ class PaymentControllerTest {
             PaymentInvoiceCreateRequest(
                 amountMinor = 350_000,
                 currency = "RUB",
-                description = "Play&Say lesson package",
+                description = "Honey School lesson package",
                 studentUserId = null,
                 payerName = "Parent",
                 payerEmail = "parent@example.com",
@@ -60,7 +60,7 @@ class PaymentControllerTest {
                 PaymentInvoiceCreateRequest(
                     amountMinor = 350_000,
                     currency = "RUB",
-                    description = "Play&Say lesson package",
+                    description = "Honey School lesson package",
                     studentUserId = null,
                     payerName = null,
                     payerEmail = null,
@@ -157,7 +157,7 @@ private class RecordingPaymentServiceClient : PaymentServiceClient {
             status = status,
             amountMinor = 350_000,
             currency = "RUB",
-            description = "Play&Say lesson package",
+            description = "Honey School lesson package",
             studentUserId = null,
             payerName = "Parent",
             payerEmail = "parent@example.com",

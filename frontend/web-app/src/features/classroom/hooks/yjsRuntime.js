@@ -1097,7 +1097,7 @@ function updateParticipants(awareness, onParticipantsChange) {
         } : null,
         exerciseInteraction: normalizeExerciseInteraction(root?.exerciseInteraction),
         htmlGameAuthorityRuns,
-        name: asString(user?.name) || "Play&Say",
+        name: asString(user?.name) || "Honey School",
       };
     });
   onParticipantsChange(nextParticipants);

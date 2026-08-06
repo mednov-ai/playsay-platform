@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Play&Say Registration API
+  title: Honey School Registration API
   version: 0.1.0
 paths:
   /registration/start:

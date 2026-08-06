@@ -143,7 +143,7 @@ class MaterialSubmissionService(
                     id = UUID.randomUUID(),
                     lessonId = lessonId,
                     title = material.title,
-                    instructions = "Play&Say material answer snapshot",
+                    instructions = "Honey School material answer snapshot",
                     type = MetaData.AssignmentTypes.MATERIAL_WORK,
                     payload = objectMapper.writeValueAsString(objectMapper.createObjectNode().put("source", "material")),
                     maxScore = materialScoringService.maxScore(material.scoringRubric),

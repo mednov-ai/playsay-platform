@@ -35,7 +35,7 @@ class MaterialAiController(
     @Operation(
         operationId = "draftMaterialWithAi",
         summary = "Draft lesson material with AI",
-        description = "Returns a structured Play&Say material draft from a text prompt and optional worksheet image scan/photo. Uses the configured AI provider, or deterministic stub when AI is disabled.",
+        description = "Returns a structured Honey School material draft from a text prompt and optional worksheet image scan/photo. Uses the configured AI provider, or deterministic stub when AI is disabled.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(
@@ -60,7 +60,7 @@ class MaterialAiController(
     @Operation(
         operationId = "draftMaterialFromUrl",
         summary = "Draft lesson material from external URL",
-        description = "Fetches readable text from an http/https page, then returns a structured Play&Say draft through the configured AI provider. Local/private hosts are rejected.",
+        description = "Fetches readable text from an http/https page, then returns a structured Honey School draft through the configured AI provider. Local/private hosts are rejected.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(

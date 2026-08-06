@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Play&Say Vocabulary API
+  title: Honey School Vocabulary API
   version: 0.3.0
 servers:
   - url: /

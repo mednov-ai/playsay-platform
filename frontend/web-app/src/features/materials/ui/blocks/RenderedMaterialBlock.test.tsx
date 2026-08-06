@@ -12,7 +12,7 @@ const rutubeBlock: MaterialEditorBlock = {
 };
 
 describe("RenderedMaterialBlock video playback", () => {
-  it("renders an external activity as a Play&Say launcher instead of an iframe", () => {
+  it("renders an external activity as a Honey School launcher instead of an iframe", () => {
     const markup = renderToStaticMarkup(
       <RenderedMaterialBlock
         assetTags={{}}

@@ -6,7 +6,7 @@ import { AppProviders } from "./AppProviders";
 import { WelcomeLanding } from "./AppShell";
 
 describe("WelcomeLanding", () => {
-  it("links the welcome logo and return action to the public Play&Say website", () => {
+  it("links the welcome logo and return action to the public Honey School website", () => {
     const markup = renderToStaticMarkup(createElement(
       AppProviders,
       null,
@@ -18,5 +18,7 @@ describe("WelcomeLanding", () => {
 
     expect(markup).toContain(`href="${publicSiteUrl}"`);
     expect(markup).toContain("playsay-welcome-return");
+    expect(markup).toContain("/brand/logo/honey-school-logo.svg");
+    expect(markup).not.toContain("playsay-official-logo.jpg");
   });
 });

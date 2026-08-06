@@ -2,10 +2,10 @@ import type { TranslationResource } from "./ru";
 
 export const en: TranslationResource = {
   app: {
-    title: "Play&Say Key",
-    wordmark: "Play&Say",
+    title: "Honey School Key",
+    wordmark: "Honey School",
     product: "Key",
-    publicSiteAria: "Open the main Play&Say website",
+    publicSiteAria: "Open the main Honey School website",
     returnToSite: "Back to website",
   },
   auth: {
@@ -188,7 +188,7 @@ export const en: TranslationResource = {
     achievement_UNKNOWN_description: "A new reward is already saved in your profile.",
   },
   trainerIntro: {
-    ariaLabel: "Play&Say Key trainer introduction",
+    ariaLabel: "Honey School Key trainer introduction",
     eyebrow: "Letter chords",
     title: "Build typing speed through letter chords",
     body: "Instead of long texts, the trainer gives frequent letter combinations. Your fingers learn them as ready-made movements — and typing gets easier.",

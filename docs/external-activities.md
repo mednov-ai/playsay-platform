@@ -1,6 +1,6 @@
 # Shared external activities
 
-Play&Say can present a public HTTPS activity inside a live shared lesson even when the provider forbids iframe embedding. The teacher's Chrome/Edge tab is the host: the Play&Say extension captures that tab, the web app publishes its video/audio to the existing LiveKit room, and participant input is applied to the host tab through the Chrome Debugger protocol.
+Honey School can present a public HTTPS activity inside a live shared lesson even when the provider forbids iframe embedding. The teacher's Chrome/Edge tab is the host: the Honey School extension captures that tab, the web app publishes its video/audio to the existing LiveKit room, and participant input is applied to the host tab through the Chrome Debugger protocol.
 
 ## Supported providers
 
@@ -34,9 +34,9 @@ Version `0.1.2` is manually distributed as this unpacked/Jenkins artifact. Chrom
 
 1. A teacher adds **External activity** in the material editor, pastes a URL, and checks it.
 2. Any lesson participant can open the activity launcher in a `SHARED` lesson.
-3. Play&Say asks the teacher extension to open the provider in a new tab.
-4. The teacher clicks the Play&Say extension action once in that provider tab. This explicit action is required by Chromium's `tabCapture` permission model.
-5. Play&Say returns to the lesson and publishes named screen-share video/audio tracks. These tracks are excluded from the generic screen-share stage.
+3. Honey School asks the teacher extension to open the provider in a new tab.
+4. The teacher clicks the Honey School extension action once in that provider tab. This explicit action is required by Chromium's `tabCapture` permission model.
+5. Honey School returns to the lesson and publishes named screen-share video/audio tracks. These tracks are excluded from the generic screen-share stage.
 6. Pointer, keyboard, drag, and scroll input from unlocked participants is sent reliably to the teacher host; cursor positions use lossy data at a maximum UI rate of 30 Hz.
 
 The teacher can lock/unlock student input, navigate back, reload, minimize, or stop the activity. Minimizing is synchronized and retains capture for 60 seconds; reopening resumes the same session. Opening a different activity or ending the retention window tears down tracks, debugger attachment, and the extension-created tab.
@@ -46,10 +46,10 @@ The teacher can lock/unlock student input, navigate back, reload, minimize, or s
 - The extension has no `<all_urls>` host permission. Its content bridge is installed only on the current HoneySchool application and localhost origins.
 - The exact bridge allowlist is `dev.online.honey.school`, `online.honey.school`, `online.honeyschool.ru`, `localhost`, and `127.0.0.1`; legacy `play-and-say.ru` application origins are intentionally excluded.
 - Every page command is versioned and bound to a session id plus a random nonce.
-- The service worker accepts commands only from the Play&Say consumer tab that created the session.
+- The service worker accepts commands only from the Honey School consumer tab that created the session.
 - Pop-up tabs opened by a hosted provider are closed. Download behavior is denied and file chooser interception is enabled.
 - Clipboard, upload, download, microphone, camera, and arbitrary popup operations are not exposed by the input protocol.
-- The provider runs in the teacher's normal browser profile. Existing provider cookies, account state, and visible page content can therefore be shown to lesson participants; the editor displays this warning explicitly. Play&Say does not read or manage provider credentials.
+- The provider runs in the teacher's normal browser profile. Existing provider cookies, account state, and visible page content can therefore be shown to lesson participants; the editor displays this warning explicitly. Honey School does not read or manage provider credentials.
 
 ## Manual smoke matrix
 

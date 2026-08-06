@@ -290,7 +290,7 @@ class DialogAllowanceService(
         users.findByKeycloakSubject(subject) ?: throw AiTutorResponseException(
             HttpStatus.CONFLICT,
             "AI_TUTOR_PROFILE_REQUIRED",
-            "Complete your Play&Say profile before starting AI practice",
+            "Complete your Honey School profile before starting AI practice",
         )
 
     private fun accessDenied(message: String) = AiTutorResponseException(

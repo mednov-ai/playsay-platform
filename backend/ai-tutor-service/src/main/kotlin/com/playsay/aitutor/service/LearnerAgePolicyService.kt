@@ -18,7 +18,7 @@ class LearnerAgePolicyService(
 ) {
     fun resolve(subject: String): AgePolicy {
         val user = users.findByKeycloakSubject(subject)
-            ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Complete your Play&Say profile before starting AI practice")
+            ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Complete your Honey School profile before starting AI practice")
         if (!user.hasRole("STUDENT")) {
             return AgePolicy.ADULT
         }

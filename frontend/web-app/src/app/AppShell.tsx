@@ -41,7 +41,6 @@ import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
 import type { ClassroomMediaChoices, LessonRoomSession } from "../features/classroom";
 import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
-import officialLogoUrl from "../shared/assets/playsay-official-logo.jpg";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
 import { useAppTheme } from "./AppProviders";
 import { profilePath } from "./routes";
@@ -616,7 +615,7 @@ export function WelcomeLanding({
 
       <div className="playsay-welcome-content">
         <a className="playsay-welcome-logo-link" href={publicSiteUrl} aria-label={t("welcome.logoLinkAria")}>
-          <PlaySayAnimatedLogo label={t("common.appName")} />
+          <BrandMark variant="welcome" />
         </a>
         <div className="playsay-welcome-actions">
           <div className="playsay-welcome-preferences">
@@ -645,54 +644,5 @@ export function WelcomeLanding({
         </div>
       </div>
     </div>
-  );
-}
-
-function PlaySayAnimatedLogo({ label }: { label: string }) {
-  return (
-    <svg
-      aria-label={label}
-      className="playsay-welcome-logo"
-      role="img"
-      viewBox="0 0 420 420"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <clipPath id="playsay-welcome-logo-clip">
-          <path d="M74 38C117 21 187 25 239 30C310 37 365 61 386 111C410 168 397 252 371 310C344 370 281 404 203 401C123 398 57 367 33 307C10 250 23 169 35 113C45 69 53 47 74 38Z" />
-        </clipPath>
-        <linearGradient id="playsay-welcome-logo-shine" x1="-30%" x2="130%" y1="0%" y2="100%">
-          <stop offset="0%" stopColor="#ff5c00" stopOpacity="0" />
-          <stop offset="35%" stopColor="#ffd84d" stopOpacity="0.1" />
-          <stop offset="50%" stopColor="#ffffff" stopOpacity="0.7" />
-          <stop offset="65%" stopColor="#74dbbe" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#ff5c00" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <g clipPath="url(#playsay-welcome-logo-clip)">
-        <rect className="playsay-welcome-logo-paper" height="420" width="420" />
-        <image
-          className="playsay-welcome-logo-art"
-          height="456"
-          href={officialLogoUrl}
-          preserveAspectRatio="xMidYMid meet"
-          width="456"
-          x="-28"
-          y="-18"
-        />
-        <rect
-          className="playsay-welcome-logo-shine"
-          fill="url(#playsay-welcome-logo-shine)"
-          height="560"
-          width="190"
-          x="-240"
-          y="-80"
-        />
-      </g>
-      <path
-        className="playsay-welcome-logo-outline"
-        d="M74 38C117 21 187 25 239 30C310 37 365 61 386 111C410 168 397 252 371 310C344 370 281 404 203 401C123 398 57 367 33 307C10 250 23 169 35 113C45 69 53 47 74 38Z"
-      />
-    </svg>
   );
 }

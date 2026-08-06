@@ -21,7 +21,7 @@ class HelloController {
     fun hello(): HelloResponse =
         HelloResponse(
             service = "api-gateway",
-            message = "Play&Say dev pipeline is alive",
+            message = "Honey School dev pipeline is alive",
             timestamp = Instant.now(),
         )
 }

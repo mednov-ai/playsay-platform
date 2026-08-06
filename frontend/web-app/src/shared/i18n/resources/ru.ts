@@ -1,6 +1,6 @@
 export const ru = {
   common: {
-    appName: "Play&Say",
+    appName: "Honey School",
     actions: {
       cancel: "Отмена",
       close: "Закрыть",
@@ -27,7 +27,7 @@ export const ru = {
   registration: {
     start: {
       title: "Регистрация",
-      subtitle: "Создайте ученический аккаунт Play&Say по email.",
+      subtitle: "Создайте ученический аккаунт Honey School по email.",
     },
     "check-email": {
       title: "Проверьте почту",
@@ -83,7 +83,7 @@ export const ru = {
     password: {
       tooShort: "Минимум 8 символов",
       tooLong: "Не больше 128 символов",
-      tooCommon: "Без очевидных слов и Play&Say",
+      tooCommon: "Без очевидных слов и Honey School",
       containsEmail: "Не содержит часть email",
       containsName: "Не содержит имя",
       needsVariety: "Есть буквы разного регистра, цифры или символы",
@@ -110,7 +110,7 @@ export const ru = {
     },
   },
   welcome: {
-    logoLinkAria: "Открыть основной сайт Play&Say",
+    logoLinkAria: "Открыть основной сайт Honey School",
     returnToSite: "Вернуться на сайт",
   },
   chat: {
@@ -166,14 +166,14 @@ export const ru = {
     page: {
       eyebrow: "Настройки аккаунта",
       title: "Профиль",
-      subtitle: "Управляйте личными данными и настройками Play&Say.",
+      subtitle: "Управляйте личными данными и настройками Honey School.",
     },
     actions: {
       backToWorkspace: "В рабочую область",
     },
     sections: {
       user: "Пользователь",
-      account: "Профиль Play&Say",
+      account: "Профиль Honey School",
       adminUsers: "Админ-пользователи",
     },
     fields: {
@@ -264,7 +264,7 @@ export const ru = {
       open: "Все разделы",
       openShort: "Разделы",
       close: "Закрыть разделы",
-      menuTitle: "Разделы Play&Say",
+      menuTitle: "Разделы Honey School",
       menuDescription: "Выберите, с чем хотите работать",
     },
   },
@@ -1038,7 +1038,7 @@ export const ru = {
       validatingExternalActivity: "Проверяем…",
       externalActivityGuaranteed: "Поддерживаемый сайт: {{provider}}",
       externalActivityExperimental: "Экспериментальный сайт: совместимость не гарантируется",
-      externalActivityHint: "На уроке учитель делится этой страницей через расширение Play&Say. Все участники видят одно состояние и курсоры.",
+      externalActivityHint: "На уроке учитель делится этой страницей через расширение Honey School. Все участники видят одно состояние и курсоры.",
       externalActivityPrivacy: "Вкладка открывается в текущем профиле браузера учителя. Участникам урока могут быть видны существующий вход и содержимое страницы.",
       externalActivityInvalid: "Не удалось проверить эту ссылку",
       imageUrl: "Ссылка на изображение",
@@ -1173,8 +1173,8 @@ export const ru = {
       preparedForAi: "подготовлено для AI",
       generate: "Подготовить черновик",
       fromUrl: "Черновик из ссылки",
-      defaultPrompt: "Создай редактируемый материал Play&Say по приложенному скану или фото задания.",
-      defaultScanPrompt: "Создай редактируемый материал Play&Say по приложенному скану: выдели упражнения, ответы и добавь задание на говорение.",
+      defaultPrompt: "Создай редактируемый материал Honey School по приложенному скану или фото задания.",
+      defaultScanPrompt: "Создай редактируемый материал Honey School по приложенному скану: выдели упражнения, ответы и добавь задание на говорение.",
       imagePrepareFailed: "Не удалось подготовить изображение.",
     },
     linkPanel: {
@@ -1226,14 +1226,14 @@ export const ru = {
       videoVolume: "Громкость {{value}}%",
       videoQuality: "Качество видео",
       videoRetry: "Повторить загрузку",
-      videoLoading: "Готовим видео к воспроизведению в Play&Say.",
+      videoLoading: "Готовим видео к воспроизведению в Honey School.",
       videoSyncResume: "Продолжить синхронное воспроизведение",
       videoLoadFailed: "Не удалось загрузить видео",
       videoProgress: "{{current}} из {{duration}}",
       videoCopyright: "© правообладатель видео на {{provider}}.",
       videoOriginalLink: "Оригинал видео",
       videoProviderFallback: "видео",
-      videoRelayUnavailable: "Видео недоступно через Play&Say",
+      videoRelayUnavailable: "Видео недоступно через Honey School",
       videoRelayReasonCode: "Код: {{reason}}",
       videoRelayReasons: {
         RF_RELAY_DISABLED: "Relay выключен в настройках стенда.",
@@ -1285,7 +1285,7 @@ export const ru = {
       returnToLesson: "Вернуться к уроку",
       interactionSurface: "Совместное внешнее задание",
       mobileKeyboard: "Ввод в совместное задание",
-      clickExtension: "Нажмите расширение Play&Say в открывшейся вкладке задания",
+      clickExtension: "Нажмите расширение Honey School в открывшейся вкладке задания",
       waitingForTeacher: "Ждём, когда учитель поделится заданием",
       waitingHint: "Не закрывайте окно. Общая страница появится здесь у всех участников.",
       error: "Показ задания остановлен",
@@ -1488,7 +1488,7 @@ export const ru = {
     translation: {
       enable: "Включить перевод",
       enableHint: "Включите перевод, чтобы собеседник мог подтвердить участие",
-      disclosure: "Речь во время удержания кнопки и до 0,3 секунды после отпускания передаётся внешнему AI-сервису и не сохраняется Play&Say.",
+      disclosure: "Речь во время удержания кнопки и до 0,3 секунды после отпускания передаётся внешнему AI-сервису и не сохраняется Honey School.",
       waitingPeer: "Ждём, когда собеседник включит перевод",
       waiting: "Готовим перевод",
       connecting: "Подключаем перевод",
@@ -1679,7 +1679,7 @@ export const ru = {
       granted: "Созданные делегирования · {{count}}",
     },
     admin: {
-      eyebrow: "Администрирование Play&Say",
+      eyebrow: "Администрирование Honey School",
       title: "Пользователи",
       subtitle: "Создавайте аккаунты, меняйте роли, назначайте преподавателей и контролируйте делегирования.",
       createUser: "Создать пользователя",
@@ -1770,7 +1770,7 @@ export const ru = {
     form: {
       amount: "Сумма, ₽",
       description: "Описание",
-      defaultDescription: "Пакет занятий Play&Say",
+      defaultDescription: "Пакет занятий Honey School",
       student: "Ученик",
       noStudent: "Без привязки",
       payerName: "Имя плательщика",
@@ -1803,7 +1803,7 @@ export const ru = {
       checkoutFailed: "Не удалось перейти к оплате",
     },
     public: {
-      title: "Оплата Play&Say",
+      title: "Оплата Honey School",
       subtitle: "Проверьте детали и перейдите на защищённую страницу оплаты.",
       invoice: "Счёт",
       amount: "Сумма",

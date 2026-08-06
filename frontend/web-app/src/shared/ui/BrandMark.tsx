@@ -1,15 +1,31 @@
-export function BrandMark() {
+import { useAppTranslation } from "../i18n";
+
+export function BrandMark({ variant = "header" }: { variant?: "header" | "welcome" }) {
+  const { t } = useAppTranslation();
+
   return (
-    <div className="flex items-center gap-3">
-      <div className="grid h-16 w-16 place-items-center rounded-[1.1rem] bg-white text-center text-[1.35rem] font-black leading-[0.86] text-primary shadow-[0_16px_38px_rgba(255,92,0,0.14)] -rotate-3">
-        Play
-        <br />
-        &Say
-      </div>
-      <div>
-        <div className="text-sm font-black uppercase text-primary">Play&Say</div>
-        <div className="text-xs font-bold text-muted-foreground">english studio</div>
-      </div>
-    </div>
+    <span className={`honey-brand honey-brand--${variant}`} role="img" aria-label={t("common.appName")}>
+      <img
+        aria-hidden="true"
+        className="honey-brand__logo honey-brand__logo--light"
+        height="215"
+        src="/brand/logo/honey-school-logo.svg"
+        width="1080"
+      />
+      <img
+        aria-hidden="true"
+        className="honey-brand__logo honey-brand__logo--dark"
+        height="215"
+        src="/brand/logo/honey-school-logo-reverse.svg"
+        width="1080"
+      />
+      <img
+        aria-hidden="true"
+        className="honey-brand__mark"
+        height="512"
+        src="/brand/logo/honey-school-mark.svg"
+        width="512"
+      />
+    </span>
   );
 }

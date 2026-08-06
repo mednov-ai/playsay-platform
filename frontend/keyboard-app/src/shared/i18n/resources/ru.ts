@@ -1,9 +1,9 @@
 export const ru = {
   app: {
-    title: "Play&Say Key",
-    wordmark: "Play&Say",
+    title: "Honey School Key",
+    wordmark: "Honey School",
     product: "Key",
-    publicSiteAria: "Открыть основной сайт Play&Say",
+    publicSiteAria: "Открыть основной сайт Honey School",
     returnToSite: "Вернуться на сайт",
   },
   auth: {
@@ -186,7 +186,7 @@ export const ru = {
     achievement_UNKNOWN_description: "Новая награда уже сохранена в профиле.",
   },
   trainerIntro: {
-    ariaLabel: "Вступление к тренажеру Play&Say Key",
+    ariaLabel: "Вступление к тренажеру Honey School Key",
     eyebrow: "Буквенные аккорды",
     title: "Тренируйте скорость печати через буквенные аккорды",
     body: "Вместо длинных текстов тренажер дает частые сочетания букв. Пальцы запоминают их как готовые движения — и печатать становится легче.",

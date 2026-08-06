@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -11,6 +11,9 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).not.toContain("fonts.gstatic.com");
     expect(mainSource).toContain('import "@fontsource-variable/manrope"');
     expect(mainSource).toContain('import "@fontsource-variable/roboto-flex/full.css"');
+    expect(styles).toContain('url("/brand/fonts/quicksand-latin-600.woff2")');
+    expect(existsSync(resolve(__dirname, "../public/brand/logo/honey-school-logo.svg"))).toBe(true);
+    expect(existsSync(resolve(__dirname, "../public/brand/icons/site.webmanifest"))).toBe(true);
   });
 
   it("caps the desktop trainer frame at the virtual keyboard width", () => {

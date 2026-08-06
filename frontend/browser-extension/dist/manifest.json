@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Honey.school",
+  "name": "Honey School Shared Activities",
   "description": "Shares an external classroom activity with lesson participants after an explicit teacher action.",
   "version": "0.1.5",
   "minimum_chrome_version": "116",
@@ -13,22 +13,22 @@
     "http://127.0.0.1/*"
   ],
   "icons": {
-    "16": "icons/bee-16.png",
-    "32": "icons/bee-32.png",
-    "48": "icons/bee-48.png",
-    "128": "icons/bee-128.png"
+    "16": "icons/honey-school-16.png",
+    "32": "icons/honey-school-32.png",
+    "48": "icons/honey-school-48.png",
+    "128": "icons/honey-school-128.png"
   },
   "background": {
     "service_worker": "service-worker.js",
     "type": "module"
   },
   "action": {
-    "default_title": "Share this activity with Honey.school",
+    "default_title": "Share this activity with Honey School",
     "default_icon": {
-      "16": "icons/bee-16.png",
-      "32": "icons/bee-32.png",
-      "48": "icons/bee-48.png",
-      "128": "icons/bee-128.png"
+      "16": "icons/honey-school-16.png",
+      "32": "icons/honey-school-32.png",
+      "48": "icons/honey-school-48.png",
+      "128": "icons/honey-school-128.png"
     }
   },
   "content_scripts": [

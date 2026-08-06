@@ -11,4 +11,5 @@
     <include file="2026-07-19-001-add-chat-unread-digest-template.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-19-002-add-password-reset-link.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-19-003-track-provider-delivery.xml" relativeToChangelogFile="true"/>
+    <include file="2026-08-06-001-rebrand-email-templates.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

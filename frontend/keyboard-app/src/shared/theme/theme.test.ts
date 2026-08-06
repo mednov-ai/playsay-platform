@@ -63,7 +63,7 @@ describe("keyboard theme helpers", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uses the shared Play&Say theme storage key", () => {
+  it("uses the shared Honey School theme storage key", () => {
     expect(themeStorageKey).toBe("playsay.theme");
   });
 

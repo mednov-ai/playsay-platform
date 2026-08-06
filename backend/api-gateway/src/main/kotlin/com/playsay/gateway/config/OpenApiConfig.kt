@@ -13,12 +13,12 @@ class OpenApiConfig {
     @Bean
     fun playsayOpenApi(): OpenAPI =
         OpenAPI()
-            .servers(listOf(Server().url("/api").description("Play&Say web-app API proxy")))
+            .servers(listOf(Server().url("/api").description("Honey School web-app API proxy")))
             .info(
                 Info()
-                    .title("Play&Say API Gateway")
+                    .title("Honey School API Gateway")
                     .version("0.1.0")
-                    .description("Public contract for the Play&Say API Gateway."),
+                    .description("Public contract for the Honey School API Gateway."),
             )
             .components(
                 Components()

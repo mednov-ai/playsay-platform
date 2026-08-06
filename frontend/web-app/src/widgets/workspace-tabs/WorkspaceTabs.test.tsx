@@ -40,11 +40,11 @@ describe("WorkspaceTabs", () => {
 
     expect(screen.getByText("Уроки")).toBeVisible();
     expect(screen.getByText("расписание и подготовка")).toBeVisible();
-    expect(screen.queryByRole("dialog", { name: "Разделы Play&Say" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Разделы Honey School" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Все разделы" }));
 
-    expect(screen.getByRole("dialog", { name: "Разделы Play&Say" })).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Разделы Honey School" })).toBeVisible();
     expect(screen.getByRole("button", { name: /Материалы/ })).toBeVisible();
   });
 
@@ -56,11 +56,11 @@ describe("WorkspaceTabs", () => {
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("button", { name: /Материалы/ }));
     expect(onSelect).toHaveBeenCalledWith("materials");
-    expect(screen.queryByRole("dialog", { name: "Разделы Play&Say" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Разделы Honey School" })).not.toBeInTheDocument();
 
     fireEvent.click(trigger);
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "Разделы Play&Say" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Разделы Honey School" })).not.toBeInTheDocument();
   });
 });
 

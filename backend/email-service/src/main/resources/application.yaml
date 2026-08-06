@@ -48,8 +48,8 @@ playsay:
   email-service:
     delivery-provider: ${PLAYSAY_EMAIL_DELIVERY_PROVIDER:smtp}
     service-token: ${PLAYSAY_EMAIL_SERVICE_TOKEN:}
-    from-address: ${PLAYSAY_EMAIL_FROM_ADDRESS:no-reply@play-and-say.ru}
-    from-name: ${PLAYSAY_EMAIL_FROM_NAME:Play&Say}
+    from-address: ${PLAYSAY_EMAIL_FROM_ADDRESS:no-reply@honey.school}
+    from-name: ${PLAYSAY_EMAIL_FROM_NAME:Honey School}
     replay-encryption-key: ${PLAYSAY_EMAIL_REPLAY_ENCRYPTION_KEY:}
     default-replay-ttl: ${PLAYSAY_EMAIL_DEFAULT_REPLAY_TTL:PT72H}
     provider-tracking-ttl: ${PLAYSAY_EMAIL_PROVIDER_TRACKING_TTL:PT72H}

@@ -1,7 +1,7 @@
 {
   "name": "@playsay/game-sync",
   "version": "0.1.0",
-  "description": "Deterministic realtime synchronization SDK for Play&Say HTML games",
+  "description": "Deterministic realtime synchronization SDK for Honey School HTML games",
   "type": "module",
   "license": "MIT",
   "files": [

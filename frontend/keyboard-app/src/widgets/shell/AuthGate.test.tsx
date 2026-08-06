@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthGate } from "./AuthGate";
 
 describe("AuthGate", () => {
-  it("links the brand to the public Play&Say website", () => {
+  it("links the brand to the public Honey School website", () => {
     const markup = renderToStaticMarkup(createElement(AuthGate, {
       status: "idle",
       language: "en",
@@ -22,10 +22,9 @@ describe("AuthGate", () => {
         light: "Light",
         dark: "Dark",
       },
-      title: "Play&Say Key",
-      wordmark: "Play&Say",
+      title: "Honey School Key",
       product: "Key",
-      publicSiteAriaLabel: "Open the main Play&Say website",
+      publicSiteAriaLabel: "Open the main Honey School website",
       signInLabel: "Sign in",
       loadingLabel: "Loading",
       callbackLabel: "Returning",
@@ -37,6 +36,7 @@ describe("AuthGate", () => {
     }));
 
     expect(markup).toContain(`href="${publicSiteUrl}"`);
-    expect(markup).toContain("aria-label=\"Open the main Play&amp;Say website\"");
+    expect(markup).toContain("aria-label=\"Open the main Honey School website\"");
+    expect(markup).toContain("/brand/logo/honey-school-logo.svg");
   });
 });

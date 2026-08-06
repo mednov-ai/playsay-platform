@@ -130,7 +130,7 @@ class PaymentInternalControllerTest @Autowired constructor(
         {
           "amountMinor": 350000,
           "currency": "RUB",
-          "description": "Play&Say lesson package",
+          "description": "Honey School lesson package",
           "createdBySubject": "teacher-1",
           "studentUserId": null,
           "payerName": "Parent",

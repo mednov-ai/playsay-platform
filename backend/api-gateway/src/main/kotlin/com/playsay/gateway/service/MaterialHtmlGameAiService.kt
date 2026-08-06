@@ -120,4 +120,4 @@ ${input.context.take(8_000)}
 """.trimIndent()
 
 private fun gameIconPrompt(title: String, context: String): String =
-    "Square friendly educational app icon for the game '$title'. ${context.take(500)}. Warm Play&Say palette with orange accent, simple central symbol, soft cream background, no text, no letters, no logo, no screenshot."
+    "Square friendly educational app icon for the game '$title'. ${context.take(500)}. Warm Honey School palette with orange accent, simple central symbol, soft cream background, no text, no letters, no logo, no screenshot."

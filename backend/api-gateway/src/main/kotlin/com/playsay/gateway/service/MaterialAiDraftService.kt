@@ -422,7 +422,7 @@ private fun JsonNode.isNonEmptyArray(): Boolean = isArray && size() > 0
 
 private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     """
-    Create a Play&Say lesson material draft.
+    Create a Honey School lesson material draft.
 
     Teacher request:
     ${input.prompt}
@@ -440,7 +440,7 @@ private fun materialAiUserPrompt(input: MaterialAiDraftInput): String =
     - Build a practical live lesson for children learning English.
     - If external source text is provided in the teacher request, use it as source material, but transform it into original live-lesson activities instead of copying the page verbatim.
     - Before writing the JSON, classify the worksheet type from the source image or request: fill gaps, multiple choice, matching pairs, flashcards, reading/listening/speaking, or mixed.
-    - If a source image is attached, first solve the worksheet yourself, then convert it into editable Play&Say blocks.
+    - If a source image is attached, first solve the worksheet yourself, then convert it into editable Honey School blocks.
     - Do not merely translate or copy the scan as text. Turn worksheet blanks into interactive exercise items.
     - Preserve every visible worksheet blank as an interactive item, grouped by the original section order, before adding any invented follow-up activity.
     - Do not drop later worksheet sections and do not replace the worksheet with a shorter practice set unless the scan is unreadable.
@@ -468,7 +468,7 @@ private fun MaterialAiDraftInput.resolvedSourceType(): String =
         ?: if (hasSourceImage()) "scan" else "teacher_prompt"
 
 private val materialAiSystemPrompt = """
-    You are Play&Say lesson material builder for an online English school for children.
+    You are Honey School lesson material builder for an online English school for children.
 
     Return only structured data that matches the provided JSON schema.
     Do not output HTML or Markdown.

@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
-  title: Play&Say API Gateway
-  description: Public contract for the Play&Say API Gateway.
+  title: Honey School API Gateway
+  description: Public contract for the Honey School API Gateway.
   version: 0.1.0
 servers:
 - url: /api
-  description: Play&Say web-app API proxy
+  description: Honey School web-app API proxy
 paths:
   /users/me/profile:
     get:
@@ -1784,7 +1784,7 @@ paths:
     post:
       tags:
       - Materials
-      summary: Adapt an HTML game to Play&Say Game Sync
+      summary: Adapt an HTML game to Honey School Game Sync
       operationId: requestMaterialGameAdaptation
       parameters:
       - name: materialId
@@ -2033,7 +2033,7 @@ paths:
       - Materials
       summary: Draft lesson material from external URL
       description: "Fetches readable text from an http/https page, then returns a\
-        \ structured Play&Say draft through the configured AI provider. Local/private\
+        \ structured Honey School draft through the configured AI provider. Local/private\
         \ hosts are rejected."
       operationId: draftMaterialFromUrl
       requestBody:
@@ -2098,7 +2098,7 @@ paths:
       tags:
       - Materials
       summary: Draft lesson material with AI
-      description: "Returns a structured Play&Say material draft from a text prompt\
+      description: "Returns a structured Honey School material draft from a text prompt\
         \ and optional worksheet image scan/photo. Uses the configured AI provider,\
         \ or deterministic stub when AI is disabled."
       operationId: draftMaterialWithAi
@@ -3067,7 +3067,7 @@ paths:
       tags:
       - Auth
       summary: Current user profile
-      description: Returns the current JWT profile and Play&Say application roles.
+      description: Returns the current JWT profile and Honey School application roles.
       operationId: getMe
       responses:
         "200":

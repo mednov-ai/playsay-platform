@@ -26,7 +26,7 @@ class PaymentInvoiceStoreTest {
             CreatePaymentInvoiceCommand(
                 amountMinor = 3_500_00,
                 currency = "RUB",
-                description = "Play&Say lesson package",
+                description = "Honey School lesson package",
                 createdBySubject = "teacher-1",
                 dueAt = null,
                 studentUserId = null,

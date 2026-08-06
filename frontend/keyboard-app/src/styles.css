@@ -1,19 +1,46 @@
+@font-face {
+  font-family: "Quicksand";
+  src: url("/brand/fonts/quicksand-latin-400.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Quicksand";
+  src: url("/brand/fonts/quicksand-latin-500.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Quicksand";
+  src: url("/brand/fonts/quicksand-latin-600.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
 :root {
   font-family: "Manrope Variable", "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #111111;
-  background: #fffaf7;
+  color: #202433;
+  background: #fff8e8;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
-  --background: #fffaf7;
+  --background: #fff8e8;
   --surface: #ffffff;
-  --surface-strong: #fff6ef;
-  --foreground: #111111;
-  --muted: #62666f;
-  --line: #ece6df;
-  --primary: #ff5c00;
-  --primary-hover: #df4100;
+  --surface-strong: #fff8e8;
+  --foreground: #202433;
+  --muted: #667085;
+  --line: #e8dfcf;
+  --primary: #202433;
+  --primary-hover: #9a5700;
+  --honey: #e99500;
+  --honey-bright: #ffc24a;
+  --honey-accessible: #9a5700;
   --mint: #dff6e9;
   --yellow: #fff0b8;
   --danger: #d92d20;
@@ -31,8 +58,8 @@
   --foreground: #f8f3ed;
   --muted: #b8aaa0;
   --line: #3b332c;
-  --primary: #ff7a2f;
-  --primary-hover: #ff5c00;
+  --primary: #ffc24a;
+  --primary-hover: #e99500;
   --mint: #14362b;
   --yellow: #3a3218;
   --danger: #ff8a7a;
@@ -68,6 +95,16 @@ select {
   font: inherit;
 }
 
+h1,
+h2,
+h3,
+.honey-school-lockup,
+.primary-button,
+.secondary-button,
+.icon-text-button {
+  font-family: "Quicksand", ui-rounded, system-ui, sans-serif;
+}
+
 button {
   cursor: pointer;
 }
@@ -97,10 +134,8 @@ input {
 
 .brand-lockup {
   display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
   color: var(--foreground);
-  font-weight: 800;
   text-decoration: none;
 }
 
@@ -109,15 +144,57 @@ input {
   color: var(--primary);
 }
 
-.brand-lockup span {
-  font-size: 20px;
+.honey-school-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.brand-lockup strong {
+.honey-school-lockup__images {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.honey-school-lockup__logo {
+  display: block;
+  width: auto;
+  height: 38px;
+}
+
+.honey-school-lockup__logo--dark,
+.honey-school-lockup__mark {
+  display: none;
+}
+
+:root.dark .honey-school-lockup__logo--light {
+  display: none;
+}
+
+:root.dark .honey-school-lockup__logo--dark {
+  display: block;
+}
+
+.honey-school-lockup strong {
   border-radius: 8px;
   background: var(--primary);
-  color: white;
+  color: var(--background);
+  font-size: 16px;
+  font-weight: 600;
   padding: 4px 8px;
+}
+
+@media (max-width: 420px) {
+  .honey-school-lockup__logo,
+  :root.dark .honey-school-lockup__logo--dark {
+    display: none;
+  }
+
+  .honey-school-lockup__mark {
+    display: block;
+    width: 38px;
+    height: 38px;
+  }
 }
 
 .topbar-actions {
@@ -320,16 +397,10 @@ input {
 }
 
 .auth-panel__mark {
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
   width: 72px;
   height: 72px;
   margin-bottom: 12px;
-  border-radius: 20px;
-  background: var(--primary);
-  color: white;
-  font-size: 38px;
-  font-weight: 800;
 }
 
 .auth-panel h1 {

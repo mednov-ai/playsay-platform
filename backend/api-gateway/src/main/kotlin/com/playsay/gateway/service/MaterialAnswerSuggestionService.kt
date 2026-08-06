@@ -195,7 +195,7 @@ private fun JsonNode.answerSuggestionOutputText(): String? {
 
 private fun materialAnswerSuggestionUserPrompt(input: MaterialAnswerSuggestionInput): String =
     """
-    Suggest additional accepted answers for one Play&Say exercise item.
+    Suggest additional accepted answers for one Honey School exercise item.
 
     Material: ${input.materialTitle}
     Language: ${input.language}

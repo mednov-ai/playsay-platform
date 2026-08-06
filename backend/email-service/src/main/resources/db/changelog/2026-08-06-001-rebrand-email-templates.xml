@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-08-06-001-rebrand-email-templates" author="codex">
+        <sql><![CDATA[
+INSERT INTO email_templates (
+    id,
+    template_key,
+    locale,
+    subject_template,
+    text_template,
+    html_template,
+    version,
+    enabled,
+    created_at,
+    updated_at
+)
+SELECT
+    CAST(
+        CASE active.template_key
+            WHEN 'registration-confirmation' THEN
+                CASE active.locale
+                    WHEN 'ru' THEN '20000000-0000-0000-0000-000000000601'
+                    WHEN 'en' THEN '20000000-0000-0000-0000-000000000602'
+                    WHEN 'de' THEN '20000000-0000-0000-0000-000000000603'
+                    WHEN 'fr' THEN '20000000-0000-0000-0000-000000000604'
+                END
+            WHEN 'password-reset-code' THEN
+                CASE active.locale
+                    WHEN 'ru' THEN '20000000-0000-0000-0000-000000000611'
+                    WHEN 'en' THEN '20000000-0000-0000-0000-000000000612'
+                    WHEN 'de' THEN '20000000-0000-0000-0000-000000000613'
+                    WHEN 'fr' THEN '20000000-0000-0000-0000-000000000614'
+                END
+            WHEN 'lesson-reminder-30m' THEN
+                CASE active.locale
+                    WHEN 'ru' THEN '20000000-0000-0000-0000-000000000621'
+                    WHEN 'en' THEN '20000000-0000-0000-0000-000000000622'
+                    WHEN 'de' THEN '20000000-0000-0000-0000-000000000623'
+                    WHEN 'fr' THEN '20000000-0000-0000-0000-000000000624'
+                END
+            WHEN 'lesson-rescheduled' THEN
+                CASE active.locale
+                    WHEN 'ru' THEN '20000000-0000-0000-0000-000000000631'
+                    WHEN 'en' THEN '20000000-0000-0000-0000-000000000632'
+                    WHEN 'de' THEN '20000000-0000-0000-0000-000000000633'
+                    WHEN 'fr' THEN '20000000-0000-0000-0000-000000000634'
+                END
+            WHEN 'chat-unread-digest' THEN
+                CASE active.locale
+                    WHEN 'ru' THEN '20000000-0000-0000-0000-000000000641'
+                    WHEN 'en' THEN '20000000-0000-0000-0000-000000000642'
+                    WHEN 'de' THEN '20000000-0000-0000-0000-000000000643'
+                    WHEN 'fr' THEN '20000000-0000-0000-0000-000000000644'
+                END
+        END AS UUID
+    ),
+    active.template_key,
+    active.locale,
+    replace(active.subject_template, 'Play&Say', 'Honey School'),
+    replace(active.text_template, 'Play&Say', 'Honey School'),
+    replace(active.html_template, 'Play&Say', 'Honey School'),
+    active.version + 1,
+    TRUE,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+FROM email_templates active
+WHERE active.enabled = TRUE
+  AND active.locale IN ('ru', 'en', 'de', 'fr')
+  AND active.template_key IN (
+      'registration-confirmation',
+      'password-reset-code',
+      'lesson-reminder-30m',
+      'lesson-rescheduled',
+      'chat-unread-digest'
+  );
+
+UPDATE email_templates
+SET enabled = FALSE,
+    updated_at = CURRENT_TIMESTAMP
+WHERE enabled = TRUE
+  AND template_key IN (
+      'registration-confirmation',
+      'password-reset-code',
+      'lesson-reminder-30m',
+      'lesson-rescheduled',
+      'chat-unread-digest'
+  )
+  AND id NOT IN (
+      '20000000-0000-0000-0000-000000000601',
+      '20000000-0000-0000-0000-000000000602',
+      '20000000-0000-0000-0000-000000000603',
+      '20000000-0000-0000-0000-000000000604',
+      '20000000-0000-0000-0000-000000000611',
+      '20000000-0000-0000-0000-000000000612',
+      '20000000-0000-0000-0000-000000000613',
+      '20000000-0000-0000-0000-000000000614',
+      '20000000-0000-0000-0000-000000000621',
+      '20000000-0000-0000-0000-000000000622',
+      '20000000-0000-0000-0000-000000000623',
+      '20000000-0000-0000-0000-000000000624',
+      '20000000-0000-0000-0000-000000000631',
+      '20000000-0000-0000-0000-000000000632',
+      '20000000-0000-0000-0000-000000000633',
+      '20000000-0000-0000-0000-000000000634',
+      '20000000-0000-0000-0000-000000000641',
+      '20000000-0000-0000-0000-000000000642',
+      '20000000-0000-0000-0000-000000000643',
+      '20000000-0000-0000-0000-000000000644'
+  );
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

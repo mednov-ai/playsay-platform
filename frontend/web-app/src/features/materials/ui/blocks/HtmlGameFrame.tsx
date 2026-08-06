@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Gamepad2, Loader2 } from "lucide-react";
 import {
   classifyGameHtml,
@@ -107,19 +107,42 @@ function validSdkActionRequest(
   );
 }
 
-function recordSdkAction(timestamps: number[]): boolean {
+type SdkActionRateWindow = {
+  count: number;
+  cursor: number;
+  timestamps: number[];
+};
+
+function createSdkActionRateWindow(): SdkActionRateWindow {
+  return {
+    count: 0,
+    cursor: 0,
+    timestamps: new Array<number>(GAME_SYNC_LIMITS.actionSustainedPerThreeSeconds),
+  };
+}
+
+function recordSdkAction(window: SdkActionRateWindow): boolean {
   const now = Date.now();
-  while (timestamps.length > 0 && now - (timestamps[0] ?? now) >= 3_000) {
-    timestamps.shift();
+  let oneSecondCount = 0;
+  let threeSecondCount = 0;
+  for (let index = 0; index < window.count; index += 1) {
+    const at = window.timestamps[index] ?? 0;
+    if (now - at < 3_000) {
+      threeSecondCount += 1;
+      if (now - at < 1_000) {
+        oneSecondCount += 1;
+      }
+    }
   }
-  const oneSecondCount = timestamps.filter((at) => now - at < 1_000).length;
   if (
     oneSecondCount >= GAME_SYNC_LIMITS.actionBurstPerSecond ||
-    timestamps.length >= GAME_SYNC_LIMITS.actionSustainedPerThreeSeconds
+    threeSecondCount >= GAME_SYNC_LIMITS.actionSustainedPerThreeSeconds
   ) {
     return true;
   }
-  timestamps.push(now);
+  window.timestamps[window.cursor] = now;
+  window.cursor = (window.cursor + 1) % window.timestamps.length;
+  window.count = Math.min(window.count + 1, window.timestamps.length);
   return false;
 }
 
@@ -137,15 +160,7 @@ function orderSdkAction(
   };
 }
 
-export function HtmlGameFrame({
-  blockId,
-  fillAvailable = false,
-  height,
-  html,
-  onRuntimeStatusChange,
-  sync,
-  title,
-}: {
+type HtmlGameFrameProps = {
   blockId: string;
   fillAvailable?: boolean;
   height: number;
@@ -153,7 +168,17 @@ export function HtmlGameFrame({
   onRuntimeStatusChange?: (status: HtmlGameRuntimeStatus) => void;
   sync?: MaterialHtmlGameSync;
   title: string;
-}) {
+};
+
+function HtmlGameFrameComponent({
+  blockId,
+  fillAvailable = false,
+  height,
+  html,
+  onRuntimeStatusChange,
+  sync,
+  title,
+}: HtmlGameFrameProps) {
   recordGameSyncCounter("htmlGameFrameRenders");
   const { t } = useAppTranslation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -183,7 +208,7 @@ export function HtmlGameFrame({
   const sdkRevisionRef = useRef(0);
   const sdkLogicalTimeRef = useRef(0);
   const sdkHelloAcceptedRef = useRef(false);
-  const sdkActionTimestampsRef = useRef<number[]>([]);
+  const sdkActionRateWindowRef = useRef<SdkActionRateWindow>(createSdkActionRateWindow());
   const mirrorReadyRef = useRef(false);
   const pendingMirrorSnapshotRef = useRef<MaterialHtmlGameSnapshot | null>(null);
   const mirrorSnapshotRetryRef = useRef<number | null>(null);
@@ -247,7 +272,7 @@ export function HtmlGameFrame({
     sdkRevisionRef.current = 0;
     sdkLogicalTimeRef.current = 0;
     sdkHelloAcceptedRef.current = false;
-    sdkActionTimestampsRef.current = [];
+    sdkActionRateWindowRef.current = createSdkActionRateWindow();
     sdkPortRef.current?.close();
     sdkPortRef.current = null;
     mirrorReadyRef.current = false;
@@ -425,7 +450,7 @@ export function HtmlGameFrame({
               setRuntimeStatus("failed");
               return;
             }
-            const actionRateError = recordSdkAction(sdkActionTimestampsRef.current);
+            const actionRateError = recordSdkAction(sdkActionRateWindowRef.current);
             if (actionRateError) {
               ports.port1.postMessage({
                 code: "ACTION_RATE_EXCEEDED",
@@ -680,6 +705,46 @@ export function HtmlGameFrame({
     </div>
   );
 }
+
+function sameHtmlGameFrameProps(
+  previous: Readonly<HtmlGameFrameProps>,
+  next: Readonly<HtmlGameFrameProps>,
+): boolean {
+  if (
+    previous.blockId !== next.blockId
+    || previous.fillAvailable !== next.fillAvailable
+    || previous.height !== next.height
+    || previous.html !== next.html
+    || previous.onRuntimeStatusChange !== next.onRuntimeStatusChange
+    || previous.title !== next.title
+  ) {
+    return false;
+  }
+  if (previous.sync === next.sync) {
+    return true;
+  }
+  if (
+    !previous.html
+    || classifyGameHtml(previous.html) !== "SDK_V1"
+    || !previous.sync
+    || !next.sync
+  ) {
+    return false;
+  }
+  return (
+    previous.sync.authorityRuns[previous.blockId]
+      === next.sync.authorityRuns[next.blockId]
+    && previous.sync.clientId === next.sync.clientId
+    && previous.sync.isAuthority === next.sync.isAuthority
+    && previous.sync.presentedBlockId === next.sync.presentedBlockId
+    && previous.sync.ready === next.sync.ready
+    && previous.sync.sdkChannel === next.sync.sdkChannel
+    && previous.sync.setAuthorityRun === next.sync.setAuthorityRun
+  );
+}
+
+export const HtmlGameFrame = memo(HtmlGameFrameComponent, sameHtmlGameFrameProps);
+HtmlGameFrame.displayName = "HtmlGameFrame";
 
 export function createSandboxedGameDocument(
   html: string,

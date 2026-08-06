@@ -341,6 +341,30 @@ describe("HTML game sandbox", () => {
     );
     expect(attach).toHaveBeenCalledOnce();
 
+    for (let index = 0; index < 100; index += 1) {
+      view.rerender(
+        <HtmlGameFrame
+          blockId="game-sdk"
+          height={640}
+          html={sdkGame}
+          sync={{
+            ...sync,
+            effects: [{
+              at: index,
+              blockId: "other",
+              id: `presence-${index}`,
+              kind: "speech",
+              payload: { text: "ignored" },
+            }],
+            presentedBlockId: "game-sdk",
+          }}
+          title="Game"
+        />,
+      );
+    }
+    expect(attach).toHaveBeenCalledOnce();
+    expect(release).not.toHaveBeenCalled();
+
     view.rerender(
       <HtmlGameFrame blockId="game-sdk" height={640} html={sdkGame} sync={sync} title="Game" />,
     );

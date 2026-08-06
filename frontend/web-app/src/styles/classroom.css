@@ -564,6 +564,13 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   pointer-events: none;
 }
 
+.playsay-classroom-shell[data-presentation-mode="external-activity-focus"] :is(
+  .playsay-activity-rail,
+  .playsay-activity-rail-backdrop
+) {
+  display: none;
+}
+
 .playsay-video-header {
   display: flex;
   flex: 0 0 auto;

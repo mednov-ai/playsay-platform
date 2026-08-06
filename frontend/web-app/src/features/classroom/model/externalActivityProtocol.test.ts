@@ -76,4 +76,9 @@ describe("external activity classroom protocol", () => {
     expect(participantCanHostExternalActivity('{"playsayRole":"STUDENT"}')).toBe(false);
     expect(participantCanHostExternalActivity("invalid")).toBe(false);
   });
+
+  it("trusts the lesson teacher identity when remote metadata is unavailable", () => {
+    expect(participantCanHostExternalActivity(undefined, "teacher-subject", "teacher-subject")).toBe(true);
+    expect(participantCanHostExternalActivity(undefined, "student-subject", "teacher-subject")).toBe(false);
+  });
 });

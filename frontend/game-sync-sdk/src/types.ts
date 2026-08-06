@@ -79,6 +79,8 @@ export type GameSessionContext = {
 
 export type GameSyncDiagnosticStage =
   | "action-created"
+  | "authority-ordered"
+  | "iframe-delivered"
   | "optimistic-applied"
   | "ordered-applied"
   | "ordered-confirmed"

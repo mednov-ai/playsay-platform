@@ -226,10 +226,11 @@ async function generateWithOpenAi(
                           additionalProperties: false,
                           properties: {
                             key: { type: ["string", "null"] },
-                            kind: { enum: ["click", "pointerdown", "keydown"], type: "string" },
+                            kind: { enum: ["click", "pointerdown", "keydown", "set-range"], type: "string" },
                             selector: { type: ["string", "null"] },
+                            value: { type: ["string", "null"] },
                           },
-                          required: ["kind", "selector", "key"],
+                          required: ["kind", "selector", "key", "value"],
                           type: "object",
                         },
                       },
@@ -326,6 +327,9 @@ Requirements:
   registered keyboard control, plus start/restart, correct/incorrect outcomes and timer-driven
   transitions when those mechanics exist. Each physical interaction must dispatch exactly one
   named SDK action and at least one step must require a DOM state change after authority ordering.
+- Validate every input[type=range] with a set-range operation using an exact value that satisfies
+  its original min/max/step. Preserve the original input then change event order, and dispatch one
+  semantic SDK action for that complete physical range intent rather than one action per DOM event.
 - Semantic timers, collision resolution, automatic answers and round completion may dispatch only
   while controller.getSession()?.isAuthority is true. Cancel them when onSession reports a replica.
 - Do not replace geometry-driven or requestAnimationFrame behavior with fixed CSS durations or

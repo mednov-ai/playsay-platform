@@ -79,6 +79,7 @@ export type MaterialHtmlGameInputEvent = {
   selectedIndex?: number;
   selectionEnd?: number | null;
   selectionStart?: number | null;
+  controlSequence?: number;
   value?: string;
 };
 
@@ -130,6 +131,7 @@ export type MaterialHtmlGameSnapshot = {
     selectedIndex?: number;
     selectionEnd?: number | null;
     selectionStart?: number | null;
+    versions?: Record<string, number>;
     value?: string;
   }>;
   html: string;

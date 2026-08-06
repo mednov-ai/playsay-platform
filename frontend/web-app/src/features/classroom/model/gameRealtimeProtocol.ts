@@ -7,6 +7,8 @@ export const gameRealtimeSubprotocol = "playsay-game-v1";
 const messageGame = 3;
 const protocolVersion = 1;
 const maximumPayloadBytes = 24 * 1024;
+const textDecoder = new TextDecoder();
+const textEncoder = new TextEncoder();
 
 const messageTypes = {
   welcome: 0,
@@ -43,7 +45,7 @@ export type DecodedGameRealtimeFrame =
 export function encodeGameRealtimeMessage(
   message: MaterialHtmlGameRealtimeMessage,
 ): Uint8Array {
-  const payload = new TextEncoder().encode(JSON.stringify(message));
+  const payload = textEncoder.encode(JSON.stringify(message));
   if (payload.byteLength > maximumPayloadBytes) {
     throw new Error("Game realtime payload is too large");
   }
@@ -68,7 +70,7 @@ export function decodeGameRealtimeFrame(data: ArrayBufferLike): DecodedGameRealt
   if (payload.byteLength > maximumPayloadBytes || decoding.hasContent(decoder)) {
     throw new Error("Invalid game realtime payload");
   }
-  const parsed = JSON.parse(new TextDecoder().decode(payload)) as unknown;
+  const parsed = JSON.parse(textDecoder.decode(payload)) as unknown;
   if (type === messageTypes.welcome) {
     if (
       !parsed

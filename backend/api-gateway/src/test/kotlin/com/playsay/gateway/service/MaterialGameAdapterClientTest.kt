@@ -14,7 +14,7 @@ class MaterialGameAdapterClientTest {
     fun `returns validated adapter response and sends internal token`() {
         withAdapterServer(
             status = 200,
-            response = """{"html":"<html>adapted</html>","report":"validated","model":"gpt-test","promptHash":"abc","sourceHash":"def","validation":{"mechanicsEquivalent":true,"validatorVersion":"mechanics-v2","checks":["source-differential"]}}""",
+            response = """{"html":"<html>adapted</html>","report":"validated","model":"gpt-test","promptHash":"abc","sourceHash":"def","validation":{"mechanicsEquivalent":true,"validatorVersion":"mechanics-v3","checks":["source-differential"]}}""",
         ) { baseUrl ->
             val result = client(baseUrl).adapt("<html>source</html>")
 
@@ -23,7 +23,7 @@ class MaterialGameAdapterClientTest {
             assertEquals("gpt-test", result.model)
             assertEquals("abc", result.promptHash)
             assertEquals("def", result.sourceHash)
-            assertEquals("mechanics-v2", result.validatorVersion)
+            assertEquals("mechanics-v3", result.validatorVersion)
             assertTrue(result.mechanicsEquivalent)
         }
     }
@@ -47,7 +47,7 @@ class MaterialGameAdapterClientTest {
     fun `maps mechanics divergence to a terminal localized error`() {
         withAdapterServer(
             status = 422,
-            response = """{"code":"ADAPTED_HTML_MECHANICS_CHANGED","retryable":false}""",
+            response = """{"code":"ADAPTED_HTML_MECHANICS_CHANGED","retryable":false,"validation":{"failureCode":"RANGE_VALUE_INVALID","mechanicsEquivalent":false,"validatorVersion":"mechanics-v3"}}""",
         ) { baseUrl ->
             val failure = assertFailsWith<GameAdapterClientException> {
                 client(baseUrl).adapt("<html>source</html>")
@@ -55,6 +55,7 @@ class MaterialGameAdapterClientTest {
 
             assertEquals(MetaData.ErrorCodes.GAME_ADAPTER_MECHANICS_CHANGED, failure.adapterErrorCode)
             assertEquals(false, failure.retryable)
+            assertTrue(failure.validationReport.orEmpty().contains("RANGE_VALUE_INVALID"))
         }
     }
 

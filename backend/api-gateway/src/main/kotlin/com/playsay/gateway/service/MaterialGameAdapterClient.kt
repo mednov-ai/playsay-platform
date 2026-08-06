@@ -25,6 +25,7 @@ data class GameAdapterResult(
 class GameAdapterClientException(
     val adapterErrorCode: String,
     val retryable: Boolean,
+    val validationReport: String? = null,
 ) : RuntimeException(adapterErrorCode)
 
 @Component
@@ -59,7 +60,10 @@ class MaterialGameAdapterClient(
             val adapterCode = failure?.path("code")?.asText().orEmpty()
             val retryable = failure?.path("retryable")?.asBoolean(response.statusCode() >= 500)
                 ?: (response.statusCode() >= 500)
-            throw GameAdapterClientException(mapAdapterError(adapterCode), retryable)
+            val validationReport = failure?.path("validation")
+                ?.takeUnless { it.isMissingNode || it.isNull }
+                ?.let(objectMapper::writeValueAsString)
+            throw GameAdapterClientException(mapAdapterError(adapterCode), retryable, validationReport)
         }
         val json = runCatching { objectMapper.readTree(response.body()) }.getOrNull()
             ?: throw GameAdapterClientException(MetaData.ErrorCodes.GAME_ADAPTER_FAILED, retryable = false)

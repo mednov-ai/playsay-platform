@@ -32,6 +32,7 @@ type BridgeMessage =
         selectedIndex?: number;
         selectionEnd?: number | null;
         selectionStart?: number | null;
+        versions?: Record<string, number>;
         value?: string;
       }>;
       html: string;
@@ -395,20 +396,6 @@ export function HtmlGameFrame({
               blockId,
               runId: runtimeRunId,
             });
-            if (
-              outbound.diagnostic.stage === "ordered-confirmed"
-              && outbound.diagnostic.eventId
-              && sync?.gameRealtime
-            ) {
-              sync.gameRealtime.publish({
-                actorId: String(sync.clientId ?? channel),
-                blockId,
-                eventId: outbound.diagnostic.eventId,
-                kind: "ack",
-                revision: outbound.diagnostic.revision,
-                runId: runtimeRunId,
-              });
-            }
           } else if (outbound.kind === "action-request") {
             recordGameSyncDiagnostic({
               blockId,
@@ -453,7 +440,21 @@ export function HtmlGameFrame({
             if (!sync || sync.isAuthority) {
               const action = orderSdkAction(request, sdkRevisionRef, sdkLogicalTimeRef);
               handledSdkActionsRef.current.add(action.id);
+              recordGameSyncDiagnostic({
+                blockId,
+                eventId: action.eventId,
+                revision: action.authorityRevision,
+                runId: runtimeRunId,
+                stage: "authority-ordered",
+              });
               ports.port1.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
+              recordGameSyncDiagnostic({
+                blockId,
+                eventId: action.eventId,
+                revision: action.authorityRevision,
+                runId: runtimeRunId,
+                stage: "iframe-delivered",
+              });
               recordGameSyncDiagnostic({
                 blockId,
                 eventId: action.eventId,
@@ -554,7 +555,21 @@ export function HtmlGameFrame({
       });
       const action = orderSdkAction(request, sdkRevisionRef, sdkLogicalTimeRef);
       handledSdkActionsRef.current.add(action.id);
+      recordGameSyncDiagnostic({
+        blockId,
+        eventId: action.eventId,
+        revision: action.authorityRevision,
+        runId: runtimeRunId,
+        stage: "authority-ordered",
+      });
       sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
+      recordGameSyncDiagnostic({
+        blockId,
+        eventId: action.eventId,
+        revision: action.authorityRevision,
+        runId: runtimeRunId,
+        stage: "iframe-delivered",
+      });
       recordGameSyncDiagnostic({
         blockId,
         eventId: action.eventId,
@@ -600,6 +615,13 @@ export function HtmlGameFrame({
           stage: "socket-received",
         });
         sdkPortRef.current?.postMessage({ action, kind: "ordered-action" } satisfies GameSyncInboundMessage);
+        recordGameSyncDiagnostic({
+          blockId,
+          eventId: action.eventId,
+          revision: action.authorityRevision,
+          runId: runtimeRunId,
+          stage: "iframe-delivered",
+        });
       });
   }, [blockId, runtimeRunId, sdkRuntime, sync, sync?.sdkActions, sync?.sdkCheckpoints]);
 
@@ -631,10 +653,24 @@ export function HtmlGameFrame({
             sdkLogicalTimeRef,
           );
           handledSdkActionsRef.current.add(action.id);
+          recordGameSyncDiagnostic({
+            blockId,
+            eventId: action.eventId,
+            revision: action.authorityRevision,
+            runId: runtimeRunId,
+            stage: "authority-ordered",
+          });
           sdkPortRef.current?.postMessage({
             action,
             kind: "ordered-action",
           } satisfies GameSyncInboundMessage);
+          recordGameSyncDiagnostic({
+            blockId,
+            eventId: action.eventId,
+            revision: action.authorityRevision,
+            runId: runtimeRunId,
+            stage: "iframe-delivered",
+          });
           gameRealtime.publish({ action, kind: "ordered-action" });
         } else if (message.kind === "ordered-action") {
           const { action } = message;
@@ -665,6 +701,13 @@ export function HtmlGameFrame({
             action,
             kind: "ordered-action",
           } satisfies GameSyncInboundMessage);
+          recordGameSyncDiagnostic({
+            blockId,
+            eventId: action.eventId,
+            revision: action.authorityRevision,
+            runId: runtimeRunId,
+            stage: "iframe-delivered",
+          });
         } else if (message.kind === "effect") {
           if (handledSdkEffectsRef.current.has(message.effect.id)) {
             return;
@@ -1000,6 +1043,12 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
     let pendingPointerMove = null;
     let pointerMoveTimer = 0;
     let lastPointerMoveAt = 0;
+    const rangeInputIntervalMs = 1000 / 20;
+    let rangeInputTimer = 0;
+    let lastRangeInputAt = 0;
+    const pendingRangeInputs = new Map();
+    const controlVersions = new Map();
+    const localControlSequences = new Map();
     let replayingPointer = false;
     let applyingSnapshotRunId = '';
     let applyingSnapshotSequence = 0;
@@ -1133,7 +1182,16 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
       }
       if (!patchFlushTimer) patchFlushTimer = window.setTimeout(flushMutationPatch, 50);
     };
-    const formState = (node) => {
+    const versionsFor = (targetIdentifier) => Object.fromEntries(
+      controlVersions.get(targetIdentifier)?.entries?.() ?? []
+    );
+    const rememberControlVersion = (targetIdentifier, actorId, sequence) => {
+      if (!actorId || !Number.isSafeInteger(sequence) || sequence <= 0) return;
+      const versions = controlVersions.get(targetIdentifier) ?? new Map();
+      versions.set(actorId, Math.max(versions.get(actorId) ?? 0, sequence));
+      controlVersions.set(targetIdentifier, versions);
+    };
+    const formState = (node, includeVersions = false) => {
       const state = {};
       if ('value' in node) state.value = String(node.value ?? '');
       if ('checked' in node) state.checked = Boolean(node.checked);
@@ -1142,11 +1200,12 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         state.selectionStart = node.selectionStart;
         state.selectionEnd = node.selectionEnd;
       }
+      if (includeVersions) state.versions = versionsFor(targetId(node));
       return state;
     };
     const serializeControls = () => Object.fromEntries(
       [...document.querySelectorAll('input, textarea, select')]
-        .map((node) => [targetId(node), formState(node)])
+        .map((node) => [targetId(node), formState(node, node.matches('input[type="range"]'))])
     );
     const serializeScroll = () => {
       const entries = [];
@@ -1285,7 +1344,7 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         relativeY: height ? Math.max(0, Math.min(1, (event.clientY - rect.top) / height)) : undefined
       };
     };
-    const inputEvent = (type, target, targetIdentifier, event) => ({
+    const inputEvent = (type, target, targetIdentifier, event, controlSequence) => ({
       type,
       targetId: targetIdentifier,
       key: event.key,
@@ -1295,10 +1354,31 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
       metaKey: Boolean(event.metaKey),
       shiftKey: Boolean(event.shiftKey),
       ...pointerState(event, target),
-      ...formState(target),
+      ...(
+        target?.matches?.('input[type="range"]') && type !== 'input' && type !== 'change'
+          ? {}
+          : formState(target)
+      ),
+      ...(controlSequence ? { controlSequence } : {}),
       data: event.data ?? null,
       inputType: event.inputType
     });
+    const flushRangeInputs = () => {
+      if (rangeInputTimer) {
+        window.clearTimeout(rangeInputTimer);
+        rangeInputTimer = 0;
+      }
+      if (!pendingRangeInputs.size) return;
+      lastRangeInputAt = performance.now();
+      pendingRangeInputs.forEach((event) => send({ type: 'input', event }));
+      pendingRangeInputs.clear();
+    };
+    const scheduleRangeInput = (event) => {
+      pendingRangeInputs.set(event.targetId, event);
+      if (rangeInputTimer) return;
+      const delay = Math.max(0, rangeInputIntervalMs - (performance.now() - lastRangeInputAt));
+      rangeInputTimer = window.setTimeout(flushRangeInputs, delay);
+    };
     const flushPointerMove = () => {
       if (pointerMoveTimer) {
         window.clearTimeout(pointerMoveTimer);
@@ -1329,6 +1409,10 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         : null;
       const resolvedTarget = activePointerTarget ?? event.target;
       const eventTargetId = targetId(resolvedTarget);
+      const rangeTarget = Boolean(resolvedTarget?.matches?.('input[type="range"]'));
+      if (rangeTarget && (type === 'change' || type === 'pointerup' || type === 'pointercancel' || type === 'blur')) {
+        flushRangeInputs();
+      }
       if (!mirror && immediateSnapshotInputTypes.has(type)) {
         patchWindowUntil = performance.now() + 1000;
       }
@@ -1355,7 +1439,16 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
           nativeDragStarted = false;
         }
       }
-      send({ type: 'input', event: inputEvent(type, resolvedTarget, eventTargetId, event) });
+      const controlSequence = rangeTarget && (type === 'input' || type === 'change')
+        ? (localControlSequences.get(eventTargetId) ?? 0) + 1
+        : 0;
+      if (controlSequence) {
+        localControlSequences.set(eventTargetId, controlSequence);
+        rememberControlVersion(eventTargetId, channel, controlSequence);
+      }
+      const publishedInput = inputEvent(type, resolvedTarget, eventTargetId, event, controlSequence);
+      if (rangeTarget && type === 'input') scheduleRangeInput(publishedInput);
+      else send({ type: 'input', event: publishedInput });
       if (mirror && (type === 'pointerup' || type === 'pointercancel')) activePointerTargetId = null;
       if (!mirror) scheduleSnapshot(immediateSnapshotInputTypes.has(type));
     }, true));
@@ -1396,6 +1489,8 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
     };
     document.addEventListener('mouseup', finishPointerDrag, true);
     document.addEventListener('dragend', finishPointerDrag, true);
+    window.addEventListener('pagehide', flushRangeInputs);
+    window.addEventListener('beforeunload', flushRangeInputs);
     const elementPrototype = window.Element?.prototype;
     const nativeSetPointerCapture = elementPrototype?.setPointerCapture;
     const nativeReleasePointerCapture = elementPrototype?.releasePointerCapture;
@@ -1455,8 +1550,30 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
       Object.defineProperty(event, '__playsayReplay', { value: true });
       return event;
     };
-    const applyFormState = (target, state) => {
+    const hasNewerControlVersion = (targetIdentifier, incomingVersions) => {
+      const current = controlVersions.get(targetIdentifier);
+      if (!current) return false;
+      return [...current].some(([actorId, sequence]) => (
+        sequence > Number(incomingVersions?.[actorId] ?? 0)
+      ));
+    };
+    const applyFormState = (target, state, actorId, controlSequence) => {
       if (!target || target === document) return;
+      const targetIdentifier = targetId(target);
+      if (
+        target.matches?.('input[type="range"]')
+        && state.versions
+        && hasNewerControlVersion(targetIdentifier, state.versions)
+      ) return;
+      if (actorId && controlSequence) {
+        const latest = controlVersions.get(targetIdentifier)?.get(actorId) ?? 0;
+        if (controlSequence <= latest) return;
+        rememberControlVersion(targetIdentifier, actorId, controlSequence);
+      } else if (state.versions) {
+        Object.entries(state.versions).forEach(([versionActorId, sequence]) => {
+          rememberControlVersion(targetIdentifier, versionActorId, Number(sequence));
+        });
+      }
       if ('value' in target && state.value !== undefined) target.value = state.value;
       if ('checked' in target && state.checked !== undefined) target.checked = Boolean(state.checked);
       if ('selectedIndex' in target && state.selectedIndex !== undefined) target.selectedIndex = Number(state.selectedIndex);
@@ -1678,7 +1795,7 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
         if (!mirror && immediateSnapshotInputTypes.has(input.type)) {
           patchWindowUntil = performance.now() + 1000;
         }
-        applyFormState(target, input);
+        applyFormState(target, input, input.actorId, input.controlSequence);
         if (input.type === 'focus') target?.focus?.();
         if (input.type === 'blur') target?.blur?.();
         const pointerInput = input.type.startsWith('pointer');

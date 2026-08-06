@@ -12,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 
@@ -63,6 +64,24 @@ class MaterialGameAdaptationServiceFailureTest {
 
         assertEquals(MaterialGameAdaptationStatuses.FAILED, job.status)
         assertNull(job.nextAttemptAt)
+    }
+
+    @Test
+    fun `terminal validator failure keeps safe mechanics diagnostics`() {
+        val job = job(attempts = 1)
+        `when`(repo.findById(job.id)).thenReturn(Optional.of(job))
+        `when`(repo.save(job)).thenReturn(job)
+
+        service.fail(
+            job.id,
+            "GAME_ADAPTER_MECHANICS_CHANGED",
+            retryable = false,
+            validationReport = """{"failureCode":"RANGE_VALUE_INVALID","mechanicsEquivalent":false,"validatorVersion":"mechanics-v3"}""",
+        )
+
+        assertEquals(MaterialGameMechanicsValidation.FAILED, job.mechanicsValidation)
+        assertEquals("mechanics-v3", job.validatorVersion)
+        assertTrue(job.validationReport.orEmpty().contains("RANGE_VALUE_INVALID"))
     }
 
     @Test

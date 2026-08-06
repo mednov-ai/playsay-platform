@@ -75,6 +75,35 @@ export function createGameRealtimeClient({
       return false;
     }
     socket.send(encodeGameRealtimeMessage(message));
+    const eventId = message.kind === "action-request"
+      ? message.request.eventId
+      : message.kind === "ordered-action"
+        ? message.action.eventId
+        : "eventId" in message
+          ? message.eventId
+          : undefined;
+    const blockId = message.kind === "action-request"
+      ? message.request.blockId
+      : message.kind === "ordered-action"
+        ? message.action.blockId
+        : "blockId" in message
+          ? message.blockId
+          : undefined;
+    const runId = message.kind === "action-request"
+      ? message.request.runId
+      : message.kind === "ordered-action"
+        ? message.action.runId
+        : "runId" in message
+          ? message.runId
+          : undefined;
+    if (eventId) {
+      recordGameSyncDiagnostic({
+        blockId,
+        eventId,
+        runId,
+        stage: "socket-queued",
+      });
+    }
     return true;
   };
 

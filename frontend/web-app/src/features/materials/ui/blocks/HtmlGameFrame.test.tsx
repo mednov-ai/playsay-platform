@@ -74,9 +74,105 @@ describe("HTML game sandbox", () => {
     expect(authority).toContain("const maxDelay = canvasSnapshotIntervalMs");
     expect(authority).toContain("'beforeinput', 'input', 'change', 'focus', 'blur'");
     expect(authority).toContain("serializeControls");
+    expect(authority).toContain("rangeInputIntervalMs = 1000 / 20");
+    expect(authority).toContain("pendingRangeInputs");
+    expect(authority).toContain("flushRangeInputs()");
+    expect(authority).toContain("controlVersions");
     expect(authority).toContain("serializeCanvases");
-    expect(authority).toContain("applyFormState(target, input)");
+    expect(authority).toContain("applyFormState(target, input, input.actorId, input.controlSequence)");
     expect(authority).not.toContain("}, 120)");
+  });
+
+  it("coalesces range input, omits stale pointer values and flushes the final value", async () => {
+    const channel = "range-bridge-test";
+    const messages: Array<Record<string, unknown>> = [];
+    const documentHtml = createSandboxedGameDocument(
+      `<html><body>
+        <input id="speed" type="range" min="1" max="5" step="1" value="1">
+        <output id="value">1</output>
+        <script>
+          const speed = document.querySelector("#speed");
+          speed.addEventListener("input", () => {
+            document.querySelector("#value").textContent = speed.value;
+          });
+        </script>
+      </body></html>`,
+      channel,
+      true,
+      "authority-run",
+      true,
+    );
+    const dom = new JSDOM(documentHtml, {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "http://localhost/",
+      beforeParse(window) {
+        window.addEventListener("message", (event) => {
+          const message = event.data as Record<string, unknown>;
+          if (message?.channel === channel) messages.push(message);
+        });
+        Object.defineProperty(window, "CSS", {
+          configurable: true,
+          value: { escape: (value: string) => value },
+        });
+      },
+    });
+
+    try {
+      const slider = dom.window.document.querySelector<HTMLInputElement>("#speed")!;
+      await waitFor(() => expect(slider.dataset.playsayNodeId).toBeTruthy());
+      slider.dispatchEvent(new dom.window.Event("pointerdown", { bubbles: true }));
+      for (const value of ["2", "3", "4"]) {
+        slider.value = value;
+        slider.dispatchEvent(new dom.window.InputEvent("input", { bubbles: true }));
+      }
+      slider.dispatchEvent(new dom.window.Event("pointerup", { bubbles: true }));
+      slider.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+
+      await waitFor(() => expect(messages.filter((message) => {
+        const event = message.event as Record<string, unknown> | undefined;
+        return message.type === "input" && event?.type === "change";
+      })).toHaveLength(1));
+      const rangeInputs = messages.filter((message) => {
+        const event = message.event as Record<string, unknown> | undefined;
+        return message.type === "input" && event?.type === "input";
+      });
+      expect(rangeInputs).toHaveLength(1);
+      expect(rangeInputs[0]?.event).toEqual(expect.objectContaining({
+        controlSequence: 3,
+        type: "input",
+        value: "4",
+      }));
+      const pointerEvents = messages.filter((message) => {
+        const event = message.event as Record<string, unknown> | undefined;
+        return message.type === "input" && String(event?.type).startsWith("pointer");
+      });
+      expect(pointerEvents.every((message) => (
+        !Object.prototype.hasOwnProperty.call(message.event as object, "value")
+      ))).toBe(true);
+
+      const targetId = slider.dataset.playsayNodeId!;
+      dom.window.postMessage({
+        channel,
+        snapshot: {
+          controls: {
+            [targetId]: { value: "1", versions: {} },
+          },
+          html: dom.window.document.body.outerHTML,
+          runId: "authority-run",
+          sequence: 1,
+        },
+        type: "applySnapshot",
+      }, "*");
+      await waitFor(() => expect(messages).toContainEqual(expect.objectContaining({
+        runId: "authority-run",
+        sequence: 1,
+        type: "snapshotApplied",
+      })));
+      expect(slider.value).toBe("4");
+    } finally {
+      dom.window.close();
+    }
   });
 
   it("runs supported mirror games predictively with the authority seed and falls back for nondeterministic APIs", () => {

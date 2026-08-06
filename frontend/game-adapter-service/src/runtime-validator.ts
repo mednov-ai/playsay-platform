@@ -9,12 +9,13 @@ const VALIDATION_URL = "http://validation.local/game";
 const SOURCE_VALIDATION_URL = "http://validation.local/source";
 const VALIDATION_TIMEOUT_MS = 12_000;
 const STEP_TIMEOUT_MS = 2_500;
-export const MECHANICS_VALIDATOR_VERSION = "mechanics-v2";
+export const MECHANICS_VALIDATOR_VERSION = "mechanics-v3";
 
 export type RuntimeValidationOperation =
   | { kind: "click"; selector: string }
   | { kind: "pointerdown"; selector: string }
-  | { key: string; kind: "keydown" };
+  | { key: string; kind: "keydown" }
+  | { kind: "set-range"; selector: string; value: string };
 
 export type RuntimeValidationStep = {
   expectActionType: string;
@@ -277,6 +278,9 @@ export async function validateGameRuntime(
           "interactive-actions",
           "one-action-per-intent",
           "dom-state-change",
+          ...(plan.steps.some((step) => step.operation.kind === "set-range")
+            ? ["range-min-max-step", "range-input-change-order"]
+            : []),
           ...(sourcePage ? ["source-differential"] : []),
           "offline-runtime",
           "action-rate",
@@ -338,6 +342,21 @@ function validateOperation(
     return { key: operation.key.trim(), kind: "keydown" };
   }
   if (
+    operation.kind === "set-range"
+    && typeof operation.selector === "string"
+    && validSelectorText(operation.selector)
+    && typeof operation.value === "string"
+    && operation.value.trim()
+    && operation.value.length <= 40
+    && Number.isFinite(Number(operation.value))
+  ) {
+    return {
+      kind: "set-range",
+      selector: operation.selector.trim(),
+      value: operation.value.trim(),
+    };
+  }
+  if (
     (operation.kind === "click" || operation.kind === "pointerdown") &&
     typeof operation.selector === "string" &&
     validSelectorText(operation.selector)
@@ -360,6 +379,42 @@ async function performOperation(page: Page, operation: RuntimeValidationOperatio
   await target.waitFor({ state: "visible", timeout: STEP_TIMEOUT_MS });
   if (operation.kind === "click") {
     await target.click();
+  } else if (operation.kind === "set-range") {
+    await target.evaluate((element, requestedValue) => {
+      if (!(element instanceof HTMLInputElement) || element.type !== "range") {
+        throw new Error("RANGE_TARGET_INVALID: set-range requires input[type=range]");
+      }
+      const value = Number(requestedValue);
+      const minimum = element.min === "" ? 0 : Number(element.min);
+      const maximum = element.max === "" ? 100 : Number(element.max);
+      const stepText = element.step === "" ? "1" : element.step;
+      const step = stepText === "any" ? null : Number(stepText);
+      const epsilon = Number.EPSILON * Math.max(1, Math.abs(value), Math.abs(minimum)) * 16;
+      if (
+        !Number.isFinite(value)
+        || !Number.isFinite(minimum)
+        || !Number.isFinite(maximum)
+        || value < minimum - epsilon
+        || value > maximum + epsilon
+        || (step !== null && (
+          !Number.isFinite(step)
+          || step <= 0
+          || Math.abs(((value - minimum) / step) - Math.round((value - minimum) / step)) > epsilon
+        ))
+      ) {
+        throw new Error("RANGE_VALUE_INVALID: value does not match min/max/step");
+      }
+      element.value = requestedValue;
+      if (Number(element.value) !== value) {
+        throw new Error("RANGE_VALUE_INVALID: browser normalized the requested value");
+      }
+      element.dispatchEvent(new InputEvent("input", {
+        bubbles: true,
+        composed: true,
+        inputType: "insertReplacementText",
+      }));
+      element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    }, operation.value);
   } else {
     await target.dispatchEvent("pointerdown", {
       button: 0,

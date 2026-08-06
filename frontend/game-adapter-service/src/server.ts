@@ -2,7 +2,10 @@ import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
 import { adaptGameHtml } from "./adapter.js";
-import { closeRuntimeValidator } from "./runtime-validator.js";
+import {
+  closeRuntimeValidator,
+  MECHANICS_VALIDATOR_VERSION,
+} from "./runtime-validator.js";
 
 const port = Number(process.env.PORT ?? 8088);
 const requestLimit = 7 * 1024 * 1024;
@@ -31,6 +34,11 @@ export function createGameAdapterServer(adapt: typeof adaptGameHtml = adaptGameH
       return json(response, failure.status, {
         code: failure.code,
         retryable: failure.retryable,
+        validation: {
+          failureCode: failure.failureCode,
+          mechanicsEquivalent: false,
+          validatorVersion: MECHANICS_VALIDATOR_VERSION,
+        },
       });
     }
   });
@@ -80,9 +88,16 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   process.once("SIGTERM", () => void shutdown());
 }
 
-function classifyFailure(raw: string): { code: string; retryable: boolean; status: number } {
+function classifyFailure(raw: string): {
+  code: string;
+  failureCode: string;
+  retryable: boolean;
+  status: number;
+} {
+  const failureCodes = raw.match(/\b(?:ACTION|ADAPTED_HTML|GAME|NETWORK|RANGE|RUNTIME|VALIDATION)_[A-Z_]+\b/g);
+  const failureCode = (failureCodes?.at(-1) ?? "ADAPTATION_FAILED").slice(0, 120);
   if (raw === "REQUEST_TOO_LARGE") {
-    return { code: raw, retryable: false, status: 413 };
+    return { code: raw, failureCode: raw, retryable: false, status: 413 };
   }
   if (raw.startsWith("OPENAI_")) {
     if (
@@ -90,26 +105,26 @@ function classifyFailure(raw: string): { code: string; retryable: boolean; statu
       raw === "OPENAI_RESPONSE_MISSING" ||
       raw === "OPENAI_RESPONSE_INVALID"
     ) {
-      return { code: raw, retryable: true, status: 503 };
+      return { code: raw, failureCode, retryable: true, status: 503 };
     }
     const status = Number(raw.slice("OPENAI_".length));
     const retryable = status === 429 || status >= 500;
-    return { code: raw.slice(0, 120), retryable, status: retryable ? 503 : 422 };
+    return { code: raw.slice(0, 120), failureCode, retryable, status: retryable ? 503 : 422 };
   }
   if (raw.includes("RUNTIME_VALIDATOR_UNAVAILABLE")) {
-    return { code: "RUNTIME_VALIDATOR_UNAVAILABLE", retryable: true, status: 503 };
+    return { code: "RUNTIME_VALIDATOR_UNAVAILABLE", failureCode, retryable: true, status: 503 };
   }
   if (raw.includes("ACTION_RATE_EXCEEDED")) {
-    return { code: "ADAPTED_HTML_ACTION_RATE_EXCEEDED", retryable: false, status: 422 };
+    return { code: "ADAPTED_HTML_ACTION_RATE_EXCEEDED", failureCode, retryable: false, status: 422 };
   }
   if (
     raw.includes("GAME_MECHANICS_CHANGED") ||
     raw.includes("ACTION_CARDINALITY_INVALID")
   ) {
-    return { code: "ADAPTED_HTML_MECHANICS_CHANGED", retryable: false, status: 422 };
+    return { code: "ADAPTED_HTML_MECHANICS_CHANGED", failureCode, retryable: false, status: 422 };
   }
   if (raw.includes("UNSAFE") || raw.includes("NETWORK_ACCESS_ATTEMPTED")) {
-    return { code: "ADAPTED_HTML_UNSAFE", retryable: false, status: 422 };
+    return { code: "ADAPTED_HTML_UNSAFE", failureCode, retryable: false, status: 422 };
   }
   if (
     raw.includes("INVALID_MANIFEST") ||
@@ -119,10 +134,10 @@ function classifyFailure(raw: string): { code: string; retryable: boolean; statu
     raw.includes("ACTION_CONTRACT_INVALID") ||
     raw.includes("VALIDATION_PLAN_INVALID")
   ) {
-    return { code: "ADAPTED_HTML_CONTRACT_INVALID", retryable: false, status: 422 };
+    return { code: "ADAPTED_HTML_CONTRACT_INVALID", failureCode, retryable: false, status: 422 };
   }
   if (raw.includes("ADAPTED_HTML_VALIDATION_FAILED") || raw.includes("RUNTIME_")) {
-    return { code: "ADAPTED_HTML_RUNTIME_INVALID", retryable: false, status: 422 };
+    return { code: "ADAPTED_HTML_RUNTIME_INVALID", failureCode, retryable: false, status: 422 };
   }
-  return { code: raw.slice(0, 120), retryable: false, status: 422 };
+  return { code: raw.slice(0, 120), failureCode, retryable: false, status: 422 };
 }

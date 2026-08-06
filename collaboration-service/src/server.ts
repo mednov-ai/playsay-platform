@@ -54,6 +54,7 @@ async function main(): Promise<void> {
     ),
     maxPayload: config.websocketMaxPayloadBytes,
     noServer: true,
+    perMessageDeflate: false,
   });
   const server = http.createServer((request, response) => {
     if (request.url === "/healthz") {
@@ -68,6 +69,9 @@ async function main(): Promise<void> {
         activeGameConnections: [...wss.clients].filter(isGameSocket).length,
         activeRooms: rooms.size,
         bufferedBytes,
+        gameBufferedBytes: [...wss.clients]
+          .filter(isGameSocket)
+          .reduce((total, client) => total + client.bufferedAmount, 0),
       }).then((body) => {
         response.writeHead(200, { "content-type": metrics.contentType });
         response.end(body);
@@ -114,7 +118,9 @@ async function main(): Promise<void> {
       });
   });
 
-  wss.on("connection", (ws: WebSocket, _request: http.IncomingMessage, claims: CollaborationClaims) => {
+  wss.on("connection", (ws: WebSocket, request: http.IncomingMessage, claims: CollaborationClaims) => {
+    request.socket.setNoDelay(true);
+    request.socket.setKeepAlive(true, 30_000);
     const pendingMessages: RawData[] = [];
     const queuePendingMessage = (message: RawData) => {
       if (pendingMessages.length >= 100) {
@@ -491,7 +497,7 @@ function rawDataToUint8Array(data: RawData): Uint8Array {
   if (Array.isArray(data)) {
     return new Uint8Array(Buffer.concat(data));
   }
-  return new Uint8Array(data);
+  return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
 }
 
 function runCatching<T>(action: () => T): { value: T; error?: never } | { value?: never; error: unknown } {

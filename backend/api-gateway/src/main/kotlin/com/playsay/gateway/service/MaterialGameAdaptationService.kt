@@ -38,7 +38,7 @@ object MaterialGameMechanicsValidation {
     const val PASSED = "PASSED"
     const val FAILED = "FAILED"
     const val REVALIDATION_REQUIRED = "REVALIDATION_REQUIRED"
-    const val CURRENT_VALIDATOR_VERSION = "mechanics-v2"
+    const val CURRENT_VALIDATOR_VERSION = "mechanics-v3"
 }
 
 @Component
@@ -129,6 +129,7 @@ class MaterialGameAdaptationService(
                     ?: (exception as? ProjectResponseException)?.errorCode
                     ?: MetaData.ErrorCodes.GAME_ADAPTER_FAILED,
                 retryable = adapterFailure?.retryable ?: false,
+                validationReport = adapterFailure?.validationReport,
             )
         }
     }
@@ -263,13 +264,23 @@ class MaterialGameAdaptationService(
     }
 
     @Transactional
-    fun fail(jobId: UUID, errorCode: String, retryable: Boolean = false) {
+    fun fail(
+        jobId: UUID,
+        errorCode: String,
+        retryable: Boolean = false,
+        validationReport: String? = null,
+    ) {
         val job = repo.findById(jobId).orElse(null) ?: return
         val exhausted = !retryable || job.attempts >= 3
         job.status = if (exhausted) MaterialGameAdaptationStatuses.FAILED else MaterialGameAdaptationStatuses.RETRY
         job.nextAttemptAt = if (exhausted) null else Instant.now().plusSeconds(30L * job.attempts.coerceAtLeast(1))
         job.leaseUntil = null
         job.lastErrorCode = errorCode
+        if (!validationReport.isNullOrBlank()) {
+            job.mechanicsValidation = MaterialGameMechanicsValidation.FAILED
+            job.validatorVersion = MaterialGameMechanicsValidation.CURRENT_VALIDATOR_VERSION
+            job.validationReport = validationReport
+        }
         job.updatedAt = Instant.now()
         repo.save(job)
     }

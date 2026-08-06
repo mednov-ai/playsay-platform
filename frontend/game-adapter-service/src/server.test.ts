@@ -25,7 +25,7 @@ describe("game adapter HTTP service", () => {
         durationMs: 10,
         mechanicsEquivalent: true,
         maximumActionsPerSecond: 1,
-        validatorVersion: "mechanics-v2" as const,
+        validatorVersion: "mechanics-v3" as const,
       },
     }));
     const server = createGameAdapterServer(adapt).listen(0, "127.0.0.1");
@@ -76,6 +76,11 @@ describe("game adapter HTTP service", () => {
       expect(await response.json()).toEqual({
         code: "ADAPTED_HTML_CONTRACT_INVALID",
         retryable: false,
+        validation: {
+          failureCode: "ACTION_CONTRACT_INVALID",
+          mechanicsEquivalent: false,
+          validatorVersion: "mechanics-v3",
+        },
       });
     } finally {
       server.close();
@@ -105,6 +110,11 @@ describe("game adapter HTTP service", () => {
       expect(await response.json()).toEqual({
         code: "ADAPTED_HTML_MECHANICS_CHANGED",
         retryable: false,
+        validation: {
+          failureCode: "GAME_MECHANICS_CHANGED",
+          mechanicsEquivalent: false,
+          validatorVersion: "mechanics-v3",
+        },
       });
     } finally {
       server.close();

@@ -99,7 +99,7 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
     }
     transport.send({
       diagnostic: {
-        at: performance.now(),
+        at: performance.timeOrigin + performance.now(),
         eventId,
         revision,
         stage,

@@ -26,7 +26,7 @@ const runtimeValidation = {
   durationMs: 12,
   mechanicsEquivalent: true,
   maximumActionsPerSecond: 1,
-  validatorVersion: "mechanics-v2" as const,
+  validatorVersion: "mechanics-v3" as const,
 };
 
 describe("game adapter", () => {

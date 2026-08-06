@@ -1,6 +1,8 @@
 export type GameSyncDiagnosticStage =
   | "action-created"
+  | "authority-ordered"
   | "host-received"
+  | "iframe-delivered"
   | "optimistic-applied"
   | "ordered-applied"
   | "ordered-confirmed"
@@ -41,7 +43,7 @@ export function recordGameSyncDiagnostic(
   const diagnostics = window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? [];
   diagnostics.push({
     ...entry,
-    at: entry.at ?? performance.now(),
+    at: entry.at ?? performance.timeOrigin + performance.now(),
   });
   if (diagnostics.length > maximumEntries) {
     diagnostics.splice(0, diagnostics.length - maximumEntries);

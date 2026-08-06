@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
@@ -15,6 +15,7 @@ const outputDir = process.env.PLAY_SAY_GAME_COMPARE_OUTPUT_DIR
   ?? path.join(process.cwd(), "tmp", "game-adaptation-compare");
 const timeoutMs = Number(process.env.PLAY_SAY_SMOKE_TIMEOUT_MS ?? 60_000);
 const sampleCount = Number(process.env.PLAY_SAY_GAME_COMPARE_SAMPLES ?? 40);
+const candidateMode = process.env.PLAY_SAY_GAME_COMPARE_CANDIDATE ?? "fixed";
 const runId = `game-compare-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
 const tokenStorageKey = "playsay.auth.tokens";
 const blockId = "game-compare-racing";
@@ -35,6 +36,10 @@ mkdirSync(outputDir, { recursive: true });
 
 const summary = {
   runId,
+  candidateMode,
+  commit: process.env.GITHUB_AFTER ?? process.env.GIT_COMMIT ?? "local",
+  build: process.env.BUILD_TAG ?? "local",
+  measuredAt: new Date().toISOString(),
   materialId: null,
   originalLessonId: null,
   adaptedLessonId: null,
@@ -87,40 +92,64 @@ try {
   );
   await deleteLesson(teacher.tokens.accessToken, originalLesson.id);
 
-  const adaptation = await requestAndWaitForAdaptation(
-    teacher.tokens.accessToken,
-    material.id,
-    originalAsset.id,
-  );
-  summary.adaptation = {
-    id: adaptation.id,
-    status: adaptation.status,
-    compatibility: adaptation.compatibility,
-    mechanicsValidation: adaptation.mechanicsValidation,
-    validatorVersion: adaptation.validatorVersion,
-    validationReport: adaptation.validationReport,
-    errorCode: adaptation.errorCode,
-  };
-  if (adaptation.status !== "READY_FOR_REVIEW" || adaptation.mechanicsValidation !== "PASSED") {
-    throw new Error(`Adaptation was not accepted: ${JSON.stringify(summary.adaptation)}`);
+  let candidateHtml;
+  if (candidateMode === "ai") {
+    const adaptation = await requestAndWaitForAdaptation(
+      teacher.tokens.accessToken,
+      material.id,
+      originalAsset.id,
+    );
+    summary.adaptation = {
+      id: adaptation.id,
+      status: adaptation.status,
+      compatibility: adaptation.compatibility,
+      mechanicsValidation: adaptation.mechanicsValidation,
+      validatorVersion: adaptation.validatorVersion,
+      validationReport: adaptation.validationReport,
+      errorCode: adaptation.errorCode,
+    };
+    if (adaptation.status !== "READY_FOR_REVIEW" || adaptation.mechanicsValidation !== "PASSED") {
+      throw new Error(`Adaptation was not accepted: ${JSON.stringify(summary.adaptation)}`);
+    }
+    candidateHtml = await assetContent(
+      teacher.tokens.accessToken,
+      material.id,
+      adaptation.adaptedAssetId,
+    );
+    await apiRequest(
+      teacher.tokens.accessToken,
+      "POST",
+      `/materials/${material.id}/assets/${originalAsset.id}/game-adaptations/${adaptation.id}/apply`,
+      200,
+    );
+  } else if (candidateMode === "fixed") {
+    candidateHtml = sdkRacingGameHtml();
+    const candidateAsset = await uploadHtmlGame(
+      teacher.tokens.accessToken,
+      material.id,
+      candidateHtml,
+    );
+    materialRequest = materialWithGame(candidateAsset.id);
+    await apiRequest(
+      teacher.tokens.accessToken,
+      "PUT",
+      `/materials/${material.id}`,
+      200,
+      materialRequest,
+    );
+    summary.adaptation = {
+      status: "DETERMINISTIC_FIXTURE",
+      compatibility: "SDK_V1",
+      mechanicsValidation: "NOT_APPLICABLE",
+      validatorVersion: null,
+    };
+  } else {
+    throw new Error(`Unsupported PLAY_SAY_GAME_COMPARE_CANDIDATE=${candidateMode}`);
   }
-
-  const candidateHtml = await assetContent(
-    teacher.tokens.accessToken,
-    material.id,
-    adaptation.adaptedAssetId,
-  );
   summary.appearance = await compareStandaloneAppearance(
     browser,
     racingGameHtml(),
     candidateHtml,
-  );
-
-  await apiRequest(
-    teacher.tokens.accessToken,
-    "POST",
-    `/materials/${material.id}/assets/${originalAsset.id}/game-adaptations/${adaptation.id}/apply`,
-    200,
   );
 
   const adaptedLesson = await createLesson(
@@ -152,6 +181,10 @@ try {
     adaptedP99Ms: percentile(summary.adapted.teacherToStudent.latenciesMs, 0.99),
     originalLoadedP95Ms: percentile(summary.original.loadedTeacherToStudent.latenciesMs, 0.95),
     adaptedLoadedP95Ms: percentile(summary.adapted.loadedTeacherToStudent.latenciesMs, 0.95),
+    originalLoadedKeyboardP95Ms: summary.original.loadedKeyboardTeacherToStudent.p95Ms,
+    adaptedLoadedKeyboardP95Ms: summary.adapted.loadedKeyboardTeacherToStudent.p95Ms,
+    originalLoadedRangeP95Ms: summary.original.loadedRangeTeacherToStudent.p95Ms,
+    adaptedLoadedRangeP95Ms: summary.adapted.loadedRangeTeacherToStudent.p95Ms,
   };
   summary.latency.p95DeltaMs = summary.latency.adaptedP95Ms - summary.latency.originalP95Ms;
   summary.latency.p95Ratio = Number(
@@ -163,6 +196,42 @@ try {
       / Math.max(1, summary.latency.originalLoadedP95Ms)
     ).toFixed(2),
   );
+  const idleRatios = [
+    ratio(summary.adapted.teacherToStudent.p95Ms, summary.original.teacherToStudent.p95Ms),
+    ratio(summary.adapted.studentToTeacher.p95Ms, summary.original.studentToTeacher.p95Ms),
+    ratio(summary.adapted.keyboardTeacherToStudent.p95Ms, summary.original.keyboardTeacherToStudent.p95Ms),
+    ratio(summary.adapted.keyboardStudentToTeacher.p95Ms, summary.original.keyboardStudentToTeacher.p95Ms),
+    ratio(summary.adapted.rangeTeacherToStudent.p95Ms, summary.original.rangeTeacherToStudent.p95Ms),
+    ratio(summary.adapted.rangeStudentToTeacher.p95Ms, summary.original.rangeStudentToTeacher.p95Ms),
+  ];
+  const loadedRatios = [
+    ratio(summary.adapted.loadedTeacherToStudent.p95Ms, summary.original.loadedTeacherToStudent.p95Ms),
+    ratio(summary.adapted.loadedStudentToTeacher.p95Ms, summary.original.loadedStudentToTeacher.p95Ms),
+    ratio(summary.adapted.loadedKeyboardTeacherToStudent.p95Ms, summary.original.loadedKeyboardTeacherToStudent.p95Ms),
+    ratio(summary.adapted.loadedKeyboardStudentToTeacher.p95Ms, summary.original.loadedKeyboardStudentToTeacher.p95Ms),
+    ratio(summary.adapted.loadedRangeTeacherToStudent.p95Ms, summary.original.loadedRangeTeacherToStudent.p95Ms),
+    ratio(summary.adapted.loadedRangeStudentToTeacher.p95Ms, summary.original.loadedRangeStudentToTeacher.p95Ms),
+  ];
+  const adaptedTrace = summary.adapted.diagnostics.summary;
+  summary.gates = {
+    idleWorstRatio: Math.max(...idleRatios),
+    loadedWorstRatio: Math.max(...loadedRatios),
+    localOptimisticP95Ms: adaptedTrace.localOptimisticP95Ms,
+    noIntegrityFailures:
+      adaptedTrace.duplicateReducerApplies === 0
+      && adaptedTrace.missingReducerApplies === 0
+      && adaptedTrace.revisionConflicts === 0,
+    visualEquivalent:
+      summary.appearance.liveDomEquivalent
+      && summary.appearance.standaloneDomEquivalent
+      && summary.appearance.standaloneScreenshotByteEqual,
+  };
+  summary.gates.primaryAccepted = candidateMode === "fixed"
+    && summary.gates.idleWorstRatio <= 1.05
+    && summary.gates.loadedWorstRatio <= 0.8
+    && summary.gates.localOptimisticP95Ms <= 32
+    && summary.gates.noIntegrityFailures
+    && summary.gates.visualEquivalent;
 } catch (error) {
   summary.error = error instanceof Error ? error.message : String(error);
   process.exitCode = 1;
@@ -387,7 +456,17 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   ]);
 
   const domFingerprint = await teacherFrame.locator("body").evaluate((body) => {
-    const selectors = ["#game", "#track", "#car", "#move", "#reset", "#position"];
+    const selectors = [
+      "#game",
+      "#track",
+      "#car",
+      "#move",
+      "#reset",
+      "#speed-wrap",
+      "#speed",
+      "#speed-value",
+      "#position",
+    ];
     return {
       text: body.innerText.replace(/\s+/g, " ").trim(),
       elements: selectors.map((selector) => {
@@ -425,6 +504,36 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
     waitForFrameText(teacherFrame, "#position", "0", timeoutMs),
     waitForFrameText(studentFrame, "#position", "0", timeoutMs),
   ]);
+  const keyboardTeacherToStudent = await measureKeyboardDirection(
+    teacherFrame,
+    studentFrame,
+    sampleCount,
+  );
+  await teacherFrame.locator("#reset").click();
+  await Promise.all([
+    waitForFrameText(teacherFrame, "#position", "0", timeoutMs),
+    waitForFrameText(studentFrame, "#position", "0", timeoutMs),
+  ]);
+  const keyboardStudentToTeacher = await measureKeyboardDirection(
+    studentFrame,
+    teacherFrame,
+    sampleCount,
+  );
+  await studentFrame.locator("#reset").click();
+  await Promise.all([
+    waitForFrameText(teacherFrame, "#position", "0", timeoutMs),
+    waitForFrameText(studentFrame, "#position", "0", timeoutMs),
+  ]);
+  const rangeTeacherToStudent = await measureRangeDirection(
+    teacherFrame,
+    studentFrame,
+    sampleCount,
+  );
+  const rangeStudentToTeacher = await measureRangeDirection(
+    studentFrame,
+    teacherFrame,
+    sampleCount,
+  );
   const loadToken = await apiRequest(
     studentToken,
     "POST",
@@ -447,12 +556,49 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
     teacherFrame,
     sampleCount,
   );
+  await studentFrame.locator("#reset").click();
+  await Promise.all([
+    waitForFrameText(teacherFrame, "#position", "0", timeoutMs),
+    waitForFrameText(studentFrame, "#position", "0", timeoutMs),
+  ]);
+  const loadedKeyboardTeacherToStudent = await measureKeyboardDirection(
+    teacherFrame,
+    studentFrame,
+    sampleCount,
+  );
+  await teacherFrame.locator("#reset").click();
+  await Promise.all([
+    waitForFrameText(teacherFrame, "#position", "0", timeoutMs),
+    waitForFrameText(studentFrame, "#position", "0", timeoutMs),
+  ]);
+  const loadedKeyboardStudentToTeacher = await measureKeyboardDirection(
+    studentFrame,
+    teacherFrame,
+    sampleCount,
+  );
+  const loadedRangeTeacherToStudent = await measureRangeDirection(
+    teacherFrame,
+    studentFrame,
+    sampleCount,
+  );
+  const loadedRangeStudentToTeacher = await measureRangeDirection(
+    studentFrame,
+    teacherFrame,
+    sampleCount,
+  );
   await stopCollaborationLoad(studentPage);
+  const teacherDiagnostics = await teacherPage.evaluate(
+    () => window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? [],
+  );
+  const studentDiagnostics = await studentPage.evaluate(
+    () => window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? [],
+  );
   return {
     runtime,
     diagnostics: {
-      teacher: await teacherPage.evaluate(() => window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? []),
-      student: await studentPage.evaluate(() => window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? []),
+      summary: summarizeDiagnostics([...teacherDiagnostics, ...studentDiagnostics]),
+      teacher: teacherDiagnostics,
+      student: studentDiagnostics,
     },
     gameRealtime: {
       teacher: await teacherPage.evaluate(() => window.__PLAY_SAY_GAME_REALTIME__ ?? null),
@@ -463,8 +609,64 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
     screenshotSha256: createHash("sha256").update(screenshot).digest("hex"),
     loadedStudentToTeacher,
     loadedTeacherToStudent,
+    loadedKeyboardStudentToTeacher,
+    loadedKeyboardTeacherToStudent,
+    loadedRangeStudentToTeacher,
+    loadedRangeTeacherToStudent,
+    keyboardStudentToTeacher,
+    keyboardTeacherToStudent,
+    rangeStudentToTeacher,
+    rangeTeacherToStudent,
     studentToTeacher,
     teacherToStudent,
+  };
+}
+
+function summarizeDiagnostics(entries) {
+  const byEvent = new Map();
+  const stageCounts = {};
+  for (const entry of entries) {
+    stageCounts[entry.stage] = (stageCounts[entry.stage] ?? 0) + 1;
+    if (!entry.eventId) continue;
+    const event = byEvent.get(entry.eventId) ?? {
+      stages: {},
+      stageTimes: {},
+      revisions: new Set(),
+    };
+    event.stages[entry.stage] = (event.stages[entry.stage] ?? 0) + 1;
+    const stageTimes = event.stageTimes[entry.stage] ?? [];
+    stageTimes.push(Number(entry.at));
+    event.stageTimes[entry.stage] = stageTimes;
+    if (Number.isSafeInteger(entry.revision)) event.revisions.add(entry.revision);
+    byEvent.set(entry.eventId, event);
+  }
+  let duplicateReducerApplies = 0;
+  let missingReducerApplies = 0;
+  let revisionConflicts = 0;
+  const localOptimisticMs = [];
+  const remoteRenderMs = [];
+  for (const event of byEvent.values()) {
+    const applied = event.stages["ordered-applied"] ?? 0;
+    if (applied === 0) missingReducerApplies += 1;
+    if (applied > 2) duplicateReducerApplies += applied - 2;
+    if (event.revisions.size > 1) revisionConflicts += 1;
+    const createdAt = Math.min(...(event.stageTimes["action-created"] ?? []));
+    const paintedAt = (event.stageTimes.painted ?? [])
+      .filter((at) => Number.isFinite(createdAt) && at >= createdAt)
+      .sort((left, right) => left - right);
+    if (paintedAt.length > 0) {
+      localOptimisticMs.push(paintedAt[0] - createdAt);
+      remoteRenderMs.push(paintedAt.at(-1) - createdAt);
+    }
+  }
+  return {
+    duplicateReducerApplies,
+    events: byEvent.size,
+    missingReducerApplies,
+    localOptimisticP95Ms: percentile(localOptimisticMs, 0.95) ?? 0,
+    remoteRenderP95Ms: percentile(remoteRenderMs, 0.95) ?? 0,
+    revisionConflicts,
+    stageCounts,
   };
 }
 
@@ -562,6 +764,49 @@ async function measureDirection(sourceFrame, targetFrame, count) {
   };
 }
 
+async function measureKeyboardDirection(sourceFrame, targetFrame, count) {
+  const latenciesMs = [];
+  let position = Number((await targetFrame.locator("#position").textContent())?.trim() ?? 0);
+  for (let index = 0; index < count; index += 1) {
+    if (position === 10) {
+      await sourceFrame.locator("body").press("r");
+      await waitForFrameText(targetFrame, "#position", "0", timeoutMs);
+      position = 0;
+    }
+    const startedAt = performance.now();
+    await sourceFrame.locator("body").press("ArrowRight");
+    position += 1;
+    await waitForFrameText(targetFrame, "#position", String(position), timeoutMs);
+    latenciesMs.push(Number((performance.now() - startedAt).toFixed(2)));
+  }
+  return latencySummary(latenciesMs);
+}
+
+async function measureRangeDirection(sourceFrame, targetFrame, count) {
+  const latenciesMs = [];
+  for (let index = 0; index < count; index += 1) {
+    const value = String(((index + 1) % 5) + 1);
+    const startedAt = performance.now();
+    await sourceFrame.locator("#speed").evaluate((slider, nextValue) => {
+      slider.value = nextValue;
+      slider.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true }));
+      slider.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    }, value);
+    await waitForFrameText(targetFrame, "#speed-value", value, timeoutMs);
+    latenciesMs.push(Number((performance.now() - startedAt).toFixed(2)));
+  }
+  return latencySummary(latenciesMs);
+}
+
+function latencySummary(latenciesMs) {
+  return {
+    latenciesMs,
+    p50Ms: percentile(latenciesMs, 0.5),
+    p95Ms: percentile(latenciesMs, 0.95),
+    p99Ms: percentile(latenciesMs, 0.99),
+  };
+}
+
 async function waitForFrameText(frame, selector, expected, timeout) {
   const started = Date.now();
   const locator = frame.locator(selector);
@@ -614,7 +859,9 @@ async function compareStandaloneAppearance(nextBrowser, originalHtml, candidateH
       screenshotSha256: createHash("sha256").update(screenshot).digest("hex"),
       bodyFingerprint: await page.locator("body").evaluate((body) => ({
         text: body.innerText.replace(/\s+/g, " ").trim(),
-        childTags: [...body.children].map((element) => `${element.tagName}#${element.id}.${element.className}`),
+        childTags: [...body.children]
+          .filter((element) => !["SCRIPT", "STYLE", "NOSCRIPT"].includes(element.tagName))
+          .map((element) => `${element.tagName}#${element.id}.${element.className}`),
       })),
     };
   }
@@ -652,8 +899,13 @@ async function apiRequest(token, method, pathname, expectedStatus, body) {
 }
 
 function percentile(values, quantile) {
+  if (values.length === 0) return undefined;
   const ordered = [...values].sort((left, right) => left - right);
   return ordered[Math.min(ordered.length - 1, Math.ceil(ordered.length * quantile) - 1)];
+}
+
+function ratio(candidate, baseline) {
+  return Number((candidate / Math.max(1, baseline)).toFixed(3));
 }
 
 function requiredEnv(name) {
@@ -685,9 +937,10 @@ function racingGameHtml() {
     #car{position:absolute;left:18px;top:52px;width:76px;height:48px;border-radius:12px 18px 8px 8px;background:#ff5c00;transform:translateX(0);transition:transform .12s ease-out}
     #car:before,#car:after{content:"";position:absolute;bottom:-10px;width:20px;height:20px;border-radius:50%;background:#111}
     #car:before{left:10px}#car:after{right:10px}
-    #controls{display:flex;gap:12px;align-items:center;margin-top:18px}
+    #controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px}
     button{border:0;border-radius:10px;padding:12px 20px;font-size:17px;font-weight:700;cursor:pointer}
     #move{background:#ff5c00;color:#fff}#reset{background:#fff0e6;color:#b23c00;border:2px solid #ffb184}
+    #speed-wrap{display:flex;align-items:center;gap:8px}#speed{accent-color:#ff5c00}
     #score{margin-left:auto;font-weight:700}.value{color:#df4100}
   </style>
 </head>
@@ -699,6 +952,7 @@ function racingGameHtml() {
     <div id="controls">
       <button id="move" type="button">Correct answer</button>
       <button id="reset" type="button">Restart</button>
+      <label id="speed-wrap">Speed <input id="speed" type="range" min="1" max="5" step="1" value="1"><output id="speed-value">1</output></label>
       <output id="score">Position: <span class="value" id="position">0</span></output>
     </div>
   </main>
@@ -706,20 +960,82 @@ function racingGameHtml() {
     let position = 0;
     const positionOutput = document.querySelector("#position");
     const car = document.querySelector("#car");
+    const speed = document.querySelector("#speed");
+    const speedOutput = document.querySelector("#speed-value");
     function render() {
       positionOutput.textContent = String(position);
       car.style.transform = "translateX(" + (position * 42) + "px)";
+      speedOutput.textContent = speed.value;
     }
-    document.querySelector("#move").addEventListener("click", () => {
+    function move() {
       position = Math.min(12, position + 1);
       render();
-    });
-    document.querySelector("#reset").addEventListener("click", () => {
+    }
+    function reset() {
       position = 0;
       render();
+    }
+    document.querySelector("#move").addEventListener("click", move);
+    document.querySelector("#reset").addEventListener("click", reset);
+    speed.addEventListener("input", render);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight") move();
+      if (event.key.toLowerCase() === "r") reset();
     });
     render();
   </script>
 </body>
 </html>`;
+}
+
+function sdkRacingGameHtml() {
+  const manifest = {
+    buildHash: "deterministic-racing-v1",
+    capabilities: ["actions", "score", "completion"],
+    gameId: "playsay-deterministic-racing",
+    protocol: "playsay-game-sync/v1",
+    reducerVersion: "1",
+    stateVersion: "1",
+  };
+  const sdkPath = new URL("../../frontend/game-sync-sdk/dist/game-sync.iife.js", import.meta.url);
+  const sdk = readFileSync(sdkPath, "utf8").replaceAll("</script", "<\\/script");
+  const source = racingGameHtml();
+  const runtime = `<script data-playsay-game-sync-sdk>${sdk}</script>
+  <script>
+    const manifest = ${JSON.stringify(manifest)};
+    const positionOutput = document.querySelector("#position");
+    const car = document.querySelector("#car");
+    const speed = document.querySelector("#speed");
+    const speedOutput = document.querySelector("#speed-value");
+    const controller = PlaySayGameSync.defineGame({
+      manifest,
+      initialState: { position: 0, speed: "1" },
+      reduce(state, action) {
+        if (action.type === "MOVE") return { ...state, position: Math.min(12, state.position + 1) };
+        if (action.type === "RESET") return { ...state, position: 0 };
+        if (action.type === "SET_SPEED") return { ...state, speed: String(action.payload.value) };
+        return state;
+      },
+      onState(state) {
+        positionOutput.textContent = String(state.position);
+        car.style.transform = "translateX(" + (state.position * 42) + "px)";
+        speed.value = state.speed;
+        speedOutput.textContent = state.speed;
+      }
+    });
+    document.querySelector("#move").addEventListener("click", () => controller.dispatch("MOVE", {}));
+    document.querySelector("#reset").addEventListener("click", () => controller.dispatch("RESET", {}));
+    speed.addEventListener("input", () => controller.dispatch("SET_SPEED", { value: speed.value }));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight") controller.dispatch("MOVE", {});
+      if (event.key.toLowerCase() === "r") controller.dispatch("RESET", {});
+    });
+    controller.ready();
+  </script>`;
+  return source
+    .replace(
+      "<head>",
+      `<head><script type="application/playsay-game+json">${JSON.stringify(manifest)}</script>`,
+    )
+    .replace(/  <script>\n    let position = 0;[\s\S]*?  <\/script>/, runtime);
 }

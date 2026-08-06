@@ -11,6 +11,7 @@ describe("CollaborationMetrics", () => {
       activeGameConnections: 0,
       activeRooms: 1,
       bufferedBytes: 0,
+      gameBufferedBytes: 0,
     });
 
     expect(rendered).toContain("playsay_collaboration_ephemeral_messages_total 1");
@@ -27,10 +28,12 @@ describe("CollaborationMetrics", () => {
       activeGameConnections: 1,
       activeRooms: 1,
       bufferedBytes: 0,
+      gameBufferedBytes: 64,
     });
 
     expect(rendered).toContain("playsay_collaboration_game_active_connections 1");
     expect(rendered).toContain('playsay_collaboration_game_messages_total{message_type="2"} 1');
     expect(rendered).toContain("playsay_collaboration_game_bytes_total 256");
+    expect(rendered).toContain("playsay_collaboration_game_websocket_buffered_bytes 64");
   });
 });

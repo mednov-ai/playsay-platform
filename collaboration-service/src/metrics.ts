@@ -15,6 +15,7 @@ interface RealtimeMetricSnapshot {
   activeGameConnections: number;
   activeRooms: number;
   bufferedBytes: number;
+  gameBufferedBytes: number;
 }
 
 export class CollaborationMetrics implements CollaborationBackpressureObserver, SnapshotMetrics {
@@ -37,6 +38,11 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
   private readonly bufferedBytes = new Gauge({
     help: "Total websocket bytes buffered for collaboration clients.",
     name: "playsay_collaboration_websocket_buffered_bytes",
+    registers: [this.registry],
+  });
+  private readonly gameBufferedBytes = new Gauge({
+    help: "Websocket bytes buffered only for low-latency game clients.",
+    name: "playsay_collaboration_game_websocket_buffered_bytes",
     registers: [this.registry],
   });
   private readonly droppedMessages = new Counter({
@@ -140,6 +146,7 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     this.activeGameConnections.set(snapshot.activeGameConnections);
     this.activeRooms.set(snapshot.activeRooms);
     this.bufferedBytes.set(snapshot.bufferedBytes);
+    this.gameBufferedBytes.set(snapshot.gameBufferedBytes);
     return this.registry.metrics();
   }
 }

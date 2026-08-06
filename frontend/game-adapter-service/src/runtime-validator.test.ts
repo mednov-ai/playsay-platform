@@ -27,6 +27,35 @@ describe("runtime validation plan", () => {
     });
   });
 
+  it("accepts an exact range operation and rejects non-numeric values", () => {
+    expect(validateRuntimePlan({
+      readySelector: "#speed",
+      steps: [{
+        expectActionType: "SET_SPEED",
+        expectDomChange: true,
+        name: "change speed",
+        operation: { kind: "set-range", selector: "#speed", value: "3" },
+      }],
+    })).toEqual({
+      readySelector: "#speed",
+      steps: [{
+        expectActionType: "SET_SPEED",
+        expectDomChange: true,
+        name: "change speed",
+        operation: { kind: "set-range", selector: "#speed", value: "3" },
+      }],
+    });
+    expect(() => validateRuntimePlan({
+      readySelector: "#speed",
+      steps: [{
+        expectActionType: "SET_SPEED",
+        expectDomChange: true,
+        name: "change speed",
+        operation: { kind: "set-range", selector: "#speed", value: "fast" },
+      }],
+    })).toThrow("VALIDATION_PLAN_INVALID");
+  });
+
   it("rejects missing actions and unsafe selector text", () => {
     expect(() => validateRuntimePlan({
       readySelector: "#start",
@@ -100,6 +129,69 @@ describe("runtime validation plan", () => {
         expect(result.actionCount).toBe(1);
         expect(result.checks).toContain("lifecycle-ready");
         expect(result.mechanicsEquivalent).toBe(true);
+      } finally {
+        await closeRuntimeValidator();
+      }
+    },
+    20_000,
+  );
+
+  it.runIf(Boolean(process.env.CHROMIUM_EXECUTABLE_PATH))(
+    "validates a range through input then change as one semantic intent",
+    async () => {
+      const sdk = await readFile(new URL("../../game-sync-sdk/dist/game-sync.iife.js", import.meta.url), "utf8");
+      const rangeManifest = {
+        buildHash: "range-test",
+        capabilities: ["actions"] as const,
+        gameId: "range-test",
+        protocol: "playsay-game-sync/v1" as const,
+        reducerVersion: "1",
+        stateVersion: "1",
+      };
+      const source = `<html><body>
+        <input id="speed" type="range" min="1" max="5" step="0.5" value="1">
+        <output id="value">1</output>
+        <script>
+          document.querySelector("#speed").addEventListener("input", (event) => {
+            document.querySelector("#value").textContent = event.target.value;
+          });
+        </script>
+      </body></html>`;
+      const candidate = `<html><head>
+        <script type="application/playsay-game+json">${JSON.stringify(rangeManifest)}</script>
+      </head><body>
+        <input id="speed" type="range" min="1" max="5" step="0.5" value="1">
+        <output id="value">1</output>
+        <script>${sdk}</script>
+        <script>
+          const slider = document.querySelector("#speed");
+          const output = document.querySelector("#value");
+          const controller = PlaySayGameSync.defineGame({
+            initialState: { speed: "1" },
+            manifest: ${JSON.stringify(rangeManifest)},
+            onState(state) { slider.value = state.speed; output.textContent = state.speed; },
+            reduce(state, action) {
+              return action.type === "SET_SPEED" ? { speed: action.payload.value } : state;
+            }
+          });
+          slider.addEventListener("input", () => controller.dispatch("SET_SPEED", { value: slider.value }));
+          controller.ready();
+        </script>
+      </body></html>`;
+
+      try {
+        const result = await validateGameRuntime(candidate, {
+          readySelector: "#speed",
+          steps: [{
+            expectActionType: "SET_SPEED",
+            expectDomChange: true,
+            name: "change speed",
+            operation: { kind: "set-range", selector: "#speed", value: "3.5" },
+          }],
+        }, source);
+        expect(result.actionCount).toBe(1);
+        expect(result.checks).toContain("range-min-max-step");
+        expect(result.checks).toContain("range-input-change-order");
       } finally {
         await closeRuntimeValidator();
       }

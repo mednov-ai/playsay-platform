@@ -38,7 +38,7 @@ for commit in "$GIT_COMMIT" "$BASE_PLATFORM_COMMIT" "$ACCEPTED_DEV_COMMIT"; do
   fi
 done
 
-TARGET_ORDER="api-gateway ai-tutor-service vocabulary-service web-app collaboration-service media-service payment-service registration-service email-service keyboard-service keyboard-app"
+TARGET_ORDER="api-gateway ai-tutor-service vocabulary-service web-app game-adapter-service collaboration-service media-service payment-service registration-service email-service keyboard-service keyboard-app"
 VALIDATION_ORDER="ci-contracts smoke-syntax"
 
 normalize_list() {

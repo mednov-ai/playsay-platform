@@ -92,6 +92,11 @@ test("release candidate lifecycle preserves a manual production gate", () => {
   assert.match(prepare, /\.build = load\(strenv\(BASE_VALUES_FILE\)\)\.build/);
   assert.match(prepare, /previous_status.*!= "ready"/);
   assert.match(prepare, /RELEASE_AFFECTED_TARGETS=/);
+  assert.match(
+    prepare,
+    /TARGET_ORDER=.*game-adapter-service/,
+    "release candidate preparation must accept every routed product image target",
+  );
 
   assert.match(finalize, /manifest_status.*"building"/);
   assert.match(finalize, /acceptedDevCommit/);

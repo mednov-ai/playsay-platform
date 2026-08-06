@@ -39,7 +39,7 @@ export function StudentLiveWorkspace({
   submissionMessage: string | null;
   submissionSaving: boolean;
   teacherName: string;
-  teacherSubject: string;
+  teacherSubject: string | null;
 }) {
   const { t } = useAppTranslation();
   const participantColor = collaborationParticipantColor(profileSubject ?? displayName);

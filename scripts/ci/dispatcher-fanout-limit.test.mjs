@@ -89,4 +89,9 @@ test("dispatcher validates CI-only changes and brackets release builds with cand
   assert.match(dispatcher, /prepare-release-candidate\.sh/);
   assert.match(dispatcher, /stage\('Finalize release candidate'\)/);
   assert.match(dispatcher, /finalize-release-candidate\.sh/);
+  assert.match(
+    dispatcher,
+    /stage\('Finalize release candidate'\)[\s\S]*?name: tools[\s\S]*?limits:[\s\S]*?memory: 1Gi/,
+    "release finalization needs enough memory to render every production chart",
+  );
 });

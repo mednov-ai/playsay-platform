@@ -4,6 +4,38 @@ import { Button } from "../../../../components/ui/button";
 import { useAppTranslation } from "../../../../shared/i18n";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../model/materialDocument";
 
+export function externalActivityPoint({
+  clientX,
+  clientY,
+  surface,
+  videoHeight,
+  videoWidth,
+}: {
+  clientX: number;
+  clientY: number;
+  surface: { height: number; left: number; top: number; width: number };
+  videoHeight: number;
+  videoWidth: number;
+}) {
+  if (!surface.width || !surface.height || !videoWidth || !videoHeight) return null;
+  const scale = Math.min(surface.width / videoWidth, surface.height / videoHeight);
+  const contentWidth = videoWidth * scale;
+  const contentHeight = videoHeight * scale;
+  const contentLeft = surface.left + (surface.width - contentWidth) / 2;
+  const contentTop = surface.top + (surface.height - contentHeight) / 2;
+  const localX = Math.min(contentWidth, Math.max(0, clientX - contentLeft));
+  const localY = Math.min(contentHeight, Math.max(0, clientY - contentTop));
+
+  return {
+    normalizedX: localX / contentWidth,
+    normalizedY: localY / contentHeight,
+    sourceHeight: videoHeight,
+    sourceWidth: videoWidth,
+    x: Math.round((localX / contentWidth) * videoWidth),
+    y: Math.round((localY / contentHeight) * videoHeight),
+  };
+}
+
 export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBlock; sync: MaterialExternalActivitySync }) {
   const { t } = useAppTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -25,13 +57,13 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     const video = videoRef.current;
     if (!surface) return null;
     const rect = surface.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    return {
-      normalizedX: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
-      normalizedY: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
-      x: Math.round(((event.clientX - rect.left) / rect.width) * (video?.videoWidth || 1280)),
-      y: Math.round(((event.clientY - rect.top) / rect.height) * (video?.videoHeight || 720)),
-    };
+    return externalActivityPoint({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      surface: rect,
+      videoHeight: video?.videoHeight || 720,
+      videoWidth: video?.videoWidth || 1280,
+    });
   }
 
   function pointer(event: PointerEvent<HTMLDivElement>, action: "move" | "down" | "up") {
@@ -46,6 +78,8 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
       action,
       x: position.x,
       y: position.y,
+      sourceHeight: position.sourceHeight,
+      sourceWidth: position.sourceWidth,
       button: event.button === 1 ? "middle" : event.button === 2 ? "right" : "left",
       clickCount: event.detail || 1,
     });
@@ -96,7 +130,15 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
         onPointerUp={(event) => pointer(event, "up")}
         onWheel={(event) => {
           const position = point(event);
-          if (position) sync.sendInput({ type: "scroll", x: position.x, y: position.y, deltaX: event.deltaX, deltaY: event.deltaY });
+          if (position) sync.sendInput({
+            type: "scroll",
+            x: position.x,
+            y: position.y,
+            sourceHeight: position.sourceHeight,
+            sourceWidth: position.sourceWidth,
+            deltaX: event.deltaX,
+            deltaY: event.deltaY,
+          });
         }}
         ref={surfaceRef}
         role="application"

@@ -38,6 +38,12 @@ describe("extension protocol", () => {
       method: "Input.dispatchMouseEvent",
       params: { type: "mousePressed", x: 10, y: 20, button: "left", clickCount: 1 },
     });
+    expect(cdpCommandForInput(
+      { type: "pointer", action: "move", x: 640, y: 360, sourceWidth: 1280, sourceHeight: 720 },
+      { width: 1440, height: 900 },
+    )).toMatchObject({
+      params: { x: 720, y: 450 },
+    });
     expect(cdpCommandForInput({ type: "key", action: "down", key: "A", code: "KeyA", text: "a", modifiers: 0 })).toMatchObject({
       method: "Input.dispatchKeyEvent",
       params: { type: "keyDown", key: "A", code: "KeyA", text: "a" },

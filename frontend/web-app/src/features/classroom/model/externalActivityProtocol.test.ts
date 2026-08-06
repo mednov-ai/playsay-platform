@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   externalActivityCaptureConstraints,
   externalActivityCaptureErrorCode,
+  externalActivitySessionIdFromTrackName,
   externalActivityTrackName,
   isCurrentExternalActivityCapture,
   parseExternalActivityMessage,
@@ -68,6 +69,8 @@ describe("external activity classroom protocol", () => {
 
   it("uses a reserved track prefix", () => {
     expect(externalActivityTrackName("session-1", "video")).toBe("playsay-external-activity-session-1-video");
+    expect(externalActivitySessionIdFromTrackName("playsay-external-activity-session-1-video")).toBe("session-1");
+    expect(externalActivitySessionIdFromTrackName("camera-video")).toBeNull();
   });
 
   it("trusts host state only from teacher or admin LiveKit metadata", () => {

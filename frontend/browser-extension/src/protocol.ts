@@ -12,8 +12,8 @@ export const TRUSTED_PLAY_SAY_MATCH_PATTERNS = [
 ] as const;
 
 export type ExternalInput =
-  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; button?: "left" | "middle" | "right"; clickCount?: number }
-  | { type: "scroll"; x: number; y: number; deltaX: number; deltaY: number }
+  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
+  | { type: "scroll"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
   | { type: "key"; action: "down" | "up"; key: string; code?: string; text?: string; modifiers?: number };
 
 export type PageCommand = {
@@ -62,26 +62,31 @@ export function sessionsToReplace<T extends { consumerTabId: number; sessionId: 
   ));
 }
 
-export function cdpCommandForInput(input: ExternalInput): { method: string; params: Record<string, unknown> } | null {
+export function cdpCommandForInput(
+  input: ExternalInput,
+  viewport?: { height: number; width: number },
+): { method: string; params: Record<string, unknown> } | null {
   if (!input || typeof input !== "object") return null;
   if (input.type === "pointer") {
     if (!coordinate(input.x) || !coordinate(input.y) || !["move", "down", "up"].includes(input.action)) return null;
     const eventTypes = { move: "mouseMoved", down: "mousePressed", up: "mouseReleased" } as const;
+    const point = targetPoint(input, viewport);
     return {
       method: "Input.dispatchMouseEvent",
       params: {
         type: eventTypes[input.action],
-        x: input.x,
-        y: input.y,
+        x: point.x,
+        y: point.y,
         ...(input.action === "move" ? {} : { button: input.button ?? "left", clickCount: input.clickCount ?? 1 }),
       },
     };
   }
   if (input.type === "scroll") {
     if (![input.x, input.y, input.deltaX, input.deltaY].every(finite) || !coordinate(input.x) || !coordinate(input.y)) return null;
+    const point = targetPoint(input, viewport);
     return {
       method: "Input.dispatchMouseEvent",
-      params: { type: "mouseWheel", x: input.x, y: input.y, deltaX: input.deltaX, deltaY: input.deltaY },
+      params: { type: "mouseWheel", x: point.x, y: point.y, deltaX: input.deltaX, deltaY: input.deltaY },
     };
   }
   if (input.type === "key") {
@@ -98,6 +103,25 @@ export function cdpCommandForInput(input: ExternalInput): { method: string; para
     };
   }
   return null;
+}
+
+function targetPoint(
+  input: { x: number; y: number; sourceWidth?: number; sourceHeight?: number },
+  viewport?: { height: number; width: number },
+): { x: number; y: number } {
+  if (
+    !viewport
+    || !finite(viewport.width)
+    || !finite(viewport.height)
+    || !finite(input.sourceWidth ?? 0)
+    || !finite(input.sourceHeight ?? 0)
+    || (input.sourceWidth ?? 0) <= 0
+    || (input.sourceHeight ?? 0) <= 0
+  ) return { x: input.x, y: input.y };
+  return {
+    x: Math.min(viewport.width, Math.max(0, input.x / input.sourceWidth! * viewport.width)),
+    y: Math.min(viewport.height, Math.max(0, input.y / input.sourceHeight! * viewport.height)),
+  };
 }
 
 function safeToken(value: unknown): value is string {

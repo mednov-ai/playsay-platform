@@ -8,6 +8,8 @@ type HostSession = {
   targetTabId: number;
   expectedUrl: string;
   debuggerAttached: boolean;
+  viewportHeight?: number;
+  viewportWidth?: number;
 };
 
 const sessions = new Map<string, HostSession>();
@@ -98,7 +100,9 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
   } else if (command.type === "BACK") {
     await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.goBack");
   } else if (command.type === "INPUT" && command.input && session.debuggerAttached) {
-    const cdp = cdpCommandForInput(command.input);
+    const cdp = cdpCommandForInput(command.input, session.viewportWidth && session.viewportHeight
+      ? { width: session.viewportWidth, height: session.viewportHeight }
+      : undefined);
     if (cdp) await chrome.debugger.sendCommand({ tabId: session.targetTabId }, cdp.method, cdp.params);
   }
   return { ok: true };
@@ -114,6 +118,12 @@ async function activateCapture(session: HostSession) {
     session.debuggerAttached = true;
     await persistSessions();
     await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.enable");
+    const metrics = await chrome.debugger.sendCommand(
+      { tabId: session.targetTabId },
+      "Page.getLayoutMetrics",
+    ) as { cssVisualViewport?: { clientHeight?: number; clientWidth?: number } };
+    session.viewportWidth = metrics.cssVisualViewport?.clientWidth;
+    session.viewportHeight = metrics.cssVisualViewport?.clientHeight;
     await applyCaptureHardening((method, params) => (
       chrome.debugger.sendCommand({ tabId: session.targetTabId }, method, params)
     ));

@@ -9,8 +9,8 @@ export const externalActivityExtensionChannel = "playsay.external-activity.exten
 
 export type ExternalActivityPhase = "REQUESTED" | "AWAITING_EXTENSION" | "STARTING" | "ACTIVE" | "ERROR";
 export type ExternalActivityInput =
-  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; button?: "left" | "middle" | "right"; clickCount?: number }
-  | { type: "scroll"; x: number; y: number; deltaX: number; deltaY: number }
+  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
+  | { type: "scroll"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
   | { type: "key"; action: "down" | "up"; key: string; code?: string; text?: string; modifiers?: number };
 
 export type ExternalActivityMessage = {
@@ -61,6 +61,12 @@ export function parseExtensionEvent(value: unknown, sessionId: string): Record<s
 
 export function externalActivityTrackName(sessionId: string, kind: "video" | "audio"): string {
   return `${externalActivityTrackPrefix}${sessionId}-${kind}`;
+}
+
+export function externalActivitySessionIdFromTrackName(trackName: string | undefined): string | null {
+  if (!trackName?.startsWith(externalActivityTrackPrefix)) return null;
+  const match = trackName.match(/^playsay-external-activity-(.+)-(?:video|audio)$/);
+  return match?.[1] && safeToken(match[1]) ? match[1] : null;
 }
 
 export function isCurrentExternalActivityCapture(

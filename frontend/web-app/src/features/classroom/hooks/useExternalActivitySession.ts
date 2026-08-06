@@ -10,6 +10,7 @@ import {
   externalActivityHostTopic,
   externalActivityInputTopic,
   externalActivityPageChannel,
+  externalActivitySessionIdFromTrackName,
   externalActivityTrackName,
   externalActivityTrackPrefix,
   isCurrentExternalActivityCapture,
@@ -56,7 +57,7 @@ export function useExternalActivitySession({
   const publish = useCallback((message: ExternalActivityMessage, topic: string, reliable: boolean) => {
     if (!enabled) return;
     const bytes = new TextEncoder().encode(JSON.stringify(message));
-    void room.localParticipant.publishData(bytes, { reliable, topic });
+    void room.localParticipant.publishData(bytes, { reliable, topic }).catch(() => undefined);
   }, [enabled, room.localParticipant]);
 
   const broadcastState = useCallback((state: ExternalActivityState) => {
@@ -264,6 +265,39 @@ export function useExternalActivitySession({
       room.off(RoomEvent.Reconnected, announceOrRequestState);
     };
   }, [broadcastState, enabled, isHost, publish, room]);
+
+  useEffect(() => {
+    if (!enabled || isHost) return undefined;
+    const discoverPublishedSession = () => {
+      if (activeRef.current) return;
+      const block = blocksRef.current.find((candidate): candidate is ExternalActivityBlock => (
+        candidate.type === "externalActivity" && Boolean(candidate.url?.trim())
+      ));
+      if (!block) return;
+      for (const participant of room.remoteParticipants.values()) {
+        if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) continue;
+        for (const publication of participant.trackPublications.values()) {
+          const sessionId = externalActivitySessionIdFromTrackName(publication.trackName);
+          if (!sessionId || !publication.track?.mediaStreamTrack) continue;
+          const discovered: ExternalActivityState = {
+            blockId: block.id,
+            sessionId,
+            hostIdentity: participant.identity,
+            phase: "ACTIVE",
+            studentsLocked: false,
+            visible: true,
+          };
+          stateResponseReceivedRef.current = true;
+          activeRef.current = discovered;
+          setActive(discovered);
+          return;
+        }
+      }
+    };
+    discoverPublishedSession();
+    room.on(RoomEvent.TrackSubscribed, discoverPublishedSession);
+    return () => { room.off(RoomEvent.TrackSubscribed, discoverPublishedSession); };
+  }, [enabled, isHost, room, trustedHostIdentity]);
 
   useEffect(() => {
     if (!enabled || !isHost) return undefined;

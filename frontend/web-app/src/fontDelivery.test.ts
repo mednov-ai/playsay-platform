@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const indexHtml = readFileSync(resolve(__dirname, "../index.html"), "utf8");
 const mainSource = readFileSync(resolve(__dirname, "main.tsx"), "utf8");
+const nginxConfig = readFileSync(resolve(__dirname, "../nginx.conf"), "utf8");
 
 describe("web font delivery", () => {
   it("bundles Manrope locally without a render-blocking Google Fonts request", () => {
@@ -21,5 +22,8 @@ describe("web font delivery", () => {
     expect(existsSync(resolve(publicRoot, "brand/logo/honey-school-logo.svg"))).toBe(true);
     expect(existsSync(resolve(publicRoot, "brand/logo/honey-school-logo-reverse.svg"))).toBe(true);
     expect(existsSync(resolve(publicRoot, "brand/fonts/quicksand-latin-600.woff2"))).toBe(true);
+    expect(nginxConfig).toMatch(
+      /location = \/brand\/icons\/site\.webmanifest \{[\s\S]*default_type application\/manifest\+json;/,
+    );
   });
 });

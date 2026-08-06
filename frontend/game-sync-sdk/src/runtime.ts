@@ -19,8 +19,10 @@ function randomId(): string {
 }
 
 function serializedBytes(value: unknown): number {
-  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  return textEncoder.encode(JSON.stringify(value)).byteLength;
 }
+
+const textEncoder = new TextEncoder();
 
 function assertSize(value: unknown, maximum: number, label: string): void {
   const bytes = serializedBytes(value);
@@ -288,6 +290,11 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
         });
         options.onSession?.(Object.freeze({ ...session }));
       } else if (message.kind === "ordered-action") {
+        diagnostic(
+          "message-port-received",
+          message.action.eventId,
+          message.action.authorityRevision,
+        );
         acceptAction(message.action);
       } else if (message.kind === "checkpoint") {
         acceptCheckpoint(message.checkpoint);

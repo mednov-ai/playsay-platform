@@ -81,6 +81,7 @@ export type GameSyncDiagnosticStage =
   | "action-created"
   | "authority-ordered"
   | "iframe-delivered"
+  | "message-port-received"
   | "optimistic-applied"
   | "ordered-applied"
   | "ordered-confirmed"

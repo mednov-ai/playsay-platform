@@ -233,7 +233,9 @@ try {
   summary.gates = {
     idleWorstRatio: Math.max(...idleRatios),
     loadedWorstRatio: Math.max(...loadedRatios),
+    clientPipelineP95Ms: adaptedTrace.clientPipelineP95Ms,
     localOptimisticP95Ms: adaptedTrace.localOptimisticP95Ms,
+    reactCommitsPerTransientAction: adaptedTrace.reactCommitsPerTransientAction,
     noIntegrityFailures:
       adaptedTrace.duplicateReducerApplies === 0
       && adaptedTrace.missingReducerApplies === 0
@@ -247,8 +249,10 @@ try {
   };
   summary.gates.primaryAccepted = candidateMode === "fixed"
     && summary.gates.idleWorstRatio <= 1.05
-    && summary.gates.loadedWorstRatio <= 0.8
-    && summary.gates.localOptimisticP95Ms <= 32
+    && summary.gates.loadedWorstRatio <= 0.9
+    && summary.gates.clientPipelineP95Ms <= 6
+    && summary.gates.localOptimisticP95Ms <= 8
+    && summary.gates.reactCommitsPerTransientAction === 0
     && summary.gates.noIntegrityFailures
     && summary.gates.visualEquivalent;
 } catch (error) {
@@ -453,6 +457,10 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
     openClassroom(teacherPage, lessonId, true),
     openClassroom(studentPage, lessonId, false),
   ]);
+  await Promise.all([teacherPage, studentPage].map((page) => page.evaluate(() => {
+    window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ = [];
+    window.__PLAY_SAY_GAME_SYNC_COUNTERS__ = {};
+  })));
 
   const teacherLaunch = teacherPage.locator(`[data-testid="html-game-launch-${blockId}"]`);
   const studentLaunch = studentPage.locator(`[data-testid="html-game-launch-${blockId}"]`);
@@ -634,10 +642,22 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   const studentDiagnostics = await studentPage.evaluate(
     () => window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? [],
   );
+  const teacherCounters = await teacherPage.evaluate(
+    () => window.__PLAY_SAY_GAME_SYNC_COUNTERS__ ?? {},
+  );
+  const studentCounters = await studentPage.evaluate(
+    () => window.__PLAY_SAY_GAME_SYNC_COUNTERS__ ?? {},
+  );
   const result = {
     runtime,
     diagnostics: {
-      summary: summarizeDiagnostics([...teacherDiagnostics, ...studentDiagnostics]),
+      counters: { student: studentCounters, teacher: teacherCounters },
+      summary: summarizeDiagnostics(
+        teacherDiagnostics,
+        studentDiagnostics,
+        teacherCounters,
+        studentCounters,
+      ),
       teacher: teacherDiagnostics,
       student: studentDiagnostics,
     },
@@ -696,7 +716,8 @@ async function gameMountState(page) {
   }));
 }
 
-function summarizeDiagnostics(entries) {
+function summarizeDiagnostics(teacherEntries, studentEntries, teacherCounters, studentCounters) {
+  const entries = [...teacherEntries, ...studentEntries];
   const byEvent = new Map();
   const stageCounts = {};
   for (const entry of entries) {
@@ -719,6 +740,7 @@ function summarizeDiagnostics(entries) {
   let revisionConflicts = 0;
   const localOptimisticMs = [];
   const remoteRenderMs = [];
+  const clientPipelineMs = [];
   for (const event of byEvent.values()) {
     const applied = event.stages["ordered-applied"] ?? 0;
     if (applied === 0) missingReducerApplies += 1;
@@ -733,15 +755,63 @@ function summarizeDiagnostics(entries) {
       remoteRenderMs.push(paintedAt.at(-1) - createdAt);
     }
   }
+  for (const [sourceEntries, targetEntries] of [
+    [teacherEntries, studentEntries],
+    [studentEntries, teacherEntries],
+  ]) {
+    for (const created of sourceEntries.filter((entry) => entry.stage === "action-created")) {
+      const outbound = earliestStageAfter(
+        sourceEntries,
+        created.eventId,
+        "client-outbound-complete",
+        created.at,
+      );
+      const inbound = earliestStageAfter(
+        targetEntries,
+        created.eventId,
+        "client-inbound-start",
+        outbound,
+      );
+      const painted = earliestStageAfter(
+        targetEntries,
+        created.eventId,
+        "painted",
+        inbound,
+      );
+      if ([outbound, inbound, painted].every(Number.isFinite)) {
+        clientPipelineMs.push((outbound - created.at) + (painted - inbound));
+      }
+    }
+  }
+  const renderCount = Number(teacherCounters.htmlGameFrameRenders ?? 0)
+    + Number(studentCounters.htmlGameFrameRenders ?? 0);
+  const transientActions = [...byEvent.values()]
+    .filter((event) => (event.stages["action-created"] ?? 0) > 0).length;
   return {
+    clientPipelineP50Ms: percentile(clientPipelineMs, 0.5) ?? 0,
+    clientPipelineP95Ms: percentile(clientPipelineMs, 0.95) ?? 0,
+    clientPipelineP99Ms: percentile(clientPipelineMs, 0.99) ?? 0,
     duplicateReducerApplies,
     events: byEvent.size,
     missingReducerApplies,
     localOptimisticP95Ms: percentile(localOptimisticMs, 0.95) ?? 0,
     remoteRenderP95Ms: percentile(remoteRenderMs, 0.95) ?? 0,
+    reactCommitsPerTransientAction: transientActions > 0
+      ? Math.max(0, renderCount - 2) / transientActions
+      : 0,
     revisionConflicts,
     stageCounts,
   };
+}
+
+function earliestStageAfter(entries, eventId, stage, after) {
+  return Math.min(...entries
+    .filter((entry) => (
+      entry.eventId === eventId
+      && entry.stage === stage
+      && Number(entry.at) >= Number(after)
+    ))
+    .map((entry) => Number(entry.at)));
 }
 
 async function startCollaborationLoad(page, tokenResponse) {

@@ -1,8 +1,11 @@
 export type GameSyncDiagnosticStage =
   | "action-created"
   | "authority-ordered"
+  | "client-inbound-start"
+  | "client-outbound-complete"
   | "host-received"
   | "iframe-delivered"
+  | "message-port-received"
   | "optimistic-applied"
   | "ordered-applied"
   | "ordered-confirmed"
@@ -22,16 +25,20 @@ export type GameSyncDiagnosticEntry = {
 declare global {
   interface Window {
     __PLAY_SAY_GAME_SYNC_DIAGNOSTICS__?: GameSyncDiagnosticEntry[];
+    __PLAY_SAY_GAME_SYNC_COUNTERS__?: Record<string, number>;
   }
 }
 
 const maximumEntries = 4_000;
+let diagnosticsEnabled: boolean | undefined;
+let overwriteCursor = 0;
 
 export function gameSyncDiagnosticsEnabled(): boolean {
   if (typeof window === "undefined") {
     return false;
   }
-  return new URLSearchParams(window.location.search).get("gameSyncTrace") === "1";
+  diagnosticsEnabled ??= new URLSearchParams(window.location.search).get("gameSyncTrace") === "1";
+  return diagnosticsEnabled;
 }
 
 export function recordGameSyncDiagnostic(
@@ -41,12 +48,24 @@ export function recordGameSyncDiagnostic(
     return;
   }
   const diagnostics = window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ ?? [];
-  diagnostics.push({
+  const normalized = {
     ...entry,
     at: entry.at ?? performance.timeOrigin + performance.now(),
-  });
-  if (diagnostics.length > maximumEntries) {
-    diagnostics.splice(0, diagnostics.length - maximumEntries);
+  };
+  if (diagnostics.length < maximumEntries) {
+    diagnostics.push(normalized);
+  } else {
+    diagnostics[overwriteCursor] = normalized;
+    overwriteCursor = (overwriteCursor + 1) % maximumEntries;
   }
   window.__PLAY_SAY_GAME_SYNC_DIAGNOSTICS__ = diagnostics;
+}
+
+export function recordGameSyncCounter(name: string, amount = 1): void {
+  if (!gameSyncDiagnosticsEnabled()) {
+    return;
+  }
+  const counters = window.__PLAY_SAY_GAME_SYNC_COUNTERS__ ?? {};
+  counters[name] = (counters[name] ?? 0) + amount;
+  window.__PLAY_SAY_GAME_SYNC_COUNTERS__ = counters;
 }

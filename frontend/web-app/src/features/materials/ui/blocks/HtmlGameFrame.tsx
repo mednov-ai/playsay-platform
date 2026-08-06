@@ -19,6 +19,7 @@ import type {
 } from "../../model/materialDocument";
 import {
   gameSyncDiagnosticsEnabled,
+  recordGameSyncCounter,
   recordGameSyncDiagnostic,
 } from "../../model/gameSyncDiagnostics";
 import { useAppTranslation } from "../../../../shared/i18n";
@@ -152,6 +153,7 @@ export function HtmlGameFrame({
   sync?: MaterialHtmlGameSync;
   title: string;
 }) {
+  recordGameSyncCounter("htmlGameFrameRenders");
   const { t } = useAppTranslation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useMemo(() => crypto.randomUUID(), [blockId, html]);
@@ -524,8 +526,12 @@ export function HtmlGameFrame({
         );
       }
     }
+    recordGameSyncCounter("htmlGameWindowListenerAdds");
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    return () => {
+      recordGameSyncCounter("htmlGameWindowListenerRemoves");
+      window.removeEventListener("message", handleMessage);
+    };
   }, [activeSnapshot, authorityRunId, blockId, channel, embeddedManifest, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
 
   useEffect(() => {

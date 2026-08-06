@@ -133,6 +133,20 @@ export function createGameRealtimeClient({
     if (!sentFast || mode === "shadow") {
       fallbackDataMessage(message);
     }
+    const action = message.kind === "action-request"
+      ? message.request
+      : message.kind === "ordered-action"
+        ? message.action
+        : null;
+    if (action) {
+      recordGameSyncDiagnostic({
+        blockId: action.blockId,
+        eventId: action.eventId,
+        revision: "authorityRevision" in action ? action.authorityRevision : undefined,
+        runId: action.runId,
+        stage: "client-outbound-complete",
+      });
+    }
   };
 
   const matchingRegistrations = (message: MaterialHtmlGameRealtimeMessage): Registration[] => {
@@ -182,6 +196,13 @@ export function createGameRealtimeClient({
 
   const dispatch = (message: MaterialHtmlGameRealtimeMessage) => {
     if (message.kind === "ordered-action") {
+      recordGameSyncDiagnostic({
+        blockId: message.action.blockId,
+        eventId: message.action.eventId,
+        revision: message.action.authorityRevision,
+        runId: message.action.runId,
+        stage: "client-inbound-start",
+      });
       rememberAction(message.action);
       recordGameSyncDiagnostic({
         blockId: message.action.blockId,

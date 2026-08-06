@@ -192,8 +192,9 @@ export function HtmlGameFrame({
   const syncClientId = sync?.clientId;
   const syncIsAuthority = sync?.isAuthority ?? true;
   const presentedBlockId = sync?.presentedBlockId ?? null;
+  const sdkReplicaAuthorityReady = Boolean(authorityRunId && sync?.ready);
   const authorityAvailable = sdkRuntime
-    ? !sync || sync.isAuthority || Boolean(authorityRunId)
+    ? !sync || sync.isAuthority || sdkReplicaAuthorityReady
     : !isMirror || Boolean(
       authorityRunId &&
       activeSnapshot?.runId === authorityRunId &&
@@ -203,7 +204,7 @@ export function HtmlGameFrame({
     sdkRuntime
     && sync
     && !sync.isAuthority
-    && !authorityRunId
+    && !sdkReplicaAuthorityReady
   );
 
   const clearMirrorSnapshotRetry = useCallback(() => {

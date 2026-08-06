@@ -64,6 +64,16 @@ chrome.debugger.onDetach.addListener((source) => {
   });
 });
 
+chrome.debugger.onEvent.addListener((source, method) => {
+  if (method !== "Page.frameResized" || source.tabId === undefined) return;
+  void hydration.then(async () => {
+    const session = [...sessions.values()].find((candidate) => candidate.targetTabId === source.tabId);
+    if (!session?.debuggerAttached) return;
+    await updateViewport(session);
+    await persistSessions();
+  });
+});
+
 chrome.tabs.onCreated.addListener((tab) => {
   if (tab.id === undefined || tab.openerTabId === undefined) return;
   void hydration.then(() => {
@@ -118,20 +128,24 @@ async function activateCapture(session: HostSession) {
     session.debuggerAttached = true;
     await persistSessions();
     await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.enable");
-    const metrics = await chrome.debugger.sendCommand(
-      { tabId: session.targetTabId },
-      "Page.getLayoutMetrics",
-    ) as { cssVisualViewport?: { clientHeight?: number; clientWidth?: number } };
-    session.viewportWidth = metrics.cssVisualViewport?.clientWidth;
-    session.viewportHeight = metrics.cssVisualViewport?.clientHeight;
     await applyCaptureHardening((method, params) => (
       chrome.debugger.sendCommand({ tabId: session.targetTabId }, method, params)
     ));
+    await updateViewport(session);
     sendStatus(session.consumerTabId, session.sessionId, "CAPTURE_READY", undefined, { streamId });
     await chrome.tabs.update(session.consumerTabId, { active: true });
   } catch (error) {
     sendStatus(session.consumerTabId, session.sessionId, "ERROR", String(error));
   }
+}
+
+async function updateViewport(session: HostSession) {
+  const metrics = await chrome.debugger.sendCommand(
+    { tabId: session.targetTabId },
+    "Page.getLayoutMetrics",
+  ) as { cssVisualViewport?: { clientHeight?: number; clientWidth?: number } };
+  session.viewportWidth = metrics.cssVisualViewport?.clientWidth;
+  session.viewportHeight = metrics.cssVisualViewport?.clientHeight;
 }
 
 async function stopSession(session: HostSession, closeTarget: boolean) {

@@ -12,8 +12,8 @@ export const TRUSTED_PLAY_SAY_MATCH_PATTERNS = [
 ] as const;
 
 export type ExternalInput =
-  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
-  | { type: "scroll"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
+  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
+  | { type: "scroll"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
   | { type: "key"; action: "down" | "up"; key: string; code?: string; text?: string; modifiers?: number };
 
 export type PageCommand = {
@@ -106,9 +106,25 @@ export function cdpCommandForInput(
 }
 
 function targetPoint(
-  input: { x: number; y: number; sourceWidth?: number; sourceHeight?: number },
+  input: { x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number },
   viewport?: { height: number; width: number },
 ): { x: number; y: number } {
+  if (
+    viewport
+    && finite(viewport.width)
+    && finite(viewport.height)
+    && finite(input.normalizedX ?? -1)
+    && finite(input.normalizedY ?? -1)
+    && input.normalizedX! >= 0
+    && input.normalizedX! <= 1
+    && input.normalizedY! >= 0
+    && input.normalizedY! <= 1
+  ) {
+    return {
+      x: input.normalizedX! * viewport.width,
+      y: input.normalizedY! * viewport.height,
+    };
+  }
   if (
     !viewport
     || !finite(viewport.width)

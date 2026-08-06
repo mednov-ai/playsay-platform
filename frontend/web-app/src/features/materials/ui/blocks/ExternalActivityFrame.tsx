@@ -61,6 +61,10 @@ export function externalActivityPoint({
   };
 }
 
+export function shouldSendExternalActivityPointerInput(action: "move" | "down" | "up") {
+  return action !== "move";
+}
+
 export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBlock; sync: MaterialExternalActivitySync }) {
   const { t } = useAppTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -137,9 +141,12 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     if (action === "move" && now - lastMoveRef.current < 33) return;
     lastMoveRef.current = now;
     sync.sendCursor(position.normalizedX, position.normalizedY);
+    if (!shouldSendExternalActivityPointerInput(action)) return;
     sync.sendInput({
       type: "pointer",
       action,
+      normalizedX: position.normalizedX,
+      normalizedY: position.normalizedY,
       x: position.x,
       y: position.y,
       sourceHeight: position.sourceHeight,
@@ -196,6 +203,8 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
           const position = point(event);
           if (position) sync.sendInput({
             type: "scroll",
+            normalizedX: position.normalizedX,
+            normalizedY: position.normalizedY,
             x: position.x,
             y: position.y,
             sourceHeight: position.sourceHeight,

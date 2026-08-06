@@ -54,6 +54,19 @@ describe("extension protocol", () => {
     });
   });
 
+  it("prefers normalized coordinates for the live target viewport", () => {
+    expect(cdpCommandForInput({
+      type: "pointer",
+      action: "down",
+      x: 300,
+      y: 200,
+      normalizedX: 0.75,
+      normalizedY: 0.25,
+    }, { width: 1200, height: 800 })).toMatchObject({
+      params: { x: 900, y: 200 },
+    });
+  });
+
   it("rejects out of bounds and unsupported input", () => {
     expect(cdpCommandForInput({ type: "pointer", action: "move", x: -1, y: 20 })).toBeNull();
     expect(cdpCommandForInput({ type: "clipboard", value: "secret" } as never)).toBeNull();

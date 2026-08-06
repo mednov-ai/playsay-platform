@@ -9,8 +9,8 @@ export const externalActivityExtensionChannel = "playsay.external-activity.exten
 
 export type ExternalActivityPhase = "REQUESTED" | "AWAITING_EXTENSION" | "STARTING" | "ACTIVE" | "ERROR";
 export type ExternalActivityInput =
-  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
-  | { type: "scroll"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
+  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
+  | { type: "scroll"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
   | { type: "key"; action: "down" | "up"; key: string; code?: string; text?: string; modifiers?: number };
 
 export type ExternalActivityRealtimeMessage =

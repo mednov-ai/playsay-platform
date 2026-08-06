@@ -1,6 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ExternalActivityFrame, externalActivityContentRect, externalActivityPoint } from "./ExternalActivityFrame";
+import {
+  ExternalActivityFrame,
+  externalActivityContentRect,
+  externalActivityPoint,
+  shouldSendExternalActivityPointerInput,
+} from "./ExternalActivityFrame";
 
 describe("ExternalActivityFrame", () => {
   it("positions remote cursors inside the same contain-fitted video rectangle as input", () => {
@@ -59,6 +64,12 @@ describe("ExternalActivityFrame", () => {
       x: 540,
       y: 450,
     });
+  });
+
+  it("keeps participant cursor movement separate from provider pointer input", () => {
+    expect(shouldSendExternalActivityPointerInput("move")).toBe(false);
+    expect(shouldSendExternalActivityPointerInput("down")).toBe(true);
+    expect(shouldSendExternalActivityPointerInput("up")).toBe(true);
   });
 
   it("shows the teacher extension action while capture is waiting", () => {

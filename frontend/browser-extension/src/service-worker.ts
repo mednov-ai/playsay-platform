@@ -5,7 +5,9 @@ type HostSession = {
   sessionId: string;
   nonce: string;
   consumerTabId: number;
+  consumerWindowId?: number;
   targetTabId: number;
+  targetWindowId?: number;
   expectedUrl: string;
   debuggerAttached: boolean;
   viewportHeight?: number;
@@ -86,13 +88,24 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
   if (command.type === "PREPARE") {
     const previousSessions = sessionsToReplace(sessions.values(), consumerTabId, command.sessionId);
     for (const previous of previousSessions) await stopSession(previous, true);
-    const target = await chrome.tabs.create({ url: command.url, active: true });
-    if (target.id === undefined) throw new Error("TARGET_TAB_NOT_CREATED");
+    const consumer = await chrome.tabs.get(consumerTabId);
+    const targetWindow = await chrome.windows.create({
+      focused: true,
+      height: 800,
+      type: "popup",
+      url: command.url,
+      width: 1280,
+    });
+    if (!targetWindow) throw new Error("TARGET_WINDOW_NOT_CREATED");
+    const target = targetWindow.tabs?.[0];
+    if (target?.id === undefined) throw new Error("TARGET_TAB_NOT_CREATED");
     sessions.set(command.sessionId, {
       sessionId: command.sessionId,
       nonce: command.nonce,
       consumerTabId,
+      consumerWindowId: consumer.windowId,
       targetTabId: target.id,
+      targetWindowId: targetWindow.id,
       expectedUrl: command.url!,
       debuggerAttached: false,
     });
@@ -134,6 +147,9 @@ async function activateCapture(session: HostSession) {
     await updateViewport(session);
     sendStatus(session.consumerTabId, session.sessionId, "CAPTURE_READY", undefined, { streamId });
     await chrome.tabs.update(session.consumerTabId, { active: true });
+    if (session.consumerWindowId !== undefined) {
+      await chrome.windows.update(session.consumerWindowId, { focused: true });
+    }
   } catch (error) {
     sendStatus(session.consumerTabId, session.sessionId, "ERROR", String(error));
   }

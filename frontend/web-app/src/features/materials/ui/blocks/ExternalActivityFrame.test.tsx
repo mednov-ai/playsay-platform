@@ -1,8 +1,34 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ExternalActivityFrame, externalActivityPoint } from "./ExternalActivityFrame";
+import { ExternalActivityFrame, externalActivityContentRect, externalActivityPoint } from "./ExternalActivityFrame";
 
 describe("ExternalActivityFrame", () => {
+  it("positions remote cursors inside the same contain-fitted video rectangle as input", () => {
+    expect(externalActivityContentRect({
+      surfaceHeight: 900,
+      surfaceWidth: 1440,
+      videoHeight: 900,
+      videoWidth: 1080,
+    })).toEqual({
+      height: 900,
+      left: 180,
+      top: 0,
+      width: 1080,
+    });
+
+    expect(externalActivityContentRect({
+      surfaceHeight: 900,
+      surfaceWidth: 1440,
+      videoHeight: 720,
+      videoWidth: 1280,
+    })).toEqual({
+      height: 810,
+      left: 0,
+      top: 45,
+      width: 1440,
+    });
+  });
+
   it("maps input against the visible contain-fitted video instead of its letterbox", () => {
     expect(externalActivityPoint({
       clientX: 180,

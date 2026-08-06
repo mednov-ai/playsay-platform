@@ -1,8 +1,32 @@
 import { ArrowLeft, RefreshCw, Unplug } from "lucide-react";
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import { Button } from "../../../../components/ui/button";
 import { useAppTranslation } from "../../../../shared/i18n";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../model/materialDocument";
+
+export function externalActivityContentRect({
+  surfaceHeight,
+  surfaceWidth,
+  videoHeight,
+  videoWidth,
+}: {
+  surfaceHeight: number;
+  surfaceWidth: number;
+  videoHeight: number;
+  videoWidth: number;
+}) {
+  if (!surfaceWidth || !surfaceHeight || !videoWidth || !videoHeight) return null;
+  const scale = Math.min(surfaceWidth / videoWidth, surfaceHeight / videoHeight);
+  const width = videoWidth * scale;
+  const height = videoHeight * scale;
+
+  return {
+    height,
+    left: (surfaceWidth - width) / 2,
+    top: (surfaceHeight - height) / 2,
+    width,
+  };
+}
 
 export function externalActivityPoint({
   clientX,
@@ -17,22 +41,23 @@ export function externalActivityPoint({
   videoHeight: number;
   videoWidth: number;
 }) {
-  if (!surface.width || !surface.height || !videoWidth || !videoHeight) return null;
-  const scale = Math.min(surface.width / videoWidth, surface.height / videoHeight);
-  const contentWidth = videoWidth * scale;
-  const contentHeight = videoHeight * scale;
-  const contentLeft = surface.left + (surface.width - contentWidth) / 2;
-  const contentTop = surface.top + (surface.height - contentHeight) / 2;
-  const localX = Math.min(contentWidth, Math.max(0, clientX - contentLeft));
-  const localY = Math.min(contentHeight, Math.max(0, clientY - contentTop));
+  const content = externalActivityContentRect({
+    surfaceHeight: surface.height,
+    surfaceWidth: surface.width,
+    videoHeight,
+    videoWidth,
+  });
+  if (!content) return null;
+  const localX = Math.min(content.width, Math.max(0, clientX - surface.left - content.left));
+  const localY = Math.min(content.height, Math.max(0, clientY - surface.top - content.top));
 
   return {
-    normalizedX: localX / contentWidth,
-    normalizedY: localY / contentHeight,
+    normalizedX: localX / content.width,
+    normalizedY: localY / content.height,
     sourceHeight: videoHeight,
     sourceWidth: videoWidth,
-    x: Math.round((localX / contentWidth) * videoWidth),
-    y: Math.round((localY / contentHeight) * videoHeight),
+    x: Math.round((localX / content.width) * videoWidth),
+    y: Math.round((localY / content.height) * videoHeight),
   };
 }
 
@@ -42,7 +67,30 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const mobileInputRef = useRef<HTMLInputElement | null>(null);
   const lastMoveRef = useRef(0);
+  const [cursorFrame, setCursorFrame] = useState<{ height: number; left: number; top: number; width: number } | null>(null);
   const active = sync.active;
+
+  const updateCursorFrame = useCallback(() => {
+    const surface = surfaceRef.current;
+    const video = videoRef.current;
+    if (!surface) return;
+    const rect = surface.getBoundingClientRect();
+    const next = externalActivityContentRect({
+      surfaceHeight: rect.height,
+      surfaceWidth: rect.width,
+      videoHeight: video?.videoHeight || 720,
+      videoWidth: video?.videoWidth || 1280,
+    });
+    setCursorFrame((current) => (
+      current && next
+      && current.height === next.height
+      && current.left === next.left
+      && current.top === next.top
+      && current.width === next.width
+        ? current
+        : next
+    ));
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -51,6 +99,22 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     if (sync.mediaStream) void video.play().catch(() => undefined);
     return () => { video.srcObject = null; };
   }, [sync.mediaStream]);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    const video = videoRef.current;
+    if (!surface || !video) return;
+    updateCursorFrame();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateCursorFrame);
+    observer?.observe(surface);
+    video.addEventListener("loadedmetadata", updateCursorFrame);
+    video.addEventListener("resize", updateCursorFrame);
+    return () => {
+      observer?.disconnect();
+      video.removeEventListener("loadedmetadata", updateCursorFrame);
+      video.removeEventListener("resize", updateCursorFrame);
+    };
+  }, [sync.mediaStream, updateCursorFrame]);
 
   function point(event: PointerEvent | WheelEvent) {
     const surface = surfaceRef.current;
@@ -165,7 +229,11 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
           <span
             className="playsay-external-activity-cursor"
             key={cursor.identity}
-            style={{ left: `${cursor.x * 100}%`, top: `${cursor.y * 100}%`, "--playsay-cursor-color": cursor.color } as React.CSSProperties}
+            style={{
+              left: cursorFrame ? `${cursorFrame.left + cursor.x * cursorFrame.width}px` : `${cursor.x * 100}%`,
+              top: cursorFrame ? `${cursorFrame.top + cursor.y * cursorFrame.height}px` : `${cursor.y * 100}%`,
+              "--playsay-cursor-color": cursor.color,
+            } as React.CSSProperties}
           >
             <i />
             <b>{cursor.name}</b>

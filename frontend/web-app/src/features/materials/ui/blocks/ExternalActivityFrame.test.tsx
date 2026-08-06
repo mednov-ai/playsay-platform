@@ -80,4 +80,19 @@ describe("ExternalActivityFrame", () => {
     expect(markup).not.toContain("Завершить показ");
     expect(markup).not.toContain("<iframe");
   });
+
+  it("mutes the local teacher preview but plays captured page audio for students", () => {
+    const block = { id: "external-1", type: "externalActivity" as const, title: "Wordwall", url: "https://wordwall.net/resource/1" };
+    const sync = {
+      active: { blockId: "external-1", sessionId: "s-1", hostIdentity: "teacher", phase: "ACTIVE" as const, studentsLocked: false, visible: true },
+      cursors: [], mediaStream: null, open: vi.fn(), reload: vi.fn(), returnToLesson: vi.fn(),
+      sendCursor: vi.fn(), sendInput: vi.fn(),
+    };
+
+    const teacherMarkup = renderToStaticMarkup(<ExternalActivityFrame block={block} sync={{ ...sync, isHost: true }} />);
+    const studentMarkup = renderToStaticMarkup(<ExternalActivityFrame block={block} sync={{ ...sync, isHost: false }} />);
+
+    expect(teacherMarkup).toMatch(/<video[^>]*muted=""/);
+    expect(studentMarkup).not.toMatch(/<video[^>]*muted=""/);
+  });
 });

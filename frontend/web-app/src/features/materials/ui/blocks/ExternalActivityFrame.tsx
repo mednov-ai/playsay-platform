@@ -208,7 +208,7 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
         role="application"
         tabIndex={0}
       >
-        <video autoPlay className="playsay-external-activity-video" muted={!sync.isHost} playsInline ref={videoRef} />
+        <video autoPlay className="playsay-external-activity-video" muted={sync.isHost} playsInline ref={videoRef} />
         <input
           aria-label={t("materials.externalActivity.mobileKeyboard")}
           className="playsay-external-activity-mobile-input"

@@ -168,25 +168,36 @@ async function sendInput(tabId: number, input: ExternalInput) {
 
       if (next.type === "pointer") {
         const button = next.button === "middle" ? 1 : next.button === "right" ? 2 : 0;
+        if (next.action === "down") {
+          target.focus({ preventScroll: true });
+          return;
+        }
         const common = {
           bubbles: true,
           button,
-          buttons: next.action === "up" ? 0 : 1 << button,
+          buttons: button === 1 ? 4 : button === 2 ? 2 : 1,
           cancelable: true,
           clientX: x,
           clientY: y,
           detail: next.clickCount ?? 1,
           view: window,
         };
-        target.dispatchEvent(new PointerEvent(`pointer${next.action}`, {
+        target.dispatchEvent(new PointerEvent("pointerdown", {
           ...common,
           pointerId: 1,
           pointerType: "mouse",
           isPrimary: true,
         }));
-        target.dispatchEvent(new MouseEvent(`mouse${next.action}`, common));
-        if (next.action === "down") target.focus({ preventScroll: true });
-        if (next.action === "up" && button === 0) target.click();
+        target.dispatchEvent(new MouseEvent("mousedown", common));
+        target.dispatchEvent(new PointerEvent("pointerup", {
+          ...common,
+          buttons: 0,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true,
+        }));
+        target.dispatchEvent(new MouseEvent("mouseup", { ...common, buttons: 0 }));
+        if (button === 0) target.click();
         return;
       }
 

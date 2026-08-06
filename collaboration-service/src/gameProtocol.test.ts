@@ -29,6 +29,17 @@ describe("game realtime protocol", () => {
     });
   });
 
+  it("accepts external activity input and cursor frames on the fast lane", () => {
+    expect(validateGameFrame(frame(
+      gameMessageTypes.externalInput,
+      new TextEncoder().encode("{}"),
+    )).type).toBe(gameMessageTypes.externalInput);
+    expect(validateGameFrame(frame(
+      gameMessageTypes.externalCursor,
+      new TextEncoder().encode("{}"),
+    )).type).toBe(gameMessageTypes.externalCursor);
+  });
+
   it("rejects welcome forgery, unknown versions and oversized payloads", () => {
     expect(() => validateGameFrame(frame(gameMessageTypes.welcome, new Uint8Array())))
       .toThrow(/message type/);

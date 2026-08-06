@@ -217,6 +217,7 @@ export function LessonWorkspace({
     isHost: canMonitorSubmissions,
     participantColor: collaborationParticipantColor(profile?.subject ?? displayName),
     participantName: displayName,
+    realtime: teacherAnnotationWorkspace.externalActivityRealtime,
   });
 
   useEffect(() => {

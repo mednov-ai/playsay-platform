@@ -1,5 +1,5 @@
 import { useRoomContext } from "@livekit/components-react";
-import { RoomEvent, Track, type RemoteParticipant } from "livekit-client";
+import { RoomEvent, Track, type RemoteParticipant, type TrackPublishOptions } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../materials/model/materialDocument";
 import {
@@ -8,6 +8,7 @@ import {
   externalActivityCursorTopic,
   externalActivityExtensionChannel,
   externalActivityHostTopic,
+  externalActivityInputReliable,
   externalActivityInputTopic,
   externalActivityPageChannel,
   externalActivitySessionIdFromTrackName,
@@ -20,8 +21,19 @@ import {
   type ExternalActivityBlock,
   type ExternalActivityInput,
   type ExternalActivityMessage,
+  type ExternalActivityRealtime,
   type ExternalActivityState,
 } from "../model/externalActivityProtocol";
+
+export const externalActivityVideoPublishOptions = {
+  degradationPreference: "maintain-framerate",
+  screenShareEncoding: {
+    maxBitrate: 2_500_000,
+    maxFramerate: 30,
+  },
+  simulcast: false,
+  videoCodec: "vp8",
+} satisfies TrackPublishOptions;
 
 export function useExternalActivitySession({
   blocks,
@@ -29,6 +41,7 @@ export function useExternalActivitySession({
   isHost,
   participantColor,
   participantName,
+  realtime,
   trustedHostIdentity,
 }: {
   blocks: MaterialEditorBlock[];
@@ -36,6 +49,7 @@ export function useExternalActivitySession({
   isHost: boolean;
   participantColor: string;
   participantName: string;
+  realtime?: ExternalActivityRealtime | null;
   trustedHostIdentity?: string | null;
 }): MaterialExternalActivitySync {
   const room = useRoomContext();
@@ -226,6 +240,50 @@ export function useExternalActivitySession({
   }, [enabled, isHost, postExtensionCommand, room, startHostSession, stopHostSession, trustedHostIdentity]);
 
   useEffect(() => {
+    if (!enabled || !realtime) return undefined;
+    return realtime.acquire((message) => {
+      const current = activeRef.current;
+      if (!current || current.sessionId !== message.sessionId || current.blockId !== message.blockId) return;
+      if (message.kind === "external-input") {
+        if (!isHost || handledInputEventsRef.current.has(message.eventId)) return;
+        handledInputEventsRef.current.add(message.eventId);
+        if (handledInputEventsRef.current.size > 500) {
+          const oldest = handledInputEventsRef.current.values().next().value;
+          if (oldest) handledInputEventsRef.current.delete(oldest);
+        }
+        const nonce = extensionNonceRef.current;
+        if (nonce) postExtensionCommand({
+          version: 1,
+          type: "INPUT",
+          sessionId: message.sessionId,
+          nonce,
+          input: message.input,
+        });
+        return;
+      }
+      if (
+        Number.isFinite(message.x)
+        && Number.isFinite(message.y)
+        && message.x >= 0
+        && message.x <= 1
+        && message.y >= 0
+        && message.y <= 1
+      ) {
+        setCursorsByIdentity((currentCursors) => ({
+          ...currentCursors,
+          [message.identity]: {
+            identity: message.identity,
+            name: message.name || message.identity,
+            color: message.color || "#ff5c00",
+            x: message.x,
+            y: message.y,
+          },
+        }));
+      }
+    });
+  }, [enabled, isHost, postExtensionCommand, realtime]);
+
+  useEffect(() => {
     if (!enabled) return undefined;
     const announceOrRequestState = () => {
       if (isHost) {
@@ -328,7 +386,14 @@ export function useExternalActivitySession({
             setMediaStream(stream);
             const video = stream.getVideoTracks()[0];
             const audio = stream.getAudioTracks()[0];
-            if (video) await room.localParticipant.publishTrack(video, { name: externalActivityTrackName(current.sessionId, "video"), source: Track.Source.ScreenShare });
+            if (video) {
+              video.contentHint = "motion";
+              await room.localParticipant.publishTrack(video, {
+                ...externalActivityVideoPublishOptions,
+                name: externalActivityTrackName(current.sessionId, "video"),
+                source: Track.Source.ScreenShare,
+              });
+            }
             if (!isCurrentExternalActivityCapture(
               generation,
               current.sessionId,
@@ -416,13 +481,35 @@ export function useExternalActivitySession({
       const nonce = extensionNonceRef.current;
       if (nonce) postExtensionCommand({ version: 1, type: "INPUT", sessionId: current.sessionId, nonce, input });
     } else {
-      publish({ version: 1, type: "INPUT", sessionId: current.sessionId, blockId: current.blockId, eventId: crypto.randomUUID(), input }, externalActivityInputTopic, true);
+      const eventId = crypto.randomUUID();
+      if (realtime?.publish({
+        blockId: current.blockId,
+        eventId,
+        input,
+        kind: "external-input",
+        sessionId: current.sessionId,
+      })) return;
+      publish(
+        { version: 1, type: "INPUT", sessionId: current.sessionId, blockId: current.blockId, eventId, input },
+        externalActivityInputTopic,
+        externalActivityInputReliable(input),
+      );
     }
-  }, [isHost, postExtensionCommand, publish]);
+  }, [isHost, postExtensionCommand, publish, realtime]);
 
   const sendCursor = useCallback((x: number, y: number) => {
     const current = activeRef.current;
     if (!current || current.phase !== "ACTIVE") return;
+    if (realtime?.publish({
+      blockId: current.blockId,
+      color: participantColor,
+      identity: room.localParticipant.identity,
+      kind: "external-cursor",
+      name: participantName,
+      sessionId: current.sessionId,
+      x,
+      y,
+    })) return;
     publish({
       version: 1,
       type: "CURSOR",
@@ -430,7 +517,7 @@ export function useExternalActivitySession({
       blockId: current.blockId,
       cursor: { x, y, name: participantName, color: participantColor },
     }, externalActivityCursorTopic, false);
-  }, [participantColor, participantName, publish]);
+  }, [participantColor, participantName, publish, realtime, room.localParticipant.identity]);
 
   const reload = useCallback(() => {
     const current = activeRef.current;

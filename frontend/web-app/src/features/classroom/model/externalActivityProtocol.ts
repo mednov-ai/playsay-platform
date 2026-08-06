@@ -13,6 +13,35 @@ export type ExternalActivityInput =
   | { type: "scroll"; x: number; y: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
   | { type: "key"; action: "down" | "up"; key: string; code?: string; text?: string; modifiers?: number };
 
+export type ExternalActivityRealtimeMessage =
+  | {
+      blockId: string;
+      eventId: string;
+      input: ExternalActivityInput;
+      kind: "external-input";
+      sessionId: string;
+    }
+  | {
+      blockId: string;
+      color: string;
+      identity: string;
+      kind: "external-cursor";
+      name: string;
+      sessionId: string;
+      x: number;
+      y: number;
+    };
+
+export type ExternalActivityRealtime = {
+  acquire: (onMessage: (message: ExternalActivityRealtimeMessage) => void) => () => void;
+  close: () => void;
+  publish: (message: ExternalActivityRealtimeMessage) => boolean;
+};
+
+export function externalActivityInputReliable(input: ExternalActivityInput): boolean {
+  return input.type !== "pointer" || input.action !== "move";
+}
+
 export type ExternalActivityMessage = {
   version: 1;
   type: "REQUEST_OPEN" | "REQUEST_CLOSE" | "REQUEST_STATE" | "INPUT" | "CURSOR" | "HOST_STATE" | "HOST_IDLE" | "STOPPED" | "SET_LOCK" | "RELOAD" | "BACK";

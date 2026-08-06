@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   externalActivityCaptureConstraints,
   externalActivityCaptureErrorCode,
+  externalActivityInputReliable,
   externalActivitySessionIdFromTrackName,
   externalActivityTrackName,
   isCurrentExternalActivityCapture,
@@ -23,6 +24,12 @@ describe("external activity classroom protocol", () => {
       audio: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: "stream-1" } },
       video: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: "stream-1" } },
     });
+  });
+
+  it("keeps click and keyboard delivery reliable while pointer moves stay realtime", () => {
+    expect(externalActivityInputReliable({ type: "pointer", action: "move", x: 1, y: 2 })).toBe(false);
+    expect(externalActivityInputReliable({ type: "pointer", action: "down", x: 1, y: 2 })).toBe(true);
+    expect(externalActivityInputReliable({ type: "key", action: "down", key: "a" })).toBe(true);
   });
 
   it("accepts versioned requests and rejects untrusted shapes", () => {

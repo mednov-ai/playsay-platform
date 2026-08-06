@@ -88,20 +88,23 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
   let pendingActions: GameActionRequest[] = [];
   let baseCheckpoint: GameCheckpoint<TState> = makeCheckpoint(canonicalState);
   const handledEffects = new Set<string>();
-  const dispatchedAt: number[] = [];
+  const dispatchedAt = new Array<number>(GAME_SYNC_LIMITS.actionSustainedPerThreeSeconds);
+  let dispatchedAtCount = 0;
+  let dispatchedAtCursor = 0;
   let diagnosticsEnabled = false;
 
   function diagnostic(
     stage: GameSyncDiagnosticStage,
     eventId?: string,
     revision?: number,
+    at = performance.timeOrigin + performance.now(),
   ): void {
     if (!diagnosticsEnabled) {
       return;
     }
     transport.send({
       diagnostic: {
-        at: performance.timeOrigin + performance.now(),
+        at,
         eventId,
         revision,
         stage,
@@ -119,17 +122,26 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
 
   function assertActionRate(): void {
     const now = Date.now();
-    while (dispatchedAt.length > 0 && now - (dispatchedAt[0] ?? now) >= 3_000) {
-      dispatchedAt.shift();
+    let oneSecondCount = 0;
+    let threeSecondCount = 0;
+    for (let index = 0; index < dispatchedAtCount; index += 1) {
+      const at = dispatchedAt[index] ?? 0;
+      if (now - at < 3_000) {
+        threeSecondCount += 1;
+        if (now - at < 1_000) {
+          oneSecondCount += 1;
+        }
+      }
     }
-    const oneSecondCount = dispatchedAt.filter((at) => now - at < 1_000).length;
     if (
       oneSecondCount >= GAME_SYNC_LIMITS.actionBurstPerSecond ||
-      dispatchedAt.length >= GAME_SYNC_LIMITS.actionSustainedPerThreeSeconds
+      threeSecondCount >= GAME_SYNC_LIMITS.actionSustainedPerThreeSeconds
     ) {
       throw new Error("ACTION_RATE_EXCEEDED");
     }
-    dispatchedAt.push(now);
+    dispatchedAt[dispatchedAtCursor] = now;
+    dispatchedAtCursor = (dispatchedAtCursor + 1) % dispatchedAt.length;
+    dispatchedAtCount = Math.min(dispatchedAtCount + 1, dispatchedAt.length);
   }
 
   function resolveInitialState(
@@ -352,15 +364,17 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
         stateVersion: options.manifest.stateVersion,
         type: type.trim(),
       };
-      diagnostic("action-created", action.eventId);
+      const actionCreatedAt = performance.timeOrigin + performance.now();
       assertSize(action, GAME_SYNC_LIMITS.actionBytes, "Action");
       pendingActions.push(action);
       rebuildRenderedState();
-      diagnostic("optimistic-applied", action.eventId);
-      diagnosticAfterPaint(action.eventId);
+      const optimisticAppliedAt = performance.timeOrigin + performance.now();
       if (connected) {
         transport.send({ action, kind: "action-request" });
       }
+      diagnostic("action-created", action.eventId, undefined, actionCreatedAt);
+      diagnostic("optimistic-applied", action.eventId, undefined, optimisticAppliedAt);
+      diagnosticAfterPaint(action.eventId);
       return action.eventId;
     },
     dispose() {
@@ -409,3 +423,4 @@ export function defineGame<TState>(options: DefineGameOptions<TState>): GameCont
     },
   };
 }
+

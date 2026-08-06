@@ -159,6 +159,25 @@ describe("game sync session controller", () => {
     });
   });
 
+  it("updates the durable checkpoint cache without a React-facing state contract", () => {
+    const { controller } = fixture();
+    const checkpoint = {
+      checksum: "checksum",
+      gameId: "racing",
+      logicalTime: 7,
+      revision: 7,
+      runId: "run",
+      seed: 1,
+      state: { position: 7 },
+      stateVersion: "1",
+      updatedAt: 1,
+    };
+    controller.replaceCheckpoints({ game: checkpoint });
+    expect(controller.getCheckpoint("game")).toEqual(checkpoint);
+    controller.replaceCheckpoints({});
+    expect(controller.getCheckpoint("game")).toBeUndefined();
+  });
+
   it("keeps simultaneous block/run sessions isolated", () => {
     const { controller, registrations } = fixture();
     const firstPort = port();
@@ -248,3 +267,4 @@ describe("game sync session controller", () => {
     }));
   });
 });
+

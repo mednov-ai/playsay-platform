@@ -192,9 +192,6 @@ export function HtmlGameFrame({
   const [runtimeStatus, setRuntimeStatus] = useState<HtmlGameRuntimeStatus>("checking");
   const activeSnapshot = sync?.snapshots[blockId];
   const sdkChannel = sync?.sdkChannel;
-  const sdkCheckpoint = sync?.sdkCheckpoints[blockId];
-  const sdkCheckpointRef = useRef(sdkCheckpoint);
-  sdkCheckpointRef.current = sdkCheckpoint;
   const syncClientId = sync?.clientId;
   const syncIsAuthority = sync?.isAuthority ?? true;
   const presentedBlockId = sync?.presentedBlockId ?? null;
@@ -391,7 +388,7 @@ export function HtmlGameFrame({
               setRuntimeStatus("failed");
               return;
             }
-            const checkpoint = sync?.sdkCheckpoints[blockId];
+            const checkpoint = sync?.sdkChannel?.getCheckpoint(blockId);
             const context: GameSyncInboundMessage = {
               actorId: String(sync?.clientId ?? channel),
               checkpoint: checkpoint?.runId === runtimeRunId ? checkpoint : undefined,
@@ -532,7 +529,7 @@ export function HtmlGameFrame({
     const attachment = sdkChannel.attach({
       actorId: String(syncClientId ?? channel),
       blockId,
-      getCheckpoint: () => sdkCheckpointRef.current,
+      getCheckpoint: () => sdkChannel.getCheckpoint(blockId),
       getPort: () => sdkPortRef.current,
       isAuthority: syncIsAuthority,
       onFailure: () => setRuntimeStatus("failed"),
@@ -1676,3 +1673,4 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
   })();`;
 }
+

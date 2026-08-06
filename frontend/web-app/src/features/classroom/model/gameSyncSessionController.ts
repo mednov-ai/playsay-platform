@@ -126,8 +126,12 @@ export function createGameSyncSessionController({
 }): MaterialHtmlGameSdkChannel & {
   close: () => void;
   receiveFallback: (message: MaterialHtmlGameRealtimeMessage) => void;
+  replaceCheckpoints: (
+    checkpoints: Record<string, MaterialHtmlGameSdkCheckpoint>,
+  ) => void;
 } {
   const sessions = new Map<string, Session>();
+  const checkpoints = new Map<string, MaterialHtmlGameSdkCheckpoint>();
 
   const publish = (message: MaterialHtmlGameRealtimeMessage) => {
     realtime.publish(message);
@@ -250,7 +254,7 @@ export function createGameSyncSessionController({
         deliver(session, { effect: message.effect, kind: "effect" });
       }
     } else if (message.kind === "recovery-required") {
-      const checkpoint = session.getCheckpoint();
+      const checkpoint = checkpoints.get(session.blockId);
       if (checkpoint?.runId === session.runId) {
         session.revision = checkpoint.revision;
         session.logicalTime = checkpoint.logicalTime;
@@ -263,7 +267,10 @@ export function createGameSyncSessionController({
     acknowledge: realtime.acknowledge,
     attach(registration) {
       const key = sessionKey(registration.blockId, registration.runId);
-      const checkpoint = registration.getCheckpoint();
+      const checkpoint = checkpoints.get(registration.blockId) ?? registration.getCheckpoint();
+      if (checkpoint) {
+        checkpoints.set(registration.blockId, checkpoint);
+      }
       const session: Session = {
         ...registration,
         handledActions: new BoundedIdSet(),
@@ -324,11 +331,13 @@ export function createGameSyncSessionController({
             publish({ effect, kind: "effect" });
           } else if (message.kind === "checkpoint" && session.isAuthority) {
             if (serializedMessageBytes(message.checkpoint) <= GAME_SYNC_LIMITS.checkpointBytes) {
-              publishCheckpoint(session.blockId, {
+              const checkpoint = {
                 ...message.checkpoint,
                 runId: session.runId,
                 updatedAt: Date.now(),
-              });
+              };
+              checkpoints.set(session.blockId, checkpoint);
+              publishCheckpoint(session.blockId, checkpoint);
             }
           }
         },
@@ -344,8 +353,17 @@ export function createGameSyncSessionController({
     close() {
       sessions.forEach((session) => session.releaseRealtime());
       sessions.clear();
+      checkpoints.clear();
     },
+    getCheckpoint: (blockId) => checkpoints.get(blockId),
     publish,
     receiveFallback: receive,
+    replaceCheckpoints(nextCheckpoints) {
+      checkpoints.clear();
+      Object.entries(nextCheckpoints).forEach(([blockId, checkpoint]) => {
+        checkpoints.set(blockId, checkpoint);
+      });
+    },
   };
 }
+

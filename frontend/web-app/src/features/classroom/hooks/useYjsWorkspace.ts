@@ -64,7 +64,6 @@ export function useYjsWorkspace({
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
   const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
   const [htmlGamePatches, setHtmlGamePatches] = useState<MaterialHtmlGamePatch[]>([]);
-  const [htmlGameSdkCheckpoints, setHtmlGameSdkCheckpoints] = useState<Record<string, MaterialHtmlGameSdkCheckpoint>>({});
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
   const [materialViewport, setMaterialViewportState] = useState<MaterialViewportState | null>(null);
@@ -86,7 +85,6 @@ export function useYjsWorkspace({
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
       setHtmlGamePatches([]);
-      setHtmlGameSdkCheckpoints({});
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
@@ -101,6 +99,7 @@ export function useYjsWorkspace({
     let reconnectTimer: number | null = null;
     let reconnectAttempt = 0;
     let gameSyncController: ReturnType<typeof createGameSyncSessionController> | null = null;
+    let latestHtmlGameSdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint> = {};
     const runtime = createYjsWorkspaceRuntime({
       color,
       onAnnotationChange: setAnnotationElementsState,
@@ -109,7 +108,10 @@ export function useYjsWorkspace({
       onHtmlGameInputsChange: setHtmlGameInputs,
       onHtmlGamePatchesChange: setHtmlGamePatches,
       onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
-      onHtmlGameSdkCheckpointsChange: setHtmlGameSdkCheckpoints,
+      onHtmlGameSdkCheckpointsChange: (checkpoints) => {
+        latestHtmlGameSdkCheckpoints = checkpoints;
+        gameSyncController?.replaceCheckpoints(checkpoints);
+      },
       onHtmlGameSdkMessage: (message) => gameSyncController?.receiveFallback(message),
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onMaterialAnswersChange: setMaterialAnswers,
@@ -142,6 +144,7 @@ export function useYjsWorkspace({
       },
       realtime: gameRealtime,
     });
+    gameSyncController.replaceCheckpoints(latestHtmlGameSdkCheckpoints);
     gameSyncControllerRef.current = gameSyncController;
     setWorkspaceClientId(runtime.getClientId());
     setStatus("connecting");
@@ -243,7 +246,6 @@ export function useYjsWorkspace({
       setHtmlGameInputs([]);
       setHtmlGameEffects([]);
       setHtmlGamePatches([]);
-      setHtmlGameSdkCheckpoints({});
       setPresentedHtmlGameBlockId(null);
       setMaterialAnswers({});
       setMaterialViewportState(null);
@@ -362,7 +364,6 @@ export function useYjsWorkspace({
       publishPatch: publishHtmlGamePatch,
       publishSnapshot: publishHtmlGameSnapshot,
       sdkChannel: gameSyncControllerRef.current ?? undefined,
-      sdkCheckpoints: htmlGameSdkCheckpoints,
       setAuthorityRun: setHtmlGameAuthorityRun,
       setPresentedBlock: setPresentedHtmlGameBlock,
       snapshots: htmlGameSnapshots,
@@ -371,7 +372,7 @@ export function useYjsWorkspace({
       authority: { ...shared, isAuthority: true } satisfies MaterialHtmlGameSync,
       replica: { ...shared, isAuthority: false } satisfies MaterialHtmlGameSync,
     };
-  }, [htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSdkCheckpoints, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status, workspaceClientId]);
+  }, [htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status, workspaceClientId]);
   const htmlGameSync = useCallback(
     (isAuthority: boolean): MaterialHtmlGameSync => (
       isAuthority ? htmlGameSyncByRole.authority : htmlGameSyncByRole.replica
@@ -439,3 +440,4 @@ function websocketOrigin(): string {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}`;
 }
+

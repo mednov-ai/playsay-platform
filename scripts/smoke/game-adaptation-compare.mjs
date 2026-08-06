@@ -728,7 +728,9 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
     studentToTeacher,
     teacherToStudent,
   };
-  const closeGame = teacherPage.locator("[data-testid='material-focus-close']");
+  const closeGame = teacherPage.locator(
+    ".playsay-material-focus-stack[data-active='true'] [data-testid='material-focus-close']",
+  );
   if (await closeGame.isVisible()) {
     await closeGame.click();
     await Promise.all([
@@ -1250,3 +1252,4 @@ function sdkRacingGameHtml() {
     )
     .replace(/  <script>\n    let position = 0;[\s\S]*?  <\/script>/, runtime);
 }
+

@@ -225,6 +225,7 @@ export type MaterialHtmlGameSdkChannel = {
   attach: (
     registration: MaterialHtmlGameSdkSessionRegistration,
   ) => MaterialHtmlGameSdkSessionAttachment;
+  getCheckpoint: (blockId: string) => MaterialHtmlGameSdkCheckpoint | undefined;
   publish: (message: MaterialHtmlGameRealtimeMessage) => void;
 };
 
@@ -242,7 +243,6 @@ export type MaterialHtmlGameSync = {
   publishEffect: (effect: MaterialHtmlGameEffect) => void;
   publishInput: (event: MaterialHtmlGameInputEvent) => void;
   publishSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
-  sdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint>;
   setAuthorityRun: (blockId: string, runId: string | null) => void;
   setPresentedBlock: (blockId: string | null) => void;
   snapshots: Record<string, MaterialHtmlGameSnapshot>;
@@ -513,3 +513,4 @@ export type MaterialDraftSourceImage = {
   fileName: string;
   originalSize: number;
 };
+

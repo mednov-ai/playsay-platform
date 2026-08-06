@@ -1177,7 +1177,6 @@ function htmlGameSync(overrides: Partial<MaterialHtmlGameSync> = {}): MaterialHt
     setAuthorityRun: vi.fn(),
     setPresentedBlock: vi.fn(),
     snapshots: {},
-    sdkCheckpoints: {},
     ...overrides,
   };
 }
@@ -1241,3 +1240,4 @@ function domRect({
     toJSON: () => ({}),
   } as DOMRect;
 }
+

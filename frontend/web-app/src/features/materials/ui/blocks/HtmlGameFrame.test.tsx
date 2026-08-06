@@ -20,7 +20,6 @@ const gameHtml = "<html><head><title>Game</title></head><body><button id=\"start
 
 const sdkSyncFields = () => ({
   clientId: 1,
-  sdkCheckpoints: {},
 });
 
 afterEach(() => {
@@ -312,6 +311,7 @@ describe("HTML game sandbox", () => {
       sdkChannel: {
         acknowledge: vi.fn(),
         attach,
+        getCheckpoint: vi.fn(),
         publish: vi.fn(),
       },
       inputs: [],
@@ -1079,3 +1079,4 @@ describe("HTML game sandbox", () => {
     }
   });
 });
+

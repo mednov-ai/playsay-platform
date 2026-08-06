@@ -72,7 +72,12 @@ export function isCurrentExternalActivityCapture(
   return generation === currentGeneration && current?.sessionId === sessionId;
 }
 
-export function participantCanHostExternalActivity(metadata: string | undefined): boolean {
+export function participantCanHostExternalActivity(
+  metadata: string | undefined,
+  participantIdentity?: string,
+  trustedHostIdentity?: string | null,
+): boolean {
+  if (trustedHostIdentity && participantIdentity === trustedHostIdentity) return true;
   if (!metadata) return false;
   try {
     const role = (JSON.parse(metadata) as { playsayRole?: unknown }).playsayRole;

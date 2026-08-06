@@ -467,6 +467,7 @@ export function LessonWorkspace({
               submissionMessage={submissionMessage}
               submissionSaving={submissionSaving}
               teacherName={session.teacherName ?? displayName}
+              teacherSubject={session.teacherSubject}
             />
           )
         ) : canManageMaterial ? (

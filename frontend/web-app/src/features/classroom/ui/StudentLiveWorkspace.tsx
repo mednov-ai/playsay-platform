@@ -25,6 +25,7 @@ export function StudentLiveWorkspace({
   submissionMessage,
   submissionSaving,
   teacherName,
+  teacherSubject,
 }: {
   displayName: string;
   lessonId: string;
@@ -38,6 +39,7 @@ export function StudentLiveWorkspace({
   submissionMessage: string | null;
   submissionSaving: boolean;
   teacherName: string;
+  teacherSubject: string;
 }) {
   const { t } = useAppTranslation();
   const participantColor = collaborationParticipantColor(profileSubject ?? displayName);
@@ -107,6 +109,7 @@ export function StudentLiveWorkspace({
     isHost: false,
     participantColor,
     participantName: displayName,
+    trustedHostIdentity: teacherSubject,
   });
 
   return (

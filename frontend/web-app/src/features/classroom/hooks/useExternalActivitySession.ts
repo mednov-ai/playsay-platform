@@ -28,12 +28,14 @@ export function useExternalActivitySession({
   isHost,
   participantColor,
   participantName,
+  trustedHostIdentity,
 }: {
   blocks: MaterialEditorBlock[];
   enabled: boolean;
   isHost: boolean;
   participantColor: string;
   participantName: string;
+  trustedHostIdentity?: string | null;
 }): MaterialExternalActivitySync {
   const room = useRoomContext();
   const [active, setActive] = useState<ExternalActivityState | null>(null);
@@ -181,7 +183,7 @@ export function useExternalActivitySession({
         return;
       }
       if (message.type === "STOPPED") {
-        if (!participantCanHostExternalActivity(participant.metadata)) return;
+        if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
         if (activeRef.current?.sessionId === message.sessionId && (!activeRef.current.hostIdentity || activeRef.current.hostIdentity === participant.identity)) {
           setActive(null);
@@ -192,7 +194,7 @@ export function useExternalActivitySession({
         return;
       }
       if (message.type === "HOST_IDLE") {
-        if (!participantCanHostExternalActivity(participant.metadata)) return;
+        if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
         setActive(null);
         activeRef.current = null;
@@ -201,7 +203,7 @@ export function useExternalActivitySession({
         return;
       }
       if (message.type === "HOST_STATE" && message.phase) {
-        if (!participantCanHostExternalActivity(participant.metadata)) return;
+        if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
         const current = activeRef.current;
         if (current?.hostIdentity && current.hostIdentity !== participant.identity) return;
@@ -220,7 +222,7 @@ export function useExternalActivitySession({
     };
     room.on(RoomEvent.DataReceived, handleData);
     return () => { room.off(RoomEvent.DataReceived, handleData); };
-  }, [enabled, isHost, postExtensionCommand, room, startHostSession, stopHostSession]);
+  }, [enabled, isHost, postExtensionCommand, room, startHostSession, stopHostSession, trustedHostIdentity]);
 
   useEffect(() => {
     if (!enabled) return undefined;

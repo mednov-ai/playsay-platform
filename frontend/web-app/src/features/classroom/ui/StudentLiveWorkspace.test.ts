@@ -58,6 +58,7 @@ describe("StudentLiveWorkspace", () => {
       submissionMessage: null,
       submissionSaving: false,
       teacherName: "Teacher Demo",
+      teacherSubject: "teacher-demo",
     }));
 
     expect(markup).toContain("Work on the assigned material.");

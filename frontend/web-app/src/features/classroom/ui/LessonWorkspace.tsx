@@ -33,7 +33,7 @@ import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
 import { TeacherLessonToolbar } from "./TeacherLessonToolbar";
 import { useAppTranslation } from "../../../shared/i18n";
-import { VocabularyLessonMenu } from "../../vocabulary/ui/VocabularyLessonMenu";
+import { VocabularyLessonDialog } from "../../vocabulary/ui/VocabularyLessonDialog";
 import { VocabularyLiveStage } from "../../vocabulary/ui/VocabularyLiveStage";
 import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
@@ -293,7 +293,7 @@ export function LessonWorkspace({
           uploadingHtmlGamePage={uploadingHtmlGamePage}
           uploadingImagePage={uploadingImagePage}
           vocabularyAction={(
-            <VocabularyLessonMenu
+            <VocabularyLessonDialog
               ownerLabel={activeParticipantLabel}
               ownerSubject={activeParticipant?.subject}
               onStartPractice={vocabularyFeatures.live ? () => void startVocabularyPractice() : undefined}
@@ -318,7 +318,7 @@ export function LessonWorkspace({
           </nav>
 
           <div className="playsay-workbench-tools">
-            <VocabularyLessonMenu
+            <VocabularyLessonDialog
               ownerSubject={profile?.subject}
               source={{
                 sourceType: "LESSON",

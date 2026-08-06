@@ -1514,118 +1514,154 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   white-space: nowrap;
 }
 
-.playsay-vocabulary-popover {
-  position: absolute;
-  z-index: 55;
-  top: calc(100% + 0.45rem);
-  right: 0;
-  width: min(17rem, calc(100vw - 2rem));
+.playsay-vocabulary-dialog-backdrop {
+  position: fixed;
+  z-index: 180;
+  inset: 0;
+  display: grid;
   overflow: hidden;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.9rem;
-  background: hsl(var(--surface));
-  box-shadow: 0 1rem 2.5rem rgb(17 17 17 / 0.16);
-  color: hsl(var(--foreground));
-  padding: 0.35rem;
+  place-items: center;
+  background: rgb(17 17 17 / 0.46);
+  padding: 1rem;
+  backdrop-filter: blur(3px);
 }
 
-.playsay-vocabulary-owner {
+.playsay-vocabulary-dialog {
+  display: flex;
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: min(48rem, calc(100dvh - 2rem));
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.25rem;
+  outline: none;
+  background: hsl(var(--surface));
+  box-shadow: 0 1.5rem 4rem rgb(17 17 17 / 0.26);
+  color: hsl(var(--foreground));
+}
+
+.playsay-vocabulary-dialog-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 1rem 1.1rem;
+}
+
+.playsay-vocabulary-dialog-header h2,
+.playsay-vocabulary-dialog-header p {
   overflow: hidden;
   margin: 0;
-  padding: 0.45rem 0.7rem 0.35rem;
-  color: hsl(var(--muted-foreground));
-  font-size: 0.7rem;
-  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.playsay-vocabulary-popover [role="menu"] > button {
-  display: flex;
-  width: 100%;
-  min-height: 2.5rem;
-  align-items: center;
-  gap: 0.55rem;
-  border: 0;
-  border-radius: 0.65rem;
-  background: transparent;
-  color: hsl(var(--foreground));
-  cursor: pointer;
-  padding: 0.55rem 0.7rem;
-  font-size: 0.78rem;
-  font-weight: 850;
-  text-align: left;
-}
-
-.playsay-vocabulary-popover [role="menu"] > button:hover,
-.playsay-vocabulary-popover [role="menu"] > button:focus-visible {
-  background: hsl(var(--muted) / 0.72);
-  outline: none;
-}
-
-.playsay-vocabulary-popover button svg {
-  width: 1rem;
-  height: 1rem;
-  flex: 0 0 auto;
-  color: hsl(var(--primary));
-}
-
-.playsay-vocabulary-recent-header {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.45rem;
-  border-bottom: 1px solid hsl(var(--border));
-  padding: 0.3rem 0.25rem 0.55rem;
-}
-
-.playsay-vocabulary-recent-header > button {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border: 0;
-  border-radius: 0.55rem;
-  background: transparent;
-  cursor: pointer;
-}
-
-.playsay-vocabulary-recent-header > button:hover,
-.playsay-vocabulary-recent-header > button:focus-visible {
-  background: hsl(var(--muted));
-  outline: none;
-}
-
-.playsay-vocabulary-recent-header div {
-  display: grid;
-  min-width: 0;
-}
-
-.playsay-vocabulary-recent-header strong,
-.playsay-vocabulary-recent-header span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.playsay-vocabulary-recent-header strong {
-  font-size: 0.78rem;
+.playsay-vocabulary-dialog-header h2 {
+  font-size: 1.15rem;
   font-weight: 900;
 }
 
-.playsay-vocabulary-recent-header span {
+.playsay-vocabulary-dialog-header p {
+  margin-top: 0.15rem;
   color: hsl(var(--muted-foreground));
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.playsay-vocabulary-dialog-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.playsay-vocabulary-dialog-tabs {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.35);
+  padding: 0.45rem;
+}
+
+.playsay-vocabulary-dialog-tabs button {
+  display: inline-flex;
+  min-height: 2.65rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.playsay-vocabulary-dialog-tabs button[aria-selected="true"] {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface));
+  box-shadow: 0 0.2rem 0.7rem rgb(17 17 17 / 0.06);
+  color: hsl(var(--foreground));
+}
+
+.playsay-vocabulary-dialog-tabs button:hover,
+.playsay-vocabulary-dialog-tabs button:focus-visible {
+  color: hsl(var(--foreground));
+  outline: 2px solid hsl(var(--primary) / 0.28);
+  outline-offset: -2px;
+}
+
+.playsay-vocabulary-dialog-tabs svg {
+  width: 1rem;
+  height: 1rem;
+  color: hsl(var(--primary));
+}
+
+.playsay-vocabulary-dialog-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.1rem;
+}
+
+.playsay-vocabulary-recent-toolbar {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 0.25rem 0.5rem;
+}
+
+.playsay-vocabulary-recent-toolbar strong {
+  font-size: 0.85rem;
+  font-weight: 900;
 }
 
 .playsay-vocabulary-offline {
-  color: hsl(var(--muted-foreground)) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.playsay-vocabulary-offline svg {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .playsay-vocabulary-recent-list {
   display: grid;
   margin: 0;
+  gap: 0.3rem;
   padding: 0.25rem 0;
   list-style: none;
 }
@@ -1634,8 +1670,10 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   gap: 0.55rem;
+  border: 1px solid hsl(var(--border));
   border-radius: 0.6rem;
-  padding: 0.48rem 0.65rem;
+  background: hsl(var(--background));
+  padding: 0.65rem 0.75rem;
   transition: background 180ms ease;
 }
 
@@ -1679,7 +1717,7 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 .playsay-vocabulary-recent-empty,
 .playsay-vocabulary-recent-state {
   margin: 0;
-  padding: 1rem 0.7rem;
+  padding: 2rem 0.7rem;
   color: hsl(var(--muted-foreground));
   font-size: 0.75rem;
   font-weight: 750;
@@ -1697,6 +1735,36 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   cursor: pointer;
   font-size: 0.72rem;
   font-weight: 850;
+}
+
+@media (max-width: 40rem) {
+  .playsay-vocabulary-dialog-backdrop {
+    align-items: stretch;
+    padding: 0.5rem;
+  }
+
+  .playsay-vocabulary-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 1rem);
+    border-radius: 1rem;
+  }
+
+  .playsay-vocabulary-dialog-header {
+    padding: 0.8rem;
+  }
+
+  .playsay-vocabulary-dialog-header-actions .inline-flex:not(:last-child) {
+    padding-inline: 0.65rem;
+  }
+
+  .playsay-vocabulary-dialog-body {
+    padding: 0.85rem;
+  }
+
+  .playsay-vocabulary-recent-list li {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
 }
 
 @keyframes playsay-vocabulary-loading {

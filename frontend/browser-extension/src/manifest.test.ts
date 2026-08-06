@@ -27,7 +27,7 @@ const expectedIcons = {
 
 describe("extension manifest contract", () => {
   it("keeps package and manifest versions aligned", () => {
-    expect(manifest.version).toBe("0.1.3");
+    expect(manifest.version).toBe("0.1.4");
     expect(extensionPackage.version).toBe(manifest.version);
     expect(frontendLock.packages["browser-extension"]?.version).toBe(manifest.version);
   });

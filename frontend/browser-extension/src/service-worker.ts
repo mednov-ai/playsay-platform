@@ -1,17 +1,12 @@
-import { cdpCommandForInput, parsePageCommand, sessionsToReplace, type PageCommand } from "./protocol";
-import { applyCaptureHardening } from "./capture-hardening";
+import { parsePageCommand, sessionsToReplace, type ExternalInput, type PageCommand } from "./protocol";
 
 type HostSession = {
   sessionId: string;
   nonce: string;
   consumerTabId: number;
-  consumerWindowId?: number;
   targetTabId: number;
-  targetWindowId?: number;
   expectedUrl: string;
-  debuggerAttached: boolean;
-  viewportHeight?: number;
-  viewportWidth?: number;
+  inputEnabled: boolean;
 };
 
 const sessions = new Map<string, HostSession>();
@@ -55,27 +50,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   });
 });
 
-chrome.debugger.onDetach.addListener((source) => {
-  void hydration.then(async () => {
-    const session = [...sessions.values()].find((candidate) => candidate.targetTabId === source.tabId);
-    if (session) {
-      session.debuggerAttached = false;
-      await persistSessions();
-      sendStatus(session.consumerTabId, session.sessionId, "DEBUGGER_DETACHED");
-    }
-  });
-});
-
-chrome.debugger.onEvent.addListener((source, method) => {
-  if (method !== "Page.frameResized" || source.tabId === undefined) return;
-  void hydration.then(async () => {
-    const session = [...sessions.values()].find((candidate) => candidate.targetTabId === source.tabId);
-    if (!session?.debuggerAttached) return;
-    await updateViewport(session);
-    await persistSessions();
-  });
-});
-
 chrome.tabs.onCreated.addListener((tab) => {
   if (tab.id === undefined || tab.openerTabId === undefined) return;
   void hydration.then(() => {
@@ -88,26 +62,15 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
   if (command.type === "PREPARE") {
     const previousSessions = sessionsToReplace(sessions.values(), consumerTabId, command.sessionId);
     for (const previous of previousSessions) await stopSession(previous, true);
-    const consumer = await chrome.tabs.get(consumerTabId);
-    const targetWindow = await chrome.windows.create({
-      focused: true,
-      height: 800,
-      type: "normal",
-      url: command.url,
-      width: 1280,
-    });
-    if (!targetWindow) throw new Error("TARGET_WINDOW_NOT_CREATED");
-    const target = targetWindow.tabs?.[0];
-    if (target?.id === undefined) throw new Error("TARGET_TAB_NOT_CREATED");
+    const target = await chrome.tabs.create({ url: command.url, active: true });
+    if (target.id === undefined) throw new Error("TARGET_TAB_NOT_CREATED");
     sessions.set(command.sessionId, {
       sessionId: command.sessionId,
       nonce: command.nonce,
       consumerTabId,
-      consumerWindowId: consumer.windowId,
       targetTabId: target.id,
-      targetWindowId: targetWindow.id,
       expectedUrl: command.url!,
-      debuggerAttached: false,
+      inputEnabled: false,
     });
     await persistSessions();
     sendStatus(consumerTabId, command.sessionId, "AWAITING_ACTION", undefined, { targetTabId: target.id });
@@ -121,12 +84,9 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
   } else if (command.type === "RELOAD") {
     await chrome.tabs.reload(session.targetTabId);
   } else if (command.type === "BACK") {
-    await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.goBack");
-  } else if (command.type === "INPUT" && command.input && session.debuggerAttached) {
-    const cdp = cdpCommandForInput(command.input, session.viewportWidth && session.viewportHeight
-      ? { width: session.viewportWidth, height: session.viewportHeight }
-      : undefined);
-    if (cdp) await chrome.debugger.sendCommand({ tabId: session.targetTabId }, cdp.method, cdp.params);
+    await chrome.tabs.goBack(session.targetTabId);
+  } else if (command.type === "INPUT" && command.input && session.inputEnabled) {
+    await sendInput(session.targetTabId, command.input);
   }
   return { ok: true };
 }
@@ -137,41 +97,101 @@ async function activateCapture(session: HostSession) {
       targetTabId: session.targetTabId,
       consumerTabId: session.consumerTabId,
     });
-    await chrome.debugger.attach({ tabId: session.targetTabId }, "1.3");
-    session.debuggerAttached = true;
+    await chrome.scripting.executeScript({
+      target: { tabId: session.targetTabId },
+      world: "MAIN",
+      func: () => true,
+    });
+    session.inputEnabled = true;
     await persistSessions();
-    await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.enable");
-    await applyCaptureHardening((method, params) => (
-      chrome.debugger.sendCommand({ tabId: session.targetTabId }, method, params)
-    ));
-    await updateViewport(session);
     sendStatus(session.consumerTabId, session.sessionId, "CAPTURE_READY", undefined, { streamId });
     await chrome.tabs.update(session.consumerTabId, { active: true });
-    if (session.consumerWindowId !== undefined) {
-      await chrome.windows.update(session.consumerWindowId, { focused: true });
-    }
   } catch (error) {
     sendStatus(session.consumerTabId, session.sessionId, "ERROR", String(error));
   }
 }
 
-async function updateViewport(session: HostSession) {
-  const metrics = await chrome.debugger.sendCommand(
-    { tabId: session.targetTabId },
-    "Page.getLayoutMetrics",
-  ) as { cssVisualViewport?: { clientHeight?: number; clientWidth?: number } };
-  session.viewportWidth = metrics.cssVisualViewport?.clientWidth;
-  session.viewportHeight = metrics.cssVisualViewport?.clientHeight;
-}
-
 async function stopSession(session: HostSession, closeTarget: boolean) {
   sessions.delete(session.sessionId);
   await persistSessions();
-  if (session.debuggerAttached) {
-    await chrome.debugger.detach({ tabId: session.targetTabId }).catch(() => undefined);
-  }
   if (closeTarget) await chrome.tabs.remove(session.targetTabId).catch(() => undefined);
   sendStatus(session.consumerTabId, session.sessionId, "STOPPED");
+}
+
+async function sendInput(tabId: number, input: ExternalInput) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    args: [input],
+    func: (next: ExternalInput) => {
+      if (next.type === "key") {
+        const keyboardTarget = document.activeElement instanceof HTMLElement ? document.activeElement : document.body;
+        keyboardTarget.dispatchEvent(new KeyboardEvent(next.action === "down" ? "keydown" : "keyup", {
+          bubbles: true,
+          cancelable: true,
+          code: next.code ?? "",
+          key: next.key,
+          altKey: Boolean(next.modifiers && (next.modifiers & 1)),
+          ctrlKey: Boolean(next.modifiers && (next.modifiers & 2)),
+          metaKey: Boolean(next.modifiers && (next.modifiers & 4)),
+          shiftKey: Boolean(next.modifiers && (next.modifiers & 8)),
+        }));
+        if (
+          next.action === "down"
+          && next.text
+          && (keyboardTarget instanceof HTMLInputElement || keyboardTarget instanceof HTMLTextAreaElement)
+        ) {
+          const start = keyboardTarget.selectionStart ?? keyboardTarget.value.length;
+          const end = keyboardTarget.selectionEnd ?? start;
+          keyboardTarget.setRangeText(next.text, start, end, "end");
+          keyboardTarget.dispatchEvent(new InputEvent("input", { bubbles: true, data: next.text, inputType: "insertText" }));
+        }
+        return;
+      }
+
+      const normalizedX = typeof next.normalizedX === "number"
+        ? next.normalizedX
+        : next.sourceWidth ? next.x / next.sourceWidth : next.x / window.innerWidth;
+      const normalizedY = typeof next.normalizedY === "number"
+        ? next.normalizedY
+        : next.sourceHeight ? next.y / next.sourceHeight : next.y / window.innerHeight;
+      const x = Math.min(window.innerWidth - 1, Math.max(0, normalizedX * window.innerWidth));
+      const y = Math.min(window.innerHeight - 1, Math.max(0, normalizedY * window.innerHeight));
+
+      if (next.type === "scroll") {
+        window.scrollBy({ left: next.deltaX, top: next.deltaY, behavior: "auto" });
+        return;
+      }
+
+      const target = document.elementFromPoint(x, y);
+      if (!(target instanceof HTMLElement)) return;
+
+      if (next.type === "pointer") {
+        const button = next.button === "middle" ? 1 : next.button === "right" ? 2 : 0;
+        const common = {
+          bubbles: true,
+          button,
+          buttons: next.action === "up" ? 0 : 1 << button,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          detail: next.clickCount ?? 1,
+          view: window,
+        };
+        target.dispatchEvent(new PointerEvent(`pointer${next.action}`, {
+          ...common,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true,
+        }));
+        target.dispatchEvent(new MouseEvent(`mouse${next.action}`, common));
+        if (next.action === "down") target.focus({ preventScroll: true });
+        if (next.action === "up" && button === 0) target.click();
+        return;
+      }
+
+    },
+  });
 }
 
 async function persistSessions() {

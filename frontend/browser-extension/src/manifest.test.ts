@@ -6,6 +6,7 @@ import { TRUSTED_PLAY_SAY_MATCH_PATTERNS } from "./protocol";
 
 type ExtensionManifest = {
   version: string;
+  permissions: string[];
   host_permissions: string[];
   icons: Record<string, string>;
   action: { default_icon: Record<string, string> };
@@ -33,6 +34,8 @@ describe("extension manifest contract", () => {
   });
 
   it("keeps manifest permissions and content-script origins aligned with the runtime guard", () => {
+    expect(manifest.permissions).toEqual(["activeTab", "scripting", "storage", "tabCapture", "tabs"]);
+    expect(manifest.permissions).not.toContain("debugger");
     expect(manifest.host_permissions).toEqual(TRUSTED_PLAY_SAY_MATCH_PATTERNS);
     expect(manifest.content_scripts).toHaveLength(1);
     expect(manifest.content_scripts[0]?.matches).toEqual(TRUSTED_PLAY_SAY_MATCH_PATTERNS);

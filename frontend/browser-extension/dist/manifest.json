@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Play&Say Shared Activities",
+  "name": "Honey.school",
   "description": "Shares an external classroom activity with lesson participants after an explicit teacher action.",
   "version": "0.1.5",
   "minimum_chrome_version": "116",
@@ -23,7 +23,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Share this activity with Play&Say",
+    "default_title": "Share this activity with Honey.school",
     "default_icon": {
       "16": "icons/bee-16.png",
       "32": "icons/bee-32.png",

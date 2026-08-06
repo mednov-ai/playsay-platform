@@ -41,11 +41,14 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     if (action === "move" && now - lastMoveRef.current < 33) return;
     lastMoveRef.current = now;
     sync.sendCursor(position.normalizedX, position.normalizedY);
+    if (action === "move") return;
     sync.sendInput({
       type: "pointer",
       action,
       x: position.x,
       y: position.y,
+      normalizedX: position.normalizedX,
+      normalizedY: position.normalizedY,
       button: event.button === 1 ? "middle" : event.button === 2 ? "right" : "left",
       clickCount: event.detail || 1,
     });
@@ -96,7 +99,15 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
         onPointerUp={(event) => pointer(event, "up")}
         onWheel={(event) => {
           const position = point(event);
-          if (position) sync.sendInput({ type: "scroll", x: position.x, y: position.y, deltaX: event.deltaX, deltaY: event.deltaY });
+          if (position) sync.sendInput({
+            type: "scroll",
+            x: position.x,
+            y: position.y,
+            normalizedX: position.normalizedX,
+            normalizedY: position.normalizedY,
+            deltaX: event.deltaX,
+            deltaY: event.deltaY,
+          });
         }}
         ref={surfaceRef}
         role="application"

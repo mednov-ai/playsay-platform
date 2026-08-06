@@ -12,8 +12,8 @@ export const TRUSTED_PLAY_SAY_MATCH_PATTERNS = [
 ] as const;
 
 export type ExternalInput =
-  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; button?: "left" | "middle" | "right"; clickCount?: number }
-  | { type: "scroll"; x: number; y: number; deltaX: number; deltaY: number }
+  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; normalizedX?: number; normalizedY?: number; button?: "left" | "middle" | "right"; clickCount?: number }
+  | { type: "scroll"; x: number; y: number; normalizedX?: number; normalizedY?: number; deltaX: number; deltaY: number }
   | { type: "key"; action: "down" | "up"; key: string; code?: string; text?: string; modifiers?: number };
 
 export type PageCommand = {
@@ -48,7 +48,7 @@ export function parsePageCommand(value: unknown): PageCommand | null {
       return null;
     }
   }
-  if (candidate.type === "INPUT" && !candidate.input) return null;
+  if (candidate.type === "INPUT" && !validInput(candidate.input)) return null;
   return candidate as PageCommand;
 }
 
@@ -62,52 +62,37 @@ export function sessionsToReplace<T extends { consumerTabId: number; sessionId: 
   ));
 }
 
-export function cdpCommandForInput(input: ExternalInput): { method: string; params: Record<string, unknown> } | null {
-  if (!input || typeof input !== "object") return null;
-  if (input.type === "pointer") {
-    if (!coordinate(input.x) || !coordinate(input.y) || !["move", "down", "up"].includes(input.action)) return null;
-    const eventTypes = { move: "mouseMoved", down: "mousePressed", up: "mouseReleased" } as const;
-    return {
-      method: "Input.dispatchMouseEvent",
-      params: {
-        type: eventTypes[input.action],
-        x: input.x,
-        y: input.y,
-        ...(input.action === "move" ? {} : { button: input.button ?? "left", clickCount: input.clickCount ?? 1 }),
-      },
-    };
-  }
-  if (input.type === "scroll") {
-    if (![input.x, input.y, input.deltaX, input.deltaY].every(finite) || !coordinate(input.x) || !coordinate(input.y)) return null;
-    return {
-      method: "Input.dispatchMouseEvent",
-      params: { type: "mouseWheel", x: input.x, y: input.y, deltaX: input.deltaX, deltaY: input.deltaY },
-    };
-  }
-  if (input.type === "key") {
-    if (!["down", "up"].includes(input.action) || typeof input.key !== "string" || input.key.length > 64) return null;
-    return {
-      method: "Input.dispatchKeyEvent",
-      params: {
-        type: input.action === "down" ? "keyDown" : "keyUp",
-        key: input.key,
-        code: input.code ?? "",
-        text: input.action === "down" ? input.text ?? "" : "",
-        modifiers: input.modifiers ?? 0,
-      },
-    };
-  }
-  return null;
-}
-
 function safeToken(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9._:-]+$/.test(value);
 }
 
-function finite(value: number): boolean {
+function validInput(input: ExternalInput | undefined): input is ExternalInput {
+  if (!input || typeof input !== "object") return false;
+  if (input.type === "pointer" || input.type === "scroll") {
+    if (!coordinate(input.x) || !coordinate(input.y)) return false;
+    if (input.normalizedX !== undefined && !normalizedCoordinate(input.normalizedX)) return false;
+    if (input.normalizedY !== undefined && !normalizedCoordinate(input.normalizedY)) return false;
+  }
+  if (input.type === "pointer") {
+    return ["move", "down", "up"].includes(input.action);
+  }
+  if (input.type === "scroll") {
+    return finite(input.deltaX) && finite(input.deltaY);
+  }
+  return input.type === "key"
+    && ["down", "up"].includes(input.action)
+    && typeof input.key === "string"
+    && input.key.length <= 64;
+}
+
+function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 100_000;
 }
 
-function coordinate(value: number): boolean {
+function coordinate(value: unknown): value is number {
   return finite(value) && value >= 0;
+}
+
+function normalizedCoordinate(value: unknown): value is number {
+  return coordinate(value) && value <= 1;
 }

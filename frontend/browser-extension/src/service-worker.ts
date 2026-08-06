@@ -1,5 +1,5 @@
-import { cdpCommandForInput, parsePageCommand, sessionsToReplace, type PageCommand } from "./protocol";
-import { applyCaptureHardening } from "./capture-hardening";
+import { applyExternalInput } from "./main-world-input";
+import { parsePageCommand, sessionsToReplace, type PageCommand } from "./protocol";
 
 type HostSession = {
   sessionId: string;
@@ -7,7 +7,7 @@ type HostSession = {
   consumerTabId: number;
   targetTabId: number;
   expectedUrl: string;
-  debuggerAttached: boolean;
+  inputEnabled: boolean;
 };
 
 const sessions = new Map<string, HostSession>();
@@ -51,21 +51,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   });
 });
 
-chrome.debugger.onDetach.addListener((source) => {
-  void hydration.then(async () => {
-    const session = [...sessions.values()].find((candidate) => candidate.targetTabId === source.tabId);
-    if (session) {
-      session.debuggerAttached = false;
-      await persistSessions();
-      sendStatus(session.consumerTabId, session.sessionId, "DEBUGGER_DETACHED");
-    }
-  });
-});
-
 chrome.tabs.onCreated.addListener((tab) => {
   if (tab.id === undefined || tab.openerTabId === undefined) return;
   void hydration.then(() => {
-    if ([...sessions.values()].some((session) => session.targetTabId === tab.openerTabId)) return chrome.tabs.remove(tab.id!);
+    if ([...sessions.values()].some((session) => session.targetTabId === tab.openerTabId)) {
+      return chrome.tabs.remove(tab.id!);
+    }
   });
 });
 
@@ -82,7 +73,7 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
       consumerTabId,
       targetTabId: target.id,
       expectedUrl: command.url!,
-      debuggerAttached: false,
+      inputEnabled: false,
     });
     await persistSessions();
     sendStatus(consumerTabId, command.sessionId, "AWAITING_ACTION", undefined, { targetTabId: target.id });
@@ -96,10 +87,14 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
   } else if (command.type === "RELOAD") {
     await chrome.tabs.reload(session.targetTabId);
   } else if (command.type === "BACK") {
-    await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.goBack");
-  } else if (command.type === "INPUT" && command.input && session.debuggerAttached) {
-    const cdp = cdpCommandForInput(command.input);
-    if (cdp) await chrome.debugger.sendCommand({ tabId: session.targetTabId }, cdp.method, cdp.params);
+    await chrome.tabs.goBack(session.targetTabId);
+  } else if (command.type === "INPUT" && command.input && session.inputEnabled) {
+    await chrome.scripting.executeScript({
+      args: [command.input],
+      func: applyExternalInput,
+      target: { tabId: session.targetTabId },
+      world: "MAIN",
+    });
   }
   return { ok: true };
 }
@@ -110,13 +105,13 @@ async function activateCapture(session: HostSession) {
       targetTabId: session.targetTabId,
       consumerTabId: session.consumerTabId,
     });
-    await chrome.debugger.attach({ tabId: session.targetTabId }, "1.3");
-    session.debuggerAttached = true;
+    await chrome.scripting.executeScript({
+      func: () => true,
+      target: { tabId: session.targetTabId },
+      world: "MAIN",
+    });
+    session.inputEnabled = true;
     await persistSessions();
-    await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Page.enable");
-    await applyCaptureHardening((method, params) => (
-      chrome.debugger.sendCommand({ tabId: session.targetTabId }, method, params)
-    ));
     sendStatus(session.consumerTabId, session.sessionId, "CAPTURE_READY", undefined, { streamId });
     await chrome.tabs.update(session.consumerTabId, { active: true });
   } catch (error) {
@@ -127,9 +122,6 @@ async function activateCapture(session: HostSession) {
 async function stopSession(session: HostSession, closeTarget: boolean) {
   sessions.delete(session.sessionId);
   await persistSessions();
-  if (session.debuggerAttached) {
-    await chrome.debugger.detach({ tabId: session.targetTabId }).catch(() => undefined);
-  }
   if (closeTarget) await chrome.tabs.remove(session.targetTabId).catch(() => undefined);
   sendStatus(session.consumerTabId, session.sessionId, "STOPPED");
 }

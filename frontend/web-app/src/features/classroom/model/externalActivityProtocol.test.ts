@@ -49,6 +49,22 @@ describe("external activity classroom protocol", () => {
     })).toMatchObject({ eventId: "event-1", type: "INPUT" });
     expect(parseExternalActivityMessage({
       version: 1,
+      type: "INPUT",
+      eventId: "event-2",
+      sessionId: "session-1",
+      blockId: "block-1",
+      input: { type: "pointer", action: "down", x: 640, y: 360, normalizedX: 0.5, normalizedY: 0.5 },
+    })).toMatchObject({ input: { normalizedX: 0.5, normalizedY: 0.5 } });
+    expect(parseExternalActivityMessage({
+      version: 1,
+      type: "INPUT",
+      eventId: "event-3",
+      sessionId: "session-1",
+      blockId: "block-1",
+      input: { type: "pointer", action: "down", x: 640, y: 360, normalizedX: 1.1, normalizedY: 0.5 },
+    })).toBeNull();
+    expect(parseExternalActivityMessage({
+      version: 1,
       type: "REQUEST_STATE",
       sessionId: "current",
       blockId: "current",

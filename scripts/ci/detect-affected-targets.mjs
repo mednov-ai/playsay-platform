@@ -266,6 +266,12 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path.startsWith("frontend/shared-ui/")) {
+      deployTargets.add("web-app");
+      deployTargets.add("keyboard-app");
+      continue;
+    }
+
     if (path.startsWith("frontend/web-app/") || path.startsWith("frontend/browser-extension/")) {
       deployTargets.add("web-app");
       continue;

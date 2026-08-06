@@ -160,6 +160,11 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
       "playsay-keyboard-frontend-develop",
     ],
   );
+  assertDetection(
+    ["frontend/shared-ui/src/index.ts"],
+    ["web-app", "keyboard-app"],
+    ["playsay-web-app-develop", "playsay-keyboard-frontend-develop"],
+  );
 });
 
 test("CI-only and smoke-only changes run validations without product images", () => {

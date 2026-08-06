@@ -14,6 +14,7 @@ const playwrightPackageDir = process.env.PLAYWRIGHT_PACKAGE_DIR
 const outputDir = process.env.PLAY_SAY_GAME_COMPARE_OUTPUT_DIR
   ?? path.join(process.cwd(), "tmp", "game-adaptation-compare");
 const timeoutMs = Number(process.env.PLAY_SAY_SMOKE_TIMEOUT_MS ?? 60_000);
+const actionTimeoutMs = Number(process.env.PLAY_SAY_GAME_COMPARE_ACTION_TIMEOUT_MS ?? 5_000);
 const sampleCount = Number(process.env.PLAY_SAY_GAME_COMPARE_SAMPLES ?? 40);
 const candidateMode = process.env.PLAY_SAY_GAME_COMPARE_CANDIDATE ?? "fixed";
 const runId = `game-compare-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
@@ -213,6 +214,20 @@ try {
     ratio(summary.adapted.loadedRangeStudentToTeacher.p95Ms, summary.original.loadedRangeStudentToTeacher.p95Ms),
   ];
   const adaptedTrace = summary.adapted.diagnostics.summary;
+  const adaptedMissingActions = [
+    summary.adapted.teacherToStudent,
+    summary.adapted.studentToTeacher,
+    summary.adapted.keyboardTeacherToStudent,
+    summary.adapted.keyboardStudentToTeacher,
+    summary.adapted.rangeTeacherToStudent,
+    summary.adapted.rangeStudentToTeacher,
+    summary.adapted.loadedTeacherToStudent,
+    summary.adapted.loadedStudentToTeacher,
+    summary.adapted.loadedKeyboardTeacherToStudent,
+    summary.adapted.loadedKeyboardStudentToTeacher,
+    summary.adapted.loadedRangeTeacherToStudent,
+    summary.adapted.loadedRangeStudentToTeacher,
+  ].reduce((total, measurement) => total + measurement.missedActions, 0);
   summary.gates = {
     idleWorstRatio: Math.max(...idleRatios),
     loadedWorstRatio: Math.max(...loadedRatios),
@@ -220,7 +235,9 @@ try {
     noIntegrityFailures:
       adaptedTrace.duplicateReducerApplies === 0
       && adaptedTrace.missingReducerApplies === 0
-      && adaptedTrace.revisionConflicts === 0,
+      && adaptedTrace.revisionConflicts === 0
+      && adaptedMissingActions === 0,
+    missingActions: adaptedMissingActions,
     visualEquivalent:
       summary.appearance.liveDomEquivalent
       && summary.appearance.standaloneDomEquivalent
@@ -436,15 +453,30 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   ]);
 
   const teacherLaunch = teacherPage.locator(`[data-testid="html-game-launch-${blockId}"]`);
-  await teacherLaunch.waitFor({ timeout: timeoutMs });
-  await teacherLaunch.click();
+  const studentLaunch = studentPage.locator(`[data-testid="html-game-launch-${blockId}"]`);
   await Promise.all([
-    teacherPage.locator(".playsay-html-game iframe").waitFor({ timeout: timeoutMs }),
-    studentPage.locator(".playsay-html-game iframe").waitFor({ timeout: timeoutMs }),
+    teacherLaunch.waitFor({ timeout: timeoutMs }),
+    studentLaunch.waitFor({ timeout: timeoutMs }),
+  ]);
+  // Establish the authority run before starting the replica. The presentation
+  // state and authority run use separate shared updates; opening both frames in
+  // the same task can otherwise boot the replica with its temporary fallback ID.
+  await teacherLaunch.click();
+  await teacherPage.locator(".playsay-html-game[data-paused='false'] iframe").waitFor({
+    timeout: timeoutMs,
+  });
+  await teacherPage.waitForTimeout(750);
+  const activeStudentIframe = studentPage.locator(".playsay-html-game[data-paused='false'] iframe");
+  if (!await activeStudentIframe.isVisible() && await studentLaunch.isVisible()) {
+    await studentLaunch.click();
+  }
+  await Promise.all([
+    teacherPage.locator(".playsay-html-game[data-paused='false'] iframe").waitFor({ timeout: timeoutMs }),
+    studentPage.locator(".playsay-html-game[data-paused='false'] iframe").waitFor({ timeout: timeoutMs }),
   ]);
 
-  const teacherFrame = teacherPage.frameLocator(".playsay-html-game iframe");
-  const studentFrame = studentPage.frameLocator(".playsay-html-game iframe");
+  const teacherFrame = teacherPage.frameLocator(".playsay-html-game[data-paused='false'] iframe");
+  const studentFrame = studentPage.frameLocator(".playsay-html-game[data-paused='false'] iframe");
   await Promise.all([
     teacherFrame.locator("#move").waitFor({ timeout: timeoutMs }),
     studentFrame.locator("#move").waitFor({ timeout: timeoutMs }),
@@ -490,8 +522,9 @@ async function measureLesson(teacherPage, studentPage, studentToken, lessonId, l
   });
 
   const screenshotPath = path.join(outputDir, `${label}.png`);
-  await teacherPage.locator(".playsay-html-game iframe").screenshot({ path: screenshotPath });
-  const screenshot = await teacherPage.locator(".playsay-html-game iframe").screenshot();
+  const activeTeacherIframe = teacherPage.locator(".playsay-html-game[data-paused='false'] iframe");
+  await activeTeacherIframe.screenshot({ path: screenshotPath });
+  const screenshot = await activeTeacherIframe.screenshot();
   const teacherToStudent = await measureDirection(teacherFrame, studentFrame, sampleCount);
   await teacherFrame.locator("#reset").click();
   await Promise.all([
@@ -743,47 +776,53 @@ async function openClassroom(page, lessonId, teacher) {
 
 async function measureDirection(sourceFrame, targetFrame, count) {
   const latenciesMs = [];
+  let missedActions = 0;
   let position = 0;
   for (let index = 0; index < count; index += 1) {
     if (position === 10) {
-      await sourceFrame.locator("#reset").click();
-      await waitForFrameText(targetFrame, "#position", "0", timeoutMs);
+      await resetGame(sourceFrame, targetFrame);
       position = 0;
     }
     const startedAt = performance.now();
     await sourceFrame.locator("#move").click();
     position += 1;
-    await waitForFrameText(targetFrame, "#position", String(position), timeoutMs);
+    if (!await waitForFrameText(targetFrame, "#position", String(position), actionTimeoutMs, false)) {
+      missedActions += 1;
+      await resetGame(sourceFrame, targetFrame);
+      position = 0;
+      continue;
+    }
     latenciesMs.push(Number((performance.now() - startedAt).toFixed(2)));
   }
-  return {
-    latenciesMs,
-    p50Ms: percentile(latenciesMs, 0.5),
-    p95Ms: percentile(latenciesMs, 0.95),
-    p99Ms: percentile(latenciesMs, 0.99),
-  };
+  return latencySummary(latenciesMs, missedActions);
 }
 
 async function measureKeyboardDirection(sourceFrame, targetFrame, count) {
   const latenciesMs = [];
+  let missedActions = 0;
   let position = Number((await targetFrame.locator("#position").textContent())?.trim() ?? 0);
   for (let index = 0; index < count; index += 1) {
     if (position === 10) {
-      await sourceFrame.locator("body").press("r");
-      await waitForFrameText(targetFrame, "#position", "0", timeoutMs);
+      await resetGame(sourceFrame, targetFrame);
       position = 0;
     }
     const startedAt = performance.now();
     await sourceFrame.locator("body").press("ArrowRight");
     position += 1;
-    await waitForFrameText(targetFrame, "#position", String(position), timeoutMs);
+    if (!await waitForFrameText(targetFrame, "#position", String(position), actionTimeoutMs, false)) {
+      missedActions += 1;
+      await resetGame(sourceFrame, targetFrame);
+      position = 0;
+      continue;
+    }
     latenciesMs.push(Number((performance.now() - startedAt).toFixed(2)));
   }
-  return latencySummary(latenciesMs);
+  return latencySummary(latenciesMs, missedActions);
 }
 
 async function measureRangeDirection(sourceFrame, targetFrame, count) {
   const latenciesMs = [];
+  let missedActions = 0;
   for (let index = 0; index < count; index += 1) {
     const value = String(((index + 1) % 5) + 1);
     const startedAt = performance.now();
@@ -792,29 +831,43 @@ async function measureRangeDirection(sourceFrame, targetFrame, count) {
       slider.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true }));
       slider.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
     }, value);
-    await waitForFrameText(targetFrame, "#speed-value", value, timeoutMs);
+    if (!await waitForFrameText(targetFrame, "#speed-value", value, actionTimeoutMs, false)) {
+      missedActions += 1;
+      continue;
+    }
     latenciesMs.push(Number((performance.now() - startedAt).toFixed(2)));
   }
-  return latencySummary(latenciesMs);
+  return latencySummary(latenciesMs, missedActions);
 }
 
-function latencySummary(latenciesMs) {
+function latencySummary(latenciesMs, missedActions = 0) {
   return {
     latenciesMs,
+    attemptedActions: latenciesMs.length + missedActions,
+    missedActions,
     p50Ms: percentile(latenciesMs, 0.5),
     p95Ms: percentile(latenciesMs, 0.95),
     p99Ms: percentile(latenciesMs, 0.99),
   };
 }
 
-async function waitForFrameText(frame, selector, expected, timeout) {
+async function resetGame(sourceFrame, targetFrame) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await sourceFrame.locator("#reset").click();
+    if (await waitForFrameText(targetFrame, "#position", "0", actionTimeoutMs, false)) return;
+  }
+  throw new Error("Game state could not be reset after a missed action");
+}
+
+async function waitForFrameText(frame, selector, expected, timeout, throwOnTimeout = true) {
   const started = Date.now();
   const locator = frame.locator(selector);
   while (Date.now() - started < timeout) {
-    if ((await locator.textContent())?.trim() === expected) return;
+    if ((await locator.textContent())?.trim() === expected) return true;
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
-  throw new Error(`Timed out waiting for ${selector}=${expected}`);
+  if (throwOnTimeout) throw new Error(`Timed out waiting for ${selector}=${expected}`);
+  return false;
 }
 
 async function requestAndWaitForAdaptation(token, materialId, assetId) {

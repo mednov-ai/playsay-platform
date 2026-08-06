@@ -199,6 +199,12 @@ export function HtmlGameFrame({
       activeSnapshot?.runId === authorityRunId &&
       appliedAuthorityRunId === authorityRunId,
     );
+  const shouldMountIframe = !(
+    sdkRuntime
+    && sync
+    && !sync.isAuthority
+    && !authorityRunId
+  );
 
   const clearMirrorSnapshotRetry = useCallback(() => {
     if (mirrorSnapshotRetryRef.current !== null) {
@@ -861,14 +867,16 @@ export function HtmlGameFrame({
       data-paused={authorityAvailable ? "false" : "true"}
       data-runtime={sdkRuntime ? "sdk-v1" : predictiveMirror ? "predictive" : isMirror ? "authority-mirror" : "authority"}
     >
-      <iframe
-        allow="autoplay"
-        ref={iframeRef}
-        sandbox="allow-scripts allow-forms allow-pointer-lock"
-        srcDoc={srcDoc}
-        style={{ height: fillAvailable ? "100%" : height }}
-        title={title}
-      />
+      {shouldMountIframe ? (
+        <iframe
+          allow="autoplay"
+          ref={iframeRef}
+          sandbox="allow-scripts allow-forms allow-pointer-lock"
+          srcDoc={srcDoc}
+          style={{ height: fillAvailable ? "100%" : height }}
+          title={title}
+        />
+      ) : null}
       {(isMirror || (sdkRuntime && !sync?.isAuthority)) && !authorityAvailable ? (
         <div className="playsay-html-game-waiting" role="status">
           <Gamepad2 className="h-5 w-5 text-primary" />

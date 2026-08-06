@@ -203,6 +203,54 @@ describe("HTML game sandbox", () => {
     expect(document).not.toContain('type="application/playsay-disabled"');
   });
 
+  it("does not boot an SDK replica with a temporary run id", () => {
+    const sdkGame = `<html><head><script type="application/playsay-game+json">{
+      "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
+      "reducerVersion":"1","buildHash":"test"
+    }</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>`;
+    const createSync = (authorityRunId?: string): MaterialHtmlGameSync => ({
+      ...sdkSyncFields(),
+      authorityRuns: authorityRunId ? { "game-sdk": authorityRunId } : {},
+      effects: [],
+      inputs: [],
+      isAuthority: false,
+      presentedBlockId: "game-sdk",
+      publishEffect: vi.fn(),
+      publishInput: vi.fn(),
+      publishSnapshot: vi.fn(),
+      ready: true,
+      setAuthorityRun: vi.fn(),
+      setPresentedBlock: vi.fn(),
+      snapshots: {},
+    });
+    const view = render(
+      <HtmlGameFrame
+        blockId="game-sdk"
+        height={640}
+        html={sdkGame}
+        sync={createSync()}
+        title="Game"
+      />,
+    );
+
+    expect(view.container.querySelector("iframe")).toBeNull();
+    expect(view.container.querySelector(".playsay-html-game-waiting")).not.toBeNull();
+
+    view.rerender(
+      <HtmlGameFrame
+        blockId="game-sdk"
+        height={640}
+        html={sdkGame}
+        sync={createSync("authority-run")}
+        title="Game"
+      />,
+    );
+
+    const iframe = view.container.querySelector("iframe");
+    expect(iframe).not.toBeNull();
+    expect(view.container.querySelector(".playsay-html-game")?.getAttribute("data-paused")).toBe("false");
+  });
+
   it("ignores legacy input messages from an SDK v1 frame", () => {
     const publishInput = vi.fn();
     const sdkGame = `<html><head><script type="application/playsay-game+json">{

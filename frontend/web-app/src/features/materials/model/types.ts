@@ -285,16 +285,13 @@ export type MaterialExternalActivitySync = {
   isHost: boolean;
   mediaStream: MediaStream | null;
   open: (block: MaterialEditorBlock) => void;
-  collapse: () => void;
   sendInput: (input: {
     type: "pointer" | "scroll" | "key";
     [key: string]: unknown;
   }) => void;
   sendCursor: (x: number, y: number) => void;
-  setStudentsLocked: (locked: boolean) => void;
   reload: () => void;
-  back: () => void;
-  stop: () => void;
+  returnToLesson: () => void;
 };
 
 export type MaterialMatchingTargetKind = "TEXT" | "IMAGE";
@@ -513,4 +510,3 @@ export type MaterialDraftSourceImage = {
   fileName: string;
   originalSize: number;
 };
-

@@ -275,7 +275,8 @@ export function LessonMaterialDocumentView({
       htmlGameSync?.setPresentedBlock(null);
     }
     if (focusedBlock?.kind === "externalActivity") {
-      externalActivitySync?.collapse();
+      if (!externalActivitySync?.isHost) return;
+      externalActivitySync.returnToLesson();
     }
     setFocusedBlock(null);
     if (blockId) {
@@ -400,25 +401,21 @@ export function LessonMaterialDocumentView({
         data-active={focusedBlock === null ? "false" : "true"}
         data-kind={focusedBlock?.kind}
       >
-        {focusedBlock ? (
-        <button
-          aria-label={focusedBlock.kind === "htmlGame"
-            ? t("materials.renderer.closeGame")
-            : focusedBlock.kind === "externalActivity"
-              ? t("materials.renderer.closeExternalActivity")
+        {focusedBlock && focusedBlock.kind !== "externalActivity" ? (
+          <button
+            aria-label={focusedBlock.kind === "htmlGame"
+              ? t("materials.renderer.closeGame")
               : t("materials.renderer.closeImage")}
-          className="playsay-material-focus-close"
-          data-testid="material-focus-close"
-          onClick={closeBlockFocus}
-          title={focusedBlock.kind === "htmlGame"
-            ? t("materials.renderer.closeGame")
-            : focusedBlock.kind === "externalActivity"
-              ? t("materials.renderer.closeExternalActivity")
+            className="playsay-material-focus-close"
+            data-testid="material-focus-close"
+            onClick={closeBlockFocus}
+            title={focusedBlock.kind === "htmlGame"
+              ? t("materials.renderer.closeGame")
               : t("materials.renderer.closeImage")}
-          type="button"
-        >
-          <Minimize2 className="h-5 w-5" />
-        </button>
+            type="button"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </button>
         ) : null}
         {allBlocks.filter((block) => block.type === "htmlGame" && launchedGameIds.has(block.id)).map((block) => {
           const assetId = materialAssetIdFromUrl(block.url);

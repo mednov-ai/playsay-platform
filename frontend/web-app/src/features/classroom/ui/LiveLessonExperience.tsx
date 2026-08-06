@@ -11,6 +11,7 @@ import type { LessonRoomSession } from "../model/session";
 import { lessonLiveKitRoomOptions } from "../model/liveKitRoomOptions";
 import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoStage";
 import { LessonWorkspace } from "./LessonWorkspace";
+import type { LessonPresentationMode } from "./LessonTaskCanvas";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
@@ -58,6 +59,7 @@ export function LiveLessonExperience({
   const shellRef = useRef<HTMLDivElement>(null);
   const [fullscreenActive, setFullscreenActive] = useState(() => classroomFullscreenActive());
   const [fullscreenPending, setFullscreenPending] = useState(false);
+  const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const [screenShareActive, setScreenShareActive] = useState(false);
   const displayName = profile?.name ?? profile?.username ?? t("classroom.participantFallback");
   const canManageLesson = canAssignLessons(profile);
@@ -70,11 +72,14 @@ export function LiveLessonExperience({
   const rawViewportMode = useClassroomViewportMode();
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive);
-  const classroomVideoMode: ClassroomVideoMode = videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
-    ? "focusOnly"
-    : videoOnly
-      ? "videoOnly"
-      : "lesson";
+  const externalActivityFocus = presentationMode === "external-activity-focus";
+  const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
+    ? "externalActivity"
+    : videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
+      ? "focusOnly"
+      : videoOnly
+        ? "videoOnly"
+        : "lesson";
   const showWorkspace = shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
   const liveKitRoomOptions = useMemo(
     () => lessonLiveKitRoomOptions(session.mediaChoices.audioOutputDeviceId),
@@ -86,6 +91,12 @@ export function LiveLessonExperience({
 
     return () => document.body.classList.remove("playsay-classroom-video-expanded");
   }, [videoExpanded]);
+
+  useEffect(() => {
+    document.body.classList.toggle("playsay-classroom-external-activity-focus", externalActivityFocus);
+
+    return () => document.body.classList.remove("playsay-classroom-external-activity-focus");
+  }, [externalActivityFocus]);
 
   useEffect(() => {
     function updateFullscreenState() {
@@ -127,6 +138,7 @@ export function LiveLessonExperience({
   return (
     <div
       className="playsay-classroom-shell"
+      data-presentation-mode={presentationMode}
       data-screen-share-active={screenShareActive ? "true" : "false"}
       data-video-expanded={videoExpanded ? "true" : "false"}
       data-video-only={videoOnly ? "true" : "false"}
@@ -184,6 +196,8 @@ export function LiveLessonExperience({
             displayName={displayName}
             materials={materials}
             onAssignMaterial={onAssignMaterial}
+            onPresentationModeChange={setPresentationMode}
+            presentationMode={presentationMode}
             profile={profile}
             session={session}
           />

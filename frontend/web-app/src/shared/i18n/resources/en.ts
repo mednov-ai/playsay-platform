@@ -1255,11 +1255,8 @@ export const en = {
       wordBankGapPlaceholder: "word",
     },
     externalActivity: {
-      back: "Back",
       reload: "Reload",
-      lockStudents: "Lock students",
-      unlockStudents: "Unlock students",
-      stop: "Stop sharing",
+      returnToLesson: "Back to lesson",
       interactionSurface: "Shared external activity",
       mobileKeyboard: "Type in the shared activity",
       clickExtension: "Click the Play&Say extension in the opened activity tab",
@@ -1267,7 +1264,6 @@ export const en = {
       waitingHint: "Keep this window open. The shared page will appear here for everyone.",
       error: "The shared activity stopped",
       errorUnknown: "Check the extension and try again",
-      locked: "The teacher locked student control",
       parallelUnsupported: "Shared external activities are available in shared lesson mode. Switch this lesson from parallel work to shared mode.",
     },
     fileSize: {

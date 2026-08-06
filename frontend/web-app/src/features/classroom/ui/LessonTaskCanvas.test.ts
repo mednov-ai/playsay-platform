@@ -377,8 +377,6 @@ describe("LessonTaskCanvas", () => {
         studentsLocked: false,
         visible: true,
       },
-      back: vi.fn(),
-      collapse: vi.fn(),
       cursors: [],
       isHost: true,
       mediaStream: null,
@@ -386,8 +384,7 @@ describe("LessonTaskCanvas", () => {
       reload: vi.fn(),
       sendCursor: vi.fn(),
       sendInput: vi.fn(),
-      setStudentsLocked: vi.fn(),
-      stop: vi.fn(),
+      returnToLesson: vi.fn(),
     };
     const { container } = render(createElement(LessonTaskCanvas, {
       externalActivitySync,
@@ -1240,4 +1237,3 @@ function domRect({
     toJSON: () => ({}),
   } as DOMRect;
 }
-

@@ -1,4 +1,4 @@
-import { ArrowLeft, Lock, LockOpen, RefreshCw, Square, Unplug } from "lucide-react";
+import { ArrowLeft, RefreshCw, Unplug } from "lucide-react";
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import { Button } from "../../../../components/ui/button";
 import { useAppTranslation } from "../../../../shared/i18n";
@@ -63,7 +63,6 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     });
   }
 
-  const interactionLocked = Boolean(active?.studentsLocked && !sync.isHost);
   const waiting = !active || active.phase === "REQUESTED" || active.phase === "AWAITING_EXTENSION" || active.phase === "STARTING";
 
   return (
@@ -74,14 +73,9 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
           <small>{block.provider ?? "EXPERIMENTAL"}</small>
         </div>
         {sync.isHost ? (
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={sync.back} type="button" variant="outline"><ArrowLeft className="h-4 w-4" />{t("materials.externalActivity.back")}</Button>
+          <div className="playsay-external-activity-actions">
             <Button onClick={sync.reload} type="button" variant="outline"><RefreshCw className="h-4 w-4" />{t("materials.externalActivity.reload")}</Button>
-            <Button onClick={() => sync.setStudentsLocked(!active?.studentsLocked)} type="button" variant="outline">
-              {active?.studentsLocked ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
-              {active?.studentsLocked ? t("materials.externalActivity.unlockStudents") : t("materials.externalActivity.lockStudents")}
-            </Button>
-            <Button onClick={sync.stop} type="button" variant="outline"><Square className="h-4 w-4" />{t("materials.externalActivity.stop")}</Button>
+            <Button onClick={sync.returnToLesson} type="button"><ArrowLeft className="h-4 w-4" />{t("materials.externalActivity.returnToLesson")}</Button>
           </div>
         ) : null}
       </header>
@@ -106,13 +100,12 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
         }}
         ref={surfaceRef}
         role="application"
-        tabIndex={interactionLocked ? -1 : 0}
+        tabIndex={0}
       >
         <video autoPlay className="playsay-external-activity-video" muted={!sync.isHost} playsInline ref={videoRef} />
         <input
           aria-label={t("materials.externalActivity.mobileKeyboard")}
           className="playsay-external-activity-mobile-input"
-          disabled={interactionLocked}
           inputMode="text"
           onChange={(event) => {
             for (const character of event.currentTarget.value) {
@@ -152,7 +145,6 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
             <span>{active.errorCode ?? t("materials.externalActivity.errorUnknown")}</span>
           </div>
         ) : null}
-        {interactionLocked ? <div className="playsay-external-activity-lock"><Lock className="h-5 w-5" />{t("materials.externalActivity.locked")}</div> : null}
       </div>
     </section>
   );

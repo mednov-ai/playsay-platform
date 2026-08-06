@@ -1255,11 +1255,8 @@ export const fr = {
       wordBankGapPlaceholder: "mot",
     },
     externalActivity: {
-      back: "Retour",
       reload: "Recharger",
-      lockStudents: "Verrouiller les élèves",
-      unlockStudents: "Déverrouiller les élèves",
-      stop: "Arrêter le partage",
+      returnToLesson: "Retour au cours",
       interactionSurface: "Activité externe partagée",
       mobileKeyboard: "Saisie dans l’activité partagée",
       clickExtension: "Cliquez sur l’extension Play&Say dans l’onglet de l’activité",
@@ -1267,7 +1264,6 @@ export const fr = {
       waitingHint: "Gardez cette fenêtre ouverte. La page partagée apparaîtra ici pour tous.",
       error: "L’activité partagée s’est arrêtée",
       errorUnknown: "Vérifiez l’extension et réessayez",
-      locked: "L’enseignant a verrouillé le contrôle des élèves",
       parallelUnsupported: "Les activités externes partagées sont disponibles en mode de cours partagé. Quittez le mode de travail parallèle.",
     },
     fileSize: {

@@ -847,3 +847,57 @@ body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expand
   left: calc(0.65rem + env(safe-area-inset-left));
   max-width: calc(100% - 1.3rem);
 }
+
+@media (max-width: 700px) {
+  .playsay-classroom-shell[data-presentation-mode="external-activity-focus"] .playsay-video-header {
+    top: 0.5rem;
+    left: 0.5rem;
+    max-width: calc(50% - 0.75rem);
+    padding: 0.55rem 0.65rem;
+  }
+
+  .playsay-classroom-shell[data-presentation-mode="external-activity-focus"] .playsay-video-header h1 {
+    font-size: 0.8rem;
+  }
+
+  .playsay-classroom-shell[data-presentation-mode="external-activity-focus"] .playsay-video-live-badge {
+    font-size: 0.6rem;
+  }
+
+  .playsay-task-board[data-presentation-mode="external-activity-focus"] .playsay-external-activity-toolbar {
+    top: 0.5rem;
+    right: 0.5rem;
+    max-width: calc(50% - 0.75rem);
+    padding: 0.35rem;
+  }
+
+  .playsay-task-board[data-presentation-mode="external-activity-focus"] .playsay-external-activity-actions {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .playsay-task-board[data-presentation-mode="external-activity-focus"] .playsay-external-activity-actions button {
+    min-height: 2.35rem;
+    padding-inline: 0.55rem;
+    font-size: 0.7rem;
+  }
+
+  .playsay-external-activity-pip {
+    width: min(11rem, 42vw);
+    height: auto;
+    aspect-ratio: 8 / 5;
+  }
+
+  .playsay-classroom-control-label {
+    display: none;
+  }
+
+  .playsay-classroom-controls[data-external-activity-focus="true"] .lk-button,
+  .playsay-classroom-controls[data-external-activity-focus="true"] .lk-start-audio-button {
+    width: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    padding-inline: 0;
+    font-size: 0;
+  }
+}

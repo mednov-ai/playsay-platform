@@ -39,6 +39,7 @@ export const classroomScreenShareCaptureOptions = {
 
 export function ClassroomControlBar({
   canCompleteLesson = false,
+  externalActivityFocus = false,
   fullscreenActive = false,
   fullscreenLabel = "",
   fullscreenPending = false,
@@ -50,6 +51,7 @@ export function ClassroomControlBar({
   translation,
 }: {
   canCompleteLesson?: boolean;
+  externalActivityFocus?: boolean;
   fullscreenActive?: boolean;
   fullscreenLabel?: string;
   fullscreenPending?: boolean;
@@ -67,32 +69,42 @@ export function ClassroomControlBar({
   } = usePersistentUserChoices();
 
   return (
-    <div className="lk-control-bar playsay-classroom-controls" ref={setControlsRef}>
+    <div
+      className="lk-control-bar playsay-classroom-controls"
+      data-external-activity-focus={externalActivityFocus ? "true" : "false"}
+      ref={setControlsRef}
+    >
       <TrackToggle
         aria-label={t("classroom.controls.microphone")}
         onChange={(enabled, userInitiated) => { if (userInitiated) saveAudioInputEnabled(enabled); }}
         source={Track.Source.Microphone}
         title={t("classroom.controls.microphone")}
-      />
+      >
+        {externalActivityFocus ? <span className="playsay-classroom-control-label">{t("classroom.controls.microphone")}</span> : null}
+      </TrackToggle>
       <TrackToggle
         aria-label={t("classroom.controls.camera")}
         onChange={(enabled, userInitiated) => { if (userInitiated) saveVideoInputEnabled(enabled); }}
         source={Track.Source.Camera}
         title={t("classroom.controls.camera")}
-      />
-      <ClassroomScreenShareToggle />
-      <ClassroomStartMediaButton />
-      <button
-        aria-label={fullscreenLabel}
-        className="lk-button playsay-classroom-fullscreen-control"
-        disabled={fullscreenPending}
-        onClick={onToggleFullscreen}
-        title={fullscreenLabel}
-        type="button"
       >
-        {fullscreenActive ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
-      </button>
-      {role && (translation.canEnable || translation.localEnabled) ? (
+        {externalActivityFocus ? <span className="playsay-classroom-control-label">{t("classroom.controls.camera")}</span> : null}
+      </TrackToggle>
+      {!externalActivityFocus ? <ClassroomScreenShareToggle /> : null}
+      <ClassroomStartMediaButton />
+      {!externalActivityFocus ? (
+        <button
+          aria-label={fullscreenLabel}
+          className="lk-button playsay-classroom-fullscreen-control"
+          disabled={fullscreenPending}
+          onClick={onToggleFullscreen}
+          title={fullscreenLabel}
+          type="button"
+        >
+          {fullscreenActive ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+        </button>
+      ) : null}
+      {!externalActivityFocus && role && (translation.canEnable || translation.localEnabled) ? (
         <button
           aria-label={translationButtonLabel(translation, role, t)}
           aria-pressed={translation.status === "speaking"}
@@ -135,7 +147,7 @@ export function ClassroomControlBar({
             : <Languages className="h-4 w-4" />}
         </button>
       ) : null}
-      {canCompleteLesson ? (
+      {!externalActivityFocus && canCompleteLesson ? (
         <details className="playsay-classroom-more">
           <summary aria-label={t("classroom.actions.more")} title={t("classroom.actions.more")}>
             <Ellipsis aria-hidden="true" />
@@ -161,6 +173,7 @@ export function ClassroomControlBar({
         type="button"
       >
         <PhoneOff aria-hidden="true" />
+        {externalActivityFocus ? <span className="playsay-classroom-control-label">{t("classroom.actions.leave")}</span> : null}
       </button>
     </div>
   );

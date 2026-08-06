@@ -7,8 +7,6 @@ import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
 vi.mock("../hooks/useExternalActivitySession", () => ({
   useExternalActivitySession: () => ({
     active: null,
-    back: vi.fn(),
-    collapse: vi.fn(),
     cursors: [],
     isHost: false,
     mediaStream: null,
@@ -16,8 +14,7 @@ vi.mock("../hooks/useExternalActivitySession", () => ({
     reload: vi.fn(),
     sendCursor: vi.fn(),
     sendInput: vi.fn(),
-    setStudentsLocked: vi.fn(),
-    stop: vi.fn(),
+    returnToLesson: vi.fn(),
   }),
 }));
 

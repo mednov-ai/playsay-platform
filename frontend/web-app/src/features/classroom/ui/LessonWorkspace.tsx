@@ -43,12 +43,16 @@ export function LessonWorkspace({
   displayName,
   materials,
   onAssignMaterial,
+  onPresentationModeChange,
+  presentationMode,
   profile,
   session,
 }: {
   displayName: string;
   materials: LessonMaterial[];
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
+  onPresentationModeChange: (mode: LessonPresentationMode) => void;
+  presentationMode: LessonPresentationMode;
   profile: MeProfile | null;
   session: LessonRoomSession;
 }) {
@@ -89,7 +93,6 @@ export function LessonWorkspace({
   const canManageMaterial = canAssignLessons(profile) && !isParallelWork;
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
   const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
-  const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const [startingVocabularyPractice, setStartingVocabularyPractice] = useState(false);
   const [activityRailOpen, setActivityRailOpen] = useState(() => (
     vocabularyFeatures.personalPracticeV2
@@ -417,7 +420,7 @@ export function LessonWorkspace({
                 externalActivitySync={isParallelWork || !externalActivitiesEnabled ? undefined : teacherExternalActivitySync}
                 liveActivePageId={liveActivePageId}
                 onSaveAnswers={(content) => void saveMaterialAnswers(content, activeParticipant?.subject)}
-                onPresentationModeChange={setPresentationMode}
+                onPresentationModeChange={onPresentationModeChange}
                 score={lessonScore}
                 submission={activeStudentSubmission}
                 submissionMessage={submissionMessage}
@@ -443,7 +446,7 @@ export function LessonWorkspace({
               lessonId={session.lessonId}
               material={visibleMaterial}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
-              onPresentationModeChange={setPresentationMode}
+              onPresentationModeChange={onPresentationModeChange}
               score={lessonScore}
               submission={submission}
               submissionMessage={submissionMessage}
@@ -456,7 +459,7 @@ export function LessonWorkspace({
               lessonId={session.lessonId}
               material={visibleMaterial}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
-              onPresentationModeChange={setPresentationMode}
+              onPresentationModeChange={onPresentationModeChange}
               profileSubject={profile?.subject}
               score={lessonScore}
               sharedPresenceEnabled={studentSharedPresenceEnabled}
@@ -481,7 +484,7 @@ export function LessonWorkspace({
             <LessonTaskCanvas
               lessonId={session.lessonId}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
-              onPresentationModeChange={setPresentationMode}
+              onPresentationModeChange={onPresentationModeChange}
               score={lessonScore}
               submission={submission}
               submissionMessage={submissionMessage}

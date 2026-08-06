@@ -42,7 +42,6 @@ export function useExternalActivitySession({
   const activeRef = useRef<ExternalActivityState | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const extensionNonceRef = useRef<string | null>(null);
-  const collapseTimerRef = useRef<number | null>(null);
   const extensionTimerRef = useRef<number | null>(null);
   const blocksRef = useRef(blocks);
   const handledInputEventsRef = useRef(new Set<string>());
@@ -65,9 +64,7 @@ export function useExternalActivitySession({
   }, [publish]);
 
   const clearTimers = useCallback(() => {
-    if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current);
     if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);
-    collapseTimerRef.current = null;
     extensionTimerRef.current = null;
   }, []);
 
@@ -133,15 +130,6 @@ export function useExternalActivitySession({
     }, 10_000);
   }, [broadcastState, clearTimers, isHost, postExtensionCommand, room.localParticipant.identity, stopHostSession]);
 
-  const collapseHostSession = useCallback(() => {
-    const current = activeRef.current;
-    if (!current || !isHost) return;
-    const next = { ...current, visible: false };
-    broadcastState(next);
-    if (collapseTimerRef.current !== null) window.clearTimeout(collapseTimerRef.current);
-    collapseTimerRef.current = window.setTimeout(() => void stopHostSession(), 60_000);
-  }, [broadcastState, isHost, stopHostSession]);
-
   useEffect(() => {
     if (!enabled) return undefined;
     const handleData = (payload: Uint8Array, participant?: RemoteParticipant, _kind?: unknown, topic?: string) => {
@@ -165,7 +153,7 @@ export function useExternalActivitySession({
         return;
       }
       if (message.type === "REQUEST_CLOSE" && isHost && activeRef.current?.sessionId === message.sessionId) {
-        collapseHostSession();
+        void stopHostSession();
         return;
       }
       if (message.type === "INPUT" && isHost && message.input && activeRef.current?.sessionId === message.sessionId) {
@@ -175,10 +163,8 @@ export function useExternalActivitySession({
           const oldest = handledInputEventsRef.current.values().next().value;
           if (oldest) handledInputEventsRef.current.delete(oldest);
         }
-        if (!activeRef.current.studentsLocked) {
-          const nonce = extensionNonceRef.current;
-          if (nonce) postExtensionCommand({ version: 1, type: "INPUT", sessionId: message.sessionId, nonce, input: message.input });
-        }
+        const nonce = extensionNonceRef.current;
+        if (nonce) postExtensionCommand({ version: 1, type: "INPUT", sessionId: message.sessionId, nonce, input: message.input });
         return;
       }
       if (message.type === "CURSOR" && message.cursor && activeRef.current?.sessionId === message.sessionId) {
@@ -234,7 +220,7 @@ export function useExternalActivitySession({
     };
     room.on(RoomEvent.DataReceived, handleData);
     return () => { room.off(RoomEvent.DataReceived, handleData); };
-  }, [collapseHostSession, enabled, isHost, postExtensionCommand, room, startHostSession]);
+  }, [enabled, isHost, postExtensionCommand, room, startHostSession, stopHostSession]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -387,16 +373,9 @@ export function useExternalActivitySession({
     }
   }, [enabled, isHost, publish, startHostSession]);
 
-  const collapse = useCallback(() => {
-    const current = activeRef.current;
-    if (!current) return;
-    if (isHost) collapseHostSession();
-    else publish({ version: 1, type: "REQUEST_CLOSE", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true);
-  }, [collapseHostSession, isHost, publish]);
-
   const sendInput = useCallback((input: ExternalActivityInput) => {
     const current = activeRef.current;
-    if (!current || current.phase !== "ACTIVE" || (!isHost && current.studentsLocked)) return;
+    if (!current || current.phase !== "ACTIVE") return;
     if (isHost) {
       const nonce = extensionNonceRef.current;
       if (nonce) postExtensionCommand({ version: 1, type: "INPUT", sessionId: current.sessionId, nonce, input });
@@ -417,32 +396,23 @@ export function useExternalActivitySession({
     }, externalActivityCursorTopic, false);
   }, [participantColor, participantName, publish]);
 
-  const setStudentsLocked = useCallback((locked: boolean) => {
-    const current = activeRef.current;
-    if (!current || !isHost) return;
-    broadcastState({ ...current, studentsLocked: locked });
-  }, [broadcastState, isHost]);
-
-  const navigation = useCallback((type: "RELOAD" | "BACK") => {
+  const reload = useCallback(() => {
     const current = activeRef.current;
     const nonce = extensionNonceRef.current;
-    if (current && nonce && isHost) postExtensionCommand({ version: 1, type, sessionId: current.sessionId, nonce });
+    if (current && nonce && isHost) postExtensionCommand({ version: 1, type: "RELOAD", sessionId: current.sessionId, nonce });
   }, [isHost, postExtensionCommand]);
 
   return useMemo(() => ({
     active,
-    back: () => navigation("BACK"),
-    collapse,
     cursors: Object.values(cursorsByIdentity),
     isHost,
     mediaStream,
     open,
-    reload: () => navigation("RELOAD"),
+    reload,
+    returnToLesson: () => { if (isHost) void stopHostSession(); },
     sendCursor,
     sendInput: sendInput as MaterialExternalActivitySync["sendInput"],
-    setStudentsLocked,
-    stop: () => { if (isHost) void stopHostSession(); },
-  }), [active, collapse, cursorsByIdentity, isHost, mediaStream, navigation, open, sendCursor, sendInput, setStudentsLocked, stopHostSession]);
+  }), [active, cursorsByIdentity, isHost, mediaStream, open, reload, sendCursor, sendInput, stopHostSession]);
 }
 
 async function consumeCapture(streamId: string, sessionId: string): Promise<MediaStream> {

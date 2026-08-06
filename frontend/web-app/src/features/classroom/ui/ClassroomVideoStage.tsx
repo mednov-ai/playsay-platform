@@ -21,7 +21,7 @@ export type ClassroomVideoSlot =
       subject: string;
     };
 type ClassroomStripLayout = "single" | "row";
-export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly";
+export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly" | "externalActivity";
 
 export function ClassroomVideoStage({
   expectedParticipants,
@@ -84,9 +84,12 @@ export function ClassroomVideoStage({
   const screenShareActive = Boolean(activeScreenShareTrack);
   const featuredSlot = cameraSlots[0];
   const stripSlots = activeScreenShareTrack ? cameraSlots : cameraSlots.slice(1);
+  const externalActivityVideo = classroomExternalActivityVideo(cameraSlots);
   const hasStrip = stripSlots.length > 0;
   const stripLayout = stripSlots.length > 1 ? "row" : "single";
-  const canDragStrip = hasStrip && stripLayout === "single";
+  const canDragStrip = mode === "externalActivity"
+    ? Boolean(externalActivityVideo.featuredSlot)
+    : hasStrip && stripLayout === "single";
   const pipStyle = {
     "--playsay-pip-x": `${pipPosition.x}px`,
     "--playsay-pip-y": `${pipPosition.y}px`,
@@ -101,17 +104,20 @@ export function ClassroomVideoStage({
     }
 
     const inset = 8;
+    const minY = mode === "externalActivity"
+      ? Math.min(112, Math.max(inset, focusRect.height - stripRect.height - inset))
+      : inset;
     const maxX = Math.max(inset, focusRect.width - stripRect.width - inset);
-    let maxY = Math.max(inset, focusRect.height - stripRect.height - inset);
+    let maxY = Math.max(minY, focusRect.height - stripRect.height - inset);
     const controlsRect = controlsRef.current?.getBoundingClientRect();
 
     if (controlsRect && controlsRect.top < focusRect.bottom && controlsRect.bottom > focusRect.top) {
-      maxY = Math.min(maxY, Math.max(inset, controlsRect.top - focusRect.top - stripRect.height - inset));
+      maxY = Math.max(minY, Math.min(maxY, controlsRect.top - focusRect.top - stripRect.height - inset));
     }
 
     return {
       x: Math.min(Math.max(x, inset), maxX),
-      y: Math.min(Math.max(y, inset), maxY),
+      y: Math.min(Math.max(y, minY), maxY),
     };
   }
 
@@ -122,6 +128,10 @@ export function ClassroomVideoStage({
 
     if (!focusRect || !stripRect) {
       return pipPosition;
+    }
+
+    if (mode === "externalActivity") {
+      return clampPipPosition(focusRect.width, focusRect.height);
     }
 
     const isCompactVideo = focusRect.width <= 640;
@@ -197,12 +207,13 @@ export function ClassroomVideoStage({
       return undefined;
     }
 
-    if (!hasStrip) {
+    if (!canDragStrip) {
+      dragState.current = null;
       singlePipInitializedRef.current = false;
       return undefined;
     }
 
-    if (stripLayout === "row") {
+    if (mode !== "externalActivity" && stripLayout === "row") {
       dragState.current = null;
       singlePipInitializedRef.current = false;
       return undefined;
@@ -223,7 +234,44 @@ export function ClassroomVideoStage({
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", keepPipInBounds);
     };
-  }, [hasStrip, mode, stripLayout, stripSlots.length]);
+  }, [canDragStrip, externalActivityVideo.additionalCount, mode, stripLayout, stripSlots.length]);
+
+  if (mode === "externalActivity") {
+    return (
+      <div className="playsay-classroom-conference" data-layout="pip" data-mode="external-activity">
+        <div className="playsay-external-activity-video-overlay" ref={focusRef}>
+          {externalActivityVideo.featuredSlot ? (
+            <div
+              className="playsay-external-activity-pip"
+              data-draggable="true"
+              onPointerCancel={handlePipPointerEnd}
+              onPointerDown={handlePipPointerDown}
+              onPointerMove={handlePipPointerMove}
+              onPointerUp={handlePipPointerEnd}
+              ref={stripRef}
+              style={pipStyle}
+            >
+              <ClassroomMiniVideoTile layout="single" slot={externalActivityVideo.featuredSlot} />
+              {externalActivityVideo.additionalCount > 0 ? (
+                <span className="playsay-external-activity-participant-count">
+                  +{externalActivityVideo.additionalCount}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        <ClassroomControlBar
+          externalActivityFocus
+          onLeave={onLeave}
+          role={translationRole}
+          setControlsRef={(node) => { controlsRef.current = node; }}
+          translation={translation}
+        />
+        <RoomAudioRenderer />
+        <ConnectionStateToast />
+      </div>
+    );
+  }
 
   if (mode === "videoOnly" && !activeScreenShareTrack) {
     return (
@@ -319,6 +367,17 @@ export function ClassroomVideoStage({
 export function classroomScreenShareTrack(screenShareTracks: ClassroomTrackReference[]) {
   const presentationTracks = screenShareTracks.filter((trackRef) => !trackRef.publication?.trackName?.startsWith(externalActivityTrackPrefix));
   return presentationTracks.find((trackRef) => !trackRef.participant.isLocal) ?? presentationTracks[0];
+}
+
+export function classroomExternalActivityVideo(cameraSlots: ClassroomVideoSlot[]) {
+  const remoteSlots = cameraSlots.filter((slot) => (
+    slot.kind === "placeholder" || !slot.trackRef.participant.isLocal
+  ));
+
+  return {
+    additionalCount: Math.max(0, remoteSlots.length - 1),
+    featuredSlot: remoteSlots[0],
+  };
 }
 
 function ClassroomTranslationOverlay({ translation }: { translation: ReturnType<typeof useLessonTranslation> }) {

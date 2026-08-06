@@ -227,6 +227,26 @@ describe("ClassroomControlBar compact controls", () => {
     renderControlBar();
     expect(screen.queryByText("Завершить занятие")).not.toBeInTheDocument();
   });
+
+  it("keeps only microphone, camera, and leave in external activity focus", () => {
+    render(
+      <ClassroomControlBar
+        canCompleteLesson
+        externalActivityFocus
+        fullscreenLabel="На весь экран"
+        role="teacher"
+        setControlsRef={vi.fn()}
+        translation={{ canEnable: true, localEnabled: false } as LessonTranslationController}
+      />,
+    );
+
+    expect(screen.getByText("Микрофон")).toBeInTheDocument();
+    expect(screen.getByText("Камера")).toBeInTheDocument();
+    expect(screen.getByText("Выйти")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Экран" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "На весь экран" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Завершить занятие")).not.toBeInTheDocument();
+  });
 });
 
 describe("ClassroomControlBar screen sharing", () => {

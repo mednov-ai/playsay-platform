@@ -1255,11 +1255,8 @@ export const de = {
       wordBankGapPlaceholder: "Wort",
     },
     externalActivity: {
-      back: "Zurück",
       reload: "Neu laden",
-      lockStudents: "Lernende sperren",
-      unlockStudents: "Lernende entsperren",
-      stop: "Freigabe beenden",
+      returnToLesson: "Zurück zum Unterricht",
       interactionSurface: "Gemeinsame externe Aktivität",
       mobileKeyboard: "Eingabe in die gemeinsame Aktivität",
       clickExtension: "Klicken Sie im geöffneten Aktivitäts-Tab auf die Play&Say-Erweiterung",
@@ -1267,7 +1264,6 @@ export const de = {
       waitingHint: "Lassen Sie dieses Fenster geöffnet. Die gemeinsame Seite erscheint hier für alle.",
       error: "Die gemeinsame Aktivität wurde beendet",
       errorUnknown: "Erweiterung prüfen und erneut versuchen",
-      locked: "Die Lehrkraft hat die Steuerung gesperrt",
       parallelUnsupported: "Gemeinsame externe Aktivitäten sind im gemeinsamen Unterrichtsmodus verfügbar. Wechseln Sie vom parallelen in den gemeinsamen Modus.",
     },
     fileSize: {

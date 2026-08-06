@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
-import { classroomCameraSlots, classroomScreenShareTrack } from "./ClassroomVideoStage";
+import {
+  classroomCameraSlots,
+  classroomExternalActivityVideo,
+  classroomScreenShareTrack,
+} from "./ClassroomVideoStage";
 
 describe("classroomCameraSlots", () => {
   const participants = [
@@ -58,6 +62,21 @@ describe("classroomCameraSlots", () => {
     const external = track("teacher-1", false, "screen_share", "playsay-external-activity-session-1-video");
 
     expect(classroomScreenShareTrack([external])).toBeUndefined();
+  });
+
+  it("shows one remote participant in external activity PiP and counts the rest", () => {
+    const slots = classroomCameraSlots(
+      [track("teacher-1", true), track("student-1", false), track("student-2", false)],
+      participants,
+      {},
+      true,
+    );
+
+    const externalVideo = classroomExternalActivityVideo(slots);
+
+    expect(externalVideo.featuredSlot?.kind).toBe("track");
+    expect(externalVideo.featuredSlot?.kind === "track" && externalVideo.featuredSlot.trackRef.participant.identity).toBe("student-1");
+    expect(externalVideo.additionalCount).toBe(1);
   });
 });
 

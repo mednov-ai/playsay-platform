@@ -71,9 +71,9 @@ test(
       git(platformWork, ["add", "."]);
       git(platformWork, ["commit", "-qm", "candidate source"]);
       const candidatePlatformCommit = git(platformWork, ["rev-parse", "HEAD"]);
-      git(platformWork, ["branch", "release/1.001.07"]);
+      git(platformWork, ["branch", "release/01.002.00"]);
       git(platformWork, ["remote", "add", "origin", `file://${platformBare}`]);
-      git(platformWork, ["push", "-q", "origin", "release/1.001.06", "release/1.001.07"]);
+      git(platformWork, ["push", "-q", "origin", "release/1.001.06", "release/01.002.00"]);
 
       initWorkRepo(infraWork);
       write(infraWork, "argocd-apps/prod/current-release.txt", "release/1.001.06\n");
@@ -195,7 +195,7 @@ test(
         GIT_CONFIG_VALUE_1: rewrittenPlatformUrl,
         INFRA_REPO: "https://example.invalid/infra.git",
         PLATFORM_REPO: rewrittenPlatformUrl,
-        CI_BRANCH: "release/1.001.07",
+        CI_BRANCH: "release/01.002.00",
         GIT_COMMIT: candidatePlatformCommit,
         BASE_RELEASE_BRANCH: "release/1.001.06",
         BASE_PLATFORM_COMMIT: basePlatformCommit,
@@ -228,7 +228,7 @@ test(
       assert.equal(retryPrepare.status, 0, `${retryPrepare.stdout}\n${retryPrepare.stderr}`);
       assert.match(retryPrepare.stdout, /RELEASE_AFFECTED_TARGETS=web-app/);
 
-      git(sandbox, ["clone", "-q", "--branch", "release/1.001.07", `file://${infraBare}`, candidateWork]);
+      git(sandbox, ["clone", "-q", "--branch", "release/01.002.00", `file://${infraBare}`, candidateWork]);
       const manifestPath = resolve(candidateWork, "argocd-apps/prod/release-candidate.yaml");
       assert.match(readFileSync(manifestPath, "utf8"), /status: building/);
       assert.equal(
@@ -256,12 +256,12 @@ test(
       const candidateValues = resolve(candidateWork, "helm-charts/web-app/values-prod.yaml");
       run(yqBin, [
         "-i",
-        `.image.tag = "new" | .image.digest = "${newDigest}" | .build.name = "new" | .build.number = "2" | .build.branch = "release/1.001.07" | .build.commit = "${candidatePlatformCommit}"`,
+        `.image.tag = "new" | .image.digest = "${newDigest}" | .build.name = "new" | .build.number = "2" | .build.branch = "release/01.002.00" | .build.commit = "${candidatePlatformCommit}"`,
         candidateValues,
       ]);
       git(candidateWork, ["add", candidateValues]);
       git(candidateWork, ["commit", "-qm", "candidate image"]);
-      git(candidateWork, ["push", "-q", "origin", "HEAD:release/1.001.07"]);
+      git(candidateWork, ["push", "-q", "origin", "HEAD:release/01.002.00"]);
 
       const finalize = spawnSync(
         "sh",
@@ -271,7 +271,7 @@ test(
       assert.equal(finalize.status, 0, `${finalize.stdout}\n${finalize.stderr}`);
 
       rmSync(candidateWork, { recursive: true, force: true });
-      git(sandbox, ["clone", "-q", "--branch", "release/1.001.07", `file://${infraBare}`, candidateWork]);
+      git(sandbox, ["clone", "-q", "--branch", "release/01.002.00", `file://${infraBare}`, candidateWork]);
       assert.equal(
         run(yqBin, ["-r", ".status", resolve(candidateWork, "argocd-apps/prod/release-candidate.yaml")]),
         "ready",

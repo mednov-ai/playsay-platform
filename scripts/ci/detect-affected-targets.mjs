@@ -22,7 +22,8 @@ export const TARGETS = Object.freeze([
 
 export const VALIDATION_SUITES = Object.freeze(["ci-contracts", "smoke-syntax"]);
 
-const NUMERIC_RELEASE_PATTERN = /^release\/[0-9]+\.[0-9]+\.[0-9]+$/;
+const NEW_RELEASE_PATTERN = /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/;
+const HISTORICAL_RELEASE_PATTERN = /^release\/[0-9]+\.[0-9]+\.[0-9]+$/;
 const ZERO_COMMIT_PATTERN = /^0{40}$/;
 const ALL_TARGETS = new Set(TARGETS);
 const BACKEND_TARGETS = new Set([
@@ -399,7 +400,7 @@ export function resolveCurrentProductionBaseline({ infraRepo, platformRemote = "
   try {
     git(["clone", "--quiet", "--depth", "1", "--single-branch", "--branch", "develop", infraRepo, infraDir]);
     const releaseBranch = readFileSync(resolve(infraDir, "argocd-apps/prod/current-release.txt"), "utf8").trim();
-    if (!NUMERIC_RELEASE_PATTERN.test(releaseBranch)) {
+    if (!HISTORICAL_RELEASE_PATTERN.test(releaseBranch)) {
       throw new DetectionError(`Invalid current production release in infra develop: ${releaseBranch}`);
     }
     git(["fetch", "--quiet", "--no-tags", platformRemote, `+refs/heads/${releaseBranch}:refs/remotes/${platformRemote}/${releaseBranch}`]);
@@ -448,7 +449,7 @@ export function detectTargetsFromGitRange({
   let baseCommit = before ?? "";
   let detectionMode = "webhook-range";
   if (!baseCommit || isZeroCommit(baseCommit)) {
-    if (!NUMERIC_RELEASE_PATTERN.test(branch) || !isCommitSha(releaseBaseCommit)) {
+    if (!NEW_RELEASE_PATTERN.test(branch) || !isCommitSha(releaseBaseCommit)) {
       throw new DetectionError(
         "A zero or missing GITHUB_BEFORE is allowed only for a numeric release with a resolved current-production baseline. Retry with FORCE_TARGETS if the baseline cannot be resolved.",
       );
@@ -502,7 +503,7 @@ function main() {
   };
 
   try {
-    if (NUMERIC_RELEASE_PATTERN.test(branch) && (!releaseBaseline.releaseBranch || !releaseBaseline.commit)) {
+    if (NEW_RELEASE_PATTERN.test(branch) && (!releaseBaseline.releaseBranch || !releaseBaseline.commit)) {
       releaseBaseline = resolveCurrentProductionBaseline({
         infraRepo: process.env.INFRA_REPO,
         platformRemote: "origin",

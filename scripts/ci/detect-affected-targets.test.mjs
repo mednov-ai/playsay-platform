@@ -244,7 +244,7 @@ test("first numeric release uses a divergent current-production baseline", () =>
     const result = detectTargetsFromGitRange({
       before: "0".repeat(40),
       after,
-      branch: "release/1.001.07",
+      branch: "release/01.002.00",
       releaseBaseCommit: base,
       releaseBaseBranch: "release/1.001.06",
     });

@@ -6,7 +6,13 @@ set -eu
 : "${GIT_COMMIT:?Missing GIT_COMMIT}"
 
 case "$CI_BRANCH" in
-  develop|codex/*|feature/*|hotfix/*|release/[0-9]*.[0-9]*.[0-9]*) ;;
+  develop|codex/*|feature/*|hotfix/*) ;;
+  release/*)
+    if ! printf '%s\n' "$CI_BRANCH" | grep -Eq '^release/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$'; then
+      echo "Production release branches must match release/NN.NNN.NN: $CI_BRANCH" >&2
+      exit 1
+    fi
+    ;;
   *)
     echo "Branch-head deployment guard does not support branch: $CI_BRANCH" >&2
     exit 1

@@ -204,6 +204,19 @@ export const en = {
       resetFailed: "Could not reset profile",
       adminUsersLoadFailed: "Could not load users",
     },
+    passkeys: {
+      title: "Passkey",
+      description: "Sign in with a fingerprint, Face ID, device PIN, or security key. Your password remains available as a fallback.",
+      add: "Add passkey",
+      manage: "Manage sign-in methods",
+      success: "A passkey is already configured or was added successfully.",
+      cancelled: "Passkey setup was cancelled.",
+      error: "Could not open passkey setup.",
+      promptAria: "Passkey setup suggestion",
+      promptTitle: "Sign in without a password",
+      promptDescription: "Add a passkey for faster and safer access to Honey School.",
+      later: "Not now",
+    },
   },
   workspace: {
     roles: {

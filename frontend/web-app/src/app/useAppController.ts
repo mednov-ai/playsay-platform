@@ -7,6 +7,7 @@ import {
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  consumeCompletedAuthAction,
   consumeSkipSilentLogin,
   fetchAdminUserProfiles,
   fetchMaterials,
@@ -22,6 +23,7 @@ import {
   startSilentLogin,
   type AdminUserProfile,
   type AppUserProfile,
+  type CompletedAuthAction,
   type LessonMaterial,
   type MeProfile,
   type ScheduledLesson,
@@ -66,6 +68,7 @@ export function useAppController(): AppShellProps {
   const [error, setError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [completedAuthAction, setCompletedAuthAction] = useState<CompletedAuthAction | null>(null);
   const resetShellUi = useAppShellUiStore((state) => state.resetShellUi);
   const setWorkspaceTab = useAppShellUiStore((state) => state.setWorkspaceTab);
   const workspaceTab = useAppShellUiStore((state) => state.workspaceTab);
@@ -97,8 +100,11 @@ export function useAppController(): AppShellProps {
         const currentUrl = new URL(window.location.href);
         if (isAuthCallback(currentUrl)) {
           await completeLogin(currentUrl);
-          window.history.replaceState({}, document.title, "/");
-          setCurrentPath("/");
+          const authAction = consumeCompletedAuthAction();
+          const returnPath = authAction?.returnPath ?? "/";
+          setCompletedAuthAction(authAction);
+          window.history.replaceState({}, document.title, returnPath);
+          setCurrentPath(returnPath);
         }
 
         if (!readTokens()) {
@@ -507,6 +513,7 @@ export function useAppController(): AppShellProps {
     openLessonPreparation,
     closeLessonPreparation,
     classroomLesson,
+    completedAuthAction,
     confirmScheduledLessonJoin,
   };
 }

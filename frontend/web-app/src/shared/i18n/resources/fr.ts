@@ -204,6 +204,19 @@ export const fr = {
       resetFailed: "Impossible de réinitialiser le profil",
       adminUsersLoadFailed: "Impossible de charger les utilisateurs",
     },
+    passkeys: {
+      title: "Clé d’accès",
+      description: "Connectez-vous avec une empreinte, Face ID, le code de l’appareil ou une clé de sécurité. Le mot de passe reste disponible en secours.",
+      add: "Ajouter une clé d’accès",
+      manage: "Gérer les méthodes de connexion",
+      success: "Une clé d’accès est déjà configurée ou a été ajoutée.",
+      cancelled: "La configuration de la clé d’accès a été annulée.",
+      error: "Impossible d’ouvrir la configuration de la clé d’accès.",
+      promptAria: "Suggestion de configuration d’une clé d’accès",
+      promptTitle: "Se connecter sans mot de passe",
+      promptDescription: "Ajoutez une clé d’accès pour un accès plus rapide et plus sûr à Honey School.",
+      later: "Pas maintenant",
+    },
   },
   workspace: {
     roles: {

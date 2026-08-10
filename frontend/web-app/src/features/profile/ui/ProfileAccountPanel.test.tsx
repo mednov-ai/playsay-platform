@@ -24,6 +24,7 @@ describe("ProfileAccountPanel", () => {
         learningGoal: null,
         updatedAt: "2026-06-03T00:00:00.000Z",
       } as AppUserProfile,
+      completedAuthAction: null,
       error: null,
       isAdmin: false,
       isAuthenticated: true,
@@ -47,6 +48,7 @@ describe("ProfileAccountPanel", () => {
     expect(markup).toContain("Россия");
     expect(markup).toContain("Дата рождения");
     expect(markup).toContain("Настройки аккаунта");
+    expect(markup).toContain("Добавить ключ доступа");
     expect(markup).toContain("В рабочую область");
   });
 });

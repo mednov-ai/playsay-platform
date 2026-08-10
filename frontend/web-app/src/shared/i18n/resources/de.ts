@@ -204,6 +204,19 @@ export const de = {
       resetFailed: "Profil konnte nicht zurückgesetzt werden",
       adminUsersLoadFailed: "Benutzer konnten nicht geladen werden",
     },
+    passkeys: {
+      title: "Passkey",
+      description: "Mit Fingerabdruck, Face ID, Geräte-PIN oder Sicherheitsschlüssel anmelden. Das Passwort bleibt als Ersatz verfügbar.",
+      add: "Passkey hinzufügen",
+      manage: "Anmeldemethoden verwalten",
+      success: "Ein Passkey ist bereits eingerichtet oder wurde erfolgreich hinzugefügt.",
+      cancelled: "Die Passkey-Einrichtung wurde abgebrochen.",
+      error: "Die Passkey-Einrichtung konnte nicht geöffnet werden.",
+      promptAria: "Vorschlag zur Passkey-Einrichtung",
+      promptTitle: "Ohne Passwort anmelden",
+      promptDescription: "Füge einen Passkey für einen schnelleren und sichereren Zugang zu Honey School hinzu.",
+      later: "Nicht jetzt",
+    },
   },
   workspace: {
     roles: {

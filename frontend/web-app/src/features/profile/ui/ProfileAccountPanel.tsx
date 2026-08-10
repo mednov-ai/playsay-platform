@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, RefreshCw, RotateCcw, Save, ShieldCheck, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, ExternalLink, KeyRound, Loader2, RefreshCw, RotateCcw, Save, ShieldCheck, User } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
 import type {
   AdminUserProfile,
   AppUserProfile,
+  CompletedAuthAction,
   MeProfile,
   UpdateUserProfileInput,
 } from "../../../shared/api/playsay";
+import { buildAccountConsoleUrl, startPasskeyRegistration } from "../../../shared/api/playsay";
 import { normalizeLanguage, useAppTranslation } from "../../../shared/i18n";
 import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
 
@@ -26,6 +28,7 @@ export function ProfileAccountPanel({
   adminMessage,
   adminUsers,
   appProfile,
+  completedAuthAction,
   error,
   isAdmin,
   isAuthenticated,
@@ -42,6 +45,7 @@ export function ProfileAccountPanel({
   adminMessage: string | null;
   adminUsers: AdminUserProfile[];
   appProfile: AppUserProfile | null;
+  completedAuthAction: CompletedAuthAction | null;
   error: string | null;
   isAdmin: boolean;
   isAuthenticated: boolean;
@@ -95,6 +99,7 @@ export function ProfileAccountPanel({
             <h2 className="text-lg font-extrabold">{t("profile.sections.user")}</h2>
           </div>
           <IdentityPanel error={error} profile={profile} status={status} />
+          {isAuthenticated ? <PasskeySecurityPanel completedAuthAction={completedAuthAction} /> : null}
         </section>
 
         <section className="min-w-0">
@@ -123,6 +128,57 @@ export function ProfileAccountPanel({
           />
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function PasskeySecurityPanel({ completedAuthAction }: { completedAuthAction: CompletedAuthAction | null }) {
+  const { t } = useAppTranslation();
+  const [localError, setLocalError] = useState(false);
+
+  function addPasskey() {
+    setLocalError(false);
+    void startPasskeyRegistration("/profile").catch(() => setLocalError(true));
+  }
+
+  const status = localError
+    ? t("profile.passkeys.error")
+    : completedAuthAction?.status === "cancelled"
+      ? t("profile.passkeys.cancelled")
+      : completedAuthAction?.status === "success"
+        ? t("profile.passkeys.success")
+        : null;
+
+  return (
+    <section className="mt-4 rounded-2xl border border-border bg-muted/50 p-4" aria-labelledby="passkey-security-title">
+      <div className="flex items-start gap-3">
+        <span className="rounded-xl bg-primary/10 p-2 text-primary" aria-hidden="true">
+          <KeyRound className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-extrabold" id="passkey-security-title">{t("profile.passkeys.title")}</h3>
+          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">
+            {t("profile.passkeys.description")}
+          </p>
+        </div>
+      </div>
+      {status ? (
+        <p className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs font-bold text-muted-foreground dark:bg-zinc-950/70" role="status">
+          {status}
+        </p>
+      ) : null}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button onClick={addPasskey} type="button">
+          <KeyRound className="h-4 w-4" />
+          {t("profile.passkeys.add")}
+        </Button>
+        <Button asChild type="button" variant="outline">
+          <a href={buildAccountConsoleUrl("/profile")}>
+            <ExternalLink className="h-4 w-4" />
+            {t("profile.passkeys.manage")}
+          </a>
+        </Button>
+      </div>
     </section>
   );
 }

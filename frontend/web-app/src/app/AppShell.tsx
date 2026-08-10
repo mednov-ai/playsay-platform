@@ -11,6 +11,7 @@ import {
   type CourseInput,
   type CourseLesson,
   type CourseLessonInput,
+  type CompletedAuthAction,
   type CurriculumTopic,
   type CurriculumTopicInput,
   type LessonMaterial,
@@ -38,6 +39,7 @@ import { BrandMark } from "../shared/ui/BrandMark";
 import { WorkspaceTabs } from "../widgets/workspace-tabs/WorkspaceTabs";
 import { Button } from "../components/ui/button";
 import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
+import { PasskeyPrompt } from "../features/profile/ui/PasskeyPrompt";
 import type { ClassroomMediaChoices, LessonRoomSession } from "../features/classroom";
 import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
@@ -80,6 +82,7 @@ export type AppShellProps = {
   assignMaterialToScheduledLesson: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   cancelScheduledLesson: (lesson: ScheduledLesson) => Promise<void>;
   classroomLesson: ScheduledLesson | null;
+  completedAuthAction?: CompletedAuthAction | null;
   completeScheduledLesson: (lessonId: string) => Promise<void>;
   confirmScheduledLessonJoin: (lesson: ScheduledLesson, mediaChoices: ClassroomMediaChoices) => Promise<void>;
   copyScheduledLessonLinks: (lesson: ScheduledLesson) => Promise<boolean>;
@@ -168,6 +171,7 @@ export function AppShell(props: AppShellProps) {
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     classroomLesson,
+    completedAuthAction = null,
     completeScheduledLesson,
     confirmScheduledLessonJoin,
     copyScheduledLessonLinks,
@@ -381,6 +385,10 @@ export function AppShell(props: AppShellProps) {
           </header>
         )}
 
+        {isAuthenticated && profile && !isClassroomOpen && !isProfileRoute ? (
+          <PasskeyPrompt key={profile.subject} subject={profile.subject} />
+        ) : null}
+
         {roomSession ? (
           <Suspense fallback={<PanelFallback />}>
             <LiveLessonExperience
@@ -412,6 +420,7 @@ export function AppShell(props: AppShellProps) {
                 adminMessage={adminMessage}
                 adminUsers={adminUsers}
                 appProfile={appProfile}
+                completedAuthAction={completedAuthAction}
                 error={error}
                 isAdmin={isAdmin}
                 isAuthenticated={isAuthenticated}

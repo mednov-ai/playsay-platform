@@ -1,9 +1,11 @@
 export {
   authConfig,
+  buildAccountConsoleUrl,
   buildAuthorizeUrl,
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  consumeCompletedAuthAction,
   consumeSkipSilentLogin,
   defaultAuthIssuer,
   getValidAccessToken,
@@ -13,11 +15,14 @@ export {
   readTokens,
   skipSilentLoginOnce,
   startLogin,
+  startPasskeyRegistration,
   startSilentLogin,
   storeTokens,
 } from "../api/auth";
 
 export type {
   AuthConfig,
+  CompletedAuthAction,
+  PasskeyAuthAction,
   TokenSet,
 } from "../api/auth";

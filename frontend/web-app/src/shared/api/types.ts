@@ -16,6 +16,8 @@ import type {
   ScheduledLessonScheduleUpdateRequest,
   UpdateUserProfileRequest,
   UserProfileResponse,
+  AuthenticationMethodsResponse,
+  RenamePasskeyRequest,
 } from "../../generated/playsay-api";
 
 export type MeProfile = MeResponse;
@@ -35,6 +37,9 @@ export type ManagedStudentInput = {
   lastName?: string;
   email?: string;
 };
+export type AuthenticationMethods = AuthenticationMethodsResponse;
+export type AuthenticationPasskey = AuthenticationMethodsResponse["passkeys"][number];
+export type RenamePasskeyInput = RenamePasskeyRequest;
 export type Course = CourseResponse;
 export type CourseLesson = CourseLessonResponse & {
   materialId?: string | null;

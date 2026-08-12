@@ -1,16 +1,25 @@
 import { KeyRound, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { startPasskeyRegistration } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 
 const promptStorageKey = "playsay.passkeyPrompt.v1";
 
-export function PasskeyPrompt({ subject }: { subject: string }) {
+export function PasskeyPrompt({ passkeyCount, subject }: { passkeyCount: number; subject: string }) {
   const { t } = useAppTranslation();
-  const [visible, setVisible] = useState(() => !hasDismissedPrompt(subject));
+  const [visible, setVisible] = useState(() => passkeyCount === 0 && !hasDismissedPrompt(subject));
 
-  if (!visible) {
+  useEffect(() => {
+    if (!visible) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") dismiss();
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [visible]);
+
+  if (!visible || passkeyCount > 0) {
     return null;
   }
 
@@ -21,40 +30,44 @@ export function PasskeyPrompt({ subject }: { subject: string }) {
 
   function configure() {
     dismiss();
-    void startPasskeyRegistration("/profile");
+    void startPasskeyRegistration({
+      mode: "ensure",
+      passkeyCountBefore: passkeyCount,
+      returnPath: "/profile",
+    });
   }
 
   return (
-    <aside
-      aria-label={t("profile.passkeys.promptAria")}
-      className="flex flex-col gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="mt-0.5 rounded-xl bg-primary/10 p-2 text-primary" aria-hidden="true">
-          <KeyRound className="h-5 w-5" />
-        </span>
-        <div>
-          <strong className="text-sm font-extrabold">{t("profile.passkeys.promptTitle")}</strong>
-          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">
-            {t("profile.passkeys.promptDescription")}
-          </p>
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
+      <aside
+        aria-label={t("profile.passkeys.promptAria")}
+        aria-modal="true"
+        className="w-full max-w-md rounded-[1.5rem] border border-border bg-background p-5 shadow-2xl"
+        role="dialog"
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 rounded-xl bg-primary/10 p-2 text-primary" aria-hidden="true">
+            <KeyRound className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-lg font-extrabold">{t("profile.passkeys.promptTitle")}</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">
+              {t("profile.passkeys.promptDescription")}
+            </p>
+          </div>
         </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <Button className="h-9 px-3 text-xs" onClick={configure} type="button">
-          {t("profile.passkeys.add")}
-        </Button>
-        <Button
-          aria-label={t("profile.passkeys.later")}
-          className="h-9 w-9 p-0"
-          onClick={dismiss}
-          type="button"
-          variant="outline"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-    </aside>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <Button onClick={configure} type="button">
+            <KeyRound className="h-4 w-4" />
+            {t("profile.passkeys.configure")}
+          </Button>
+          <Button onClick={dismiss} type="button" variant="outline">
+            <X className="h-4 w-4" />
+            {t("profile.passkeys.later")}
+          </Button>
+        </div>
+      </aside>
+    </div>
   );
 }
 

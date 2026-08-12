@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildAuthorizeUrl,
-  buildAccountConsoleUrl,
   clearTokens,
   completeLogin,
   consumeCompletedAuthAction,
@@ -82,14 +81,6 @@ describe("auth helpers", () => {
     expect(url.searchParams.get("kc_action")).toBe("webauthn-register-passwordless:skip_if_exists");
   });
 
-  it("builds an environment-derived Keycloak account console URL", () => {
-    const url = new URL(buildAccountConsoleUrl("/profile", config));
-
-    expect(url.pathname).toBe("/keycloak/realms/playsay/account/");
-    expect(url.searchParams.get("referrer")).toBe("playsay-web");
-    expect(url.searchParams.get("referrer_uri")).toBe("http://localhost/profile");
-  });
-
   it("records the passkey action result and safe return path after callback", async () => {
     const storage = new MemoryStorage();
     storage.setItem(
@@ -97,6 +88,7 @@ describe("auth helpers", () => {
       JSON.stringify({
         authAction: "webauthn-register-passwordless:skip_if_exists",
         codeVerifier: "verifier-1",
+        passkeyCountBefore: 0,
         redirectUri: "https://online.play-and-say.ru/auth/callback",
         returnPath: "/profile",
         state: "state-1",
@@ -114,8 +106,9 @@ describe("auth helpers", () => {
 
     expect(consumeCompletedAuthAction()).toEqual({
       action: "webauthn-register-passwordless:skip_if_exists",
+      passkeyCountBefore: 0,
       returnPath: "/profile",
-      status: "success",
+      status: "pending",
     });
   });
 

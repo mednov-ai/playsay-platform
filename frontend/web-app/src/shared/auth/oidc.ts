@@ -1,6 +1,5 @@
 export {
   authConfig,
-  buildAccountConsoleUrl,
   buildAuthorizeUrl,
   buildLogoutUrl,
   clearTokens,
@@ -24,5 +23,6 @@ export type {
   AuthConfig,
   CompletedAuthAction,
   PasskeyAuthAction,
+  PasskeyRegistrationOptions,
   TokenSet,
 } from "../api/auth";

@@ -7,6 +7,7 @@ import {
   startLogin,
   type AdminUserProfile,
   type AppUserProfile,
+  type AuthenticationMethods,
   type Course,
   type CourseInput,
   type CourseLesson,
@@ -77,6 +78,9 @@ export type AppShellProps = {
   adminLoading: boolean;
   adminMessage: string | null;
   adminUsers: AdminUserProfile[];
+  authenticationMethods: AuthenticationMethods | null;
+  authenticationMethodsLoading: boolean;
+  authenticationMethodsMessage: string | null;
   anyLessonLoading: boolean;
   appProfile: AppUserProfile | null;
   assignMaterialToScheduledLesson: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
@@ -97,6 +101,7 @@ export type AppShellProps = {
   createScheduledLesson: (input: ScheduledLessonInput) => Promise<ScheduledLesson | null | void>;
   createManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   deleteCourse: (courseId: string) => Promise<void>;
+  deletePasskey: (credentialId: string) => Promise<boolean>;
   deleteLesson: (courseId: string, lessonId: string) => Promise<void>;
   deleteMaterial: (materialId: string) => Promise<void>;
   deleteTopic: (courseId: string, topicId: string) => Promise<void>;
@@ -127,11 +132,13 @@ export type AppShellProps = {
   profileMessage: string | null;
   profileSaving: boolean;
   refreshAdminUsers: () => Promise<void>;
+  refreshAuthenticationMethods: () => Promise<void>;
   refreshCourses: () => Promise<void>;
   refreshMaterials: () => Promise<void>;
   refreshPaymentInvoices: () => Promise<void>;
   refreshSchedule: () => Promise<void>;
   rescheduleScheduledLesson?: (lessonId: string, input: ScheduledLessonScheduleInput) => Promise<ScheduledLesson | null>;
+  renamePasskey: (credentialId: string, label: string) => Promise<boolean>;
   resetProfile: () => Promise<void>;
   roomLoadingLessonId: string | null;
   roomMessage: string | null;
@@ -166,6 +173,9 @@ export function AppShell(props: AppShellProps) {
     adminLoading,
     adminMessage,
     adminUsers,
+    authenticationMethods,
+    authenticationMethodsLoading,
+    authenticationMethodsMessage,
     anyLessonLoading,
     appProfile,
     assignMaterialToScheduledLesson,
@@ -186,6 +196,7 @@ export function AppShell(props: AppShellProps) {
     createScheduledLesson,
     createManagedStudent,
     deleteCourse,
+    deletePasskey,
     deleteLesson,
     deleteMaterial,
     deleteTopic,
@@ -216,11 +227,13 @@ export function AppShell(props: AppShellProps) {
     profileMessage,
     profileSaving,
     refreshAdminUsers,
+    refreshAuthenticationMethods,
     refreshCourses,
     refreshMaterials,
     refreshPaymentInvoices,
     refreshSchedule,
     rescheduleScheduledLesson = async () => null,
+    renamePasskey,
     resetProfile,
     roomLoadingLessonId,
     roomMessage,
@@ -385,8 +398,12 @@ export function AppShell(props: AppShellProps) {
           </header>
         )}
 
-        {isAuthenticated && profile && !isClassroomOpen && !isProfileRoute ? (
-          <PasskeyPrompt key={profile.subject} subject={profile.subject} />
+        {isAuthenticated && profile && authenticationMethods && !isClassroomOpen && !isProfileRoute ? (
+          <PasskeyPrompt
+            key={profile.subject}
+            passkeyCount={authenticationMethods.passkeys.length}
+            subject={profile.subject}
+          />
         ) : null}
 
         {roomSession ? (
@@ -420,12 +437,18 @@ export function AppShell(props: AppShellProps) {
                 adminMessage={adminMessage}
                 adminUsers={adminUsers}
                 appProfile={appProfile}
+                authenticationMethods={authenticationMethods}
+                authenticationMethodsLoading={authenticationMethodsLoading}
+                authenticationMethodsMessage={authenticationMethodsMessage}
                 completedAuthAction={completedAuthAction}
                 error={error}
                 isAdmin={isAdmin}
                 isAuthenticated={isAuthenticated}
                 onBack={closeProfile}
                 onRefreshAdminUsers={() => void refreshAdminUsers()}
+                onRefreshAuthenticationMethods={refreshAuthenticationMethods}
+                onDeletePasskey={deletePasskey}
+                onRenamePasskey={renamePasskey}
                 onResetProfile={() => void resetProfile()}
                 onSaveProfile={saveProfile}
                 profile={profile}

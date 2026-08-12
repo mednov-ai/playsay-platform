@@ -24,12 +24,18 @@ describe("ProfileAccountPanel", () => {
         learningGoal: null,
         updatedAt: "2026-06-03T00:00:00.000Z",
       } as AppUserProfile,
+      authenticationMethods: { hasPassword: true, passkeys: [] },
+      authenticationMethodsLoading: false,
+      authenticationMethodsMessage: null,
       completedAuthAction: null,
       error: null,
       isAdmin: false,
       isAuthenticated: true,
       onBack: vi.fn(),
+      onDeletePasskey: vi.fn(),
       onRefreshAdminUsers: vi.fn(),
+      onRefreshAuthenticationMethods: vi.fn(),
+      onRenamePasskey: vi.fn(),
       onResetProfile: vi.fn(),
       onSaveProfile: vi.fn(),
       profile: {
@@ -48,7 +54,11 @@ describe("ProfileAccountPanel", () => {
     expect(markup).toContain("Россия");
     expect(markup).toContain("Дата рождения");
     expect(markup).toContain("Настройки аккаунта");
+    expect(markup).toContain("Способы входа");
+    expect(markup).toContain("Изменить пароль");
     expect(markup).toContain("Добавить ключ доступа");
+    expect(markup).not.toContain("Управлять способами входа");
+    expect(markup).not.toContain("/account/");
     expect(markup).toContain("В рабочую область");
   });
 });

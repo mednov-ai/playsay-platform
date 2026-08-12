@@ -3,6 +3,7 @@ package com.playsay.registration.client
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.playsay.registration.service.KeycloakRegistrationClient
+import com.playsay.registration.service.KeycloakCredential
 import com.playsay.registration.service.KeycloakRegistrationUser
 import com.playsay.registration.service.KeycloakTokenSet
 import com.playsay.registration.service.KeycloakUserCreateCommand
@@ -12,6 +13,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 
 class KeycloakAdminRegistrationClient(
     private val httpClient: HttpClient,
@@ -136,6 +138,44 @@ class KeycloakAdminRegistrationClient(
         require(response.statusCode() in 200..299) { "Keycloak password reset failed with HTTP ${response.statusCode()}" }
     }
 
+    override fun listCredentials(subject: String): List<KeycloakCredential> {
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/users/${subject.urlEncoded()}/credentials",
+            method = "GET",
+        )
+        require(response.statusCode() in 200..299) { "Keycloak credential lookup failed with HTTP ${response.statusCode()}" }
+        return objectMapper.readTree(response.body()).mapNotNull { credential ->
+            val id = credential.get("id")?.asText()?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+            val type = credential.get("type")?.asText()?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+            KeycloakCredential(
+                id = id,
+                type = type,
+                userLabel = credential.get("userLabel")?.asText()?.takeIf(String::isNotBlank),
+                createdAt = credential.get("createdDate")?.asLong()?.takeIf { it > 0 }?.let(Instant::ofEpochMilli),
+            )
+        }
+    }
+
+    override fun renameCredential(subject: String, credentialId: String, label: String) {
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/users/${subject.urlEncoded()}/credentials/${credentialId.urlEncoded()}/userLabel",
+            method = "PUT",
+            body = label,
+            contentType = "text/plain",
+        )
+        require(response.statusCode() in 200..299) { "Keycloak credential rename failed with HTTP ${response.statusCode()}" }
+    }
+
+    override fun deleteCredential(subject: String, credentialId: String) {
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/users/${subject.urlEncoded()}/credentials/${credentialId.urlEncoded()}",
+            method = "DELETE",
+        )
+        require(response.statusCode() in 200..299 || response.statusCode() == 404) {
+            "Keycloak credential delete failed with HTTP ${response.statusCode()}"
+        }
+    }
+
     override fun passwordGrant(username: String, password: String, clientId: String): KeycloakTokenSet {
         val body = listOf(
             "grant_type" to "password",
@@ -204,13 +244,18 @@ class KeycloakAdminRegistrationClient(
         return objectMapper.readTree(response.body())
     }
 
-    private fun sendAdmin(path: String, method: String, body: String? = null): HttpResponse<String> {
+    private fun sendAdmin(
+        path: String,
+        method: String,
+        body: String? = null,
+        contentType: String = "application/json",
+    ): HttpResponse<String> {
         val builder = HttpRequest.newBuilder(URI.create("${keycloakBaseUrl.trimEnd('/')}$path"))
             .header("authorization", "Bearer ${accessToken()}")
         if (body == null) {
             builder.method(method, HttpRequest.BodyPublishers.noBody())
         } else {
-            builder.header("content-type", "application/json")
+            builder.header("content-type", contentType)
                 .method(method, HttpRequest.BodyPublishers.ofString(body))
         }
         return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString())

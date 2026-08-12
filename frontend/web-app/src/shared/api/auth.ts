@@ -24,6 +24,7 @@ type TokenResponse = {
 
 type LoginFlow = {
   authAction?: PasskeyAuthAction;
+  passkeyCountBefore?: number;
   codeVerifier: string;
   returnPath?: string;
   state: string;
@@ -31,12 +32,21 @@ type LoginFlow = {
   silent?: boolean;
 };
 
-export type PasskeyAuthAction = "webauthn-register-passwordless:skip_if_exists";
+export type PasskeyAuthAction =
+  | "webauthn-register-passwordless"
+  | "webauthn-register-passwordless:skip_if_exists";
+
+export type PasskeyRegistrationOptions = {
+  mode: "additional" | "ensure";
+  passkeyCountBefore: number;
+  returnPath?: string;
+};
 
 export type CompletedAuthAction = {
   action: PasskeyAuthAction;
+  passkeyCountBefore: number;
   returnPath: string;
-  status: "cancelled" | "success";
+  status: "cancelled" | "failed" | "pending" | "success";
 };
 
 type CompletedLoginFlow = {
@@ -162,7 +172,7 @@ export async function startSilentLogin(config = authConfig): Promise<void> {
 }
 
 export async function startPasskeyRegistration(
-  returnPath = "/profile",
+  options: PasskeyRegistrationOptions,
   config = authConfig,
 ): Promise<void> {
   const redirectUri = getRedirectUri(config);
@@ -170,12 +180,15 @@ export async function startPasskeyRegistration(
   const codeChallenge = await createCodeChallenge(codeVerifier);
   const state = createCodeVerifier();
   const language = currentApiLanguage();
-  const authAction: PasskeyAuthAction = "webauthn-register-passwordless:skip_if_exists";
+  const authAction: PasskeyAuthAction = options.mode === "additional"
+    ? "webauthn-register-passwordless"
+    : "webauthn-register-passwordless:skip_if_exists";
   const flow: LoginFlow = {
     authAction,
     codeVerifier,
+    passkeyCountBefore: Math.max(0, options.passkeyCountBefore),
     redirectUri,
-    returnPath: safeReturnPath(returnPath),
+    returnPath: safeReturnPath(options.returnPath),
     state,
   };
 
@@ -312,14 +325,6 @@ export function buildLogoutUrl(config = authConfig): string {
   return url.toString();
 }
 
-export function buildAccountConsoleUrl(returnPath = "/profile", config = authConfig): string {
-  const url = new URL(`${trimTrailingSlash(config.issuer)}/account/`);
-  const appOrigin = globalThis.location?.origin ?? "http://localhost";
-  url.searchParams.set("referrer", config.clientId);
-  url.searchParams.set("referrer_uri", `${appOrigin}${safeReturnPath(returnPath)}`);
-  return url.toString();
-}
-
 export function buildAuthorizeUrl(input: {
   config: AuthConfig;
   redirectUri: string;
@@ -397,9 +402,14 @@ function writeCompletedAuthAction(flow: LoginFlow | null, callbackUrl: URL): voi
   }
 
   const rawStatus = callbackUrl.searchParams.get("kc_action_status");
-  const status: CompletedAuthAction["status"] = rawStatus === "cancelled" ? "cancelled" : "success";
+  const status: CompletedAuthAction["status"] = rawStatus === "success"
+    ? "pending"
+    : rawStatus === "cancelled"
+      ? "cancelled"
+      : "failed";
   const result: CompletedAuthAction = {
     action: flow.authAction,
+    passkeyCountBefore: flow.passkeyCountBefore ?? 0,
     returnPath: safeReturnPath(flow.returnPath),
     status,
   };

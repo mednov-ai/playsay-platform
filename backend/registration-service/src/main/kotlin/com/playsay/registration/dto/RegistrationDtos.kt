@@ -168,3 +168,20 @@ data class InternalCreateUserRequest(
 data class InternalUpdateRolesRequest(
     val roles: Set<String>,
 )
+
+data class InternalAuthenticationMethodsResponse(
+    val hasPassword: Boolean,
+    val passkeys: List<InternalPasskeyCredentialResponse>,
+)
+
+data class InternalPasskeyCredentialResponse(
+    val id: String,
+    val label: String?,
+    val createdAt: Instant?,
+)
+
+data class InternalRenamePasskeyRequest(
+    @field:NotBlank
+    @field:Size(max = 64)
+    val label: String,
+)

@@ -19,6 +19,6 @@ data class PasskeyCredentialResponse(
 
 data class RenamePasskeyRequest(
     @field:NotBlank
-    @field:Size(max = 64)
+    @field:Size(min = 1, max = 64)
     val label: String,
 )

@@ -5,28 +5,6 @@
  * Public contract for the Honey School API Gateway.
  * OpenAPI spec version: 0.1.0
  */
-export interface RenamePasskeyRequest {
-  /**
-     * @minLength 1
-     * @maxLength 64
-     */
-  label: string;
-}
-
-export interface PasskeyCredentialResponse {
-  /** Opaque credential identifier usable only by self-service endpoints. */
-  id: string;
-  /** @nullable */
-  label?: string | null;
-  /** @nullable */
-  createdAt?: string | null;
-}
-
-export interface AuthenticationMethodsResponse {
-  hasPassword: boolean;
-  passkeys: PasskeyCredentialResponse[];
-}
-
 export interface UpdateUserProfileRequest {
   /**
      * @maxLength 120
@@ -82,6 +60,28 @@ export interface UserProfileResponse {
   /** @nullable */
   birthDate?: string | null;
   readonly lessonTranslationAllowed: boolean;
+}
+
+export interface RenamePasskeyRequest {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     */
+  label: string;
+}
+
+export interface PasskeyCredentialResponse {
+  /** Opaque credential identifier usable only by self-service endpoints. */
+  id: string;
+  /** @nullable */
+  label?: string | null;
+  /** @nullable */
+  createdAt?: string | null;
+}
+
+export interface AuthenticationMethodsResponse {
+  hasPassword: boolean;
+  passkeys: PasskeyCredentialResponse[];
 }
 
 export interface UpdateStudentLessonTranslationPermissionRequest {
@@ -1945,85 +1945,17 @@ export const deleteMyUserProfile = async ( options?: RequestInit): Promise<delet
 
 
 
-export type getMyAuthenticationMethodsResponse200 = {
-  data: AuthenticationMethodsResponse
-  status: 200
-}
-
-export type getMyAuthenticationMethodsResponse401 = {
-  data: void
-  status: 401
-}
-
-export type getMyAuthenticationMethodsResponseSuccess = (getMyAuthenticationMethodsResponse200) & {
-  headers: Headers;
-};
-export type getMyAuthenticationMethodsResponseError = (getMyAuthenticationMethodsResponse401) & {
-  headers: Headers;
-};
-
-export type getMyAuthenticationMethodsResponse = (getMyAuthenticationMethodsResponseSuccess | getMyAuthenticationMethodsResponseError)
-
-export const getGetMyAuthenticationMethodsUrl = () => {
-
-
-
-
-  return `/api/users/me/authentication-methods`
-}
-
-/**
- * Returns password availability and safe metadata for the current user's passwordless Passkeys.
- * @summary Current user's sign-in methods
- */
-export const getMyAuthenticationMethods = async ( options?: RequestInit): Promise<getMyAuthenticationMethodsResponse> => {
-
-  const res = await fetch(getGetMyAuthenticationMethodsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getMyAuthenticationMethodsResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getMyAuthenticationMethodsResponse
-}
-
-
-
 export type renameMyPasskeyResponse200 = {
   data: AuthenticationMethodsResponse
   status: 200
 }
 
-export type renameMyPasskeyResponse400 = {
-  data: void
-  status: 400
-}
-
-export type renameMyPasskeyResponse401 = {
-  data: void
-  status: 401
-}
-
-export type renameMyPasskeyResponse404 = {
-  data: void
-  status: 404
-}
-
 export type renameMyPasskeyResponseSuccess = (renameMyPasskeyResponse200) & {
   headers: Headers;
 };
-export type renameMyPasskeyResponseError = (renameMyPasskeyResponse400 | renameMyPasskeyResponse401 | renameMyPasskeyResponse404) & {
-  headers: Headers;
-};
+;
 
-export type renameMyPasskeyResponse = (renameMyPasskeyResponseSuccess | renameMyPasskeyResponseError)
+export type renameMyPasskeyResponse = (renameMyPasskeyResponseSuccess)
 
 export const getRenameMyPasskeyUrl = (credentialId: string,) => {
 
@@ -2062,29 +1994,12 @@ export type deleteMyPasskeyResponse200 = {
   status: 200
 }
 
-export type deleteMyPasskeyResponse401 = {
-  data: void
-  status: 401
-}
-
-export type deleteMyPasskeyResponse404 = {
-  data: void
-  status: 404
-}
-
-export type deleteMyPasskeyResponse409 = {
-  data: void
-  status: 409
-}
-
 export type deleteMyPasskeyResponseSuccess = (deleteMyPasskeyResponse200) & {
   headers: Headers;
 };
-export type deleteMyPasskeyResponseError = (deleteMyPasskeyResponse401 | deleteMyPasskeyResponse404 | deleteMyPasskeyResponse409) & {
-  headers: Headers;
-};
+;
 
-export type deleteMyPasskeyResponse = (deleteMyPasskeyResponseSuccess | deleteMyPasskeyResponseError)
+export type deleteMyPasskeyResponse = (deleteMyPasskeyResponseSuccess)
 
 export const getDeleteMyPasskeyUrl = (credentialId: string,) => {
 
@@ -2095,7 +2010,7 @@ export const getDeleteMyPasskeyUrl = (credentialId: string,) => {
 }
 
 /**
- * Deletes a passwordless Passkey owned by the current user.
+ * Deletes a passwordless Passkey owned by the current user without exposing Keycloak administration.
  * @summary Delete current user's Passkey
  */
 export const deleteMyPasskey = async (credentialId: string, options?: RequestInit): Promise<deleteMyPasskeyResponse> => {
@@ -7517,6 +7432,57 @@ export const listStudentProfiles = async ( options?: RequestInit): Promise<listS
 
   const data: listStudentProfilesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listStudentProfilesResponse
+}
+
+
+
+export type getMyAuthenticationMethodsResponse200 = {
+  data: AuthenticationMethodsResponse
+  status: 200
+}
+
+export type getMyAuthenticationMethodsResponse401 = {
+  data: void
+  status: 401
+}
+
+export type getMyAuthenticationMethodsResponseSuccess = (getMyAuthenticationMethodsResponse200) & {
+  headers: Headers;
+};
+export type getMyAuthenticationMethodsResponseError = (getMyAuthenticationMethodsResponse401) & {
+  headers: Headers;
+};
+
+export type getMyAuthenticationMethodsResponse = (getMyAuthenticationMethodsResponseSuccess | getMyAuthenticationMethodsResponseError)
+
+export const getGetMyAuthenticationMethodsUrl = () => {
+
+
+
+
+  return `/api/users/me/authentication-methods`
+}
+
+/**
+ * Returns password availability and safe metadata for the current user's passwordless Passkeys.
+ * @summary Current user's sign-in methods
+ */
+export const getMyAuthenticationMethods = async ( options?: RequestInit): Promise<getMyAuthenticationMethodsResponse> => {
+
+  const res = await fetch(getGetMyAuthenticationMethodsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMyAuthenticationMethodsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMyAuthenticationMethodsResponse
 }
 
 

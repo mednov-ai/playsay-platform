@@ -54,29 +54,12 @@ paths:
       tags:
       - Users
       summary: Delete current application user profile
-      description: Deletes editable app-level profile data for the current Keycloak user.
+      description: Deletes editable app-level profile data for the current Keycloak
+        user.
       operationId: deleteMyUserProfile
       responses:
         "204":
           description: Current app-level user profile deleted
-        "401":
-          description: Missing or invalid bearer token
-      security:
-      - bearerAuth: []
-  /users/me/authentication-methods:
-    get:
-      tags:
-      - Authentication methods
-      summary: Current user's sign-in methods
-      description: Returns password availability and safe metadata for the current user's passwordless Passkeys.
-      operationId: getMyAuthenticationMethods
-      responses:
-        "200":
-          description: Current sign-in methods
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthenticationMethodsResponse"
         "401":
           description: Missing or invalid bearer token
       security:
@@ -94,31 +77,26 @@ paths:
         schema:
           type: string
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/RenamePasskeyRequest"
+        required: true
       responses:
         "200":
-          description: Updated sign-in methods
+          description: OK
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthenticationMethodsResponse"
-        "400":
-          description: Invalid label
-        "401":
-          description: Missing or invalid bearer token
-        "404":
-          description: Passkey not found
       security:
       - bearerAuth: []
     delete:
       tags:
       - Authentication methods
       summary: Delete current user's Passkey
-      description: Deletes a passwordless Passkey owned by the current user.
+      description: Deletes a passwordless Passkey owned by the current user without
+        exposing Keycloak administration.
       operationId: deleteMyPasskey
       parameters:
       - name: credentialId
@@ -128,17 +106,11 @@ paths:
           type: string
       responses:
         "200":
-          description: Updated sign-in methods
+          description: OK
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthenticationMethodsResponse"
-        "401":
-          description: Missing or invalid bearer token
-        "404":
-          description: Passkey not found
-        "409":
-          description: Last available sign-in method cannot be removed
       security:
       - bearerAuth: []
   /teacher/students/{subject}/lesson-translation-permission:
@@ -2978,6 +2950,25 @@ paths:
           description: Current user is not a teacher/admin
       security:
       - bearerAuth: []
+  /users/me/authentication-methods:
+    get:
+      tags:
+      - Authentication methods
+      summary: Current user's sign-in methods
+      description: Returns password availability and safe metadata for the current
+        user's passwordless Passkeys.
+      operationId: getMyAuthenticationMethods
+      responses:
+        "200":
+          description: Current sign-in methods
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticationMethodsResponse"
+        "401":
+          description: Missing or invalid bearer token
+      security:
+      - bearerAuth: []
   /teachers/directory:
     get:
       tags:
@@ -3618,44 +3609,6 @@ paths:
           description: No Content
 components:
   schemas:
-    RenamePasskeyRequest:
-      type: object
-      required:
-      - label
-      properties:
-        label:
-          type: string
-          minLength: 1
-          maxLength: 64
-    AuthenticationMethodsResponse:
-      type: object
-      required:
-      - hasPassword
-      - passkeys
-      properties:
-        hasPassword:
-          type: boolean
-        passkeys:
-          type: array
-          items:
-            $ref: "#/components/schemas/PasskeyCredentialResponse"
-    PasskeyCredentialResponse:
-      type: object
-      required:
-      - id
-      properties:
-        id:
-          type: string
-          description: Opaque credential identifier usable only by self-service endpoints.
-        label:
-          type:
-          - string
-          - "null"
-        createdAt:
-          type:
-          - string
-          - "null"
-          format: date-time
     UpdateUserProfileRequest:
       type: object
       properties:
@@ -3750,6 +3703,44 @@ components:
       - roles
       - subject
       - updatedAt
+    RenamePasskeyRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 64
+          minLength: 1
+      required:
+      - label
+    AuthenticationMethodsResponse:
+      type: object
+      properties:
+        hasPassword:
+          type: boolean
+        passkeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/PasskeyCredentialResponse"
+      required:
+      - hasPassword
+      - passkeys
+    PasskeyCredentialResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Opaque credential identifier usable only by self-service endpoints.
+        label:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - id
     UpdateStudentLessonTranslationPermissionRequest:
       type: object
       properties:

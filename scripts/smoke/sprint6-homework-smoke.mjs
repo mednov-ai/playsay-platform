@@ -429,11 +429,28 @@ async function openHomeworkTab(page) {
   if (await homeworkTab.count() === 0) {
     const trigger = page.locator('[data-testid="workspace-switcher-trigger"]');
     await trigger.waitFor({ timeout: timeoutMs });
-    await trigger.click();
+    try {
+      await trigger.click({ timeout: 2_000 });
+    } catch (error) {
+      if (!(await dismissPasskeyPrompt(page))) {
+        throw error;
+      }
+      await trigger.click();
+    }
   }
   await homeworkTab.waitFor({ timeout: timeoutMs });
   await homeworkTab.click();
   await page.locator(".playsay-homework-panel").waitFor({ timeout: timeoutMs });
+}
+
+async function dismissPasskeyPrompt(page) {
+  const passkeyPrompt = page.locator('[data-testid="passkey-prompt"]');
+  if (!(await passkeyPrompt.isVisible().catch(() => false))) {
+    return false;
+  }
+  await page.keyboard.press("Escape");
+  await passkeyPrompt.waitFor({ state: "detached", timeout: timeoutMs });
+  return true;
 }
 
 async function selectHomeworkAssignment(page, title) {

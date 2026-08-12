@@ -356,20 +356,31 @@ async function verifyAiDialogAllowanceGrantAndDebit(teacher, student, studentSub
 }
 
 async function openWorkspaceTab(page, tabId) {
-  const passkeyPrompt = page.locator('[data-testid="passkey-prompt"]');
-  if (await passkeyPrompt.isVisible().catch(() => false)) {
-    await passkeyPrompt.press("Escape");
-    await passkeyPrompt.waitFor({ state: "detached", timeout: timeoutMs });
-  }
-
   const tab = page.locator(`[data-tab-id="${tabId}"]`);
   if (await tab.count() === 0) {
     const trigger = page.locator('[data-testid="workspace-switcher-trigger"]');
     await trigger.waitFor({ timeout: timeoutMs });
-    await trigger.click();
+    try {
+      await trigger.click({ timeout: 2_000 });
+    } catch (error) {
+      if (!(await dismissPasskeyPrompt(page))) {
+        throw error;
+      }
+      await trigger.click();
+    }
   }
   await tab.waitFor({ timeout: timeoutMs });
   await tab.click();
+}
+
+async function dismissPasskeyPrompt(page) {
+  const passkeyPrompt = page.locator('[data-testid="passkey-prompt"]');
+  if (!(await passkeyPrompt.isVisible().catch(() => false))) {
+    return false;
+  }
+  await page.keyboard.press("Escape");
+  await passkeyPrompt.waitFor({ state: "detached", timeout: timeoutMs });
+  return true;
 }
 
 async function ensureStudentBirthDate(token, profile) {

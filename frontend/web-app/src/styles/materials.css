@@ -3241,13 +3241,25 @@
 .dark .playsay-image-checkbox,
 .dark .playsay-material-reader-toolbar,
 .dark .playsay-material-play-toolbar,
+.dark .playsay-page-picker-button,
 .dark .playsay-material-score-badge,
+.dark .playsay-material-block-preview,
 .dark .playsay-render-block,
+.dark .playsay-html-game-app,
+.dark .playsay-html-game,
+.dark .playsay-external-activity-toolbar,
+.dark .playsay-material-focus-stack,
 .dark .playsay-image-prompt-popover,
+.dark .playsay-image-prompt-button,
+.dark .playsay-image-tag,
+.dark .playsay-image-resize-handle,
+.dark .playsay-video-resize-handle,
 .dark .playsay-image-tag-input,
+.dark .playsay-match-word,
 .dark .playsay-match-picture,
 .dark .playsay-inline-select,
 .dark .playsay-inline-input,
+.dark .playsay-word-bank-chip,
 .dark .playsay-word-bank-drop,
 .dark .playsay-student-answer,
 .dark .playsay-picture-face,
@@ -3257,8 +3269,13 @@
 }
 
 .dark .playsay-matching-asset-chip,
+.dark .playsay-inline-upload,
 .dark .playsay-markdown-inline code,
+.dark .playsay-markdown code,
+.dark .playsay-game-icon-enrichment-symbol,
+.dark .playsay-html-game-app-launch,
 .dark .playsay-image-placeholder,
+.dark .playsay-video-embed-placeholder,
 .dark .playsay-video-relay-pending,
 .dark .playsay-video-relay-unavailable,
 .dark .playsay-rendered-image img,
@@ -3276,11 +3293,63 @@
     linear-gradient(180deg, hsl(var(--surface)) 0%, hsl(var(--background)) 100%);
 }
 
+.dark .playsay-external-activity-state {
+  background:
+    radial-gradient(circle at 50% 20%, hsl(var(--surface-strong)), hsl(var(--surface)) 62%);
+}
+
+.dark .playsay-drawing-area {
+  background:
+    linear-gradient(90deg, hsl(var(--border) / 0.55) 1px, transparent 1px),
+    linear-gradient(180deg, hsl(var(--border) / 0.55) 1px, transparent 1px),
+    hsl(var(--surface));
+  background-size: 1.25rem 1.25rem;
+}
+
 .dark .playsay-choice-row,
 .dark .playsay-match-word[data-active="true"],
 .dark .playsay-match-word[data-status="retry"],
 .dark .playsay-inline-select[data-status="retry"] {
   background: hsl(var(--surface-strong));
+}
+
+.dark .playsay-choice-row[data-status="correct"],
+.dark .playsay-choice-row[data-status="hint"],
+.dark .playsay-speaking-prompt,
+.dark .playsay-match-word[data-status="correct"],
+.dark .playsay-match-solved-index,
+.dark .playsay-match-solved-card,
+.dark .playsay-inline-select[data-status="correct"],
+.dark .playsay-inline-select[data-status="hint"],
+.dark .playsay-word-bank-drop[data-status="correct"],
+.dark .playsay-word-bank-drop[data-status="hint"] {
+  background: hsl(var(--status-success-surface));
+  color: hsl(var(--status-success-foreground));
+}
+
+.dark .playsay-choice-row[data-status="wrong"],
+.dark .playsay-choice-row[data-status="locked"],
+.dark .playsay-match-word[data-status="wrong"],
+.dark .playsay-match-word[data-status="locked"],
+.dark .playsay-match-picture[data-flash="wrong"],
+.dark .playsay-inline-select[data-status="wrong"],
+.dark .playsay-inline-select[data-status="locked"],
+.dark .playsay-word-bank-drop[data-status="wrong"],
+.dark .playsay-word-bank-drop[data-status="locked"] {
+  background: hsl(var(--status-danger-surface));
+  color: hsl(var(--status-danger-foreground));
+}
+
+.dark .playsay-match-word[data-status="retry"],
+.dark .playsay-inline-select[data-status="retry"],
+.dark .playsay-word-bank-drop[data-status="retry"] {
+  background: hsl(var(--status-warning-surface));
+  color: hsl(var(--status-warning-foreground));
+}
+
+.dark .playsay-mind-map-limit {
+  background: hsl(var(--status-warning-surface));
+  color: hsl(var(--status-warning-foreground));
 }
 
 .dark .playsay-picture-tower {

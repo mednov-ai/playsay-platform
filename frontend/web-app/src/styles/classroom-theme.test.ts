@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const classroomCss = readFileSync(resolve(process.cwd(), "src/styles/classroom.css"), "utf8");
+const materialsCss = readFileSync(resolve(process.cwd(), "src/styles/materials.css"), "utf8");
+const appCss = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
 
 function cssRule(selector: string): string {
   const start = classroomCss.indexOf(`${selector} {`);
@@ -30,5 +32,29 @@ describe("classroom video theme", () => {
   it("keeps media letterboxing dark in either theme", () => {
     expect(cssRule('.playsay-video-focus > .lk-participant-tile .lk-participant-media-video[data-lk-source="camera"]')).toContain("background: #111111;");
     expect(cssRule('.playsay-video-focus > .lk-participant-tile .lk-participant-media-video[data-lk-source="screen_share"]')).toContain("background: #111111;");
+  });
+});
+
+describe("classroom workspace dark theme", () => {
+  it("defines semantic dark status surfaces", () => {
+    expect(appCss).toContain("--status-success-surface: 150 38% 16%;");
+    expect(appCss).toContain("--status-warning-surface: 27 45% 17%;");
+    expect(appCss).toContain("--status-danger-surface: 3 42% 17%;");
+  });
+
+  it("covers classroom chrome and collaboration surfaces", () => {
+    expect(classroomCss).toContain(".dark .playsay-activity-rail,");
+    expect(classroomCss).toContain(".dark .playsay-controlled-annotation-canvas,");
+    expect(classroomCss).toContain(".dark .playsay-collaboration-student-row,");
+    expect(cssRule(".dark .playsay-task-page")).toContain("hsl(var(--surface-muted))");
+  });
+
+  it("covers lesson materials, dialogs and answer states", () => {
+    expect(materialsCss).toContain(".dark .playsay-material-focus-stack,");
+    expect(materialsCss).toContain(".dark .playsay-video-embed-placeholder,");
+    expect(materialsCss).toContain(".dark .playsay-word-bank-chip,");
+    expect(materialsCss).toContain(".dark .playsay-speaking-prompt,");
+    expect(materialsCss).toContain(".dark .playsay-word-bank-drop[data-status=\"wrong\"],");
+    expect(materialsCss).toContain(".dark .playsay-mind-map-limit {");
   });
 });

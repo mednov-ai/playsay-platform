@@ -2940,8 +2940,16 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 .dark .playsay-classroom-shell,
 .dark .playsay-prejoin-card,
 .dark .playsay-workbench,
+.dark .playsay-activity-rail,
 .dark .playsay-task-board,
+.dark .playsay-controlled-annotation-canvas,
+.dark .playsay-annotation-button,
 .dark .playsay-page-button,
+.dark .playsay-submission-pill,
+.dark .playsay-submission-monitor-empty,
+.dark .playsay-collaboration-group-row,
+.dark .playsay-collaboration-student-row,
+.dark .playsay-collaboration-recent-pill,
 .dark .playsay-collaboration-empty,
 .dark .playsay-teacher-live-editor,
 .dark .playsay-material-list-item {
@@ -2960,6 +2968,18 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   background: hsl(var(--surface-muted));
 }
 
+.dark .playsay-classroom-shell[data-presentation-mode="external-activity-focus"] .playsay-video-header {
+  border-color: hsl(var(--border) / 0.92);
+  background: hsl(var(--surface) / 0.92);
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.36);
+}
+
+.dark .playsay-task-page {
+  background:
+    radial-gradient(circle at 12% 16%, rgb(116 219 190 / 0.07), transparent 18rem),
+    linear-gradient(180deg, hsl(var(--surface-muted)) 0%, hsl(var(--surface)) 100%);
+}
+
 .dark .playsay-assignment-card[data-active="true"],
 .dark .playsay-submission-monitor,
 .dark .playsay-collaboration-doc-status[data-active="true"],
@@ -2967,10 +2987,25 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   background: hsl(var(--surface-strong));
 }
 
-.dark .playsay-student-health-card[data-health="clear"],
-.dark .playsay-student-health-card[data-health="watch"],
-.dark .playsay-student-health-card[data-health="warm"],
+.dark .playsay-homework-status-badge[data-homework-status="DRAFT"],
+.dark .playsay-student-health-card[data-health="watch"] {
+  background: hsl(var(--status-warning-surface));
+  color: hsl(var(--status-warning-foreground));
+}
+
+.dark .playsay-homework-status-badge[data-homework-status="SUBMITTED"],
+.dark .playsay-student-health-card[data-health="clear"] {
+  background: hsl(var(--status-success-surface));
+  color: hsl(var(--status-success-foreground));
+}
+
+.dark .playsay-homework-status-badge[data-homework-status="OVERDUE"],
 .dark .playsay-student-health-card[data-health="hot"] {
+  background: hsl(var(--status-danger-surface));
+  color: hsl(var(--status-danger-foreground));
+}
+
+.dark .playsay-student-health-card[data-health="warm"] {
   background: hsl(var(--surface-strong));
 }
 

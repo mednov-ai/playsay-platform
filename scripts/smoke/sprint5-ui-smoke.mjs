@@ -356,6 +356,12 @@ async function verifyAiDialogAllowanceGrantAndDebit(teacher, student, studentSub
 }
 
 async function openWorkspaceTab(page, tabId) {
+  const passkeyPrompt = page.locator('[data-testid="passkey-prompt"]');
+  if (await passkeyPrompt.isVisible().catch(() => false)) {
+    await passkeyPrompt.press("Escape");
+    await passkeyPrompt.waitFor({ state: "detached", timeout: timeoutMs });
+  }
+
   const tab = page.locator(`[data-tab-id="${tabId}"]`);
   if (await tab.count() === 0) {
     const trigger = page.locator('[data-testid="workspace-switcher-trigger"]');

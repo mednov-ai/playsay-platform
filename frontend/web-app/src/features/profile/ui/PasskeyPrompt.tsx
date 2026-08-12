@@ -43,6 +43,7 @@ export function PasskeyPrompt({ passkeyCount, subject }: { passkeyCount: number;
         aria-label={t("profile.passkeys.promptAria")}
         aria-modal="true"
         className="w-full max-w-md rounded-[1.5rem] border border-border bg-background p-5 shadow-2xl"
+        data-testid="passkey-prompt"
         role="dialog"
       >
         <div className="flex min-w-0 items-start gap-3">

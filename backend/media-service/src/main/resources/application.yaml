@@ -24,9 +24,6 @@ playsay:
     ytdlp-path: ${PLAYSAY_MEDIA_SERVICE_YTDLP_PATH:yt-dlp}
     ytdlp-plugin-directory: ${PLAYSAY_MEDIA_SERVICE_YTDLP_PLUGIN_DIRECTORY:/usr/local/lib}
     ytdlp-js-runtime: ${PLAYSAY_MEDIA_SERVICE_YTDLP_JS_RUNTIME:deno:/usr/local/bin/deno}
-    youtube-data-api-key: ${PLAYSAY_YOUTUBE_DATA_API_KEY:}
-    youtube-data-api-base-url: ${PLAYSAY_YOUTUBE_DATA_API_BASE_URL:https://www.googleapis.com/youtube/v3}
-    youtube-data-api-timeout-seconds: ${PLAYSAY_YOUTUBE_DATA_API_TIMEOUT_SECONDS:8}
     youtube-pot-enabled: ${PLAYSAY_YOUTUBE_POT_ENABLED:false}
     youtube-pot-provider-base-url: ${PLAYSAY_YOUTUBE_POT_PROVIDER_BASE_URL:http://127.0.0.1:4416}
     youtube-pot-allowed-video-ids: ${PLAYSAY_YOUTUBE_POT_ALLOWED_VIDEO_IDS:}

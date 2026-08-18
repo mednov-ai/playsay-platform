@@ -8,6 +8,7 @@ import com.playsay.media.dto.YoutubeVideoCacheRequest
 import com.playsay.media.dto.YoutubeVideoCacheResponse
 import com.playsay.media.service.MediaInternalAuth
 import com.playsay.media.service.MediaServiceException
+import com.playsay.media.service.YoutubeMetadataLookupService
 import com.playsay.media.service.YoutubeMetadataResolver
 import com.playsay.media.service.YoutubePlaybackQuality
 import com.playsay.media.service.YoutubePlaybackSessionStore
@@ -33,6 +34,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 @RestController
 class MediaController(
+    private val metadataLookup: YoutubeMetadataLookupService,
     private val metadataResolver: YoutubeMetadataResolver,
     private val sessionStore: YoutubePlaybackSessionStore,
     private val streamService: YoutubeRelayStreamService,
@@ -52,7 +54,7 @@ class MediaController(
         @RequestBody request: YoutubeMetadataRequest,
     ): YoutubeMetadataResponse {
         internalAuth.requireValid(serviceToken)
-        val metadata = metadataResolver.resolve(request.videoId)
+        val metadata = metadataLookup.resolve(request.videoId)
             ?: throw MediaServiceException(HttpStatus.NOT_FOUND, "YOUTUBE_METADATA_NOT_FOUND")
         return YoutubeMetadataResponse(
             videoId = metadata.videoId,

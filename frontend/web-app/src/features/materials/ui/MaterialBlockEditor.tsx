@@ -84,6 +84,8 @@ export function MaterialBlockEditor({
   const [flashcardsSource, setFlashcardsSource] = useState(() => formatFlashcards(block.cards));
   const [videoClipStartSource, setVideoClipStartSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.startSeconds));
   const [videoClipEndSource, setVideoClipEndSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.endSeconds));
+  const [videoMetaDurationSource, setVideoMetaDurationSource] = useState(() => formatMaterialVideoClipTime(block.videoMeta?.durationSeconds));
+  const [videoMetaEnglishConfirmed, setVideoMetaEnglishConfirmed] = useState(() => block.videoMeta?.language?.toLowerCase().startsWith("en") === true);
   const [uploading, setUploading] = useState(false);
   const [resolvingExternalActivity, setResolvingExternalActivity] = useState(false);
   const [externalActivityError, setExternalActivityError] = useState(false);
@@ -102,6 +104,11 @@ export function MaterialBlockEditor({
     setVideoClipEndSource(formatMaterialVideoClipTime(block.videoClip?.endSeconds));
   }, [block.id, block.videoClip?.endSeconds, block.videoClip?.startSeconds]);
 
+  useEffect(() => {
+    setVideoMetaDurationSource(formatMaterialVideoClipTime(block.videoMeta?.durationSeconds));
+    setVideoMetaEnglishConfirmed(block.videoMeta?.language?.toLowerCase().startsWith("en") === true);
+  }, [block.id, block.videoMeta?.durationSeconds, block.videoMeta?.language]);
+
   function commitVideoClip(boundary: "startSeconds" | "endSeconds", value: string) {
     const seconds = parseMaterialVideoClipTime(value);
     const nextClip = { ...(block.videoClip ?? {}) };
@@ -114,6 +121,24 @@ export function MaterialBlockEditor({
     setVideoClipStartSource(formatMaterialVideoClipTime(normalizedClip?.startSeconds));
     setVideoClipEndSource(formatMaterialVideoClipTime(normalizedClip?.endSeconds));
     onUpdate({ videoClip: normalizedClip });
+  }
+
+  function commitManualVideoMeta(durationSource: string, englishConfirmed: boolean) {
+    const durationSeconds = parseMaterialVideoClipTime(durationSource);
+    setVideoMetaDurationSource(durationSource);
+    setVideoMetaEnglishConfirmed(englishConfirmed);
+    if (durationSeconds !== undefined && durationSeconds <= 420 && englishConfirmed) {
+      setVideoMetaDurationSource(formatMaterialVideoClipTime(durationSeconds));
+      onUpdate({
+        videoMeta: {
+          durationSeconds,
+          language: "en",
+          validationStatus: "TEACHER_CONFIRMED",
+        },
+      });
+    } else {
+      onUpdate({ videoMeta: undefined });
+    }
   }
 
   async function uploadAsset(kind: "image" | "htmlGame", file: File | undefined) {
@@ -249,7 +274,7 @@ export function MaterialBlockEditor({
                 <select
                   className="playsay-input"
                   disabled={disabled}
-                  onChange={(event) => onUpdate({ provider: event.target.value })}
+                  onChange={(event) => onUpdate({ provider: event.target.value, videoMeta: undefined })}
                   value={block.provider ?? "YOUTUBE"}
                 >
                   <option value="YOUTUBE">YouTube</option>
@@ -261,12 +286,52 @@ export function MaterialBlockEditor({
                 <input
                   className="playsay-input"
                   disabled={disabled}
-                  onChange={(event) => onUpdate({ url: event.target.value })}
+                  onChange={(event) => onUpdate({ url: event.target.value, videoMeta: undefined })}
                   placeholder={t("materials.blockEditor.linkPlaceholder")}
                   value={block.url ?? ""}
                 />
               </FormField>
             </div>
+            {(block.provider ?? "YOUTUBE").toUpperCase() === "YOUTUBE" ? (
+              <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-2" data-layout="video-metadata">
+                <strong className="text-sm">{t("materials.blockEditor.videoMetadataTitle")}</strong>
+                <p className="text-xs font-bold text-muted-foreground">
+                  {t("materials.blockEditor.videoMetadataHint")}
+                </p>
+                <div className="playsay-material-field-grid">
+                  <FormField label={t("materials.blockEditor.videoDuration")}>
+                    <input
+                      aria-invalid={Boolean(videoMetaDurationSource) && (parseMaterialVideoClipTime(videoMetaDurationSource) === undefined || (parseMaterialVideoClipTime(videoMetaDurationSource) ?? 0) > 420)}
+                      className="playsay-input"
+                      disabled={disabled}
+                      inputMode="numeric"
+                      onBlur={(event) => commitManualVideoMeta(event.currentTarget.value, videoMetaEnglishConfirmed)}
+                      onChange={(event) => setVideoMetaDurationSource(event.target.value)}
+                      placeholder={t("materials.blockEditor.videoDurationPlaceholder")}
+                      value={videoMetaDurationSource}
+                    />
+                  </FormField>
+                  <label className="flex items-center gap-2 self-end rounded-lg border border-border bg-white px-3 py-2 text-sm font-bold">
+                    <input
+                      checked={videoMetaEnglishConfirmed}
+                      disabled={disabled}
+                      onChange={(event) => commitManualVideoMeta(videoMetaDurationSource, event.target.checked)}
+                      type="checkbox"
+                    />
+                    {t("materials.blockEditor.videoEnglishAudio")}
+                  </label>
+                </div>
+                {block.videoMeta?.validationStatus === "TEACHER_CONFIRMED" ? (
+                  <small className="text-xs font-bold text-success" role="status">
+                    {t("materials.blockEditor.videoMetadataConfirmed")}
+                  </small>
+                ) : (
+                  <small className="text-xs font-bold text-muted-foreground">
+                    {t("materials.blockEditor.videoMetadataOptional")}
+                  </small>
+                )}
+              </div>
+            ) : null}
             <div className="playsay-material-field-grid rounded-lg border border-border bg-muted/20 p-2" data-layout="video-clip">
               <FormField label={t("materials.blockEditor.videoClipStart")}>
                 <input

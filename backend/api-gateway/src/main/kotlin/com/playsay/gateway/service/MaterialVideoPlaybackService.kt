@@ -57,8 +57,8 @@ class MaterialVideoPlaybackService(
 
         val storedMeta = YoutubeVideoSupport.metaFromBlock(block)
         val storedMetaComplete = storedMeta?.durationSeconds != null && storedMeta.language != null
-        val cachedMeta = diagnostics.videoId
-            ?.let { videoId -> youtubeVideoCacheService.find(videoId) }
+        val cachedRecord = diagnostics.videoId?.let { videoId -> youtubeVideoCacheService.find(videoId) }
+        val cachedMeta = cachedRecord
             ?.takeIf { cache -> cache.durationSeconds != null && cache.language != null }
             ?.let { cache ->
                 YoutubeVideoMeta(
@@ -69,6 +69,9 @@ class MaterialVideoPlaybackService(
                 )
             }
         val resolvedMeta = if (storedMetaComplete || cachedMeta != null) null else diagnostics.videoId?.let { videoId -> youtubeMediaClient.resolveMetadata(videoId) }
+        if (resolvedMeta?.durationSeconds != null && resolvedMeta.language != null && cachedRecord != null) {
+            youtubeVideoCacheService.recordMetadata(cachedRecord.id, resolvedMeta)
+        }
         val meta = storedMeta?.takeIf { storedMetaComplete } ?: cachedMeta ?: resolvedMeta
             ?: return response(
                 materialId,

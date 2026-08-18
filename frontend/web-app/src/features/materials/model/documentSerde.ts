@@ -6,6 +6,7 @@ import { cleanMaterialWordBankOptions, materialCardFromJson, materialItemFromJso
 import { cleanMaterialAssessment, defaultObjectiveAssessmentPolicy } from "./scoring";
 import { asJsonObject, asNumber, asPositiveNumber, asString, createClientId, isMaterialNormalizationTerm, isObjectiveMaterialBlockType, materialBlockLabel, normalizeMaterialAnswer, normalizeMaterialBlockType, readPromptFromSourceMeta, uniqueMaterialOptions } from "./formatters";
 import { normalizeMaterialVideoClip } from "./videoClip";
+import { normalizeMaterialVideoMeta } from "./videoMeta";
 
 export function materialToForm(material: LessonMaterial): MaterialFormState {
   const sourceMeta = asJsonObject(material.sourceMeta);
@@ -202,6 +203,7 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   const gameTitleSource = normalizeGameTitleSource(asString(block.gameTitleSource));
   const externalActivitySupportLevel = normalizeExternalActivitySupportLevel(asString(block.externalActivitySupportLevel));
   const videoClip = normalizeMaterialVideoClip(block.videoClip);
+  const videoMeta = normalizeMaterialVideoMeta(block.videoMeta);
 
   if (body) {
     result.body = body;
@@ -217,6 +219,9 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
   }
   if (videoClip) {
     result.videoClip = videoClip;
+  }
+  if (videoMeta) {
+    result.videoMeta = videoMeta;
   }
   if (caption) {
     result.caption = caption;
@@ -302,6 +307,10 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
   const videoClip = normalizeMaterialVideoClip(block.videoClip);
   if (videoClip) {
     clean.videoClip = videoClip;
+  }
+  const videoMeta = normalizeMaterialVideoMeta(block.videoMeta);
+  if (videoMeta) {
+    clean.videoMeta = videoMeta;
   }
   if (block.caption?.trim()) {
     clean.caption = block.caption.trim();

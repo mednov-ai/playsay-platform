@@ -281,6 +281,9 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
         assertEquals("5l-fo-d0gt8", response.videoId)
         assertNotNull(response.sessionId)
         assertNull(response.reason)
+        val cachedMetadata = assertNotNull(youtubeVideoCacheRepo.findByVideoIdAndQuality("5l-fo-d0gt8", "MEDIUM"))
+        assertEquals(105, cachedMetadata.durationSeconds)
+        assertEquals("en", cachedMetadata.language)
     }
 
     @Test

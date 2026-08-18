@@ -1114,7 +1114,8 @@ describe("LessonTaskCanvas", () => {
     const textElement = container.querySelector<HTMLElement>(".playsay-annotation-text-text");
     const textFrame = textElement?.closest("foreignObject");
     expect(textElement?.style.fontSize).toBe("14px");
-    expect(textFrame?.getAttribute("width")).toBe("240");
+    expect(textElement?.style.backgroundColor).toBe("transparent");
+    expect(textFrame?.getAttribute("width")).toBe("72");
     expect(textFrame?.getAttribute("height")).toBe("56");
     expect(container.querySelectorAll(".playsay-annotation-resize-handle")).toHaveLength(2);
 

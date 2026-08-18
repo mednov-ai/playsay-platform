@@ -9,6 +9,51 @@ import {
 } from "./yjsRuntime";
 
 describe("yjs workspace runtime annotations", () => {
+  it("normalizes the regressed text default after realtime restore", () => {
+    const annotationChanges: AnnotationElement[][] = [];
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: (elements) => annotationChanges.push(elements),
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      participantName: "Teacher",
+      snapshot: null,
+    });
+
+    runtime.setAnnotationElements([{
+      autoHeight: true,
+      autoWidth: false,
+      color: "#ff5c00",
+      createdAt: 1,
+      fill: "#fffaf5",
+      fontSize: 18,
+      height: 56,
+      id: "legacy-text",
+      kind: "text",
+      pageId: "material",
+      text: "why",
+      width: 240,
+      x: 20,
+      y: 30,
+    }]);
+
+    expect(annotationChanges.at(-1)).toEqual([
+      expect.objectContaining({
+        autoHeight: true,
+        autoWidth: true,
+        fill: "transparent",
+        height: 56,
+        id: "legacy-text",
+        width: 72,
+      }),
+    ]);
+
+    runtime.destroy();
+  });
+
   it("stores annotation strokes in the collaboration document", () => {
     const annotationChanges: AnnotationElement[][] = [];
     const runtime = createYjsWorkspaceRuntime({

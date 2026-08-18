@@ -402,7 +402,11 @@ const AnnotationElementView = memo(function AnnotationElementView({
         data-empty={element.text ? "false" : "true"}
         data-mind-map-root={element.kind === "mindMapNode" && element.parentId === null ? "true" : undefined}
         data-text-clamped={sizeableTextClamped ? "true" : undefined}
-        style={{ backgroundColor: element.fill, color: element.color, fontSize: `${element.fontSize}px` }}
+        style={{
+          backgroundColor: element.kind === "text" ? "transparent" : element.fill,
+          color: element.color,
+          fontSize: `${element.fontSize}px`,
+        }}
       >
         {sizeableTextElement ? (
           <span aria-hidden="true" className="playsay-annotation-text-measure" ref={measurementRef}>

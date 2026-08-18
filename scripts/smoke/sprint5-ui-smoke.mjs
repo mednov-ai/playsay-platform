@@ -6,12 +6,15 @@ import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-const webBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_WEB_BASE_URL ?? "https://online.play-and-say.ru");
+const webBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_WEB_BASE_URL ?? "https://dev.online.honey.school");
 const apiBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_API_BASE_URL ?? new URL("/api", `${webBaseUrl}/`).toString());
-const authIssuer = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_AUTH_ISSUER ?? "https://ops.play-and-say.ru:18443/keycloak/realms/playsay");
+const authIssuer = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_AUTH_ISSUER ?? "https://dev.ops.honey.school/keycloak/realms/playsay");
 const authClientId = process.env.PLAY_SAY_SMOKE_AUTH_CLIENT_ID ?? "playsay-web";
 const playwrightPackageDir = process.env.PLAYWRIGHT_PACKAGE_DIR ?? "/Users/evgeniymednov/.codex/tools/playwright";
-const sshHost = process.env.PLAY_SAY_SMOKE_SSH_HOST ?? "root@146.103.126.15";
+const sshHost = process.env.PLAY_SAY_SMOKE_SSH_HOST ?? "playsay@10.60.0.30";
+const sshJumpHost = process.env.PLAY_SAY_SMOKE_SSH_JUMP_HOST ?? "root@65.109.55.110";
+const sshIdentityFile = process.env.PLAY_SAY_SMOKE_SSH_IDENTITY_FILE
+  ?? "/Users/evgeniymednov/.ssh/play_and_say_vps_ed25519";
 const headless = process.env.PLAY_SAY_SMOKE_HEADLESS !== "false";
 const fakeMedia = process.env.PLAY_SAY_SMOKE_FAKE_MEDIA === "true";
 const timeoutMs = Number(process.env.PLAY_SAY_SMOKE_TIMEOUT_MS ?? 45_000);
@@ -227,8 +230,14 @@ function readPasswordFromDevSecret(secretKey) {
     return execFileSync(
       "ssh",
       [
+        "-i",
+        sshIdentityFile,
+        "-o",
+        "IdentitiesOnly=yes",
+        "-o",
+        `ProxyCommand=ssh -i ${sshIdentityFile} -o IdentitiesOnly=yes -W %h:%p ${sshJumpHost}`,
         sshHost,
-        `kubectl -n keycloak get secret keycloak-dev-users -o jsonpath='{.data.${secretKey}}' | base64 -d`,
+        `sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n keycloak get secret keycloak-dev-users -o jsonpath='{.data.${secretKey}}' | base64 -d`,
       ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
@@ -882,18 +891,20 @@ async function drawTextAndMindMap(page) {
   const initialTextSize = await textEditor.evaluate((editor) => {
     const frame = editor.closest("foreignObject");
     return frame ? {
+      backgroundColor: getComputedStyle(editor.parentElement).backgroundColor,
       height: Number(frame.getAttribute("height")),
       width: Number(frame.getAttribute("width")),
     } : null;
   });
   if (
     !initialTextSize
-    || initialTextSize.width < 230
-    || initialTextSize.width > 250
+    || initialTextSize.backgroundColor !== "rgba(0, 0, 0, 0)"
+    || initialTextSize.width <= 72
+    || initialTextSize.width >= 240
     || initialTextSize.height < 50
     || initialTextSize.height > 70
   ) {
-    throw new Error(`Text did not start with wide readable bounds: ${JSON.stringify(initialTextSize)}`);
+    throw new Error(`Text did not start with transparent content-sized bounds: ${JSON.stringify(initialTextSize)}`);
   }
   await textEditor.fill(
     "Friendly text wraps automatically across several lines without manually stretching its frame downward.",
@@ -941,13 +952,13 @@ async function drawTextAndMindMap(page) {
   const mindMapSizes = sizes.filter((size) => size.kind === "mindMapNode");
   if (
     !textSize
-    || textSize.width < 230
-    || textSize.width > 250
+    || textSize.width <= 72
+    || textSize.width >= 240
     || textSize.height < 50
     || textSize.height > 70
     || textSize.lineCount !== 1
   ) {
-    throw new Error(`Text did not retain its readable default bounds: ${JSON.stringify(textSize)}`);
+    throw new Error(`Text did not retain its compact content-sized bounds: ${JSON.stringify(textSize)}`);
   }
   if (mindMapSizes.length !== 2 || mindMapSizes.some((size) => size.width > 220 || size.height > 160)) {
     throw new Error(`Mind map nodes exceeded compact bounds: ${JSON.stringify(mindMapSizes)}`);

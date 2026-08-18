@@ -6,12 +6,15 @@ import { createRequire } from "node:module";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-const webBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_WEB_BASE_URL ?? "https://online.play-and-say.ru");
+const webBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_WEB_BASE_URL ?? "https://dev.online.honey.school");
 const apiBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_API_BASE_URL ?? new URL("/api", `${webBaseUrl}/`).toString());
-const authIssuer = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_AUTH_ISSUER ?? "https://ops.play-and-say.ru:18443/keycloak/realms/playsay");
+const authIssuer = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_AUTH_ISSUER ?? "https://dev.ops.honey.school/keycloak/realms/playsay");
 const authClientId = process.env.PLAY_SAY_SMOKE_AUTH_CLIENT_ID ?? "playsay-web";
 const playwrightPackageDir = process.env.PLAYWRIGHT_PACKAGE_DIR ?? "/Users/evgeniymednov/.codex/tools/playwright";
-const sshHost = process.env.PLAY_SAY_SMOKE_SSH_HOST ?? "root@146.103.126.15";
+const sshHost = process.env.PLAY_SAY_SMOKE_SSH_HOST ?? "playsay@10.60.0.30";
+const sshJumpHost = process.env.PLAY_SAY_SMOKE_SSH_JUMP_HOST ?? "root@65.109.55.110";
+const sshIdentityFile = process.env.PLAY_SAY_SMOKE_SSH_IDENTITY_FILE
+  ?? "/Users/evgeniymednov/.ssh/play_and_say_vps_ed25519";
 const headless = process.env.PLAY_SAY_SMOKE_HEADLESS !== "false";
 const timeoutMs = Number(process.env.PLAY_SAY_SMOKE_TIMEOUT_MS ?? 60_000);
 const runId = `sprint6-homework-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
@@ -298,8 +301,14 @@ function readPasswordFromDevSecret(secretKey) {
     return execFileSync(
       "ssh",
       [
+        "-i",
+        sshIdentityFile,
+        "-o",
+        "IdentitiesOnly=yes",
+        "-o",
+        `ProxyCommand=ssh -i ${sshIdentityFile} -o IdentitiesOnly=yes -W %h:%p ${sshJumpHost}`,
         sshHost,
-        `kubectl -n keycloak get secret keycloak-dev-users -o jsonpath='{.data.${secretKey}}' | base64 -d`,
+        `sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n keycloak get secret keycloak-dev-users -o jsonpath='{.data.${secretKey}}' | base64 -d`,
       ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();

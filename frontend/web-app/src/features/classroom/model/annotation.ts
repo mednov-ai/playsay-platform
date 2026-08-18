@@ -377,6 +377,16 @@ export function estimateAnnotationTextSize(
   return { height, width };
 }
 
+export function shouldRestoreAnnotationTextAutosize(element: {
+  autoHeight?: unknown;
+  autoWidth?: unknown;
+  width: number;
+}): boolean {
+  return element.autoWidth === false
+    && element.autoHeight !== false
+    && Math.abs(element.width - legacyFixedAnnotationTextWidth) < 0.5;
+}
+
 export function pointsToSvgPath(points: AnnotationPoint[]): string {
   if (points.length === 0) {
     return "";
@@ -548,7 +558,7 @@ function serializeAnnotationElement(element: AnnotationElement): Record<string, 
   }
   return {
     ...base,
-    fill: element.fill,
+    fill: element.kind === "text" ? "transparent" : element.fill,
     ...(element.kind === "text" || element.kind === "stickyNote" ? { fontSize: element.fontSize } : {}),
     ...(element.kind === "text"
       ? {
@@ -628,24 +638,51 @@ function annotationElementFromJson(value: unknown, index: number): AnnotationEle
       y: clampCoordinate(y),
     };
   }
-  if (kind === "text" || kind === "stickyNote") {
-    const autoWidth = kind === "text" ? element.autoWidth !== false : false;
-    const autoHeight = kind === "text" ? element.autoHeight === undefined ? autoWidth : element.autoHeight !== false : false;
-    const constraints = kind === "text" ? textSizingConstraints : stickyNoteSizingConstraints;
-    return {
+  if (kind === "text") {
+    const restoreAutosize = shouldRestoreAnnotationTextAutosize({
+      autoHeight: element.autoHeight,
+      autoWidth: element.autoWidth,
+      width,
+    });
+    const autoWidth = restoreAutosize || element.autoWidth !== false;
+    const autoHeight = element.autoHeight === undefined ? autoWidth : element.autoHeight !== false;
+    const normalized: Extract<AnnotationElement, { kind: "text" }> = {
       ...base,
       autoHeight,
       autoWidth,
-      fill: asString(element.fill) || (kind === "stickyNote" ? defaultStickyFill : "#fffaf5"),
+      fill: "transparent",
       fontSize: annotationFontSize(element.fontSize, 30),
-      height: kind === "text"
-        ? clampSize(height, constraints.minHeight, constraints.maxHeight)
-        : Math.max(minimumElementSize, height),
+      height: clampSize(height, textSizingConstraints.minHeight, textSizingConstraints.maxHeight),
       kind,
       text: asString(element.text),
-      width: kind === "text" && autoWidth
-        ? clampSize(width, constraints.minWidth, constraints.maxWidth)
+      width: autoWidth
+        ? clampSize(width, textSizingConstraints.minWidth, textSizingConstraints.maxWidth)
         : Math.max(minimumElementSize, width),
+      x: clampCoordinate(x),
+      y: clampCoordinate(y),
+    };
+    if (!restoreAutosize) {
+      return normalized;
+    }
+    const size = estimateAnnotationTextSize(normalized);
+    return {
+      ...normalized,
+      ...size,
+      x: Math.min(normalized.x, annotationCoordinateMax - size.width),
+      y: Math.min(normalized.y, annotationCoordinateMax - size.height),
+    };
+  }
+  if (kind === "stickyNote") {
+    return {
+      ...base,
+      autoHeight: false,
+      autoWidth: false,
+      fill: asString(element.fill) || defaultStickyFill,
+      fontSize: annotationFontSize(element.fontSize, 30),
+      height: Math.max(minimumElementSize, height),
+      kind,
+      text: asString(element.text),
+      width: Math.max(minimumElementSize, width),
       x: clampCoordinate(x),
       y: clampCoordinate(y),
     };
@@ -778,6 +815,7 @@ const defaultStickyFill = "#fff0a8";
 const defaultMindMapFill = "#ffffff";
 const eraserRadius = 28;
 const minimumElementSize = 36;
+const legacyFixedAnnotationTextWidth = 240;
 const mindMapLevelGap = 52;
 const mindMapPagePadding = 20;
 const mindMapSiblingGap = 16;

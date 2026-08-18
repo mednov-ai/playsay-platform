@@ -716,15 +716,15 @@ export function useLessonAnnotation({
   }
 
   function createTextElement(tool: "stickyNote" | "text", point: AnnotationPoint) {
-    const width = tool === "stickyNote" ? 220 : 240;
+    const width = tool === "stickyNote" ? 220 : 72;
     const height = tool === "stickyNote" ? 160 : 56;
     const element: AnnotationElement = {
       ...(point.anchorId ? { anchorId: point.anchorId } : {}),
       autoHeight: tool === "text",
-      autoWidth: false,
+      autoWidth: tool === "text",
       color: tool === "stickyNote" ? "#111111" : annotationColor,
       createdAt: Date.now(),
-      fill: tool === "stickyNote" ? "#fff0a8" : "#fffaf5",
+      fill: tool === "stickyNote" ? "#fff0a8" : "transparent",
       fontSize: tool === "stickyNote" ? 30 : defaultAnnotationFontSize,
       height,
       id: annotationElementId(tool),

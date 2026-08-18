@@ -171,6 +171,86 @@ describe("annotation model", () => {
     expect(content.elements.find((element) => element.id === "map")).toEqual(expect.objectContaining({ fontSize: 18, height: 82, width: 220 }));
   });
 
+  it("restores transparent autosize for the regressed fixed-width text default", () => {
+    const content = annotationContentFromJson({
+      schemaVersion: 7,
+      elements: [
+        {
+          autoHeight: true,
+          autoWidth: false,
+          color: "#ff5c00",
+          createdAt: 1,
+          fill: "#fffaf5",
+          fontSize: 18,
+          height: 56,
+          id: "legacy-default",
+          kind: "text",
+          pageId: "page-1",
+          text: "why",
+          width: 240,
+          x: 950,
+          y: 960,
+        },
+        {
+          autoHeight: true,
+          autoWidth: false,
+          color: "#111111",
+          createdAt: 2,
+          fill: "#fffaf5",
+          fontSize: 18,
+          height: 90,
+          id: "manual-width",
+          kind: "text",
+          pageId: "page-1",
+          text: "Keep my width",
+          width: 280,
+          x: 10,
+          y: 20,
+        },
+      ],
+    });
+
+    expect(content.elements.find((element) => element.id === "legacy-default")).toEqual(expect.objectContaining({
+      autoHeight: true,
+      autoWidth: true,
+      fill: "transparent",
+      height: 56,
+      width: 72,
+      x: 928,
+      y: 944,
+    }));
+    expect(content.elements.find((element) => element.id === "manual-width")).toEqual(expect.objectContaining({
+      autoHeight: true,
+      autoWidth: false,
+      fill: "transparent",
+      height: 90,
+      width: 280,
+    }));
+  });
+
+  it("serializes plain text with a transparent fill defensively", () => {
+    const content = annotationContentFromElements([{
+      autoHeight: true,
+      autoWidth: true,
+      color: "#111111",
+      createdAt: 1,
+      fill: "#fffaf5",
+      fontSize: 18,
+      height: 56,
+      id: "text-fill",
+      kind: "text",
+      pageId: "page-1",
+      text: "Transparent",
+      width: 120,
+      x: 10,
+      y: 20,
+    }], "page-1");
+
+    expect(content.elements).toEqual([
+      expect.objectContaining({ fill: "transparent", id: "text-fill" }),
+    ]);
+  });
+
   it("keeps a manually resized text height after content measurement", () => {
     const text: AnnotationElement = {
       autoHeight: true,
@@ -198,6 +278,37 @@ describe("annotation model", () => {
       width: 120,
     }));
     expect(estimateAnnotationTextSize(resized as Extract<AnnotationElement, { kind: "text" }>).height).toBe(260);
+  });
+
+  it("locks a manually resized text width while continuing to fit its height", () => {
+    const text: AnnotationElement = {
+      autoHeight: true,
+      autoWidth: true,
+      color: "#111111",
+      createdAt: 1,
+      fill: "transparent",
+      fontSize: 18,
+      height: 56,
+      id: "text-horizontal-resize",
+      kind: "text",
+      pageId: "page-1",
+      text: "A long annotation that should wrap after its width is set manually by the teacher.",
+      width: 72,
+      x: 100,
+      y: 100,
+    };
+
+    const resized = resizeAnnotationElement(text, "e", { pageId: "page-1", x: 260, y: 100 });
+    const fitted = estimateAnnotationTextSize(resized as Extract<AnnotationElement, { kind: "text" }>);
+
+    expect(resized).toEqual(expect.objectContaining({
+      autoHeight: true,
+      autoWidth: false,
+      height: 56,
+      width: 160,
+    }));
+    expect(fitted.width).toBe(160);
+    expect(fitted.height).toBeGreaterThan(56);
   });
 
   it("preserves image anchors and isolates erasing to the active anchor", () => {

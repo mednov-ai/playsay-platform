@@ -5,6 +5,10 @@ import * as syncProtocol from "y-protocols/sync";
 import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import * as Y from "yjs";
+import {
+  estimateAnnotationTextSize,
+  shouldRestoreAnnotationTextAutosize,
+} from "../model/annotation";
 import { isMaterialViewportNewer } from "../model/materialViewport";
 
 const messageSync = 0;
@@ -795,21 +799,49 @@ function normalizeAnnotationElement(value, index) {
       y: clampCoordinate(y),
     };
   }
-  if (kind === "text" || kind === "stickyNote") {
-    const autoWidth = kind === "text" ? element?.autoWidth !== false : false;
-    const autoHeight = kind === "text"
-      ? element?.autoHeight === undefined ? autoWidth : element.autoHeight !== false
-      : false;
-    return {
+  if (kind === "text") {
+    const restoreAutosize = shouldRestoreAnnotationTextAutosize({
+      autoHeight: element?.autoHeight,
+      autoWidth: element?.autoWidth,
+      width,
+    });
+    const autoWidth = restoreAutosize || element?.autoWidth !== false;
+    const autoHeight = element?.autoHeight === undefined ? autoWidth : element.autoHeight !== false;
+    const normalized = {
       ...base,
       autoHeight,
       autoWidth,
-      fill: asString(element?.fill) || (kind === "stickyNote" ? "#fff0a8" : "#fffaf5"),
+      fill: "transparent",
       fontSize: normalizeFontSize(element?.fontSize, 30),
-      height: kind === "text" ? clampSize(height, 34, 320) : Math.max(36, height),
+      height: clampSize(height, 56, 320),
       kind,
       text: asString(element?.text),
-      width: kind === "text" && autoWidth ? clampSize(width, 72, 360) : Math.max(36, width),
+      width: autoWidth ? clampSize(width, 72, 360) : Math.max(36, width),
+      x: clampCoordinate(x),
+      y: clampCoordinate(y),
+    };
+    if (!restoreAutosize) {
+      return normalized;
+    }
+    const size = estimateAnnotationTextSize(normalized);
+    return {
+      ...normalized,
+      ...size,
+      x: Math.min(normalized.x, 1000 - size.width),
+      y: Math.min(normalized.y, 1000 - size.height),
+    };
+  }
+  if (kind === "stickyNote") {
+    return {
+      ...base,
+      autoHeight: false,
+      autoWidth: false,
+      fill: asString(element?.fill) || "#fff0a8",
+      fontSize: normalizeFontSize(element?.fontSize, 30),
+      height: Math.max(36, height),
+      kind,
+      text: asString(element?.text),
+      width: Math.max(36, width),
       x: clampCoordinate(x),
       y: clampCoordinate(y),
     };

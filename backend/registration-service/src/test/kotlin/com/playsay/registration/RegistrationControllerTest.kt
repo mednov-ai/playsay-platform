@@ -41,7 +41,7 @@ import org.springframework.http.HttpStatus
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=true",
-        "playsay.registration.public-base-url=https://online.play-and-say.ru",
+        "playsay.registration.public-base-url=https://dev.online.honey.school",
         "playsay.registration.keycloak.base-url=http://127.0.0.1:18080",
         "playsay.registration.keycloak.realm=playsay-dev",
         "playsay.registration.keycloak.client-id=playsay-registration-service",
@@ -103,7 +103,7 @@ class RegistrationControllerTest @Autowired constructor(
         assertFalse(createdUser.emailVerified)
         assertTrue(
             RecordingRegistrationEmailClient.registrationConfirmations.single().confirmationUrl
-                .startsWith("https://online.play-and-say.ru/register/confirm?token="),
+                .startsWith("https://dev.online.honey.school/register/confirm?token="),
         )
 
         val confirmed = confirmRegistration(lastConfirmationToken())
@@ -227,7 +227,7 @@ class RegistrationControllerTest @Autowired constructor(
             email = null,
             displayName = "Invitee",
             lessonId = "3f20a6e4-a861-49ab-aa70-8300b589f61f",
-            continueUrl = "https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
+            continueUrl = "https://dev.online.honey.school/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
         )
         val token = assertNotNull(invite.token)
 
@@ -239,7 +239,7 @@ class RegistrationControllerTest @Autowired constructor(
             email = null,
             displayName = "Invitee",
             lessonId = "3f20a6e4-a861-49ab-aa70-8300b589f61f",
-            continueUrl = "https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
+            continueUrl = "https://dev.online.honey.school/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
         )
         val manualToken = assertNotNull(manualInvite.token)
         val manualEntry = "${manualToken.substring(0, 3).lowercase()} ${manualToken.substring(3).lowercase()}"
@@ -250,7 +250,7 @@ class RegistrationControllerTest @Autowired constructor(
         assertEquals(HttpStatus.OK.value(), consumed.statusCode(), consumed.body())
         assertEquals(HttpStatus.OK.value(), manualConsumed.statusCode(), manualConsumed.body())
         assertTrue(consumed.body().contains("access-token-invitee"))
-        assertTrue(consumed.body().contains("https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom"))
+        assertTrue(consumed.body().contains("https://dev.online.honey.school/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom"))
         assertEquals(HttpStatus.BAD_REQUEST.value(), repeated.statusCode(), repeated.body())
         assertEquals(
             listOf("invitee", "invitee"),
@@ -262,7 +262,7 @@ class RegistrationControllerTest @Autowired constructor(
     fun `managed student invite lookup is pending metadata only and does not consume code`() {
         provisionManagedStudent("lookup.student", "Lookup", "Student", "lookup@example.com")
         val lessonId = "37a6f61a-434f-483d-9177-f4b2f6fcdca5"
-        val continueUrl = "https://online.play-and-say.ru/lessons/$lessonId/classroom"
+        val continueUrl = "https://dev.online.honey.school/lessons/$lessonId/classroom"
         val invite = createManagedStudentInvite(
             subject = "managed-subject-1",
             username = "lookup.student",
@@ -401,7 +401,7 @@ class RegistrationControllerTest @Autowired constructor(
         assertEquals(email, reset.to)
         assertEquals("en", reset.locale)
         assertEquals(6, reset.code.length)
-        assertEquals("https://online.play-and-say.ru/reset-password?email=forgot%40example.com", reset.resetUrl)
+        assertEquals("https://dev.online.honey.school/reset-password?email=forgot%40example.com", reset.resetUrl)
     }
 
     @Test
@@ -502,12 +502,12 @@ class RegistrationControllerTest @Autowired constructor(
     @Test
     fun `confirmed registration returns allowed keyboard continue url`() {
         val email = "keyboard-return@example.com"
-        startRegistration(email, returnTo = "https://key.play-and-say.ru/")
+        startRegistration(email, returnTo = "https://dev.key.honey.school/")
 
         val confirmed = confirmRegistration(lastConfirmationToken())
 
         assertEquals(HttpStatus.OK.value(), confirmed.statusCode(), confirmed.body())
-        assertTrue(confirmed.body().contains("\"continueUrl\":\"https://key.play-and-say.ru/\""))
+        assertTrue(confirmed.body().contains("\"continueUrl\":\"https://dev.key.honey.school/\""))
     }
 
     @Test
@@ -552,7 +552,7 @@ class RegistrationControllerTest @Autowired constructor(
         email: String,
         password: String = "River2026!",
         forwardedFor: String? = nextForwardedFor(),
-        returnTo: String? = "https://key.play-and-say.ru/",
+        returnTo: String? = "https://dev.key.honey.school/",
     ): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
@@ -574,7 +574,7 @@ class RegistrationControllerTest @Autowired constructor(
                 }
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
-                        """{"email":"$email","locale":"en","returnTo":"https://key.play-and-say.ru/"}""",
+                        """{"email":"$email","locale":"en","returnTo":"https://dev.key.honey.school/"}""",
                     ),
                 )
                 .build(),
@@ -599,7 +599,7 @@ class RegistrationControllerTest @Autowired constructor(
                 }
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
-                        """{"email":"$email","locale":"en","returnTo":"https://key.play-and-say.ru/"}""",
+                        """{"email":"$email","locale":"en","returnTo":"https://dev.key.honey.school/"}""",
                     ),
                 )
                 .build(),
@@ -731,7 +731,7 @@ class RegistrationControllerTest @Autowired constructor(
     private fun startRegistrationBody(
         email: String = "student@example.com",
         password: String = "River2026!",
-        returnTo: String? = "https://key.play-and-say.ru/",
+        returnTo: String? = "https://dev.key.honey.school/",
     ): String {
         val returnToLine = returnTo?.let { ",\"returnTo\":\"$it\"" } ?: ""
         return """{"email":"$email","password":"$password","displayName":"Student","locale":"en"$returnToLine}"""

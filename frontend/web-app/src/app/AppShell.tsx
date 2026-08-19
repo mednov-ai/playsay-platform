@@ -33,9 +33,11 @@ import {
   type PaymentInvoiceCreated,
   type ScheduledLesson,
   type ScheduledLessonInput,
+  type ScheduledLessonLinkOrigin,
   type ScheduledLessonScheduleInput,
   type UpdateUserProfileInput,
 } from "../shared/api/playsay";
+import type { ClipboardCopyResult } from "../shared/lib/clipboard";
 import { BrandMark } from "../shared/ui/BrandMark";
 import { WorkspaceTabs } from "../widgets/workspace-tabs/WorkspaceTabs";
 import { Button } from "../components/ui/button";
@@ -89,7 +91,7 @@ export type AppShellProps = {
   completedAuthAction?: CompletedAuthAction | null;
   completeScheduledLesson: (lessonId: string) => Promise<void>;
   confirmScheduledLessonJoin: (lesson: ScheduledLesson, mediaChoices: ClassroomMediaChoices) => Promise<void>;
-  copyScheduledLessonLinks: (lesson: ScheduledLesson) => Promise<boolean>;
+  copyScheduledLessonLinks: (lesson: ScheduledLesson, linkOrigin?: ScheduledLessonLinkOrigin) => Promise<ClipboardCopyResult | null>;
   courseLessons: CourseLessonMap;
   courseLoading: boolean;
   courseMessage: string | null;
@@ -496,7 +498,7 @@ export function AppShell(props: AppShellProps) {
                   onCreate={createScheduledLesson}
                   onCreateManagedStudent={createManagedStudent}
                   onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
-                  onCopyLinks={(lesson) => copyScheduledLessonLinks(lesson)}
+                  onCopyLinks={(lesson, linkOrigin) => copyScheduledLessonLinks(lesson, linkOrigin)}
                   onJoin={(lesson) => void joinScheduledLesson(lesson)}
                   onOpenMaterials={() => setWorkspaceTab("materials")}
                   onPrepare={openLessonPreparation}

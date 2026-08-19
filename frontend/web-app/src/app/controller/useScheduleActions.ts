@@ -22,10 +22,12 @@ import {
   type MeProfile,
   type ScheduledLesson,
   type ScheduledLessonInput,
+  type ScheduledLessonLinkOrigin,
   type ScheduledLessonScheduleInput,
   type ScheduledLessonParticipantLink,
 } from "../../shared/api/playsay";
 import { useAppTranslation } from "../../shared/i18n";
+import { copyTextFromPromise, type ClipboardCopyResult } from "../../shared/lib/clipboard";
 import type { SessionErrorHandler } from "./types";
 
 export function useScheduleActions({
@@ -134,17 +136,20 @@ export function useScheduleActions({
     }
   }
 
-  async function copyScheduledLessonLinks(lesson: ScheduledLesson): Promise<boolean> {
+  async function copyScheduledLessonLinks(
+    lesson: ScheduledLesson,
+    linkOrigin: ScheduledLessonLinkOrigin = "HONEYSCHOOL_RU",
+  ): Promise<ClipboardCopyResult | null> {
     setScheduleMessage(null);
     try {
-      const text = createScheduledLessonParticipantLinks(lesson.id)
+      const text = createScheduledLessonParticipantLinks(lesson.id, linkOrigin)
         .then((links) => formatLessonLinks(lesson, links.links));
-      await copyText(text, t("schedule.messages.linksPromptTitle"));
-      setScheduleMessage(t("schedule.messages.linksCopied"));
-      return true;
+      const result = await copyTextFromPromise(text);
+      setScheduleMessage(t(result.copied ? "schedule.messages.linksCopied" : "schedule.messages.linksManualCopy"));
+      return result;
     } catch (caught) {
       setScheduleMessage(applySessionError(caught, t("schedule.messages.linksCopyFailed")));
-      return false;
+      return null;
     }
   }
 
@@ -370,26 +375,6 @@ function formatLessonLinks(lesson: ScheduledLesson, links: ScheduledLessonPartic
   return links
     .map((link) => `${link.displayName ?? link.email ?? link.subject}: ${link.url}`)
     .join("\n");
-}
-
-async function copyText(text: Promise<string>, promptTitle: string): Promise<void> {
-  if (typeof ClipboardItem === "function" && typeof navigator.clipboard?.write === "function") {
-    try {
-      const blob = text.then((value) => new Blob([value], { type: "text/plain" }));
-      await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
-      return;
-    } catch {
-      // A browser can expose ClipboardItem but reject clipboard.write for its own
-      // permission policy. Reuse the already-started request in the fallback.
-    }
-  }
-
-  const value = await text;
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    window.prompt(promptTitle, value);
-  }
 }
 
 function userLabel(user: AdminUserProfile): string {

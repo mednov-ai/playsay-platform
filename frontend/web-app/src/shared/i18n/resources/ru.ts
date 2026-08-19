@@ -597,6 +597,8 @@ export const ru = {
       cancel: "Отменить",
       delete: "Удалить",
       copyLinks: "Ссылки",
+      copyLinksRf: "Ссылки · honeyschool.ru",
+      copyLinksDirect: "Ссылки · honey.school",
       reschedule: "Изменить дату и время",
     },
     confirm: {
@@ -682,6 +684,7 @@ export const ru = {
       managedStudentCreated: "Ученик добавлен",
       managedStudentCreateFailed: "Не удалось создать ученика",
       linksCopied: "Ссылки на урок скопированы",
+      linksManualCopy: "Выделите и скопируйте ссылки вручную",
       linksCopyFailed: "Не удалось скопировать ссылки",
       linksPromptTitle: "Ссылки на урок",
       cancelled: "Занятие отменено",
@@ -699,6 +702,14 @@ export const ru = {
       finishedOrCancelled: "Занятие завершено или отменено",
       entryNotOpen: "Вход в урок ещё не открыт. Он станет доступен за 10 минут до начала.",
       rescheduledClassroomClosed: "Занятие перенесено. Комната закрыта, новое время уже появилось в расписании.",
+    },
+    manualCopy: {
+      title: "Ссылки на урок",
+      subtitle: "Браузер не разрешил автоматическое копирование. Текст уже выделен — скопируйте его вручную.",
+      textLabel: "Ссылки для копирования",
+      copyAgain: "Скопировать ещё раз",
+      copied: "Скопировано",
+      close: "Закрыть ссылки",
     },
   },
   homework: {

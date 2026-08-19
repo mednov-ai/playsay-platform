@@ -64,6 +64,8 @@ import liquibase.integration.spring.SpringLiquibase
         "playsay.livekit.api-key=test-key",
         "playsay.livekit.api-secret=01234567890123456789012345678901",
         "playsay.livekit.token-ttl-seconds=900",
+        "playsay.public-app-url=https://online.honey.school",
+        "playsay.public-app-rf-url=https://online.honeyschool.ru",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -188,13 +190,20 @@ class ScheduledLessonControllerTest @Autowired constructor(
         assertEquals(1, links.links.size)
         assertEquals("managed-student-1", links.links.single().subject)
         assertEquals("MAGIC_LINK", links.links.single().mode)
+        assertTrue(links.links.single().url.startsWith("https://online.honeyschool.ru/"))
         assertTrue(links.links.single().url.endsWith("/join#A7K2Q9"))
         assertFalse(links.links.single().url.contains("?token="))
         assertEquals(lesson.id, RecordingScheduledLessonRegistrationGateway.invites.single().lessonId)
         assertEquals("managed-student-1", RecordingScheduledLessonRegistrationGateway.invites.single().subject)
         assertEquals("new.student", RecordingScheduledLessonRegistrationGateway.invites.single().username)
         assertEquals(null, RecordingScheduledLessonRegistrationGateway.invites.single().email)
+        assertTrue(RecordingScheduledLessonRegistrationGateway.invites.single().continueUrl.startsWith("https://online.honeyschool.ru/"))
         assertTrue(RecordingScheduledLessonRegistrationGateway.invites.single().continueUrl.endsWith("/lessons/${lesson.id}/classroom"))
+
+        RecordingScheduledLessonRegistrationGateway.reset()
+        val directLinks = scheduleController.createParticipantLinks(teacher, lesson.id, ScheduledLessonLinkOrigin.HONEY_SCHOOL)
+        assertTrue(directLinks.links.single().url.startsWith("https://online.honey.school/"))
+        assertTrue(RecordingScheduledLessonRegistrationGateway.invites.single().continueUrl.startsWith("https://online.honey.school/"))
     }
 
     @Test

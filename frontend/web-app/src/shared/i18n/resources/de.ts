@@ -589,6 +589,8 @@ export const de = {
       cancel: "Absagen",
       delete: "Löschen",
       copyLinks: "Links",
+      copyLinksRf: "Links · honeyschool.ru",
+      copyLinksDirect: "Links · honey.school",
       reschedule: "Datum und Uhrzeit ändern",
     },
     confirm: {
@@ -670,6 +672,7 @@ export const de = {
       managedStudentCreated: "Schüler hinzugefügt",
       managedStudentCreateFailed: "Schüler konnte nicht erstellt werden",
       linksCopied: "Stundenlinks kopiert",
+      linksManualCopy: "Links auswählen und manuell kopieren",
       linksCopyFailed: "Stundenlinks konnten nicht kopiert werden",
       linksPromptTitle: "Stundenlinks",
       cancelled: "Stunde abgesagt",
@@ -687,6 +690,14 @@ export const de = {
       finishedOrCancelled: "Stunde beendet oder abgesagt",
       entryNotOpen: "Der Zugang ist noch nicht geöffnet. Er wird 10 Minuten vor Beginn verfügbar.",
       rescheduledClassroomClosed: "Die Stunde wurde verschoben. Der Raum ist geschlossen und die neue Zeit steht im Plan.",
+    },
+    manualCopy: {
+      title: "Stundenlinks",
+      subtitle: "Der Browser hat das automatische Kopieren blockiert. Der Text ist markiert und kann manuell kopiert werden.",
+      textLabel: "Zu kopierende Links",
+      copyAgain: "Erneut kopieren",
+      copied: "Kopiert",
+      close: "Stundenlinks schließen",
     },
   },
   homework: {

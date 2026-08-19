@@ -1163,6 +1163,15 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: linkOrigin
+        in: query
+        required: false
+        schema:
+          type: string
+          default: HONEYSCHOOL_RU
+          enum:
+          - HONEYSCHOOL_RU
+          - HONEY_SCHOOL
       responses:
         "200":
           description: Scheduled lesson participant links

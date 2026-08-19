@@ -39,7 +39,7 @@ describe("AppShell teacher header", () => {
           message={null}
           onAssignMaterial={async () => null}
           onBack={() => undefined}
-          onCopyLinks={async () => true}
+          onCopyLinks={async () => ({ copied: true, text: "https://dev.online.honey.school/join#token" })}
           onOpenMaterials={() => undefined}
           onStart={async () => undefined}
         />
@@ -95,7 +95,7 @@ function props(): AppShellProps {
     classroomLesson: null,
     completeScheduledLesson: async () => undefined,
     confirmScheduledLessonJoin: async () => undefined,
-    copyScheduledLessonLinks: async () => true,
+    copyScheduledLessonLinks: async () => ({ copied: true, text: "https://dev.online.honey.school/join#token" }),
     courseLessons: {},
     courseLoading: false,
     courseMessage: null,

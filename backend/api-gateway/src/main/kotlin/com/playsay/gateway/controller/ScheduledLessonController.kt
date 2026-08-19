@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.service.*
@@ -238,6 +239,7 @@ class ScheduledLessonController(
     fun createParticipantLinks(
         authentication: JwtAuthenticationToken,
         @PathVariable lessonId: UUID,
+        @RequestParam(defaultValue = "HONEYSCHOOL_RU") linkOrigin: ScheduledLessonLinkOrigin = ScheduledLessonLinkOrigin.HONEYSCHOOL_RU,
     ): ScheduledLessonParticipantLinksResponse =
-        store.createParticipantLinks(authentication, lessonId)
+        store.createParticipantLinks(authentication, lessonId, linkOrigin)
 }

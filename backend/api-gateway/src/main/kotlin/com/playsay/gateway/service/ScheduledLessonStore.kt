@@ -257,12 +257,16 @@ class ScheduledLessonStore(
     }
 
     @Transactional
-    fun createParticipantLinks(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonParticipantLinksResponse {
+    fun createParticipantLinks(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+        linkOrigin: ScheduledLessonLinkOrigin = ScheduledLessonLinkOrigin.HONEYSCHOOL_RU,
+    ): ScheduledLessonParticipantLinksResponse {
         authentication.requireScheduleManager()
         requireLessonManagement(authentication, lessonId)
         val lesson = find(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        return participantLinkService.createLinks(lesson, participantsFor(listOf(lessonId)))
+        return participantLinkService.createLinks(lesson, participantsFor(listOf(lessonId)), linkOrigin)
     }
 
     private fun findVisible(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonRow? {

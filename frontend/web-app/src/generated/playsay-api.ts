@@ -1713,6 +1713,18 @@ direction?: string;
 status?: string;
 };
 
+export type CreateScheduledLessonParticipantLinksParams = {
+linkOrigin?: CreateScheduledLessonParticipantLinksLinkOrigin;
+};
+
+export type CreateScheduledLessonParticipantLinksLinkOrigin = typeof CreateScheduledLessonParticipantLinksLinkOrigin[keyof typeof CreateScheduledLessonParticipantLinksLinkOrigin];
+
+
+export const CreateScheduledLessonParticipantLinksLinkOrigin = {
+  HONEYSCHOOL_RU: 'HONEYSCHOOL_RU',
+  HONEY_SCHOOL: 'HONEY_SCHOOL',
+} as const;
+
 export type AppendScheduledLessonImagePageParams = {
 title?: string;
 };
@@ -4107,21 +4119,30 @@ export type createScheduledLessonParticipantLinksResponseError = (createSchedule
 
 export type createScheduledLessonParticipantLinksResponse = (createScheduledLessonParticipantLinksResponseSuccess | createScheduledLessonParticipantLinksResponseError)
 
-export const getCreateScheduledLessonParticipantLinksUrl = (lessonId: string,) => {
+export const getCreateScheduledLessonParticipantLinksUrl = (lessonId: string,
+    params?: CreateScheduledLessonParticipantLinksParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/schedule/lessons/${lessonId}/participant-links`
+  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/participant-links?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/participant-links`
 }
 
 /**
  * Returns per-participant lesson links. Teacher-managed students receive one-time magic links. Requires TEACHER or ADMIN role.
  * @summary Create scheduled lesson participant links
  */
-export const createScheduledLessonParticipantLinks = async (lessonId: string, options?: RequestInit): Promise<createScheduledLessonParticipantLinksResponse> => {
+export const createScheduledLessonParticipantLinks = async (lessonId: string,
+    params?: CreateScheduledLessonParticipantLinksParams, options?: RequestInit): Promise<createScheduledLessonParticipantLinksResponse> => {
 
-  const res = await fetch(getCreateScheduledLessonParticipantLinksUrl(lessonId),
+  const res = await fetch(getCreateScheduledLessonParticipantLinksUrl(lessonId,params),
   {
     ...options,
     method: 'POST'

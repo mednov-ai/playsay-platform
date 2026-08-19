@@ -69,6 +69,7 @@ export type ScheduledLessonParticipantLinks = {
   lessonId: string;
   links: ScheduledLessonParticipantLink[];
 };
+export type ScheduledLessonLinkOrigin = "HONEYSCHOOL_RU" | "HONEY_SCHOOL";
 export type ScheduledLessonMaterialAssignmentInput = ScheduledLessonMaterialAssignmentRequest;
 export type ScheduledLessonRecurrenceInput = {
   mode: "WEEKLY_COUNT" | "WEEKLY_BY_WEEK";

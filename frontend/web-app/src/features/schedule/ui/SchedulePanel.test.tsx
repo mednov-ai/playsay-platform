@@ -18,7 +18,7 @@ describe("SchedulePanel", () => {
           nowMs={Date.parse("2026-06-27T10:00:00.000Z")}
           onCancel={() => undefined}
           onComplete={() => undefined}
-          onCopyLinks={() => Promise.resolve(true)}
+          onCopyLinks={() => Promise.resolve({ copied: true, text: "https://dev.online.honey.school/join#token" })}
           onCreate={() => undefined}
           onCreateManagedStudent={() => Promise.resolve(null)}
           onDelete={() => undefined}

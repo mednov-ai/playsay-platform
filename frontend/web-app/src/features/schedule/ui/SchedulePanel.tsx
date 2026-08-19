@@ -15,11 +15,14 @@ import type {
   MeProfile,
   ScheduledLesson,
   ScheduledLessonInput,
+  ScheduledLessonLinkOrigin,
   ScheduledLessonScheduleInput,
 } from "../../../shared/api/playsay";
+import { copyTextFromPromise, type ClipboardCopyResult } from "../../../shared/lib/clipboard";
 import { LessonAssignmentWizard } from "./LessonAssignmentWizard";
 import { LessonRescheduleDialog } from "./LessonRescheduleDialog";
 import { ScheduledLessonCard } from "./ScheduledLessonCard";
+import { LessonLinksManualCopyDialog } from "./LessonLinksManualCopyDialog";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function SchedulePanel({
@@ -57,7 +60,7 @@ export function SchedulePanel({
   nowMs: number;
   onCancel: (lesson: ScheduledLesson) => void;
   onComplete: (lesson: ScheduledLesson) => void;
-  onCopyLinks: (lesson: ScheduledLesson) => Promise<boolean>;
+  onCopyLinks: (lesson: ScheduledLesson, linkOrigin?: ScheduledLessonLinkOrigin) => Promise<ClipboardCopyResult | null>;
   onCreate: (input: ScheduledLessonInput) => Promise<ScheduledLesson | null | void> | void;
   onCreateManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   onDelete: (lessonId: string) => void;
@@ -80,6 +83,8 @@ export function SchedulePanel({
   const [copiedLessonId, setCopiedLessonId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [rescheduleLesson, setRescheduleLesson] = useState<ScheduledLesson | null>(null);
+  const [manualCopyText, setManualCopyText] = useState<string | null>(null);
+  const showProductionLinkOrigins = typeof window !== "undefined" && isProductionLessonLinkHost(window.location.hostname);
 
   useEffect(() => {
     function openWizard() {
@@ -89,20 +94,23 @@ export function SchedulePanel({
     return () => window.removeEventListener("playsay:assign-lesson", openWizard);
   }, []);
 
-  async function copyLessonLink(lesson: ScheduledLesson) {
+  async function copyLessonLink(lesson: ScheduledLesson, linkOrigin: ScheduledLessonLinkOrigin = "HONEYSCHOOL_RU") {
     if (canManage) {
-      if (await onCopyLinks(lesson)) {
+      const result = await onCopyLinks(lesson, linkOrigin);
+      if (result?.copied) {
         markCopied(lesson.id);
+      } else if (result) {
+        setManualCopyText(result.text);
       }
       return;
     }
 
     const url = new URL(classroomPath(lesson.id), window.location.origin).toString();
-    try {
-      await navigator.clipboard.writeText(url);
+    const result = await copyTextFromPromise(Promise.resolve(url));
+    if (result.copied) {
       markCopied(lesson.id);
-    } catch {
-      window.prompt(t("schedule.clipboard.promptTitle"), url);
+    } else {
+      setManualCopyText(result.text);
     }
   }
 
@@ -123,13 +131,14 @@ export function SchedulePanel({
       nowMs={nowMs}
       onCancel={() => onCancel(lesson)}
       onComplete={() => onComplete(lesson)}
-      onCopyLink={() => void copyLessonLink(lesson)}
+      onCopyLink={(linkOrigin) => void copyLessonLink(lesson, linkOrigin)}
       onDelete={() => onDelete(lesson.id)}
       onJoin={() => onJoin(lesson)}
       onPrepare={() => onPrepare?.(lesson.id)}
       onReschedule={() => setRescheduleLesson(lesson)}
       onStart={() => onStart(lesson)}
       roomLoading={roomLoadingLessonId === lesson.id}
+      showProductionLinkOrigins={showProductionLinkOrigins}
     />
   );
 
@@ -240,6 +249,11 @@ export function SchedulePanel({
           onSave={onReschedule}
         />
       ) : null}
+      {manualCopyText ? <LessonLinksManualCopyDialog onClose={() => setManualCopyText(null)} text={manualCopyText} /> : null}
     </section>
   );
+}
+
+export function isProductionLessonLinkHost(hostname: string): boolean {
+  return hostname === "online.honeyschool.ru" || hostname === "online.honey.school";
 }

@@ -2,17 +2,19 @@
 // @vitest-environment-options { "url": "http://localhost/" }
 
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClassroomMediaChoices } from "../../features/classroom";
 import type { ScheduledLesson } from "../../shared/api/playsay";
 import { useScheduleActions } from "./useScheduleActions";
 
 const apiMocks = vi.hoisted(() => ({
+  createScheduledLessonParticipantLinks: vi.fn(),
   enterScheduledLessonRoom: vi.fn(),
 }));
 
 vi.mock("../../shared/api/playsay", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/api/playsay")>()),
+  createScheduledLessonParticipantLinks: apiMocks.createScheduledLessonParticipantLinks,
   enterScheduledLessonRoom: apiMocks.enterScheduledLessonRoom,
 }));
 
@@ -20,15 +22,26 @@ vi.mock("../../shared/i18n", () => ({
   useAppTranslation: () => ({ t: (key: string) => key }),
 }));
 
-describe("useScheduleActions classroom entry", () => {
+const originalClipboard = navigator.clipboard;
+
+describe("useScheduleActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    apiMocks.createScheduledLessonParticipantLinks.mockResolvedValue({ links: [] });
     apiMocks.enterScheduledLessonRoom.mockResolvedValue({
       expiresAt: "2026-07-17T12:00:00Z",
       identity: "student-demo",
       roomName: "lesson-lesson-1",
       serverUrl: "wss://online.play-and-say.ru/livekit",
       token: "token",
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: originalClipboard,
     });
   });
 
@@ -55,6 +68,56 @@ describe("useScheduleActions classroom entry", () => {
       mediaChoices,
       token: "token",
     }));
+  });
+
+  it("starts copying participant links while the click still has clipboard permission", async () => {
+    let resolveLinks: ((value: { links: Array<{ mode: "AUTHENTICATED"; subject: string; url: string }> }) => void) | undefined;
+    apiMocks.createScheduledLessonParticipantLinks.mockImplementation(() => new Promise((resolve) => {
+      resolveLinks = resolve;
+    }));
+
+    class ClipboardItemMock {
+      constructor(readonly data: Record<string, Promise<Blob>>) {}
+    }
+
+    let copiedText: string | undefined;
+    const write = vi.fn(async ([item]: ClipboardItemMock[]) => {
+      const blob = await item.data["text/plain"];
+      copiedText = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener("error", () => reject(reader.error));
+        reader.addEventListener("load", () => resolve(String(reader.result)));
+        reader.readAsText(blob);
+      });
+    });
+    const writeText = vi.fn();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { write, writeText },
+    });
+    vi.stubGlobal("ClipboardItem", ClipboardItemMock);
+
+    const input = setup();
+    const { result } = renderHook(() => useScheduleActions(input.props));
+
+    let copied: Promise<boolean> | undefined;
+    act(() => {
+      copied = result.current.copyScheduledLessonLinks(input.lesson);
+    });
+
+    expect(write).toHaveBeenCalledOnce();
+    expect(resolveLinks).toBeTypeOf("function");
+
+    resolveLinks?.({
+      links: [{ mode: "AUTHENTICATED", subject: "student-demo", url: "https://online.honey.school/join#lesson-1" }],
+    });
+    await act(async () => {
+      await expect(copied).resolves.toBe(true);
+    });
+
+    expect(copiedText).toBe("https://online.honey.school/join#lesson-1");
+    expect(writeText).not.toHaveBeenCalled();
+    expect(input.props.setScheduleMessage).toHaveBeenLastCalledWith("schedule.messages.linksCopied");
   });
 });
 

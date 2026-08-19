@@ -137,8 +137,8 @@ export function useScheduleActions({
   async function copyScheduledLessonLinks(lesson: ScheduledLesson): Promise<boolean> {
     setScheduleMessage(null);
     try {
-      const links = await createScheduledLessonParticipantLinks(lesson.id);
-      const text = formatLessonLinks(lesson, links.links);
+      const text = createScheduledLessonParticipantLinks(lesson.id)
+        .then((links) => formatLessonLinks(lesson, links.links));
       await copyText(text, t("schedule.messages.linksPromptTitle"));
       setScheduleMessage(t("schedule.messages.linksCopied"));
       return true;
@@ -372,11 +372,23 @@ function formatLessonLinks(lesson: ScheduledLesson, links: ScheduledLessonPartic
     .join("\n");
 }
 
-async function copyText(text: string, promptTitle: string): Promise<void> {
+async function copyText(text: Promise<string>, promptTitle: string): Promise<void> {
+  if (typeof ClipboardItem === "function" && typeof navigator.clipboard?.write === "function") {
+    try {
+      const blob = text.then((value) => new Blob([value], { type: "text/plain" }));
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+      return;
+    } catch {
+      // A browser can expose ClipboardItem but reject clipboard.write for its own
+      // permission policy. Reuse the already-started request in the fallback.
+    }
+  }
+
+  const value = await text;
   try {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(value);
   } catch {
-    window.prompt(promptTitle, text);
+    window.prompt(promptTitle, value);
   }
 }
 

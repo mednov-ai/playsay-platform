@@ -94,6 +94,15 @@ test("contracts trigger their producers and frontend consumers", () => {
     ],
   );
   assertDetection(
+    ["contracts/keyboard-openapi.yaml"],
+    ["vocabulary-service", "keyboard-service", "keyboard-app"],
+    [
+      "playsay-vocabulary-service-develop",
+      "playsay-keyboard-backend-develop",
+      "playsay-keyboard-frontend-develop",
+    ],
+  );
+  assertDetection(
     ["contracts/websocket-messages.schema.json"],
     ["vocabulary-service", "web-app", "keyboard-app"],
     [

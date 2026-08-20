@@ -206,6 +206,13 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path === "contracts/keyboard-openapi.yaml") {
+      deployTargets.add("vocabulary-service");
+      deployTargets.add("keyboard-service");
+      deployTargets.add("keyboard-app");
+      continue;
+    }
+
     if (path === "contracts/websocket-messages.schema.json") {
       deployTargets.add("vocabulary-service");
       deployTargets.add("web-app");

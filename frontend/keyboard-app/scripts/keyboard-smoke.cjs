@@ -336,7 +336,7 @@ async function capture(page, name) {
     throw new Error(`Keyboard app returned HTTP ${response ? response.status() : "no response"}`);
   }
 
-  await expectVisibleText(page, "Honey School");
+  await page.locator('.brand-lockup [role="img"][aria-label="Honey School Key"]').waitFor({ state: "visible", timeout: 10_000 });
   await capture(page, "01-intro");
   await page.locator(".intro-play-button").click();
   if (await page.getByText("Loading field", { exact: false }).isVisible().catch(() => false)) {

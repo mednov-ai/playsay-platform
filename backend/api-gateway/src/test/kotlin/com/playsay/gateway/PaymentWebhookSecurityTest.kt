@@ -1,12 +1,12 @@
 package com.playsay.gateway
 
+import com.playsay.contract.payment.model.CreatePaymentInvoiceRequest
 import com.playsay.gateway.dto.PaymentCheckoutResponse
 import com.playsay.gateway.dto.PaymentInvoiceCreatedResponse
 import com.playsay.gateway.dto.PaymentInvoiceDetailResponse
 import com.playsay.gateway.dto.PaymentInvoiceResponse
 import com.playsay.gateway.dto.PaymentProviderEventResponse
-import com.playsay.gateway.service.InternalPaymentInvoiceCreatePayload
-import com.playsay.gateway.service.PaymentServiceClient
+import com.playsay.gateway.client.PaymentServiceClient
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -61,7 +61,7 @@ class PaymentWebhookSecurityTest @Autowired constructor(
 }
 
 private class AnonymousWebhookPaymentServiceClient : PaymentServiceClient {
-    override fun createInvoice(payload: InternalPaymentInvoiceCreatePayload): PaymentInvoiceCreatedResponse =
+    override fun createInvoice(payload: CreatePaymentInvoiceRequest): PaymentInvoiceCreatedResponse =
         throw UnsupportedOperationException()
 
     override fun listInvoices(): List<PaymentInvoiceResponse> =

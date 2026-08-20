@@ -357,11 +357,11 @@ spec:
                     sh '''
                       set -eu
                       TASKS=""
-                      if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:test :api-gateway:bootJar :api-gateway:exportOpenApi"; fi
-                      if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:test :media-service:bootJar"; fi
-                      if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:test :payment-service:bootJar"; fi
-                      if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then TASKS="$TASKS :registration-service:test :registration-service:bootJar"; fi
-                      if [ "$RUN_EMAIL_SERVICE" = "true" ]; then TASKS="$TASKS :email-service:test :email-service:bootJar"; fi
+                      if [ "$RUN_API_GATEWAY" = "true" ]; then TASKS="$TASKS :api-gateway:detektMain :api-gateway:test :api-gateway:bootJar :api-gateway:exportOpenApi"; fi
+                      if [ "$RUN_MEDIA_SERVICE" = "true" ]; then TASKS="$TASKS :media-service:detektMain :media-service:test :media-service:bootJar"; fi
+                      if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then TASKS="$TASKS :payment-service:detektMain :payment-service:test :payment-service:bootJar"; fi
+                      if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then TASKS="$TASKS :registration-service:detektMain :registration-service:test :registration-service:bootJar"; fi
+                      if [ "$RUN_EMAIL_SERVICE" = "true" ]; then TASKS="$TASKS :email-service:detektMain :email-service:test :email-service:bootJar"; fi
                       gradle $TASKS -PlowMemoryTests --no-daemon --stacktrace --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process
                     '''
                   }

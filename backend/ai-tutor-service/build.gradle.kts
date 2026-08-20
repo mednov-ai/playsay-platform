@@ -1,15 +1,9 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.jpa")
-    kotlin("plugin.spring")
-    id("org.springframework.boot")
-    id("io.spring.dependency-management")
+    id("playsay.jpa-service-conventions")
 }
 
-kotlin { jvmToolchain(21) }
-
 dependencies {
-    implementation(project(":shared-kotlin"))
+    testImplementation(project(":architecture-testkit"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-jackson")
@@ -28,9 +22,7 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    useJUnitPlatform()
     maxParallelForks = 1
     maxHeapSize = "384m"
     jvmArgs("-XX:MaxMetaspaceSize=192m")
 }
-tasks.named("jar") { enabled = false }

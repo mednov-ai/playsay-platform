@@ -1,7 +1,7 @@
 package com.playsay.email.controller
 
+import com.playsay.contract.email.model.TransactionalEmailResponse
 import com.playsay.email.dto.TransactionalEmailRequest
-import com.playsay.email.dto.TransactionalEmailResponse
 import com.playsay.email.service.TransactionalEmailCommand
 import com.playsay.email.service.TransactionalEmailService
 import jakarta.validation.Valid

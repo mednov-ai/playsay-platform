@@ -1,0 +1,7 @@
+{
+  "email": "student@example.com",
+  "password": "strong-password",
+  "displayName": null,
+  "locale": "ru",
+  "returnTo": "https://online.honey-school.ru/welcome"
+}

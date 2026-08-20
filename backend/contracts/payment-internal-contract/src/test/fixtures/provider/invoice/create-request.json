@@ -1,0 +1,11 @@
+{
+  "amountMinor": 125000,
+  "currency": "RUB",
+  "description": "Individual lesson package",
+  "createdBySubject": "admin-1",
+  "studentUserId": null,
+  "payerName": "Parent",
+  "payerEmail": "parent@example.com",
+  "payerPhone": null,
+  "dueAt": "2026-08-25T12:00:00Z"
+}

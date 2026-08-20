@@ -1,0 +1,5 @@
+{
+  "invoiceId": "11111111-2222-3333-4444-555555555555",
+  "paymentAttemptId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  "confirmationUrl": "https://yookassa.example/confirm/1"
+}

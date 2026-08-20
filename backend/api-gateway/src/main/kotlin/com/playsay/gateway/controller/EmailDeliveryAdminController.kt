@@ -4,7 +4,7 @@ import com.playsay.gateway.dto.EmailDeliveryDetailResponse
 import com.playsay.gateway.dto.EmailDeliveryPageResponse
 import com.playsay.gateway.dto.EmailDeliveryQuery
 import com.playsay.gateway.dto.EmailDeliveryResendResponse
-import com.playsay.gateway.service.EmailDeliveryAdminGateway
+import com.playsay.gateway.service.EmailDeliveryAdminService
 import io.swagger.v3.oas.annotations.Operation
 import java.time.Instant
 import java.util.UUID
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 class EmailDeliveryAdminController(
-    private val gateway: EmailDeliveryAdminGateway,
+    private val gateway: EmailDeliveryAdminService,
 ) {
     @GetMapping("/admin/email-deliveries", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(operationId = "listEmailDeliveries", summary = "List transactional email deliveries")

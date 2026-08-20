@@ -4,8 +4,8 @@ import com.playsay.gateway.dto.ScheduledLessonResponse
 import com.playsay.gateway.dto.ScheduledLessonScheduleUpdateRequest
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.realtime.LessonChangedEvent
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Duration
 import java.time.Instant

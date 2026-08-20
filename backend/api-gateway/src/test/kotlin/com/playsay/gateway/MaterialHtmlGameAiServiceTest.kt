@@ -3,7 +3,7 @@ package com.playsay.gateway
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.service.MaterialHtmlGameAiInput
 import com.playsay.gateway.service.MaterialHtmlGameAiService
-import com.playsay.gateway.service.OpenAiResponsesTransport
+import com.playsay.gateway.service.material.OpenAiResponsesTransport
 import com.playsay.gateway.utils.MetaData
 import kotlin.test.Test
 import kotlin.test.assertEquals

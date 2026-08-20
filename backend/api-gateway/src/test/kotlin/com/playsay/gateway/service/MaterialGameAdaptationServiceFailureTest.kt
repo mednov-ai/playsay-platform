@@ -1,4 +1,5 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.MaterialGameAdapterClient
 
 import com.playsay.gateway.entity.MaterialGameAdaptationEntity
 import com.playsay.gateway.error.ProjectResponseException

@@ -109,6 +109,48 @@ test("contracts trigger their producers and frontend consumers", () => {
   );
 });
 
+test("internal backend modules trigger their direct consumers", () => {
+  assertDetection(
+    ["backend/contracts/email-internal-contract/src/main/openapi/openapi.yaml"],
+    ["api-gateway", "registration-service", "email-service"],
+    [
+      "playsay-api-gateway-develop",
+      "playsay-registration-service-develop",
+      "playsay-email-service-develop",
+    ],
+  );
+  assertDetection(
+    ["backend/contracts/media-internal-contract/src/main/openapi/openapi.yaml"],
+    ["api-gateway", "media-service"],
+    ["playsay-api-gateway-develop", "playsay-media-service-develop"],
+  );
+  assertDetection(
+    ["backend/contracts/payment-internal-contract/src/main/openapi/openapi.yaml"],
+    ["api-gateway", "payment-service"],
+    ["playsay-api-gateway-develop", "playsay-payment-service-develop"],
+  );
+  assertDetection(
+    ["backend/contracts/registration-internal-contract/src/main/openapi/openapi.yaml"],
+    ["api-gateway", "registration-service"],
+    ["playsay-api-gateway-develop", "playsay-registration-service-develop"],
+  );
+  assertDetection(
+    ["backend/integration-support/src/main/kotlin/com/playsay/integration/http/InternalHttpTransport.kt"],
+    ["api-gateway", "vocabulary-service", "registration-service", "keyboard-service"],
+    [
+      "playsay-api-gateway-develop",
+      "playsay-vocabulary-service-develop",
+      "playsay-registration-service-develop",
+      "playsay-keyboard-backend-develop",
+    ],
+  );
+  assertDetection(
+    ["backend/openai-support/src/main/kotlin/com/playsay/openai/OpenAiReasoningEffort.kt"],
+    ["api-gateway", "vocabulary-service"],
+    ["playsay-api-gateway-develop", "playsay-vocabulary-service-develop"],
+  );
+});
+
 test("frontend and browser extension changes stay scoped", () => {
   assertDetection(
     ["frontend/web-app/src/App.tsx", "frontend/browser-extension/src/protocol.ts"],
@@ -151,6 +193,35 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
       "playsay-keyboard-backend-develop",
     ],
   );
+  for (const sharedBackendPath of [
+    "backend/architecture-testkit/src/main/kotlin/com/playsay/architecture/Rules.kt",
+    "backend/build-logic/src/main/kotlin/playsay.spring-service-conventions.gradle.kts",
+    "backend/config/detekt/detekt.yml",
+  ]) {
+    assertDetection(
+      [sharedBackendPath],
+      [
+        "api-gateway",
+        "ai-tutor-service",
+        "vocabulary-service",
+        "media-service",
+        "payment-service",
+        "registration-service",
+        "email-service",
+        "keyboard-service",
+      ],
+      [
+        "playsay-api-gateway-develop",
+        "playsay-ai-tutor-service-develop",
+        "playsay-vocabulary-service-develop",
+        "playsay-media-service-develop",
+        "playsay-payment-service-develop",
+        "playsay-registration-service-develop",
+        "playsay-email-service-develop",
+        "playsay-keyboard-backend-develop",
+      ],
+    );
+  }
   assertDetection(
     ["frontend/package-lock.json", "frontend/.dockerignore"],
     ["web-app", "game-adapter-service", "keyboard-app"],

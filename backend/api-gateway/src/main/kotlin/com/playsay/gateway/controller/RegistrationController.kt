@@ -6,7 +6,7 @@ import com.playsay.gateway.dto.RegistrationResponse
 import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
-import com.playsay.gateway.service.RegistrationGateway
+import com.playsay.gateway.service.RegistrationService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 class RegistrationController(
-    private val registrationGateway: RegistrationGateway,
+    private val registrationGateway: RegistrationService,
 ) {
     @PostMapping(
         path = ["/registration/start", "/api/registration/start"],

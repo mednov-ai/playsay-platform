@@ -1,8 +1,8 @@
 package com.playsay.registration.controller
 
-import com.playsay.registration.dto.InternalCreateUserRequest
-import com.playsay.registration.dto.InternalUpdateRolesRequest
-import com.playsay.registration.dto.InternalUserIdentityResponse
+import com.playsay.contract.registration.model.InternalCreateUserRequest
+import com.playsay.contract.registration.model.InternalUpdateRolesRequest
+import com.playsay.contract.registration.model.InternalUserIdentityResponse
 import com.playsay.registration.service.CreateKeycloakManagedIdentityCommand
 import com.playsay.registration.service.KeycloakManagedIdentity
 import com.playsay.registration.service.KeycloakUserManagementService
@@ -41,7 +41,7 @@ class InternalUserManagementController(
                 lastName = request.lastName,
                 email = request.email,
                 roles = request.roles,
-                managedStudent = request.managedStudent,
+                managedStudent = request.managedStudent ?: false,
             ),
         ).toResponse()
 

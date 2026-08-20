@@ -21,15 +21,17 @@ import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.CourseRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.LessonTemplateRepo
 import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.repo.SubmissionRepo
 import com.playsay.gateway.repo.AssignmentIntegrationOutboxRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.repo.TeacherDelegationStudentRepo
-import com.playsay.gateway.service.AssignmentStore
+import com.playsay.gateway.realtime.AssignmentChangedEvent
+import com.playsay.gateway.service.assignment.AssignmentStore
+import com.playsay.gateway.service.assignment.VOCABULARY_ASSIGNMENT_PREPARE_EVENT
 import com.playsay.gateway.service.UserProfileStore
 import java.math.BigDecimal
 import java.time.Duration
@@ -51,6 +53,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.context.event.ApplicationEvents
+import org.springframework.test.context.event.RecordApplicationEvents
 import org.springframework.web.server.ResponseStatusException
 import javax.sql.DataSource
 import liquibase.integration.spring.SpringLiquibase
@@ -66,6 +70,7 @@ import liquibase.integration.spring.SpringLiquibase
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@RecordApplicationEvents
 class AssignmentControllerTest @Autowired constructor(
     private val assignmentController: AssignmentController,
     private val assignmentStore: AssignmentStore,
@@ -88,6 +93,9 @@ class AssignmentControllerTest @Autowired constructor(
     private val teacherDelegationStudentRepo: TeacherDelegationStudentRepo,
     private val dataSource: DataSource,
 ) {
+    @Autowired
+    private lateinit var applicationEvents: ApplicationEvents
+
     private val objectMapper = jacksonObjectMapper()
 
     @BeforeAll
@@ -381,6 +389,13 @@ class AssignmentControllerTest @Autowired constructor(
 
         assertEquals("PREPARING", preparing.assignment.status)
         val assignmentId = preparing.assignment.id
+        assertEquals(
+            "PENDING",
+            assignmentIntegrationOutboxRepo.findByAssignmentIdAndEventType(
+                assignmentId,
+                VOCABULARY_ASSIGNMENT_PREPARE_EVENT,
+            )?.status,
+        )
         listOf("FAILED", "ARCHIVED", "ACTIVE", "PREPARING").forEach { status ->
             dataSource.connection.use { connection ->
                 connection.prepareStatement("update assignment set status = ? where id = ?").use { statement ->
@@ -404,6 +419,33 @@ class AssignmentControllerTest @Autowired constructor(
             actorSubject = "teacher-1",
         )
         assertEquals("ACTIVE", assignmentController.getHomeworkAssignment(teacher, assignmentId).assignment.status)
+        assertEquals(
+            "COMPLETED",
+            assignmentIntegrationOutboxRepo.findByAssignmentIdAndEventType(
+                assignmentId,
+                VOCABULARY_ASSIGNMENT_PREPARE_EVENT,
+            )?.status,
+        )
+    }
+
+    @Test
+    fun `assignment changes preserve realtime visibility and change type`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val material = fillGapMaterial(teacher)
+
+        val created = assignmentController.createHomeworkAssignment(
+            teacher,
+            HomeworkAssignmentRequest(materialId = material.id, studentSubjects = listOf("student-1")),
+        ).body!!.assignment
+
+        val event = applicationEvents.stream(AssignmentChangedEvent::class.java)
+            .filter { it.assignmentId == created.id }
+            .findFirst()
+            .orElseThrow()
+        assertEquals("CREATED", event.change)
+        assertEquals(setOf("teacher-1", "student-1"), event.visibleSubjects)
     }
 
     @Test

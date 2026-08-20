@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:MailjetDeliveryStatusClient.kt:MailjetDeliveryStatusClient$fun currentEvent: ProviderDeliveryEvent?</ID>
+    <ID>LongMethod:TransactionalEmailService.kt:TransactionalEmailService$private fun dispatch: TransactionalEmailResult</ID>
+  </CurrentIssues>
+</SmellBaseline>

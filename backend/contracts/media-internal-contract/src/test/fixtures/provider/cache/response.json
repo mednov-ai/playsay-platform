@@ -1,0 +1,13 @@
+{
+  "videoId": "dQw4w9WgXcQ",
+  "status": "READY",
+  "storageKey": "youtube-cache/dQw4w9WgXcQ/MEDIUM.mp4",
+  "requestedQuality": "MEDIUM",
+  "selectedQuality": "MEDIUM",
+  "selectedHeight": 720,
+  "contentType": "video/mp4",
+  "byteSize": 1048576,
+  "durationSeconds": 213,
+  "language": "en",
+  "thumbnailUrl": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+}

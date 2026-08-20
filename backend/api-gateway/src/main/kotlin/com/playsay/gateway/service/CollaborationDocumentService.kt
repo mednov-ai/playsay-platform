@@ -15,8 +15,8 @@ import com.playsay.gateway.entity.CollaborationDocumentEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.CollaborationDocumentRepo
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.utils.MetaData
 import java.nio.charset.StandardCharsets

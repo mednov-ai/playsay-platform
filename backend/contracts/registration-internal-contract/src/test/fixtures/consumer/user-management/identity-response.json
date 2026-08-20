@@ -1,0 +1,8 @@
+{
+  "subject": "new-student-1",
+  "username": "new.student",
+  "email": "new.student@example.com",
+  "displayName": "New Student",
+  "roles": ["STUDENT"],
+  "enabled": true
+}

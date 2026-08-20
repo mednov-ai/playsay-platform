@@ -5,9 +5,9 @@ import com.playsay.gateway.entity.LessonEntity
 import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
-import com.playsay.gateway.repo.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.LessonParticipantRow
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.utils.MetaData
 import java.nio.charset.StandardCharsets

@@ -9,7 +9,7 @@ import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.StudentAssignmentDetailResponse
 import com.playsay.gateway.dto.TeacherAssignmentDetailResponse
 import com.playsay.gateway.dto.TeacherAssignmentSubmissionDetailResponse
-import com.playsay.gateway.service.AssignmentStore
+import com.playsay.gateway.service.assignment.AssignmentStore
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.responses.ApiResponse

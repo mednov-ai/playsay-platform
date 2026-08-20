@@ -1,0 +1,12 @@
+{
+  "sessionId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  "expiresAt": "2026-08-20T12:15:00Z",
+  "requestedQuality": "MEDIUM",
+  "selectedQuality": "MEDIUM",
+  "selectedHeight": 720,
+  "thumbnailSourceUrl": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+  "thumbnailStored": true,
+  "thumbnailContentType": "image/jpeg",
+  "thumbnailByteSize": 32000,
+  "deliverySource": "MINIO_CACHE"
+}

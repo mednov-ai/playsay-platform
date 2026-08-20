@@ -1,5 +1,7 @@
 package com.playsay.gateway.service
 
+import com.playsay.gateway.service.material.OpenAiTransportException
+
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode

@@ -1,5 +1,10 @@
 package com.playsay.gateway
+import com.playsay.gateway.client.RegistrationGateway
 
+import com.playsay.contract.registration.model.ManagedStudentInviteLookupResponse
+import com.playsay.contract.registration.model.ManagedStudentInviteRequest
+import com.playsay.contract.registration.model.ManagedStudentInviteResponse
+import com.playsay.contract.registration.model.ManagedStudentResponse
 import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.repo.*
@@ -295,9 +300,9 @@ private object RecordingManagedStudentRegistrationGateway : RegistrationGateway 
     override fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse =
         RegistrationResponse(status = "PASSWORD_RESET")
 
-    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse {
+    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentResponse {
         created += request
-        return ManagedStudentProvisionResponse(
+        return ManagedStudentResponse(
             subject = "managed-student-1",
             username = request.username,
             email = request.email,

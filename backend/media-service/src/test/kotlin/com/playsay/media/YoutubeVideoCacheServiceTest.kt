@@ -1,6 +1,8 @@
 package com.playsay.media
 
-import com.playsay.media.dto.YoutubeVideoCacheRequest
+import com.playsay.contract.media.model.YoutubePlaybackQuality
+import com.playsay.contract.media.model.YoutubeVideoCacheRequest
+import com.playsay.contract.media.model.YoutubeVideoCacheResponse
 import com.playsay.media.service.InMemoryMediaObjectStorage
 import com.playsay.media.service.MediaServiceException
 import com.playsay.media.service.YoutubeMetadataResolver
@@ -26,12 +28,12 @@ class YoutubeVideoCacheServiceTest {
         val ytdlp = fakeYtdlp(invocationFile)
         val storage = InMemoryMediaObjectStorage()
         val service = cacheService(ytdlp, storage, maxVideoBytes = 1024)
-        val request = YoutubeVideoCacheRequest(videoId = "5l-fo-d0gt8", requestedQuality = "MEDIUM")
+        val request = YoutubeVideoCacheRequest(videoId = "5l-fo-d0gt8", requestedQuality = YoutubePlaybackQuality.MEDIUM)
 
         val first = service.cache(request)
         val second = service.cache(request)
 
-        assertEquals("READY", first.status)
+        assertEquals(YoutubeVideoCacheResponse.Status.READY, first.status)
         assertEquals("youtube-cache/v1/5l-fo-d0gt8/medium.mp4", first.storageKey)
         assertEquals(first, second)
         assertEquals("x", invocationFile.readText())
@@ -48,7 +50,7 @@ class YoutubeVideoCacheServiceTest {
         val service = cacheService(ytdlp, storage, maxVideoBytes = 4)
 
         val error = assertFailsWith<MediaServiceException> {
-            service.cache(YoutubeVideoCacheRequest(videoId = "5l-fo-d0gt8", requestedQuality = "MEDIUM"))
+            service.cache(YoutubeVideoCacheRequest(videoId = "5l-fo-d0gt8", requestedQuality = YoutubePlaybackQuality.MEDIUM))
         }
 
         assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, error.status)

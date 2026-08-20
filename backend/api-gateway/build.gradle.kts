@@ -1,17 +1,15 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.jpa")
-    kotlin("plugin.spring")
-    id("org.springframework.boot")
-    id("io.spring.dependency-management")
-}
-
-kotlin {
-    jvmToolchain(21)
+    id("playsay.jpa-service-conventions")
 }
 
 dependencies {
-    implementation(project(":shared-kotlin"))
+    implementation(project(":integration-support"))
+    implementation(project(":openai-support"))
+    implementation(project(":contracts:email-internal-contract"))
+    implementation(project(":contracts:media-internal-contract"))
+    implementation(project(":contracts:registration-internal-contract"))
+    implementation(project(":contracts:payment-internal-contract"))
+    testImplementation(project(":architecture-testkit"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
@@ -37,16 +35,11 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    useJUnitPlatform()
     if (providers.gradleProperty("lowMemoryTests").isPresent) {
         maxParallelForks = 1
         forkEvery = 8
         maxHeapSize = "512m"
     }
-}
-
-tasks.named("jar") {
-    enabled = false
 }
 
 tasks.register<Test>("exportOpenApi") {

@@ -1,6 +1,11 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.YoutubeMediaClient
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.playsay.contract.media.model.YoutubeDeliverySource
+import com.playsay.contract.media.model.YoutubePlaybackQuality
+import com.playsay.contract.media.model.YoutubePlaybackSessionRequest
+import com.playsay.contract.media.model.YoutubePlaybackSessionResponse
 import com.playsay.gateway.dto.MaterialVideoPlaybackRequest
 import com.playsay.gateway.dto.MaterialVideoPlaybackResponse
 import com.playsay.gateway.error.ProjectResponseException
@@ -36,7 +41,7 @@ class MaterialVideoPlaybackService(
         request: MaterialVideoPlaybackRequest,
         servletRequest: HttpServletRequest,
     ): MaterialVideoPlaybackResponse {
-        val requestedQuality = YoutubePlaybackQuality.normalized(request.quality)
+        val requestedQuality = normalizedYoutubePlaybackQuality(request.quality)
         val profile = userProfileStore.current(authentication)
         val materialRow = materialCatalogService.find(materialId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
@@ -137,12 +142,12 @@ class MaterialVideoPlaybackService(
         val thumbnailAssetId = existingThumbnail?.id ?: UUID.randomUUID()
         val thumbnailStorageKey = existingThumbnail?.storageKey ?: "material-assets/$materialId/$thumbnailAssetId.youtube-thumbnail"
         val mediaSession = youtubeMediaClient.createPlaybackSession(
-            YoutubeMediaPlaybackSessionCommand(
+            YoutubePlaybackSessionRequest(
                 subject = profile.subject,
                 materialId = materialId,
                 blockId = request.blockId,
                 videoId = meta.videoId,
-                requestedQuality = requestedQuality.name,
+                requestedQuality = requestedQuality,
                 thumbnailStorageKey = if (existingThumbnail == null) thumbnailStorageKey else null,
                 thumbnailSourceUrl = meta.thumbnailUrl,
             ),
@@ -150,7 +155,7 @@ class MaterialVideoPlaybackService(
         if (
             youtubeCacheEnabled &&
             requestedQuality == YoutubePlaybackQuality.MEDIUM &&
-            mediaSession.deliverySource != "MINIO_CACHE"
+            mediaSession.deliverySource != YoutubeDeliverySource.MINIO_CACHE
         ) {
             youtubeVideoCacheService.markUnavailable(meta.videoId)
         }
@@ -173,12 +178,12 @@ class MaterialVideoPlaybackService(
             relayUrl = "/api/media/video-playback-sessions/${mediaSession.sessionId}/stream",
             sessionId = mediaSession.sessionId,
             expiresAt = mediaSession.expiresAt,
-            requestedQuality = requestedQuality.name,
-            selectedQuality = mediaSession.selectedQuality,
+            requestedQuality = requestedQuality.value,
+            selectedQuality = mediaSession.selectedQuality.value,
             selectedHeight = mediaSession.selectedHeight,
             thumbnailUrl = thumbnailAsset?.contentUrl,
             thumbnailAssetId = thumbnailAsset?.id,
-            deliverySource = mediaSession.deliverySource,
+            deliverySource = mediaSession.deliverySource.value,
             cacheStatus = cacheStatus(meta.videoId),
         )
     }
@@ -223,7 +228,7 @@ class MaterialVideoPlaybackService(
             relayUrl = null,
             sessionId = null,
             expiresAt = null,
-            requestedQuality = requestedQuality.name,
+            requestedQuality = requestedQuality.value,
             selectedQuality = null,
             selectedHeight = null,
             thumbnailUrl = null,
@@ -249,7 +254,7 @@ class MaterialVideoPlaybackService(
         videoId: String,
         assetId: UUID,
         storageKey: String,
-        mediaSession: YoutubeMediaPlaybackSessionResult,
+        mediaSession: YoutubePlaybackSessionResponse,
     ): com.playsay.gateway.dto.MaterialAssetResponse? {
         if (!mediaSession.thumbnailStored) {
             logger.warn(
@@ -327,18 +332,10 @@ class MaterialVideoPlaybackService(
     }
 
     companion object {
+        private fun normalizedYoutubePlaybackQuality(value: String?): YoutubePlaybackQuality =
+            YoutubePlaybackQuality.decodeOrNull(value?.trim()?.uppercase()) ?: YoutubePlaybackQuality.MEDIUM
+
         private val countryCodePattern = Regex("^[A-Z]{2}$")
         private val logger = LoggerFactory.getLogger(MaterialVideoPlaybackService::class.java)
-    }
-}
-
-enum class YoutubePlaybackQuality(val targetHeight: Int) {
-    LOW(480),
-    MEDIUM(720),
-    HIGH(1080);
-
-    companion object {
-        fun normalized(value: String?): YoutubePlaybackQuality =
-            entries.firstOrNull { quality -> quality.name == value?.trim()?.uppercase() } ?: MEDIUM
     }
 }

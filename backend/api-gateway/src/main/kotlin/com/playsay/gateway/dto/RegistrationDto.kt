@@ -4,7 +4,6 @@ import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.Instant
-import java.util.UUID
 
 data class StartRegistrationRequest(
     @field:Email
@@ -66,39 +65,6 @@ data class ResetPasswordRequest(
 data class RegistrationResponse(
     val status: String,
     val continueUrl: String? = null,
-)
-
-data class ManagedStudentProvisionResponse(
-    val subject: String,
-    val username: String,
-    val email: String?,
-    val firstName: String,
-    val lastName: String?,
-    val displayName: String,
-)
-
-data class ManagedStudentInviteRequest(
-    val subject: String,
-    val username: String,
-    val email: String?,
-    val displayName: String?,
-    val lessonId: UUID,
-    val continueUrl: String,
-)
-
-data class ManagedStudentInviteResponse(
-    val token: String,
-    val expiresAt: Instant,
-)
-
-data class ManagedStudentInviteLookupResponse(
-    val subject: String,
-    val username: String,
-    val email: String?,
-    val displayName: String?,
-    val lessonId: UUID,
-    val continueUrl: String,
-    val expiresAt: Instant? = null,
 )
 
 data class StudentInviteConsumeRequest(

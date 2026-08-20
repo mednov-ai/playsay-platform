@@ -1,0 +1,7 @@
+{
+  "accessToken": "access-token",
+  "refreshToken": null,
+  "idToken": "id-token",
+  "expiresIn": 300,
+  "continueUrl": "https://online.honey-school.ru/lessons/11111111-2222-3333-4444-555555555555"
+}

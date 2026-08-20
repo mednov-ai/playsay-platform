@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:GamificationService.kt:GamificationService$private fun leagueLevel: Int</ID>
+  </CurrentIssues>
+</SmellBaseline>

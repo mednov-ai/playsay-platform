@@ -1,6 +1,7 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.RegistrationGateway
 
-import com.playsay.gateway.dto.ManagedStudentInviteRequest
+import com.playsay.contract.registration.model.ManagedStudentInviteRequest
 import com.playsay.gateway.dto.ScheduledLessonParticipantLinkResponse
 import com.playsay.gateway.dto.ScheduledLessonParticipantLinksResponse
 import com.playsay.gateway.dto.ScheduledLessonLinkOrigin

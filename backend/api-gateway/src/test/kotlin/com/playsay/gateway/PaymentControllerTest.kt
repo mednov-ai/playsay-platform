@@ -1,6 +1,7 @@
 package com.playsay.gateway
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.playsay.contract.payment.model.CreatePaymentInvoiceRequest
 import com.playsay.gateway.controller.PaymentController
 import com.playsay.gateway.dto.PaymentCheckoutResponse
 import com.playsay.gateway.dto.PaymentInvoiceCreateRequest
@@ -8,9 +9,8 @@ import com.playsay.gateway.dto.PaymentInvoiceCreatedResponse
 import com.playsay.gateway.dto.PaymentInvoiceResponse
 import com.playsay.gateway.dto.PaymentProviderEventResponse
 import com.playsay.gateway.error.ProjectResponseException
-import com.playsay.gateway.service.InternalPaymentInvoiceCreatePayload
 import com.playsay.gateway.service.PaymentInvoiceFacade
-import com.playsay.gateway.service.PaymentServiceClient
+import com.playsay.gateway.client.PaymentServiceClient
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -110,10 +110,10 @@ class PaymentControllerTest {
 }
 
 private class RecordingPaymentServiceClient : PaymentServiceClient {
-    val createdInvoices = mutableListOf<InternalPaymentInvoiceCreatePayload>()
+    val createdInvoices = mutableListOf<CreatePaymentInvoiceRequest>()
     val checkoutTokens = mutableListOf<String>()
 
-    override fun createInvoice(payload: InternalPaymentInvoiceCreatePayload): PaymentInvoiceCreatedResponse {
+    override fun createInvoice(payload: CreatePaymentInvoiceRequest): PaymentInvoiceCreatedResponse {
         createdInvoices += payload
         return PaymentInvoiceCreatedResponse(
             invoice = paymentInvoice(),

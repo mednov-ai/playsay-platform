@@ -1,12 +1,12 @@
 package com.playsay.gateway
 
 import com.playsay.gateway.controller.RegistrationController
-import com.playsay.gateway.dto.ManagedStudentInviteLookupResponse
+import com.playsay.contract.registration.model.ManagedStudentInviteLookupResponse
+import com.playsay.contract.registration.model.ManagedStudentInviteRequest
+import com.playsay.contract.registration.model.ManagedStudentInviteResponse
+import com.playsay.contract.registration.model.ManagedStudentResponse
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
-import com.playsay.gateway.dto.ManagedStudentInviteRequest
-import com.playsay.gateway.dto.ManagedStudentInviteResponse
-import com.playsay.gateway.dto.ManagedStudentProvisionResponse
 import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.RegistrationResponse
 import com.playsay.gateway.dto.ResetPasswordRequest
@@ -14,7 +14,8 @@ import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
 import com.playsay.gateway.dto.StudentInviteConsumeRequest
 import com.playsay.gateway.dto.StudentInviteConsumeResponse
-import com.playsay.gateway.service.RegistrationGateway
+import com.playsay.gateway.client.RegistrationGateway
+import com.playsay.gateway.service.RegistrationService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.springframework.mock.web.MockHttpServletRequest
@@ -23,7 +24,7 @@ class RegistrationControllerTest {
     @Test
     fun `start forwards public request to registration service`() {
         val gateway = RecordingRegistrationGateway()
-        val controller = RegistrationController(gateway)
+        val controller = RegistrationController(RegistrationService(gateway))
 
         val response = controller.start(
             StartRegistrationRequest(
@@ -47,7 +48,7 @@ class RegistrationControllerTest {
     @Test
     fun `confirm returns continue url from registration service`() {
         val gateway = RecordingRegistrationGateway()
-        val controller = RegistrationController(gateway)
+        val controller = RegistrationController(RegistrationService(gateway))
 
         val response = controller.confirm(ConfirmRegistrationRequest(token = "token-1"))
 
@@ -58,7 +59,7 @@ class RegistrationControllerTest {
     @Test
     fun `password reset endpoints forward public requests to registration service`() {
         val gateway = RecordingRegistrationGateway()
-        val controller = RegistrationController(gateway)
+        val controller = RegistrationController(RegistrationService(gateway))
 
         val forgot = controller.forgotPassword(
             ForgotPasswordRequest(
@@ -128,7 +129,7 @@ private class RecordingRegistrationGateway : RegistrationGateway {
         return RegistrationResponse(status = "PASSWORD_RESET")
     }
 
-    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse =
+    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentResponse =
         error("Managed student creation is not used in this test.")
 
     override fun createManagedStudentInvite(request: ManagedStudentInviteRequest): ManagedStudentInviteResponse =

@@ -1,11 +1,13 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.LessonReminderEmailClient
+import com.playsay.gateway.client.LessonReminderEmailCommand
 
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.LessonEmailReminderEntity
 import com.playsay.gateway.repo.AppUserRepo
-import com.playsay.gateway.repo.LessonEmailReminderRepo
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonEmailReminderRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.ScheduledLessonRow
 import com.playsay.gateway.utils.MetaData
 import java.time.Duration

@@ -4,7 +4,8 @@ import com.playsay.gateway.controller.AuthenticationMethodsController
 import com.playsay.gateway.dto.AuthenticationMethodsResponse
 import com.playsay.gateway.dto.PasskeyCredentialResponse
 import com.playsay.gateway.dto.RenamePasskeyRequest
-import com.playsay.gateway.service.RegistrationGateway
+import com.playsay.gateway.client.RegistrationGateway
+import com.playsay.gateway.service.RegistrationService
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +14,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 
 class AuthenticationMethodsControllerTest {
     private val gateway = CapturingAuthenticationMethodsGateway()
-    private val controller = AuthenticationMethodsController(gateway)
+    private val controller = AuthenticationMethodsController(RegistrationService(gateway))
 
     @Test
     fun `all operations derive owner subject from jwt`() {
@@ -72,7 +73,7 @@ private class CapturingAuthenticationMethodsGateway : RegistrationGateway {
     override fun forgotPassword(request: com.playsay.gateway.dto.ForgotPasswordRequest, clientAddress: String?) = error("Not used")
     override fun resetPassword(request: com.playsay.gateway.dto.ResetPasswordRequest, clientAddress: String?) = error("Not used")
     override fun createManagedStudent(request: com.playsay.gateway.dto.ManagedStudentRequest) = error("Not used")
-    override fun createManagedStudentInvite(request: com.playsay.gateway.dto.ManagedStudentInviteRequest) = error("Not used")
+    override fun createManagedStudentInvite(request: com.playsay.contract.registration.model.ManagedStudentInviteRequest) = error("Not used")
     override fun lookupManagedStudentInvite(request: com.playsay.gateway.dto.StudentInviteConsumeRequest, clientAddress: String?) = error("Not used")
     override fun consumeStudentInvite(request: com.playsay.gateway.dto.StudentInviteConsumeRequest, clientAddress: String?) = error("Not used")
 }

@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         gradlePluginPortal()
         mavenCentral()
@@ -21,4 +22,10 @@ include("registration-service")
 include("email-service")
 include("ai-tutor-service")
 include("vocabulary-service")
-include("shared-kotlin")
+include("architecture-testkit")
+include("openai-support")
+include("integration-support")
+include("contracts:registration-internal-contract")
+include("contracts:payment-internal-contract")
+include("contracts:email-internal-contract")
+include("contracts:media-internal-contract")

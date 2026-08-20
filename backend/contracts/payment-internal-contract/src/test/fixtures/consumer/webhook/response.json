@@ -1,0 +1,9 @@
+{
+  "id": "99999999-8888-7777-6666-555555555555",
+  "provider": "YOOKASSA",
+  "eventType": "payment.succeeded",
+  "providerPaymentId": "provider-payment-1",
+  "status": "PROCESSED",
+  "receivedAt": "2026-08-20T12:06:00Z",
+  "processedAt": "2026-08-20T12:06:01Z"
+}

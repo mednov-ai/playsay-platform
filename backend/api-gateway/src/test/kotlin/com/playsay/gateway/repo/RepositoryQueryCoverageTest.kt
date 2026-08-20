@@ -1,5 +1,7 @@
 package com.playsay.gateway.repo
 
+import com.playsay.gateway.repo.schedule.*
+
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.AssignmentEntity
 import com.playsay.gateway.entity.CourseEntity

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.service.MaterialAnswerSuggestionInput
 import com.playsay.gateway.service.OpenAiMaterialAnswerSuggestionProvider
-import com.playsay.gateway.service.OpenAiResponsesTransport
+import com.playsay.gateway.service.material.OpenAiResponsesTransport
 import com.playsay.gateway.service.materialAnswerItemContexts
 import kotlin.test.Test
 import kotlin.test.assertEquals

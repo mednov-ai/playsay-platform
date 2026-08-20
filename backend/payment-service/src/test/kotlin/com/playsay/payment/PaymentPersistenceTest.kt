@@ -1,10 +1,8 @@
 package com.playsay.payment
 
-import com.playsay.payment.service.PaymentProviderClient
-import com.playsay.payment.service.ProviderPaymentCreateCommand
-import com.playsay.payment.service.ProviderPaymentCreateResult
-import com.playsay.payment.service.ProviderPaymentStatus
-import com.playsay.payment.service.PaymentAttemptStatus
+import com.playsay.payment.fixture.PaymentInvoiceOperationsBehavior
+import com.playsay.payment.fixture.RecordingPaymentProviderClient
+import com.playsay.payment.service.PaymentInvoiceOperations
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -13,6 +11,7 @@ import java.util.UUID
 import javax.sql.DataSource
 import liquibase.integration.spring.SpringLiquibase
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,12 +42,14 @@ class PaymentPersistenceTest @Autowired constructor(
     @param:LocalServerPort private val port: Int,
     private val jdbcTemplate: JdbcTemplate,
     private val dataSource: DataSource,
-) {
+    private val paymentOperations: PaymentInvoiceOperations,
+    private val recordingProvider: RecordingPaymentProviderClient,
+) : PaymentInvoiceOperationsBehavior() {
     @TestConfiguration
     class PaymentProviderTestConfig {
         @Bean
         @Primary
-        fun paymentProviderClient(): PaymentProviderClient = PersistenceRecordingPaymentProviderClient()
+        fun paymentProviderClient(): RecordingPaymentProviderClient = RecordingPaymentProviderClient()
     }
 
     private val httpClient = HttpClient.newHttpClient()
@@ -60,6 +61,18 @@ class PaymentPersistenceTest @Autowired constructor(
             changeLog = "classpath:db/changelog/db.changelog-master.xml"
         }.afterPropertiesSet()
     }
+
+    @BeforeEach
+    fun resetPersistenceState() {
+        jdbcTemplate.update("delete from payment_provider_events")
+        jdbcTemplate.update("delete from payment_attempts")
+        jdbcTemplate.update("delete from payment_invoices")
+        recordingProvider.reset()
+    }
+
+    override fun operations(): PaymentInvoiceOperations = paymentOperations
+
+    override fun provider(): RecordingPaymentProviderClient = recordingProvider
 
     @Test
     fun `invoice and checkout attempt are persisted in database`() {
@@ -115,29 +128,4 @@ class PaymentPersistenceTest @Autowired constructor(
           "dueAt": null
         }
         """.trimIndent()
-}
-
-private class PersistenceRecordingPaymentProviderClient : PaymentProviderClient {
-    private val attempts = mutableMapOf<String, ProviderPaymentCreateCommand>()
-
-    override fun createPayment(command: ProviderPaymentCreateCommand): ProviderPaymentCreateResult {
-        attempts["pay-1"] = command
-        return ProviderPaymentCreateResult(
-            providerPaymentId = "pay-1",
-            confirmationUrl = "https://checkout.test/pay-1",
-            status = PaymentAttemptStatus.WAITING_FOR_CONFIRMATION,
-        )
-    }
-
-    override fun fetchPayment(providerPaymentId: String): ProviderPaymentStatus {
-        val command = attempts.getValue(providerPaymentId)
-        return ProviderPaymentStatus(
-            providerPaymentId = providerPaymentId,
-            status = PaymentAttemptStatus.SUCCEEDED,
-            amountMinor = command.amountMinor,
-            currency = command.currency,
-            invoiceId = command.invoiceId,
-            paymentAttemptId = UUID.fromString(command.metadata.getValue("paymentAttemptId")),
-        )
-    }
 }

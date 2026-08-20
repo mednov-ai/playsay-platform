@@ -21,8 +21,8 @@ import com.playsay.gateway.dto.MaterialSubmissionResponse
 import com.playsay.gateway.dto.MaterialUrlImportRequest
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.LessonMaterialRow
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant

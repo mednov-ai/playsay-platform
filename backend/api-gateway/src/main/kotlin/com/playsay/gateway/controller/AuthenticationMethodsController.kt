@@ -2,7 +2,7 @@ package com.playsay.gateway.controller
 
 import com.playsay.gateway.dto.AuthenticationMethodsResponse
 import com.playsay.gateway.dto.RenamePasskeyRequest
-import com.playsay.gateway.service.RegistrationGateway
+import com.playsay.gateway.service.RegistrationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @Tag(name = "Authentication methods")
 class AuthenticationMethodsController(
-    private val registration: RegistrationGateway,
+    private val registration: RegistrationService,
 ) {
     @GetMapping("/users/me/authentication-methods", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(

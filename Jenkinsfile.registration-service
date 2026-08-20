@@ -167,7 +167,7 @@ spec:
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :registration-service:test :registration-service:bootJar -Pkotlin.compiler.execution.strategy=in-process --no-daemon --stacktrace --max-workers=1'
+            sh 'gradle :registration-service:detektMain :registration-service:test :registration-service:bootJar -Pkotlin.compiler.execution.strategy=in-process --no-daemon --stacktrace --max-workers=1'
           }
         }
       }

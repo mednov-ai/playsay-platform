@@ -14,8 +14,8 @@ import com.playsay.gateway.repo.ChatEmailDigestMessageRepo
 import com.playsay.gateway.repo.ChatEmailDigestRepo
 import com.playsay.gateway.repo.ChatMessageRepo
 import com.playsay.gateway.repo.ChatParticipantStateRepo
-import com.playsay.gateway.service.ChatEmailClient
-import com.playsay.gateway.service.ChatEmailCommand
+import com.playsay.gateway.client.ChatEmailClient
+import com.playsay.gateway.client.ChatEmailCommand
 import com.playsay.gateway.service.ChatEmailDigestScheduler
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant

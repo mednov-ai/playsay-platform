@@ -15,8 +15,8 @@ import com.playsay.gateway.repo.CollaborationDocumentRepo
 import com.playsay.gateway.repo.CourseRepo
 import com.playsay.gateway.repo.LessonMaterialAnnotationRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.LessonTemplateRepo
 import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.repo.SubmissionRepo

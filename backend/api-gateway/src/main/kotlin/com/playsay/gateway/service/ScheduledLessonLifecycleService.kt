@@ -3,7 +3,7 @@ package com.playsay.gateway.service
 import com.playsay.gateway.dto.ScheduledLessonResponse
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.realtime.LessonChangedEvent
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant
 import java.util.UUID

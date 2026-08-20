@@ -1,9 +1,10 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.RegistrationGateway
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.playsay.contract.registration.model.InternalCreateUserRequest
+import com.playsay.contract.registration.model.InternalUpdateRolesRequest
 import com.playsay.gateway.dto.CreateUserManagementUserRequest
-import com.playsay.gateway.dto.RegistrationCreateUserRequest
-import com.playsay.gateway.dto.RegistrationRolesRequest
 import com.playsay.gateway.dto.UpdateUserRolesRequest
 import com.playsay.gateway.dto.UserDeletionOperationResponse
 import com.playsay.gateway.dto.UserManagementUser
@@ -80,12 +81,12 @@ class UserManagementService(
         val primaryTeacher = request.primaryTeacherSubject?.let(::activeUser)?.also(::requireTeacherUser)
         if (MetaData.Roles.STUDENT !in roles && primaryTeacher != null) invalidRoles()
         val identity = registrationGateway.createUser(
-            RegistrationCreateUserRequest(
+            InternalCreateUserRequest(
                 username = request.username,
                 firstName = request.firstName,
+                roles = roles,
                 lastName = request.lastName,
                 email = request.email,
-                roles = roles,
                 managedStudent = MetaData.Roles.STUDENT in roles,
             ),
         )
@@ -144,7 +145,7 @@ class UserManagementService(
                 studentProfileRepo.save(profile)
             }
         }
-        registrationGateway.updateRoles(subject, RegistrationRolesRequest(roles))
+        registrationGateway.updateRoles(subject, InternalUpdateRolesRequest(roles))
         target.roles = roles.toStoredRoles()
         target.rolesChangedAt = Instant.now(clock)
         target.updatedAt = target.rolesChangedAt!!

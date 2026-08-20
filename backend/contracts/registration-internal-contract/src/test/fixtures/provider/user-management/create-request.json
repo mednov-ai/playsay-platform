@@ -1,0 +1,8 @@
+{
+  "username": "new.student",
+  "firstName": "New",
+  "lastName": null,
+  "email": "new.student@example.com",
+  "roles": ["STUDENT"],
+  "managedStudent": false
+}

@@ -123,6 +123,9 @@ function isSharedBackendPath(path) {
     path === "backend/gradle.properties" ||
     path === "backend/.dockerignore" ||
     path.startsWith("backend/shared-kotlin/") ||
+    path.startsWith("backend/architecture-testkit/") ||
+    path.startsWith("backend/build-logic/") ||
+    path.startsWith("backend/config/") ||
     path.startsWith("backend/gradle/") ||
     path.startsWith("backend/buildSrc/")
   );
@@ -214,6 +217,36 @@ export function detectTargetsForPaths(paths, options = {}) {
     if (path === "contracts/registration-openapi.yaml") {
       deployTargets.add("registration-service");
       deployTargets.add("web-app");
+      continue;
+    }
+
+    if (path.startsWith("backend/contracts/email-internal-contract/")) {
+      addAll(deployTargets, ["api-gateway", "registration-service", "email-service"]);
+      continue;
+    }
+
+    if (path.startsWith("backend/contracts/media-internal-contract/")) {
+      addAll(deployTargets, ["api-gateway", "media-service"]);
+      continue;
+    }
+
+    if (path.startsWith("backend/contracts/payment-internal-contract/")) {
+      addAll(deployTargets, ["api-gateway", "payment-service"]);
+      continue;
+    }
+
+    if (path.startsWith("backend/contracts/registration-internal-contract/")) {
+      addAll(deployTargets, ["api-gateway", "registration-service"]);
+      continue;
+    }
+
+    if (path.startsWith("backend/integration-support/")) {
+      addAll(deployTargets, ["api-gateway", "vocabulary-service", "registration-service", "keyboard-service"]);
+      continue;
+    }
+
+    if (path.startsWith("backend/openai-support/")) {
+      addAll(deployTargets, ["api-gateway", "vocabulary-service"]);
       continue;
     }
 

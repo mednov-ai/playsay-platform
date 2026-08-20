@@ -15,7 +15,7 @@ import com.playsay.gateway.entity.LessonMaterialEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.mapper.LessonMaterialResponseMapper
 import com.playsay.gateway.repo.LessonMaterialRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant
 import java.util.UUID

@@ -4,13 +4,39 @@ import com.playsay.gateway.controller.*
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.service.*
+import com.playsay.gateway.service.material.StubMaterialAiDraftProvider
+import com.playsay.gateway.service.material.OpenAiResponsesTransport
 import com.playsay.gateway.utils.MetaData
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import org.springframework.context.support.StaticMessageSource
 
 class MaterialAiDraftServiceTest {
+    @Test
+    fun `provider selection uses deterministic stub and rejects unknown provider`() {
+        val messages = StaticMessageSource()
+        val stub = StubMaterialAiDraftProvider(MessageProvider(messages))
+        val openAi = OpenAiMaterialAiDraftProvider(
+            transport = RecordingOpenAiTransport(openAiResponse(openAiDraftJson())),
+            apiKey = "",
+            model = "gpt-5.4-mini",
+            baseUrl = "https://api.openai.com/v1",
+        )
+        val input = MaterialAiDraftInput("Topic", "Discuss pets", "en", "A1")
+
+        val first = MaterialAiDraftService("stub", stub, openAi).draft(input)
+        val second = MaterialAiDraftService(" STUB ", stub, openAi).draft(input)
+
+        assertEquals(first, second)
+        assertEquals("stub", first.sourceMeta["provider"].asText())
+        val exception = assertFailsWith<ProjectResponseException> {
+            MaterialAiDraftService("unsupported", stub, openAi).draft(input)
+        }
+        assertEquals(MetaData.ErrorCodes.AI_PROVIDER_UNKNOWN, exception.errorCode)
+    }
+
     @Test
     fun `openai provider parses structured response and enriches source metadata`() {
         val transport = RecordingOpenAiTransport(openAiResponse(openAiDraftJson()))

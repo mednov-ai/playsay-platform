@@ -1,6 +1,10 @@
 package com.playsay.gateway
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.playsay.contract.media.model.YoutubeDeliverySource
+import com.playsay.contract.media.model.YoutubePlaybackQuality
+import com.playsay.contract.media.model.YoutubePlaybackSessionRequest
+import com.playsay.contract.media.model.YoutubePlaybackSessionResponse
 import com.playsay.gateway.controller.MaterialCrudController
 import com.playsay.gateway.controller.MaterialVideoPlaybackController
 import com.playsay.gateway.dto.LessonMaterialRequest
@@ -19,9 +23,7 @@ import com.playsay.gateway.repo.YoutubeVideoCacheRepo
 import com.playsay.gateway.service.MaterialAssetService
 import com.playsay.gateway.service.MaterialVideoPlaybackService
 import com.playsay.gateway.service.UserProfileStore
-import com.playsay.gateway.service.YoutubeMediaClient
-import com.playsay.gateway.service.YoutubeMediaPlaybackSessionCommand
-import com.playsay.gateway.service.YoutubeMediaPlaybackSessionResult
+import com.playsay.gateway.client.YoutubeMediaClient
 import com.playsay.gateway.service.YoutubeVideoMeta
 import com.playsay.gateway.service.YoutubeVideoCacheService
 import com.playsay.gateway.service.YoutubeVideoCacheStatuses
@@ -502,7 +504,7 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
 }
 
 class TestYoutubeMediaClient : YoutubeMediaClient {
-    val sessionRequests = mutableListOf<YoutubeMediaPlaybackSessionCommand>()
+    val sessionRequests = mutableListOf<YoutubePlaybackSessionRequest>()
     var thumbnailStored: Boolean = false
     var metadataAvailable: Boolean = true
 
@@ -520,28 +522,29 @@ class TestYoutubeMediaClient : YoutubeMediaClient {
             thumbnailUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg",
         ) else null
 
-    override fun createPlaybackSession(command: YoutubeMediaPlaybackSessionCommand): YoutubeMediaPlaybackSessionResult {
+    override fun createPlaybackSession(command: YoutubePlaybackSessionRequest): YoutubePlaybackSessionResponse {
         sessionRequests.add(command)
         val height = when (command.requestedQuality) {
-            "LOW" -> 480
-            "HIGH" -> 1080
+            YoutubePlaybackQuality.LOW -> 480
+            YoutubePlaybackQuality.HIGH -> 1080
             else -> 720
         }
         val selectedQuality = when (height) {
-            in 0..480 -> "LOW"
-            in 481..720 -> "MEDIUM"
-            else -> "HIGH"
+            in 0..480 -> YoutubePlaybackQuality.LOW
+            in 481..720 -> YoutubePlaybackQuality.MEDIUM
+            else -> YoutubePlaybackQuality.HIGH
         }
-        return YoutubeMediaPlaybackSessionResult(
+        return YoutubePlaybackSessionResponse(
             sessionId = UUID.randomUUID(),
             expiresAt = Instant.now().plusSeconds(900),
-            requestedQuality = command.requestedQuality,
+            requestedQuality = command.requestedQuality ?: YoutubePlaybackQuality.MEDIUM,
             selectedQuality = selectedQuality,
             selectedHeight = height,
             thumbnailSourceUrl = "https://img.youtube.com/vi/${command.videoId}/maxresdefault.jpg",
             thumbnailStored = thumbnailStored && command.thumbnailStorageKey != null,
             thumbnailContentType = if (thumbnailStored && command.thumbnailStorageKey != null) "image/jpeg" else null,
             thumbnailByteSize = if (thumbnailStored && command.thumbnailStorageKey != null) 12345 else null,
+            deliverySource = YoutubeDeliverySource.YOUTUBE_RELAY,
         )
     }
 }

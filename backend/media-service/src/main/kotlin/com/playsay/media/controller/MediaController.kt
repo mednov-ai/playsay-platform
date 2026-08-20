@@ -1,11 +1,13 @@
 package com.playsay.media.controller
 
-import com.playsay.media.dto.YoutubeMetadataRequest
-import com.playsay.media.dto.YoutubeMetadataResponse
-import com.playsay.media.dto.YoutubePlaybackSessionRequest
-import com.playsay.media.dto.YoutubePlaybackSessionResponse
-import com.playsay.media.dto.YoutubeVideoCacheRequest
-import com.playsay.media.dto.YoutubeVideoCacheResponse
+import com.playsay.contract.media.model.YoutubeDeliverySource
+import com.playsay.contract.media.model.YoutubeMetadataRequest
+import com.playsay.contract.media.model.YoutubeMetadataResponse
+import com.playsay.contract.media.model.YoutubePlaybackQuality as ContractYoutubePlaybackQuality
+import com.playsay.contract.media.model.YoutubePlaybackSessionRequest
+import com.playsay.contract.media.model.YoutubePlaybackSessionResponse
+import com.playsay.contract.media.model.YoutubeVideoCacheRequest
+import com.playsay.contract.media.model.YoutubeVideoCacheResponse
 import com.playsay.media.service.MediaInternalAuth
 import com.playsay.media.service.MediaServiceException
 import com.playsay.media.service.YoutubeMetadataResolver
@@ -72,7 +74,7 @@ class MediaController(
         @RequestBody request: YoutubePlaybackSessionRequest,
     ): YoutubePlaybackSessionResponse {
         internalAuth.requireValid(serviceToken)
-        val requestedQuality = YoutubePlaybackQuality.normalized(request.requestedQuality)
+        val requestedQuality = YoutubePlaybackQuality.normalized(request.requestedQuality?.value)
         val cached = if (requestedQuality == YoutubePlaybackQuality.MEDIUM) videoCacheService.find(request.videoId, requestedQuality) else null
         if (cached != null) {
             val thumbnail = thumbnailService.store(request.thumbnailSourceUrl ?: cached.thumbnailUrl, request.thumbnailStorageKey)
@@ -91,15 +93,15 @@ class MediaController(
             )
             return YoutubePlaybackSessionResponse(
                 sessionId = session.id,
-                expiresAt = session.expiresAt.toString(),
-                requestedQuality = requestedQuality.name,
-                selectedQuality = cached.selectedQuality.name,
+                expiresAt = session.expiresAt,
+                requestedQuality = ContractYoutubePlaybackQuality.valueOf(requestedQuality.name),
+                selectedQuality = ContractYoutubePlaybackQuality.valueOf(cached.selectedQuality.name),
                 selectedHeight = cached.selectedHeight,
                 thumbnailSourceUrl = request.thumbnailSourceUrl ?: cached.thumbnailUrl,
                 thumbnailStored = thumbnail != null,
                 thumbnailContentType = thumbnail?.contentType,
                 thumbnailByteSize = thumbnail?.byteSize,
-                deliverySource = "MINIO_CACHE",
+                deliverySource = YoutubeDeliverySource.MINIO_CACHE,
             )
         }
         val metadata = metadataResolver.resolve(request.videoId)
@@ -120,15 +122,15 @@ class MediaController(
         )
         return YoutubePlaybackSessionResponse(
             sessionId = session.id,
-            expiresAt = session.expiresAt.toString(),
-            requestedQuality = requestedQuality.name,
-            selectedQuality = selected.selectedQuality.name,
+            expiresAt = session.expiresAt,
+            requestedQuality = ContractYoutubePlaybackQuality.valueOf(requestedQuality.name),
+            selectedQuality = ContractYoutubePlaybackQuality.valueOf(selected.selectedQuality.name),
             selectedHeight = selected.height,
             thumbnailSourceUrl = metadata.thumbnailUrl,
             thumbnailStored = thumbnail != null,
             thumbnailContentType = thumbnail?.contentType,
             thumbnailByteSize = thumbnail?.byteSize,
-            deliverySource = "YOUTUBE_RELAY",
+            deliverySource = YoutubeDeliverySource.YOUTUBE_RELAY,
         )
     }
 

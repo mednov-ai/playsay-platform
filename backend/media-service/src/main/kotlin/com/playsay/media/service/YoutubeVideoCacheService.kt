@@ -1,7 +1,8 @@
 package com.playsay.media.service
 
-import com.playsay.media.dto.YoutubeVideoCacheRequest
-import com.playsay.media.dto.YoutubeVideoCacheResponse
+import com.playsay.contract.media.model.YoutubePlaybackQuality as ContractYoutubePlaybackQuality
+import com.playsay.contract.media.model.YoutubeVideoCacheRequest
+import com.playsay.contract.media.model.YoutubeVideoCacheResponse
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import java.io.InputStream
@@ -54,7 +55,7 @@ class YoutubeVideoCacheService(
     fun cache(request: YoutubeVideoCacheRequest): YoutubeVideoCacheResponse {
         requireEnabled()
         val videoId = validatedVideoId(request.videoId)
-        val requestedQuality = YoutubePlaybackQuality.normalized(request.requestedQuality)
+        val requestedQuality = YoutubePlaybackQuality.normalized(request.requestedQuality?.value)
         if (requestedQuality != YoutubePlaybackQuality.MEDIUM) {
             throw MediaServiceException(HttpStatus.BAD_REQUEST, "YOUTUBE_CACHE_MEDIUM_ONLY")
         }
@@ -280,10 +281,10 @@ class YoutubeVideoCacheService(
     private fun CachedYoutubeVideo.toResponse(status: String): YoutubeVideoCacheResponse =
         YoutubeVideoCacheResponse(
             videoId = videoId,
-            status = status,
+            status = YoutubeVideoCacheResponse.Status.valueOf(status),
             storageKey = storageKey,
-            requestedQuality = requestedQuality.name,
-            selectedQuality = selectedQuality.name,
+            requestedQuality = ContractYoutubePlaybackQuality.valueOf(requestedQuality.name),
+            selectedQuality = ContractYoutubePlaybackQuality.valueOf(selectedQuality.name),
             selectedHeight = selectedHeight,
             contentType = contentType,
             byteSize = byteSize,

@@ -1,0 +1,11 @@
+{
+  "to": "student@example.com",
+  "templateKey": "lesson-reminder",
+  "locale": "ru",
+  "idempotencyKey": "lesson-reminder:1:student-1",
+  "model": {
+    "displayName": "Student",
+    "optionalValue": null
+  },
+  "replayUntil": "2026-08-21T12:00:00Z"
+}

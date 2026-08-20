@@ -1,4 +1,6 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.ChatEmailClient
+import com.playsay.gateway.client.ChatEmailCommand
 
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.ChatEmailDigestEntity

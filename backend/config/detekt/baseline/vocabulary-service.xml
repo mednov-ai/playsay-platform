@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:VocabularyPracticePlanner.kt:VocabularyPracticePlanner$private fun itemsForEntry: List&lt;PlannedPracticeItem&gt;</ID>
+    <ID>LongMethod:VocabularyPracticePlanService.kt:VocabularyPracticePlanService$@Transactional fun preview: VocabularyPracticePreviewResponse</ID>
+    <ID>LongMethod:VocabularyPracticePlanner.kt:VocabularyPracticePlanner$fun planOwner: PlannedOwnerPractice</ID>
+  </CurrentIssues>
+</SmellBaseline>

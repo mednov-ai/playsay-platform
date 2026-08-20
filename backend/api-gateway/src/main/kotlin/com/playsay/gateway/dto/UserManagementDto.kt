@@ -103,25 +103,3 @@ data class UserDeletionOperationResponse(
     val updatedAt: Instant,
     val completedAt: Instant? = null,
 )
-
-data class RegistrationIdentityResponse(
-    val subject: String,
-    val username: String,
-    val email: String?,
-    val displayName: String?,
-    val roles: Set<String> = emptySet(),
-    val enabled: Boolean = true,
-)
-
-data class RegistrationCreateUserRequest(
-    val username: String,
-    val firstName: String,
-    val lastName: String?,
-    val email: String?,
-    val roles: Set<String>,
-    val managedStudent: Boolean,
-)
-
-data class RegistrationRolesRequest(
-    val roles: Set<String>,
-)

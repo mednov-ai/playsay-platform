@@ -1,6 +1,8 @@
 package com.playsay.keyboard.service
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.playsay.integration.delivery.IntegrationDeliveryState
+import com.playsay.integration.delivery.exponentialRetryDelay
 import com.playsay.keyboard.dto.SubmitResultRequest
 import com.playsay.keyboard.entity.KeyboardVocabularyResultOutboxEntity
 import com.playsay.keyboard.entity.TrainingResultEntity
@@ -11,7 +13,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
@@ -56,16 +57,16 @@ class KeyboardVocabularyResultOutbox(
         val now = Instant.now()
         val clientResultId = result.clientResultId ?: "keyboard-result-${result.id}"
         outbox.save(
-            KeyboardVocabularyResultOutboxEntity(
-                id = UUID.randomUUID(),
-                trainingResultId = result.id,
-                sessionId = sessionId,
-                payload = objectMapper.writeValueAsString(KeyboardVocabularyResultPayload(clientResultId, attempts)),
-                status = PENDING,
-                nextAttemptAt = now,
-                createdAt = now,
-                updatedAt = now,
-            ),
+            KeyboardVocabularyResultOutboxEntity().apply {
+                id = UUID.randomUUID()
+                trainingResultId = result.id
+                this.sessionId = sessionId
+                payload = objectMapper.writeValueAsString(KeyboardVocabularyResultPayload(clientResultId, attempts))
+                status = PENDING
+                nextAttemptAt = now
+                createdAt = now
+                updatedAt = now
+            },
         )
     }
 
@@ -105,14 +106,11 @@ class KeyboardVocabularyResultOutbox(
             val now = Instant.now()
             current.attemptCount += 1
             current.lastError = listOfNotNull(error::class.simpleName, error.message).joinToString(": ").take(240)
-            current.nextAttemptAt = now.plus(retryDelaySeconds(current.attemptCount), ChronoUnit.SECONDS)
+            current.nextAttemptAt = now.plus(exponentialRetryDelay(current.attemptCount))
             current.updatedAt = now
             outbox.save(current)
         }
     }
-
-    private fun retryDelaySeconds(attempt: Int): Long =
-        (10L * (1L shl attempt.coerceIn(0, 5))).coerceAtMost(300L)
 
     private fun Map<String, Any?>.uuid(key: String): UUID? =
         (this[key] as? String)?.let { value -> runCatching { UUID.fromString(value) }.getOrNull() }
@@ -128,7 +126,7 @@ class KeyboardVocabularyResultOutbox(
 
     private companion object {
         val objectMapper = jacksonObjectMapper()
-        const val PENDING = "PENDING"
+        val PENDING = IntegrationDeliveryState.PENDING.persistedValue
         const val MAX_ERRORS = 999
     }
 }

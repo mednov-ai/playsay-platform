@@ -1,10 +1,10 @@
 package com.playsay.email.service
 
-import com.playsay.email.dto.EmailDeliveryDetailResponse
-import com.playsay.email.dto.EmailDeliveryPageResponse
-import com.playsay.email.dto.EmailDeliveryResendResponse
-import com.playsay.email.dto.EmailDeliverySummaryResponse
-import com.playsay.email.dto.EmailProviderAttemptResponse
+import com.playsay.contract.email.model.EmailDeliveryDetailResponse
+import com.playsay.contract.email.model.EmailDeliveryPageResponse
+import com.playsay.contract.email.model.EmailDeliveryResendResponse
+import com.playsay.contract.email.model.EmailDeliverySummaryResponse
+import com.playsay.contract.email.model.EmailProviderAttemptResponse
 import com.playsay.email.entity.EmailDeliveryAttemptEntity
 import com.playsay.email.entity.EmailProviderAttemptEntity
 import com.playsay.email.repo.EmailDeliveryAttemptRepo

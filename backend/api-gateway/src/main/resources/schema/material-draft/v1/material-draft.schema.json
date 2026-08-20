@@ -1,0 +1,172 @@
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string", "maxLength": 160 },
+    "description": { "type": ["string", "null"], "maxLength": 2000 },
+    "language": { "type": "string", "maxLength": 16 },
+    "cefrLevel": { "type": "string", "enum": ["A1", "A2", "B1", "B2", "C1", "C2"] },
+    "visibility": { "type": "string", "enum": ["PRIVATE"] },
+    "status": { "type": "string", "enum": ["DRAFT"] },
+    "document": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "type": "integer", "enum": [1] },
+        "pages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/page" }
+        }
+      },
+      "required": ["schemaVersion", "pages"],
+      "additionalProperties": false
+    },
+    "sourceMeta": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "enum": ["AI_GENERATED"] },
+        "provider": { "type": "string", "enum": ["openai"] },
+        "sourceType": { "type": "string", "enum": ["teacher_prompt", "scan", "external_url", "voice_description", "mixed"] },
+        "inputSummary": { "type": "string", "maxLength": 1000 },
+        "notes": { "type": "string", "maxLength": 1000 }
+      },
+      "required": ["kind", "provider", "sourceType", "inputSummary", "notes"],
+      "additionalProperties": false
+    },
+    "scoringRubric": {
+      "type": "object",
+      "properties": {
+        "maxScore": { "type": "integer", "enum": [10] },
+        "criteria": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/criterion" }
+        },
+        "analysisFlags": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "enum": ["taskCompletion", "grammar", "vocabulary", "spelling", "fluency", "pronunciation", "comprehension", "participation"]
+          }
+        }
+      },
+      "required": ["maxScore", "criteria", "analysisFlags"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["title", "description", "language", "cefrLevel", "visibility", "status", "document", "sourceMeta", "scoringRubric"],
+  "additionalProperties": false,
+  "$defs": {
+    "page": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 80 },
+        "title": { "type": "string", "maxLength": 160 },
+        "layout": { "type": "string", "enum": ["FLOW", "CANVAS"] },
+        "blocks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/block" }
+        }
+      },
+      "required": ["id", "title", "layout", "blocks"],
+      "additionalProperties": false
+    },
+    "block": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 80 },
+        "type": { "type": "string", "enum": ["text", "videoEmbed", "image", "generatedImage", "flashcards", "fillGaps", "multipleChoice", "matchingPairs", "freeWriting", "speakingPrompt", "drawingArea"] },
+        "title": { "type": "string", "maxLength": 160 },
+        "body": { "type": ["string", "null"], "maxLength": 4000 },
+        "instruction": { "type": ["string", "null"], "maxLength": 1000 },
+        "prompt": { "type": ["string", "null"], "maxLength": 2000 },
+        "level": { "type": ["string", "null"], "maxLength": 16 },
+        "language": { "type": ["string", "null"], "maxLength": 16 },
+        "url": { "type": ["string", "null"], "maxLength": 4000 },
+        "provider": { "type": ["string", "null"], "maxLength": 32 },
+        "caption": { "type": ["string", "null"], "maxLength": 1000 },
+        "imageUrl": { "type": ["string", "null"], "maxLength": 4000 },
+        "alt": { "type": ["string", "null"], "maxLength": 500 },
+        "height": { "type": ["integer", "null"], "minimum": 120, "maximum": 800 },
+        "minWords": { "type": ["integer", "null"], "minimum": 1, "maximum": 300 },
+        "cards": {
+          "type": "array",
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/flashcard" }
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/exerciseItem" }
+        },
+        "pairs": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/matchingPair" }
+        },
+        "options": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "type": "string", "maxLength": 160 }
+        }
+      },
+      "required": ["id", "type", "title", "body", "instruction", "prompt", "level", "language", "url", "provider", "caption", "imageUrl", "alt", "height", "minWords", "cards", "items", "pairs", "options"],
+      "additionalProperties": false
+    },
+    "flashcard": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 80 },
+        "front": { "type": "string", "maxLength": 160 },
+        "back": { "type": "string", "maxLength": 160 },
+        "example": { "type": "string", "maxLength": 300 }
+      },
+      "required": ["id", "front", "back", "example"],
+      "additionalProperties": false
+    },
+    "exerciseItem": {
+      "type": "object",
+      "properties": {
+        "prompt": { "type": "string", "maxLength": 1000 },
+        "answer": { "type": ["string", "null"], "maxLength": 500 },
+        "correct": { "type": ["string", "null"], "maxLength": 500 },
+        "choices": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "type": "string", "maxLength": 160 }
+        }
+      },
+      "required": ["prompt", "answer", "correct", "choices"],
+      "additionalProperties": false
+    },
+    "matchingPair": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 80 },
+        "left": { "type": "string", "maxLength": 160 },
+        "right": { "type": "string", "maxLength": 160 },
+        "targetKind": { "type": "string", "enum": ["TEXT", "IMAGE"] },
+        "imagePrompt": { "type": "string", "maxLength": 500 },
+        "imageAlt": { "type": "string", "maxLength": 200 },
+        "imageUrl": { "type": ["string", "null"], "maxLength": 4000 }
+      },
+      "required": ["id", "left", "right", "targetKind", "imagePrompt", "imageAlt", "imageUrl"],
+      "additionalProperties": false
+    },
+    "criterion": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string", "maxLength": 80 },
+        "label": { "type": "string", "maxLength": 160 },
+        "weight": { "type": "integer", "minimum": 1, "maximum": 10 }
+      },
+      "required": ["key", "label", "weight"],
+      "additionalProperties": false
+    }
+  }
+}

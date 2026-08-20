@@ -1,7 +1,7 @@
 package com.playsay.gateway
 
 import com.playsay.gateway.error.ProjectResponseException
-import com.playsay.gateway.service.EmailDeliveryAdminGateway
+import com.playsay.gateway.client.EmailDeliveryAdminGateway
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant
 import kotlin.test.Test

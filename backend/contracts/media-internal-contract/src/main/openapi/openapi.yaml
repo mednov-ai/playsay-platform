@@ -1,0 +1,194 @@
+openapi: 3.0.3
+info:
+  title: Honey School Media Service Boundary API
+  version: 0.1.0
+  description: >-
+    Service-owned contract for YouTube metadata, playback sessions, video-cache
+    creation, and cache removal. The public relay stream is intentionally outside
+    this service-to-gateway model contract.
+security:
+  - mediaServiceToken: []
+paths:
+  /internal/youtube/metadata:
+    post:
+      operationId: resolveYoutubeMetadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YoutubeMetadataRequest"
+      responses:
+        "200":
+          description: Resolved metadata returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YoutubeMetadataResponse"
+        "401": { description: Missing or invalid media service token. }
+        "404": { description: Metadata not found. }
+  /internal/youtube/playback-sessions:
+    post:
+      operationId: createYoutubePlaybackSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YoutubePlaybackSessionRequest"
+      responses:
+        "200":
+          description: Short-lived relay or cached playback session returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YoutubePlaybackSessionResponse"
+        "401": { description: Missing or invalid media service token. }
+        "413": { description: Cache request rejected because of size. }
+        "422": { description: Cache request rejected by media policy. }
+        "503": { description: YouTube relay is unavailable. }
+  /internal/youtube/video-cache:
+    post:
+      operationId: cacheYoutubeVideo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YoutubeVideoCacheRequest"
+      responses:
+        "200":
+          description: Existing or newly created cache object returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YoutubeVideoCacheResponse"
+        "400": { description: Invalid video id or unsupported cache quality. }
+        "401": { description: Missing or invalid media service token. }
+        "413": { description: Downloaded video exceeds the cache limit. }
+        "503": { description: Cache is disabled or unavailable. }
+  /internal/youtube/video-cache/{videoId}:
+    delete:
+      operationId: deleteYoutubeVideoCache
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: quality
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/YoutubePlaybackQuality"
+          example: MEDIUM
+      responses:
+        "204": { description: Cache removal completed; no response body. }
+        "400": { description: Invalid video id or unsupported cache quality. }
+        "401": { description: Missing or invalid media service token. }
+        "503": { description: Cache is disabled or unavailable. }
+components:
+  securitySchemes:
+    mediaServiceToken:
+      type: apiKey
+      in: header
+      name: X-PlaySay-Media-Service-Token
+  schemas:
+    YoutubePlaybackQuality:
+      type: string
+      enum: [LOW, MEDIUM, HIGH]
+    YoutubeDeliverySource:
+      type: string
+      enum: [YOUTUBE_RELAY, MINIO_CACHE]
+    YoutubeMetadataRequest:
+      type: object
+      required: [videoId]
+      properties:
+        videoId: { type: string }
+    YoutubeMetadataResponse:
+      type: object
+      required: [videoId, durationSeconds, language, thumbnailUrl]
+      properties:
+        videoId: { type: string }
+        durationSeconds: { type: integer, format: int32, nullable: true }
+        language: { type: string, nullable: true }
+        thumbnailUrl: { type: string, nullable: true }
+    YoutubePlaybackSessionRequest:
+      type: object
+      required: [subject, materialId, blockId, videoId]
+      properties:
+        subject: { type: string }
+        materialId: { type: string, format: uuid }
+        blockId: { type: string }
+        videoId: { type: string }
+        requestedQuality:
+          allOf:
+            - $ref: "#/components/schemas/YoutubePlaybackQuality"
+          nullable: true
+        thumbnailStorageKey: { type: string, nullable: true }
+        thumbnailSourceUrl: { type: string, nullable: true }
+    YoutubePlaybackSessionResponse:
+      type: object
+      required:
+        - sessionId
+        - expiresAt
+        - requestedQuality
+        - selectedQuality
+        - selectedHeight
+        - thumbnailSourceUrl
+        - thumbnailStored
+        - thumbnailContentType
+        - thumbnailByteSize
+        - deliverySource
+      properties:
+        sessionId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        requestedQuality:
+          $ref: "#/components/schemas/YoutubePlaybackQuality"
+        selectedQuality:
+          $ref: "#/components/schemas/YoutubePlaybackQuality"
+        selectedHeight: { type: integer, format: int32, nullable: true }
+        thumbnailSourceUrl: { type: string, nullable: true }
+        thumbnailStored: { type: boolean }
+        thumbnailContentType: { type: string, nullable: true }
+        thumbnailByteSize: { type: integer, format: int64, nullable: true }
+        deliverySource:
+          $ref: "#/components/schemas/YoutubeDeliverySource"
+    YoutubeVideoCacheRequest:
+      type: object
+      required: [videoId]
+      properties:
+        videoId: { type: string }
+        requestedQuality:
+          allOf:
+            - $ref: "#/components/schemas/YoutubePlaybackQuality"
+          nullable: true
+    YoutubeVideoCacheResponse:
+      type: object
+      required:
+        - videoId
+        - status
+        - storageKey
+        - requestedQuality
+        - selectedQuality
+        - selectedHeight
+        - contentType
+        - byteSize
+        - durationSeconds
+        - language
+        - thumbnailUrl
+      properties:
+        videoId: { type: string }
+        status:
+          type: string
+          enum: [READY]
+        storageKey: { type: string }
+        requestedQuality:
+          $ref: "#/components/schemas/YoutubePlaybackQuality"
+        selectedQuality:
+          $ref: "#/components/schemas/YoutubePlaybackQuality"
+        selectedHeight: { type: integer, format: int32, nullable: true }
+        contentType: { type: string }
+        byteSize: { type: integer, format: int64 }
+        durationSeconds: { type: integer, format: int32, nullable: true }
+        language: { type: string, nullable: true }
+        thumbnailUrl: { type: string, nullable: true }

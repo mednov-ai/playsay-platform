@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CognitiveComplexMethod:MaterialExternalActivityResolver.kt:MaterialExternalActivityResolver$private fun isBlockedIpv4: Boolean</ID>
+    <ID>CognitiveComplexMethod:MaterialImageTargets.kt:internal fun materialImageTargets: List&lt;MaterialImageTarget&gt;</ID>
+    <ID>CognitiveComplexMethod:MaterialVideoPlaybackService.kt:MaterialVideoPlaybackService$fun playback: MaterialVideoPlaybackResponse</ID>
+    <ID>CognitiveComplexMethod:ScheduledLessonStudentAccessService.kt:ScheduledLessonStudentAccessService$fun synchronize</ID>
+    <ID>CyclomaticComplexMethod:LessonReminderService.kt:LessonReminderScheduler$private fun dispatch</ID>
+    <ID>CyclomaticComplexMethod:MaterialExternalActivityResolver.kt:MaterialExternalActivityResolver$private fun isBlockedIpv4: Boolean</ID>
+    <ID>CyclomaticComplexMethod:MaterialImageTargets.kt:internal fun materialImageTargets: List&lt;MaterialImageTarget&gt;</ID>
+    <ID>CyclomaticComplexMethod:MaterialUrlImportService.kt:private fun InetAddress.isPrivateImportAddress: Boolean</ID>
+    <ID>CyclomaticComplexMethod:MaterialVideoPlaybackService.kt:MaterialVideoPlaybackService$fun playback: MaterialVideoPlaybackResponse</ID>
+    <ID>CyclomaticComplexMethod:ScheduledLessonStudentAccessService.kt:ScheduledLessonStudentAccessService$fun prepare</ID>
+    <ID>CyclomaticComplexMethod:ScheduledLessonStudentAccessService.kt:ScheduledLessonStudentAccessService$fun synchronize</ID>
+    <ID>LongMethod:ChatEmailDigestService.kt:ChatEmailDigestScheduler$private fun dispatch</ID>
+    <ID>LongMethod:MaterialImageTargets.kt:internal fun materialImageTargets: List&lt;MaterialImageTarget&gt;</ID>
+    <ID>LongMethod:MaterialVideoPlaybackService.kt:MaterialVideoPlaybackService$fun playback: MaterialVideoPlaybackResponse</ID>
+    <ID>LongMethod:ScheduledLessonStore.kt:ScheduledLessonStore$@Transactional fun create: ScheduledLessonResponse</ID>
+    <ID>LongMethod:ScheduledLessonStudentAccessService.kt:ScheduledLessonStudentAccessService$fun prepare</ID>
+    <ID>LongMethod:ScheduledLessonStudentAccessService.kt:ScheduledLessonStudentAccessService$fun synchronize</ID>
+  </CurrentIssues>
+</SmellBaseline>

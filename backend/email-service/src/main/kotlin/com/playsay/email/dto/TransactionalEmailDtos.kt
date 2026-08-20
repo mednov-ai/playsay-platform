@@ -4,7 +4,6 @@ import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.Instant
-import java.util.UUID
 
 data class TransactionalEmailRequest(
     @field:Email
@@ -21,11 +20,4 @@ data class TransactionalEmailRequest(
     val idempotencyKey: String,
     val model: Map<String, String?> = emptyMap(),
     val replayUntil: Instant? = null,
-)
-
-data class TransactionalEmailResponse(
-    val status: String,
-    val deliveryAttemptId: UUID,
-    val provider: String?,
-    val providerStatus: String?,
 )

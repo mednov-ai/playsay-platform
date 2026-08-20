@@ -1,16 +1,10 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.spring")
-    id("org.springframework.boot")
-    id("io.spring.dependency-management")
-}
-
-kotlin {
-    jvmToolchain(21)
+    id("playsay.spring-service-conventions")
 }
 
 dependencies {
-    implementation(project(":shared-kotlin"))
+    implementation(project(":contracts:media-internal-contract"))
+    testImplementation(project(":architecture-testkit"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jackson")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
@@ -21,12 +15,4 @@ dependencies {
     implementation("software.amazon.awssdk:s3")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-}
-
-tasks.withType<Test> {
-    useJUnitPlatform()
-}
-
-tasks.named("jar") {
-    enabled = false
 }

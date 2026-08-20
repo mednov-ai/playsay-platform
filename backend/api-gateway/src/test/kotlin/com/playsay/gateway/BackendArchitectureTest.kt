@@ -1,8 +1,8 @@
 package com.playsay.gateway
 
-import com.playsay.gateway.controller.*
-import com.playsay.gateway.dto.*
-import com.playsay.gateway.service.*
+import com.playsay.architecture.KotlinSpringModuleArchitecture
+import com.playsay.architecture.KotlinSpringModuleArchitectureConfig
+import com.playsay.architecture.KotlinSpringModuleArchitectureTest
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
@@ -10,92 +10,31 @@ import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-class BackendArchitectureTest {
+class BackendArchitectureTest : KotlinSpringModuleArchitectureTest() {
     private val sourceRoot: Path =
         Path.of("").toAbsolutePath().resolve("src/main/kotlin/com/playsay/gateway")
 
-    @Test
-    fun `root package contains only application launcher`() {
-        val misplacedRootFiles = sourceRoot.listEntries()
-            .filter { path -> Files.isRegularFile(path) && path.name.endsWith(".kt") }
-            .filterNot { path -> path.name == "ApiGatewayApplication.kt" }
-            .map { path -> path.name }
-
-        assertTrue(
-            misplacedRootFiles.isEmpty(),
-            "Root package must contain only ApiGatewayApplication.kt: $misplacedRootFiles",
-        )
-    }
-
-    @Test
-    fun `top level package folders are intentional`() {
-        val intentionalFolders = setOf(
-            "client",
-            "config",
-            "controller",
-            "dto",
-            "entity",
-            "error",
-            "mapper",
-            "realtime",
-            "repo",
-            "service",
-            "utils",
-        )
-        val unexpectedFolders = sourceRoot.listEntries()
-            .filter { path -> Files.isDirectory(path) }
-            .map { path -> path.name }
-            .filterNot { name -> name in intentionalFolders }
-
-        assertTrue(
-            unexpectedFolders.isEmpty(),
-            "Top-level package folders must be intentional and reviewed: $unexpectedFolders",
-        )
-    }
-
-    @Test
-    fun `rest controllers are isolated in controller package`() {
-        val misplacedControllers = kotlinSources()
-            .filter { source -> Regex("""(?m)^@RestController$""").containsMatchIn(source.text) }
-            .filterNot { source -> ".controller" in source.packageName }
-            .map { source -> source.relativePath }
-
-        assertTrue(
-            misplacedControllers.isEmpty(),
-            "REST controllers must live in com.playsay.gateway.controller: $misplacedControllers",
-        )
-    }
-
-    @Test
-    fun `rest controllers stay focused by endpoint group`() {
-        val mappingAnnotation = Regex("""@(Get|Post|Put|Patch|Delete)Mapping\b""")
-        val oversizedControllers = kotlinSources()
-            .filter { source -> Regex("""(?m)^@RestController$""").containsMatchIn(source.text) }
-            .mapNotNull { source ->
-                val endpointCount = mappingAnnotation.findAll(source.text).count()
-                if (endpointCount > 10) "${source.relativePath} has $endpointCount endpoints" else null
-            }
-
-        assertTrue(
-            oversizedControllers.isEmpty(),
-            "Split REST controllers by cohesive endpoint groups: $oversizedControllers",
-        )
-    }
-
-    @Test
-    fun `openapi request and response dto classes are isolated in dto package`() {
-        val dtoRegex = Regex("""(?m)^data\s+class\s+\w+(Request|Response)\b""")
-        val misplacedDtos = kotlinSources()
-            .filter { source -> dtoRegex.containsMatchIn(source.text) }
-            .filterNot { source -> ".error" in source.packageName }
-            .filterNot { source -> ".dto" in source.packageName }
-            .map { source -> source.relativePath }
-
-        assertTrue(
-            misplacedDtos.isEmpty(),
-            "OpenAPI request/response DTOs must live in com.playsay.gateway.dto: $misplacedDtos",
-        )
-    }
+    override val architecture = KotlinSpringModuleArchitecture(
+        KotlinSpringModuleArchitectureConfig(
+            basePackage = "com.playsay.gateway",
+            applicationFile = "ApiGatewayApplication.kt",
+            allowedTopLevelPackages = setOf(
+                "client",
+                "config",
+                "controller",
+                "dto",
+                "entity",
+                "error",
+                "mapper",
+                "realtime",
+                "repo",
+                "service",
+                "utils",
+            ),
+            legacyOversizedServiceFiles = emptySet(),
+            controllerForbiddenTypes = setOf("Repo", "Repository", "ServiceClient"),
+        ),
+    )
 
     @Test
     fun `application services are isolated in service package`() {
@@ -108,6 +47,59 @@ class BackendArchitectureTest {
         assertTrue(
             misplacedServices.isEmpty(),
             "Service/store/provider components must live in com.playsay.gateway.service: $misplacedServices",
+        )
+    }
+
+    @Test
+    fun `assignment package depends only on explicit application policies`() {
+        val allowedGenericServices = setOf(
+            "AssignmentAccessPolicy",
+            "AssignmentProgressCalculator",
+            "MaterialScoringService",
+            "StudentAccessPolicy",
+            "UserProfileStore",
+        )
+        val genericServiceImport = Regex(
+            """^import com\.playsay\.gateway\.service\.([A-Za-z0-9_]+)$""",
+            setOf(RegexOption.MULTILINE),
+        )
+        val forbiddenImports = kotlinSources()
+            .filter { source -> source.packageName == "com.playsay.gateway.service.assignment" }
+            .flatMap { source ->
+                genericServiceImport.findAll(source.text)
+                    .map { match -> match.groupValues[1] }
+                    .filterNot(allowedGenericServices::contains)
+                    .map { service -> "${source.relativePath}: $service" }
+            }
+            .toList()
+
+        assertTrue(
+            forbiddenImports.isEmpty(),
+            "Assignment collaborators may depend only on explicit generic application policies: $forbiddenImports",
+        )
+    }
+
+    @Test
+    fun `material and schedule slices keep inward dependency direction`() {
+        val materialForbidden = kotlinSources()
+            .filter { it.packageName.startsWith("com.playsay.gateway.service.material") }
+            .flatMap { source ->
+                Regex("""^import com\.playsay\.gateway\.(controller|repo)(?:\.|$)""", RegexOption.MULTILINE)
+                    .findAll(source.text)
+                    .map { "${source.relativePath}: ${it.value}" }
+            }
+        val scheduleForbidden = kotlinSources()
+            .filter { it.packageName == "com.playsay.gateway.repo.schedule" }
+            .flatMap { source ->
+                Regex("""^import com\.playsay\.gateway\.(controller|service)(?:\.|$)""", RegexOption.MULTILINE)
+                    .findAll(source.text)
+                    .map { "${source.relativePath}: ${it.value}" }
+            }
+
+        assertTrue(
+            (materialForbidden + scheduleForbidden).none(),
+            "Material collaborators and schedule repositories must not depend on outward layers: " +
+                (materialForbidden + scheduleForbidden).toList(),
         )
     }
 
@@ -126,64 +118,6 @@ class BackendArchitectureTest {
     }
 
     @Test
-    fun `new service files stay below cleanup threshold`() {
-        val legacyOversizedServices = setOf(
-            "service/AssignmentStore.kt",
-            "service/LessonMaterialStore.kt",
-            "service/MaterialAiDraftService.kt",
-            "service/MaterialScoringService.kt",
-        )
-        val oversizedServices = kotlinSources()
-            .filter { source -> ".service" in source.packageName }
-            .filterNot { source -> source.relativePath in legacyOversizedServices }
-            .mapNotNull { source ->
-                val lineCount = source.text.lineSequence().count()
-                if (lineCount > 450) "${source.relativePath} has $lineCount lines" else null
-            }
-
-        assertTrue(
-            oversizedServices.isEmpty(),
-            "New services should be split before crossing 450 lines: $oversizedServices",
-        )
-    }
-
-    @Test
-    fun `controllers do not parse or serialize json directly`() {
-        val controllerJsonUsage = kotlinSources()
-            .filter { source -> ".controller" in source.packageName }
-            .filter { source ->
-                source.text.contains("ObjectMapper") ||
-                    source.text.contains(".readTree(") ||
-                    source.text.contains(".writeValueAsString(")
-            }
-            .map { source -> source.relativePath }
-
-        assertTrue(
-            controllerJsonUsage.isEmpty(),
-            "Controllers must delegate JSON parsing and serialization to services or codecs: $controllerJsonUsage",
-        )
-    }
-
-    @Test
-    fun `controllers do not inject persistence or internal provider clients`() {
-        val entityReference = Regex("""com\.playsay\.gateway\.entity\.|\b[A-Z]\w*Entity\b""")
-        val controllerLowLevelDependencies = kotlinSources()
-            .filter { source -> ".controller" in source.packageName }
-            .filter { source ->
-                source.text.contains("Repo") ||
-                    source.text.contains("Repository") ||
-                    entityReference.containsMatchIn(source.text.replace("ResponseEntity", "")) ||
-                    source.text.contains("ServiceClient")
-            }
-            .map { source -> source.relativePath }
-
-        assertTrue(
-            controllerLowLevelDependencies.isEmpty(),
-            "Controllers must depend on application services/stores, not persistence or internal provider clients: $controllerLowLevelDependencies",
-        )
-    }
-
-    @Test
     fun `controllers delegate business authorization failures to services`() {
         val controllerBusinessErrors = kotlinSources()
             .filter { source -> ".controller" in source.packageName }
@@ -194,6 +128,44 @@ class BackendArchitectureTest {
             controllerBusinessErrors.isEmpty(),
             "Controllers must delegate business authorization and error decisions to services: $controllerBusinessErrors",
         )
+    }
+
+    @Test
+    fun `controllers do not depend on remote clients`() {
+        val directClientImports = kotlinSources()
+            .filter { ".controller" in it.packageName }
+            .filter { Regex("""^import com\.playsay\.gateway\.client\.""", RegexOption.MULTILINE).containsMatchIn(it.text) }
+            .map { it.relativePath }
+
+        assertTrue(
+            directClientImports.isEmpty(),
+            "Controllers must delegate remote calls through application services: $directClientImports",
+        )
+    }
+
+    @Test
+    fun `controllers avoid persistence and nested domain slices stay acyclic`() {
+        val forbiddenControllerImports = kotlinSources()
+            .filter { ".controller" in it.packageName }
+            .flatMap { source ->
+                Regex("""^import com\.playsay\.gateway\.(repo|client)\.""", RegexOption.MULTILINE)
+                    .findAll(source.text)
+                    .map { "${source.relativePath}: ${it.value}" }
+            }
+            .toList()
+        val domainSources = kotlinSources().filter { it.packageName.startsWith("com.playsay.gateway.service.") }
+        val edges = domainSources.flatMap { source ->
+            val owner = source.packageName.removePrefix("com.playsay.gateway.service.").substringBefore('.')
+            Regex("""^import com\.playsay\.gateway\.service\.([a-z][A-Za-z0-9_]*)\.""", RegexOption.MULTILINE)
+                .findAll(source.text)
+                .map { it.groupValues[1] }
+                .filter { it != owner }
+                .map { target -> owner to target }
+        }.toSet()
+        val directCycles = edges.filter { (from, to) -> (to to from) in edges }
+
+        assertTrue(forbiddenControllerImports.isEmpty(), "Controllers must not import repositories or clients: $forbiddenControllerImports")
+        assertTrue(directCycles.isEmpty(), "Nested gateway domain slices must not form dependency cycles: $directCycles")
     }
 
     @Test
@@ -240,19 +212,6 @@ class BackendArchitectureTest {
     }
 
     @Test
-    fun `repositories are isolated in repo package`() {
-        val misplacedRepositories = kotlinSources()
-            .filter { source -> source.text.contains("JpaRepository<") }
-            .filterNot { source -> ".repo" in source.packageName }
-            .map { source -> source.relativePath }
-
-        assertTrue(
-            misplacedRepositories.isEmpty(),
-            "JpaRepository interfaces must live in com.playsay.gateway.repo: $misplacedRepositories",
-        )
-    }
-
-    @Test
     fun `jdbc client is not used in production code`() {
         val springJdbcType = "Jdbc" + "Client"
         val springJdbcSqlCall = "jdbc" + "Client.sql"
@@ -288,7 +247,9 @@ class BackendArchitectureTest {
         val expectedRepoFiles = setOf(
             "repo/UserRepos.kt",
             "repo/CourseRepos.kt",
-            "repo/ScheduleRepos.kt",
+            "repo/schedule/LessonRepo.kt",
+            "repo/schedule/LessonParticipantRepo.kt",
+            "repo/schedule/LessonEmailReminderRepo.kt",
             "repo/MaterialRepos.kt",
             "repo/AssignmentRepos.kt",
             "repo/CollaborationRepos.kt",
@@ -540,13 +501,4 @@ class BackendArchitectureTest {
         val packageName: String,
         val text: String,
     )
-
-    private fun Path.listEntries(): List<Path> {
-        val stream = Files.list(this)
-        return try {
-            stream.toList()
-        } finally {
-            stream.close()
-        }
-    }
 }

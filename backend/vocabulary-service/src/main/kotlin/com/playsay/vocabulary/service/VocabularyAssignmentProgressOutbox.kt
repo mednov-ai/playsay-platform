@@ -1,6 +1,8 @@
 package com.playsay.vocabulary.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.playsay.integration.delivery.IntegrationDeliveryState
+import com.playsay.integration.delivery.exponentialRetryDelay
 import com.playsay.vocabulary.entity.VocabularyIntegrationOutboxEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeSessionEntity
 import com.playsay.vocabulary.dto.SessionStatus
@@ -11,7 +13,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
@@ -67,17 +68,17 @@ class VocabularyAssignmentProgressOutbox(
             updatedAt = session.updatedAt,
         )
         outbox.save(
-            VocabularyIntegrationOutboxEntity(
-                id = eventId,
-                assignmentId = assignmentId,
-                sessionId = session.id,
-                sessionRevision = session.revision,
-                payload = objectMapper.writeValueAsString(payload),
-                status = PENDING,
-                nextAttemptAt = now,
-                createdAt = now,
-                updatedAt = now,
-            ),
+            VocabularyIntegrationOutboxEntity().apply {
+                id = eventId
+                this.assignmentId = assignmentId
+                this.sessionId = session.id
+                sessionRevision = session.revision
+                this.payload = objectMapper.writeValueAsString(payload)
+                status = PENDING
+                nextAttemptAt = now
+                createdAt = now
+                updatedAt = now
+            },
         )
     }
 
@@ -121,17 +122,14 @@ class VocabularyAssignmentProgressOutbox(
             val now = Instant.now()
             current.attemptCount += 1
             current.lastError = listOfNotNull(error::class.simpleName, error.message).joinToString(": ").take(240)
-            current.nextAttemptAt = now.plus(retryDelaySeconds(current.attemptCount), ChronoUnit.SECONDS)
+            current.nextAttemptAt = now.plus(exponentialRetryDelay(current.attemptCount))
             current.updatedAt = now
             outbox.save(current)
         }
     }
 
-    private fun retryDelaySeconds(attempt: Int): Long =
-        (10L * (1L shl attempt.coerceIn(0, 5))).coerceAtMost(300L)
-
     private companion object {
-        const val PENDING = "PENDING"
-        const val COMPLETED = "COMPLETED"
+        val PENDING = IntegrationDeliveryState.PENDING.persistedValue
+        val COMPLETED = IntegrationDeliveryState.COMPLETED.persistedValue
     }
 }

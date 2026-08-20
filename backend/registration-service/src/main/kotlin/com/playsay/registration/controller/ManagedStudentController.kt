@@ -1,12 +1,12 @@
 package com.playsay.registration.controller
 
-import com.playsay.registration.dto.ConsumeStudentInviteRequest
-import com.playsay.registration.dto.ConsumeStudentInviteResponse
-import com.playsay.registration.dto.ManagedStudentInviteLookupResponse
-import com.playsay.registration.dto.ManagedStudentInviteRequest
-import com.playsay.registration.dto.ManagedStudentInviteResponse
-import com.playsay.registration.dto.ManagedStudentRequest
-import com.playsay.registration.dto.ManagedStudentResponse
+import com.playsay.contract.registration.model.ManagedStudentInviteLookupResponse
+import com.playsay.contract.registration.model.ManagedStudentInviteRequest
+import com.playsay.contract.registration.model.ManagedStudentInviteResponse
+import com.playsay.contract.registration.model.ManagedStudentRequest
+import com.playsay.contract.registration.model.ManagedStudentResponse
+import com.playsay.contract.registration.model.StudentInviteConsumeRequest
+import com.playsay.contract.registration.model.StudentInviteConsumeResponse
 import com.playsay.registration.service.ManagedStudentCommand
 import com.playsay.registration.service.ManagedStudentInviteCommand
 import com.playsay.registration.service.ManagedStudentRegistrationService
@@ -76,7 +76,7 @@ class ManagedStudentController(
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
     fun lookupManagedStudentInvite(
-        @Valid @RequestBody request: ConsumeStudentInviteRequest,
+        @Valid @RequestBody request: StudentInviteConsumeRequest,
         servletRequest: HttpServletRequest,
     ): ManagedStudentInviteLookupResponse {
         val result = registrationService.lookupManagedStudentInvite(
@@ -100,14 +100,14 @@ class ManagedStudentController(
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
     fun consumeStudentInvite(
-        @Valid @RequestBody request: ConsumeStudentInviteRequest,
+        @Valid @RequestBody request: StudentInviteConsumeRequest,
         servletRequest: HttpServletRequest,
-    ): ConsumeStudentInviteResponse {
+    ): StudentInviteConsumeResponse {
         val result = registrationService.consumeManagedStudentInvite(
             request.token,
             clientIpResolver.resolve(servletRequest),
         )
-        return ConsumeStudentInviteResponse(
+        return StudentInviteConsumeResponse(
             accessToken = result.accessToken,
             refreshToken = result.refreshToken,
             idToken = result.idToken,

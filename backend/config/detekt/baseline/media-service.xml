@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LongMethod:MediaController.kt:MediaController$@PostMapping( "/internal/youtube/playback-sessions", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE], ) fun createPlaybackSession: YoutubePlaybackSessionResponse</ID>
+    <ID>LongMethod:YoutubeMetadataResolver.kt:YoutubeMetadataResolver$fun resolve: YoutubeResolvedVideo?</ID>
+    <ID>LongMethod:YoutubeVideoCacheService.kt:YoutubeVideoCacheService$private fun downloadAndStore: CachedYoutubeVideo</ID>
+  </CurrentIssues>
+</SmellBaseline>

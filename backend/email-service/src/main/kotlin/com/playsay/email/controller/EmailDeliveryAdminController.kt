@@ -1,8 +1,8 @@
 package com.playsay.email.controller
 
-import com.playsay.email.dto.EmailDeliveryDetailResponse
-import com.playsay.email.dto.EmailDeliveryPageResponse
-import com.playsay.email.dto.EmailDeliveryResendResponse
+import com.playsay.contract.email.model.EmailDeliveryDetailResponse
+import com.playsay.contract.email.model.EmailDeliveryPageResponse
+import com.playsay.contract.email.model.EmailDeliveryResendResponse
 import com.playsay.email.service.EmailDeliveryAdminService
 import com.playsay.email.service.EmailDeliveryNotFoundException
 import com.playsay.email.service.EmailDeliveryResendNotAllowedException

@@ -1,11 +1,11 @@
 package com.playsay.gateway
 
+import com.playsay.contract.registration.model.ManagedStudentInviteLookupResponse
+import com.playsay.contract.registration.model.ManagedStudentInviteRequest
+import com.playsay.contract.registration.model.ManagedStudentInviteResponse
+import com.playsay.contract.registration.model.ManagedStudentResponse
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
-import com.playsay.gateway.dto.ManagedStudentInviteRequest
-import com.playsay.gateway.dto.ManagedStudentInviteResponse
-import com.playsay.gateway.dto.ManagedStudentInviteLookupResponse
-import com.playsay.gateway.dto.ManagedStudentProvisionResponse
 import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.RegistrationResponse
 import com.playsay.gateway.dto.ResetPasswordRequest
@@ -13,7 +13,7 @@ import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
 import com.playsay.gateway.dto.StudentInviteConsumeRequest
 import com.playsay.gateway.dto.StudentInviteConsumeResponse
-import com.playsay.gateway.service.RegistrationGateway
+import com.playsay.gateway.client.RegistrationGateway
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -127,8 +127,8 @@ private class AnonymousRegistrationGateway : RegistrationGateway {
     override fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse =
         RegistrationResponse(status = "PASSWORD_RESET")
 
-    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentProvisionResponse =
-        ManagedStudentProvisionResponse(
+    override fun createManagedStudent(request: ManagedStudentRequest): ManagedStudentResponse =
+        ManagedStudentResponse(
             subject = "student-subject",
             username = request.username,
             email = request.email,

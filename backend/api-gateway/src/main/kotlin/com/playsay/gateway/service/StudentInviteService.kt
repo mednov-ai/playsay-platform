@@ -1,10 +1,11 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.RegistrationGateway
 
 import com.playsay.gateway.dto.StudentInviteConsumeRequest
 import com.playsay.gateway.dto.StudentInviteConsumeResponse
 import com.playsay.gateway.error.ProjectResponseException
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Clock
 import java.time.Instant

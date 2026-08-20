@@ -1,11 +1,15 @@
 package com.playsay.payment.mapper
 
-import com.playsay.payment.dto.CreatePaymentInvoiceRequest
-import com.playsay.payment.dto.PaymentAttemptResponse
-import com.playsay.payment.dto.PaymentCheckoutResponse
-import com.playsay.payment.dto.PaymentInvoiceDetailResponse
-import com.playsay.payment.dto.PaymentInvoiceResponse
-import com.playsay.payment.dto.PaymentProviderEventResponse
+import com.playsay.contract.payment.model.CreatePaymentInvoiceRequest
+import com.playsay.contract.payment.model.PaymentAttemptResponse
+import com.playsay.contract.payment.model.PaymentAttemptStatus as ContractPaymentAttemptStatus
+import com.playsay.contract.payment.model.PaymentCheckoutResponse
+import com.playsay.contract.payment.model.PaymentInvoiceDetailResponse
+import com.playsay.contract.payment.model.PaymentInvoiceResponse
+import com.playsay.contract.payment.model.PaymentInvoiceStatus as ContractPaymentInvoiceStatus
+import com.playsay.contract.payment.model.PaymentProvider as ContractPaymentProvider
+import com.playsay.contract.payment.model.PaymentProviderEventResponse
+import com.playsay.contract.payment.model.PaymentProviderEventStatus as ContractPaymentProviderEventStatus
 import com.playsay.payment.service.CreatePaymentInvoiceCommand
 import com.playsay.payment.service.PaymentAttempt
 import com.playsay.payment.service.PaymentCheckoutResult
@@ -30,7 +34,7 @@ fun PaymentInvoice.toResponse(): PaymentInvoiceResponse =
     PaymentInvoiceResponse(
         id = id,
         number = number,
-        status = status,
+        status = ContractPaymentInvoiceStatus.valueOf(status.name),
         amountMinor = amountMinor,
         currency = currency,
         description = description,
@@ -56,9 +60,9 @@ fun PaymentAttempt.toResponse(): PaymentAttemptResponse =
     PaymentAttemptResponse(
         id = id,
         invoiceId = invoiceId,
-        provider = provider,
+        provider = ContractPaymentProvider.valueOf(provider.name),
         providerPaymentId = providerPaymentId,
-        status = status,
+        status = ContractPaymentAttemptStatus.valueOf(status.name),
         confirmationUrl = confirmationUrl,
         amountMinor = amountMinor,
         currency = currency,
@@ -76,10 +80,10 @@ fun PaymentCheckoutResult.toResponse(): PaymentCheckoutResponse =
 fun PaymentProviderEvent.toResponse(): PaymentProviderEventResponse =
     PaymentProviderEventResponse(
         id = id,
-        provider = provider,
+        provider = ContractPaymentProvider.valueOf(provider.name),
         eventType = eventType,
         providerPaymentId = providerPaymentId,
-        status = status,
+        status = ContractPaymentProviderEventStatus.valueOf(status.name),
         receivedAt = receivedAt,
         processedAt = processedAt,
     )

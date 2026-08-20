@@ -1,0 +1,23 @@
+config:
+  validation: true
+  warningsAsErrors: true
+
+complexity:
+  CognitiveComplexMethod:
+    active: true
+    allowedComplexity: 15
+  CyclomaticComplexMethod:
+    active: true
+    allowedComplexity: 15
+  LargeClass:
+    active: true
+    allowedLines: 450
+  LongMethod:
+    active: true
+    allowedLines: 60
+  LongParameterList:
+    active: true
+    allowedFunctionParameters: 8
+    allowedConstructorParameters: 8
+    ignoreDefaultParameters: false
+    ignoreDataClasses: true

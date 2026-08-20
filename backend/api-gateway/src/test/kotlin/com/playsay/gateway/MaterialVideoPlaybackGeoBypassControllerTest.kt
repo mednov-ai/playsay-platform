@@ -10,7 +10,7 @@ import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
-import com.playsay.gateway.service.YoutubeMediaClient
+import com.playsay.gateway.client.YoutubeMediaClient
 import com.playsay.gateway.service.UserProfileStore
 import java.util.UUID
 import javax.sql.DataSource

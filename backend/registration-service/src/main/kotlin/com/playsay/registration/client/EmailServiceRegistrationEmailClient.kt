@@ -1,13 +1,15 @@
 package com.playsay.registration.client
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.playsay.contract.email.model.TransactionalEmailRequest
+import com.playsay.integration.http.InternalHttpFailure
+import com.playsay.integration.http.InternalHttpMethod
+import com.playsay.integration.http.InternalHttpResponse
+import com.playsay.integration.http.InternalHttpTransport
 import com.playsay.registration.service.PasswordResetEmailCommand
 import com.playsay.registration.service.RegistrationEmailClient
 import com.playsay.registration.service.RegistrationEmailCommand
-import java.net.URI
 import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 
 class EmailServiceRegistrationEmailClient(
     private val httpClient: HttpClient,
@@ -15,51 +17,59 @@ class EmailServiceRegistrationEmailClient(
     private val emailServiceBaseUrl: String,
     private val serviceToken: String,
 ) : RegistrationEmailClient {
+    private val transport = InternalHttpTransport(
+        integration = "email-service",
+        baseUrl = emailServiceBaseUrl,
+        serviceTokenHeader = "X-PlaySay-Email-Service-Token",
+        serviceToken = serviceToken,
+        httpClient = httpClient,
+    )
+
     override fun sendRegistrationConfirmation(command: RegistrationEmailCommand) {
-        val payload = mapOf(
-            "to" to command.to,
-            "templateKey" to "registration-confirmation",
-            "locale" to command.locale,
-            "idempotencyKey" to command.idempotencyKey,
-            "replayUntil" to command.replayUntil.toString(),
-            "model" to mapOf(
+        val payload = TransactionalEmailRequest(
+            to = command.to,
+            templateKey = "registration-confirmation",
+            locale = command.locale,
+            idempotencyKey = command.idempotencyKey,
+            replayUntil = command.replayUntil,
+            model = mapOf(
                 "displayName" to command.displayName,
                 "confirmationUrl" to command.confirmationUrl,
             ),
         )
-        val request = HttpRequest.newBuilder(URI.create("${emailServiceBaseUrl.trimEnd('/')}/internal/emails/transactional"))
-            .header("content-type", "application/json")
-            .header("X-PlaySay-Email-Service-Token", serviceToken)
-            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-            .build()
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.discarding())
-        if (response.statusCode() !in 200..299) {
-            error("email-service returned HTTP ${response.statusCode()}")
-        }
+        send(payload)
     }
 
     override fun sendPasswordResetCode(command: PasswordResetEmailCommand) {
-        val payload = mapOf(
-            "to" to command.to,
-            "templateKey" to "password-reset-code",
-            "locale" to command.locale,
-            "idempotencyKey" to command.idempotencyKey,
-            "replayUntil" to command.replayUntil.toString(),
-            "model" to mapOf(
+        val payload = TransactionalEmailRequest(
+            to = command.to,
+            templateKey = "password-reset-code",
+            locale = command.locale,
+            idempotencyKey = command.idempotencyKey,
+            replayUntil = command.replayUntil,
+            model = mapOf(
                 "displayName" to command.displayName,
                 "code" to command.code,
                 "expiresMinutes" to command.expiresMinutes.toString(),
                 "resetUrl" to command.resetUrl,
             ),
         )
-        val request = HttpRequest.newBuilder(URI.create("${emailServiceBaseUrl.trimEnd('/')}/internal/emails/transactional"))
-            .header("content-type", "application/json")
-            .header("X-PlaySay-Email-Service-Token", serviceToken)
-            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-            .build()
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.discarding())
-        if (response.statusCode() !in 200..299) {
-            error("email-service returned HTTP ${response.statusCode()}")
+        send(payload)
+    }
+
+    private fun send(payload: TransactionalEmailRequest) {
+        when (
+            val result = transport.exchange(
+                method = InternalHttpMethod.POST,
+                path = "/internal/emails/transactional",
+                body = objectMapper.writeValueAsString(payload),
+                contentType = "application/json",
+            )
+        ) {
+            is InternalHttpResponse -> if (result.statusCode !in 200..299) {
+                error("email-service returned HTTP ${result.statusCode}")
+            }
+            is InternalHttpFailure -> error("email-service request failed: ${result::class.simpleName}")
         }
     }
 }

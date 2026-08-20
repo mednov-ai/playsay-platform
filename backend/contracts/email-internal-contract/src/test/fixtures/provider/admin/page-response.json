@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "id": "11111111-2222-3333-4444-555555555555",
+      "toEmail": "student@example.com",
+      "templateKey": "lesson-reminder",
+      "locale": "ru",
+      "subject": "Lesson reminder",
+      "status": "SENT",
+      "provider": "MAILJET",
+      "providerStatus": "accepted",
+      "providerDeliveryStatus": null,
+      "providerDestinationResponse": null,
+      "providerAttemptCount": 1,
+      "providerEventAt": null,
+      "providerCheckedAt": null,
+      "providerTrackingUntil": "2026-08-27T12:00:00Z",
+      "resendAllowed": false,
+      "resendReason": "DELIVERY_IN_PROGRESS",
+      "createdAt": "2026-08-20T12:00:00Z",
+      "updatedAt": "2026-08-20T12:01:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 25,
+  "totalElements": 1,
+  "totalPages": 1
+}

@@ -1,0 +1,18 @@
+{
+  "id": "11111111-2222-3333-4444-555555555555",
+  "number": "HS-2026-0001",
+  "status": "PAYMENT_PENDING",
+  "amountMinor": 125000,
+  "currency": "RUB",
+  "description": "Individual lesson package",
+  "studentUserId": null,
+  "payerName": "Parent",
+  "payerEmail": "parent@example.com",
+  "payerPhone": null,
+  "createdBySubject": "admin-1",
+  "dueAt": "2026-08-25T12:00:00Z",
+  "paidAt": null,
+  "canceledAt": null,
+  "createdAt": "2026-08-20T12:00:00Z",
+  "updatedAt": "2026-08-20T12:05:00Z"
+}

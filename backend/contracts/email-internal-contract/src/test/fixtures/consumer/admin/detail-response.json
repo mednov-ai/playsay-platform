@@ -1,0 +1,39 @@
+{
+  "delivery": {
+    "id": "11111111-2222-3333-4444-555555555555",
+    "toEmail": "student@example.com",
+    "templateKey": "lesson-reminder",
+    "locale": "ru",
+    "subject": "Lesson reminder",
+    "status": "FAILED",
+    "provider": "MAILJET",
+    "providerStatus": "error",
+    "providerDeliveryStatus": "BOUNCED",
+    "providerDestinationResponse": "mailbox unavailable",
+    "providerAttemptCount": 1,
+    "providerEventAt": "2026-08-20T12:02:00Z",
+    "providerCheckedAt": "2026-08-20T12:03:00Z",
+    "providerTrackingUntil": "2026-08-27T12:00:00Z",
+    "resendAllowed": true,
+    "resendReason": "FAILED",
+    "createdAt": "2026-08-20T12:00:00Z",
+    "updatedAt": "2026-08-20T12:03:00Z"
+  },
+  "attempts": [
+    {
+      "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "attemptNumber": 1,
+      "provider": "MAILJET",
+      "providerJobId": "job-1",
+      "providerStatus": "error",
+      "providerDeliveryStatus": "BOUNCED",
+      "providerDestinationResponse": "mailbox unavailable",
+      "providerEventAt": "2026-08-20T12:02:00Z",
+      "providerCheckedAt": "2026-08-20T12:03:00Z",
+      "trackingUntil": "2026-08-27T12:00:00Z",
+      "errorMessage": null,
+      "createdAt": "2026-08-20T12:00:00Z",
+      "updatedAt": "2026-08-20T12:03:00Z"
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.RegistrationGateway
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.playsay.gateway.dto.RegistrationRolesRequest
+import com.playsay.contract.registration.model.InternalUpdateRolesRequest
 import com.playsay.gateway.dto.UpdateUserRolesRequest
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.StudentProfileEntity
@@ -85,7 +86,7 @@ class UserManagementServiceTest {
         verify(studentProfileRepo).save(profile)
         verify(registrationGateway).updateRoles(
             student.keycloakSubject,
-            RegistrationRolesRequest(setOf(MetaData.Roles.TEACHER)),
+            InternalUpdateRolesRequest(setOf(MetaData.Roles.TEACHER)),
         )
     }
 

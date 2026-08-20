@@ -1,5 +1,7 @@
 package com.playsay.gateway.service
 
+import com.playsay.gateway.service.assignment.AssignmentStore
+
 import com.playsay.gateway.dto.VocabularyAssignmentProgressUpdateRequest
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData

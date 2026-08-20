@@ -1,0 +1,369 @@
+openapi: 3.0.3
+info:
+  title: Honey School Payment Service Boundary API
+  version: 0.1.0
+  description: >-
+    Service-owned contract for api-gateway admin invoice, public invoice,
+    checkout, and YooKassa webhook forwarding. The webhook request remains an
+    opaque raw JSON body; transport adapters must not parse and reserialize it.
+security:
+  - paymentServiceToken: []
+paths:
+  /internal/admin/payment-invoices:
+    post:
+      operationId: createPaymentInvoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentInvoiceRequest"
+      responses:
+        "201":
+          description: Invoice created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedPaymentInvoiceResponse"
+        "401":
+          description: Missing or invalid payment service token.
+    get:
+      operationId: listPaymentInvoices
+      responses:
+        "200":
+          description: Invoices returned in the provider's current ordering.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentInvoiceResponse"
+        "401":
+          description: Missing or invalid payment service token.
+  /internal/admin/payment-invoices/{invoiceId}:
+    get:
+      operationId: getAdminPaymentInvoice
+      parameters:
+        - $ref: "#/components/parameters/InvoiceId"
+      responses:
+        "200":
+          description: Invoice and payment attempts returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInvoiceDetailResponse"
+        "401":
+          description: Missing or invalid payment service token.
+        "404":
+          description: Invoice not found.
+  /internal/admin/payment-invoices/{invoiceId}/cancel:
+    post:
+      operationId: cancelPaymentInvoice
+      parameters:
+        - $ref: "#/components/parameters/InvoiceId"
+      responses:
+        "200":
+          description: Canceled invoice returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInvoiceResponse"
+        "401":
+          description: Missing or invalid payment service token.
+        "404":
+          description: Invoice not found.
+  /internal/public/payment-invoices/{publicToken}:
+    get:
+      operationId: getPublicPaymentInvoice
+      parameters:
+        - $ref: "#/components/parameters/PublicToken"
+      responses:
+        "200":
+          description: Invoice returned for the gateway public facade.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInvoiceResponse"
+        "401":
+          description: Missing or invalid payment service token.
+        "404":
+          description: Invoice not found.
+  /internal/public/payment-invoices/{publicToken}/checkout:
+    post:
+      operationId: createPaymentCheckout
+      parameters:
+        - $ref: "#/components/parameters/PublicToken"
+      responses:
+        "200":
+          description: Checkout payment attempt created or reused.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentCheckoutResponse"
+        "401":
+          description: Missing or invalid payment service token.
+        "404":
+          description: Invoice not found.
+  /internal/payment-webhooks/yookassa:
+    post:
+      operationId: processYooKassaPaymentWebhook
+      description: >-
+        The gateway forwards the original UTF-8 request body byte-for-byte.
+        This object schema documents only that the existing payload is JSON;
+        it must not be used to generate a typed or normalized request model.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Provider event processing result returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentProviderEventResponse"
+        "401":
+          description: Missing or invalid payment service token.
+components:
+  securitySchemes:
+    paymentServiceToken:
+      type: apiKey
+      in: header
+      name: X-PlaySay-Payment-Service-Token
+  parameters:
+    InvoiceId:
+      name: invoiceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PublicToken:
+      name: publicToken
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    CreatePaymentInvoiceRequest:
+      type: object
+      required:
+        - amountMinor
+        - currency
+        - description
+        - createdBySubject
+        - studentUserId
+        - payerName
+        - payerEmail
+        - payerPhone
+        - dueAt
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        description:
+          type: string
+        createdBySubject:
+          type: string
+        studentUserId:
+          type: string
+          format: uuid
+          nullable: true
+        payerName:
+          type: string
+          nullable: true
+        payerEmail:
+          type: string
+          nullable: true
+        payerPhone:
+          type: string
+          nullable: true
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreatedPaymentInvoiceResponse:
+      type: object
+      required: [invoice, publicUrlToken]
+      properties:
+        invoice:
+          $ref: "#/components/schemas/PaymentInvoiceResponse"
+        publicUrlToken:
+          type: string
+    PaymentInvoiceDetailResponse:
+      type: object
+      required: [invoice, paymentAttempts]
+      properties:
+        invoice:
+          $ref: "#/components/schemas/PaymentInvoiceResponse"
+        paymentAttempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentAttemptResponse"
+    PaymentInvoiceResponse:
+      type: object
+      required:
+        - id
+        - number
+        - status
+        - amountMinor
+        - currency
+        - description
+        - studentUserId
+        - payerName
+        - payerEmail
+        - payerPhone
+        - createdBySubject
+        - dueAt
+        - paidAt
+        - canceledAt
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+        status:
+          $ref: "#/components/schemas/PaymentInvoiceStatus"
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        description:
+          type: string
+        studentUserId:
+          type: string
+          format: uuid
+          nullable: true
+        payerName:
+          type: string
+          nullable: true
+        payerEmail:
+          type: string
+          nullable: true
+        payerPhone:
+          type: string
+          nullable: true
+        createdBySubject:
+          type: string
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        canceledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PaymentAttemptResponse:
+      type: object
+      required:
+        - id
+        - invoiceId
+        - provider
+        - providerPaymentId
+        - status
+        - confirmationUrl
+        - amountMinor
+        - currency
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        provider:
+          $ref: "#/components/schemas/PaymentProvider"
+        providerPaymentId:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/PaymentAttemptStatus"
+        confirmationUrl:
+          type: string
+          nullable: true
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PaymentCheckoutResponse:
+      type: object
+      required: [invoiceId, paymentAttemptId, confirmationUrl]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        paymentAttemptId:
+          type: string
+          format: uuid
+        confirmationUrl:
+          type: string
+    PaymentProviderEventResponse:
+      type: object
+      required:
+        - id
+        - provider
+        - eventType
+        - providerPaymentId
+        - status
+        - receivedAt
+        - processedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          $ref: "#/components/schemas/PaymentProvider"
+        eventType:
+          type: string
+        providerPaymentId:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/PaymentProviderEventStatus"
+        receivedAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: string
+          format: date-time
+          nullable: true
+    PaymentInvoiceStatus:
+      type: string
+      enum: [OPEN, PAYMENT_PENDING, PAID, EXPIRED, CANCELED, REFUNDED]
+    PaymentAttemptStatus:
+      type: string
+      enum: [CREATED, WAITING_FOR_CONFIRMATION, SUCCEEDED, CANCELED, FAILED]
+    PaymentProvider:
+      type: string
+      enum: [YOOKASSA, ROBOKASSA]
+    PaymentProviderEventStatus:
+      type: string
+      enum: [PROCESSED, DUPLICATE, IGNORED, FAILED]

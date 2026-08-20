@@ -7,8 +7,8 @@ import com.playsay.gateway.entity.TeacherDelegationStudentEntity
 import com.playsay.gateway.entity.UserManagementAuditEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.repo.TeacherDelegationStudentRepo
 import com.playsay.gateway.repo.UserManagementAuditRepo

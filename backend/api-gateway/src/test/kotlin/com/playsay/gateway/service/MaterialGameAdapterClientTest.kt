@@ -1,4 +1,6 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.GameAdapterClientException
+import com.playsay.gateway.client.MaterialGameAdapterClient
 
 import com.playsay.gateway.utils.MetaData
 import com.sun.net.httpserver.HttpServer

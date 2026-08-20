@@ -1,4 +1,5 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.PaymentServiceClient
 
 import com.playsay.gateway.dto.PaymentInvoiceCreateRequest
 import com.playsay.gateway.dto.PaymentInvoiceCreatedResponse

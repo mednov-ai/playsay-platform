@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LongMethod:ManagedStudentRegistrationService.kt:ManagedStudentRegistrationService$@Transactional fun createManagedStudent: ManagedStudentResult</ID>
+    <ID>LongMethod:RegistrationService.kt:RegistrationService$@Transactional fun start: RegistrationResult</ID>
+  </CurrentIssues>
+</SmellBaseline>

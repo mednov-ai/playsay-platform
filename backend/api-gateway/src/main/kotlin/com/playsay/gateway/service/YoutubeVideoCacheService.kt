@@ -3,6 +3,7 @@ package com.playsay.gateway.service
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.playsay.contract.media.model.YoutubeVideoCacheResponse
 import com.playsay.gateway.entity.YoutubeVideoCacheEntity
 import com.playsay.gateway.entity.YoutubeVideoCacheReferenceEntity
 import com.playsay.gateway.repo.YoutubeVideoCacheReferenceRepo
@@ -112,12 +113,12 @@ class YoutubeVideoCacheService(
     }
 
     @Transactional
-    fun markReady(cacheId: UUID, result: YoutubeVideoCacheResult) {
+    fun markReady(cacheId: UUID, result: YoutubeVideoCacheResponse) {
         val cache = cacheRepo.findById(cacheId).orElse(null) ?: return
         val now = clock.instant()
         cache.status = YoutubeVideoCacheStatuses.READY
         cache.storageKey = result.storageKey
-        cache.selectedQuality = result.selectedQuality
+        cache.selectedQuality = result.selectedQuality.value
         cache.selectedHeight = result.selectedHeight
         cache.contentType = result.contentType
         cache.byteSize = result.byteSize

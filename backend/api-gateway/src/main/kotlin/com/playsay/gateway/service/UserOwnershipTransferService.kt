@@ -5,8 +5,8 @@ import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.CourseRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
-import com.playsay.gateway.repo.LessonParticipantRepo
-import com.playsay.gateway.repo.LessonRepo
+import com.playsay.gateway.repo.schedule.LessonParticipantRepo
+import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.repo.TeacherProfileRepo

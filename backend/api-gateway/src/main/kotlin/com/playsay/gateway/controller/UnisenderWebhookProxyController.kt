@@ -1,6 +1,6 @@
 package com.playsay.gateway.controller
 
-import com.playsay.gateway.service.EmailDeliveryAdminGateway
+import com.playsay.gateway.service.EmailDeliveryAdminService
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 class UnisenderWebhookProxyController(
-    private val gateway: EmailDeliveryAdminGateway,
+    private val gateway: EmailDeliveryAdminService,
 ) {
     @GetMapping("/webhooks/unisender")
     @ResponseStatus(org.springframework.http.HttpStatus.OK)

@@ -1,4 +1,7 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.MaterialGameAdapterClient
+import com.playsay.gateway.client.GameAdapterClientException
+import com.playsay.gateway.client.GameAdapterResult
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper

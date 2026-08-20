@@ -1,11 +1,11 @@
 package com.playsay.payment.controller
 
-import com.playsay.payment.dto.CreatePaymentInvoiceRequest
-import com.playsay.payment.dto.CreatedPaymentInvoiceResponse
-import com.playsay.payment.dto.PaymentCheckoutResponse
-import com.playsay.payment.dto.PaymentInvoiceDetailResponse
-import com.playsay.payment.dto.PaymentInvoiceResponse
-import com.playsay.payment.dto.PaymentProviderEventResponse
+import com.playsay.contract.payment.model.CreatePaymentInvoiceRequest
+import com.playsay.contract.payment.model.CreatedPaymentInvoiceResponse
+import com.playsay.contract.payment.model.PaymentCheckoutResponse
+import com.playsay.contract.payment.model.PaymentInvoiceDetailResponse
+import com.playsay.contract.payment.model.PaymentInvoiceResponse
+import com.playsay.contract.payment.model.PaymentProviderEventResponse
 import com.playsay.payment.mapper.toCommand
 import com.playsay.payment.mapper.toResponse
 import com.playsay.payment.service.PaymentInvoiceOperations

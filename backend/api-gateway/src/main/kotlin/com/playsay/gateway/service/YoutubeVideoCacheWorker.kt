@@ -1,5 +1,9 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.YoutubeMediaClient
+import com.playsay.gateway.client.YoutubeVideoCacheRejectedException
 
+import com.playsay.contract.media.model.YoutubePlaybackQuality
+import com.playsay.contract.media.model.YoutubeVideoCacheRequest
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.utils.MetaData
 import io.micrometer.core.instrument.MeterRegistry
@@ -149,9 +153,9 @@ class YoutubeVideoCacheWorker(
 
         val result = try {
             mediaClient.cacheVideo(
-                YoutubeVideoCacheCommand(
+                YoutubeVideoCacheRequest(
                     videoId = work.videoId,
-                    requestedQuality = work.quality,
+                    requestedQuality = YoutubePlaybackQuality.decodeOrNull(work.quality),
                 ),
             )
         } catch (rejected: YoutubeVideoCacheRejectedException) {

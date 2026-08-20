@@ -1,4 +1,5 @@
 package com.playsay.gateway.service
+import com.playsay.gateway.client.RegistrationGateway
 
 import com.playsay.gateway.client.UserDataPurgeClient
 import com.playsay.gateway.repo.AppUserRepo

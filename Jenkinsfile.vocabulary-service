@@ -160,7 +160,7 @@ spec:
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :vocabulary-service:test :vocabulary-service:bootJar --no-daemon --stacktrace --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :vocabulary-service:detektMain :vocabulary-service:test :vocabulary-service:bootJar --no-daemon --stacktrace --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process'
           }
         }
       }

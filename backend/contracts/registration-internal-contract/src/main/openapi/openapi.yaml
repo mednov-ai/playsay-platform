@@ -1,0 +1,659 @@
+openapi: 3.0.3
+info:
+  title: Honey School Registration Service Boundary API
+  version: 0.1.0
+  description: >-
+    Service-owned wire contract used by api-gateway. It documents the existing
+    password-registration, managed-student, invite-authentication, and internal
+    user-management exchanges without changing the public facade API.
+tags:
+  - name: Password registration
+  - name: Managed students
+  - name: Invite authentication
+  - name: Internal user management
+paths:
+  /api/registration/start:
+    post:
+      tags: [Password registration]
+      operationId: startRegistration
+      parameters:
+        - $ref: "#/components/parameters/ForwardedFor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRegistrationRequest"
+      responses:
+        "202":
+          description: Registration accepted and a generic check-email result returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid registration payload.
+        "429":
+          description: Registration rate limit exceeded.
+  /api/registration/resend:
+    post:
+      tags: [Password registration]
+      operationId: resendRegistration
+      parameters:
+        - $ref: "#/components/parameters/ForwardedFor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendRegistrationRequest"
+      responses:
+        "202":
+          description: Resend accepted and a generic check-email result returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid resend payload.
+        "429":
+          description: Registration rate limit exceeded.
+  /api/registration/confirm:
+    post:
+      tags: [Password registration]
+      operationId: confirmRegistration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmRegistrationRequest"
+      responses:
+        "200":
+          description: Registration confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid or expired confirmation token.
+  /api/registration/forgot-password:
+    post:
+      tags: [Password registration]
+      operationId: forgotPassword
+      parameters:
+        - $ref: "#/components/parameters/ForwardedFor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "202":
+          description: Password reset request accepted with a generic result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid password reset payload.
+        "429":
+          description: Password reset rate limit exceeded.
+  /api/registration/reset-password:
+    post:
+      tags: [Password registration]
+      operationId: resetPassword
+      parameters:
+        - $ref: "#/components/parameters/ForwardedFor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationResponse"
+        "400":
+          description: Invalid or expired code, or invalid password.
+  /api/internal/managed-students:
+    post:
+      tags: [Managed students]
+      operationId: createManagedStudent
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManagedStudentRequest"
+      responses:
+        "201":
+          description: Managed student provisioned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedStudentResponse"
+        "400":
+          description: Invalid managed-student payload.
+        "401":
+          description: Missing or invalid service token.
+        "409":
+          description: Username or email is already occupied.
+        "503":
+          description: Internal service-token authentication is not configured.
+  /api/internal/managed-student-invites:
+    post:
+      tags: [Invite authentication]
+      operationId: createManagedStudentInvite
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManagedStudentInviteRequest"
+      responses:
+        "201":
+          description: One-time invite created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedStudentInviteResponse"
+        "400":
+          description: Invalid invite payload.
+        "401":
+          description: Missing or invalid service token.
+        "503":
+          description: Internal service-token authentication is not configured.
+  /api/internal/managed-student-invites/lookup:
+    post:
+      tags: [Invite authentication]
+      operationId: lookupManagedStudentInvite
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: "#/components/parameters/ForwardedFor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentInviteConsumeRequest"
+      responses:
+        "200":
+          description: Pending invite metadata returned without consuming the invite.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagedStudentInviteLookupResponse"
+        "400":
+          description: Invalid, expired, or consumed invite.
+        "401":
+          description: Missing or invalid service token.
+        "503":
+          description: Internal service-token authentication is not configured.
+  /api/student-invites/consume:
+    post:
+      tags: [Invite authentication]
+      operationId: consumeManagedStudentInvite
+      parameters:
+        - $ref: "#/components/parameters/ForwardedFor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentInviteConsumeRequest"
+      responses:
+        "200":
+          description: Invite exchanged for the existing Keycloak token-set wire shape.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentInviteConsumeResponse"
+        "400":
+          description: Invalid, expired, or already consumed invite.
+  /api/internal/user-management/users/exact:
+    get:
+      tags: [Internal user management]
+      operationId: findExactUser
+      security:
+        - serviceToken: []
+      parameters:
+        - name: identifier
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Exact identity returned. An empty body is also treated as not found by the current consumer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalUserIdentityResponse"
+        "404":
+          description: No exact identity exists.
+        "401":
+          description: Missing or invalid service token.
+        "503":
+          description: Internal service-token authentication is not configured.
+  /api/internal/user-management/users:
+    post:
+      tags: [Internal user management]
+      operationId: createInternalUser
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalCreateUserRequest"
+      responses:
+        "201":
+          description: User identity created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalUserIdentityResponse"
+        "400":
+          description: Invalid user payload.
+        "401":
+          description: Missing or invalid service token.
+        "409":
+          description: User identity already exists.
+        "503":
+          description: Internal service-token authentication is not configured.
+  /api/internal/user-management/users/{subject}/roles:
+    put:
+      tags: [Internal user management]
+      operationId: updateInternalUserRoles
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: "#/components/parameters/Subject"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalUpdateRolesRequest"
+      responses:
+        "200":
+          description: Updated user identity returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalUserIdentityResponse"
+        "400":
+          description: Invalid role payload.
+        "401":
+          description: Missing or invalid service token.
+        "404":
+          description: User identity not found.
+        "503":
+          description: Internal service-token authentication is not configured.
+  /api/internal/user-management/users/{subject}:
+    delete:
+      tags: [Internal user management]
+      operationId: deleteInternalUser
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: "#/components/parameters/Subject"
+      responses:
+        "204":
+          description: User identity deleted; no response body is returned.
+        "401":
+          description: Missing or invalid service token.
+        "404":
+          description: User identity not found.
+        "503":
+          description: Internal service-token authentication is not configured.
+components:
+  securitySchemes:
+    serviceToken:
+      type: apiKey
+      in: header
+      name: X-PlaySay-Service-Token
+      description: Existing service-to-service token required for every /api/internal route.
+  parameters:
+    ForwardedFor:
+      name: X-Forwarded-For
+      in: header
+      required: false
+      schema:
+        type: string
+    Subject:
+      name: subject
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 255
+  schemas:
+    StartRegistrationRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        displayName:
+          type: string
+          nullable: true
+          maxLength: 120
+        locale:
+          type: string
+          nullable: true
+          maxLength: 16
+        returnTo:
+          type: string
+          nullable: true
+          maxLength: 1024
+    ResendRegistrationRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        locale:
+          type: string
+          nullable: true
+          maxLength: 16
+        returnTo:
+          type: string
+          nullable: true
+          maxLength: 1024
+    ConfirmRegistrationRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 255
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        locale:
+          type: string
+          nullable: true
+          maxLength: 16
+        returnTo:
+          type: string
+          nullable: true
+          maxLength: 1024
+    ResetPasswordRequest:
+      type: object
+      required: [email, code, newPassword]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        code:
+          type: string
+          minLength: 6
+          maxLength: 12
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 128
+    RegistrationResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+        continueUrl:
+          type: string
+          nullable: true
+    ManagedStudentRequest:
+      type: object
+      required: [username, firstName]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          pattern: "^[A-Za-z0-9._-]+$"
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.NotBlank"
+            - "@field:jakarta.validation.constraints.Size(min = 3, max = 64)"
+            - "@field:jakarta.validation.constraints.Pattern(regexp = \"^[A-Za-z0-9._-]+$\")"
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 120
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.NotBlank"
+            - "@field:jakarta.validation.constraints.Size(max = 120)"
+        lastName:
+          type: string
+          nullable: true
+          maxLength: 120
+          x-field-extra-annotation: "@field:jakarta.validation.constraints.Size(max = 120)"
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 320
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.Email"
+            - "@field:jakarta.validation.constraints.Size(max = 320)"
+    ManagedStudentResponse:
+      type: object
+      required: [subject, username, email, firstName, lastName, displayName]
+      properties:
+        subject:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        firstName:
+          type: string
+        lastName:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+    ManagedStudentInviteRequest:
+      type: object
+      required: [subject, username, lessonId, continueUrl]
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 255
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.NotBlank"
+            - "@field:jakarta.validation.constraints.Size(max = 255)"
+        username:
+          type: string
+          minLength: 1
+          maxLength: 320
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.NotBlank"
+            - "@field:jakarta.validation.constraints.Size(max = 320)"
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 320
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.Email"
+            - "@field:jakarta.validation.constraints.Size(max = 320)"
+        displayName:
+          type: string
+          nullable: true
+          maxLength: 120
+          x-field-extra-annotation: "@field:jakarta.validation.constraints.Size(max = 120)"
+        lessonId:
+          type: string
+          format: uuid
+        continueUrl:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.NotBlank"
+            - "@field:jakarta.validation.constraints.Size(max = 1024)"
+    ManagedStudentInviteResponse:
+      type: object
+      required: [token, expiresAt]
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    ManagedStudentInviteLookupResponse:
+      type: object
+      required: [subject, username, email, displayName, lessonId, continueUrl, expiresAt]
+      properties:
+        subject:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+        lessonId:
+          type: string
+          format: uuid
+        continueUrl:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    StudentInviteConsumeRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Existing field name retained for compatibility; current invite codes are shorter.
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.NotBlank"
+            - "@field:jakarta.validation.constraints.Size(max = 255)"
+    StudentInviteConsumeResponse:
+      type: object
+      required: [accessToken, refreshToken, idToken, expiresIn, continueUrl]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+          nullable: true
+        idToken:
+          type: string
+          nullable: true
+        expiresIn:
+          type: integer
+          format: int64
+        continueUrl:
+          type: string
+    InternalCreateUserRequest:
+      type: object
+      required: [username, firstName, roles]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          pattern: "^[A-Za-z0-9._-]+$"
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.NotBlank"
+            - "@field:jakarta.validation.constraints.Size(min = 3, max = 64)"
+            - "@field:jakarta.validation.constraints.Pattern(regexp = \"^[A-Za-z0-9._-]+$\")"
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 120
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.NotBlank"
+            - "@field:jakarta.validation.constraints.Size(max = 120)"
+        lastName:
+          type: string
+          nullable: true
+          maxLength: 120
+          x-field-extra-annotation: "@field:jakarta.validation.constraints.Size(max = 120)"
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 320
+          x-field-extra-annotation:
+            - "@field:jakarta.validation.constraints.Email"
+            - "@field:jakarta.validation.constraints.Size(max = 320)"
+        roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        managedStudent:
+          type: boolean
+          default: false
+          x-field-extra-annotation: "@field:jakarta.validation.constraints.NotNull"
+    InternalUpdateRolesRequest:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    InternalUserIdentityResponse:
+      type: object
+      required: [subject, username, email, displayName, roles, enabled]
+      properties:
+        subject:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+        roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        enabled:
+          type: boolean

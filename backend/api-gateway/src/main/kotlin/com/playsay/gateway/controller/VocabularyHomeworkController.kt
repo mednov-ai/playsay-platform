@@ -3,8 +3,8 @@ package com.playsay.gateway.controller
 import com.playsay.gateway.dto.StudentVocabularyAssignmentDetailResponse
 import com.playsay.gateway.dto.TeacherAssignmentDetailResponse
 import com.playsay.gateway.dto.VocabularyHomeworkRequest
-import com.playsay.gateway.service.AssignmentStore
-import com.playsay.gateway.service.VocabularyAssignmentOutboxProcessor
+import com.playsay.gateway.service.assignment.AssignmentStore
+import com.playsay.gateway.service.assignment.VocabularyAssignmentOutboxProcessor
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag

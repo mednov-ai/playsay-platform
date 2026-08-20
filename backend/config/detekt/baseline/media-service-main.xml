@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LongMethod:MediaController.kt:MediaController$@PostMapping( "/internal/youtube/playback-sessions", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE], ) fun createPlaybackSession( @RequestHeader("X-PlaySay-Media-Service-Token", required = false) serviceToken: String?, @RequestBody request: YoutubePlaybackSessionRequest, ): YoutubePlaybackSessionResponse</ID>
+    <ID>LongMethod:YoutubeMetadataResolver.kt:YoutubeMetadataResolver$fun resolve(videoId: String): YoutubeResolvedVideo?</ID>
+    <ID>LongMethod:YoutubeVideoCacheService.kt:YoutubeVideoCacheService$private fun downloadAndStore( videoId: String, requestedQuality: YoutubePlaybackQuality, storageKey: String, ): CachedYoutubeVideo</ID>
+    <ID>LongParameterList:YoutubeMediaTypes.kt:YoutubePlaybackSessionStore$( subject: String, materialId: UUID, blockId: String, videoId: String, upstreamUrl: String?, requestedQuality: YoutubePlaybackQuality, selectedQuality: YoutubePlaybackQuality, selectedHeight: Int?, ttlSeconds: Long, cacheStorageKey: String? = null, deliverySource: String = "YOUTUBE_RELAY", )</ID>
+    <ID>LongParameterList:YoutubeVideoCacheService.kt:YoutubeVideoCacheService$( private val metadataResolver: YoutubeMetadataResolver, private val objectStorage: MediaObjectStorage, private val meterRegistry: MeterRegistry, @param:Value("\${playsay.media-service.youtube-cache-enabled:false}") private val enabled: Boolean, @param:Value("\${playsay.media-service.cache-download-timeout-seconds:600}") private val downloadTimeoutSeconds: Long, @param:Value("\${playsay.media-service.cache-max-video-bytes:262144000}") private val maxVideoBytes: Long, @param:Value("\${playsay.media-service.cache-temp-directory:/tmp/playsay-media-cache}") private val cacheTempDirectory: String, @param:Value("\${playsay.media-service.ffmpeg-path:/usr/local/bin/ffmpeg}") private val ffmpegPath: String, @param:Value("\${playsay.media-service.ytdlp-path:yt-dlp}") private val ytdlpPath: String, private val ytDlpArguments: YoutubeYtDlpArguments = YoutubeYtDlpArguments(), )</ID>
+  </CurrentIssues>
+</SmellBaseline>

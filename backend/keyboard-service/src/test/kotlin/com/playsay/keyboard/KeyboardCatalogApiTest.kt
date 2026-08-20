@@ -12,6 +12,7 @@ import com.playsay.keyboard.dto.ResetAnonymousProfileRequest
 import com.playsay.keyboard.dto.SubmitAnonymousResultRequest
 import com.playsay.keyboard.dto.SubmitResultRequest
 import com.playsay.keyboard.dto.TechniqueAdviceResponse
+import com.playsay.keyboard.dto.KeyboardVocabularyTargetResultRequest
 import com.playsay.keyboard.entity.TechniqueAdviceCacheEntity
 import com.playsay.keyboard.dto.UpdateAnonymousProfileRequest
 import com.playsay.keyboard.repo.AnonymousProfileRepo
@@ -187,6 +188,51 @@ class KeyboardCatalogApiTest : KeyboardApiTestFixture() {
         assertEquals(itemId.toString(), payload.path("attempts").path(0).path("itemId").asText())
         assertEquals(entryId.toString(), payload.path("attempts").path(0).path("entryId").asText())
         assertEquals(2, payload.path("attempts").path(0).path("errors").asInt())
+    }
+
+    @Test
+    fun `typed vocabulary target result keeps identity timing position and attribution in outbox`() {
+        keyboardVocabularyResultOutboxRepo.deleteAllInBatch()
+        trainingResultRepo.deleteAllInBatch()
+        layoutMasteryProfileRepo.deleteAllInBatch()
+        val sessionId = UUID.randomUUID()
+        val targetId = UUID.randomUUID()
+        val resultId = UUID.randomUUID()
+        val itemIds = listOf(UUID.randomUUID(), UUID.randomUUID())
+        val entryIds = listOf(UUID.randomUUID(), UUID.randomUUID())
+        val request = SubmitResultRequest(
+            clientResultId = "typed-vocabulary-result-1",
+            chordSetId = chordSetController.list(layout = "EN", difficulty = null).first().id,
+            speedCpm = 120.0,
+            accuracy = 0.9,
+            errors = 1,
+            durationMs = 2_000,
+            practiceContext = mapOf("practiceKind" to "VOCABULARY", "vocabularySessionId" to sessionId.toString()),
+            vocabularyResults = listOf(
+                KeyboardVocabularyTargetResultRequest(
+                    resultId = resultId,
+                    targetId = targetId,
+                    targetType = "CHARACTER_NGRAM",
+                    errors = 1,
+                    durationMs = 750,
+                    position = 3,
+                    typedText = "ead",
+                    sourceEntryIds = entryIds,
+                    sourceItemIds = itemIds,
+                ),
+            ),
+        )
+
+        trainingController.submit(keyboardAuthentication(subject = "typed-vocabulary-subject"), request)
+        val payload = jacksonObjectMapper().readTree(keyboardVocabularyResultOutboxRepo.findAll().single().payload)
+        val attempt = payload.path("attempts").single()
+
+        assertEquals(resultId.toString(), attempt.path("resultId").asText())
+        assertEquals(targetId.toString(), attempt.path("targetId").asText())
+        assertEquals("CHARACTER_NGRAM", attempt.path("targetType").asText())
+        assertEquals(750, attempt.path("durationMs").asLong())
+        assertEquals(3, attempt.path("position").asInt())
+        assertEquals(entryIds.map(UUID::toString), attempt.path("sourceEntryIds").map { it.asText() })
     }
 
 }

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-08-20-001-learning-evidence" author="codex">
+        <createTable tableName="vocabulary_learning_evidence">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="entry_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_entries" referencedColumnNames="id" foreignKeyName="fk_vocabulary_evidence_entry" deleteCascade="true"/></column>
+            <column name="session_id" type="UUID"/>
+            <column name="item_id" type="UUID"/>
+            <column name="client_evidence_id" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="evidence_type" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="skill" type="VARCHAR(24)"/>
+            <column name="exercise_type" type="VARCHAR(32)"/>
+            <column name="answer_text" type="TEXT"/>
+            <column name="correct" type="BOOLEAN"/>
+            <column name="rating" type="VARCHAR(16)"/>
+            <column name="hints_used" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="duration_ms" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="algorithm_version" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="evaluator_version" type="VARCHAR(64)" defaultValue="deterministic-v2"><constraints nullable="false"/></column>
+            <column name="scheduler_version" type="VARCHAR(64)" defaultValue="legacy-v1"><constraints nullable="false"/></column>
+            <column name="payload_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_learning_evidence" columnNames="owner_subject,client_evidence_id" constraintName="uq_vocabulary_evidence_owner_client"/>
+        <createIndex tableName="vocabulary_learning_evidence" indexName="idx_vocabulary_evidence_owner_entry_time">
+            <column name="owner_subject"/><column name="entry_id"/><column name="occurred_at"/>
+        </createIndex>
+        <createIndex tableName="vocabulary_learning_evidence" indexName="idx_vocabulary_evidence_session_time">
+            <column name="session_id"/><column name="occurred_at"/>
+        </createIndex>
+
+        <addColumn tableName="vocabulary_skill_states">
+            <column name="policy_version" type="VARCHAR(64)" defaultValue="legacy-v1"><constraints nullable="false"/></column>
+            <column name="evidence_watermark" type="UUID"/>
+            <column name="difficulty_score" type="DECIMAL(8,4)" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="review_reason" type="VARCHAR(32)" defaultValue="NEW"><constraints nullable="false"/></column>
+            <column name="skill_available" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="last_evidence_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+        <createIndex tableName="vocabulary_skill_states" indexName="idx_vocabulary_memory_owner_reason_due">
+            <column name="owner_subject"/><column name="review_reason"/><column name="due_at"/>
+        </createIndex>
+
+        <createTable tableName="vocabulary_projection_queue">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="evidence_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_learning_evidence" referencedColumnNames="id" foreignKeyName="fk_vocabulary_projection_evidence" deleteCascade="true"/></column>
+            <column name="entry_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_entries" referencedColumnNames="id" foreignKeyName="fk_vocabulary_projection_entry" deleteCascade="true"/></column>
+            <column name="skill" type="VARCHAR(24)"/>
+            <column name="status" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="attempt_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="last_error" type="VARCHAR(240)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_projection_queue" columnNames="evidence_id" constraintName="uq_vocabulary_projection_evidence"/>
+        <createIndex tableName="vocabulary_projection_queue" indexName="idx_vocabulary_projection_due">
+            <column name="status"/><column name="next_attempt_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2026-08-20-002-lexical-content" author="codex">
+        <createTable tableName="vocabulary_lexical_senses">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="catalog_scope" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="scope_key" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="source_language" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="target_language" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="normalized_lemma" type="VARCHAR(240)"><constraints nullable="false"/></column>
+            <column name="normalized_part_of_speech" type="VARCHAR(80)" defaultValue=""><constraints nullable="false"/></column>
+            <column name="normalized_meaning" type="VARCHAR(500)"><constraints nullable="false"/></column>
+            <column name="imageability" type="VARCHAR(24)" defaultValue="UNKNOWN"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_lexical_senses" columnNames="catalog_scope,scope_key,source_language,target_language,normalized_lemma,normalized_part_of_speech,normalized_meaning" constraintName="uq_vocabulary_lexical_sense_identity"/>
+        <createIndex tableName="vocabulary_lexical_senses" indexName="idx_vocabulary_sense_lookup">
+            <column name="scope_key"/><column name="source_language"/><column name="normalized_lemma"/>
+        </createIndex>
+
+        <createTable tableName="vocabulary_lexical_content_revisions">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="sense_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_lexical_senses" referencedColumnNames="id" foreignKeyName="fk_vocabulary_content_sense" deleteCascade="true"/></column>
+            <column name="revision" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="source_text" type="VARCHAR(240)"><constraints nullable="false"/></column>
+            <column name="translation" type="VARCHAR(500)"/>
+            <column name="definition" type="VARCHAR(1000)"/>
+            <column name="part_of_speech" type="VARCHAR(80)"/>
+            <column name="example" type="VARCHAR(1000)"/>
+            <column name="example_translation" type="VARCHAR(1000)"/>
+            <column name="accepted_answers_json" type="TEXT" defaultValue="[]"><constraints nullable="false"/></column>
+            <column name="created_by_subject" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_lexical_content_revisions" columnNames="sense_id,revision" constraintName="uq_vocabulary_content_sense_revision"/>
+
+        <dropUniqueConstraint tableName="vocabulary_entries" constraintName="uq_vocabulary_owner_word_pair"/>
+        <addColumn tableName="vocabulary_entries">
+            <column name="lexical_sense_id" type="UUID"><constraints nullable="true" referencedTableName="vocabulary_lexical_senses" referencedColumnNames="id" foreignKeyName="fk_vocabulary_entry_sense"/></column>
+            <column name="lexical_content_revision_id" type="UUID"><constraints nullable="true" referencedTableName="vocabulary_lexical_content_revisions" referencedColumnNames="id" foreignKeyName="fk_vocabulary_entry_content_revision"/></column>
+            <column name="favorite" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="media_override_kind" type="VARCHAR(24)"/>
+            <column name="media_override_asset_id" type="UUID"/>
+        </addColumn>
+        <addUniqueConstraint tableName="vocabulary_entries" columnNames="owner_subject,lexical_sense_id" constraintName="uq_vocabulary_owner_resolved_sense"/>
+        <createIndex tableName="vocabulary_entries" indexName="idx_vocabulary_owner_sense">
+            <column name="owner_subject"/><column name="lexical_sense_id"/>
+        </createIndex>
+        <createIndex tableName="vocabulary_entries" indexName="idx_vocabulary_owner_favorite_updated">
+            <column name="owner_subject"/><column name="favorite"/><column name="updated_at"/>
+        </createIndex>
+
+        <addColumn tableName="vocabulary_occurrences">
+            <column name="course_id" type="UUID"/>
+            <column name="source_revision" type="VARCHAR(128)"/>
+        </addColumn>
+        <createIndex tableName="vocabulary_occurrences" indexName="idx_vocabulary_occurrence_lesson_time">
+            <column name="lesson_id"/><column name="created_at"/>
+        </createIndex>
+        <createIndex tableName="vocabulary_occurrences" indexName="idx_vocabulary_occurrence_assignment_time">
+            <column name="assignment_id"/><column name="created_at"/>
+        </createIndex>
+        <createIndex tableName="vocabulary_occurrences" indexName="idx_vocabulary_occurrence_course_time">
+            <column name="course_id"/><column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2026-08-20-003-selection-recipes-and-plans" author="codex">
+        <createTable tableName="vocabulary_selection_recipes">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="name" type="VARCHAR(120)"><constraints nullable="false"/></column>
+            <column name="revision" type="BIGINT" defaultValueNumeric="1"><constraints nullable="false"/></column>
+            <column name="filters_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+            <column name="pinned_entry_ids_json" type="TEXT" defaultValue="[]"><constraints nullable="false"/></column>
+            <column name="excluded_entry_ids_json" type="TEXT" defaultValue="[]"><constraints nullable="false"/></column>
+            <column name="settings_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_selection_recipes" columnNames="owner_subject,name" constraintName="uq_vocabulary_recipe_owner_name"/>
+        <createIndex tableName="vocabulary_selection_recipes" indexName="idx_vocabulary_recipe_owner_updated">
+            <column name="owner_subject"/><column name="updated_at"/>
+        </createIndex>
+
+        <addColumn tableName="vocabulary_practice_plans">
+            <column name="recipe_id" type="UUID"><constraints nullable="true" referencedTableName="vocabulary_selection_recipes" referencedColumnNames="id" foreignKeyName="fk_vocabulary_plan_recipe"/></column>
+            <column name="selection_reasons_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+            <column name="exclusions_json" type="TEXT" defaultValue="[]"><constraints nullable="false"/></column>
+            <column name="eligibility_watermark" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="materialization_seed" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="policy_versions_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+            <column name="content_revision_ids_json" type="TEXT" defaultValue="[]"><constraints nullable="false"/></column>
+            <column name="materialization_key" type="VARCHAR(128)"/>
+        </addColumn>
+        <addUniqueConstraint tableName="vocabulary_practice_plans" columnNames="created_by_subject,materialization_key" constraintName="uq_vocabulary_plan_actor_materialization"/>
+        <createIndex tableName="vocabulary_practice_plans" indexName="idx_vocabulary_plan_recipe_revision">
+            <column name="recipe_id"/><column name="revision"/>
+        </createIndex>
+
+        <addColumn tableName="vocabulary_practice_items">
+            <column name="lexical_content_revision_id" type="UUID"><constraints nullable="true" referencedTableName="vocabulary_lexical_content_revisions" referencedColumnNames="id" foreignKeyName="fk_vocabulary_item_content_revision"/></column>
+        </addColumn>
+        <createIndex tableName="vocabulary_practice_items" indexName="idx_vocabulary_item_entry_session">
+            <column name="entry_id"/><column name="session_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

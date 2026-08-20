@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArrowLeft, BookOpen, CalendarClock, Loader2, Pause, Pencil, Play, Search, UserRound } from "lucide-react";
+import { Archive, ArrowLeft, BookOpen, CalendarClock, Heart, Loader2, Pause, Pencil, Play, Search, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -22,9 +22,13 @@ import { VocabularyPracticeDrawer } from "./VocabularyPracticeDrawer";
 import { VocabularyPracticePlayer } from "./VocabularyPracticePlayer";
 import { VocabularyQuickAdd } from "./VocabularyQuickAdd";
 import { VocabularyEntryEditDialog } from "./VocabularyEntryEditDialog";
+import { StudentPracticeComposer } from "./StudentPracticeComposer";
+import { VocabularyMediaCard } from "./VocabularyMediaCard";
+import { VocabularyMediaReviewQueue } from "./VocabularyMediaReviewQueue";
 
 type VocabularyTab = "TODAY" | "WORDS" | "HISTORY";
 type EntryFilter = "ALL" | VocabularyLearningStage | "PAUSED" | "MISSING";
+type StudentEntryFilter = "ALL" | "RECENT" | "DUE" | "FORGOTTEN" | "DIFFICULT" | "NEW" | "FAVORITE";
 
 export function VocabularyPanel({ profile }: { profile: MeProfile | null }) {
   const canManage = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
@@ -101,6 +105,7 @@ function TeacherVocabularyPanel() {
           ))}
         </div>
       )}
+      {vocabularyFeatures.generatedMedia ? <VocabularyMediaReviewQueue /> : null}
     </section>
   );
 }
@@ -217,6 +222,8 @@ function StudentVocabularyPanel() {
   const [tab, setTab] = useState<VocabularyTab>(vocabularyFeatures.practice ? "TODAY" : "WORDS");
   const [session, setSession] = useState<VocabularyPracticeSession | null>(null);
   const [starting, setStarting] = useState(false);
+  const [wordFilter, setWordFilter] = useState<StudentEntryFilter>("ALL");
+  const [wordQuery, setWordQuery] = useState("");
   const dashboardQuery = useQuery({
     queryFn: ({ signal }) => fetchVocabularyDashboard(undefined, "", undefined, signal),
     queryKey: ["vocabulary-dashboard", "self"],
@@ -227,6 +234,22 @@ function StudentVocabularyPanel() {
   });
   const dashboard = dashboardQuery.data ?? null;
   const history = historyQuery.data ?? [];
+  const visibleEntries = useMemo(() => {
+    const normalized = wordQuery.trim().toLocaleLowerCase();
+    const recentThreshold = Date.now() - 14 * 24 * 60 * 60 * 1_000;
+    return (dashboard?.entries ?? []).filter((item) => {
+      const matchesQuery = !normalized || item.entry.sourceText.toLocaleLowerCase().includes(normalized)
+        || item.entry.translation?.toLocaleLowerCase().includes(normalized);
+      if (!matchesQuery) return false;
+      if (wordFilter === "ALL") return true;
+      if (wordFilter === "RECENT") return Date.parse(item.entry.updatedAt) >= recentThreshold;
+      if (wordFilter === "DUE") return item.overdue;
+      if (wordFilter === "FORGOTTEN") return item.skills.some((skill) => skill.reviewReason === "LAPSED");
+      if (wordFilter === "DIFFICULT") return item.skills.some((skill) => skill.reviewReason === "DIFFICULT" || (skill.difficultyScore ?? 0) >= 0.55);
+      if (wordFilter === "NEW") return item.stage === "NEW";
+      return item.entry.favorite === true;
+    });
+  }, [dashboard?.entries, wordFilter, wordQuery]);
 
   function refreshSelf() {
     void queryClient.invalidateQueries({ queryKey: ["vocabulary-dashboard", "self"] });
@@ -270,7 +293,7 @@ function StudentVocabularyPanel() {
           ))}
       </div>
       {dashboardQuery.isPending || historyQuery.isPending ? <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-primary" /> : tab === "TODAY" ? (
-        <div className="mx-auto mt-6 max-w-2xl rounded-3xl border border-primary/20 bg-[#fff7f0] p-6 text-center">
+        vocabularyFeatures.composer ? <StudentPracticeComposer onStart={setSession} /> : <div className="mx-auto mt-6 max-w-2xl rounded-3xl border border-primary/20 bg-[#fff7f0] p-6 text-center">
           <CalendarClock className="mx-auto h-8 w-8 text-primary" />
           <h2 className="mt-3 text-2xl font-black">{t("vocabulary.today.title")}</h2>
           <p className="mt-2 font-semibold text-muted-foreground">
@@ -288,7 +311,18 @@ function StudentVocabularyPanel() {
           </Button>
         </div>
       ) : tab === "WORDS" ? (
-        <VocabularyWordGrid dashboard={dashboard} entries={dashboard?.entries ?? []} onChanged={refreshSelf} />
+        <div>
+          <label className="relative mt-5 block">
+            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <input aria-label={t("vocabulary.search")} className="playsay-input pl-9" onChange={(event) => setWordQuery(event.target.value)} placeholder={t("vocabulary.search")} value={wordQuery} />
+          </label>
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {(["ALL", "RECENT", "DUE", "FORGOTTEN", "DIFFICULT", "NEW", "FAVORITE"] as StudentEntryFilter[]).map((value) => (
+              <Button aria-pressed={wordFilter === value} className="shrink-0" key={value} onClick={() => setWordFilter(value)} type="button" variant={wordFilter === value ? "default" : "outline"}>{t(`vocabulary.studentFilters.${value}`)}</Button>
+            ))}
+          </div>
+          <VocabularyWordGrid allowFavorite dashboard={dashboard} entries={visibleEntries} onChanged={refreshSelf} />
+        </div>
       ) : (
         <VocabularyHistory
           onContinue={(historySession) => setSession(historySession)}
@@ -300,10 +334,12 @@ function StudentVocabularyPanel() {
 }
 
 function VocabularyWordGrid({
+  allowFavorite = false,
   dashboard,
   entries,
   onChanged,
 }: {
+  allowFavorite?: boolean;
   dashboard: VocabularyDashboard | null;
   entries: VocabularyDashboard["entries"];
   onChanged: () => void;
@@ -323,7 +359,10 @@ function VocabularyWordGrid({
         </div>
       ) : null}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        {entries.map(({ entry, stage, overdue }) => (
+        {entries.map(({ entry, stage, overdue, skills }) => {
+          const nextSkill = skills.filter((skill) => skill.available !== false)
+            .slice().sort((first, second) => Date.parse(first.dueAt) - Date.parse(second.dueAt))[0];
+          return (
         <article className="rounded-2xl border border-border bg-background p-4" key={entry.id}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -332,7 +371,36 @@ function VocabularyWordGrid({
             </div>
             <span className={`rounded-full px-2 py-1 text-[0.68rem] font-black ${overdue ? "bg-[#fff0e7] text-primary" : "bg-muted text-muted-foreground"}`}>{t(`vocabulary.stage.${stage}`)}</span>
           </div>
+          {vocabularyFeatures.generatedMedia ? <VocabularyMediaCard entry={entry} /> : null}
           {entry.example ? <p className="mt-3 text-sm text-muted-foreground">{entry.example}</p> : null}
+          {nextSkill ? (
+            <p className="mt-3 rounded-xl bg-muted/55 p-2 text-xs font-bold text-muted-foreground">
+              {t(`vocabulary.memory.${nextSkill.reviewReason ?? "NEW"}`, { date: formatVocabularyDate(nextSkill.dueAt) })}
+            </p>
+          ) : null}
+          {entry.occurrences.length > 0 ? (
+            <details className="mt-3 rounded-xl border border-border/70 bg-white p-2 text-sm">
+              <summary className="cursor-pointer font-bold text-muted-foreground">
+                {t("vocabulary.occurrences.summary", { count: entry.occurrences.length })}
+              </summary>
+              <ul className="mt-2 grid gap-2">
+                {entry.occurrences
+                  .slice()
+                  .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt))
+                  .map((occurrence, index) => (
+                    <li className="rounded-lg bg-muted/45 p-2" key={`${occurrence.sourceType}-${occurrence.createdAt}-${index}`}>
+                      <strong className="block text-xs">
+                        {t("vocabulary.occurrences.added", {
+                          date: formatVocabularyDate(occurrence.createdAt),
+                          source: t(`vocabulary.occurrences.source.${occurrence.sourceType}`),
+                        })}
+                      </strong>
+                      {occurrence.context ? <span className="mt-1 block text-xs text-muted-foreground">{t("vocabulary.occurrences.context", { context: occurrence.context })}</span> : null}
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          ) : null}
           {!entry.translation || !hasExactExample(entry) ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {!entry.translation ? <span className="rounded-full bg-[#fff0ed] px-2 py-1 text-xs font-black text-[#a52a20]">{t("vocabulary.readiness.noTranslation")}</span> : null}
@@ -340,6 +408,11 @@ function VocabularyWordGrid({
             </div>
           ) : null}
           <div className="mt-3 flex justify-end gap-2">
+            {allowFavorite ? (
+              <Button aria-label={entry.favorite ? t("vocabulary.actions.unfavorite") : t("vocabulary.actions.favorite")} onClick={async () => { await updateVocabularyEntry(entry.id, { favorite: !entry.favorite }); onChanged(); }} type="button" variant="outline">
+                <Heart className={`h-4 w-4 ${entry.favorite ? "fill-primary text-primary" : ""}`} />
+              </Button>
+            ) : null}
             <Button aria-label={t("vocabulary.actions.edit")} onClick={() => setEditingEntry(entry)} type="button" variant="outline"><Pencil className="h-4 w-4" /></Button>
             <Button
               aria-label={entry.practicePaused ? t("vocabulary.actions.resume") : t("vocabulary.actions.pause")}
@@ -367,7 +440,8 @@ function VocabularyWordGrid({
             </Button>
           </div>
         </article>
-        ))}
+          );
+        })}
       </div>
       <VocabularyEntryEditDialog entry={editingEntry} onClose={() => setEditingEntry(null)} onSaved={onChanged} />
     </>

@@ -16,8 +16,6 @@ export const gameMessageTypes = {
   ack: 4,
   resume: 5,
   recoveryRequired: 6,
-  externalInput: 7,
-  externalCursor: 8,
 } as const;
 
 const clientMessageTypes = new Set<number>([
@@ -27,8 +25,6 @@ const clientMessageTypes = new Set<number>([
   gameMessageTypes.ack,
   gameMessageTypes.resume,
   gameMessageTypes.recoveryRequired,
-  gameMessageTypes.externalInput,
-  gameMessageTypes.externalCursor,
 ]);
 
 export function validateGameFrame(bytes: Uint8Array): {

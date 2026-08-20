@@ -50,7 +50,7 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
         assertFalse(createdUser.emailVerified)
         assertTrue(
             RecordingRegistrationEmailClient.registrationConfirmations.single().confirmationUrl
-                .startsWith("https://dev.online.honey.school/register/confirm?token="),
+                .startsWith("https://online.play-and-say.ru/register/confirm?token="),
         )
 
         val confirmed = confirmRegistration(lastConfirmationToken())
@@ -174,7 +174,7 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
             email = null,
             displayName = "Invitee",
             lessonId = "3f20a6e4-a861-49ab-aa70-8300b589f61f",
-            continueUrl = "https://dev.online.honey.school/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
+            continueUrl = "https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
         )
         val token = assertNotNull(invite.token)
 
@@ -186,7 +186,7 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
             email = null,
             displayName = "Invitee",
             lessonId = "3f20a6e4-a861-49ab-aa70-8300b589f61f",
-            continueUrl = "https://dev.online.honey.school/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
+            continueUrl = "https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
         )
         val manualToken = assertNotNull(manualInvite.token)
         val manualEntry = "${manualToken.substring(0, 3).lowercase()} ${manualToken.substring(3).lowercase()}"
@@ -197,7 +197,7 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
         assertEquals(HttpStatus.OK.value(), consumed.statusCode(), consumed.body())
         assertEquals(HttpStatus.OK.value(), manualConsumed.statusCode(), manualConsumed.body())
         assertTrue(consumed.body().contains("access-token-invitee"))
-        assertTrue(consumed.body().contains("https://dev.online.honey.school/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom"))
+        assertTrue(consumed.body().contains("https://online.play-and-say.ru/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom"))
         assertEquals(HttpStatus.BAD_REQUEST.value(), repeated.statusCode(), repeated.body())
         assertEquals(
             listOf("invitee", "invitee"),
@@ -209,7 +209,7 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
     fun `managed student invite lookup is pending metadata only and does not consume code`() {
         provisionManagedStudent("lookup.student", "Lookup", "Student", "lookup@example.com")
         val lessonId = "37a6f61a-434f-483d-9177-f4b2f6fcdca5"
-        val continueUrl = "https://dev.online.honey.school/lessons/$lessonId/classroom"
+        val continueUrl = "https://online.play-and-say.ru/lessons/$lessonId/classroom"
         val invite = createManagedStudentInvite(
             subject = "managed-subject-1",
             username = "lookup.student",

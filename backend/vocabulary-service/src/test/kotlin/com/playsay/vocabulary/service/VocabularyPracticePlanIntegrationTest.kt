@@ -4,6 +4,9 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.playsay.vocabulary.dto.PracticeDelivery
 import com.playsay.vocabulary.dto.VocabularyPracticeSettingsRequest
+import com.playsay.vocabulary.dto.VocabularySelectionCriteriaRequest
+import com.playsay.vocabulary.dto.VocabularySelectionRecipeRequest
+import com.playsay.vocabulary.dto.VocabularySelectionSource
 import com.playsay.vocabulary.entity.VocabularyEntryEntity
 import com.playsay.vocabulary.repo.VocabularyEntryRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeItemRepo
@@ -12,10 +15,12 @@ import java.util.UUID
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.web.server.ResponseStatusException
 
 @SpringBootTest(
     properties = [
@@ -115,5 +120,99 @@ class VocabularyPracticePlanIntegrationTest @Autowired constructor(
             "устойчивый",
             practice.reveal(owner, learnerSession.id, requireNotNull(learnerSession.currentItem).id).expectedAnswer,
         )
+    }
+
+    @Test
+    fun `saved recipe resolves dynamically while materialized plans stay immutable and idempotent`() {
+        val owner = "recipe-owner-${UUID.randomUUID()}"
+        jdbc.update(
+            "insert into app_user(id, keycloak_subject, username, display_name) values (?, ?, ?, ?)",
+            UUID.randomUUID(), owner, "recipe", "Recipe learner",
+        )
+        entries.save(
+            VocabularyEntryEntity(
+                ownerSubject = owner,
+                sourceText = "first",
+                normalizedSource = "first",
+                translation = "первый",
+                createdBySubject = owner,
+            ),
+        )
+        val recipe = practice.createRecipe(
+            owner,
+            VocabularySelectionRecipeRequest(
+                name = "All current words",
+                selection = VocabularySelectionCriteriaRequest(sources = setOf(VocabularySelectionSource.FULL_DICTIONARY)),
+                wordLimit = 10,
+            ),
+        )
+        val firstPreview = practice.preview(
+            owner,
+            VocabularyPracticeSettingsRequest(recipeId = recipe.id, materializationKey = "recipe-launch-1"),
+        )
+        val repeatedPreview = practice.preview(
+            owner,
+            VocabularyPracticeSettingsRequest(recipeId = recipe.id, materializationKey = "recipe-launch-1"),
+        )
+        entries.save(
+            VocabularyEntryEntity(
+                ownerSubject = owner,
+                sourceText = "second",
+                normalizedSource = "second",
+                translation = "второй",
+                createdBySubject = owner,
+            ),
+        )
+        val refreshedPreview = practice.preview(owner, VocabularyPracticeSettingsRequest(recipeId = recipe.id))
+        val launched = practice.create(
+            owner,
+            VocabularyPracticeSettingsRequest(
+                delivery = PracticeDelivery.SELF,
+                planId = firstPreview.planId,
+                planRevision = firstPreview.revision,
+            ),
+        )
+
+        assertEquals(firstPreview.planId, repeatedPreview.planId)
+        assertEquals(firstPreview.revision, repeatedPreview.revision)
+        assertEquals(1, firstPreview.owners.single().selectedCount)
+        assertEquals(2, refreshedPreview.owners.single().selectedCount)
+        assertEquals(firstPreview.owners.single().estimatedItemCount, launched.sessions.single().totalItems)
+        assertEquals(recipe.id, practice.recipe(owner, recipe.id).id)
+        assertEquals(1, practice.recipes(owner).size)
+        assertThrows(ResponseStatusException::class.java) { practice.recipe("another-learner", recipe.id) }
+    }
+
+    @Test
+    fun `empty explicit preview is safe and stale preview revisions are rejected`() {
+        val owner = "empty-owner-${UUID.randomUUID()}"
+        jdbc.update(
+            "insert into app_user(id, keycloak_subject, username, display_name) values (?, ?, ?, ?)",
+            UUID.randomUUID(), owner, "empty", "Empty learner",
+        )
+        val foreignId = UUID.randomUUID()
+        val empty = practice.preview(
+            owner,
+            VocabularyPracticeSettingsRequest(
+                selection = VocabularySelectionCriteriaRequest(
+                    sources = setOf(VocabularySelectionSource.EXPLICIT),
+                    explicitEntryIds = listOf(foreignId),
+                ),
+            ),
+        )
+        val revised = practice.preview(
+            owner,
+            VocabularyPracticeSettingsRequest(planId = empty.planId, planRevision = empty.revision),
+        )
+
+        assertEquals(0, empty.owners.single().selectedCount)
+        assertEquals("NOT_FOUND_OR_UNAUTHORIZED", empty.exclusions.single().reason)
+        assertThrows(ResponseStatusException::class.java) {
+            practice.preview(
+                owner,
+                VocabularyPracticeSettingsRequest(planId = empty.planId, planRevision = empty.revision),
+            )
+        }
+        assertEquals(empty.revision + 1, revised.revision)
     }
 }

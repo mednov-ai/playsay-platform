@@ -74,6 +74,7 @@ class VocabularyPracticeResponseMapper(
         mode = practice?.mode,
         lessonId = practice?.lessonId,
         assignmentId = practice?.assignmentId,
+        lastAcknowledgedPosition = entity.currentItemPosition,
     )
 
     fun learningEntry(
@@ -99,6 +100,11 @@ class VocabularyPracticeResponseMapper(
         lapseCount = entity.lapseCount,
         lastRating = entity.lastRating,
         lastPracticedAt = entity.lastPracticedAt,
+        policyVersion = entity.policyVersion,
+        reviewReason = runCatching { com.playsay.vocabulary.dto.MemoryReviewReason.valueOf(entity.reviewReason) }
+            .getOrDefault(com.playsay.vocabulary.dto.MemoryReviewReason.NEW),
+        difficultyScore = entity.difficultyScore.toDouble(),
+        available = entity.skillAvailable,
     )
 
     fun item(entity: VocabularyPracticeItemEntity): VocabularyPracticeItemResponse {

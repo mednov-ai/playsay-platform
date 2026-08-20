@@ -110,34 +110,6 @@ describe("MaterialLibraryPanel focused editor", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Название" }), { target: { value: "New card" } });
     await waitFor(() => expect(onAuthoringStateChange).toHaveBeenCalledWith({ dirty: true, focused: true }));
   });
-
-  it("stores a teacher-confirmed YouTube duration and clears it when the URL changes", async () => {
-    const onSave = vi.fn(async (input: LessonMaterialInput) => savedMaterial(input));
-    renderPanel({ onSave });
-
-    fireEvent.click(screen.getByRole("button", { name: "Новая" }));
-    fireEvent.click(screen.getByRole("button", { name: "Видео" }));
-
-    const duration = screen.getByLabelText("Длительность (м:сс)");
-    fireEvent.change(duration, { target: { value: "3:42" } });
-    fireEvent.click(screen.getByRole("checkbox", { name: "Аудио на английском" }));
-
-    expect(screen.getByRole("status")).toBeVisible();
-
-    fireEvent.change(screen.getByLabelText("Ссылка"), {
-      target: { value: "https://www.youtube.com/watch?v=_TGPrAdUaTY" },
-    });
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByRole("textbox", { name: "Название" }), { target: { value: "YouTube lesson" } });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
-
-    const savedDocument = onSave.mock.calls[0]?.[0].document as {
-      pages: Array<{ blocks: Array<{ videoMeta?: unknown }> }>;
-    };
-    expect(savedDocument.pages[0]?.blocks[0]?.videoMeta).toBeUndefined();
-  });
 });
 
 function renderPanel({

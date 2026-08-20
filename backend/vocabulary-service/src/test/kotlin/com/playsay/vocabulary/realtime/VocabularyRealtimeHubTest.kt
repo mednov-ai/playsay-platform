@@ -22,10 +22,11 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 
 class VocabularyRealtimeHubTest {
     private val objectMapper = jacksonObjectMapper().findAndRegisterModules()
-    private val hub = VocabularyRealtimeHub(objectMapper)
+    private val hub = VocabularyRealtimeHub(objectMapper, SimpleMeterRegistry())
 
     @Test
     fun `entry changes reach only sessions subscribed to the owner`() {

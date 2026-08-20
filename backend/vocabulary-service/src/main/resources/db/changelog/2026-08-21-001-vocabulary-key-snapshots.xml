@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-08-21-001-vocabulary-key-practice-settings" author="codex">
+        <addColumn tableName="vocabulary_practices">
+            <column name="key_mode" type="VARCHAR(32)" defaultValue="WHOLE_WORDS"><constraints nullable="false"/></column>
+            <column name="key_ngram_settings_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+            <column name="key_materializer_version" type="VARCHAR(64)" defaultValue="vocabulary-key-v1"><constraints nullable="false"/></column>
+            <column name="key_materializer_seed" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+        </addColumn>
+    </changeSet>
+    <changeSet id="2026-08-21-002-vocabulary-key-snapshots" author="codex">
+        <createTable tableName="vocabulary_key_snapshots">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_practice_sessions" referencedColumnNames="id" foreignKeyName="fk_vocabulary_key_snapshot_session" deleteCascade="true"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="mode" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="layout" type="VARCHAR(8)"><constraints nullable="false"/></column>
+            <column name="ngram_settings_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="materializer_version" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="materializer_seed" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="completion_context_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="return_context_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_key_snapshots" columnNames="session_id" constraintName="uq_vocabulary_key_snapshot_session"/>
+        <createTable tableName="vocabulary_key_targets">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="snapshot_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_key_snapshots" referencedColumnNames="id" foreignKeyName="fk_vocabulary_key_target_snapshot" deleteCascade="true"/></column>
+            <column name="position" type="INT"><constraints nullable="false"/></column>
+            <column name="target_type" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="text" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="source_entry_ids_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="source_item_ids_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="offsets_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_key_targets" columnNames="snapshot_id,position" constraintName="uq_vocabulary_key_target_position"/>
+        <createIndex tableName="vocabulary_key_targets" indexName="idx_vocabulary_key_target_snapshot"><column name="snapshot_id"/><column name="position"/></createIndex>
+    </changeSet>
+    <changeSet id="2026-08-21-003-vocabulary-key-results" author="codex">
+        <createTable tableName="vocabulary_key_results">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="client_result_id" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_practice_sessions" referencedColumnNames="id" foreignKeyName="fk_vocabulary_key_result_session" deleteCascade="true"/></column>
+            <column name="snapshot_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_key_snapshots" referencedColumnNames="id" foreignKeyName="fk_vocabulary_key_result_snapshot" deleteCascade="true"/></column>
+            <column name="target_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_key_targets" referencedColumnNames="id" foreignKeyName="fk_vocabulary_key_result_target"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="target_type" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="errors" type="INT"><constraints nullable="false"/></column>
+            <column name="duration_ms" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="position" type="INT"><constraints nullable="false"/></column>
+            <column name="typed_text" type="VARCHAR(200)"/>
+            <column name="source_entry_ids_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="source_item_ids_json" type="TEXT"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="vocabulary_key_results" indexName="idx_vocabulary_key_result_session"><column name="session_id"/><column name="position"/></createIndex>
+        <createIndex tableName="vocabulary_key_results" indexName="idx_vocabulary_key_result_target"><column name="target_id"/></createIndex>
+    </changeSet>
+</databaseChangeLog>

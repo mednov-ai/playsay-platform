@@ -2,6 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+.vocabulary-media-card {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.vocabulary-media-card__viewport {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  background: hsl(var(--muted) / 0.45);
+}
+
+.vocabulary-media-card__viewport img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vocabulary-media-card__placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 1rem;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.vocabulary-media-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.vocabulary-media-card__actions button {
+  min-height: 2rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.72rem;
+}
+
+.vocabulary-media-card__error {
+  color: hsl(var(--destructive));
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 @font-face {
   font-family: "Quicksand";
   src: url("/brand/fonts/quicksand-latin-400.woff2") format("woff2");
@@ -304,8 +357,7 @@ h3,
 }
 
 @media (max-width: 359px) {
-  .honey-brand--header .honey-brand__logo,
-  .dark .honey-brand--header .honey-brand__logo--dark {
+  .honey-brand--header .honey-brand__logo {
     display: none;
   }
 

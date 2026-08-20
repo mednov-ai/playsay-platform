@@ -12,6 +12,33 @@ export type ClassroomMediaChoices = {
 export type LessonParticipantPresenceState = "OFFLINE" | "ONLINE" | "CHECKING_DEVICES";
 export type LessonParticipantPresenceMap = Record<string, LessonParticipantPresenceState>;
 
+export type LessonDiceRoll = {
+  eventId: string;
+  lessonId: string;
+  requestId: string;
+  value: 1 | 2 | 3 | 4 | 5 | 6;
+  rollerSubject: string;
+  rollerName: string;
+  rolledAt: string;
+  cooldownUntil: string;
+};
+
+export type LessonDiceRejectionCode = "COOLDOWN" | "LESSON_NOT_ACTIVE" | "FORBIDDEN";
+
+export type LessonDiceRejection = {
+  code: LessonDiceRejectionCode;
+  lessonId: string | null;
+  requestId: string | null;
+  retryAt: string | null;
+};
+
+export type LessonDiceController = {
+  lastRoll: LessonDiceRoll | null;
+  liveRoll: LessonDiceRoll | null;
+  rejection: LessonDiceRejection | null;
+  roll: () => void;
+};
+
 export type LessonRoomSession = LiveKitRoomToken & {
   courseTitle: string | null;
   lessonId: string;

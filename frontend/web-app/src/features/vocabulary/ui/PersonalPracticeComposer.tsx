@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   fetchVocabularyDashboard,
+  fetchVocabularySelectionRecipes,
   isApiStatus,
   previewVocabularyPractice,
   type VocabularyEntry,
   type VocabularyPracticeMode,
   type VocabularyPracticePreview,
   type VocabularyPracticeSettings,
+  type VocabularySelectionCriteria,
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
@@ -39,6 +41,15 @@ export function PersonalPracticeComposer({
   const { t } = useAppTranslation();
   const [mode, setMode] = useState<VocabularyPracticeMode>("BALANCED");
   const [wordLimit, setWordLimit] = useState(10);
+  const [targetMinutes, setTargetMinutes] = useState(10);
+  const [sources, setSources] = useState<NonNullable<VocabularySelectionCriteria["sources"]>>(
+    () => lessonId ? ["LESSON", "DUE", "DIFFICULT"] : ["DUE", "DIFFICULT", "RECENT"],
+  );
+  const [recipeId, setRecipeId] = useState("");
+  const [completionPolicy, setCompletionPolicy] = useState<NonNullable<VocabularyPracticeSettings["completionPolicy"]>>("MEANINGFUL_ACTIVITY");
+  const [distinctGradedPrompts, setDistinctGradedPrompts] = useState(8);
+  const [distinctEntries, setDistinctEntries] = useState(4);
+  const [masteryPercent, setMasteryPercent] = useState(80);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(() => (
     owners.filter((owner) => owner.presence !== "ABSENT").map((owner) => owner.subject)
   ));
@@ -77,7 +88,12 @@ export function PersonalPracticeComposer({
     })),
     [excludedByOwner, pinnedByOwner, selectedSubjects],
   );
-  const settingsKey = JSON.stringify({ delivery, lessonId, mode, ownerOverrides, selectedSubjects, wordLimit });
+  const selection = useMemo(() => ({
+    lessonId: sources.includes("LESSON") ? lessonId : undefined,
+    sources,
+    targetMinutes,
+  }), [lessonId, sources, targetMinutes]);
+  const settingsKey = JSON.stringify({ delivery, lessonId, mode, ownerOverrides, recipeId, selectedSubjects, selection, wordLimit });
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSettings(settingsKey), 300);
     return () => window.clearTimeout(timer);
@@ -96,6 +112,8 @@ export function PersonalPracticeComposer({
         ownerSubjects: selectedSubjects,
         planId: currentPlan?.id,
         planRevision: currentPlan?.revision,
+        recipeId: recipeId || undefined,
+        selection,
         wordLimit,
       };
       try {
@@ -115,6 +133,11 @@ export function PersonalPracticeComposer({
     staleTime: 0,
   });
   const preview = previewQuery.data;
+  const recipesQuery = useQuery({
+    queryKey: ["vocabulary-selection-recipes"],
+    queryFn: ({ signal }) => fetchVocabularySelectionRecipes(signal),
+    staleTime: 60_000,
+  });
   useEffect(() => {
     if (!preview) return;
     planRef.current = { id: preview.planId, revision: preview.revision };
@@ -195,7 +218,18 @@ export function PersonalPracticeComposer({
         ownerSubjects: selectedSubjects,
         planId: preview.planId,
         planRevision: preview.revision,
+        recipeId: recipeId || undefined,
+        selection,
         wordLimit,
+        ...(delivery === "HOMEWORK" ? {
+          completionPolicy,
+          completionThresholds: {
+            distinctEntries,
+            distinctGradedPrompts,
+            masteryPercent,
+            policyVersion: "vocabulary-homework-v1",
+          },
+        } : {}),
       });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : t("vocabulary.practice.errors.publish"));
@@ -346,10 +380,54 @@ export function PersonalPracticeComposer({
           {t("vocabulary.practice.composer.settings")}<ChevronDown className="h-4 w-4" />
         </summary>
         <div className="mt-4 grid gap-4">
+          {recipesQuery.data?.length ? (
+            <label className="grid gap-1 text-sm font-bold">
+              {t("vocabulary.practice.composer.recipe")}
+              <select
+                className="playsay-input"
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  setRecipeId(nextId);
+                  const recipe = recipesQuery.data?.find((item) => item.id === nextId);
+                  if (!recipe) return;
+                  setMode(recipe.mode ?? "BALANCED");
+                  setWordLimit(recipe.wordLimit ?? 10);
+                  setSources(recipe.selection.sources ?? []);
+                  setTargetMinutes(recipe.selection.targetMinutes ?? 10);
+                }}
+                value={recipeId}
+              >
+                <option value="">{t("vocabulary.practice.composer.recipeNone")}</option>
+                {recipesQuery.data.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}
+              </select>
+            </label>
+          ) : null}
+          <fieldset className="grid gap-2">
+            <legend className="text-sm font-bold">{t("vocabulary.practice.composer.sources")}</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {([...(lessonId ? ["LESSON"] as const : []), "DUE", "DIFFICULT", "RECENT"] as const).map((source) => (
+                <Button
+                  aria-pressed={sources.includes(source)}
+                  key={source}
+                  onClick={() => setSources((current) => current.includes(source) ? current.filter((item) => item !== source) : [...current, source])}
+                  type="button"
+                  variant={sources.includes(source) ? "default" : "outline"}
+                >
+                  {t(`vocabulary.practice.composer.source.${source}`)}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs font-bold text-muted-foreground">{t("vocabulary.practice.composer.manualSource")}</p>
+          </fieldset>
           <label className="grid gap-1 text-sm font-bold">
             {t("vocabulary.practice.builder.wordLimit")}
             <input className="accent-primary" max={20} min={1} onChange={(event) => setWordLimit(Number(event.target.value))} type="range" value={wordLimit} />
             <span className="text-muted-foreground">{wordLimit}</span>
+          </label>
+          <label className="grid gap-1 text-sm font-bold">
+            {t("vocabulary.practice.composer.timeBudget")}
+            <input className="accent-primary" max={30} min={3} onChange={(event) => setTargetMinutes(Number(event.target.value))} type="range" value={targetMinutes} />
+            <span className="text-muted-foreground">{t("vocabulary.practice.composer.minutes", { count: targetMinutes })}</span>
           </label>
           <div className="grid grid-cols-2 gap-2">
             {(["QUICK", "BALANCED", "WRITING", "KEYBOARD"] as VocabularyPracticeMode[])
@@ -360,8 +438,43 @@ export function PersonalPracticeComposer({
                 </Button>
               ))}
           </div>
+          {delivery === "HOMEWORK" ? (
+            <fieldset className="grid gap-3 rounded-xl border border-primary/15 bg-[#fff8f3] p-3">
+              <legend className="px-1 text-sm font-black">{t("homework.vocabularyPolicy.title")}</legend>
+              <label className="grid gap-1 text-sm font-bold">
+                {t("homework.vocabularyPolicy.label")}
+                <select className="playsay-input" onChange={(event) => setCompletionPolicy(event.target.value as typeof completionPolicy)} value={completionPolicy}>
+                  {(["MEANINGFUL_ACTIVITY", "COMPLETE_SESSION", "MASTERY_TARGET", "TEACHER_REVIEW"] as const).map((policy) => (
+                    <option key={policy} value={policy}>{t(`homework.vocabularyPolicy.option.${policy}`)}</option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-xs font-bold text-muted-foreground">{t(`homework.vocabularyPolicy.description.${completionPolicy}`)}</p>
+              <details>
+                <summary className="cursor-pointer text-sm font-black">{t("homework.vocabularyPolicy.advanced")}</summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <label className="grid gap-1 text-xs font-bold">{t("homework.vocabularyPolicy.prompts")}<input className="playsay-input" max={100} min={1} onChange={(event) => setDistinctGradedPrompts(Number(event.target.value))} type="number" value={distinctGradedPrompts} /></label>
+                  <label className="grid gap-1 text-xs font-bold">{t("homework.vocabularyPolicy.entries")}<input className="playsay-input" max={30} min={1} onChange={(event) => setDistinctEntries(Number(event.target.value))} type="number" value={distinctEntries} /></label>
+                  <label className="grid gap-1 text-xs font-bold">{t("homework.vocabularyPolicy.mastery")}<input className="playsay-input" max={100} min={1} onChange={(event) => setMasteryPercent(Number(event.target.value))} type="number" value={masteryPercent} /></label>
+                </div>
+              </details>
+            </fieldset>
+          ) : null}
         </div>
       </details>
+
+      {preview?.categoryCounts && Object.keys(preview.categoryCounts).length ? (
+        <div className="flex flex-wrap gap-2" aria-label={t("vocabulary.practice.composer.categorySummary")}>
+          {Object.entries(preview.categoryCounts).map(([category, count]) => (
+            <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-extrabold" key={category}>{t(`vocabulary.practice.reason.${category}`)} · {count}</span>
+          ))}
+        </div>
+      ) : null}
+      {preview?.exclusions?.length ? (
+        <p className="rounded-xl border border-dashed border-border p-3 text-xs font-bold text-muted-foreground">
+          {t("vocabulary.practice.composer.unavailable", { count: preview.exclusions.length })}
+        </p>
+      ) : null}
 
       {activePreview?.sampleItems?.length ? (
         <details className="rounded-2xl border border-border bg-white p-4">

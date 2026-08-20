@@ -61,6 +61,73 @@ paths:
     delete:
       responses:
         '204': { description: Archived owner-aware entry }
+  /api/vocabulary/entries/{entryId}/media:
+    get:
+      summary: Resolve approved sense media or trigger a non-blocking first-use request
+      parameters:
+        - { in: path, name: entryId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 'Entry-specific media state, content placeholder, and approved alternatives', content: { application/json: { schema: { $ref: '#/components/schemas/MediaView' } } } }
+  /api/vocabulary/entries/{entryId}/media/regenerate:
+    post:
+      parameters:
+        - { in: path, name: entryId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '202': { description: Distinct regeneration candidate queued without replacing current approval, content: { application/json: { schema: { $ref: '#/components/schemas/MediaView' } } } }
+        '429': { description: Per-actor and per-sense regeneration rate limit reached }
+  /api/vocabulary/entries/{entryId}/media/override:
+    put:
+      parameters:
+        - { in: path, name: entryId, required: true, schema: { type: string, format: uuid } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MediaOverride' } } } }
+      responses:
+        '200': { description: Personal hide/default/approved-alternative selection, content: { application/json: { schema: { $ref: '#/components/schemas/MediaView' } } } }
+  /api/vocabulary/entries/{entryId}/media/assets/{assetId}/report:
+    post:
+      parameters:
+        - { in: path, name: entryId, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: assetId, required: true, schema: { type: string, format: uuid } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { reasonCode: { type: string, maxLength: 64, default: WRONG_SENSE } } } } } }
+      responses:
+        '200': { description: Idempotent wrong-image report plus personal hide, content: { application/json: { schema: { $ref: '#/components/schemas/MediaView' } } } }
+  /api/vocabulary/entries/{entryId}/media/assets/{assetId}/content:
+    get:
+      summary: Authorized opaque delivery of an approved immutable asset revision
+      parameters:
+        - { in: path, name: entryId, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: assetId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Privately cached image bytes, content: { image/png: { schema: { type: string, format: binary } }, image/jpeg: { schema: { type: string, format: binary } }, image/webp: { schema: { type: string, format: binary } } } }
+        '403': { description: Asset is not authorized for this entry }
+  /api/vocabulary/media/candidates:
+    get:
+      summary: Reviewer-only generated candidate queue
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 0, maximum: 10000, default: 0 } }
+        - { in: query, name: size, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200': { description: Reviewable candidates, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/MediaAsset' } } } } }
+  /api/vocabulary/media/candidates/{assetId}:
+    get:
+      parameters: [{ in: path, name: assetId, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 'Candidate provenance, safety, alternative text and review history', content: { application/json: { schema: { $ref: '#/components/schemas/MediaAsset' } } } }
+    patch:
+      parameters: [{ in: path, name: assetId, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MediaReview' } } } }
+      responses:
+        '200': { description: Approved or rejected immutable candidate, content: { application/json: { schema: { $ref: '#/components/schemas/MediaAsset' } } } }
+  /api/vocabulary/media/candidates/{assetId}/content:
+    get:
+      parameters: [{ in: path, name: assetId, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Reviewer-only no-store candidate bytes, content: { image/png: { schema: { type: string, format: binary } } } }
+  /api/vocabulary/media/senses/{senseId}/imageability:
+    patch:
+      parameters: [{ in: path, name: senseId, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [imageability], properties: { imageability: { $ref: '#/components/schemas/Imageability' } } } } } }
+      responses:
+        '204': { description: Sense imageability or generation suppression updated }
   /api/vocabulary/overview:
     get:
       summary: Compact lesson and recent vocabulary preview
@@ -122,6 +189,66 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PracticePreview' }
+  /api/vocabulary/practices/recommended-preview:
+    post:
+      summary: Preview a balanced, explainable learner practice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PracticeSettings' }
+      responses:
+        '200':
+          description: Deterministic recommended preview within the requested budget
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticePreview' }
+  /api/vocabulary/selection-recipes:
+    get:
+      responses:
+        '200':
+          description: Dynamic recipes owned by the current learner
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/SelectionRecipe' } }
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SelectionRecipeRequest' }
+      responses:
+        '201':
+          description: Recipe created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SelectionRecipe' }
+  /api/vocabulary/selection-recipes/{recipeId}:
+    parameters:
+      - { in: path, name: recipeId, required: true, schema: { type: string, format: uuid } }
+    get:
+      responses:
+        '200':
+          description: Current dynamic recipe definition
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SelectionRecipe' }
+        '404': { description: Recipe absent or not owned by the caller }
+    put:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SelectionRecipeRequest' }
+      responses:
+        '200':
+          description: Recipe revision updated without mutating launched plans
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SelectionRecipe' }
+    delete:
+      responses:
+        '204': { description: Recipe deleted without mutating launched plans }
   /api/vocabulary/practices:
     post:
       requestBody:
@@ -242,6 +369,23 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KeySet' }
+  /api/vocabulary/practice-sessions/{sessionId}/key-acknowledgement:
+    patch:
+      summary: Persist the owning learner's monotonic position in an immutable Key target stream
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KeyAcknowledgementRequest' }
+      responses:
+        '200':
+          description: Latest acknowledged target position
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KeyAcknowledgement' }
+        '409': { description: Snapshot is missing or target identity does not match the position }
   /api/vocabulary/practice-sessions/{sessionId}/hint:
     post:
       parameters:
@@ -302,11 +446,90 @@ components:
     LearningStage: { type: string, enum: [NEW, LEARNING, REVIEW, MASTERED] }
     Rating: { type: string, enum: [AGAIN, HARD, GOOD] }
     Delivery: { type: string, enum: [SELF, HOMEWORK, LIVE] }
+    HomeworkCompletionPolicy: { type: string, enum: [MEANINGFUL_ACTIVITY, COMPLETE_SESSION, MASTERY_TARGET, TEACHER_REVIEW] }
+    KeyMode: { type: string, enum: [WHOLE_WORDS, CHARACTER_NGRAMS, MIXED] }
+    KeyTargetType: { type: string, enum: [WHOLE_WORD, CHARACTER_NGRAM] }
+    Imageability: { type: string, enum: [UNKNOWN, IMAGEABLE, NON_IMAGEABLE, SUPPRESSED] }
+    MediaAssetState: { type: string, enum: [GENERATING, CANDIDATE, APPROVED, REJECTED, FAILED, SUPERSEDED] }
+    MediaSafetyState: { type: string, enum: [PENDING, SAFE, BLOCKED, PROVIDER_REJECTED, UNKNOWN] }
+    MediaAsset:
+      type: object
+      required: [id, senseId, state, origin, safetyState, altText, decorative, createdAt, reviewHistory]
+      properties:
+        id: { type: string, format: uuid }
+        senseId: { type: string, format: uuid }
+        state: { $ref: '#/components/schemas/MediaAssetState' }
+        contentUrl: { type: [string, 'null'] }
+        contentType: { type: [string, 'null'] }
+        width: { type: [integer, 'null'] }
+        height: { type: [integer, 'null'] }
+        checksumSha256: { type: [string, 'null'], pattern: '^[a-f0-9]{64}$' }
+        origin: { type: string }
+        generatorType: { type: [string, 'null'] }
+        generatorModel: { type: [string, 'null'] }
+        promptTemplateVersion: { type: [string, 'null'] }
+        safetyState: { $ref: '#/components/schemas/MediaSafetyState' }
+        altText: { type: object, additionalProperties: { type: string } }
+        decorative: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        reviewHistory:
+          type: array
+          items:
+            type: object
+            required: [action, actorSubject, createdAt]
+            properties:
+              action: { type: string }
+              actorSubject: { type: string }
+              reasonCode: { type: [string, 'null'] }
+              note: { type: [string, 'null'] }
+              createdAt: { type: string, format: date-time }
+    MediaView:
+      type: object
+      required: [entryId, state, alternatives, generationPending, hidden]
+      properties:
+        entryId: { type: string, format: uuid }
+        senseId: { type: [string, 'null'], format: uuid }
+        imageability: { anyOf: [{ $ref: '#/components/schemas/Imageability' }, { type: 'null' }] }
+        state: { type: string, enum: [UNRESOLVED_PRIVATE, HIDDEN, APPROVED, GENERATING, FAILED, TEXT_ONLY, NO_IMAGE] }
+        asset: { anyOf: [{ $ref: '#/components/schemas/MediaAsset' }, { type: 'null' }] }
+        alternatives: { type: array, items: { $ref: '#/components/schemas/MediaAsset' } }
+        generationPending: { type: boolean }
+        hidden: { type: boolean }
+        failureCode: { type: [string, 'null'] }
+    MediaOverride:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [DEFAULT, HIDE, APPROVED_ALTERNATIVE] }
+        assetId: { type: [string, 'null'], format: uuid }
+    MediaReview:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [APPROVE, REJECT] }
+        reasonCode: { type: [string, 'null'], maxLength: 64 }
+        note: { type: [string, 'null'], maxLength: 500 }
+    KeyNgramSettings:
+      type: object
+      properties:
+        minLength: { type: integer, minimum: 2, maximum: 8, default: 2 }
+        maxLength: { type: integer, minimum: 2, maximum: 8, default: 5 }
+        targetLimit: { type: integer, minimum: 1, maximum: 200, default: 64 }
+        maxRepetitions: { type: integer, minimum: 1, maximum: 4, default: 2 }
+    CompletionThresholds:
+      type: object
+      properties:
+        distinctGradedPrompts: { type: integer, minimum: 1, maximum: 100, default: 8 }
+        distinctEntries: { type: integer, minimum: 1, maximum: 30, default: 4 }
+        masteryPercent: { type: integer, minimum: 1, maximum: 100, default: 80 }
+        policyVersion: { type: string, maxLength: 64, default: vocabulary-homework-v1 }
     PracticeMode: { type: string, enum: [QUICK, BALANCED, WRITING, KEYBOARD] }
     PracticeStatus: { type: string, enum: [PREPARING, PUBLISHED, ACTIVE, PAUSED, COMPLETED, CANCELLED, FAILED] }
     SessionStatus: { type: string, enum: [NOT_STARTED, IN_PROGRESS, PAUSED, COMPLETED, CANCELLED] }
     ExerciseType: { type: string, enum: [FLASHCARD, MATCHING, MEANING_CHOICE, PHRASE_BUILDER, FORM_INPUT, CONTEXT_GAP, KEYBOARD] }
-    SelectionReason: { type: string, enum: [OVERDUE, PINNED, DUE_TODAY, RECENT_LESSON, NEW, CONTROL_REVIEW] }
+    SelectionReason: { type: string, enum: [OVERDUE, PINNED, DUE_TODAY, RECENT_LESSON, NEW, CONTROL_REVIEW, LAPSED, DIFFICULT, FAVORITE, LESSON, COURSE, EXPLICIT, FULL_DICTIONARY] }
+    SelectionSource: { type: string, enum: [RECENT, DUE, FORGOTTEN, DIFFICULT, NEW, FAVORITE, LESSON, COURSE, FULL_DICTIONARY, EXPLICIT] }
+    ReviewReason: { type: string, enum: [NEW, DUE, LAPSED, DIFFICULT, STABLE] }
     ReadinessWarning: { type: string, enum: [MISSING_TRANSLATION, MISSING_EXACT_EXAMPLE, INSUFFICIENT_DISTRACTORS] }
     SourceTerm:
       type: object
@@ -357,7 +580,9 @@ components:
             lessonId: { type: string, format: uuid }
             assignmentId: { type: string, format: uuid }
             materialId: { type: string, format: uuid }
+            courseId: { type: string, format: uuid }
             blockId: { type: string, maxLength: 120 }
+            sourceRevision: { type: string, maxLength: 128 }
     UpdateEntry:
       type: object
       properties:
@@ -368,6 +593,7 @@ components:
         translationState: { $ref: '#/components/schemas/TranslationState' }
         status: { $ref: '#/components/schemas/EntryStatus' }
         practicePaused: { type: boolean }
+        favorite: { type: boolean }
     VocabularyOccurrence:
       type: object
       required: [sourceType, createdAt]
@@ -376,7 +602,9 @@ components:
         lessonId: { type: [string, 'null'], format: uuid }
         assignmentId: { type: [string, 'null'], format: uuid }
         materialId: { type: [string, 'null'], format: uuid }
+        courseId: { type: [string, 'null'], format: uuid }
         blockId: { type: [string, 'null'], maxLength: 120 }
+        sourceRevision: { type: [string, 'null'], maxLength: 128 }
         context: { type: [string, 'null'], maxLength: 1000 }
         createdAt: { type: string, format: date-time }
     VocabularyEntry:
@@ -394,6 +622,7 @@ components:
         translationState: { $ref: '#/components/schemas/TranslationState' }
         status: { $ref: '#/components/schemas/EntryStatus' }
         practicePaused: { type: boolean }
+        favorite: { type: boolean, default: false }
         occurrences: { type: array, items: { $ref: '#/components/schemas/VocabularyOccurrence' } }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -415,6 +644,10 @@ components:
         lapseCount: { type: integer, minimum: 0 }
         lastRating: { anyOf: [{ $ref: '#/components/schemas/Rating' }, { type: 'null' }] }
         lastPracticedAt: { type: [string, 'null'], format: date-time }
+        policyVersion: { type: string, default: legacy-v1 }
+        reviewReason: { $ref: '#/components/schemas/ReviewReason' }
+        difficultyScore: { type: number, minimum: 0, maximum: 1 }
+        available: { type: boolean, default: true }
     LearningEntry:
       type: object
       required: [entry, stage, dueAt, overdue, skills]
@@ -468,6 +701,45 @@ components:
               excludedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
         planId: { type: [string, 'null'], format: uuid }
         planRevision: { type: [integer, 'null'], format: int64 }
+        selection: { anyOf: [{ $ref: '#/components/schemas/SelectionCriteria' }, { type: 'null' }] }
+        recipeId: { type: [string, 'null'], format: uuid }
+        materializationKey: { type: [string, 'null'], maxLength: 128 }
+        completionPolicy: { $ref: '#/components/schemas/HomeworkCompletionPolicy' }
+        completionThresholds: { $ref: '#/components/schemas/CompletionThresholds' }
+        keyMode: { $ref: '#/components/schemas/KeyMode' }
+        keyNgramSettings: { $ref: '#/components/schemas/KeyNgramSettings' }
+    SelectionCriteria:
+      type: object
+      properties:
+        sources: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/SelectionSource' } }
+        match: { type: string, enum: [ANY, ALL], default: ANY }
+        recentDays: { type: integer, minimum: 1, maximum: 365, default: 14 }
+        lessonId: { type: [string, 'null'], format: uuid }
+        courseId: { type: [string, 'null'], format: uuid }
+        explicitEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        maxNewItems: { type: integer, minimum: 0, maximum: 30, default: 3 }
+        targetMinutes: { type: [integer, 'null'], minimum: 1, maximum: 120 }
+        preferredSkills: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/Skill' } }
+    SelectionRecipeRequest:
+      type: object
+      required: [name, selection]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        selection: { $ref: '#/components/schemas/SelectionCriteria' }
+        pinnedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        excludedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        mode: { $ref: '#/components/schemas/PracticeMode' }
+        wordLimit: { type: integer, minimum: 1, maximum: 30, default: 10 }
+    SelectionRecipe:
+      allOf:
+        - { $ref: '#/components/schemas/SelectionRecipeRequest' }
+        - type: object
+          required: [id, revision, createdAt, updatedAt]
+          properties:
+            id: { type: string, format: uuid }
+            revision: { type: integer, format: int64 }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
     PracticePreview:
       type: object
       required: [planId, revision, expiresAt, mode, delivery, estimatedMinutes, owners]
@@ -520,6 +792,19 @@ components:
                     entryId: { type: [string, 'null'], format: uuid }
                     exerciseType: { $ref: '#/components/schemas/ExerciseType' }
                     prompt: { type: string }
+        eligibilityWatermark: { type: [string, 'null'], format: date-time }
+        materializationSeed: { type: integer, format: int64 }
+        categoryCounts:
+          type: object
+          additionalProperties: { type: integer }
+        exclusions:
+          type: array
+          items:
+            type: object
+            required: [entryId, reason]
+            properties:
+              entryId: { type: string, format: uuid }
+              reason: { type: string }
     PracticeItem:
       type: object
       required: [id, position, skill, exerciseType, prompt, options]
@@ -590,6 +875,7 @@ components:
         mode: { anyOf: [{ $ref: '#/components/schemas/PracticeMode' }, { type: 'null' }] }
         lessonId: { type: [string, 'null'], format: uuid }
         assignmentId: { type: [string, 'null'], format: uuid }
+        lastAcknowledgedPosition: { type: integer, minimum: 0, default: 0 }
     Practice:
       type: object
       required: [id, delivery, mode, status, sessions, createdAt, updatedAt]
@@ -625,7 +911,7 @@ components:
         session: { $ref: '#/components/schemas/PracticeSession' }
     KeySet:
       type: object
-      required: [sessionId, title, entries, items]
+      required: [sessionId, title, entries, items, mode, layout, materializerVersion, materializerSeed, ngramSettings, targets]
       properties:
         sessionId: { type: string, format: uuid }
         title: { type: string }
@@ -639,6 +925,62 @@ components:
               itemId: { type: string, format: uuid }
               entryId: { type: string, format: uuid }
               sourceText: { type: string }
+        mode: { $ref: '#/components/schemas/KeyMode' }
+        layout: { type: string, enum: [EN] }
+        materializerVersion: { type: string, maxLength: 64 }
+        materializerSeed: { type: integer, format: int64 }
+        ngramSettings: { $ref: '#/components/schemas/KeyNgramSettings' }
+        targets:
+          type: array
+          items:
+            type: object
+            required: [targetId, position, type, text, sourceEntryIds, sourceItemIds, offsets]
+            properties:
+              targetId: { type: string, format: uuid }
+              position: { type: integer, minimum: 0 }
+              type: { $ref: '#/components/schemas/KeyTargetType' }
+              text: { type: string, maxLength: 255 }
+              sourceEntryIds: { type: array, maxItems: 20, items: { type: string, format: uuid } }
+              sourceItemIds: { type: array, maxItems: 20, items: { type: string, format: uuid } }
+              offsets:
+                type: array
+                items:
+                  type: object
+                  required: [entryId, itemId, start, endExclusive]
+                  properties:
+                    entryId: { type: string, format: uuid }
+                    itemId: { type: string, format: uuid }
+                    start: { type: integer, minimum: 0 }
+                    endExclusive: { type: integer, minimum: 1 }
+        completionContext:
+          type: [object, 'null']
+          required: [delivery, completionPolicy, completionPolicyVersion, lastAcknowledgedPosition]
+          properties:
+            delivery: { $ref: '#/components/schemas/Delivery' }
+            completionPolicy: { $ref: '#/components/schemas/HomeworkCompletionPolicy' }
+            completionPolicyVersion: { type: string, maxLength: 64 }
+            assignmentId: { type: [string, 'null'], format: uuid }
+            lessonId: { type: [string, 'null'], format: uuid }
+            lastAcknowledgedPosition: { type: integer, minimum: 0 }
+        returnContext:
+          type: [object, 'null']
+          required: [target, path]
+          properties:
+            target: { type: string, enum: [HONEY_SCHOOL_VOCABULARY, HONEY_SCHOOL_LESSON, HONEY_SCHOOL_HOMEWORK] }
+            path: { type: string, enum: ['/'] }
+    KeyAcknowledgementRequest:
+      type: object
+      required: [position]
+      properties:
+        position: { type: integer, minimum: 0 }
+        targetId: { type: [string, 'null'], format: uuid }
+    KeyAcknowledgement:
+      type: object
+      required: [sessionId, lastAcknowledgedPosition, revision]
+      properties:
+        sessionId: { type: string, format: uuid }
+        lastAcknowledgedPosition: { type: integer, minimum: 0 }
+        revision: { type: integer, format: int64, minimum: 0 }
     HomeworkPreparation:
       type: object
       required: [actorSubject, assignmentId, ownerSubjects]
@@ -653,6 +995,8 @@ components:
         sourcePracticeId: { type: [string, 'null'], format: uuid }
         planId: { type: [string, 'null'], format: uuid }
         planRevision: { type: [integer, 'null'], format: int64 }
+        completionPolicy: { $ref: '#/components/schemas/HomeworkCompletionPolicy' }
+        completionThresholds: { $ref: '#/components/schemas/CompletionThresholds' }
     KeyResult:
       type: object
       required: [clientResultId, attempts]
@@ -669,3 +1013,11 @@ components:
               itemId: { type: string, format: uuid }
               entryId: { type: string, format: uuid }
               errors: { type: integer, minimum: 0 }
+              resultId: { type: [string, 'null'], format: uuid }
+              targetId: { type: [string, 'null'], format: uuid }
+              targetType: { $ref: '#/components/schemas/KeyTargetType' }
+              durationMs: { type: integer, format: int64, minimum: 0 }
+              position: { type: integer, minimum: 0 }
+              typedText: { type: [string, 'null'], maxLength: 200 }
+              sourceEntryIds: { type: array, maxItems: 20, items: { type: string, format: uuid } }
+              sourceItemIds: { type: array, maxItems: 20, items: { type: string, format: uuid } }

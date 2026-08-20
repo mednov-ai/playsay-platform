@@ -45,6 +45,10 @@ class VocabularyServiceApplicationTest @Autowired constructor(
         assertEquals(0, jdbcTemplate.queryForObject("select count(*) from vocabulary_entries", Long::class.java))
         assertEquals(0, jdbcTemplate.queryForObject("select count(*) from vocabulary_occurrences", Long::class.java))
         assertEquals(0, jdbcTemplate.queryForObject("select count(*) from vocabulary_practice_plans", Long::class.java))
+        assertEquals(0, jdbcTemplate.queryForObject("select count(*) from vocabulary_learning_evidence", Long::class.java))
+        assertEquals(0, jdbcTemplate.queryForObject("select count(*) from vocabulary_projection_queue", Long::class.java))
+        assertEquals(0, jdbcTemplate.queryForObject("select count(*) from vocabulary_lexical_senses", Long::class.java))
+        assertEquals(0, jdbcTemplate.queryForObject("select count(*) from vocabulary_selection_recipes", Long::class.java))
         assertEquals(
             4,
             jdbcTemplate.queryForObject(
@@ -53,6 +57,21 @@ class VocabularyServiceApplicationTest @Autowired constructor(
                       from information_schema.columns
                      where table_name = 'vocabulary_practice_items'
                        and column_name in ('schema_version', 'accepted_answers_json', 'content_json', 'affects_schedule')
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
+        assertEquals(
+            6,
+            jdbcTemplate.queryForObject(
+                """
+                    select count(*)
+                      from information_schema.columns
+                     where table_name = 'vocabulary_skill_states'
+                       and column_name in (
+                           'policy_version', 'evidence_watermark', 'difficulty_score',
+                           'review_reason', 'skill_available', 'last_evidence_at'
+                       )
                 """.trimIndent(),
                 Int::class.java,
             ),

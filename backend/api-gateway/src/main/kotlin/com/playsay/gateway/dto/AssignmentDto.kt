@@ -3,6 +3,10 @@ package com.playsay.gateway.dto
 import com.fasterxml.jackson.databind.JsonNode
 import io.swagger.v3.oas.annotations.media.ArraySchema
 import io.swagger.v3.oas.annotations.media.Schema
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.Size
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
@@ -52,6 +56,37 @@ data class VocabularyHomeworkRequest(
     val planId: UUID? = null,
     @field:Schema(nullable = true)
     val planRevision: Long? = null,
+    @field:Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    val completionPolicy: VocabularyHomeworkCompletionPolicy = VocabularyHomeworkCompletionPolicy.MEANINGFUL_ACTIVITY,
+    @field:Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @field:Valid val completionThresholds: VocabularyCompletionThresholds = VocabularyCompletionThresholds(),
+    @field:Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    val keyMode: VocabularyKeyMode = VocabularyKeyMode.WHOLE_WORDS,
+    @field:Valid @field:Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    val keyNgramSettings: VocabularyKeyNgramSettings = VocabularyKeyNgramSettings(),
+)
+
+enum class VocabularyHomeworkCompletionPolicy { MEANINGFUL_ACTIVITY, COMPLETE_SESSION, MASTERY_TARGET, TEACHER_REVIEW }
+enum class VocabularyHomeworkReviewAction { ACCEPT, RETURN }
+enum class VocabularyKeyMode { WHOLE_WORDS, CHARACTER_NGRAMS, MIXED }
+
+data class VocabularyKeyNgramSettings(
+    @field:Min(2) @field:Max(8) val minLength: Int = 2,
+    @field:Min(2) @field:Max(8) val maxLength: Int = 5,
+    @field:Min(1) @field:Max(200) val targetLimit: Int = 64,
+    @field:Min(1) @field:Max(4) val maxRepetitions: Int = 2,
+)
+
+data class VocabularyCompletionThresholds(
+    @field:Min(1) @field:Max(100) val distinctGradedPrompts: Int = 8,
+    @field:Min(1) @field:Max(30) val distinctEntries: Int = 4,
+    @field:Min(1) @field:Max(100) val masteryPercent: Int = 80,
+    @field:Size(max = 64) @field:Schema(maxLength = 64) val policyVersion: String = "vocabulary-homework-v1",
+)
+
+data class VocabularyHomeworkReviewRequest(
+    val action: VocabularyHomeworkReviewAction,
+    @field:Size(max = 1_000) @field:Schema(maxLength = 1_000, nullable = true) val note: String? = null,
 )
 
 data class AssignmentSummaryResponse(
@@ -84,7 +119,7 @@ data class AssignmentSummaryResponse(
     val mySubmittedAt: Instant? = null,
     @field:Schema(nullable = true)
     val mySubmissionUpdatedAt: Instant? = null,
-    @field:Schema(nullable = true, allowableValues = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"])
+    @field:Schema(nullable = true, allowableValues = ["NOT_STARTED", "IN_PROGRESS", "AWAITING_REVIEW", "COMPLETED", "FAILED"])
     val myActivityState: String? = null,
     @field:Schema(nullable = true)
     val myCompletionRatio: BigDecimal? = null,
@@ -92,6 +127,15 @@ data class AssignmentSummaryResponse(
     val myAccuracy: BigDecimal? = null,
     @field:Schema(nullable = true)
     val myDifficultWordCount: Int? = null,
+    val completionPolicy: VocabularyHomeworkCompletionPolicy? = null,
+    val completionPolicyVersion: String? = null,
+    val completionThresholds: VocabularyCompletionThresholds? = null,
+    val myDistinctGradedPrompts: Int? = null,
+    val myDistinctEntries: Int? = null,
+    val myHintsUsed: Int? = null,
+    val myActiveDurationMs: Long? = null,
+    val myMasteryRatio: BigDecimal? = null,
+    val myReviewState: String? = null,
 )
 
 data class AssignmentRecipientProgressResponse(
@@ -115,11 +159,20 @@ data class AssignmentRecipientProgressResponse(
     val submittedAt: Instant?,
     val updatedAt: Instant?,
     val activityRef: UUID? = null,
-    @field:Schema(allowableValues = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"])
+    @field:Schema(allowableValues = ["NOT_STARTED", "IN_PROGRESS", "AWAITING_REVIEW", "COMPLETED", "FAILED"])
     val activityState: String? = null,
     val completionRatio: BigDecimal? = null,
     val accuracy: BigDecimal? = null,
     val difficultWordCount: Int? = null,
+    val learnerSnapshotId: UUID? = null,
+    val distinctGradedPrompts: Int? = null,
+    val distinctEntries: Int? = null,
+    val hintsUsed: Int? = null,
+    val activeDurationMs: Long? = null,
+    val masteryRatio: BigDecimal? = null,
+    val reviewState: String? = null,
+    val reviewNote: String? = null,
+    val reviewedAt: Instant? = null,
 )
 
 data class TeacherAssignmentDetailResponse(
@@ -159,6 +212,7 @@ data class StudentVocabularyAssignmentDetailResponse(
     val assignment: AssignmentSummaryResponse,
     val practiceId: UUID,
     val sessionId: UUID,
+    val learnerSnapshotId: UUID = sessionId,
 )
 
 data class VocabularyAssignmentPreparationResponse(
@@ -177,6 +231,10 @@ data class VocabularyAssignmentPreparationRequest(
     val sourcePracticeId: UUID?,
     val planId: UUID?,
     val planRevision: Long?,
+    val completionPolicy: VocabularyHomeworkCompletionPolicy,
+    val completionThresholds: VocabularyCompletionThresholds,
+    val keyMode: VocabularyKeyMode,
+    val keyNgramSettings: VocabularyKeyNgramSettings,
 )
 
 data class VocabularyAssignmentSessionRef(
@@ -189,10 +247,18 @@ data class VocabularyAssignmentProgressUpdateRequest(
     val sessionId: UUID,
     val ownerSubject: String,
     val revision: Long,
-    @field:Schema(allowableValues = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "FAILED"])
+    @field:Schema(allowableValues = ["NOT_STARTED", "IN_PROGRESS", "AWAITING_REVIEW", "COMPLETED", "FAILED"])
     val state: String,
     val completionRatio: BigDecimal?,
     val accuracy: BigDecimal?,
     val difficultWordCount: Int?,
+    val learnerSnapshotId: UUID? = null,
+    val distinctGradedPrompts: Int? = null,
+    val distinctEntries: Int? = null,
+    val hintsUsed: Int? = null,
+    val activeDurationMs: Long? = null,
+    val masteryRatio: BigDecimal? = null,
+    val completionPolicy: VocabularyHomeworkCompletionPolicy? = null,
+    val completionPolicyVersion: String? = null,
     val updatedAt: Instant,
 )

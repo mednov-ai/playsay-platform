@@ -7,11 +7,12 @@ import com.playsay.vocabulary.mapper.toResponse
 import com.playsay.vocabulary.repo.VocabularyEntryRepo
 import com.playsay.vocabulary.repo.VocabularyUserRepo
 import com.playsay.vocabulary.realtime.VocabularyEntryChangedEvent
+import com.playsay.vocabulary.util.lexicalSenseKey
+import com.playsay.vocabulary.util.normalizeLexicalText
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
-import java.text.Normalizer
 import java.time.Instant
 import java.util.Locale
 import java.util.UUID
@@ -23,6 +24,7 @@ class VocabularyService(
     private val users: VocabularyUserRepo,
     private val access: VocabularyAccessService,
     private val translationProvider: TranslationProvider,
+    private val lexicalIdentity: VocabularyLexicalIdentityService,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     fun suggest(subject: String, request: TranslationSuggestionRequest): TranslationSuggestionResponse {
@@ -46,19 +48,60 @@ class VocabularyService(
         )
         val sourceText = cleanSource(request.sourceText)
         val languages = languages(ownerSubject, request.sourceLanguage, request.targetLanguage)
-        val normalized = normalize(sourceText)
+        val normalized = normalizeLexicalText(sourceText, 240)
         val now = Instant.now()
-        val existing = entries.findByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguage(ownerSubject, normalized, languages.first, languages.second)
+        val requestedTranslation = request.translation?.trim()?.takeIf(String::isNotEmpty)
+        val resolved = lexicalIdentity.resolveLearnerContent(
+            ownerSubject = ownerSubject,
+            actorSubject = subject,
+            sourceText = sourceText,
+            sourceLanguage = languages.first,
+            targetLanguage = languages.second,
+            translation = requestedTranslation,
+            partOfSpeech = request.partOfSpeech,
+            example = request.example,
+            exampleTranslation = request.exampleTranslation,
+        )
+        val sameSource = entries.findAllByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguageOrderByUpdatedAtDesc(
+            ownerSubject,
+            normalized,
+            languages.first,
+            languages.second,
+        )
+        val existing = resolved?.let { content -> entries.findByOwnerSubjectAndLexicalSenseId(ownerSubject, content.sense.id) }
+            ?: sameSource.firstOrNull { candidate ->
+                candidate.lexicalSenseId == null &&
+                    lexicalSenseKey(sourceText, languages.first, languages.second, candidate.translation, candidate.partOfSpeech) ==
+                    lexicalSenseKey(sourceText, languages.first, languages.second, requestedTranslation, request.partOfSpeech)
+            }
         val entry = existing
             ?: VocabularyEntryEntity(ownerSubject = ownerSubject, sourceText = sourceText, normalizedSource = normalized, sourceLanguage = languages.first, targetLanguage = languages.second, createdBySubject = subject, createdAt = now, updatedAt = now)
-        request.translation?.trim()?.takeIf { it.isNotEmpty() }?.let { entry.translation = it }
+        requestedTranslation?.let { entry.translation = it }
         entry.partOfSpeech = request.partOfSpeech?.trim()?.takeIf { it.isNotEmpty() } ?: entry.partOfSpeech
         entry.example = request.example?.trim()?.takeIf { it.isNotEmpty() } ?: entry.example
         entry.exampleTranslation = request.exampleTranslation?.trim()?.takeIf { it.isNotEmpty() } ?: entry.exampleTranslation
         entry.translationState = request.translationState ?: if (entry.translation != null) TranslationState.SUGGESTED else entry.translationState
         entry.status = EntryStatus.ACTIVE
+        resolved?.let { content ->
+            entry.lexicalSenseId = content.sense.id
+            entry.lexicalContentRevisionId = content.content.id
+        }
         entry.updatedAt = now
-        entry.occurrences.add(VocabularyOccurrenceEntity(entry = entry, sourceType = request.sourceType, lessonId = request.lessonId, assignmentId = request.assignmentId, materialId = request.materialId, blockId = request.blockId?.trim(), context = request.context?.trim(), addedBySubject = subject, createdAt = now))
+        entry.occurrences.add(
+            VocabularyOccurrenceEntity(
+                entry = entry,
+                sourceType = request.sourceType,
+                lessonId = request.lessonId,
+                assignmentId = request.assignmentId,
+                materialId = request.materialId,
+                courseId = request.courseId,
+                blockId = request.blockId?.trim(),
+                sourceRevision = request.sourceRevision?.trim(),
+                context = request.context?.trim(),
+                addedBySubject = subject,
+                createdAt = now,
+            ),
+        )
         val response = entries.save(entry).toResponse()
         eventPublisher.publishEvent(
             VocabularyEntryChangedEvent(
@@ -145,6 +188,7 @@ class VocabularyService(
         request.translationState?.let { entry.translationState = it }
         request.status?.let { entry.status = it }
         request.practicePaused?.let { entry.practicePaused = it }
+        request.favorite?.let { entry.favorite = it }
         entry.updatedAt = Instant.now()
         val response = entries.save(entry).toResponse()
         eventPublisher.publishEvent(
@@ -166,7 +210,6 @@ class VocabularyService(
 
     private fun cleanSource(value: String) = value.trim().replace(Regex("\\s+"), " ").take(240).also { if (it.isBlank()) throw ResponseStatusException(HttpStatus.BAD_REQUEST) }
     private fun cleanLanguage(value: String?, fallback: String) = value?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.matches(Regex("[a-z]{2,3}(-[a-z]{2})?")) } ?: fallback
-    private fun normalize(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKC).lowercase(Locale.ROOT).trim().replace(Regex("\\s+"), " ")
 }
 
 internal data class VocabularyOverviewSelection(

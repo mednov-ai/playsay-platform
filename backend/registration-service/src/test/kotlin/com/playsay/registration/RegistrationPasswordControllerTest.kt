@@ -114,7 +114,7 @@ class RegistrationPasswordControllerTest : RegistrationControllerTestFixture() {
         assertEquals(email, reset.to)
         assertEquals("en", reset.locale)
         assertEquals(6, reset.code.length)
-        assertEquals("https://dev.online.honey.school/reset-password?email=forgot%40example.com", reset.resetUrl)
+        assertEquals("https://online.play-and-say.ru/reset-password?email=forgot%40example.com", reset.resetUrl)
     }
 
     @Test

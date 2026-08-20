@@ -1,4 +1,4 @@
-import type { ChordSet, SubmitResult } from "../../shared/types";
+import type { ChordSet, SubmitResult, VocabularyTargetResult } from "../../shared/types";
 import type { SessionResult } from "./typingStore";
 
 export function buildTrainingSubmitPayload(result: SessionResult, activeSet: ChordSet | null): SubmitResult | null {
@@ -29,7 +29,30 @@ export function buildTrainingSubmitPayload(result: SessionResult, activeSet: Cho
     clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     localTrainingDate: localTrainingDate(),
     practiceContext: activeSet?.practiceContext,
+    vocabularyResults: buildVocabularyResults(result, activeSet),
   };
+}
+
+export function buildVocabularyResults(result: SessionResult, activeSet: ChordSet | null): VocabularyTargetResult[] | undefined {
+  const context = activeSet?.vocabularyContext;
+  if (!context?.typedTargets || context.targets.length === 0) return undefined;
+  const remainingErrors = { ...result.perChord };
+  const durationPerTarget = Math.max(0, Math.round(result.durationMs / context.targets.length));
+  return context.targets.map((target) => {
+    const errors = remainingErrors[target.text] ?? 0;
+    remainingErrors[target.text] = 0;
+    return {
+      resultId: target.targetId,
+      targetId: target.targetId,
+      targetType: target.type,
+      errors,
+      durationMs: durationPerTarget,
+      position: target.position,
+      typedText: target.text,
+      sourceEntryIds: target.sourceEntryIds,
+      sourceItemIds: target.sourceItemIds,
+    };
+  });
 }
 
 function localTrainingDate(): string {

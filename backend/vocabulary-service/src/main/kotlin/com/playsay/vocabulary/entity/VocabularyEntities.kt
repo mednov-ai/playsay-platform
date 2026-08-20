@@ -8,7 +8,7 @@ import java.time.Instant
 import java.util.UUID
 
 @Entity
-@Table(name = "vocabulary_entries", uniqueConstraints = [UniqueConstraint(name = "uq_vocabulary_owner_word_pair", columnNames = ["owner_subject", "normalized_source", "source_language", "target_language"])])
+@Table(name = "vocabulary_entries", uniqueConstraints = [UniqueConstraint(name = "uq_vocabulary_owner_resolved_sense", columnNames = ["owner_subject", "lexical_sense_id"])])
 class VocabularyEntryEntity(
     @Id var id: UUID = UUID.randomUUID(),
     @Column(name = "owner_subject", nullable = false, length = 255) var ownerSubject: String = "",
@@ -23,6 +23,11 @@ class VocabularyEntryEntity(
     @Enumerated(EnumType.STRING) @Column(name = "translation_state", nullable = false, length = 16) var translationState: TranslationState = TranslationState.MISSING,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) var status: EntryStatus = EntryStatus.ACTIVE,
     @Column(name = "practice_paused", nullable = false) var practicePaused: Boolean = false,
+    @Column(name = "lexical_sense_id") var lexicalSenseId: UUID? = null,
+    @Column(name = "lexical_content_revision_id") var lexicalContentRevisionId: UUID? = null,
+    @Column(nullable = false) var favorite: Boolean = false,
+    @Column(name = "media_override_kind", length = 24) var mediaOverrideKind: String? = null,
+    @Column(name = "media_override_asset_id") var mediaOverrideAssetId: UUID? = null,
     @Column(name = "created_by_subject", nullable = false, length = 255) var createdBySubject: String = "",
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now(),
@@ -39,7 +44,9 @@ class VocabularyOccurrenceEntity(
     @Column(name = "lesson_id") var lessonId: UUID? = null,
     @Column(name = "assignment_id") var assignmentId: UUID? = null,
     @Column(name = "material_id") var materialId: UUID? = null,
+    @Column(name = "course_id") var courseId: UUID? = null,
     @Column(name = "block_id", length = 120) var blockId: String? = null,
+    @Column(name = "source_revision", length = 128) var sourceRevision: String? = null,
     @Column(length = 1000) var context: String? = null,
     @Column(name = "added_by_subject", nullable = false, length = 255) var addedBySubject: String = "",
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.now(),

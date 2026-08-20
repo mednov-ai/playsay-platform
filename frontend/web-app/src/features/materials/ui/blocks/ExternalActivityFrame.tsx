@@ -1,69 +1,8 @@
 import { ArrowLeft, RefreshCw, Unplug } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import { Button } from "../../../../components/ui/button";
 import { useAppTranslation } from "../../../../shared/i18n";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../model/materialDocument";
-
-export function externalActivityContentRect({
-  surfaceHeight,
-  surfaceWidth,
-  videoHeight,
-  videoWidth,
-}: {
-  surfaceHeight: number;
-  surfaceWidth: number;
-  videoHeight: number;
-  videoWidth: number;
-}) {
-  if (!surfaceWidth || !surfaceHeight || !videoWidth || !videoHeight) return null;
-  const scale = Math.min(surfaceWidth / videoWidth, surfaceHeight / videoHeight);
-  const width = videoWidth * scale;
-  const height = videoHeight * scale;
-
-  return {
-    height,
-    left: (surfaceWidth - width) / 2,
-    top: (surfaceHeight - height) / 2,
-    width,
-  };
-}
-
-export function externalActivityPoint({
-  clientX,
-  clientY,
-  surface,
-  videoHeight,
-  videoWidth,
-}: {
-  clientX: number;
-  clientY: number;
-  surface: { height: number; left: number; top: number; width: number };
-  videoHeight: number;
-  videoWidth: number;
-}) {
-  const content = externalActivityContentRect({
-    surfaceHeight: surface.height,
-    surfaceWidth: surface.width,
-    videoHeight,
-    videoWidth,
-  });
-  if (!content) return null;
-  const localX = Math.min(content.width, Math.max(0, clientX - surface.left - content.left));
-  const localY = Math.min(content.height, Math.max(0, clientY - surface.top - content.top));
-
-  return {
-    normalizedX: localX / content.width,
-    normalizedY: localY / content.height,
-    sourceHeight: videoHeight,
-    sourceWidth: videoWidth,
-    x: Math.round((localX / content.width) * videoWidth),
-    y: Math.round((localY / content.height) * videoHeight),
-  };
-}
-
-export function shouldSendExternalActivityPointerInput(action: "move" | "down" | "up") {
-  return action !== "move";
-}
 
 export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBlock; sync: MaterialExternalActivitySync }) {
   const { t } = useAppTranslation();
@@ -71,30 +10,7 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const mobileInputRef = useRef<HTMLInputElement | null>(null);
   const lastMoveRef = useRef(0);
-  const [cursorFrame, setCursorFrame] = useState<{ height: number; left: number; top: number; width: number } | null>(null);
   const active = sync.active;
-
-  const updateCursorFrame = useCallback(() => {
-    const surface = surfaceRef.current;
-    const video = videoRef.current;
-    if (!surface) return;
-    const rect = surface.getBoundingClientRect();
-    const next = externalActivityContentRect({
-      surfaceHeight: rect.height,
-      surfaceWidth: rect.width,
-      videoHeight: video?.videoHeight || 720,
-      videoWidth: video?.videoWidth || 1280,
-    });
-    setCursorFrame((current) => (
-      current && next
-      && current.height === next.height
-      && current.left === next.left
-      && current.top === next.top
-      && current.width === next.width
-        ? current
-        : next
-    ));
-  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -104,34 +20,18 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     return () => { video.srcObject = null; };
   }, [sync.mediaStream]);
 
-  useEffect(() => {
-    const surface = surfaceRef.current;
-    const video = videoRef.current;
-    if (!surface || !video) return;
-    updateCursorFrame();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateCursorFrame);
-    observer?.observe(surface);
-    video.addEventListener("loadedmetadata", updateCursorFrame);
-    video.addEventListener("resize", updateCursorFrame);
-    return () => {
-      observer?.disconnect();
-      video.removeEventListener("loadedmetadata", updateCursorFrame);
-      video.removeEventListener("resize", updateCursorFrame);
-    };
-  }, [sync.mediaStream, updateCursorFrame]);
-
   function point(event: PointerEvent | WheelEvent) {
     const surface = surfaceRef.current;
     const video = videoRef.current;
     if (!surface) return null;
     const rect = surface.getBoundingClientRect();
-    return externalActivityPoint({
-      clientX: event.clientX,
-      clientY: event.clientY,
-      surface: rect,
-      videoHeight: video?.videoHeight || 720,
-      videoWidth: video?.videoWidth || 1280,
-    });
+    if (!rect.width || !rect.height) return null;
+    return {
+      normalizedX: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+      normalizedY: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+      x: Math.round(((event.clientX - rect.left) / rect.width) * (video?.videoWidth || 1280)),
+      y: Math.round(((event.clientY - rect.top) / rect.height) * (video?.videoHeight || 720)),
+    };
   }
 
   function pointer(event: PointerEvent<HTMLDivElement>, action: "move" | "down" | "up") {
@@ -141,16 +41,14 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     if (action === "move" && now - lastMoveRef.current < 33) return;
     lastMoveRef.current = now;
     sync.sendCursor(position.normalizedX, position.normalizedY);
-    if (!shouldSendExternalActivityPointerInput(action)) return;
+    if (action === "move") return;
     sync.sendInput({
       type: "pointer",
       action,
-      normalizedX: position.normalizedX,
-      normalizedY: position.normalizedY,
       x: position.x,
       y: position.y,
-      sourceHeight: position.sourceHeight,
-      sourceWidth: position.sourceWidth,
+      normalizedX: position.normalizedX,
+      normalizedY: position.normalizedY,
       button: event.button === 1 ? "middle" : event.button === 2 ? "right" : "left",
       clickCount: event.detail || 1,
     });
@@ -203,12 +101,10 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
           const position = point(event);
           if (position) sync.sendInput({
             type: "scroll",
-            normalizedX: position.normalizedX,
-            normalizedY: position.normalizedY,
             x: position.x,
             y: position.y,
-            sourceHeight: position.sourceHeight,
-            sourceWidth: position.sourceWidth,
+            normalizedX: position.normalizedX,
+            normalizedY: position.normalizedY,
             deltaX: event.deltaX,
             deltaY: event.deltaY,
           });
@@ -217,7 +113,7 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
         role="application"
         tabIndex={0}
       >
-        <video autoPlay className="playsay-external-activity-video" muted={sync.isHost} playsInline ref={videoRef} />
+        <video autoPlay className="playsay-external-activity-video" muted={!sync.isHost} playsInline ref={videoRef} />
         <input
           aria-label={t("materials.externalActivity.mobileKeyboard")}
           className="playsay-external-activity-mobile-input"
@@ -238,11 +134,7 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
           <span
             className="playsay-external-activity-cursor"
             key={cursor.identity}
-            style={{
-              left: cursorFrame ? `${cursorFrame.left + cursor.x * cursorFrame.width}px` : `${cursor.x * 100}%`,
-              top: cursorFrame ? `${cursorFrame.top + cursor.y * cursorFrame.height}px` : `${cursor.y * 100}%`,
-              "--playsay-cursor-color": cursor.color,
-            } as React.CSSProperties}
+            style={{ left: `${cursor.x * 100}%`, top: `${cursor.y * 100}%`, "--playsay-cursor-color": cursor.color } as React.CSSProperties}
           >
             <i />
             <b>{cursor.name}</b>

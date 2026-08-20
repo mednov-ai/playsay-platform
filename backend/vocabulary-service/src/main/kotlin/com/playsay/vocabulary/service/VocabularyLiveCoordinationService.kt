@@ -42,6 +42,9 @@ class VocabularyLiveCoordinationService(
         if (target !in mutableStatuses) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported vocabulary practice status.")
         }
+        if (practice.status == target) {
+            return VocabularyLiveTransition(practice, sessions.findAllByPracticeIdOrderByCreatedAtAsc(practice.id))
+        }
 
         val now = Instant.now()
         practice.status = target

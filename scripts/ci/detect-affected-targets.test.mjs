@@ -109,48 +109,6 @@ test("contracts trigger their producers and frontend consumers", () => {
   );
 });
 
-test("internal backend modules trigger their direct consumers", () => {
-  assertDetection(
-    ["backend/contracts/email-internal-contract/src/main/openapi/openapi.yaml"],
-    ["api-gateway", "registration-service", "email-service"],
-    [
-      "playsay-api-gateway-develop",
-      "playsay-registration-service-develop",
-      "playsay-email-service-develop",
-    ],
-  );
-  assertDetection(
-    ["backend/contracts/media-internal-contract/src/main/openapi/openapi.yaml"],
-    ["api-gateway", "media-service"],
-    ["playsay-api-gateway-develop", "playsay-media-service-develop"],
-  );
-  assertDetection(
-    ["backend/contracts/payment-internal-contract/src/main/openapi/openapi.yaml"],
-    ["api-gateway", "payment-service"],
-    ["playsay-api-gateway-develop", "playsay-payment-service-develop"],
-  );
-  assertDetection(
-    ["backend/contracts/registration-internal-contract/src/main/openapi/openapi.yaml"],
-    ["api-gateway", "registration-service"],
-    ["playsay-api-gateway-develop", "playsay-registration-service-develop"],
-  );
-  assertDetection(
-    ["backend/integration-support/src/main/kotlin/com/playsay/integration/http/InternalHttpTransport.kt"],
-    ["api-gateway", "vocabulary-service", "registration-service", "keyboard-service"],
-    [
-      "playsay-api-gateway-develop",
-      "playsay-vocabulary-service-develop",
-      "playsay-registration-service-develop",
-      "playsay-keyboard-backend-develop",
-    ],
-  );
-  assertDetection(
-    ["backend/openai-support/src/main/kotlin/com/playsay/openai/OpenAiReasoningEffort.kt"],
-    ["api-gateway", "vocabulary-service"],
-    ["playsay-api-gateway-develop", "playsay-vocabulary-service-develop"],
-  );
-});
-
 test("frontend and browser extension changes stay scoped", () => {
   assertDetection(
     ["frontend/web-app/src/App.tsx", "frontend/browser-extension/src/protocol.ts"],
@@ -231,11 +189,6 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
       "playsay-keyboard-frontend-develop",
     ],
   );
-  assertDetection(
-    ["frontend/shared-ui/src/index.ts"],
-    ["web-app", "keyboard-app"],
-    ["playsay-web-app-develop", "playsay-keyboard-frontend-develop"],
-  );
 });
 
 test("CI-only and smoke-only changes run validations without product images", () => {
@@ -315,7 +268,7 @@ test("first numeric release uses a divergent current-production baseline", () =>
     const result = detectTargetsFromGitRange({
       before: "0".repeat(40),
       after,
-      branch: "release/01.002.00",
+      branch: "release/1.001.07",
       releaseBaseCommit: base,
       releaseBaseBranch: "release/1.001.06",
     });

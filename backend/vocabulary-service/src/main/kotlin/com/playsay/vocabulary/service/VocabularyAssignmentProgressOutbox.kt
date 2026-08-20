@@ -17,6 +17,8 @@ import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import io.micrometer.core.instrument.MeterRegistry
+import org.slf4j.LoggerFactory
 
 data class VocabularyAssignmentProgressPayload(
     val eventId: UUID,
@@ -27,6 +29,14 @@ data class VocabularyAssignmentProgressPayload(
     val completionRatio: Double?,
     val accuracy: Double?,
     val difficultWordCount: Int?,
+    val learnerSnapshotId: UUID,
+    val distinctGradedPrompts: Int,
+    val distinctEntries: Int,
+    val hintsUsed: Int,
+    val activeDurationMs: Long,
+    val masteryRatio: Double?,
+    val completionPolicy: String,
+    val completionPolicyVersion: String,
     val updatedAt: Instant,
 )
 
@@ -38,15 +48,14 @@ class VocabularyAssignmentProgressOutbox(
     private val gatewayBaseUrl: String,
     @param:Value("\${playsay.user-data.service-token:}")
     private val serviceToken: String,
+    private val meters: MeterRegistry,
 ) {
     private val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build()
 
     fun enqueue(
         assignmentId: UUID,
         session: VocabularyPracticeSessionEntity,
-        completedItems: Int,
-        totalItems: Int,
-        difficultWordCount: Int,
+        evaluation: VocabularyHomeworkProgressEvaluation,
     ) {
         if (outbox.findBySessionIdAndSessionRevision(session.id, session.revision) != null) return
         val now = Instant.now()
@@ -56,15 +65,18 @@ class VocabularyAssignmentProgressOutbox(
             sessionId = session.id,
             ownerSubject = session.ownerSubject,
             revision = session.revision,
-            state = when (session.status) {
-                SessionStatus.NOT_STARTED -> "NOT_STARTED"
-                SessionStatus.IN_PROGRESS, SessionStatus.PAUSED -> "IN_PROGRESS"
-                SessionStatus.COMPLETED -> "COMPLETED"
-                SessionStatus.CANCELLED -> "FAILED"
-            },
-            completionRatio = totalItems.takeIf { it > 0 }?.let { completedItems.toDouble() / it },
-            accuracy = session.attemptCount.takeIf { it > 0 }?.let { session.correctCount.toDouble() / it },
-            difficultWordCount = difficultWordCount,
+            state = evaluation.state,
+            completionRatio = evaluation.completionRatio,
+            accuracy = evaluation.accuracy,
+            difficultWordCount = evaluation.difficultWordCount,
+            learnerSnapshotId = session.id,
+            distinctGradedPrompts = evaluation.distinctGradedPrompts,
+            distinctEntries = evaluation.distinctEntries,
+            hintsUsed = evaluation.hintsUsed,
+            activeDurationMs = evaluation.activeDurationMs,
+            masteryRatio = evaluation.masteryRatio,
+            completionPolicy = evaluation.completionPolicy.name,
+            completionPolicyVersion = evaluation.completionPolicyVersion,
             updatedAt = session.updatedAt,
         )
         outbox.save(
@@ -94,6 +106,8 @@ class VocabularyAssignmentProgressOutbox(
     private fun deliver(eventId: UUID) {
         val event = outbox.findById(eventId).orElse(null) ?: return
         if (event.status != PENDING) return
+        meters.timer("playsay.vocabulary.outbox.age", "kind", "assignment_progress")
+            .record(Duration.between(event.createdAt, Instant.now()).coerceAtLeast(Duration.ZERO))
         runCatching {
             check(serviceToken.isNotBlank()) { "Vocabulary integration token is not configured" }
             val request = HttpRequest.newBuilder(
@@ -117,6 +131,7 @@ class VocabularyAssignmentProgressOutbox(
             current.lastError = null
             current.updatedAt = Instant.now()
             outbox.save(current)
+            meters.counter("playsay.vocabulary.outbox.delivered", "kind", "assignment_progress").increment()
         }.onFailure { error ->
             val current = outbox.findById(eventId).orElse(null) ?: return@onFailure
             val now = Instant.now()
@@ -125,10 +140,24 @@ class VocabularyAssignmentProgressOutbox(
             current.nextAttemptAt = now.plus(exponentialRetryDelay(current.attemptCount))
             current.updatedAt = now
             outbox.save(current)
+            meters.counter(
+                "playsay.vocabulary.outbox.retry",
+                "kind",
+                "assignment_progress",
+                "error",
+                error.javaClass.simpleName,
+            ).increment()
+            logger.warn(
+                "Vocabulary assignment callback deferred: eventId={}, attemptCount={}, errorType={}",
+                current.id,
+                current.attemptCount,
+                error.javaClass.simpleName,
+            )
         }
     }
 
     private companion object {
+        val logger = LoggerFactory.getLogger(VocabularyAssignmentProgressOutbox::class.java)
         val PENDING = IntegrationDeliveryState.PENDING.persistedValue
         val COMPLETED = IntegrationDeliveryState.COMPLETED.persistedValue
     }

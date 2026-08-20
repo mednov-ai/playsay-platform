@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 
 class VocabularySchedulerTest {
     private val now = Instant.parse("2026-07-28T09:00:00Z")
@@ -147,6 +148,43 @@ class VocabularySchedulerTest {
             practicedState(VocabularySkill.CONTEXT, 4),
         )
         assertEquals(LearningStage.MASTERED, aggregateVocabularyStage(withContext))
+    }
+
+    @Test
+    fun `unavailable context does not block mastery`() {
+        val states = listOf(
+            practicedState(VocabularySkill.MEANING, 2),
+            practicedState(VocabularySkill.FORM, 4),
+            practicedState(VocabularySkill.CONTEXT, 0).apply { skillAvailable = false },
+        )
+
+        assertEquals(LearningStage.MASTERED, aggregateVocabularyStage(states))
+    }
+
+    @Test
+    fun `adaptive success schedules later than failure and records versions and reasons`() {
+        val success = state()
+        val failure = state()
+        val policy = AdaptiveVocabularySchedulingPolicy()
+
+        policy.apply(success, VocabularySchedulingInput(PracticeRating.GOOD), now)
+        policy.apply(failure, VocabularySchedulingInput(PracticeRating.AGAIN), now)
+
+        assertTrue(success.dueAt.isAfter(failure.dueAt))
+        assertEquals("adaptive-v1", success.policyVersion)
+        assertEquals("STABLE", success.reviewReason)
+        assertEquals("LAPSED", failure.reviewReason)
+    }
+
+    @Test
+    fun `adaptive difficulty recovers after successful unassisted evidence`() {
+        val state = state().apply { difficultyScore = BigDecimal("0.9000") }
+        val policy = AdaptiveVocabularySchedulingPolicy()
+
+        repeat(4) { policy.apply(state, VocabularySchedulingInput(PracticeRating.GOOD), now.plus(it.toLong(), ChronoUnit.DAYS)) }
+
+        assertTrue(state.difficultyScore < BigDecimal("0.5000"))
+        assertEquals("STABLE", state.reviewReason)
     }
 
     private fun state() = VocabularySkillStateEntity(

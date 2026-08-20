@@ -54,6 +54,7 @@ class LessonRealtimeWebSocketHandler(
         when (inbound.type) {
             "subscribe.lesson" -> subscribeToLesson(session, authentication, inbound.lessonId)
             "presence.update" -> updatePresence(session, authentication, inbound.lessonId, inbound.state)
+            "tool.dice.roll" -> rollDice(session, authentication, inbound.lessonId, inbound.requestId)
             else -> hub.sendError(session, "Unsupported realtime message.")
         }
     }
@@ -107,6 +108,35 @@ class LessonRealtimeWebSocketHandler(
             hub.updatePresence(session, lesson, validState)
         } catch (caught: ResponseStatusException) {
             hub.sendError(session, caught.reason ?: "Lesson is not available.")
+        }
+    }
+
+    private fun rollDice(
+        session: WebSocketSession,
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID?,
+        requestId: UUID?,
+    ) {
+        if (lessonId == null || requestId == null) {
+            hub.sendDiceRejected(
+                session = session,
+                lessonId = lessonId,
+                requestId = requestId,
+                code = LessonDiceRejectionCodes.LESSON_NOT_ACTIVE,
+            )
+            return
+        }
+
+        try {
+            val lesson = store.get(authentication, lessonId)
+            hub.rollDice(session, lesson, requestId)
+        } catch (caught: ResponseStatusException) {
+            hub.sendDiceRejected(
+                session = session,
+                lessonId = lessonId,
+                requestId = requestId,
+                code = LessonDiceRejectionCodes.FORBIDDEN,
+            )
         }
     }
 

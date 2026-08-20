@@ -100,7 +100,7 @@ describe("useScheduleActions", () => {
     const input = setup();
     const { result } = renderHook(() => useScheduleActions(input.props));
 
-    let copied: Promise<{ copied: boolean; text: string } | null> | undefined;
+    let copied: Promise<boolean> | undefined;
     act(() => {
       copied = result.current.copyScheduledLessonLinks(input.lesson);
     });
@@ -112,29 +112,12 @@ describe("useScheduleActions", () => {
       links: [{ mode: "AUTHENTICATED", subject: "student-demo", url: "https://online.honey.school/join#lesson-1" }],
     });
     await act(async () => {
-      await expect(copied).resolves.toEqual({ copied: true, text: "https://online.honey.school/join#lesson-1" });
+      await expect(copied).resolves.toBe(true);
     });
 
     expect(copiedText).toBe("https://online.honey.school/join#lesson-1");
-    expect(apiMocks.createScheduledLessonParticipantLinks).toHaveBeenCalledWith("lesson-1", "HONEYSCHOOL_RU");
     expect(writeText).not.toHaveBeenCalled();
     expect(input.props.setScheduleMessage).toHaveBeenLastCalledWith("schedule.messages.linksCopied");
-  });
-
-  it("requests the selected direct Honey School origin", async () => {
-    apiMocks.createScheduledLessonParticipantLinks.mockResolvedValue({
-      links: [{ mode: "AUTHENTICATED_LINK", subject: "student-demo", url: "https://online.honey.school/lessons/lesson-1/classroom" }],
-    });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: vi.fn().mockResolvedValue(undefined) },
-    });
-
-    const input = setup();
-    const { result } = renderHook(() => useScheduleActions(input.props));
-    await act(() => result.current.copyScheduledLessonLinks(input.lesson, "HONEY_SCHOOL"));
-
-    expect(apiMocks.createScheduledLessonParticipantLinks).toHaveBeenCalledWith("lesson-1", "HONEY_SCHOOL");
   });
 });
 

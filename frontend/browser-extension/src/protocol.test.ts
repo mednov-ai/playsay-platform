@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  cdpCommandForInput,
   isTrustedPlaySayOrigin,
   parsePageCommand,
   sessionsToReplace,
@@ -33,43 +32,41 @@ describe("extension protocol", () => {
     expect(parsePageCommand({ version: 1, type: "PREPARE", sessionId: "", nonce: "n", url: "javascript:alert(1)" })).toBeNull();
   });
 
-  it("maps pointer keyboard and scroll events to debugger input commands", () => {
-    expect(cdpCommandForInput({ type: "pointer", action: "down", x: 10, y: 20, button: "left", clickCount: 1 })).toEqual({
-      method: "Input.dispatchMouseEvent",
-      params: { type: "mousePressed", x: 10, y: 20, button: "left", clickCount: 1 },
-    });
-    expect(cdpCommandForInput(
-      { type: "pointer", action: "move", x: 640, y: 360, sourceWidth: 1280, sourceHeight: 720 },
-      { width: 1440, height: 900 },
-    )).toMatchObject({
-      params: { x: 720, y: 450 },
-    });
-    expect(cdpCommandForInput({ type: "key", action: "down", key: "A", code: "KeyA", text: "a", modifiers: 0 })).toMatchObject({
-      method: "Input.dispatchKeyEvent",
-      params: { type: "keyDown", key: "A", code: "KeyA", text: "a" },
-    });
-    expect(cdpCommandForInput({ type: "scroll", x: 5, y: 6, deltaX: 0, deltaY: 120 })).toMatchObject({
-      method: "Input.dispatchMouseEvent",
-      params: { type: "mouseWheel", deltaY: 120 },
-    });
-  });
-
-  it("prefers normalized coordinates for the live target viewport", () => {
-    expect(cdpCommandForInput({
-      type: "pointer",
-      action: "down",
-      x: 300,
-      y: 200,
-      normalizedX: 0.75,
-      normalizedY: 0.25,
-    }, { width: 1200, height: 800 })).toMatchObject({
-      params: { x: 900, y: 200 },
+  it("accepts additive normalized pointer coordinates", () => {
+    expect(parsePageCommand({
+      version: 1,
+      type: "INPUT",
+      sessionId: "s-1",
+      nonce: "n-1",
+      input: {
+        type: "pointer",
+        action: "down",
+        x: 640,
+        y: 360,
+        normalizedX: 0.5,
+        normalizedY: 0.5,
+      },
+    })).toMatchObject({
+      type: "INPUT",
+      input: { normalizedX: 0.5, normalizedY: 0.5 },
     });
   });
 
-  it("rejects out of bounds and unsupported input", () => {
-    expect(cdpCommandForInput({ type: "pointer", action: "move", x: -1, y: 20 })).toBeNull();
-    expect(cdpCommandForInput({ type: "clipboard", value: "secret" } as never)).toBeNull();
+  it("rejects invalid normalized coordinates and unsupported input", () => {
+    expect(parsePageCommand({
+      version: 1,
+      type: "INPUT",
+      sessionId: "s-1",
+      nonce: "n-1",
+      input: { type: "pointer", action: "move", x: 10, y: 20, normalizedX: 1.1, normalizedY: 0.5 },
+    })).toBeNull();
+    expect(parsePageCommand({
+      version: 1,
+      type: "INPUT",
+      sessionId: "s-1",
+      nonce: "n-1",
+      input: { type: "clipboard", value: "secret" },
+    })).toBeNull();
   });
 
   it("replaces the previous tab whenever the same classroom launches a new capture session", () => {

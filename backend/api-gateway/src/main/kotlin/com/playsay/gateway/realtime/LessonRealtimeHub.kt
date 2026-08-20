@@ -2,6 +2,10 @@ package com.playsay.gateway.realtime
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.playsay.gateway.dto.ScheduledLessonResponse
+import com.playsay.gateway.service.isLessonInsideAccessWindow
+import com.playsay.gateway.utils.MetaData
+import java.security.SecureRandom
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import org.springframework.stereotype.Component
@@ -17,8 +21,11 @@ class LessonRealtimeHub(
     private val lessonSubscriptions = ConcurrentHashMap<UUID, MutableSet<String>>()
     private val subscriptionsBySession = ConcurrentHashMap<String, MutableSet<UUID>>()
     private val lessonSnapshots = ConcurrentHashMap<UUID, ScheduledLessonResponse>()
+    private val latestDiceRolls = ConcurrentHashMap<UUID, LessonDiceRoll>()
     private val presenceBySession = ConcurrentHashMap<String, MutableMap<UUID, String>>()
     private val sessionLocks = ConcurrentHashMap<String, Any>()
+    private val diceLocks = ConcurrentHashMap<UUID, Any>()
+    private val secureRandom = SecureRandom()
 
     fun register(session: WebSocketSession, principal: LessonRealtimePrincipal) {
         sessions[session.id] = session
@@ -43,6 +50,8 @@ class LessonRealtimeHub(
                 if (subscribers.isEmpty()) {
                     lessonSubscriptions.remove(lessonId, subscribers)
                     lessonSnapshots.remove(lessonId)
+                    latestDiceRolls.remove(lessonId)
+                    diceLocks.remove(lessonId)
                 }
             }
         }
@@ -54,6 +63,7 @@ class LessonRealtimeHub(
         lessonSubscriptions.computeIfAbsent(lesson.id) { ConcurrentHashMap.newKeySet() }.add(session.id)
         subscriptionsBySession.computeIfAbsent(session.id) { ConcurrentHashMap.newKeySet() }.add(lesson.id)
         sendLessonPresence(session, lesson)
+        latestDiceRolls[lesson.id]?.let { roll -> sendDiceSnapshot(session, roll) }
     }
 
     fun updatePresence(session: WebSocketSession, lesson: ScheduledLessonResponse, state: String) {
@@ -80,9 +90,97 @@ class LessonRealtimeHub(
         sendToSession(session, LessonRealtimeOutboundMessage(type = "lesson.updated", lesson = lesson))
     }
 
+    fun rollDice(
+        session: WebSocketSession,
+        lesson: ScheduledLessonResponse,
+        requestId: UUID,
+        now: Instant = Instant.now(),
+    ) {
+        val principal = principals[session.id]
+        if (
+            principal == null ||
+            !principal.canRollDice(lesson) ||
+            lesson.status != MetaData.LessonStatuses.IN_PROGRESS ||
+            !isLessonInsideAccessWindow(
+                status = lesson.status,
+                scheduledStart = lesson.scheduledStart,
+                scheduledEnd = lesson.scheduledEnd,
+                now = now,
+                closedStatuses = diceClosedLessonStatuses,
+            ) ||
+            lesson.id !in subscriptionsBySession[session.id].orEmpty()
+        ) {
+            sendDiceRejected(
+                session = session,
+                lessonId = lesson.id,
+                requestId = requestId,
+                code = if (principal?.canRollDice(lesson) == false) {
+                    LessonDiceRejectionCodes.FORBIDDEN
+                } else {
+                    LessonDiceRejectionCodes.LESSON_NOT_ACTIVE
+                },
+            )
+            return
+        }
+
+        synchronized(diceLocks.computeIfAbsent(lesson.id) { Any() }) {
+            val latest = latestDiceRolls[lesson.id]
+            if (latest?.requestId == requestId && latest.rollerSubject == principal.subject) {
+                sendDiceSnapshot(session, latest)
+                return
+            }
+            if (latest != null && now.isBefore(latest.cooldownUntil)) {
+                sendDiceRejected(
+                    session = session,
+                    lessonId = lesson.id,
+                    requestId = requestId,
+                    code = LessonDiceRejectionCodes.COOLDOWN,
+                    retryAt = latest.cooldownUntil,
+                )
+                return
+            }
+
+            val roll = LessonDiceRoll(
+                eventId = UUID.randomUUID(),
+                lessonId = lesson.id,
+                requestId = requestId,
+                value = secureRandom.nextInt(1, 7),
+                rollerSubject = principal.subject,
+                rollerName = lesson.diceRollerName(principal.subject),
+                rolledAt = now,
+                cooldownUntil = now.plusMillis(DICE_COOLDOWN_MILLIS),
+            )
+            latestDiceRolls[lesson.id] = roll
+            broadcastDiceRoll(roll)
+        }
+    }
+
+    fun sendDiceRejected(
+        session: WebSocketSession,
+        lessonId: UUID?,
+        requestId: UUID?,
+        code: String,
+        retryAt: Instant? = null,
+    ) {
+        sendToSession(
+            session,
+            LessonRealtimeOutboundMessage(
+                type = "tool.dice.rejected",
+                lessonId = lessonId,
+                requestId = requestId,
+                code = code,
+                retryAt = retryAt,
+            ),
+        )
+    }
+
     fun publishLessonUpdated(lesson: ScheduledLessonResponse) {
         broadcastScheduleChanged()
         if (lessonSubscriptions.containsKey(lesson.id)) lessonSnapshots[lesson.id] = lesson
+        if (lesson.status != MetaData.LessonStatuses.IN_PROGRESS) {
+            latestDiceRolls.remove(lesson.id)
+            diceLocks.remove(lesson.id)
+        }
         lessonSubscriptions[lesson.id].orEmpty().forEach { sessionId ->
             val session = sessions[sessionId] ?: return@forEach
             val principal = principals[sessionId] ?: return@forEach
@@ -104,6 +202,8 @@ class LessonRealtimeHub(
             }
         }
         lessonSnapshots.remove(lessonId)
+        latestDiceRolls.remove(lessonId)
+        diceLocks.remove(lessonId)
         presenceBySession.values.forEach { presence -> presence.remove(lessonId) }
     }
 
@@ -179,6 +279,18 @@ class LessonRealtimeHub(
             .filter { lesson -> lesson.participants.any { participant -> participant.subject == subject } }
             .mapTo(mutableSetOf()) { lesson -> lesson.id }
 
+    private fun broadcastDiceRoll(roll: LessonDiceRoll) {
+        lessonSubscriptions[roll.lessonId].orEmpty().forEach { sessionId ->
+            sessions[sessionId]?.let { session ->
+                sendToSession(session, roll.toMessage("tool.dice.rolled"))
+            }
+        }
+    }
+
+    private fun sendDiceSnapshot(session: WebSocketSession, roll: LessonDiceRoll) {
+        sendToSession(session, roll.toMessage("tool.dice.snapshot"))
+    }
+
     private fun sendToSession(session: WebSocketSession, message: LessonRealtimeOutboundMessage) {
         if (!session.isOpen) {
             unregister(session)
@@ -194,3 +306,8 @@ class LessonRealtimeHub(
         }
     }
 }
+
+private val diceClosedLessonStatuses = setOf(
+    MetaData.LessonStatuses.COMPLETED,
+    MetaData.LessonStatuses.CANCELLED,
+)

@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 
 const styles = readFileSync(resolve(__dirname, "styles.css"), "utf8");
 const mainSource = readFileSync(resolve(__dirname, "main.tsx"), "utf8");
-const nginxConfig = readFileSync(resolve(__dirname, "../nginx.conf"), "utf8");
 
 describe("keyboard trainer wide frame", () => {
   it("bundles trainer fonts locally without Google Fonts", () => {
@@ -15,9 +14,6 @@ describe("keyboard trainer wide frame", () => {
     expect(styles).toContain('url("/brand/fonts/quicksand-latin-600.woff2")');
     expect(existsSync(resolve(__dirname, "../public/brand/logo/honey-school-logo.svg"))).toBe(true);
     expect(existsSync(resolve(__dirname, "../public/brand/icons/site.webmanifest"))).toBe(true);
-    expect(nginxConfig).toMatch(
-      /location = \/brand\/icons\/site\.webmanifest \{[\s\S]*default_type application\/manifest\+json;/,
-    );
   });
 
   it("caps the desktop trainer frame at the virtual keyboard width", () => {

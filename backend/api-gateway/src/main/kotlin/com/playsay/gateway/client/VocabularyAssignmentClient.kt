@@ -43,6 +43,10 @@ class VocabularyAssignmentClient(
                 sourcePracticeId = request.sourcePracticeId,
                 planId = request.planId,
                 planRevision = request.planRevision,
+                completionPolicy = request.completionPolicy,
+                completionThresholds = request.completionThresholds,
+                keyMode = request.keyMode,
+                keyNgramSettings = request.keyNgramSettings,
             ),
         )
         val httpRequest = HttpRequest.newBuilder(

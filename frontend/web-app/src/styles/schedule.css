@@ -174,7 +174,7 @@
   position: relative;
 }
 
-.playsay-schedule-card-menu-trigger {
+.playsay-schedule-card-menu summary {
   display: grid;
   width: 2.5rem;
   height: 2.5rem;
@@ -184,12 +184,10 @@
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
   background: hsl(var(--background));
-  color: hsl(var(--foreground));
 }
 
-.playsay-schedule-card-menu-trigger:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
+.playsay-schedule-card-menu summary::-webkit-details-marker {
+  display: none;
 }
 
 .playsay-schedule-card-menu > div {
@@ -206,11 +204,6 @@
   background: hsl(var(--background));
   box-shadow: 0 1rem 2.5rem rgb(17 17 17 / 0.16);
   padding: 0.35rem;
-}
-
-.playsay-schedule-card-menu > div[data-placement="up"] {
-  top: auto;
-  bottom: calc(100% + 0.4rem);
 }
 
 .playsay-schedule-card-menu button {

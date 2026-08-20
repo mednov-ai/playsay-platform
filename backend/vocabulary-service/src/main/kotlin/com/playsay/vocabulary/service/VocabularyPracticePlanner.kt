@@ -15,10 +15,15 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
+import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.stereotype.Component
 
 @Component
-class VocabularyPracticePlanner {
+class VocabularyPracticePlanner(
+    private val exercisePolicy: VocabularyExercisePlanningPolicy = ContentAwareExercisePlanningPolicy(),
+    private val meters: MeterRegistry? = null,
+    private val selectionResolver: VocabularySelectionResolver = VocabularySelectionResolver(),
+) {
     fun planOwner(
         ownerSubject: String,
         ownerEntries: List<VocabularyEntryEntity>,
@@ -31,12 +36,16 @@ class VocabularyPracticePlanner {
         val ownerOverride = request.ownerOverrides.firstOrNull { it.ownerSubject.trim() == ownerSubject }
         val pinnedIds = ownerOverride?.pinnedEntryIds ?: request.pinnedEntryIds
         val excludedIds = ownerOverride?.excludedEntryIds ?: request.excludedEntryIds
-        val eligible = ownerEntries.filter { entry ->
+        val baseEligible = ownerEntries.filter { entry ->
             entry.status == EntryStatus.ACTIVE &&
                 !entry.practicePaused &&
                 !entry.translation.isNullOrBlank()
         }
+        val resolution = selectionResolver.resolve(baseEligible, statesByEntry, request.selection, now)
+        val eligible = (resolution.eligibleEntries + baseEligible.filter { it.id in pinnedIds }).distinctBy { it.id }
         val byId = eligible.associateBy(VocabularyEntryEntity::id)
+        val durationLimit = request.selection?.targetMinutes?.times(2)
+        val effectiveWordLimit = durationLimit?.let { minOf(request.wordLimit, it.coerceAtLeast(1)) } ?: request.wordLimit
         val selected = selectPracticeEntryIds(
             candidates = eligible.map { entry ->
                 VocabularySelectionCandidate(
@@ -47,14 +56,29 @@ class VocabularyPracticePlanner {
                     priority = selectionPriority(entry, statesByEntry[entry.id].orEmpty(), recentLessonEntryIds, now),
                 )
             },
-            wordLimit = request.wordLimit,
+            wordLimit = effectiveWordLimit,
             pinnedEntryIds = pinnedIds,
             excludedEntryIds = excludedIds,
             now = now,
+            maxNewItems = request.selection?.maxNewItems ?: 3,
         ).mapNotNull(byId::get)
 
         val reasons = selected.associate { entry ->
-            entry.id to selectionReason(entry, statesByEntry[entry.id].orEmpty(), pinnedIds, recentLessonEntryIds, now)
+            entry.id to if (entry.id in pinnedIds) {
+                PracticeSelectionReason.PINNED
+            } else {
+                resolution.reasons[entry.id]
+                    ?: selectionReason(entry, statesByEntry[entry.id].orEmpty(), pinnedIds, recentLessonEntryIds, now)
+            }
+        }
+        reasons.values.groupingBy { it }.eachCount().forEach { (reason, count) ->
+            meters?.counter(
+                "playsay.vocabulary.selection.reason",
+                "reason",
+                reason.name,
+                "delivery",
+                request.delivery.name,
+            )?.increment(count.toDouble())
         }
         val distractors = eligible.mapNotNull(VocabularyEntryEntity::translation).distinctBy(::normalizeAnswer)
         val perEntry = selected.mapIndexed { index, entry ->
@@ -67,7 +91,10 @@ class VocabularyPracticePlanner {
                 index = index,
                 seed = seed,
                 reason = reasons.getValue(entry.id),
-            )
+            ).filter { planned ->
+                val preferred = request.selection?.preferredSkills.orEmpty()
+                preferred.isEmpty() || planned.skill in preferred || (planned.type == PracticeExerciseType.FLASHCARD && planned.entryId != null)
+            }
         }
         val interleaved = buildList {
             val newEntries = selected.filter { aggregateVocabularyStage(statesByEntry[it.id].orEmpty()) == LearningStage.NEW }
@@ -75,6 +102,19 @@ class VocabularyPracticePlanner {
             val rounds = perEntry.maxOfOrNull(List<PlannedPracticeItem>::size) ?: 0
             repeat(rounds) { round ->
                 perEntry.forEach { ownerItems -> ownerItems.getOrNull(round)?.let(::add) }
+            }
+        }
+        interleaved.groupingBy { it.skill to it.type }.eachCount().forEach { (composition, count) ->
+            listOf("legacy-v1", exercisePolicy.version).distinct().forEach { policyVersion ->
+                meters?.counter(
+                    "playsay.vocabulary.policy.session.composition",
+                    "policy",
+                    policyVersion,
+                    "skill",
+                    composition.first.name,
+                    "exercise",
+                    composition.second.name,
+                )?.increment(count.toDouble())
             }
         }
         return PlannedOwnerPractice(
@@ -87,6 +127,8 @@ class VocabularyPracticePlanner {
                 )
             },
             items = interleaved,
+            exclusions = resolution.exclusions,
+            categoryCounts = resolution.categoryCounts,
         )
     }
 
@@ -242,6 +284,7 @@ class VocabularyPracticePlanner {
         reason: PracticeSelectionReason,
     ) = PlannedPracticeItem(
         entryId = entry.id,
+        lexicalContentRevisionId = entry.lexicalContentRevisionId,
         skill = skill,
         type = type,
         prompt = prompt,
@@ -304,7 +347,7 @@ class VocabularyPracticePlanner {
     private fun entryDueAt(entry: VocabularyEntryEntity, states: List<VocabularySkillStateEntity>): Instant {
         val required = states.filter { state ->
             state.skill in setOf(VocabularySkill.MEANING, VocabularySkill.FORM) ||
-                (state.skill == VocabularySkill.CONTEXT && exactContextMatch(entry) != null)
+                (state.skill == VocabularySkill.CONTEXT && exercisePolicy.isSkillAvailable(entry, VocabularySkill.CONTEXT))
         }
         return required.minOfOrNull(VocabularySkillStateEntity::dueAt) ?: entry.createdAt
     }
@@ -341,6 +384,8 @@ data class PlannedOwnerPractice(
     val ownerSubject: String,
     val selected: List<PlannedEntrySelection>,
     val items: List<PlannedPracticeItem>,
+    val exclusions: Map<UUID, String> = emptyMap(),
+    val categoryCounts: Map<String, Int> = emptyMap(),
 )
 
 data class PlannedEntrySelection(
@@ -351,6 +396,7 @@ data class PlannedEntrySelection(
 
 data class PlannedPracticeItem(
     val entryId: UUID?,
+    val lexicalContentRevisionId: UUID? = null,
     val skill: VocabularySkill,
     val type: PracticeExerciseType,
     val prompt: String,

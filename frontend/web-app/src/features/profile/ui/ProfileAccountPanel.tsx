@@ -5,14 +5,11 @@ import { FormField } from "../../../shared/ui/FormField";
 import type {
   AdminUserProfile,
   AppUserProfile,
-  AuthenticationMethods,
-  CompletedAuthAction,
   MeProfile,
   UpdateUserProfileInput,
 } from "../../../shared/api/playsay";
 import { normalizeLanguage, useAppTranslation } from "../../../shared/i18n";
 import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
-import { AuthenticationMethodsPanel } from "./AuthenticationMethodsPanel";
 
 export type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggingOut" | "error";
 
@@ -29,18 +26,11 @@ export function ProfileAccountPanel({
   adminMessage,
   adminUsers,
   appProfile,
-  authenticationMethods,
-  authenticationMethodsLoading,
-  authenticationMethodsMessage,
-  completedAuthAction,
   error,
   isAdmin,
   isAuthenticated,
   onBack,
-  onDeletePasskey,
   onRefreshAdminUsers,
-  onRefreshAuthenticationMethods,
-  onRenamePasskey,
   onResetProfile,
   onSaveProfile,
   profile,
@@ -52,18 +42,11 @@ export function ProfileAccountPanel({
   adminMessage: string | null;
   adminUsers: AdminUserProfile[];
   appProfile: AppUserProfile | null;
-  authenticationMethods: AuthenticationMethods | null;
-  authenticationMethodsLoading: boolean;
-  authenticationMethodsMessage: string | null;
-  completedAuthAction: CompletedAuthAction | null;
   error: string | null;
   isAdmin: boolean;
   isAuthenticated: boolean;
   onBack: () => void;
-  onDeletePasskey: (credentialId: string) => Promise<boolean>;
   onRefreshAdminUsers: () => void;
-  onRefreshAuthenticationMethods: () => Promise<void>;
-  onRenamePasskey: (credentialId: string, label: string) => Promise<boolean>;
   onResetProfile: () => void;
   onSaveProfile: (input: UpdateUserProfileInput) => Promise<void>;
   profile: MeProfile | null;
@@ -112,18 +95,6 @@ export function ProfileAccountPanel({
             <h2 className="text-lg font-extrabold">{t("profile.sections.user")}</h2>
           </div>
           <IdentityPanel error={error} profile={profile} status={status} />
-          {isAuthenticated ? (
-            <AuthenticationMethodsPanel
-              completedAuthAction={completedAuthAction}
-              email={profile?.email ?? appProfile?.email ?? null}
-              loading={authenticationMethodsLoading}
-              message={authenticationMethodsMessage}
-              methods={authenticationMethods}
-              onDeletePasskey={onDeletePasskey}
-              onRefresh={onRefreshAuthenticationMethods}
-              onRenamePasskey={onRenamePasskey}
-            />
-          ) : null}
         </section>
 
         <section className="min-w-0">

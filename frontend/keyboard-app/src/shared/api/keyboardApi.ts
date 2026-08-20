@@ -22,6 +22,7 @@ import type {
   UpdateAnonymousProfileRequest,
   VocabularyPracticeResponse,
   VocabularySessionPracticeResponse,
+  VocabularyKeyAcknowledgementResponse,
 } from "../types";
 
 const apiBaseUrl = import.meta.env.VITE_KEYBOARD_API_BASE_URL ?? "";
@@ -122,6 +123,17 @@ export function fetchVocabularySessionPractice(sessionId: string): Promise<Vocab
   return apiJson<VocabularySessionPracticeResponse>(
     `${apiBaseUrl}/api/vocabulary/practice-sessions/${encodeURIComponent(sessionId)}/key-set`,
     { method: "GET" },
+  );
+}
+
+export function acknowledgeVocabularyTarget(
+  sessionId: string,
+  position: number,
+  targetId?: string,
+): Promise<VocabularyKeyAcknowledgementResponse> {
+  return apiJson<VocabularyKeyAcknowledgementResponse>(
+    `${apiBaseUrl}/api/vocabulary/practice-sessions/${encodeURIComponent(sessionId)}/key-acknowledgement`,
+    { method: "PATCH", body: JSON.stringify({ position, targetId }) },
   );
 }
 

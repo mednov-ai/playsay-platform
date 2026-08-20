@@ -47,6 +47,26 @@ class AssignmentRecipientEntity(
     var activityRevision: Long = 0,
     @Column(name = "activity_updated_at")
     var activityUpdatedAt: Instant? = null,
+    @Column(name = "learner_snapshot_id")
+    var learnerSnapshotId: UUID? = null,
+    @Column(name = "distinct_graded_prompts")
+    var distinctGradedPrompts: Int? = null,
+    @Column(name = "distinct_entries")
+    var distinctEntries: Int? = null,
+    @Column(name = "hints_used")
+    var hintsUsed: Int? = null,
+    @Column(name = "active_duration_ms")
+    var activeDurationMs: Long? = null,
+    @Column(name = "mastery_ratio", precision = 7, scale = 4)
+    var masteryRatio: BigDecimal? = null,
+    @Column(name = "review_state", length = 24)
+    var reviewState: String? = null,
+    @Column(name = "review_note", columnDefinition = "TEXT")
+    var reviewNote: String? = null,
+    @Column(name = "reviewed_at")
+    var reviewedAt: Instant? = null,
+    @Column(name = "reviewed_by_subject", length = 255)
+    var reviewedBySubject: String? = null,
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)

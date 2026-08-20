@@ -141,26 +141,7 @@ interface KeycloakRegistrationClient {
     fun sendRequiredActionsEmail(subject: String, actions: List<String>) {
         error("Required actions email is not supported by this Keycloak client.")
     }
-
-    fun listCredentials(subject: String): List<KeycloakCredential> {
-        error("Credential management is not supported by this Keycloak client.")
-    }
-
-    fun renameCredential(subject: String, credentialId: String, label: String) {
-        error("Credential management is not supported by this Keycloak client.")
-    }
-
-    fun deleteCredential(subject: String, credentialId: String) {
-        error("Credential management is not supported by this Keycloak client.")
-    }
 }
-
-data class KeycloakCredential(
-    val id: String,
-    val type: String,
-    val userLabel: String?,
-    val createdAt: java.time.Instant?,
-)
 
 data class RegistrationEmailCommand(
     val to: String,

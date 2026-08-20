@@ -1,6 +1,6 @@
-# Play&Say Platform
+# Honey School Platform
 
-Product monorepo for the Play&Say online English school platform.
+Product monorepo for the Honey School online English school platform.
 
 Sprint 0 contents:
 

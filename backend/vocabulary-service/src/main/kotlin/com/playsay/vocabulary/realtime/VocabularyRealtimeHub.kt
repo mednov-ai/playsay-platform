@@ -7,10 +7,12 @@ import java.util.concurrent.CopyOnWriteArraySet
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
+import io.micrometer.core.instrument.MeterRegistry
 
 @Component
 class VocabularyRealtimeHub(
     private val objectMapper: ObjectMapper,
+    private val meters: MeterRegistry,
 ) {
     private val sessions = ConcurrentHashMap<String, WebSocketSession>()
     private val sessionSubjects = ConcurrentHashMap<String, String>()
@@ -22,6 +24,7 @@ class VocabularyRealtimeHub(
         sessionSubjects[session.id] = subject
         sessionLocks.computeIfAbsent(session.id) { Any() }
         send(session, VocabularyRealtimeOutboundMessage(type = "connected"))
+        meters.counter("playsay.vocabulary.live.connection", "event", "connected").increment()
     }
 
     fun unregister(session: WebSocketSession) {
@@ -29,6 +32,7 @@ class VocabularyRealtimeHub(
         sessionSubjects.remove(session.id)
         subscriptions.remove(session.id)
         sessionLocks.remove(session.id)
+        meters.counter("playsay.vocabulary.live.connection", "event", "disconnected").increment()
     }
 
     fun subscribe(session: WebSocketSession, ownerSubject: String, lessonId: UUID?) {
@@ -55,6 +59,7 @@ class VocabularyRealtimeHub(
                 lessonId = lessonId,
             ),
         )
+        meters.counter("playsay.vocabulary.live.connection", "event", "practice_subscribed").increment()
     }
 
     fun sendError(session: WebSocketSession, message: String) {

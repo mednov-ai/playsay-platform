@@ -1353,6 +1353,54 @@ input {
   font-weight: 700;
 }
 
+.vocabulary-context {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--honey) 28%, var(--line));
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--surface) 92%, var(--honey) 8%);
+}
+
+.vocabulary-context > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.vocabulary-context > div:first-child span,
+.vocabulary-context small {
+  color: var(--muted);
+}
+
+.vocabulary-context__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.vocabulary-context__facts span {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.82rem;
+}
+
+.vocabulary-context__correction {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 650;
+}
+
+@media (max-width: 720px) {
+  .vocabulary-context > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+}
+
 .stats-panel {
   display: grid;
   gap: 7px;

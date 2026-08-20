@@ -8,9 +8,10 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { MeProfile } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
+import type { LessonDiceController, LessonDiceRoll } from "../../classroom";
 import { consumePendingChatTarget, readPendingChatTarget } from "../model/chatDeepLink";
 import {
   createChatConversation,
@@ -41,9 +42,24 @@ type ChatToast = {
 
 const emptyMessages: ConversationMessages = { items: [], loading: false, nextCursor: null };
 
-export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
+export type GlobalToolId = "chat" | "dice";
+
+type GlobalToolDefinition = {
+  id: GlobalToolId;
+  label: string;
+  icon: ReactNode;
+  badge?: ReactNode;
+};
+
+export function GlobalToolsRail({
+  classroomDice,
+  profile,
+}: {
+  classroomDice?: LessonDiceController;
+  profile: MeProfile;
+}) {
   const { i18n, t } = useAppTranslation();
-  const [open, setOpen] = useState(false);
+  const [activeTool, setActiveTool] = useState<GlobalToolId | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
@@ -54,18 +70,23 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ChatToast | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [diceNow, setDiceNow] = useState(() => Date.now());
+  const [visibleDiceRoll, setVisibleDiceRoll] = useState<LessonDiceRoll | null>(null);
+  const chatTriggerRef = useRef<HTMLButtonElement>(null);
+  const diceTriggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
-  const openRef = useRef(open);
+  const chatOpen = activeTool === "chat";
+  const diceOpen = activeTool === "dice";
+  const openRef = useRef(chatOpen);
   const activeConversationIdRef = useRef(activeConversationId);
   const messagesRef = useRef(messagesByConversation);
   const conversationsRef = useRef(conversations);
   const initialChatTargetRef = useRef(readPendingChatTarget());
 
   useEffect(() => {
-    openRef.current = open;
-  }, [open]);
+    openRef.current = chatOpen;
+  }, [chatOpen]);
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
@@ -249,7 +270,7 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
     const target = initialChatTargetRef.current;
     if (!target) return;
     initialChatTargetRef.current = null;
-    setOpen(true);
+    setActiveTool("chat");
     setToast(null);
     const conversation = target === "open" ? null : conversations.find((item) => item.id === target);
     if (conversation) {
@@ -260,9 +281,9 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
   }, [conversations, loadMessages, loading]);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!activeTool) return undefined;
     window.requestAnimationFrame(() => {
-      panelRef.current?.querySelector<HTMLElement>("button, input, textarea")?.focus();
+      panelRef.current?.querySelector<HTMLElement>("[data-tool-autofocus], button, input, textarea")?.focus();
     });
     function closeOnEscape(event: globalThis.KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -271,7 +292,40 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
     }
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [open]);
+  }, [activeTool]);
+
+  useEffect(() => {
+    if (classroomDice || activeTool !== "dice") return;
+    setActiveTool(null);
+  }, [activeTool, classroomDice]);
+
+  const cooldownUntilMs = Math.max(
+    Date.parse(classroomDice?.lastRoll?.cooldownUntil ?? "") || 0,
+    Date.parse(classroomDice?.rejection?.retryAt ?? "") || 0,
+  );
+  const diceCoolingDown = cooldownUntilMs > diceNow;
+  const visibleDiceRejection = classroomDice?.rejection &&
+    (classroomDice.rejection.code !== "COOLDOWN" || diceCoolingDown)
+    ? classroomDice.rejection
+    : null;
+
+  useEffect(() => {
+    setDiceNow(Date.now());
+    if (!cooldownUntilMs || cooldownUntilMs <= Date.now()) return undefined;
+    const timer = window.setTimeout(() => setDiceNow(Date.now()), cooldownUntilMs - Date.now() + 20);
+    return () => window.clearTimeout(timer);
+  }, [cooldownUntilMs]);
+
+  useEffect(() => {
+    const liveRoll = classroomDice?.liveRoll ?? null;
+    if (!liveRoll) {
+      setVisibleDiceRoll(null);
+      return undefined;
+    }
+    setVisibleDiceRoll(liveRoll);
+    const timer = window.setTimeout(() => setVisibleDiceRoll(null), 2_100);
+    return () => window.clearTimeout(timer);
+  }, [classroomDice?.liveRoll?.eventId]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -284,6 +338,26 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
     ? messagesByConversation[activeConversationId] ?? emptyMessages
     : emptyMessages;
   const unreadCount = conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
+  const diceValue = classroomDice?.lastRoll?.value ?? null;
+  const diceLabel = diceValue === null
+    ? t("dice.open")
+    : diceCoolingDown
+      ? t("dice.aria.valueCooling", { value: diceValue })
+      : t("dice.aria.value", { value: diceValue });
+  const toolDefinitions: Record<GlobalToolId, GlobalToolDefinition> = {
+    chat: {
+      id: "chat",
+      label: t("chat.open"),
+      icon: <MessageCircle aria-hidden="true" />,
+      badge: unreadCount > 0 ? <span className="playsay-tools-badge">{compactCount(unreadCount)}</span> : undefined,
+    },
+    dice: {
+      id: "dice",
+      label: diceLabel,
+      icon: <DiceFaceIcon value={diceValue} />,
+    },
+  };
+  const tools = availableGlobalToolIds(Boolean(classroomDice)).map((toolId) => toolDefinitions[toolId]);
   const query = search.trim().toLocaleLowerCase(i18n.language);
   const filteredConversations = useMemo(() => conversations.filter((conversation) => (
     !query || conversation.counterpart.displayName.toLocaleLowerCase(i18n.language).includes(query)
@@ -297,18 +371,19 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
     (!query || contact.displayName.toLocaleLowerCase(i18n.language).includes(query))
   )), [contacts, conversationSubjects, i18n.language, query]);
 
-  function togglePanel() {
-    const next = !open;
-    setOpen(next);
-    if (next && !activeConversationIdRef.current && conversationsRef.current.length === 1) {
+  function toggleTool(toolId: GlobalToolId) {
+    const next = activeTool === toolId ? null : toolId;
+    setActiveTool(next);
+    if (next === "chat" && !activeConversationIdRef.current && conversationsRef.current.length === 1) {
       void selectConversation(conversationsRef.current[0].id);
     }
-    setToast(null);
+    if (next === "chat") setToast(null);
   }
 
   function closePanel() {
-    setOpen(false);
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
+    const trigger = activeTool === "dice" ? diceTriggerRef.current : chatTriggerRef.current;
+    setActiveTool(null);
+    window.requestAnimationFrame(() => trigger?.focus());
   }
 
   function trapPanelFocus(event: KeyboardEvent<HTMLElement>) {
@@ -411,29 +486,33 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
   }
 
   useEffect(() => {
-    if (!open || !activeConversationId) return;
+    if (!chatOpen || !activeConversationId) return;
     messageEndRef.current?.scrollIntoView({ block: "nearest" });
-  }, [activeConversationId, activeMessages.items.length, open]);
+  }, [activeConversationId, activeMessages.items.length, chatOpen]);
 
   return (
     <>
       <aside aria-label={t("chat.toolsAria")} className="playsay-tools-rail">
-        <button
-          aria-expanded={open}
-          aria-label={t("chat.open")}
-          className="playsay-tools-button"
-          data-active={open ? "true" : "false"}
-          onClick={togglePanel}
-          ref={triggerRef}
-          title={t("chat.open")}
-          type="button"
-        >
-          <MessageCircle aria-hidden="true" />
-          {unreadCount > 0 ? <span className="playsay-tools-badge">{compactCount(unreadCount)}</span> : null}
-        </button>
+        {tools.map((tool) => (
+          <button
+            aria-expanded={activeTool === tool.id}
+            aria-label={tool.label}
+            className="playsay-tools-button"
+            data-active={activeTool === tool.id ? "true" : "false"}
+            data-tool={tool.id}
+            key={tool.id}
+            onClick={() => toggleTool(tool.id)}
+            ref={tool.id === "chat" ? chatTriggerRef : diceTriggerRef}
+            title={tool.label}
+            type="button"
+          >
+            {tool.icon}
+            {tool.badge}
+          </button>
+        ))}
       </aside>
 
-      {open ? (
+      {chatOpen ? (
         <section
           aria-label={t("chat.title")}
           className="playsay-chat-panel"
@@ -568,10 +647,68 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
         </section>
       ) : null}
 
+      {diceOpen && classroomDice ? (
+        <section
+          aria-label={t("dice.title")}
+          className="playsay-tool-panel playsay-dice-panel"
+          onKeyDown={trapPanelFocus}
+          ref={panelRef}
+          role="dialog"
+        >
+          <header className="playsay-tool-panel-header">
+            <DiceFaceIcon value={diceValue} />
+            <div>
+              <h2>{t("dice.title")}</h2>
+              <p>{t("dice.subtitle")}</p>
+            </div>
+            <button aria-label={t("common.actions.close")} onClick={closePanel} type="button">
+              <X aria-hidden="true" />
+            </button>
+          </header>
+          <div className="playsay-dice-panel-body">
+            <p>{classroomDice.lastRoll
+              ? t("dice.lastRoller", { name: classroomDice.lastRoll.rollerName })
+              : t("dice.empty")}</p>
+            {visibleDiceRejection ? (
+              <p className="playsay-dice-error" role="alert">
+                {t(`dice.errors.${visibleDiceRejection.code}`)}
+              </p>
+            ) : null}
+            <button
+              className="playsay-dice-roll-button"
+              data-tool-autofocus
+              disabled={diceCoolingDown}
+              onClick={classroomDice.roll}
+              type="button"
+            >
+              {diceCoolingDown ? t("dice.cooldown") : t("dice.roll")}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {visibleDiceRoll ? (
+        <div
+          aria-atomic="true"
+          aria-live="assertive"
+          className="playsay-dice-reveal"
+          key={visibleDiceRoll.eventId}
+          role="status"
+        >
+          <div className="playsay-dice-reveal-face">
+            <DiceFaceIcon value={visibleDiceRoll.value} />
+          </div>
+          <p aria-hidden="true">{t("dice.rolledBy", { name: visibleDiceRoll.rollerName })}</p>
+          <span className="sr-only">
+            {t("dice.result", { name: visibleDiceRoll.rollerName, value: visibleDiceRoll.value })}
+          </span>
+        </div>
+      ) : null}
+
       {toast ? (
         <div className="playsay-chat-toast" role="status">
           <button className="playsay-chat-toast-open" onClick={() => {
-            setOpen(true);
+            setActiveTool("chat");
             setToast(null);
             void selectConversation(toast.conversationId);
           }} type="button">
@@ -585,6 +722,47 @@ export function GlobalToolsRail({ profile }: { profile: MeProfile }) {
       ) : null}
     </>
   );
+}
+
+export function DiceFaceIcon({ value }: { value: LessonDiceRoll["value"] | null }) {
+  return (
+    <svg aria-hidden="true" className="playsay-dice-face-icon" viewBox="0 0 24 24">
+      <rect height="19" rx="4.5" width="19" x="2.5" y="2.5" />
+      {dicePips(value).map(([x, y]) => <circle cx={x} cy={y} key={`${x}-${y}`} r="1.65" />)}
+    </svg>
+  );
+}
+
+export function availableGlobalToolIds(hasClassroomDice: boolean): GlobalToolId[] {
+  return hasClassroomDice ? ["chat", "dice"] : ["chat"];
+}
+
+export function dicePips(value: LessonDiceRoll["value"] | null): Array<[number, number]> {
+  const positions = {
+    topLeft: [7, 7] as [number, number],
+    topRight: [17, 7] as [number, number],
+    middleLeft: [7, 12] as [number, number],
+    center: [12, 12] as [number, number],
+    middleRight: [17, 12] as [number, number],
+    bottomLeft: [7, 17] as [number, number],
+    bottomRight: [17, 17] as [number, number],
+  };
+  switch (value) {
+    case 1: return [positions.center];
+    case 2: return [positions.topLeft, positions.bottomRight];
+    case 3: return [positions.topLeft, positions.center, positions.bottomRight];
+    case 4: return [positions.topLeft, positions.topRight, positions.bottomLeft, positions.bottomRight];
+    case 5: return [positions.topLeft, positions.topRight, positions.center, positions.bottomLeft, positions.bottomRight];
+    case 6: return [
+      positions.topLeft,
+      positions.middleLeft,
+      positions.bottomLeft,
+      positions.topRight,
+      positions.middleRight,
+      positions.bottomRight,
+    ];
+    default: return [];
+  }
 }
 
 function ChatAvatar({ contact }: { contact: ChatContact }) {

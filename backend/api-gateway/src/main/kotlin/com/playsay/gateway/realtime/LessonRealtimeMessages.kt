@@ -11,6 +11,7 @@ data class LessonRealtimeInboundMessage(
     val type: String? = null,
     val lessonId: UUID? = null,
     val state: String? = null,
+    val requestId: UUID? = null,
 )
 
 data class LessonParticipantPresence(
@@ -27,6 +28,15 @@ data class LessonRealtimeOutboundMessage(
     val change: String? = null,
     val participants: List<LessonParticipantPresence>? = null,
     val message: String? = null,
+    val eventId: UUID? = null,
+    val requestId: UUID? = null,
+    val value: Int? = null,
+    val rollerSubject: String? = null,
+    val rollerName: String? = null,
+    val rolledAt: Instant? = null,
+    val cooldownUntil: Instant? = null,
+    val code: String? = null,
+    val retryAt: Instant? = null,
 )
 
 data class LessonRealtimePrincipal(
@@ -38,6 +48,10 @@ data class LessonRealtimePrincipal(
 
     fun canReportPresence(lesson: ScheduledLessonResponse): Boolean =
         MetaData.Roles.STUDENT in roles && lesson.participants.any { participant -> participant.subject == subject }
+
+    fun canRollDice(lesson: ScheduledLessonResponse): Boolean =
+        MetaData.Roles.TEACHER in roles ||
+            (MetaData.Roles.STUDENT in roles && lesson.participants.any { participant -> participant.subject == subject })
 
     fun canSee(lesson: ScheduledLessonResponse, now: Instant = Instant.now()): Boolean {
         if (canManagePresence()) {

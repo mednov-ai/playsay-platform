@@ -4,8 +4,6 @@ import { Button } from "../../../components/ui/button";
 import { formatDateTime, isJoinableScheduledLesson, isScheduledLessonReadyToStart, lessonAccessOpensAt } from "../../../entities/schedule/model";
 import type { LessonMaterial, ScheduledLesson } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
-import type { ClipboardCopyResult } from "../../../shared/lib/clipboard";
-import { LessonLinksManualCopyDialog } from "./LessonLinksManualCopyDialog";
 
 const MaterialPlayPreviewDialog = lazy(() => (
   import("../../materials/ui/MaterialPlayPreviewDialog").then((module) => ({ default: module.MaterialPlayPreviewDialog }))
@@ -28,7 +26,7 @@ export function LessonPreparationPanel({
   message: string | null;
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   onBack: () => void;
-  onCopyLinks: (lesson: ScheduledLesson) => Promise<ClipboardCopyResult | null>;
+  onCopyLinks: (lesson: ScheduledLesson) => Promise<boolean>;
   onOpenMaterials: () => void;
   onStart: (lesson: ScheduledLesson) => Promise<void>;
 }) {
@@ -36,7 +34,6 @@ export function LessonPreparationPanel({
   const [currentLesson, setCurrentLesson] = useState(lesson);
   const [previewMaterial, setPreviewMaterial] = useState<LessonMaterial | null>(null);
   const [linksCopied, setLinksCopied] = useState(false);
-  const [manualCopyText, setManualCopyText] = useState<string | null>(null);
   const activeMaterials = materials.filter((material) => material.status !== "ARCHIVED");
   const selectedMaterial = activeMaterials.find((material) => material.id === currentLesson.materialId) ?? null;
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
@@ -56,12 +53,9 @@ export function LessonPreparationPanel({
   }
 
   async function copyLinks() {
-    const result = await onCopyLinks(currentLesson);
-    if (result?.copied) {
+    if (await onCopyLinks(currentLesson)) {
       setLinksCopied(true);
       window.setTimeout(() => setLinksCopied(false), 1800);
-    } else if (result) {
-      setManualCopyText(result.text);
     }
   }
 
@@ -161,7 +155,6 @@ export function LessonPreparationPanel({
           <MaterialPlayPreviewDialog material={previewMaterial} onClose={() => setPreviewMaterial(null)} open />
         </Suspense>
       ) : null}
-      {manualCopyText ? <LessonLinksManualCopyDialog onClose={() => setManualCopyText(null)} text={manualCopyText} /> : null}
     </section>
   );
 }

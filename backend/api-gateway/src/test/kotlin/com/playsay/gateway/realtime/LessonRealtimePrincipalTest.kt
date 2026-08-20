@@ -35,6 +35,16 @@ class LessonRealtimePrincipalTest {
     }
 
     @Test
+    fun `teacher and assigned student can roll lesson dice`() {
+        val activeLesson = lesson(participantSubjects = listOf("student-1"))
+
+        assertTrue(LessonRealtimePrincipal(subject = "teacher-1", roles = setOf("TEACHER")).canRollDice(activeLesson))
+        assertTrue(LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT")).canRollDice(activeLesson))
+        assertFalse(LessonRealtimePrincipal(subject = "student-2", roles = setOf("STUDENT")).canRollDice(activeLesson))
+        assertFalse(LessonRealtimePrincipal(subject = "admin-1", roles = setOf("ADMIN")).canRollDice(activeLesson))
+    }
+
+    @Test
     fun `student does not receive completed cancelled or expired lesson snapshot`() {
         val principal = LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT"))
         val now = Instant.parse("2026-05-25T10:00:00Z")

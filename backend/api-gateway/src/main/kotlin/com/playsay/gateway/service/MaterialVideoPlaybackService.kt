@@ -62,8 +62,8 @@ class MaterialVideoPlaybackService(
 
         val storedMeta = YoutubeVideoSupport.metaFromBlock(block)
         val storedMetaComplete = storedMeta?.durationSeconds != null && storedMeta.language != null
-        val cachedRecord = diagnostics.videoId?.let { videoId -> youtubeVideoCacheService.find(videoId) }
-        val cachedMeta = cachedRecord
+        val cachedMeta = diagnostics.videoId
+            ?.let { videoId -> youtubeVideoCacheService.find(videoId) }
             ?.takeIf { cache -> cache.durationSeconds != null && cache.language != null }
             ?.let { cache ->
                 YoutubeVideoMeta(
@@ -74,45 +74,21 @@ class MaterialVideoPlaybackService(
                 )
             }
         val resolvedMeta = if (storedMetaComplete || cachedMeta != null) null else diagnostics.videoId?.let { videoId -> youtubeMediaClient.resolveMetadata(videoId) }
-        if (resolvedMeta?.durationSeconds != null && resolvedMeta.language != null && cachedRecord != null) {
-            youtubeVideoCacheService.recordMetadata(cachedRecord.id, resolvedMeta)
-        }
         val meta = storedMeta?.takeIf { storedMetaComplete } ?: cachedMeta ?: resolvedMeta
-        if (meta == null) {
-            val videoId = diagnostics.videoId
-            val embedUrl = videoId?.let(YoutubeVideoSupport::embedUrl)
-            return if (!rfRelayEnabled && embedUrl != null) {
-                response(
-                    materialId,
-                    request.blockId,
-                    videoId,
-                    "EMBED",
-                    "RF_RELAY_DISABLED_METADATA_OPTIONAL",
-                    embedUrl,
-                    diagnostics,
-                    profileCountry,
-                    ipCountry,
-                    requestedQuality,
-                    metadataSource = "MISSING",
-                    effectiveMeta = null,
-                )
-            } else {
-                response(
-                    materialId,
-                    request.blockId,
-                    videoId,
-                    "NEEDS_REVIEW",
-                    "YOUTUBE_METADATA_MISSING",
-                    null,
-                    diagnostics,
-                    profileCountry,
-                    ipCountry,
-                    requestedQuality,
-                    metadataSource = "MISSING",
-                    effectiveMeta = null,
-                )
-            }
-        }
+            ?: return response(
+                materialId,
+                request.blockId,
+                diagnostics.videoId,
+                "NEEDS_REVIEW",
+                "YOUTUBE_METADATA_MISSING",
+                null,
+                diagnostics,
+                profileCountry,
+                ipCountry,
+                requestedQuality,
+                metadataSource = "MISSING",
+                effectiveMeta = null,
+            )
         val metadataSource = when {
             storedMetaComplete -> "STORED"
             cachedMeta != null -> "CACHE_RECORD"
@@ -121,9 +97,6 @@ class MaterialVideoPlaybackService(
         val embedUrl = YoutubeVideoSupport.embedUrl(meta.videoId)
         val policy = YoutubeVideoSupport.videoMeetsPolicy(meta)
         if (!policy.approved) {
-            if (!rfRelayEnabled && policy.reason == "YOUTUBE_METADATA_MISSING") {
-                return response(materialId, request.blockId, meta.videoId, "EMBED", "RF_RELAY_DISABLED_METADATA_OPTIONAL", embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
-            }
             return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", policy.reason, embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
         }
 

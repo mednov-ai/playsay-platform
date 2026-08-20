@@ -3,7 +3,6 @@ import {
   buildAuthorizeUrl,
   clearTokens,
   completeLogin,
-  consumeCompletedAuthAction,
   defaultAuthIssuer,
   isSilentLoginUnavailable,
   mapTokenResponse,
@@ -67,49 +66,6 @@ describe("auth helpers", () => {
     });
 
     expect(url.searchParams.get("prompt")).toBe("none");
-  });
-
-  it("requests idempotent passwordless WebAuthn registration through Keycloak AIA", () => {
-    const url = buildAuthorizeUrl({
-      config,
-      redirectUri: "https://online.play-and-say.ru/auth/callback",
-      state: "state-1",
-      codeChallenge: "challenge-1",
-      kcAction: "webauthn-register-passwordless:skip_if_exists",
-    });
-
-    expect(url.searchParams.get("kc_action")).toBe("webauthn-register-passwordless:skip_if_exists");
-  });
-
-  it("records the passkey action result and safe return path after callback", async () => {
-    const storage = new MemoryStorage();
-    storage.setItem(
-      "playsay.auth.loginFlow",
-      JSON.stringify({
-        authAction: "webauthn-register-passwordless:skip_if_exists",
-        codeVerifier: "verifier-1",
-        passkeyCountBefore: 0,
-        redirectUri: "https://online.play-and-say.ru/auth/callback",
-        returnPath: "/profile",
-        state: "state-1",
-      }),
-    );
-    vi.stubGlobal("window", { sessionStorage: storage });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      access_token: "access",
-      expires_in: 60,
-    }), { status: 200 })));
-
-    await completeLogin(new URL(
-      "https://online.play-and-say.ru/auth/callback?code=code-1&state=state-1&kc_action_status=success",
-    ), config);
-
-    expect(consumeCompletedAuthAction()).toEqual({
-      action: "webauthn-register-passwordless:skip_if_exists",
-      passkeyCountBefore: 0,
-      returnPath: "/profile",
-      status: "pending",
-    });
   });
 
   it("passes the selected app theme to Keycloak authorization", () => {

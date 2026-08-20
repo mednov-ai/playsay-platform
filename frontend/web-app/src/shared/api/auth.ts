@@ -23,30 +23,10 @@ type TokenResponse = {
 };
 
 type LoginFlow = {
-  authAction?: PasskeyAuthAction;
-  passkeyCountBefore?: number;
   codeVerifier: string;
-  returnPath?: string;
   state: string;
   redirectUri: string;
   silent?: boolean;
-};
-
-export type PasskeyAuthAction =
-  | "webauthn-register-passwordless"
-  | "webauthn-register-passwordless:skip_if_exists";
-
-export type PasskeyRegistrationOptions = {
-  mode: "additional" | "ensure";
-  passkeyCountBefore: number;
-  returnPath?: string;
-};
-
-export type CompletedAuthAction = {
-  action: PasskeyAuthAction;
-  passkeyCountBefore: number;
-  returnPath: string;
-  status: "cancelled" | "failed" | "pending" | "success";
 };
 
 type CompletedLoginFlow = {
@@ -82,7 +62,6 @@ export const authConfig: AuthConfig = {
 const tokenStorageKey = "playsay.auth.tokens";
 const flowStorageKey = "playsay.auth.loginFlow";
 const completedFlowStorageKey = "playsay.auth.completedLoginFlow";
-const completedAuthActionStorageKey = "playsay.auth.completedAuthAction";
 const skipSilentLoginStorageKey = "playsay.auth.skipSilentLoginOnce";
 const themeStorageKey = "playsay.theme";
 const expirySkewMs = 30_000;
@@ -121,7 +100,6 @@ export function clearTokens(): void {
   window.sessionStorage.removeItem(tokenStorageKey);
   window.sessionStorage.removeItem(flowStorageKey);
   window.sessionStorage.removeItem(completedFlowStorageKey);
-  window.sessionStorage.removeItem(completedAuthActionStorageKey);
 }
 
 export function storeTokens(tokens: TokenSet): void {
@@ -171,42 +149,6 @@ export async function startSilentLogin(config = authConfig): Promise<void> {
   );
 }
 
-export async function startPasskeyRegistration(
-  options: PasskeyRegistrationOptions,
-  config = authConfig,
-): Promise<void> {
-  const redirectUri = getRedirectUri(config);
-  const codeVerifier = createCodeVerifier();
-  const codeChallenge = await createCodeChallenge(codeVerifier);
-  const state = createCodeVerifier();
-  const language = currentApiLanguage();
-  const authAction: PasskeyAuthAction = options.mode === "additional"
-    ? "webauthn-register-passwordless"
-    : "webauthn-register-passwordless:skip_if_exists";
-  const flow: LoginFlow = {
-    authAction,
-    codeVerifier,
-    passkeyCountBefore: Math.max(0, options.passkeyCountBefore),
-    redirectUri,
-    returnPath: safeReturnPath(options.returnPath),
-    state,
-  };
-
-  rememberPendingLoginLanguage(language);
-  window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
-  window.location.assign(
-    buildAuthorizeUrl({
-      config,
-      redirectUri,
-      state,
-      codeChallenge,
-      kcAction: authAction,
-      themeMode: readStoredThemeMode(),
-      uiLocales: language,
-    }).toString(),
-  );
-}
-
 export async function completeLogin(url: URL, config = authConfig): Promise<TokenSet> {
   const error = url.searchParams.get("error");
   if (error) {
@@ -238,34 +180,13 @@ export async function completeLogin(url: URL, config = authConfig): Promise<Toke
     return inFlightCompletion;
   }
 
-  const flow = readLoginFlow();
   const completion = exchangeLoginCode(config, code, state);
   loginCompletionRequests.set(completionKey, completion);
 
   try {
-    const tokens = await completion;
-    writeCompletedAuthAction(flow, url);
-    return tokens;
+    return await completion;
   } finally {
     loginCompletionRequests.delete(completionKey);
-  }
-}
-
-export function consumeCompletedAuthAction(): CompletedAuthAction | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const value = window.sessionStorage.getItem(completedAuthActionStorageKey);
-  window.sessionStorage.removeItem(completedAuthActionStorageKey);
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value) as CompletedAuthAction;
-  } catch {
-    return null;
   }
 }
 
@@ -330,7 +251,6 @@ export function buildAuthorizeUrl(input: {
   redirectUri: string;
   state: string;
   codeChallenge: string;
-  kcAction?: PasskeyAuthAction;
   prompt?: "none";
   themeMode?: string;
   uiLocales?: string;
@@ -345,9 +265,6 @@ export function buildAuthorizeUrl(input: {
   url.searchParams.set("code_challenge_method", "S256");
   if (input.prompt) {
     url.searchParams.set("prompt", input.prompt);
-  }
-  if (input.kcAction) {
-    url.searchParams.set("kc_action", input.kcAction);
   }
   if (input.uiLocales) {
     url.searchParams.set("ui_locales", normalizeLanguage(input.uiLocales));
@@ -394,26 +311,6 @@ function readLoginFlow(): LoginFlow | null {
     return null;
   }
   return JSON.parse(value) as LoginFlow;
-}
-
-function writeCompletedAuthAction(flow: LoginFlow | null, callbackUrl: URL): void {
-  if (!flow?.authAction) {
-    return;
-  }
-
-  const rawStatus = callbackUrl.searchParams.get("kc_action_status");
-  const status: CompletedAuthAction["status"] = rawStatus === "success"
-    ? "pending"
-    : rawStatus === "cancelled"
-      ? "cancelled"
-      : "failed";
-  const result: CompletedAuthAction = {
-    action: flow.authAction,
-    passkeyCountBefore: flow.passkeyCountBefore ?? 0,
-    returnPath: safeReturnPath(flow.returnPath),
-    status,
-  };
-  window.sessionStorage.setItem(completedAuthActionStorageKey, JSON.stringify(result));
 }
 
 async function exchangeLoginCode(config: AuthConfig, code: string, state: string): Promise<TokenSet> {
@@ -514,11 +411,4 @@ function base64UrlEncode(bytes: Uint8Array): string {
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
-}
-
-function safeReturnPath(value: string | null | undefined): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/profile";
-  }
-  return value;
 }

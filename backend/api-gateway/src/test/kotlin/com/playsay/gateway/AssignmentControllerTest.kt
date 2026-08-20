@@ -14,6 +14,10 @@ import com.playsay.gateway.dto.ScheduledLessonRequest
 import com.playsay.gateway.dto.VocabularyAssignmentPreparationResponse
 import com.playsay.gateway.dto.VocabularyAssignmentSessionRef
 import com.playsay.gateway.dto.VocabularyHomeworkRequest
+import com.playsay.gateway.dto.VocabularyHomeworkCompletionPolicy
+import com.playsay.gateway.dto.VocabularyHomeworkReviewAction
+import com.playsay.gateway.dto.VocabularyHomeworkReviewRequest
+import com.playsay.gateway.dto.VocabularyAssignmentProgressUpdateRequest
 import com.playsay.gateway.entity.TeacherDelegationEntity
 import com.playsay.gateway.entity.TeacherDelegationStudentEntity
 import com.playsay.gateway.repo.AppUserRepo
@@ -29,6 +33,7 @@ import com.playsay.gateway.repo.SubmissionRepo
 import com.playsay.gateway.repo.AssignmentIntegrationOutboxRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.repo.TeacherDelegationStudentRepo
+import com.playsay.gateway.repo.VocabularyAssignmentProgressEventRepo
 import com.playsay.gateway.realtime.AssignmentChangedEvent
 import com.playsay.gateway.service.assignment.AssignmentStore
 import com.playsay.gateway.service.assignment.VOCABULARY_ASSIGNMENT_PREPARE_EVENT
@@ -91,6 +96,7 @@ class AssignmentControllerTest @Autowired constructor(
     private val appUserRepo: AppUserRepo,
     private val teacherDelegationRepo: TeacherDelegationRepo,
     private val teacherDelegationStudentRepo: TeacherDelegationStudentRepo,
+    private val vocabularyProgressEventRepo: VocabularyAssignmentProgressEventRepo,
     private val dataSource: DataSource,
 ) {
     @Autowired
@@ -109,6 +115,7 @@ class AssignmentControllerTest @Autowired constructor(
     @BeforeEach
     fun cleanDatabase() {
         assignmentIntegrationOutboxRepo.deleteAllInBatch()
+        vocabularyProgressEventRepo.deleteAllInBatch()
         submissionRepo.deleteAllInBatch()
         assignmentRecipientRepo.deleteAllInBatch()
         assignmentRepo.deleteAllInBatch()
@@ -426,6 +433,64 @@ class AssignmentControllerTest @Autowired constructor(
                 VOCABULARY_ASSIGNMENT_PREPARE_EVENT,
             )?.status,
         )
+    }
+
+    @Test
+    fun `teacher review completion is versioned idempotent and separate from diagnostic accuracy`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        userProfileStore.currentUserId(authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT"))
+        val created = assignmentStore.createVocabularyHomework(
+            teacher,
+            VocabularyHomeworkRequest(
+                studentSubjects = listOf("student-1"),
+                completionPolicy = VocabularyHomeworkCompletionPolicy.TEACHER_REVIEW,
+            ),
+        )
+        val practiceId = UUID.randomUUID()
+        val sessionId = UUID.randomUUID()
+        assignmentStore.applyVocabularyPreparation(
+            created.assignment.id,
+            VocabularyAssignmentPreparationResponse(practiceId, listOf(VocabularyAssignmentSessionRef(sessionId, "student-1"))),
+            "teacher-1",
+        )
+        val eventId = UUID.randomUUID()
+        val progress = VocabularyAssignmentProgressUpdateRequest(
+            eventId = eventId,
+            sessionId = sessionId,
+            ownerSubject = "student-1",
+            revision = 1,
+            state = "AWAITING_REVIEW",
+            completionRatio = BigDecimal.ONE,
+            accuracy = BigDecimal("0.25"),
+            difficultWordCount = 3,
+            learnerSnapshotId = sessionId,
+            distinctGradedPrompts = 8,
+            distinctEntries = 4,
+            hintsUsed = 2,
+            activeDurationMs = 42_000,
+            masteryRatio = BigDecimal("0.50"),
+            completionPolicy = VocabularyHomeworkCompletionPolicy.TEACHER_REVIEW,
+            completionPolicyVersion = "vocabulary-homework-v1",
+            updatedAt = Instant.now(),
+        )
+
+        assignmentStore.updateVocabularyProgress(created.assignment.id, progress)
+        assignmentStore.updateVocabularyProgress(created.assignment.id, progress)
+        val awaiting = assignmentStore.teacherDetail(teacher, created.assignment.id).recipients.single()
+        assertEquals("AWAITING_REVIEW", awaiting.activityState)
+        assertEquals(8, awaiting.distinctGradedPrompts)
+        assertEquals(0, BigDecimal("0.25").compareTo(awaiting.accuracy))
+        assertEquals(1, vocabularyProgressEventRepo.count())
+
+        val accepted = assignmentStore.reviewVocabularyHomework(
+            teacher,
+            created.assignment.id,
+            "student-1",
+            VocabularyHomeworkReviewRequest(VocabularyHomeworkReviewAction.ACCEPT, "Enough meaningful work"),
+        ).recipients.single()
+        assertEquals("COMPLETED", accepted.activityState)
+        assertEquals("ACCEPT", accepted.reviewState)
+        assertEquals("Enough meaningful work", accepted.reviewNote)
     }
 
     @Test

@@ -53,12 +53,13 @@ internal fun stageForInterval(intervalIndex: Int): LearningStage = when {
 }
 
 internal fun aggregateVocabularyStage(states: List<VocabularySkillStateEntity>): LearningStage {
-    if (states.isEmpty() || states.all { it.lastPracticedAt == null }) return LearningStage.NEW
-    val meaningInterval = states.firstOrNull { it.skill == VocabularySkill.MEANING }?.intervalIndex ?: 0
-    val formInterval = states.firstOrNull { it.skill == VocabularySkill.FORM }?.intervalIndex ?: 0
-    val contextInterval = states.firstOrNull { it.skill == VocabularySkill.CONTEXT }?.intervalIndex ?: 0
+    val available = states.filter(VocabularySkillStateEntity::skillAvailable)
+    if (available.isEmpty() || available.all { it.lastPracticedAt == null }) return LearningStage.NEW
+    val meaningInterval = available.firstOrNull { it.skill == VocabularySkill.MEANING }?.intervalIndex ?: 0
+    val formInterval = available.firstOrNull { it.skill == VocabularySkill.FORM }?.intervalIndex ?: 0
+    val contextState = available.firstOrNull { it.skill == VocabularySkill.CONTEXT }
     return when {
-        meaningInterval >= 2 && formInterval >= 4 && contextInterval >= 4 -> LearningStage.MASTERED
+        meaningInterval >= 2 && formInterval >= 4 && (contextState == null || contextState.intervalIndex >= 4) -> LearningStage.MASTERED
         meaningInterval >= 2 && formInterval >= 2 -> LearningStage.REVIEW
         else -> LearningStage.LEARNING
     }
@@ -78,6 +79,7 @@ internal fun selectPracticeEntryIds(
     pinnedEntryIds: List<UUID>,
     excludedEntryIds: List<UUID>,
     now: Instant,
+    maxNewItems: Int = 3,
 ): List<UUID> {
     val limit = wordLimit.coerceIn(1, 30)
     val excluded = excludedEntryIds.toSet()
@@ -100,7 +102,7 @@ internal fun selectPracticeEntryIds(
         .forEach { candidate ->
             if (selected.size >= limit) return@forEach
             val isNew = candidate.stage == LearningStage.NEW
-            if (isNew && newCount >= 3) return@forEach
+            if (isNew && newCount >= maxNewItems.coerceIn(0, limit)) return@forEach
             selected += candidate
             selectedIds += candidate.id
             if (isNew) newCount += 1

@@ -62,28 +62,6 @@ export interface UserProfileResponse {
   readonly lessonTranslationAllowed: boolean;
 }
 
-export interface RenamePasskeyRequest {
-  /**
-     * @minLength 1
-     * @maxLength 64
-     */
-  label: string;
-}
-
-export interface PasskeyCredentialResponse {
-  /** Opaque credential identifier usable only by self-service endpoints. */
-  id: string;
-  /** @nullable */
-  label?: string | null;
-  /** @nullable */
-  createdAt?: string | null;
-}
-
-export interface AuthenticationMethodsResponse {
-  hasPassword: boolean;
-  passkeys: PasskeyCredentialResponse[];
-}
-
 export interface UpdateStudentLessonTranslationPermissionRequest {
   allowed: boolean;
 }
@@ -706,6 +684,7 @@ export type AssignmentRecipientProgressResponseActivityState = typeof Assignment
 export const AssignmentRecipientProgressResponseActivityState = {
   NOT_STARTED: 'NOT_STARTED',
   IN_PROGRESS: 'IN_PROGRESS',
+  AWAITING_REVIEW: 'AWAITING_REVIEW',
   COMPLETED: 'COMPLETED',
   FAILED: 'FAILED',
 } as const;
@@ -753,6 +732,24 @@ export interface AssignmentRecipientProgressResponse {
   accuracy?: number | null;
   /** @nullable */
   difficultWordCount?: number | null;
+  /** @nullable */
+  learnerSnapshotId?: string | null;
+  /** @nullable */
+  distinctGradedPrompts?: number | null;
+  /** @nullable */
+  distinctEntries?: number | null;
+  /** @nullable */
+  hintsUsed?: number | null;
+  /** @nullable */
+  activeDurationMs?: number | null;
+  /** @nullable */
+  masteryRatio?: number | null;
+  /** @nullable */
+  reviewState?: string | null;
+  /** @nullable */
+  reviewNote?: string | null;
+  /** @nullable */
+  reviewedAt?: string | null;
 }
 
 export type AssignmentSummaryResponseContentKind = typeof AssignmentSummaryResponseContentKind[keyof typeof AssignmentSummaryResponseContentKind];
@@ -784,9 +781,46 @@ export type AssignmentSummaryResponseMyActivityState = typeof AssignmentSummaryR
 export const AssignmentSummaryResponseMyActivityState = {
   NOT_STARTED: 'NOT_STARTED',
   IN_PROGRESS: 'IN_PROGRESS',
+  AWAITING_REVIEW: 'AWAITING_REVIEW',
   COMPLETED: 'COMPLETED',
   FAILED: 'FAILED',
 } as const;
+
+/**
+ * @nullable
+ */
+export type AssignmentSummaryResponseCompletionPolicy = typeof AssignmentSummaryResponseCompletionPolicy[keyof typeof AssignmentSummaryResponseCompletionPolicy] | null;
+
+
+export const AssignmentSummaryResponseCompletionPolicy = {
+  MEANINGFUL_ACTIVITY: 'MEANINGFUL_ACTIVITY',
+  COMPLETE_SESSION: 'COMPLETE_SESSION',
+  MASTERY_TARGET: 'MASTERY_TARGET',
+  TEACHER_REVIEW: 'TEACHER_REVIEW',
+} as const;
+
+export interface VocabularyCompletionThresholds {
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  distinctGradedPrompts: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  distinctEntries: number;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  masteryPercent: number;
+  /**
+     * @minLength 0
+     * @maxLength 64
+     */
+  policyVersion: string;
+}
 
 export interface AssignmentSummaryResponse {
   id: string;
@@ -835,6 +869,23 @@ export interface AssignmentSummaryResponse {
   myAccuracy?: number | null;
   /** @nullable */
   myDifficultWordCount?: number | null;
+  /** @nullable */
+  completionPolicy?: AssignmentSummaryResponseCompletionPolicy;
+  /** @nullable */
+  completionPolicyVersion?: string | null;
+  completionThresholds?: VocabularyCompletionThresholds | null;
+  /** @nullable */
+  myDistinctGradedPrompts?: number | null;
+  /** @nullable */
+  myDistinctEntries?: number | null;
+  /** @nullable */
+  myHintsUsed?: number | null;
+  /** @nullable */
+  myActiveDurationMs?: number | null;
+  /** @nullable */
+  myMasteryRatio?: number | null;
+  /** @nullable */
+  myReviewState?: string | null;
 }
 
 export interface TeacherAssignmentDetailResponse {
@@ -1241,8 +1292,22 @@ export type VocabularyAssignmentProgressUpdateRequestState = typeof VocabularyAs
 export const VocabularyAssignmentProgressUpdateRequestState = {
   NOT_STARTED: 'NOT_STARTED',
   IN_PROGRESS: 'IN_PROGRESS',
+  AWAITING_REVIEW: 'AWAITING_REVIEW',
   COMPLETED: 'COMPLETED',
   FAILED: 'FAILED',
+} as const;
+
+/**
+ * @nullable
+ */
+export type VocabularyAssignmentProgressUpdateRequestCompletionPolicy = typeof VocabularyAssignmentProgressUpdateRequestCompletionPolicy[keyof typeof VocabularyAssignmentProgressUpdateRequestCompletionPolicy] | null;
+
+
+export const VocabularyAssignmentProgressUpdateRequestCompletionPolicy = {
+  MEANINGFUL_ACTIVITY: 'MEANINGFUL_ACTIVITY',
+  COMPLETE_SESSION: 'COMPLETE_SESSION',
+  MASTERY_TARGET: 'MASTERY_TARGET',
+  TEACHER_REVIEW: 'TEACHER_REVIEW',
 } as const;
 
 export interface VocabularyAssignmentProgressUpdateRequest {
@@ -1257,6 +1322,22 @@ export interface VocabularyAssignmentProgressUpdateRequest {
   accuracy?: number | null;
   /** @nullable */
   difficultWordCount?: number | null;
+  /** @nullable */
+  learnerSnapshotId?: string | null;
+  /** @nullable */
+  distinctGradedPrompts?: number | null;
+  /** @nullable */
+  distinctEntries?: number | null;
+  /** @nullable */
+  hintsUsed?: number | null;
+  /** @nullable */
+  activeDurationMs?: number | null;
+  /** @nullable */
+  masteryRatio?: number | null;
+  /** @nullable */
+  completionPolicy?: VocabularyAssignmentProgressUpdateRequestCompletionPolicy;
+  /** @nullable */
+  completionPolicyVersion?: string | null;
   updatedAt: string;
 }
 
@@ -1330,6 +1411,48 @@ export const VocabularyHomeworkRequestMode = {
   KEYBOARD: 'KEYBOARD',
 } as const;
 
+export type VocabularyHomeworkRequestCompletionPolicy = typeof VocabularyHomeworkRequestCompletionPolicy[keyof typeof VocabularyHomeworkRequestCompletionPolicy];
+
+
+export const VocabularyHomeworkRequestCompletionPolicy = {
+  MEANINGFUL_ACTIVITY: 'MEANINGFUL_ACTIVITY',
+  COMPLETE_SESSION: 'COMPLETE_SESSION',
+  MASTERY_TARGET: 'MASTERY_TARGET',
+  TEACHER_REVIEW: 'TEACHER_REVIEW',
+} as const;
+
+export type VocabularyHomeworkRequestKeyMode = typeof VocabularyHomeworkRequestKeyMode[keyof typeof VocabularyHomeworkRequestKeyMode];
+
+
+export const VocabularyHomeworkRequestKeyMode = {
+  WHOLE_WORDS: 'WHOLE_WORDS',
+  CHARACTER_NGRAMS: 'CHARACTER_NGRAMS',
+  MIXED: 'MIXED',
+} as const;
+
+export interface VocabularyKeyNgramSettings {
+  /**
+     * @minimum 2
+     * @maximum 8
+     */
+  minLength: number;
+  /**
+     * @minimum 2
+     * @maximum 8
+     */
+  maxLength: number;
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  targetLimit: number;
+  /**
+     * @minimum 1
+     * @maximum 4
+     */
+  maxRepetitions: number;
+}
+
 export interface VocabularyHomeworkRequest {
   /**
      * @minItems 1
@@ -1367,6 +1490,10 @@ export interface VocabularyHomeworkRequest {
   planId?: string | null;
   /** @nullable */
   planRevision?: number | null;
+  completionPolicy?: VocabularyHomeworkRequestCompletionPolicy;
+  completionThresholds?: VocabularyCompletionThresholds;
+  keyMode?: VocabularyHomeworkRequestKeyMode;
+  keyNgramSettings?: VocabularyKeyNgramSettings;
 }
 
 export interface StudentInviteConsumeRequest {
@@ -1555,6 +1682,24 @@ export interface MaterialAssetUpdateRequest {
   tags?: string[] | null;
 }
 
+export type VocabularyHomeworkReviewRequestAction = typeof VocabularyHomeworkReviewRequestAction[keyof typeof VocabularyHomeworkReviewRequestAction];
+
+
+export const VocabularyHomeworkReviewRequestAction = {
+  ACCEPT: 'ACCEPT',
+  RETURN: 'RETURN',
+} as const;
+
+export interface VocabularyHomeworkReviewRequest {
+  action: VocabularyHomeworkReviewRequestAction;
+  /**
+     * @minLength 0
+     * @maxLength 1000
+     * @nullable
+     */
+  note?: string | null;
+}
+
 export interface PublicPaymentInvoiceResponse {
   number: string;
   status: string;
@@ -1612,6 +1757,7 @@ export interface StudentVocabularyAssignmentDetailResponse {
   assignment: AssignmentSummaryResponse;
   practiceId: string;
   sessionId: string;
+  learnerSnapshotId: string;
 }
 
 export interface HelloResponse {
@@ -1712,18 +1858,6 @@ export type DelegationsParams = {
 direction?: string;
 status?: string;
 };
-
-export type CreateScheduledLessonParticipantLinksParams = {
-linkOrigin?: CreateScheduledLessonParticipantLinksLinkOrigin;
-};
-
-export type CreateScheduledLessonParticipantLinksLinkOrigin = typeof CreateScheduledLessonParticipantLinksLinkOrigin[keyof typeof CreateScheduledLessonParticipantLinksLinkOrigin];
-
-
-export const CreateScheduledLessonParticipantLinksLinkOrigin = {
-  HONEYSCHOOL_RU: 'HONEYSCHOOL_RU',
-  HONEY_SCHOOL: 'HONEY_SCHOOL',
-} as const;
 
 export type AppendScheduledLessonImagePageParams = {
 title?: string;
@@ -1953,94 +2087,6 @@ export const deleteMyUserProfile = async ( options?: RequestInit): Promise<delet
 
   const data: deleteMyUserProfileResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteMyUserProfileResponse
-}
-
-
-
-export type renameMyPasskeyResponse200 = {
-  data: AuthenticationMethodsResponse
-  status: 200
-}
-
-export type renameMyPasskeyResponseSuccess = (renameMyPasskeyResponse200) & {
-  headers: Headers;
-};
-;
-
-export type renameMyPasskeyResponse = (renameMyPasskeyResponseSuccess)
-
-export const getRenameMyPasskeyUrl = (credentialId: string,) => {
-
-
-
-
-  return `/api/users/me/authentication-methods/passkeys/${credentialId}`
-}
-
-/**
- * @summary Rename current user's Passkey
- */
-export const renameMyPasskey = async (credentialId: string,
-    renamePasskeyRequest: RenamePasskeyRequest, options?: RequestInit): Promise<renameMyPasskeyResponse> => {
-
-  const res = await fetch(getRenameMyPasskeyUrl(credentialId),
-  {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(renamePasskeyRequest)
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: renameMyPasskeyResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as renameMyPasskeyResponse
-}
-
-
-
-export type deleteMyPasskeyResponse200 = {
-  data: AuthenticationMethodsResponse
-  status: 200
-}
-
-export type deleteMyPasskeyResponseSuccess = (deleteMyPasskeyResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteMyPasskeyResponse = (deleteMyPasskeyResponseSuccess)
-
-export const getDeleteMyPasskeyUrl = (credentialId: string,) => {
-
-
-
-
-  return `/api/users/me/authentication-methods/passkeys/${credentialId}`
-}
-
-/**
- * Deletes a passwordless Passkey owned by the current user without exposing Keycloak administration.
- * @summary Delete current user's Passkey
- */
-export const deleteMyPasskey = async (credentialId: string, options?: RequestInit): Promise<deleteMyPasskeyResponse> => {
-
-  const res = await fetch(getDeleteMyPasskeyUrl(credentialId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: deleteMyPasskeyResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as deleteMyPasskeyResponse
 }
 
 
@@ -4119,30 +4165,21 @@ export type createScheduledLessonParticipantLinksResponseError = (createSchedule
 
 export type createScheduledLessonParticipantLinksResponse = (createScheduledLessonParticipantLinksResponseSuccess | createScheduledLessonParticipantLinksResponseError)
 
-export const getCreateScheduledLessonParticipantLinksUrl = (lessonId: string,
-    params?: CreateScheduledLessonParticipantLinksParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getCreateScheduledLessonParticipantLinksUrl = (lessonId: string,) => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/participant-links?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/participant-links`
+  return `/api/schedule/lessons/${lessonId}/participant-links`
 }
 
 /**
  * Returns per-participant lesson links. Teacher-managed students receive one-time magic links. Requires TEACHER or ADMIN role.
  * @summary Create scheduled lesson participant links
  */
-export const createScheduledLessonParticipantLinks = async (lessonId: string,
-    params?: CreateScheduledLessonParticipantLinksParams, options?: RequestInit): Promise<createScheduledLessonParticipantLinksResponse> => {
+export const createScheduledLessonParticipantLinks = async (lessonId: string, options?: RequestInit): Promise<createScheduledLessonParticipantLinksResponse> => {
 
-  const res = await fetch(getCreateScheduledLessonParticipantLinksUrl(lessonId,params),
+  const res = await fetch(getCreateScheduledLessonParticipantLinksUrl(lessonId),
   {
     ...options,
     method: 'POST'
@@ -7401,6 +7438,52 @@ export const updateMaterialAsset = async (materialId: string,
 
 
 
+export type reviewVocabularyHomeworkAssignmentResponse200 = {
+  data: TeacherAssignmentDetailResponse
+  status: 200
+}
+
+export type reviewVocabularyHomeworkAssignmentResponseSuccess = (reviewVocabularyHomeworkAssignmentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type reviewVocabularyHomeworkAssignmentResponse = (reviewVocabularyHomeworkAssignmentResponseSuccess)
+
+export const getReviewVocabularyHomeworkAssignmentUrl = (assignmentId: string,
+    studentSubject: string,) => {
+
+
+
+
+  return `/api/assignments/${assignmentId}/vocabulary-review/${studentSubject}`
+}
+
+/**
+ * @summary Accept or return vocabulary homework awaiting teacher review
+ */
+export const reviewVocabularyHomeworkAssignment = async (assignmentId: string,
+    studentSubject: string,
+    vocabularyHomeworkReviewRequest: VocabularyHomeworkReviewRequest, options?: RequestInit): Promise<reviewVocabularyHomeworkAssignmentResponse> => {
+
+  const res = await fetch(getReviewVocabularyHomeworkAssignmentUrl(assignmentId,studentSubject),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vocabularyHomeworkReviewRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: reviewVocabularyHomeworkAssignmentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as reviewVocabularyHomeworkAssignmentResponse
+}
+
+
+
 export type listStudentProfilesResponse200 = {
   data: UserProfileResponse[]
   status: 200
@@ -7453,57 +7536,6 @@ export const listStudentProfiles = async ( options?: RequestInit): Promise<listS
 
   const data: listStudentProfilesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listStudentProfilesResponse
-}
-
-
-
-export type getMyAuthenticationMethodsResponse200 = {
-  data: AuthenticationMethodsResponse
-  status: 200
-}
-
-export type getMyAuthenticationMethodsResponse401 = {
-  data: void
-  status: 401
-}
-
-export type getMyAuthenticationMethodsResponseSuccess = (getMyAuthenticationMethodsResponse200) & {
-  headers: Headers;
-};
-export type getMyAuthenticationMethodsResponseError = (getMyAuthenticationMethodsResponse401) & {
-  headers: Headers;
-};
-
-export type getMyAuthenticationMethodsResponse = (getMyAuthenticationMethodsResponseSuccess | getMyAuthenticationMethodsResponseError)
-
-export const getGetMyAuthenticationMethodsUrl = () => {
-
-
-
-
-  return `/api/users/me/authentication-methods`
-}
-
-/**
- * Returns password availability and safe metadata for the current user's passwordless Passkeys.
- * @summary Current user's sign-in methods
- */
-export const getMyAuthenticationMethods = async ( options?: RequestInit): Promise<getMyAuthenticationMethodsResponse> => {
-
-  const res = await fetch(getGetMyAuthenticationMethodsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getMyAuthenticationMethodsResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getMyAuthenticationMethodsResponse
 }
 
 

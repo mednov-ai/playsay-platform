@@ -114,7 +114,7 @@ export function buildStream(layoutId: LayoutId, chordSet: ChordSet, visibleCapac
     });
   });
 
-  if (baseStream.length === 0 || baseStream.length >= targetLength) {
+  if (chordSet.practiceKind === "VOCABULARY" || baseStream.length === 0 || baseStream.length >= targetLength) {
     return baseStream;
   }
 

@@ -14,4 +14,7 @@ interface KeyboardVocabularyResultOutboxRepo : JpaRepository<KeyboardVocabularyR
     ): List<KeyboardVocabularyResultOutboxEntity>
 
     fun deleteByTrainingResultIdIn(trainingResultIds: Collection<Long>): Long
+    fun countByStatus(status: String): Long
+    fun countByStatusAndNextAttemptAtBefore(status: String, nextAttemptAt: Instant): Long
+    fun findFirstByStatusOrderByCreatedAtAsc(status: String): KeyboardVocabularyResultOutboxEntity?
 }

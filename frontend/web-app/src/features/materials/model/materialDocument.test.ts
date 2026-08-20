@@ -161,28 +161,6 @@ describe("material document accepted answers", () => {
     } as MaterialEditorBlock).videoClip).toBeUndefined();
   });
 
-  it("keeps teacher-confirmed video metadata through serde", () => {
-    const block = materialBlockFromJson({
-      id: "video-meta-1",
-      type: "videoEmbed",
-      title: "Warm-up video",
-      provider: "YOUTUBE",
-      url: "https://www.youtube.com/watch?v=_TGPrAdUaTY",
-      videoMeta: {
-        durationSeconds: 222,
-        language: "en",
-        validationStatus: "TEACHER_CONFIRMED",
-      },
-    });
-
-    expect(block?.videoMeta).toEqual({
-      durationSeconds: 222,
-      language: "en",
-      validationStatus: "TEACHER_CONFIRMED",
-    });
-    expect(cleanMaterialBlock(block as MaterialEditorBlock).videoMeta).toEqual(block?.videoMeta);
-  });
-
   it("keeps stable item ids and accepted answer variants through serde", () => {
     const block = materialBlockFromJson({
       id: "gaps",

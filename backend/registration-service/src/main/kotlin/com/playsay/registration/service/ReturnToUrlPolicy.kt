@@ -20,14 +20,7 @@ class ReturnToUrlPolicy {
     }
 
     private companion object {
-        val publicHosts = setOf(
-            "dev.key.honey.school",
-            "dev.online.honey.school",
-            "key.honey.school",
-            "online.honey.school",
-            "key.honeyschool.ru",
-            "online.honeyschool.ru",
-        )
+        val publicHosts = setOf("key.play-and-say.ru", "online.play-and-say.ru")
         val localHosts = setOf("localhost", "127.0.0.1")
     }
 }

@@ -39,7 +39,7 @@ describe("AppShell teacher header", () => {
           message={null}
           onAssignMaterial={async () => null}
           onBack={() => undefined}
-          onCopyLinks={async () => ({ copied: true, text: "https://dev.online.honey.school/join#token" })}
+          onCopyLinks={async () => true}
           onOpenMaterials={() => undefined}
           onStart={async () => undefined}
         />
@@ -85,9 +85,6 @@ function props(): AppShellProps {
     adminLoading: false,
     adminMessage: null,
     adminUsers: [],
-    authenticationMethods: { hasPassword: true, passkeys: [] },
-    authenticationMethodsLoading: false,
-    authenticationMethodsMessage: null,
     anyLessonLoading: false,
     appProfile: null,
     assignMaterialToScheduledLesson: async () => null,
@@ -95,7 +92,7 @@ function props(): AppShellProps {
     classroomLesson: null,
     completeScheduledLesson: async () => undefined,
     confirmScheduledLessonJoin: async () => undefined,
-    copyScheduledLessonLinks: async () => ({ copied: true, text: "https://dev.online.honey.school/join#token" }),
+    copyScheduledLessonLinks: async () => true,
     courseLessons: {},
     courseLoading: false,
     courseMessage: null,
@@ -107,7 +104,6 @@ function props(): AppShellProps {
     createTopic: async () => null,
     createScheduledLesson: async () => undefined,
     deleteCourse: async () => undefined,
-    deletePasskey: async () => true,
     deleteLesson: async () => undefined,
     deleteMaterial: async () => undefined,
     deleteTopic: async () => undefined,
@@ -141,12 +137,10 @@ function props(): AppShellProps {
     profileMessage: null,
     profileSaving: false,
     refreshAdminUsers: async () => undefined,
-    refreshAuthenticationMethods: async () => undefined,
     refreshCourses: async () => undefined,
     refreshMaterials: async () => undefined,
     refreshPaymentInvoices: async () => undefined,
     refreshSchedule: async () => undefined,
-    renamePasskey: async () => true,
     resetProfile: async () => undefined,
     roomLoadingLessonId: null,
     roomMessage: null,

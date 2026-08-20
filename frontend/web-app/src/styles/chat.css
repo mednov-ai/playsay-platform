@@ -11,8 +11,10 @@ main[data-playsay-tools-layout="true"] {
   left: 0;
   display: flex;
   width: 3.5rem;
+  flex-direction: column;
   align-items: flex-start;
   justify-content: center;
+  gap: 0.35rem;
   border-right: 1px solid hsl(var(--border));
   background: color-mix(in srgb, hsl(var(--surface)) 94%, transparent);
   padding-top: max(1rem, env(safe-area-inset-top));
@@ -50,6 +52,17 @@ main[data-playsay-tools-layout="true"] {
   height: 1.35rem;
 }
 
+.playsay-dice-face-icon rect {
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.65;
+}
+
+.playsay-dice-face-icon circle {
+  fill: currentcolor;
+  stroke: none;
+}
+
 .playsay-tools-badge {
   position: absolute;
   top: -0.3rem;
@@ -84,6 +97,169 @@ main[data-playsay-tools-layout="true"] {
   background: hsl(var(--surface));
   color: hsl(var(--foreground));
   box-shadow: 0 28px 80px rgb(39 23 14 / 0.22);
+}
+
+.playsay-tool-panel {
+  position: fixed;
+  z-index: 82;
+  top: 0.75rem;
+  left: 4.25rem;
+  width: min(19rem, calc(100vw - 5rem));
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.25rem;
+  background: hsl(var(--surface));
+  color: hsl(var(--foreground));
+  box-shadow: 0 28px 80px rgb(39 23 14 / 0.22);
+}
+
+.playsay-tool-panel-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0.8rem;
+}
+
+.playsay-tool-panel-header > .playsay-dice-face-icon {
+  width: 2rem;
+  height: 2rem;
+  color: hsl(var(--primary));
+}
+
+.playsay-tool-panel-header h2,
+.playsay-tool-panel-header p {
+  margin: 0;
+}
+
+.playsay-tool-panel-header h2 {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.playsay-tool-panel-header p {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.76rem;
+}
+
+.playsay-tool-panel-header button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+
+.playsay-tool-panel-header button:hover,
+.playsay-tool-panel-header button:focus-visible {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  outline: none;
+}
+
+.playsay-tool-panel-header button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.playsay-dice-panel-body {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.playsay-dice-panel-body > p {
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.playsay-dice-panel-body > .playsay-dice-error {
+  color: #b42318;
+  font-weight: 750;
+}
+
+.playsay-dice-roll-button {
+  min-height: 2.75rem;
+  border: 1px solid hsl(var(--primary));
+  border-radius: 0.8rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.playsay-dice-roll-button:hover:not(:disabled),
+.playsay-dice-roll-button:focus-visible:not(:disabled) {
+  background: #df4100;
+  outline: none;
+}
+
+.playsay-dice-roll-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.playsay-dice-reveal {
+  position: fixed;
+  z-index: 96;
+  top: 50%;
+  left: calc(50% + 1.75rem);
+  display: grid;
+  min-width: 9rem;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgb(255 92 0 / 0.28);
+  border-radius: 1.5rem;
+  background: color-mix(in srgb, hsl(var(--surface)) 94%, transparent);
+  box-shadow: 0 28px 80px rgb(39 23 14 / 0.24);
+  padding: 1.35rem 1.6rem 1.1rem;
+  pointer-events: none;
+  animation: playsay-dice-reveal 2.1s ease both;
+  backdrop-filter: blur(18px);
+}
+
+.playsay-dice-reveal-face {
+  display: grid;
+  width: 5.5rem;
+  height: 5.5rem;
+  transform-origin: center;
+  place-items: center;
+  color: hsl(var(--primary));
+  animation: playsay-dice-roll 0.72s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.playsay-dice-reveal-face .playsay-dice-face-icon {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0.7rem 1rem rgb(255 92 0 / 0.16));
+}
+
+.playsay-dice-reveal p {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+@keyframes playsay-dice-roll {
+  0% { transform: scale(0.45) rotate(-150deg); opacity: 0; }
+  58% { transform: scale(1.12) rotate(18deg); opacity: 1; }
+  78% { transform: scale(0.96) rotate(-5deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+@keyframes playsay-dice-reveal {
+  0% { opacity: 0; }
+  12%, 78% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .playsay-chat-header {
@@ -575,6 +751,7 @@ main[data-playsay-tools-layout="true"] {
     bottom: 0;
     width: auto;
     height: calc(3.35rem + env(safe-area-inset-bottom));
+    flex-direction: row;
     align-items: flex-start;
     justify-content: center;
     border-top: 1px solid hsl(var(--border));
@@ -588,6 +765,35 @@ main[data-playsay-tools-layout="true"] {
     width: auto;
     border: 0;
     border-radius: 0;
+  }
+
+  .playsay-tool-panel {
+    inset: 0;
+    display: flex;
+    width: auto;
+    flex-direction: column;
+    justify-content: flex-end;
+    border: 0;
+    border-radius: 0;
+    background: color-mix(in srgb, hsl(var(--foreground)) 18%, transparent);
+  }
+
+  .playsay-dice-panel .playsay-tool-panel-header,
+  .playsay-dice-panel .playsay-dice-panel-body {
+    background: hsl(var(--surface));
+  }
+
+  .playsay-dice-panel .playsay-tool-panel-header {
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding-top: 1rem;
+  }
+
+  .playsay-dice-panel .playsay-dice-panel-body {
+    padding-bottom: max(1rem, calc(0.75rem + env(safe-area-inset-bottom)));
+  }
+
+  .playsay-dice-reveal {
+    left: 50%;
   }
 
   .playsay-chat-header {
@@ -606,5 +812,10 @@ main[data-playsay-tools-layout="true"] {
 @media (prefers-reduced-motion: reduce) {
   .playsay-tools-button {
     transition: none;
+  }
+
+  .playsay-dice-reveal,
+  .playsay-dice-reveal-face {
+    animation: none;
   }
 }

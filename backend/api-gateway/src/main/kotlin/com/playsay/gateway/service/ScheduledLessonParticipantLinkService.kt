@@ -4,7 +4,6 @@ import com.playsay.gateway.client.RegistrationGateway
 import com.playsay.contract.registration.model.ManagedStudentInviteRequest
 import com.playsay.gateway.dto.ScheduledLessonParticipantLinkResponse
 import com.playsay.gateway.dto.ScheduledLessonParticipantLinksResponse
-import com.playsay.gateway.dto.ScheduledLessonLinkOrigin
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.LessonParticipantRow
@@ -20,17 +19,14 @@ class ScheduledLessonParticipantLinkService(
     private val appUserRepo: AppUserRepo,
     private val registrationGateway: RegistrationGateway,
     @param:Value("\${playsay.public-app-url:https://online.honey.school}") private val publicAppUrl: String,
-    @param:Value("\${playsay.public-app-rf-url:\${playsay.public-app-url:https://online.honey.school}}") private val publicAppRfUrl: String,
 ) {
     fun createLinks(
         lesson: ScheduledLessonRow,
         participants: List<LessonParticipantRow>,
-        linkOrigin: ScheduledLessonLinkOrigin,
     ): ScheduledLessonParticipantLinksResponse {
         val usersBySubject = appUserRepo.findByKeycloakSubjectIn(participants.map { participant -> participant.subject })
             .associateBy { user -> user.keycloakSubject }
-        val appUrl = appUrl(linkOrigin)
-        val classroomUrl = classroomUrl(appUrl, lesson.id)
+        val classroomUrl = classroomUrl(lesson.id)
 
         return ScheduledLessonParticipantLinksResponse(
             lessonId = lesson.id,
@@ -53,7 +49,7 @@ class ScheduledLessonParticipantLinkService(
                         subject = participant.subject,
                         displayName = displayName,
                         email = user.email,
-                        url = inviteUrl(appUrl, invite.token),
+                        url = inviteUrl(invite.token),
                         expiresAt = lesson.scheduledEnd?.plusSeconds(LESSON_ACCESS_GRACE_SECONDS) ?: invite.expiresAt,
                         mode = participantLinkModeMagic,
                     )
@@ -70,16 +66,11 @@ class ScheduledLessonParticipantLinkService(
         )
     }
 
-    private fun appUrl(linkOrigin: ScheduledLessonLinkOrigin): String = when (linkOrigin) {
-        ScheduledLessonLinkOrigin.HONEYSCHOOL_RU -> publicAppRfUrl
-        ScheduledLessonLinkOrigin.HONEY_SCHOOL -> publicAppUrl
-    }.trimEnd('/')
+    private fun classroomUrl(lessonId: UUID): String =
+        "${publicAppUrl.trimEnd('/')}/lessons/$lessonId/classroom"
 
-    private fun classroomUrl(appUrl: String, lessonId: UUID): String =
-        "$appUrl/lessons/$lessonId/classroom"
-
-    private fun inviteUrl(appUrl: String, token: String): String =
-        "$appUrl/join#$token"
+    private fun inviteUrl(token: String): String =
+        "${publicAppUrl.trimEnd('/')}/join#$token"
 
     private companion object {
         const val participantLinkModeMagic = "MAGIC_LINK"

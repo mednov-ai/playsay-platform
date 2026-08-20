@@ -16,8 +16,6 @@ import type {
   ScheduledLessonScheduleUpdateRequest,
   UpdateUserProfileRequest,
   UserProfileResponse,
-  AuthenticationMethodsResponse,
-  RenamePasskeyRequest,
 } from "../../generated/playsay-api";
 
 export type MeProfile = MeResponse;
@@ -37,9 +35,6 @@ export type ManagedStudentInput = {
   lastName?: string;
   email?: string;
 };
-export type AuthenticationMethods = AuthenticationMethodsResponse;
-export type AuthenticationPasskey = AuthenticationMethodsResponse["passkeys"][number];
-export type RenamePasskeyInput = RenamePasskeyRequest;
 export type Course = CourseResponse;
 export type CourseLesson = CourseLessonResponse & {
   materialId?: string | null;
@@ -69,7 +64,6 @@ export type ScheduledLessonParticipantLinks = {
   lessonId: string;
   links: ScheduledLessonParticipantLink[];
 };
-export type ScheduledLessonLinkOrigin = "HONEYSCHOOL_RU" | "HONEY_SCHOOL";
 export type ScheduledLessonMaterialAssignmentInput = ScheduledLessonMaterialAssignmentRequest;
 export type ScheduledLessonRecurrenceInput = {
   mode: "WEEKLY_COUNT" | "WEEKLY_BY_WEEK";
@@ -322,6 +316,15 @@ export type VocabularyHomeworkInput = {
   sourcePracticeId?: string | null;
   planId?: string | null;
   planRevision?: number | null;
+  completionPolicy?: VocabularyHomeworkCompletionPolicy;
+  completionThresholds?: VocabularyCompletionThresholds;
+};
+export type VocabularyHomeworkCompletionPolicy = "MEANINGFUL_ACTIVITY" | "COMPLETE_SESSION" | "MASTERY_TARGET" | "TEACHER_REVIEW";
+export type VocabularyCompletionThresholds = {
+  distinctGradedPrompts: number;
+  distinctEntries: number;
+  masteryPercent: number;
+  policyVersion: string;
 };
 export type LessonHomeworkInput = {
   dueAt?: string | null;
@@ -354,10 +357,19 @@ export type HomeworkAssignment = {
   myScore?: number | null;
   mySubmittedAt?: string | null;
   mySubmissionUpdatedAt?: string | null;
-  myActivityState?: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | null;
+  myActivityState?: "NOT_STARTED" | "IN_PROGRESS" | "AWAITING_REVIEW" | "COMPLETED" | "FAILED" | null;
   myCompletionRatio?: number | null;
   myAccuracy?: number | null;
   myDifficultWordCount?: number | null;
+  completionPolicy?: VocabularyHomeworkCompletionPolicy | null;
+  completionPolicyVersion?: string | null;
+  completionThresholds?: VocabularyCompletionThresholds | null;
+  myDistinctGradedPrompts?: number | null;
+  myDistinctEntries?: number | null;
+  myHintsUsed?: number | null;
+  myActiveDurationMs?: number | null;
+  myMasteryRatio?: number | null;
+  myReviewState?: string | null;
 };
 export type HomeworkRecipientProgress = {
   assignmentId: string;
@@ -380,10 +392,19 @@ export type HomeworkRecipientProgress = {
   submittedAt?: string | null;
   updatedAt?: string | null;
   activityRef?: string | null;
-  activityState?: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | null;
+  activityState?: "NOT_STARTED" | "IN_PROGRESS" | "AWAITING_REVIEW" | "COMPLETED" | "FAILED" | null;
   completionRatio?: number | null;
   accuracy?: number | null;
   difficultWordCount?: number | null;
+  learnerSnapshotId?: string | null;
+  distinctGradedPrompts?: number | null;
+  distinctEntries?: number | null;
+  hintsUsed?: number | null;
+  activeDurationMs?: number | null;
+  masteryRatio?: number | null;
+  reviewState?: string | null;
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
 };
 export type HomeworkAssignmentDetail = {
   assignment: HomeworkAssignment;
@@ -406,6 +427,7 @@ export type StudentVocabularyHomeworkDetail = {
   assignment: HomeworkAssignment;
   practiceId: string;
   sessionId: string;
+  learnerSnapshotId: string;
 };
 export type LessonMaterialAnnotation = {
   id: string;

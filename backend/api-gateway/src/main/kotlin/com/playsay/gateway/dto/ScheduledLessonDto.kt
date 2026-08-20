@@ -88,8 +88,3 @@ data class ScheduledLessonParticipantLinksResponse(
     val lessonId: UUID,
     val links: List<ScheduledLessonParticipantLinkResponse>,
 )
-
-enum class ScheduledLessonLinkOrigin {
-    HONEYSCHOOL_RU,
-    HONEY_SCHOOL,
-}

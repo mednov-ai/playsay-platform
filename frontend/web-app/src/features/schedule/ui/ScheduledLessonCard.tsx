@@ -1,4 +1,3 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { BookOpen, CalendarClock, CheckCircle2, Copy, EllipsisVertical, Loader2, Play, RotateCcw, Trash2, Video } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -9,7 +8,7 @@ import {
   isScheduledLessonReadyToStart,
   scheduleStateLabel,
 } from "../../../entities/schedule/model";
-import type { ScheduledLesson, ScheduledLessonLinkOrigin } from "../../../shared/api/playsay";
+import type { ScheduledLesson } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function ScheduledLessonCard({
@@ -27,7 +26,6 @@ export function ScheduledLessonCard({
   onPrepare = () => undefined,
   onReschedule = () => undefined,
   roomLoading,
-  showProductionLinkOrigins,
 }: {
   canManage: boolean;
   disabled: boolean;
@@ -36,14 +34,13 @@ export function ScheduledLessonCard({
   nowMs: number;
   onCancel: () => void;
   onComplete: () => void;
-  onCopyLink: (linkOrigin: ScheduledLessonLinkOrigin) => void;
+  onCopyLink: () => void;
   onDelete: () => void;
   onJoin: () => void;
   onStart: () => void;
   onPrepare?: () => void;
   onReschedule?: () => void;
   roomLoading: boolean;
-  showProductionLinkOrigins: boolean;
 }) {
   const { t } = useAppTranslation();
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
@@ -52,69 +49,6 @@ export function ScheduledLessonCard({
   const readyToStart = canManage && isScheduledLessonReadyToStart(lesson, nowMs);
   const teacherLessonLive = canManage && joinable;
   const stateLabel = scheduleStateLabel(lesson, nowMs, translate);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPlacement, setMenuPlacement] = useState<"down" | "up">("down");
-  const menuId = useId();
-  const menuRootRef = useRef<HTMLDivElement>(null);
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-
-    menuRootRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus({ preventScroll: true });
-
-    function closeOnOutsidePointer(event: PointerEvent) {
-      if (!menuRootRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    }
-
-    function closeOnEscape(event: globalThis.KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      setMenuOpen(false);
-      menuTriggerRef.current?.focus({ preventScroll: true });
-    }
-
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [menuOpen]);
-
-  function toggleMenu() {
-    if (!menuOpen) {
-      const triggerRect = menuTriggerRef.current?.getBoundingClientRect();
-      setMenuPlacement(triggerRect && triggerRect.bottom + 260 > window.innerHeight && triggerRect.top > 260 ? "up" : "down");
-    }
-    setMenuOpen((current) => !current);
-  }
-
-  function runMenuAction(action: () => void) {
-    setMenuOpen(false);
-    action();
-  }
-
-  function handleMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Tab") {
-      setMenuOpen(false);
-      return;
-    }
-    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-
-    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'));
-    if (items.length === 0) return;
-    event.preventDefault();
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-    const nextIndex = event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? items.length - 1
-        : event.key === "ArrowUp"
-          ? (currentIndex <= 0 ? items.length - 1 : currentIndex - 1)
-          : (currentIndex + 1) % items.length;
-    items[nextIndex]?.focus({ preventScroll: true });
-  }
 
   return (
     <article
@@ -203,40 +137,20 @@ export function ScheduledLessonCard({
             </span>
           )}
           {!canManage ? (
-            <Button disabled={disabled} onClick={() => onCopyLink("HONEYSCHOOL_RU")} type="button" variant="outline">
+            <Button disabled={disabled} onClick={onCopyLink} type="button" variant="outline">
               <Copy className="h-4 w-4" />{linkCopied ? t("schedule.clipboard.copied") : t("schedule.clipboard.link")}
             </Button>
           ) : (
-            <div className="playsay-schedule-card-menu" ref={menuRootRef}>
-              <button
-                aria-controls={menuOpen ? menuId : undefined}
-                aria-expanded={menuOpen}
-                aria-haspopup="menu"
-                aria-label={t("schedule.actions.more")}
-                className="playsay-schedule-card-menu-trigger"
-                onClick={toggleMenu}
-                ref={menuTriggerRef}
-                type="button"
-              >
-                <EllipsisVertical className="h-4 w-4" />
-              </button>
-              {menuOpen ? (
-                <div data-placement={menuPlacement} id={menuId} onKeyDown={handleMenuKeyDown} role="menu">
-                  <button disabled={disabled} onClick={() => runMenuAction(() => onCopyLink("HONEYSCHOOL_RU"))} role="menuitem" type="button">
-                    <Copy />{linkCopied ? t("schedule.clipboard.copied") : t(showProductionLinkOrigins ? "schedule.actions.copyLinksRf" : "schedule.actions.copyLinks")}
-                  </button>
-                  {showProductionLinkOrigins ? (
-                    <button disabled={disabled} onClick={() => runMenuAction(() => onCopyLink("HONEY_SCHOOL"))} role="menuitem" type="button">
-                      <Copy />{t("schedule.actions.copyLinksDirect")}
-                    </button>
-                  ) : null}
-                  {!archived ? <button disabled={disabled} onClick={() => runMenuAction(onReschedule)} role="menuitem" type="button"><CalendarClock />{t("schedule.actions.reschedule")}</button> : null}
-                  {!archived ? <button disabled={disabled} onClick={() => runMenuAction(() => window.confirm(t("schedule.confirm.complete")) && onComplete())} role="menuitem" type="button"><CheckCircle2 />{t("schedule.actions.complete")}</button> : null}
-                  {!archived ? <button disabled={disabled} onClick={() => runMenuAction(() => window.confirm(t("schedule.confirm.cancel")) && onCancel())} role="menuitem" type="button"><RotateCcw />{t("schedule.actions.cancel")}</button> : null}
-                  <button disabled={disabled} onClick={() => runMenuAction(() => window.confirm(t("schedule.confirm.delete")) && onDelete())} role="menuitem" type="button"><Trash2 />{t("schedule.actions.delete")}</button>
-                </div>
-              ) : null}
-            </div>
+            <details className="playsay-schedule-card-menu">
+              <summary aria-label={t("schedule.actions.more")}><EllipsisVertical className="h-4 w-4" /></summary>
+              <div>
+                <button disabled={disabled} onClick={onCopyLink} type="button"><Copy />{linkCopied ? t("schedule.clipboard.copied") : t("schedule.actions.copyLinks")}</button>
+                {!archived ? <button disabled={disabled} onClick={onReschedule} type="button"><CalendarClock />{t("schedule.actions.reschedule")}</button> : null}
+                {!archived ? <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.complete")) && onComplete()} type="button"><CheckCircle2 />{t("schedule.actions.complete")}</button> : null}
+                {!archived ? <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.cancel")) && onCancel()} type="button"><RotateCcw />{t("schedule.actions.cancel")}</button> : null}
+                <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.delete")) && onDelete()} type="button"><Trash2 />{t("schedule.actions.delete")}</button>
+              </div>
+            </details>
           )}
         </div>
       </div>

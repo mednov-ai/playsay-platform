@@ -336,12 +336,6 @@ export type MaterialVideoClip = {
   endSeconds?: number;
 };
 
-export type MaterialVideoMeta = {
-  durationSeconds?: number;
-  language?: string;
-  validationStatus?: string;
-};
-
 export type MaterialAssessmentPolicy = {
   weight?: number;
   maxAttempts?: number;
@@ -402,7 +396,6 @@ export type MaterialEditorBlock = {
   provider?: string;
   externalActivitySupportLevel?: ExternalActivitySupportLevel;
   videoClip?: MaterialVideoClip;
-  videoMeta?: MaterialVideoMeta;
   caption?: string;
   alt?: string;
   objectFit?: "contain" | "cover";

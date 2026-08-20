@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   fetchVocabularyPracticeSession,
   fetchHomeworkSubmissionResult,
+  reviewVocabularyHomeworkAssignment,
   type HomeworkAssignment,
   type HomeworkAssignmentDetail,
   type HomeworkRecipientProgress,
@@ -21,10 +22,12 @@ export function TeacherHomeworkDetail({
   assignment,
   detail,
   lastLoadedAt,
+  onDetailChange,
 }: {
   assignment: HomeworkAssignment | null;
   detail: HomeworkAssignmentDetail | null;
   lastLoadedAt: string | null;
+  onDetailChange: (detail: HomeworkAssignmentDetail) => void;
 }) {
   const { t } = useAppTranslation();
   const [recipientSearch, setRecipientSearch] = useState("");
@@ -188,7 +191,9 @@ export function TeacherHomeworkDetail({
         ) : (
           visibleRecipients.map((recipient) => (
             <RecipientProgressRow
+              assignmentId={active.id}
               key={recipient.studentUserId}
+              onDetailChange={onDetailChange}
               onOpenResult={() => void (
                 active.contentKind === "VOCABULARY_PRACTICE"
                   ? openVocabularyResult(recipient)
@@ -205,17 +210,35 @@ export function TeacherHomeworkDetail({
 }
 
 function RecipientProgressRow({
+  assignmentId,
+  onDetailChange,
   onOpenResult,
   opening,
   recipient,
 }: {
+  assignmentId: string;
+  onDetailChange: (detail: HomeworkAssignmentDetail) => void;
   onOpenResult: () => void;
   opening: boolean;
   recipient: HomeworkRecipientProgress;
 }) {
   const { t } = useAppTranslation();
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewNote, setReviewNote] = useState(recipient.reviewNote ?? "");
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const tone = recipient.progressTone ?? 0;
   const vocabularyProgress = recipient.activityState !== null && recipient.activityState !== undefined;
+  async function review(action: "ACCEPT" | "RETURN") {
+    setReviewing(true);
+    setReviewError(null);
+    try {
+      onDetailChange(await reviewVocabularyHomeworkAssignment(assignmentId, recipient.studentSubject, action, reviewNote));
+    } catch (caught) {
+      setReviewError(caught instanceof Error ? caught.message : t("homework.review.failed"));
+    } finally {
+      setReviewing(false);
+    }
+  }
   return (
     <div className="rounded-xl border border-border bg-muted/35 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -252,6 +275,27 @@ function RecipientProgressRow({
               </Button>
             ) : null}
           </div>
+          <dl className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-white p-2 text-xs sm:grid-cols-3">
+            <Metric label={t("homework.report.activity")} value={t("homework.report.activityValue", { entries: recipient.distinctEntries ?? 0, prompts: recipient.distinctGradedPrompts ?? 0 })} />
+            <Metric label={t("homework.report.duration")} value={recipient.activeDurationMs == null ? t("homework.report.notAvailable") : t("homework.report.minutes", { count: Math.max(0, Math.round(recipient.activeDurationMs / 60_000)) })} />
+            <Metric label={t("homework.report.accuracy")} value={recipient.accuracy == null ? t("homework.report.notAvailable") : `${Math.round(recipient.accuracy * 100)}%`} />
+            <Metric label={t("homework.report.hints")} value={String(recipient.hintsUsed ?? 0)} />
+            <Metric label={t("homework.report.difficult")} value={String(recipient.difficultWordCount ?? 0)} />
+            <Metric label={t("homework.report.mastery")} value={recipient.masteryRatio == null ? t("homework.report.notAvailable") : `${Math.round(recipient.masteryRatio * 100)}%`} />
+          </dl>
+          {recipient.activityState === "AWAITING_REVIEW" ? (
+            <div className="mt-3 grid gap-2 rounded-xl border border-primary/20 bg-[#fff8f3] p-3">
+              <strong className="text-sm">{t("homework.review.title")}</strong>
+              <input className="playsay-input" maxLength={1000} onChange={(event) => setReviewNote(event.target.value)} placeholder={t("homework.review.note")} value={reviewNote} />
+              <div className="flex flex-wrap gap-2">
+                <Button disabled={reviewing} onClick={() => void review("ACCEPT")} type="button">{t("homework.review.accept")}</Button>
+                <Button disabled={reviewing} onClick={() => void review("RETURN")} type="button" variant="outline">{t("homework.review.return")}</Button>
+              </div>
+              {reviewError ? <p aria-live="assertive" className="text-xs font-bold text-destructive">{reviewError}</p> : null}
+            </div>
+          ) : recipient.reviewState ? (
+            <p className="mt-2 text-xs font-bold text-muted-foreground">{t("homework.review.state", { state: recipient.reviewState })}</p>
+          ) : null}
         </>
       ) : (
         <>
@@ -282,4 +326,8 @@ function RecipientProgressRow({
       </div>
     </div>
   );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div><dt className="font-bold text-muted-foreground">{label}</dt><dd className="mt-0.5 font-black">{value}</dd></div>;
 }

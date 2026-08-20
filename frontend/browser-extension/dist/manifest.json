@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Honey School Shared Activities",
+  "name": "Honey.school",
   "description": "Shares an external classroom activity with lesson participants after an explicit teacher action.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "scripting", "storage", "tabCapture", "tabs"],
   "host_permissions": [
@@ -23,7 +23,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Share this activity with Honey School",
+    "default_title": "Share this activity with Honey.school",
     "default_icon": {
       "16": "icons/honey-school-16.png",
       "32": "icons/honey-school-32.png",

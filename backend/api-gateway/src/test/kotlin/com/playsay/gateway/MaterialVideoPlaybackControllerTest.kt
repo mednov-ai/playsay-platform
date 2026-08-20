@@ -21,7 +21,6 @@ import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.repo.YoutubeVideoCacheReferenceRepo
 import com.playsay.gateway.repo.YoutubeVideoCacheRepo
 import com.playsay.gateway.service.MaterialAssetService
-import com.playsay.gateway.service.MaterialVideoPlaybackService
 import com.playsay.gateway.service.UserProfileStore
 import com.playsay.gateway.client.YoutubeMediaClient
 import com.playsay.gateway.service.YoutubeVideoMeta
@@ -49,7 +48,6 @@ import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
-import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.web.server.ResponseStatusException
 import javax.sql.DataSource
 import liquibase.integration.spring.SpringLiquibase
@@ -75,7 +73,6 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val materialAssetRepo: MaterialAssetRepo,
     private val materialAssetService: MaterialAssetService,
-    private val materialVideoPlaybackService: MaterialVideoPlaybackService,
     private val youtubeVideoCacheRepo: YoutubeVideoCacheRepo,
     private val youtubeVideoCacheReferenceRepo: YoutubeVideoCacheReferenceRepo,
     private val youtubeVideoCacheService: YoutubeVideoCacheService,
@@ -286,37 +283,6 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
         assertEquals("5l-fo-d0gt8", response.videoId)
         assertNotNull(response.sessionId)
         assertNull(response.reason)
-        val cachedMetadata = assertNotNull(youtubeVideoCacheRepo.findByVideoIdAndQuality("5l-fo-d0gt8", "MEDIUM"))
-        assertEquals(105, cachedMetadata.durationSeconds)
-        assertEquals("en", cachedMetadata.language)
-    }
-
-    @Test
-    fun `missing youtube metadata does not block official embed when relay is disabled`() {
-        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
-        val material = createYoutubeMaterial(
-            teacher,
-            includeVideoMeta = false,
-            url = "https://www.youtube.com/watch?v=_TGPrAdUaTY",
-        )
-        testYoutubeMediaClient.metadataAvailable = false
-        ReflectionTestUtils.setField(materialVideoPlaybackService, "rfRelayEnabled", false)
-
-        try {
-            val response = materialVideoPlaybackController.playback(
-                teacher,
-                material.id,
-                MaterialVideoPlaybackRequest(blockId = "video-1"),
-                requestWithCountry("RU"),
-            )
-
-            assertEquals("EMBED", response.mode)
-            assertEquals("RF_RELAY_DISABLED_METADATA_OPTIONAL", response.reason)
-            assertEquals("https://www.youtube-nocookie.com/embed/_TGPrAdUaTY?rel=0", response.embedUrl)
-            assertNull(response.relayUrl)
-        } finally {
-            ReflectionTestUtils.setField(materialVideoPlaybackService, "rfRelayEnabled", true)
-        }
     }
 
     @Test
@@ -506,21 +472,19 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
 class TestYoutubeMediaClient : YoutubeMediaClient {
     val sessionRequests = mutableListOf<YoutubePlaybackSessionRequest>()
     var thumbnailStored: Boolean = false
-    var metadataAvailable: Boolean = true
 
     fun reset() {
         sessionRequests.clear()
         thumbnailStored = false
-        metadataAvailable = true
     }
 
     override fun resolveMetadata(videoId: String): YoutubeVideoMeta? =
-        if (metadataAvailable) YoutubeVideoMeta(
+        YoutubeVideoMeta(
             videoId = videoId,
             durationSeconds = 105,
             language = "en",
             thumbnailUrl = "https://img.youtube.com/vi/$videoId/maxresdefault.jpg",
-        ) else null
+        )
 
     override fun createPlaybackSession(command: YoutubePlaybackSessionRequest): YoutubePlaybackSessionResponse {
         sessionRequests.add(command)

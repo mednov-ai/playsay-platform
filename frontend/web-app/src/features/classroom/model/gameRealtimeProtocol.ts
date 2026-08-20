@@ -1,7 +1,6 @@
 import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import type { MaterialHtmlGameRealtimeMessage } from "../../materials/model/materialDocument";
-import type { ExternalActivityRealtimeMessage } from "./externalActivityProtocol";
 
 export const gameRealtimeSubprotocol = "playsay-game-v1";
 
@@ -19,8 +18,6 @@ const messageTypes = {
   ack: 4,
   resume: 5,
   recoveryRequired: 6,
-  externalInput: 7,
-  externalCursor: 8,
 } as const;
 
 const typeByKind = {
@@ -30,14 +27,12 @@ const typeByKind = {
   ack: messageTypes.ack,
   resume: messageTypes.resume,
   "recovery-required": messageTypes.recoveryRequired,
-  "external-input": messageTypes.externalInput,
-  "external-cursor": messageTypes.externalCursor,
-} satisfies Record<(MaterialHtmlGameRealtimeMessage | ExternalActivityRealtimeMessage)["kind"], number>;
+} satisfies Record<MaterialHtmlGameRealtimeMessage["kind"], number>;
 
-const kindByType = new Map<number, (MaterialHtmlGameRealtimeMessage | ExternalActivityRealtimeMessage)["kind"]>(
+const kindByType = new Map<number, MaterialHtmlGameRealtimeMessage["kind"]>(
   Object.entries(typeByKind).map(([kind, type]) => [
     type,
-    kind as (MaterialHtmlGameRealtimeMessage | ExternalActivityRealtimeMessage)["kind"],
+    kind as MaterialHtmlGameRealtimeMessage["kind"],
   ]),
 );
 
@@ -45,22 +40,10 @@ export type GameRealtimeMode = "shadow" | "primary";
 
 export type DecodedGameRealtimeFrame =
   | { kind: "welcome"; mode: GameRealtimeMode }
-  | { kind: "message"; message: MaterialHtmlGameRealtimeMessage | ExternalActivityRealtimeMessage };
+  | { kind: "message"; message: MaterialHtmlGameRealtimeMessage };
 
 export function encodeGameRealtimeMessage(
   message: MaterialHtmlGameRealtimeMessage,
-): Uint8Array {
-  return encodeRealtimeMessage(message);
-}
-
-export function encodeExternalActivityRealtimeMessage(
-  message: ExternalActivityRealtimeMessage,
-): Uint8Array {
-  return encodeRealtimeMessage(message);
-}
-
-function encodeRealtimeMessage(
-  message: MaterialHtmlGameRealtimeMessage | ExternalActivityRealtimeMessage,
 ): Uint8Array {
   const payload = textEncoder.encode(JSON.stringify(message));
   if (payload.byteLength > maximumPayloadBytes) {

@@ -9,15 +9,14 @@ import com.playsay.vocabulary.dto.VocabularyAttemptRequest
 import com.playsay.vocabulary.dto.VocabularyAttemptResponse
 import com.playsay.vocabulary.dto.VocabularyPracticeRevealResponse
 import com.playsay.vocabulary.dto.VocabularyPracticeSessionSummaryResponse
+import com.playsay.vocabulary.dto.VocabularyEvidenceType
 import com.playsay.vocabulary.entity.VocabularyPracticeAttemptEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeItemEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeSessionEntity
-import com.playsay.vocabulary.entity.VocabularySkillStateEntity
 import com.playsay.vocabulary.repo.VocabularyPracticeAttemptRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeItemRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeSessionRepo
-import com.playsay.vocabulary.repo.VocabularySkillStateRepo
 import com.playsay.vocabulary.util.maskedVocabularyHint
 import java.time.Instant
 import java.util.UUID
@@ -31,8 +30,8 @@ class VocabularyPracticeAttemptService(
     private val sessions: VocabularyPracticeSessionRepo,
     private val items: VocabularyPracticeItemRepo,
     private val attempts: VocabularyPracticeAttemptRepo,
-    private val skillStates: VocabularySkillStateRepo,
     private val grading: VocabularySessionGradingService,
+    private val learningEvidence: VocabularyLearningEvidenceService,
     private val queryService: VocabularyPracticeQueryService,
     private val outcome: VocabularyPracticeOutcomeService,
 ) {
@@ -43,13 +42,63 @@ class VocabularyPracticeAttemptService(
         val item = requireCurrentItem(session, request)
         val now = Instant.now()
         val result = recordAttempt(session, item, request, now)
+        recordLearningEvidence(session, item, result, request, now)
         updateSessionAfterAttempt(session, result.correct, now)
         updateItemAfterAttempt(session, item, result.rating, now)
-        if (result.scheduleCreditApplied) updateSchedule(session, item, result.rating, now)
         finishSession(session, now)
         val response = queryService.sessionResponse(session)
         outcome.publishAttempt(actorSubject, session, now)
         return VocabularyAttemptResponse(result.attempt.id, result.rating, result.correct, item.answer, response)
+    }
+
+    private fun recordLearningEvidence(
+        session: VocabularyPracticeSessionEntity,
+        item: VocabularyPracticeItemEntity,
+        result: RecordedAttempt,
+        request: VocabularyAttemptRequest,
+        now: Instant,
+    ) {
+        val entryId = item.entryId ?: return
+        val evidenceType = if (item.exerciseType == PracticeExerciseType.FLASHCARD) {
+            VocabularyEvidenceType.SELF_RATING
+        } else {
+            VocabularyEvidenceType.RETRIEVAL
+        }
+        learningEvidence.record(
+            VocabularyEvidenceCommand(
+                ownerSubject = session.ownerSubject,
+                entryId = entryId,
+                clientEvidenceId = "attempt:${request.clientAttemptId}",
+                evidenceType = evidenceType,
+                skill = item.skill,
+                exerciseType = item.exerciseType,
+                sessionId = session.id,
+                itemId = item.id,
+                answerText = request.answer,
+                correct = result.correct,
+                rating = result.rating,
+                hintsUsed = request.hintsUsed,
+                durationMs = request.durationMs,
+                scheduleCredit = result.scheduleCreditApplied,
+                occurredAt = now,
+            ),
+        )
+        if (!result.correct) {
+            learningEvidence.record(
+                VocabularyEvidenceCommand(
+                    ownerSubject = session.ownerSubject,
+                    entryId = entryId,
+                    clientEvidenceId = "correction:${request.clientAttemptId}",
+                    evidenceType = VocabularyEvidenceType.CORRECTION,
+                    skill = item.skill,
+                    exerciseType = item.exerciseType,
+                    sessionId = session.id,
+                    itemId = item.id,
+                    correct = false,
+                    occurredAt = now,
+                ),
+            )
+        }
     }
 
     private fun requireOpenSession(actorSubject: String, session: VocabularyPracticeSessionEntity) {
@@ -154,36 +203,11 @@ class VocabularyPracticeAttemptService(
         if (rating == PracticeRating.AGAIN) {
             val otherPendingCount = items.findAllBySessionIdOrderByPositionAsc(session.id)
                 .count { candidate -> candidate.id != item.id && candidate.completedAt == null }
-            if (otherPendingCount >= 3) {
-                item.retryAfterSequence = session.attemptSequence + 3
-            } else {
-                item.completedAt = now
-            }
+            item.retryAfterSequence = session.attemptSequence + otherPendingCount.coerceIn(0, 3)
         } else {
             item.completedAt = now
         }
         items.save(item)
-    }
-
-    private fun updateSchedule(
-        session: VocabularyPracticeSessionEntity,
-        item: VocabularyPracticeItemEntity,
-        rating: PracticeRating,
-        now: Instant,
-    ) {
-        item.entryId?.let { entryId ->
-            val state = skillStates.findByEntryIdAndSkill(entryId, item.skill)
-                ?: VocabularySkillStateEntity(
-                    entryId = entryId,
-                    ownerSubject = session.ownerSubject,
-                    skill = item.skill,
-                    dueAt = now,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            applyPracticeRating(state, rating, now)
-            skillStates.save(state)
-        }
     }
 
     private fun finishSession(session: VocabularyPracticeSessionEntity, now: Instant) {
@@ -213,6 +237,20 @@ class VocabularyPracticeAttemptService(
         ) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Only the current flashcard can be revealed.")
         }
+        item.entryId?.let { entryId ->
+            learningEvidence.record(
+                VocabularyEvidenceCommand(
+                    ownerSubject = session.ownerSubject,
+                    entryId = entryId,
+                    clientEvidenceId = "presentation:${session.id}:${item.id}",
+                    evidenceType = VocabularyEvidenceType.PRESENTATION,
+                    skill = item.skill,
+                    exerciseType = item.exerciseType,
+                    sessionId = session.id,
+                    itemId = item.id,
+                ),
+            )
+        }
         return VocabularyPracticeRevealResponse(item.id, item.answer)
     }
 
@@ -225,6 +263,20 @@ class VocabularyPracticeAttemptService(
         }
         val current = queryService.currentItem(session, items.findAllBySessionIdOrderByPositionAsc(session.id))
             ?: throw ResponseStatusException(HttpStatus.CONFLICT, "There is no current vocabulary item.")
+        current.entryId?.let { entryId ->
+            learningEvidence.record(
+                VocabularyEvidenceCommand(
+                    ownerSubject = session.ownerSubject,
+                    entryId = entryId,
+                    clientEvidenceId = "hint:${session.id}:${current.id}:${session.revision}",
+                    evidenceType = VocabularyEvidenceType.HINT,
+                    skill = current.skill,
+                    exerciseType = current.exerciseType,
+                    sessionId = session.id,
+                    itemId = current.id,
+                ),
+            )
+        }
         session.teacherHint = maskedVocabularyHint(current.answer)
         session.helpRequested = false
         session.revision += 1

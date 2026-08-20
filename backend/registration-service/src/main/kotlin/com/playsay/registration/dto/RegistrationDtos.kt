@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
-import java.time.Instant
 
 data class StartRegistrationRequest(
     @field:Email
@@ -67,21 +66,4 @@ data class ResetPasswordRequest(
 data class RegistrationResponse(
     val status: String,
     val continueUrl: String? = null,
-)
-
-data class InternalAuthenticationMethodsResponse(
-    val hasPassword: Boolean,
-    val passkeys: List<InternalPasskeyCredentialResponse>,
-)
-
-data class InternalPasskeyCredentialResponse(
-    val id: String,
-    val label: String?,
-    val createdAt: Instant?,
-)
-
-data class InternalRenamePasskeyRequest(
-    @field:NotBlank
-    @field:Size(max = 64)
-    val label: String,
 )

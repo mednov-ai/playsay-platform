@@ -21,15 +21,4 @@ class RegistrationService(
 
     fun resetPassword(request: ResetPasswordRequest, clientAddress: String?): RegistrationResponse =
         gateway.resetPassword(request, clientAddress)
-
-    fun authenticationMethods(subject: String): AuthenticationMethodsResponse = gateway.authenticationMethods(subject)
-
-    fun renamePasskey(
-        subject: String,
-        credentialId: String,
-        request: RenamePasskeyRequest,
-    ): AuthenticationMethodsResponse = gateway.renamePasskey(subject, credentialId, request)
-
-    fun deletePasskey(subject: String, credentialId: String): AuthenticationMethodsResponse =
-        gateway.deletePasskey(subject, credentialId)
 }

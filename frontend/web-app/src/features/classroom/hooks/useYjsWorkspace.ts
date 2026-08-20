@@ -36,8 +36,6 @@ import type {
   MaterialViewportUpdate,
 } from "../model/materialViewport";
 import { realtimeReconnectDelayMs } from "../model/realtimeLifecycle";
-import { createExternalActivityRealtimeClient } from "../model/externalActivityRealtimeClient";
-import type { ExternalActivityRealtime } from "../model/externalActivityProtocol";
 import { createGameRealtimeClient } from "../model/gameRealtimeClient";
 import { createGameSyncSessionController } from "../model/gameSyncSessionController";
 
@@ -72,7 +70,6 @@ export function useYjsWorkspace({
   const [videoPlaybackStates, setVideoPlaybackStates] = useState<Record<string, MaterialVideoPlaybackState>>({});
   const [workspaceClientId, setWorkspaceClientId] = useState<number | null>(null);
   const [annotationUndoState, setAnnotationUndoState] = useState({ canRedo: false, canUndo: false });
-  const [externalActivityRealtime, setExternalActivityRealtime] = useState<ExternalActivityRealtime | null>(null);
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -94,7 +91,6 @@ export function useYjsWorkspace({
       setVideoPlaybackStates({});
       setWorkspaceClientId(null);
       setAnnotationUndoState({ canRedo: false, canUndo: false });
-      setExternalActivityRealtime(null);
       exerciseInteractionRef.current = null;
       return undefined;
     }
@@ -142,12 +138,6 @@ export function useYjsWorkspace({
         await createCollaborationDocumentToken(document.lessonId, document.id),
       ),
     });
-    const externalRealtime = createExternalActivityRealtimeClient({
-      getUrl: async () => collaborationWebSocketUrl(
-        await createCollaborationDocumentToken(document.lessonId, document.id),
-      ),
-    });
-    setExternalActivityRealtime(externalRealtime);
     gameSyncController = createGameSyncSessionController({
       publishCheckpoint: (blockId, checkpoint) => {
         runtime.setHtmlGameSdkCheckpoint(blockId, checkpoint);
@@ -248,8 +238,6 @@ export function useYjsWorkspace({
       runtime.destroy();
       gameSyncController.close();
       gameRealtime.close();
-      externalRealtime.close();
-      setExternalActivityRealtime(null);
       gameSyncControllerRef.current = null;
       runtimeRef.current = null;
       setAnnotationElementsState([]);
@@ -420,7 +408,6 @@ export function useYjsWorkspace({
     participants,
     htmlGameSync,
     exerciseSync,
-    externalActivityRealtime,
     videoSync,
     materialViewport,
     workspaceClientId,

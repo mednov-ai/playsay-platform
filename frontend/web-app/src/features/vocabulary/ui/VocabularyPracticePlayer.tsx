@@ -1,5 +1,5 @@
 import { Check, ExternalLink, Loader2, RotateCcw, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   fetchVocabularyPracticeSession,
@@ -31,6 +31,7 @@ export function VocabularyPracticePlayer({
   const [feedback, setFeedback] = useState<VocabularyAttemptResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const attemptIdRef = useRef<string | null>(null);
   const item = session.currentItem;
   const matchingContent = item?.content && "left" in item.content && "right" in item.content ? item.content : null;
   const phraseContent = item?.content && "tokens" in item.content ? item.content : null;
@@ -44,6 +45,7 @@ export function VocabularyPracticePlayer({
     setFeedback(null);
     setRevealed(false);
     setRevealedAnswer(null);
+    attemptIdRef.current = null;
   }, [initialSession.id, initialSession.revision]);
 
   useEffect(() => {
@@ -80,9 +82,11 @@ export function VocabularyPracticePlayer({
     setSaving(true);
     setMessage(null);
     try {
+      const clientAttemptId = attemptIdRef.current ?? crypto.randomUUID();
+      attemptIdRef.current = clientAttemptId;
       const result = await recordVocabularyAttempt(session.id, {
         answer: value,
-        clientAttemptId: crypto.randomUUID(),
+        clientAttemptId,
         hintsUsed: session.teacherHint ? 1 : 0,
         itemId: item.id,
         rating,
@@ -97,6 +101,7 @@ export function VocabularyPracticePlayer({
         const refreshed = await fetchVocabularyPracticeSession(session.id);
         setSession(refreshed);
         onSessionChange?.(refreshed);
+        if (refreshed.revision !== session.revision) attemptIdRef.current = null;
       } catch {
         // Keep the current item so the learner can retry explicitly.
       }
@@ -113,6 +118,7 @@ export function VocabularyPracticePlayer({
     setMatchingSelection({});
     setRevealed(false);
     setRevealedAnswer(null);
+    attemptIdRef.current = null;
   }
 
   async function revealFlashcard() {
@@ -142,6 +148,13 @@ export function VocabularyPracticePlayer({
               total: session.attemptCount,
             })}
           </p>
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">
+            {t("vocabulary.practice.complete.diagnostic", {
+              accuracy: Math.round((session.accuracy ?? (session.attemptCount > 0 ? session.correctCount / session.attemptCount : 0)) * 100),
+              attempts: session.attemptCount,
+              items: session.completedItems,
+            })}
+          </p>
         </div>
       </section>
     );
@@ -149,7 +162,7 @@ export function VocabularyPracticePlayer({
 
   return (
     <section className="mx-auto w-full max-w-2xl rounded-3xl border border-border bg-white p-4 shadow-sm sm:p-6">
-      <div className="flex items-center justify-between gap-3 text-sm font-extrabold text-muted-foreground">
+      <div aria-live="polite" className="flex items-center justify-between gap-3 text-sm font-extrabold text-muted-foreground">
         <span>{t("vocabulary.practice.progress", { current: session.completedItems + 1, total: session.totalItems })}</span>
         <span>{progress}%</span>
       </div>

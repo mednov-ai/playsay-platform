@@ -99,6 +99,9 @@ class AssignmentCreationService(
                 contentKind = MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE,
                 practicePlanId = request.planId,
                 sourceVocabularyPracticeId = request.sourcePracticeId,
+                completionPolicy = request.completionPolicy.name,
+                completionPolicyVersion = request.completionThresholds.policyVersion,
+                completionThresholdsJson = objectMapper.writeValueAsString(request.completionThresholds),
                 title = request.title.cleanAssignmentField("title", 160) ?: "Vocabulary practice",
                 instructions = request.instructions.cleanAssignmentField("instructions", 2_000),
                 type = MetaData.AssignmentTypes.HOMEWORK,
@@ -162,6 +165,10 @@ class AssignmentCreationService(
                 put("wordLimit", request.wordLimit)
                 request.planId?.let { planId -> put("planId", planId.toString()) }
                 request.sourcePracticeId?.let { practiceId -> put("sourcePracticeId", practiceId.toString()) }
+                put("completionPolicy", request.completionPolicy.name)
+                set<com.fasterxml.jackson.databind.JsonNode>("completionThresholds", objectMapper.valueToTree(request.completionThresholds))
+                put("keyMode", request.keyMode.name)
+                set<com.fasterxml.jackson.databind.JsonNode>("keyNgramSettings", objectMapper.valueToTree(request.keyNgramSettings))
             },
         )
 }

@@ -13,6 +13,7 @@ import com.playsay.gateway.dto.TeacherAssignmentSubmissionDetailResponse
 import com.playsay.gateway.dto.VocabularyAssignmentPreparationResponse
 import com.playsay.gateway.dto.VocabularyAssignmentProgressUpdateRequest
 import com.playsay.gateway.dto.VocabularyHomeworkRequest
+import com.playsay.gateway.dto.VocabularyHomeworkReviewRequest
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.service.UserProfileStore
 import com.playsay.gateway.utils.MetaData
@@ -187,6 +188,19 @@ class AssignmentStore(
         request: VocabularyAssignmentProgressUpdateRequest,
     ) {
         vocabularyAssignmentIntegrationService.updateProgress(assignmentId, request)
+    }
+
+    @Transactional
+    fun reviewVocabularyHomework(
+        authentication: JwtAuthenticationToken,
+        assignmentId: UUID,
+        studentSubject: String,
+        request: VocabularyHomeworkReviewRequest,
+    ): TeacherAssignmentDetailResponse {
+        authentication.requireAssignmentManager()
+        teacherDetail(authentication, assignmentId)
+        vocabularyAssignmentIntegrationService.review(assignmentId, studentSubject, authentication.token.subject, request)
+        return teacherDetail(authentication, assignmentId)
     }
 
 }

@@ -56,6 +56,21 @@ export interface ChordSet {
   practiceKind?: "LETTER" | "CODE" | "CODE_COMBO" | "VOCABULARY";
   codeLanguages?: string[];
   practiceContext?: PracticeContext;
+  vocabularyContext?: VocabularyRuntimeContext;
+}
+
+export interface VocabularyRuntimeContext {
+  sessionId: string;
+  mode: VocabularyKeyMode;
+  targets: VocabularyKeyTarget[];
+  typedTargets: boolean;
+  startPosition: number;
+  totalTargets: number;
+  delivery: "SELF" | "LIVE" | "HOMEWORK";
+  completionPolicy: string;
+  assignmentId?: string;
+  lessonId?: string;
+  returnTarget?: "HONEY_SCHOOL_VOCABULARY" | "HONEY_SCHOOL_LESSON" | "HONEY_SCHOOL_HOMEWORK";
 }
 
 export interface PracticeContext {
@@ -68,6 +83,11 @@ export interface PracticeContext {
   vocabularyItemIds?: string[];
   vocabularyWords?: string[];
   vocabularySessionId?: string;
+  vocabularyMode?: VocabularyKeyMode;
+  vocabularyMaterializerVersion?: string;
+  vocabularyMaterializerSeed?: number;
+  vocabularyCompletionPolicy?: string;
+  vocabularyReturnTarget?: "HONEY_SCHOOL_VOCABULARY" | "HONEY_SCHOOL_LESSON" | "HONEY_SCHOOL_HOMEWORK";
 }
 
 export interface VocabularyPracticeEntry { id: string; sourceText: string; }
@@ -77,6 +97,52 @@ export interface VocabularySessionPracticeResponse {
   title: string;
   entries: VocabularyPracticeEntry[];
   items: Array<{ itemId: string; entryId: string; sourceText: string }>;
+  mode?: VocabularyKeyMode;
+  layout?: LayoutId;
+  materializerVersion?: string;
+  materializerSeed?: number;
+  ngramSettings?: VocabularyKeyNgramSettings;
+  targets?: VocabularyKeyTarget[];
+  completionContext?: {
+    delivery: "SELF" | "LIVE" | "HOMEWORK";
+    completionPolicy: string;
+    completionPolicyVersion: string;
+    assignmentId?: string;
+    lessonId?: string;
+    lastAcknowledgedPosition: number;
+  };
+  returnContext?: {
+    target: "HONEY_SCHOOL_VOCABULARY" | "HONEY_SCHOOL_LESSON" | "HONEY_SCHOOL_HOMEWORK";
+    path: "/";
+  };
+}
+export type VocabularyKeyMode = "WHOLE_WORDS" | "CHARACTER_NGRAMS" | "MIXED";
+export type VocabularyKeyTargetType = "WHOLE_WORD" | "CHARACTER_NGRAM";
+export interface VocabularyKeyNgramSettings { minLength: number; maxLength: number; targetLimit: number; maxRepetitions: number; }
+export interface VocabularyKeyTarget {
+  targetId: string;
+  position: number;
+  type: VocabularyKeyTargetType;
+  text: string;
+  sourceEntryIds: string[];
+  sourceItemIds: string[];
+  offsets: Array<{ entryId: string; itemId: string; start: number; endExclusive: number }>;
+}
+export interface VocabularyTargetResult {
+  resultId: string;
+  targetId: string;
+  targetType: VocabularyKeyTargetType;
+  errors: number;
+  durationMs: number;
+  position: number;
+  typedText?: string;
+  sourceEntryIds: string[];
+  sourceItemIds: string[];
+}
+export interface VocabularyKeyAcknowledgementResponse {
+  sessionId: string;
+  lastAcknowledgedPosition: number;
+  revision: number;
 }
 
 export type TrainingLessonKind = "CALIBRATION" | "STANDARD" | "FOCUS";
@@ -111,6 +177,7 @@ export interface SubmitResult {
   clientTimezone?: string;
   localTrainingDate?: string;
   practiceContext?: PracticeContext;
+  vocabularyResults?: VocabularyTargetResult[];
 }
 
 export interface TrainingResult {

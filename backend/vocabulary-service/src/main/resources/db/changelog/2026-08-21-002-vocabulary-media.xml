@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-08-21-002-vocabulary-media" author="codex">
+        <createTable tableName="vocabulary_media_assets">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="sense_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_lexical_senses" referencedColumnNames="id" foreignKeyName="fk_vocabulary_media_asset_sense"/></column>
+            <column name="catalog_scope" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="scope_key" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="state" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="origin" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="storage_key" type="VARCHAR(500)"/>
+            <column name="content_type" type="VARCHAR(100)"/>
+            <column name="byte_size" type="BIGINT"/>
+            <column name="width" type="INT"/>
+            <column name="height" type="INT"/>
+            <column name="checksum_sha256" type="VARCHAR(64)"/>
+            <column name="generator_type" type="VARCHAR(32)"/>
+            <column name="generator_model" type="VARCHAR(120)"/>
+            <column name="prompt_template_version" type="VARCHAR(64)"/>
+            <column name="prompt_fingerprint" type="VARCHAR(64)"/>
+            <column name="safety_state" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="alt_text_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+            <column name="decorative" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="supersedes_asset_id" type="UUID"/>
+            <column name="approved_by_subject" type="VARCHAR(255)"/>
+            <column name="approved_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="retired_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="vocabulary_media_assets" indexName="idx_vocabulary_media_sense_state"><column name="sense_id"/><column name="state"/><column name="created_at"/></createIndex>
+        <createIndex tableName="vocabulary_media_assets" indexName="idx_vocabulary_media_scope"><column name="catalog_scope"/><column name="scope_key"/><column name="state"/></createIndex>
+
+        <createTable tableName="vocabulary_media_generation_requests">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="sense_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_lexical_senses" referencedColumnNames="id" foreignKeyName="fk_vocabulary_media_generation_sense"/></column>
+            <column name="policy_version" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="request_kind" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="active_first_use_key" type="VARCHAR(128)"/>
+            <column name="state" type="VARCHAR(24)"><constraints nullable="false"/></column>
+            <column name="requested_by_subject" type="VARCHAR(255)"/>
+            <column name="asset_id" type="UUID"/>
+            <column name="attempt_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="failure_code" type="VARCHAR(64)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_media_generation_requests" columnNames="active_first_use_key" constraintName="uq_vocabulary_media_active_first_use"/>
+        <createIndex tableName="vocabulary_media_generation_requests" indexName="idx_vocabulary_media_generation_due"><column name="state"/><column name="next_attempt_at"/></createIndex>
+
+        <createTable tableName="vocabulary_media_review_events">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="asset_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_media_assets" referencedColumnNames="id" foreignKeyName="fk_vocabulary_media_review_asset"/></column>
+            <column name="actor_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="action" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="reason_code" type="VARCHAR(64)"/>
+            <column name="note" type="VARCHAR(500)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="vocabulary_media_review_events" indexName="idx_vocabulary_media_review_asset_time"><column name="asset_id"/><column name="created_at"/></createIndex>
+
+        <createTable tableName="vocabulary_media_reports">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="entry_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_entries" referencedColumnNames="id" foreignKeyName="fk_vocabulary_media_report_entry" deleteCascade="true"/></column>
+            <column name="asset_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_media_assets" referencedColumnNames="id" foreignKeyName="fk_vocabulary_media_report_asset"/></column>
+            <column name="reporter_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="reason_code" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_media_reports" columnNames="entry_id,asset_id,reporter_subject" constraintName="uq_vocabulary_media_report_actor"/>
+
+        <createTable tableName="vocabulary_media_snapshot_refs">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="practice_item_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_practice_items" referencedColumnNames="id" foreignKeyName="fk_vocabulary_media_snapshot_item" deleteCascade="true"/></column>
+            <column name="asset_id" type="UUID"><constraints nullable="false" referencedTableName="vocabulary_media_assets" referencedColumnNames="id" foreignKeyName="fk_vocabulary_media_snapshot_asset"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_media_snapshot_refs" columnNames="practice_item_id" constraintName="uq_vocabulary_media_snapshot_item"/>
+        <createIndex tableName="vocabulary_media_snapshot_refs" indexName="idx_vocabulary_media_snapshot_asset"><column name="asset_id"/></createIndex>
+    </changeSet>
+</databaseChangeLog>

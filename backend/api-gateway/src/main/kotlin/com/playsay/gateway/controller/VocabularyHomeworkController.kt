@@ -3,12 +3,14 @@ package com.playsay.gateway.controller
 import com.playsay.gateway.dto.StudentVocabularyAssignmentDetailResponse
 import com.playsay.gateway.dto.TeacherAssignmentDetailResponse
 import com.playsay.gateway.dto.VocabularyHomeworkRequest
+import com.playsay.gateway.dto.VocabularyHomeworkReviewRequest
 import com.playsay.gateway.service.assignment.AssignmentStore
 import com.playsay.gateway.service.assignment.VocabularyAssignmentOutboxProcessor
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import java.util.UUID
+import jakarta.validation.Valid
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
@@ -39,7 +42,7 @@ class VocabularyHomeworkController(
     )
     fun createVocabularyHomeworkAssignment(
         authentication: JwtAuthenticationToken,
-        @RequestBody request: VocabularyHomeworkRequest,
+        @Valid @RequestBody request: VocabularyHomeworkRequest,
     ): ResponseEntity<TeacherAssignmentDetailResponse> {
         val created = try {
             store.createVocabularyHomework(authentication, request)
@@ -68,4 +71,18 @@ class VocabularyHomeworkController(
         @PathVariable assignmentId: UUID,
     ): StudentVocabularyAssignmentDetailResponse =
         store.studentVocabularyDetail(authentication, assignmentId)
+
+    @PatchMapping("/assignments/{assignmentId}/vocabulary-review/{studentSubject}", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "reviewVocabularyHomeworkAssignment",
+        summary = "Accept or return vocabulary homework awaiting teacher review",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun reviewVocabularyHomeworkAssignment(
+        authentication: JwtAuthenticationToken,
+        @PathVariable assignmentId: UUID,
+        @PathVariable studentSubject: String,
+        @Valid @RequestBody request: VocabularyHomeworkReviewRequest,
+    ): TeacherAssignmentDetailResponse =
+        store.reviewVocabularyHomework(authentication, assignmentId, studentSubject, request)
 }

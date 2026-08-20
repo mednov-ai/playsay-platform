@@ -52,6 +52,12 @@ class AssignmentEntity(
     var practicePlanId: UUID? = null,
     @Column(name = "source_vocabulary_practice_id")
     var sourceVocabularyPracticeId: UUID? = null,
+    @Column(name = "completion_policy", nullable = false, length = 32)
+    var completionPolicy: String = "COMPLETE_SESSION",
+    @Column(name = "completion_policy_version", nullable = false, length = 64)
+    var completionPolicyVersion: String = "legacy-v1",
+    @Column(name = "completion_thresholds_json", nullable = false, columnDefinition = "TEXT")
+    var completionThresholdsJson: String = "{}",
     @Column(name = "title", nullable = false, length = 160)
     var title: String = "",
     @Column(name = "instructions", columnDefinition = "TEXT")

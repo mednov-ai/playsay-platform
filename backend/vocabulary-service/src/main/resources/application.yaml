@@ -24,7 +24,30 @@ playsay.vocabulary.translation:
   base-url: ${PLAYSAY_VOCABULARY_OPENAI_BASE_URL:https://api.openai.com/v1}
   model: ${PLAYSAY_VOCABULARY_OPENAI_MODEL:gpt-5.4-mini}
   reasoning-effort: ${PLAYSAY_VOCABULARY_OPENAI_REASONING_EFFORT:none}
+playsay.vocabulary.features:
+  composer-enabled: ${PLAYSAY_VOCABULARY_COMPOSER_ENABLED:false}
+  adaptive-policy-enabled: ${PLAYSAY_VOCABULARY_ADAPTIVE_POLICY_ENABLED:false}
+  delivery-policies-enabled: ${PLAYSAY_VOCABULARY_DELIVERY_POLICIES_ENABLED:false}
+  key-ngrams-enabled: ${PLAYSAY_VOCABULARY_KEY_NGRAMS_ENABLED:false}
+  generated-media-enabled: ${PLAYSAY_VOCABULARY_GENERATED_MEDIA_ENABLED:false}
+  lexical-backfill-enabled: ${PLAYSAY_VOCABULARY_LEXICAL_BACKFILL_ENABLED:false}
+playsay.vocabulary.media:
+  generator: ${PLAYSAY_VOCABULARY_MEDIA_GENERATOR:disabled}
+  api-key: ${PLAYSAY_VOCABULARY_MEDIA_API_KEY:}
+  base-url: ${PLAYSAY_VOCABULARY_MEDIA_BASE_URL:https://api.openai.com/v1}
+  model: ${PLAYSAY_VOCABULARY_MEDIA_MODEL:gpt-image-1-mini}
+  generation-worker-ms: ${PLAYSAY_VOCABULARY_MEDIA_GENERATION_WORKER_MS:10000}
+  regeneration-limit-per-hour: ${PLAYSAY_VOCABULARY_MEDIA_REGENERATION_LIMIT_PER_HOUR:5}
+  storage:
+    provider: ${PLAYSAY_VOCABULARY_MEDIA_STORAGE_PROVIDER:memory}
+    endpoint: ${PLAYSAY_VOCABULARY_MEDIA_S3_ENDPOINT:}
+    region: ${PLAYSAY_VOCABULARY_MEDIA_S3_REGION:us-east-1}
+    bucket: ${PLAYSAY_VOCABULARY_MEDIA_S3_BUCKET:playsay-vocabulary-media}
+    access-key: ${PLAYSAY_VOCABULARY_MEDIA_S3_ACCESS_KEY:}
+    secret-key: ${PLAYSAY_VOCABULARY_MEDIA_S3_SECRET_KEY:}
+    create-bucket: ${PLAYSAY_VOCABULARY_MEDIA_S3_CREATE_BUCKET:false}
 playsay.user-data.service-token: ${PLAYSAY_USER_DATA_SERVICE_TOKEN:}
+playsay.vocabulary.reconciliation-ms: ${PLAYSAY_VOCABULARY_RECONCILIATION_MS:60000}
 playsay.assignment-integration:
   gateway-base-url: ${PLAYSAY_API_GATEWAY_SERVICE_BASE_URL:http://api-gateway.playsay-dev.svc.cluster.local}
   retry-delay-ms: ${PLAYSAY_VOCABULARY_PROGRESS_RETRY_DELAY_MS:10000}

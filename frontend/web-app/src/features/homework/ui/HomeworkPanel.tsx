@@ -157,6 +157,13 @@ export function HomeworkPanel({
         dueAt: localDateTimeToIso(dueAt),
         instructions: instructions.trim() || null,
         mode: vocabularyMode,
+        completionPolicy: "MEANINGFUL_ACTIVITY",
+        completionThresholds: {
+          distinctEntries: 4,
+          distinctGradedPrompts: 8,
+          masteryPercent: 80,
+          policyVersion: "vocabulary-homework-v1",
+        },
         studentSubjects: selectedSubjects,
         title: title.trim() || t("homework.create.defaultVocabularyTitle"),
         wordLimit: vocabularyWordLimit,
@@ -187,6 +194,13 @@ export function HomeworkPanel({
         dueAt: localDateTimeToIso(dueAt),
         instructions: instructions.trim() || null,
         mode: settings.mode,
+        completionPolicy: settings.completionPolicy ?? "MEANINGFUL_ACTIVITY",
+        completionThresholds: {
+          distinctEntries: settings.completionThresholds?.distinctEntries ?? 4,
+          distinctGradedPrompts: settings.completionThresholds?.distinctGradedPrompts ?? 8,
+          masteryPercent: settings.completionThresholds?.masteryPercent ?? 80,
+          policyVersion: settings.completionThresholds?.policyVersion ?? "vocabulary-homework-v1",
+        },
         planId: preview.planId,
         planRevision: preview.revision,
         studentSubjects: recipients,
@@ -326,7 +340,7 @@ export function HomeworkPanel({
           </div>
 
           <div className="min-w-0">
-            <TeacherHomeworkDetail assignment={selectedAssignment} detail={detail} lastLoadedAt={lastLoadedAt} />
+            <TeacherHomeworkDetail assignment={selectedAssignment} detail={detail} lastLoadedAt={lastLoadedAt} onDetailChange={setDetail} />
           </div>
         </div>
       ) : selectedAssignmentId ? (

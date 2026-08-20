@@ -48,8 +48,12 @@ case "$DEPLOY_ENVIRONMENT" in
     esac
     ;;
   prod)
-    if ! printf '%s\n' "$CI_BRANCH" | grep -Eq '^release/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$'; then
-      echo "Production source must match release/NN.NNN.NN." >&2
+    case "$CI_BRANCH" in
+      release/[0-9]*.[0-9]*.[0-9]*) ;;
+      *) echo "Production source must be a numeric release branch." >&2; exit 1 ;;
+    esac
+    if ! printf '%s\n' "$CI_BRANCH" | grep -Eq '^release/[0-9]+\.[0-9]+\.[0-9]+$'; then
+      echo "Production source must match release/<number>.<number>.<number>." >&2
       exit 1
     fi
     if [ "$INFRA_BRANCH" != "$CI_BRANCH" ]; then

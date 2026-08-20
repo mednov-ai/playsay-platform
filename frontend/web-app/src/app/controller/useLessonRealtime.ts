@@ -1,9 +1,13 @@
-import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { isArchivedScheduleLesson, isJoinableScheduledLesson } from "../../entities/schedule/model";
 import {
   buildLessonRealtimeUrl,
   isRoomSessionExpired,
   roomSessionFromScheduledLesson,
+  type LessonDiceController,
+  type LessonDiceRejection,
+  type LessonDiceRejectionCode,
+  type LessonDiceRoll,
   type LessonParticipantPresenceMap,
   type LessonParticipantPresenceState,
   type LessonRoomSession,
@@ -29,6 +33,15 @@ type LessonRealtimeMessage = {
   change?: string;
   participants?: Array<{ subject?: string; state?: string }>;
   message?: string;
+  eventId?: string;
+  requestId?: string;
+  value?: number;
+  rollerSubject?: string;
+  rollerName?: string;
+  rolledAt?: string;
+  cooldownUntil?: string;
+  code?: string;
+  retryAt?: string;
 };
 
 export function useLessonRealtime({
@@ -55,6 +68,9 @@ export function useLessonRealtime({
   status: SessionStatus;
 }) {
   const { t } = useAppTranslation();
+  const [lastDiceRoll, setLastDiceRoll] = useState<LessonDiceRoll | null>(null);
+  const [liveDiceRoll, setLiveDiceRoll] = useState<LessonDiceRoll | null>(null);
+  const [diceRejection, setDiceRejection] = useState<LessonDiceRejection | null>(null);
   const realtimeSocketRef = useRef<WebSocket | null>(null);
   const realtimeReconnectTimerRef = useRef<number | null>(null);
   const realtimeReconnectAttemptRef = useRef(0);
@@ -76,6 +92,18 @@ export function useLessonRealtime({
   useEffect(() => {
     roomSessionRef.current = roomSession;
   }, [roomSession]);
+
+  useEffect(() => {
+    if (!roomSessionLessonId) {
+      setLastDiceRoll(null);
+      setLiveDiceRoll(null);
+      setDiceRejection(null);
+      return;
+    }
+    setLastDiceRoll((current) => current?.lessonId === roomSessionLessonId ? current : null);
+    setLiveDiceRoll((current) => current?.lessonId === roomSessionLessonId ? current : null);
+    setDiceRejection((current) => current?.lessonId === roomSessionLessonId ? current : null);
+  }, [roomSessionLessonId]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -283,6 +311,23 @@ export function useLessonRealtime({
 
     if (message.type === "lesson.presence" && message.lessonId && message.participants) {
       applyLessonPresence(message.lessonId, lessonPresenceMap(message.participants));
+      return;
+    }
+
+    if ((message.type === "tool.dice.rolled" || message.type === "tool.dice.snapshot")) {
+      const roll = lessonDiceRoll(message);
+      if (!roll) return;
+      setLastDiceRoll(roll);
+      setDiceRejection(null);
+      if (message.type === "tool.dice.rolled") {
+        setLiveDiceRoll(roll);
+      }
+      return;
+    }
+
+    if (message.type === "tool.dice.rejected") {
+      const rejection = lessonDiceRejection(message);
+      if (rejection) setDiceRejection(rejection);
     }
   }
 
@@ -337,6 +382,17 @@ export function useLessonRealtime({
     sendLessonRealtimeMessage({ type: "presence.update", lessonId, state });
   }
 
+  function rollDice() {
+    const lessonId = roomSessionRef.current?.lessonId;
+    if (!lessonId) return;
+    setDiceRejection(null);
+    sendLessonRealtimeMessage({
+      type: "tool.dice.roll",
+      lessonId,
+      requestId: crypto.randomUUID(),
+    });
+  }
+
   function sendLessonRealtimeMessage(message: Record<string, string>) {
     const socket = realtimeSocketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -349,6 +405,52 @@ export function useLessonRealtime({
       socket.close();
     }
   }
+
+  const dice: LessonDiceController = {
+    lastRoll: lastDiceRoll,
+    liveRoll: liveDiceRoll,
+    rejection: diceRejection,
+    roll: rollDice,
+  };
+  return { dice };
+}
+
+export function lessonDiceRoll(message: LessonRealtimeMessage): LessonDiceRoll | null {
+  if (
+    !message.eventId ||
+    !message.lessonId ||
+    !message.requestId ||
+    !Number.isInteger(message.value) ||
+    (message.value ?? 0) < 1 ||
+    (message.value ?? 0) > 6 ||
+    !message.rollerSubject ||
+    !message.rollerName ||
+    !message.rolledAt ||
+    !message.cooldownUntil
+  ) {
+    return null;
+  }
+  return {
+    eventId: message.eventId,
+    lessonId: message.lessonId,
+    requestId: message.requestId,
+    value: message.value as LessonDiceRoll["value"],
+    rollerSubject: message.rollerSubject,
+    rollerName: message.rollerName,
+    rolledAt: message.rolledAt,
+    cooldownUntil: message.cooldownUntil,
+  };
+}
+
+export function lessonDiceRejection(message: LessonRealtimeMessage): LessonDiceRejection | null {
+  const allowedCodes = new Set<LessonDiceRejectionCode>(["COOLDOWN", "LESSON_NOT_ACTIVE", "FORBIDDEN"]);
+  if (!allowedCodes.has(message.code as LessonDiceRejectionCode)) return null;
+  return {
+    code: message.code as LessonDiceRejectionCode,
+    lessonId: message.lessonId ?? null,
+    requestId: message.requestId ?? null,
+    retryAt: message.retryAt ?? null,
+  };
 }
 
 export function lessonPresenceMap(

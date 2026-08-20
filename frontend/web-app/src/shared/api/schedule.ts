@@ -14,7 +14,7 @@ import {
 import { authConfig, clearTokens } from "./auth";
 import { apiErrorFromData } from "./errors";
 import { apiJson, authorizedOptions } from "./http";
-import type { LessonTranslationSession, LiveKitRoomToken, ScheduledLesson, ScheduledLessonInput, ScheduledLessonLinkOrigin, ScheduledLessonParticipantLinks } from "./types";
+import type { LessonTranslationSession, LiveKitRoomToken, ScheduledLesson, ScheduledLessonInput, ScheduledLessonParticipantLinks } from "./types";
 
 export async function fetchScheduledLessons(config = authConfig): Promise<ScheduledLesson[]> {
   const response = await listScheduledLessons(await authorizedOptions(config));
@@ -168,11 +168,10 @@ export async function createLessonTranslationSession(
 
 export async function createScheduledLessonParticipantLinks(
   lessonId: string,
-  linkOrigin: ScheduledLessonLinkOrigin = "HONEYSCHOOL_RU",
   config = authConfig,
 ): Promise<ScheduledLessonParticipantLinks> {
   return apiJson<ScheduledLessonParticipantLinks>(
-    `/api/schedule/lessons/${encodeURIComponent(lessonId)}/participant-links?linkOrigin=${encodeURIComponent(linkOrigin)}`,
+    `/api/schedule/lessons/${encodeURIComponent(lessonId)}/participant-links`,
     { method: "POST" },
     config,
     200,

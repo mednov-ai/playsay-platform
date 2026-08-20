@@ -116,6 +116,8 @@ class AssignmentQueryService(
                 ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.ASSIGNMENT_NOT_READY),
             sessionId = recipient.activityRef
                 ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.ASSIGNMENT_NOT_READY),
+            learnerSnapshotId = recipient.learnerSnapshotId ?: recipient.activityRef
+                ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.ASSIGNMENT_NOT_READY),
         )
     }
 

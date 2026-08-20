@@ -7,10 +7,8 @@ import {
   buildLogoutUrl,
   clearTokens,
   completeLogin,
-  consumeCompletedAuthAction,
   consumeSkipSilentLogin,
   fetchAdminUserProfiles,
-  fetchAuthenticationMethods,
   fetchMaterials,
   fetchMe,
   fetchScheduledLessons,
@@ -20,14 +18,10 @@ import {
   isAuthCallback,
   readTokens,
   saveUserProfile,
-  deleteAuthenticationPasskey,
-  renameAuthenticationPasskey,
   skipSilentLoginOnce,
   startSilentLogin,
   type AdminUserProfile,
-  type AuthenticationMethods,
   type AppUserProfile,
-  type CompletedAuthAction,
   type LessonMaterial,
   type MeProfile,
   type ScheduledLesson,
@@ -72,10 +66,6 @@ export function useAppController(): AppShellProps {
   const [error, setError] = useState<string | null>(null);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [completedAuthAction, setCompletedAuthAction] = useState<CompletedAuthAction | null>(null);
-  const [authenticationMethods, setAuthenticationMethods] = useState<AuthenticationMethods | null>(null);
-  const [authenticationMethodsLoading, setAuthenticationMethodsLoading] = useState(true);
-  const [authenticationMethodsMessage, setAuthenticationMethodsMessage] = useState<string | null>(null);
   const resetShellUi = useAppShellUiStore((state) => state.resetShellUi);
   const setWorkspaceTab = useAppShellUiStore((state) => state.setWorkspaceTab);
   const workspaceTab = useAppShellUiStore((state) => state.workspaceTab);
@@ -102,16 +92,13 @@ export function useAppController(): AppShellProps {
     let cancelled = false;
 
     async function boot() {
-      let callbackAuthAction: CompletedAuthAction | null = null;
       try {
         rememberChatTargetFromLocation();
         const currentUrl = new URL(window.location.href);
         if (isAuthCallback(currentUrl)) {
           await completeLogin(currentUrl);
-          callbackAuthAction = consumeCompletedAuthAction();
-          const returnPath = callbackAuthAction?.returnPath ?? "/";
-          window.history.replaceState({}, document.title, returnPath);
-          setCurrentPath(returnPath);
+          window.history.replaceState({}, document.title, "/");
+          setCurrentPath("/");
         }
 
         if (!readTokens()) {
@@ -131,13 +118,12 @@ export function useAppController(): AppShellProps {
 
         const me = await fetchMe();
         const canManagePeople = me.roles.includes("TEACHER") || me.roles.includes("ADMIN");
-        const [currentAppProfile, currentAdminUsers, currentMaterials, currentSchedule, currentStudents, currentAuthenticationMethods] = await Promise.all([
+        const [currentAppProfile, currentAdminUsers, currentMaterials, currentSchedule, currentStudents] = await Promise.all([
           fetchUserProfile(),
           me.roles.includes("ADMIN") ? fetchAdminUserProfiles() : Promise.resolve([]),
           fetchMaterials(),
           fetchScheduledLessons(),
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
-          fetchAuthenticationMethods().catch(() => null),
         ]);
         if (!cancelled) {
           let authenticatedAppProfile = currentAppProfile;
@@ -175,12 +161,6 @@ export function useAppController(): AppShellProps {
           setMaterials(currentMaterials);
           setScheduledLessons(currentSchedule);
           setStudentUsers(currentStudents);
-          setAuthenticationMethods(currentAuthenticationMethods);
-          setAuthenticationMethodsLoading(false);
-          setAuthenticationMethodsMessage(
-            currentAuthenticationMethods ? null : i18n.t("profile.passkeys.loadError"),
-          );
-          setCompletedAuthAction(resolveCompletedPasskeyAction(callbackAuthAction, currentAuthenticationMethods));
           setStatus("authenticated");
         }
       } catch (caught) {
@@ -194,7 +174,6 @@ export function useAppController(): AppShellProps {
         }
         clearTokens();
         if (!cancelled) {
-          setAuthenticationMethodsLoading(false);
           setError(caught instanceof Error ? caught.message : t("errors.authFailed"));
           setStatus("error");
         }
@@ -253,48 +232,6 @@ export function useAppController(): AppShellProps {
     applySessionError,
     enabled: isAuthenticated,
   });
-
-  async function refreshAuthenticationMethods(): Promise<void> {
-    setAuthenticationMethodsLoading(true);
-    setAuthenticationMethodsMessage(null);
-    try {
-      setAuthenticationMethods(await fetchAuthenticationMethods());
-    } catch {
-      setAuthenticationMethodsMessage(t("profile.passkeys.loadError"));
-    } finally {
-      setAuthenticationMethodsLoading(false);
-    }
-  }
-
-  async function renamePasskey(credentialId: string, label: string): Promise<boolean> {
-    setAuthenticationMethodsLoading(true);
-    setAuthenticationMethodsMessage(null);
-    try {
-      setAuthenticationMethods(await renameAuthenticationPasskey(credentialId, { label }));
-      setAuthenticationMethodsMessage(t("profile.passkeys.renamed"));
-      return true;
-    } catch {
-      setAuthenticationMethodsMessage(t("profile.passkeys.renameError"));
-      return false;
-    } finally {
-      setAuthenticationMethodsLoading(false);
-    }
-  }
-
-  async function deletePasskey(credentialId: string): Promise<boolean> {
-    setAuthenticationMethodsLoading(true);
-    setAuthenticationMethodsMessage(null);
-    try {
-      setAuthenticationMethods(await deleteAuthenticationPasskey(credentialId));
-      setAuthenticationMethodsMessage(t("profile.passkeys.deleted"));
-      return true;
-    } catch {
-      setAuthenticationMethodsMessage(t("profile.passkeys.deleteError"));
-      return false;
-    } finally {
-      setAuthenticationMethodsLoading(false);
-    }
-  }
   const {
     createPaymentInvoice,
     paymentInvoices,
@@ -366,7 +303,7 @@ export function useAppController(): AppShellProps {
     setStudentUsers,
     studentUsers,
   });
-  useLessonRealtime({
+  const lessonRealtime = useLessonRealtime({
     applySessionError,
     classroomLessonId: classroomLesson?.id ?? null,
     closeClassroom,
@@ -446,8 +383,6 @@ export function useAppController(): AppShellProps {
     appQueryClient.clear();
     setProfile(null);
     setAppProfile(null);
-    setAuthenticationMethods(null);
-    setAuthenticationMethodsMessage(null);
     setAdminUsers([]);
     setMaterials([]);
     setScheduledLessons([]);
@@ -471,8 +406,6 @@ export function useAppController(): AppShellProps {
       appQueryClient.clear();
       setProfile(null);
       setAppProfile(null);
-      setAuthenticationMethods(null);
-      setAuthenticationMethodsMessage(null);
       setAdminUsers([]);
       setMaterials([]);
       setScheduledLessons([]);
@@ -497,9 +430,6 @@ export function useAppController(): AppShellProps {
     adminLoading,
     adminMessage,
     adminUsers,
-    authenticationMethods,
-    authenticationMethodsLoading,
-    authenticationMethodsMessage,
     anyLessonLoading,
     appProfile,
     assignMaterialToScheduledLesson,
@@ -517,7 +447,6 @@ export function useAppController(): AppShellProps {
     createScheduledLesson,
     createManagedStudent,
     deleteCourse,
-    deletePasskey,
     deleteLesson,
     deleteMaterial,
     deleteScheduledLesson,
@@ -548,13 +477,11 @@ export function useAppController(): AppShellProps {
     profileMessage,
     profileSaving,
     refreshAdminUsers,
-    refreshAuthenticationMethods,
     refreshCourses,
     refreshMaterials,
     refreshPaymentInvoices,
     refreshSchedule,
     rescheduleScheduledLesson,
-    renamePasskey,
     resetProfile,
     roomLoadingLessonId,
     roomMessage,
@@ -580,21 +507,8 @@ export function useAppController(): AppShellProps {
     openLessonPreparation,
     closeLessonPreparation,
     classroomLesson,
-    completedAuthAction,
     confirmScheduledLessonJoin,
-  };
-}
-
-function resolveCompletedPasskeyAction(
-  action: CompletedAuthAction | null,
-  methods: AuthenticationMethods | null,
-): CompletedAuthAction | null {
-  if (!action || action.status !== "pending") {
-    return action;
-  }
-  return {
-    ...action,
-    status: methods && methods.passkeys.length > action.passkeyCountBefore ? "success" : "failed",
+    lessonDice: lessonRealtime.dice,
   };
 }
 

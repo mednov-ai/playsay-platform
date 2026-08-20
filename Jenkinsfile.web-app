@@ -166,9 +166,9 @@ spec:
           }
           env.BUILD_LABEL_PREFIX = buildPrefix ?: 'web'
           env.BUILD_LABEL = "${env.BUILD_LABEL_PREFIX}-${env.BUILD_NUMBER}"
-          env.DEPLOY_TO_PROD = (env.CI_BRANCH ==~ /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/).toString()
+          env.DEPLOY_TO_PROD = (env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/).toString()
           if (env.CI_BRANCH.startsWith('release/') && env.DEPLOY_TO_PROD != 'true') {
-            error 'Production release branches must match release/NN.NNN.NN.'
+            error 'Production release branches must match release/<number>.<number>.<number>.'
           }
           env.DEPLOY_TO_DEV = (
             env.CI_BRANCH == 'develop' ||
@@ -204,6 +204,11 @@ spec:
                 export VITE_VOCABULARY_LIVE_ENABLED=true
                 export VITE_VOCABULARY_KEY_ENABLED=true
                 export VITE_PERSONAL_PRACTICE_V2_ENABLED=true
+                export VITE_VOCABULARY_COMPOSER_ENABLED=true
+                export VITE_VOCABULARY_ADAPTIVE_POLICY_ENABLED=true
+                export VITE_VOCABULARY_DELIVERY_POLICIES_ENABLED=true
+                export VITE_VOCABULARY_KEY_NGRAMS_ENABLED=true
+                export VITE_VOCABULARY_GENERATED_MEDIA_ENABLED=true
                 export VITE_KEYBOARD_ORIGIN=https://dev.key.honey.school
               elif [ "$DEPLOY_TO_PROD" = "true" ]; then
                 export VITE_KEYBOARD_ORIGIN=https://key.honey.school

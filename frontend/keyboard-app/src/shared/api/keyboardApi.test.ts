@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { claimAnonymousProgress, keyboardApiPath, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult } from "./keyboardApi";
+import { acknowledgeVocabularyTarget, claimAnonymousProgress, fetchVocabularySessionPractice, keyboardApiPath, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult } from "./keyboardApi";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -175,6 +175,38 @@ describe("keyboard API paths", () => {
         layout: "EN",
       },
     });
+  });
+
+  it("keeps loading legacy whole-word vocabulary responses without typed target fields", async () => {
+    const sessionStorage = memoryStorage();
+    vi.stubGlobal("window", { sessionStorage });
+    sessionStorage.setItem("playsay.keyboard.auth.tokens", JSON.stringify({ accessToken: "token-1", expiresAt: Date.now() + 60_000 }));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      entries: [{ id: "entry-1", sourceText: "steady" }],
+      items: [{ entryId: "entry-1", itemId: "item-1", sourceText: "steady" }],
+      sessionId: "session-1",
+      title: "Vocabulary",
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+    await expect(fetchVocabularySessionPractice("session-1")).resolves.toMatchObject({
+      items: [{ sourceText: "steady" }],
+      sessionId: "session-1",
+    });
+  });
+
+  it("persists an authenticated vocabulary target acknowledgement", async () => {
+    const sessionStorage = memoryStorage();
+    vi.stubGlobal("window", { sessionStorage });
+    sessionStorage.setItem("playsay.keyboard.auth.tokens", JSON.stringify({ accessToken: "token-1", expiresAt: Date.now() + 60_000 }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      sessionId: "session-1", lastAcknowledgedPosition: 2, revision: 3,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+    await expect(acknowledgeVocabularyTarget("session-1", 2, "target-2")).resolves.toMatchObject({ lastAcknowledgedPosition: 2 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/vocabulary/practice-sessions/session-1/key-acknowledgement",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ position: 2, targetId: "target-2" }) }),
+    );
   });
 });
 

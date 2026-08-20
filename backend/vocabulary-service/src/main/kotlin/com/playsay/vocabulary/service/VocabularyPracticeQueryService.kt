@@ -161,6 +161,16 @@ class VocabularyPracticeQueryService(
     fun ensureStates(ownerEntries: List<VocabularyEntryEntity>): List<VocabularySkillStateEntity> {
         if (ownerEntries.isEmpty()) return emptyList()
         val existing = skillStates.findAllByEntryIdIn(ownerEntries.map(VocabularyEntryEntity::id))
+        val entriesById = ownerEntries.associateBy(VocabularyEntryEntity::id)
+        val changedAvailability = existing.filter { state ->
+            val entry = entriesById[state.entryId] ?: return@filter false
+            val available = state.skill != VocabularySkill.CONTEXT || hasExactVocabularyContext(entry)
+            if (state.skillAvailable == available) false else {
+                state.skillAvailable = available
+                true
+            }
+        }
+        if (changedAvailability.isNotEmpty()) skillStates.saveAll(changedAvailability)
         val existingKeys = existing.mapTo(mutableSetOf()) { it.entryId to it.skill }
         val now = Instant.now()
         val missing = ownerEntries.flatMap { entry ->
@@ -176,6 +186,7 @@ class VocabularyPracticeQueryService(
                         stage = LearningStage.NEW,
                         intervalIndex = 0,
                         dueAt = now,
+                        skillAvailable = skill != VocabularySkill.CONTEXT || hasExactVocabularyContext(entry),
                         createdAt = now,
                         updatedAt = now,
                     )
@@ -297,7 +308,7 @@ class VocabularyPracticeQueryService(
             masteredCount = allStages.values.count { it == LearningStage.MASTERED },
             needsTranslationCount = ownerEntries.count { it.translation.isNullOrBlank() },
             difficultCount = statesByEntry.values.count { entryStates ->
-                entryStates.any { it.lapseCount > 0 || it.lastRating == PracticeRating.AGAIN }
+                entryStates.any { it.difficultyScore.toDouble() >= 0.55 || it.reviewReason == "DIFFICULT" || it.reviewReason == "LAPSED" }
             },
             lastPracticedAt = statesByEntry.values.flatten()
                 .mapNotNull(VocabularySkillStateEntity::lastPracticedAt)

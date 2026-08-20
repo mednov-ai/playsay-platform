@@ -21,8 +21,8 @@ do
   require_env "$name"
 done
 
-if ! printf '%s\n' "$CI_BRANCH" | grep -Eq '^release/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$'; then
-  echo "Only release/NN.NNN.NN branches can be finalized." >&2
+if ! printf '%s\n' "$CI_BRANCH" | grep -Eq '^release/[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "Only numeric release branches can be finalized." >&2
   exit 1
 fi
 if ! printf '%s\n' "$GIT_COMMIT" | grep -Eq '^[0-9a-f]{40}$'; then

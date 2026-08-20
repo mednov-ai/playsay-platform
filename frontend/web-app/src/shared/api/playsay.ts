@@ -2,7 +2,6 @@ export * from "./auth";
 export * from "./errors";
 export * from "./types";
 export * from "./profile";
-export * from "./authenticationMethods";
 export * from "./courses";
 export * from "./schedule";
 export * from "./materials";

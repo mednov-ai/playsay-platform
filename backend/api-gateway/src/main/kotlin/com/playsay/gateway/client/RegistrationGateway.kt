@@ -20,9 +20,7 @@ import com.playsay.contract.registration.model.StudentInviteConsumeRequest as Co
 import com.playsay.contract.registration.model.StudentInviteConsumeResponse as ContractStudentInviteConsumeResponse
 import com.playsay.gateway.dto.ConfirmRegistrationRequest
 import com.playsay.gateway.dto.ForgotPasswordRequest
-import com.playsay.gateway.dto.AuthenticationMethodsResponse
 import com.playsay.gateway.dto.ManagedStudentRequest
-import com.playsay.gateway.dto.RenamePasskeyRequest
 import com.playsay.gateway.dto.RegistrationResponse
 import com.playsay.gateway.dto.ResetPasswordRequest
 import com.playsay.gateway.dto.ResendRegistrationRequest
@@ -62,12 +60,6 @@ interface RegistrationGateway {
     fun deleteUser(subject: String) {
         throw UnsupportedOperationException("User management is not supported by this registration gateway.")
     }
-    fun authenticationMethods(subject: String): AuthenticationMethodsResponse =
-        throw UnsupportedOperationException("Authentication method management is not supported by this registration gateway.")
-    fun renamePasskey(subject: String, credentialId: String, request: RenamePasskeyRequest): AuthenticationMethodsResponse =
-        throw UnsupportedOperationException("Authentication method management is not supported by this registration gateway.")
-    fun deletePasskey(subject: String, credentialId: String): AuthenticationMethodsResponse =
-        throw UnsupportedOperationException("Authentication method management is not supported by this registration gateway.")
 }
 
 @Component
@@ -191,33 +183,6 @@ class HttpRegistrationGateway(
         val path = "/api/internal/user-management/users/${subject.urlEncoded()}"
         val response = send(path, deleteMethod, null, null)
         requireExpected(path, response, HttpStatus.NO_CONTENT)
-    }
-
-    override fun authenticationMethods(subject: String): AuthenticationMethodsResponse {
-        val path = "/api/internal/authentication-methods/users/${subject.urlEncoded()}"
-        val response = send(path, "GET", null, null)
-        requireExpected(path, response, HttpStatus.OK)
-        return parse(path, response.body(), AuthenticationMethodsResponse::class.java)
-    }
-
-    override fun renamePasskey(
-        subject: String,
-        credentialId: String,
-        request: RenamePasskeyRequest,
-    ): AuthenticationMethodsResponse =
-        requestJson(
-            "/api/internal/authentication-methods/users/${subject.urlEncoded()}/passkeys/${credentialId.urlEncoded()}",
-            "PUT",
-            request,
-            HttpStatus.OK,
-            AuthenticationMethodsResponse::class.java,
-        )
-
-    override fun deletePasskey(subject: String, credentialId: String): AuthenticationMethodsResponse {
-        val path = "/api/internal/authentication-methods/users/${subject.urlEncoded()}/passkeys/${credentialId.urlEncoded()}"
-        val response = send(path, deleteMethod, null, null)
-        requireExpected(path, response, HttpStatus.OK)
-        return parse(path, response.body(), AuthenticationMethodsResponse::class.java)
     }
 
     private fun <T : Any> postJson(

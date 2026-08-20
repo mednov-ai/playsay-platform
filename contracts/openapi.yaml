@@ -64,55 +64,6 @@ paths:
           description: Missing or invalid bearer token
       security:
       - bearerAuth: []
-  /users/me/authentication-methods/passkeys/{credentialId}:
-    put:
-      tags:
-      - Authentication methods
-      summary: Rename current user's Passkey
-      operationId: renameMyPasskey
-      parameters:
-      - name: credentialId
-        in: path
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RenamePasskeyRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthenticationMethodsResponse"
-      security:
-      - bearerAuth: []
-    delete:
-      tags:
-      - Authentication methods
-      summary: Delete current user's Passkey
-      description: Deletes a passwordless Passkey owned by the current user without
-        exposing Keycloak administration.
-      operationId: deleteMyPasskey
-      parameters:
-      - name: credentialId
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthenticationMethodsResponse"
-      security:
-      - bearerAuth: []
   /teacher/students/{subject}/lesson-translation-permission:
     put:
       tags:
@@ -1163,15 +1114,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: linkOrigin
-        in: query
-        required: false
-        schema:
-          type: string
-          default: HONEYSCHOOL_RU
-          enum:
-          - HONEYSCHOOL_RU
-          - HONEY_SCHOOL
       responses:
         "200":
           description: Scheduled lesson participant links
@@ -2936,6 +2878,39 @@ paths:
           description: Material or asset not found
       security:
       - bearerAuth: []
+  /assignments/{assignmentId}/vocabulary-review/{studentSubject}:
+    patch:
+      tags:
+      - Assignments
+      summary: Accept or return vocabulary homework awaiting teacher review
+      operationId: reviewVocabularyHomeworkAssignment
+      parameters:
+      - name: assignmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: studentSubject
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VocabularyHomeworkReviewRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAssignmentDetailResponse"
+      security:
+      - bearerAuth: []
   /users/students:
     get:
       tags:
@@ -2957,25 +2932,6 @@ paths:
           description: Missing or invalid bearer token
         "403":
           description: Current user is not a teacher/admin
-      security:
-      - bearerAuth: []
-  /users/me/authentication-methods:
-    get:
-      tags:
-      - Authentication methods
-      summary: Current user's sign-in methods
-      description: Returns password availability and safe metadata for the current
-        user's passwordless Passkeys.
-      operationId: getMyAuthenticationMethods
-      responses:
-        "200":
-          description: Current sign-in methods
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthenticationMethodsResponse"
-        "401":
-          description: Missing or invalid bearer token
       security:
       - bearerAuth: []
   /teachers/directory:
@@ -3712,44 +3668,6 @@ components:
       - roles
       - subject
       - updatedAt
-    RenamePasskeyRequest:
-      type: object
-      properties:
-        label:
-          type: string
-          maxLength: 64
-          minLength: 1
-      required:
-      - label
-    AuthenticationMethodsResponse:
-      type: object
-      properties:
-        hasPassword:
-          type: boolean
-        passkeys:
-          type: array
-          items:
-            $ref: "#/components/schemas/PasskeyCredentialResponse"
-      required:
-      - hasPassword
-      - passkeys
-    PasskeyCredentialResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          description: Opaque credential identifier usable only by self-service endpoints.
-        label:
-          type:
-          - string
-          - "null"
-        createdAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-      required:
-      - id
     UpdateStudentLessonTranslationPermissionRequest:
       type: object
       properties:
@@ -5112,6 +5030,7 @@ components:
           enum:
           - NOT_STARTED
           - IN_PROGRESS
+          - AWAITING_REVIEW
           - COMPLETED
           - FAILED
         completionRatio:
@@ -5127,6 +5046,48 @@ components:
           - integer
           - "null"
           format: int32
+        learnerSnapshotId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        distinctGradedPrompts:
+          type:
+          - integer
+          - "null"
+          format: int32
+        distinctEntries:
+          type:
+          - integer
+          - "null"
+          format: int32
+        hintsUsed:
+          type:
+          - integer
+          - "null"
+          format: int32
+        activeDurationMs:
+          type:
+          - integer
+          - "null"
+          format: int64
+        masteryRatio:
+          type:
+          - number
+          - "null"
+        reviewState:
+          type:
+          - string
+          - "null"
+        reviewNote:
+          type:
+          - string
+          - "null"
+        reviewedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
       required:
       - assignmentId
       - hasSubmission
@@ -5240,6 +5201,7 @@ components:
           enum:
           - NOT_STARTED
           - IN_PROGRESS
+          - AWAITING_REVIEW
           - COMPLETED
           - FAILED
         myCompletionRatio:
@@ -5255,6 +5217,51 @@ components:
           - integer
           - "null"
           format: int32
+        completionPolicy:
+          type:
+          - string
+          - "null"
+          enum:
+          - MEANINGFUL_ACTIVITY
+          - COMPLETE_SESSION
+          - MASTERY_TARGET
+          - TEACHER_REVIEW
+        completionPolicyVersion:
+          type:
+          - string
+          - "null"
+        completionThresholds:
+          oneOf:
+          - $ref: "#/components/schemas/VocabularyCompletionThresholds"
+          - type: "null"
+        myDistinctGradedPrompts:
+          type:
+          - integer
+          - "null"
+          format: int32
+        myDistinctEntries:
+          type:
+          - integer
+          - "null"
+          format: int32
+        myHintsUsed:
+          type:
+          - integer
+          - "null"
+          format: int32
+        myActiveDurationMs:
+          type:
+          - integer
+          - "null"
+          format: int64
+        myMasteryRatio:
+          type:
+          - number
+          - "null"
+        myReviewState:
+          type:
+          - string
+          - "null"
       required:
       - contentKind
       - createdAt
@@ -5278,6 +5285,33 @@ components:
       required:
       - assignment
       - recipients
+    VocabularyCompletionThresholds:
+      type: object
+      properties:
+        distinctGradedPrompts:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+        distinctEntries:
+          type: integer
+          format: int32
+          maximum: 30
+          minimum: 1
+        masteryPercent:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+        policyVersion:
+          type: string
+          maxLength: 64
+          minLength: 0
+      required:
+      - distinctEntries
+      - distinctGradedPrompts
+      - masteryPercent
+      - policyVersion
     CollaborationTokenResponse:
       type: object
       properties:
@@ -5977,6 +6011,7 @@ components:
           enum:
           - NOT_STARTED
           - IN_PROGRESS
+          - AWAITING_REVIEW
           - COMPLETED
           - FAILED
         completionRatio:
@@ -5992,6 +6027,48 @@ components:
           - integer
           - "null"
           format: int32
+        learnerSnapshotId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        distinctGradedPrompts:
+          type:
+          - integer
+          - "null"
+          format: int32
+        distinctEntries:
+          type:
+          - integer
+          - "null"
+          format: int32
+        hintsUsed:
+          type:
+          - integer
+          - "null"
+          format: int32
+        activeDurationMs:
+          type:
+          - integer
+          - "null"
+          format: int64
+        masteryRatio:
+          type:
+          - number
+          - "null"
+        completionPolicy:
+          type:
+          - string
+          - "null"
+          enum:
+          - MEANINGFUL_ACTIVITY
+          - COMPLETE_SESSION
+          - MASTERY_TARGET
+          - TEACHER_REVIEW
+        completionPolicyVersion:
+          type:
+          - string
+          - "null"
         updatedAt:
           type: string
           format: date-time
@@ -6190,12 +6267,57 @@ components:
           - integer
           - "null"
           format: int64
+        completionPolicy:
+          type: string
+          enum:
+          - MEANINGFUL_ACTIVITY
+          - COMPLETE_SESSION
+          - MASTERY_TARGET
+          - TEACHER_REVIEW
+        completionThresholds:
+          $ref: "#/components/schemas/VocabularyCompletionThresholds"
+        keyMode:
+          type: string
+          enum:
+          - WHOLE_WORDS
+          - CHARACTER_NGRAMS
+          - MIXED
+        keyNgramSettings:
+          $ref: "#/components/schemas/VocabularyKeyNgramSettings"
       required:
       - excludedEntryIds
       - mode
       - pinnedEntryIds
       - studentSubjects
       - wordLimit
+    VocabularyKeyNgramSettings:
+      type: object
+      properties:
+        minLength:
+          type: integer
+          format: int32
+          maximum: 8
+          minimum: 2
+        maxLength:
+          type: integer
+          format: int32
+          maximum: 8
+          minimum: 2
+        targetLimit:
+          type: integer
+          format: int32
+          maximum: 200
+          minimum: 1
+        maxRepetitions:
+          type: integer
+          format: int32
+          maximum: 4
+          minimum: 1
+      required:
+      - maxLength
+      - maxRepetitions
+      - minLength
+      - targetLimit
     StudentInviteConsumeRequest:
       type: object
       properties:
@@ -6451,6 +6573,22 @@ components:
             type: string
             maxLength: 40
           maxItems: 16
+    VocabularyHomeworkReviewRequest:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+          - ACCEPT
+          - RETURN
+        note:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+          minLength: 0
+      required:
+      - action
     PublicPaymentInvoiceResponse:
       type: object
       properties:
@@ -6591,8 +6729,12 @@ components:
         sessionId:
           type: string
           format: uuid
+        learnerSnapshotId:
+          type: string
+          format: uuid
       required:
       - assignment
+      - learnerSnapshotId
       - practiceId
       - sessionId
     HelloResponse:

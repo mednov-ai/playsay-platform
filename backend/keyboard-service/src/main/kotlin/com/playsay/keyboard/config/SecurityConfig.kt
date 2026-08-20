@@ -24,6 +24,7 @@ class SecurityConfig {
                         "/actuator/health/**",
                         "/api/anonymous/**",
                         "/internal/user-data/**",
+                        "/internal/keyboard/**",
                     ).permitAll()
                     .anyRequest().authenticated()
             }

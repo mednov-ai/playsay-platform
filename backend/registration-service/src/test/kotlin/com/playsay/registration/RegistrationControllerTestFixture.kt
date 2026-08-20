@@ -42,7 +42,7 @@ import org.springframework.http.HttpStatus
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=true",
-        "playsay.registration.public-base-url=https://dev.online.honey.school",
+        "playsay.registration.public-base-url=https://online.play-and-say.ru",
         "playsay.registration.keycloak.base-url=http://127.0.0.1:18080",
         "playsay.registration.keycloak.realm=playsay-dev",
         "playsay.registration.keycloak.client-id=playsay-registration-service",
@@ -91,7 +91,7 @@ abstract class RegistrationControllerTestFixture {
         email: String,
         password: String = "River2026!",
         forwardedFor: String? = nextForwardedFor(),
-        returnTo: String? = "https://dev.key.honey.school/",
+        returnTo: String? = "https://key.play-and-say.ru/",
     ): HttpResponse<String> =
         httpClient.send(
             HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/registration/start"))
@@ -113,7 +113,7 @@ abstract class RegistrationControllerTestFixture {
                 }
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
-                        """{"email":"$email","locale":"en","returnTo":"https://dev.key.honey.school/"}""",
+                        """{"email":"$email","locale":"en","returnTo":"https://key.play-and-say.ru/"}""",
                     ),
                 )
                 .build(),
@@ -138,7 +138,7 @@ abstract class RegistrationControllerTestFixture {
                 }
                 .POST(
                     HttpRequest.BodyPublishers.ofString(
-                        """{"email":"$email","locale":"en","returnTo":"https://dev.key.honey.school/"}""",
+                        """{"email":"$email","locale":"en","returnTo":"https://key.play-and-say.ru/"}""",
                     ),
                 )
                 .build(),
@@ -270,7 +270,7 @@ abstract class RegistrationControllerTestFixture {
     protected fun startRegistrationBody(
         email: String = "student@example.com",
         password: String = "River2026!",
-        returnTo: String? = "https://dev.key.honey.school/",
+        returnTo: String? = "https://key.play-and-say.ru/",
     ): String {
         val returnToLine = returnTo?.let { ",\"returnTo\":\"$it\"" } ?: ""
         return """{"email":"$email","password":"$password","displayName":"Student","locale":"en"$returnToLine}"""

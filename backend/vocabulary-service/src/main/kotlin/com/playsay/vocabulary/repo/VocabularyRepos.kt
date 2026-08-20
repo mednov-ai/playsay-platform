@@ -9,10 +9,26 @@ import com.playsay.vocabulary.entity.VocabularyPracticeEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeItemEntity
 import com.playsay.vocabulary.entity.VocabularyPracticePlanEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeSessionEntity
+import com.playsay.vocabulary.entity.VocabularyKeySnapshotEntity
+import com.playsay.vocabulary.entity.VocabularyKeyTargetEntity
+import com.playsay.vocabulary.entity.VocabularyKeyResultEntity
 import com.playsay.vocabulary.entity.VocabularySkillStateEntity
 import com.playsay.vocabulary.entity.VocabularyIntegrationOutboxEntity
 import com.playsay.vocabulary.entity.VocabularyUserProjection
 import com.playsay.vocabulary.entity.VocabularyLessonParticipantProjection
+import com.playsay.vocabulary.entity.VocabularyLexicalContentRevisionEntity
+import com.playsay.vocabulary.entity.VocabularyLexicalSenseEntity
+import com.playsay.vocabulary.dto.LexicalCatalogScope
+import com.playsay.vocabulary.entity.VocabularyLearningEvidenceEntity
+import com.playsay.vocabulary.entity.VocabularyProjectionQueueEntity
+import com.playsay.vocabulary.entity.VocabularySelectionRecipeEntity
+import com.playsay.vocabulary.entity.VocabularyMediaAssetEntity
+import com.playsay.vocabulary.entity.VocabularyMediaGenerationRequestEntity
+import com.playsay.vocabulary.entity.VocabularyMediaReviewEventEntity
+import com.playsay.vocabulary.entity.VocabularyMediaReportEntity
+import com.playsay.vocabulary.entity.VocabularyMediaSnapshotReferenceEntity
+import com.playsay.vocabulary.dto.VocabularyMediaAssetState
+import com.playsay.vocabulary.dto.VocabularyMediaGenerationState
 import com.playsay.vocabulary.dto.PracticeStatus
 import com.playsay.vocabulary.dto.SessionStatus
 import org.springframework.data.jpa.repository.JpaRepository
@@ -26,10 +42,84 @@ import java.time.Instant
 
 interface VocabularyEntryRepo : JpaRepository<VocabularyEntryEntity, UUID> {
     fun deleteByOwnerSubject(ownerSubject: String): Long
-    fun findByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguage(ownerSubject: String, normalizedSource: String, sourceLanguage: String, targetLanguage: String): VocabularyEntryEntity?
+    fun findAllByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguageOrderByUpdatedAtDesc(ownerSubject: String, normalizedSource: String, sourceLanguage: String, targetLanguage: String): List<VocabularyEntryEntity>
+    fun findByOwnerSubjectAndLexicalSenseId(ownerSubject: String, lexicalSenseId: UUID): VocabularyEntryEntity?
+    fun findAllByLexicalSenseIdIsNullOrderByIdAsc(): List<VocabularyEntryEntity>
     fun findAllByOwnerSubjectAndStatusOrderByUpdatedAtDesc(ownerSubject: String, status: EntryStatus): List<VocabularyEntryEntity>
     fun findByIdAndOwnerSubject(id: UUID, ownerSubject: String): VocabularyEntryEntity?
     fun findAllByOwnerSubjectInAndStatus(ownerSubjects: Collection<String>, status: EntryStatus): List<VocabularyEntryEntity>
+    fun findAllByOwnerSubjectAndStatusAndFavoriteTrue(ownerSubject: String, status: EntryStatus): List<VocabularyEntryEntity>
+    fun findAllByOwnerSubjectAndStatusAndUpdatedAtGreaterThanEqual(ownerSubject: String, status: EntryStatus, updatedAt: Instant): List<VocabularyEntryEntity>
+    fun findAllByOwnerSubjectAndIdIn(ownerSubject: String, ids: Collection<UUID>): List<VocabularyEntryEntity>
+}
+
+interface VocabularyLexicalSenseRepo : JpaRepository<VocabularyLexicalSenseEntity, UUID> {
+    fun findByCatalogScopeAndScopeKeyAndSourceLanguageAndTargetLanguageAndNormalizedLemmaAndNormalizedPartOfSpeechAndNormalizedMeaning(
+        catalogScope: LexicalCatalogScope,
+        scopeKey: String,
+        sourceLanguage: String,
+        targetLanguage: String,
+        normalizedLemma: String,
+        normalizedPartOfSpeech: String,
+        normalizedMeaning: String,
+    ): VocabularyLexicalSenseEntity?
+}
+
+interface VocabularyLexicalContentRevisionRepo : JpaRepository<VocabularyLexicalContentRevisionEntity, UUID> {
+    fun findTopBySenseIdOrderByRevisionDesc(senseId: UUID): VocabularyLexicalContentRevisionEntity?
+    fun findAllBySenseIdOrderByRevisionAsc(senseId: UUID): List<VocabularyLexicalContentRevisionEntity>
+}
+
+interface VocabularyLearningEvidenceRepo : JpaRepository<VocabularyLearningEvidenceEntity, UUID> {
+    fun findByOwnerSubjectAndClientEvidenceId(ownerSubject: String, clientEvidenceId: String): VocabularyLearningEvidenceEntity?
+    fun findAllBySessionIdOrderByOccurredAtAsc(sessionId: UUID): List<VocabularyLearningEvidenceEntity>
+    fun deleteByOwnerSubject(ownerSubject: String): Long
+}
+
+interface VocabularyProjectionQueueRepo : JpaRepository<VocabularyProjectionQueueEntity, UUID> {
+    fun findByEvidenceId(evidenceId: UUID): VocabularyProjectionQueueEntity?
+    fun findTop50ByStatusAndNextAttemptAtLessThanEqualOrderByCreatedAtAsc(status: String, nextAttemptAt: Instant): List<VocabularyProjectionQueueEntity>
+    fun countByStatus(status: String): Long
+    fun countByStatusAndNextAttemptAtBefore(status: String, nextAttemptAt: Instant): Long
+    fun findFirstByStatusOrderByCreatedAtAsc(status: String): VocabularyProjectionQueueEntity?
+}
+
+interface VocabularySelectionRecipeRepo : JpaRepository<VocabularySelectionRecipeEntity, UUID> {
+    fun findAllByOwnerSubjectOrderByUpdatedAtDesc(ownerSubject: String): List<VocabularySelectionRecipeEntity>
+    fun findByIdAndOwnerSubject(id: UUID, ownerSubject: String): VocabularySelectionRecipeEntity?
+    fun existsByOwnerSubjectAndNameIgnoreCaseAndIdNot(ownerSubject: String, name: String, id: UUID): Boolean
+    fun deleteByOwnerSubject(ownerSubject: String): Long
+}
+
+interface VocabularyMediaAssetRepo : JpaRepository<VocabularyMediaAssetEntity, UUID> {
+    fun findAllBySenseIdOrderByCreatedAtDesc(senseId: UUID): List<VocabularyMediaAssetEntity>
+    fun findFirstBySenseIdAndStateOrderByApprovedAtDesc(senseId: UUID, state: VocabularyMediaAssetState): VocabularyMediaAssetEntity?
+    fun findAllByStateOrderByCreatedAtAsc(state: VocabularyMediaAssetState): List<VocabularyMediaAssetEntity>
+    fun findAllByStateOrderByCreatedAtAsc(state: VocabularyMediaAssetState, pageable: Pageable): List<VocabularyMediaAssetEntity>
+    fun findTop50ByStateInAndStorageKeyIsNotNullOrderByUpdatedAtAsc(states: Collection<VocabularyMediaAssetState>): List<VocabularyMediaAssetEntity>
+}
+
+interface VocabularyMediaGenerationRequestRepo : JpaRepository<VocabularyMediaGenerationRequestEntity, UUID> {
+    fun findByActiveFirstUseKey(activeFirstUseKey: String): VocabularyMediaGenerationRequestEntity?
+    fun findTop50ByStateAndNextAttemptAtLessThanEqualOrderByCreatedAtAsc(state: VocabularyMediaGenerationState, nextAttemptAt: Instant): List<VocabularyMediaGenerationRequestEntity>
+    fun findFirstBySenseIdOrderByCreatedAtDesc(senseId: UUID): VocabularyMediaGenerationRequestEntity?
+    fun countByState(state: VocabularyMediaGenerationState): Long
+    fun countByStateAndNextAttemptAtBefore(state: VocabularyMediaGenerationState, nextAttemptAt: Instant): Long
+    fun findFirstByStateOrderByCreatedAtAsc(state: VocabularyMediaGenerationState): VocabularyMediaGenerationRequestEntity?
+    fun findTop50ByStateAndUpdatedAtBeforeOrderByUpdatedAtAsc(state: VocabularyMediaGenerationState, updatedAt: Instant): List<VocabularyMediaGenerationRequestEntity>
+}
+
+interface VocabularyMediaReviewEventRepo : JpaRepository<VocabularyMediaReviewEventEntity, UUID> {
+    fun findAllByAssetIdOrderByCreatedAtAsc(assetId: UUID): List<VocabularyMediaReviewEventEntity>
+}
+
+interface VocabularyMediaReportRepo : JpaRepository<VocabularyMediaReportEntity, UUID> {
+    fun findByEntryIdAndAssetIdAndReporterSubject(entryId: UUID, assetId: UUID, reporterSubject: String): VocabularyMediaReportEntity?
+}
+
+interface VocabularyMediaSnapshotReferenceRepo : JpaRepository<VocabularyMediaSnapshotReferenceEntity, UUID> {
+    fun existsByAssetId(assetId: UUID): Boolean
+    fun findByPracticeItemId(practiceItemId: UUID): VocabularyMediaSnapshotReferenceEntity?
 }
 
 interface VocabularyOccurrenceRepo : JpaRepository<VocabularyOccurrenceEntity, Long> {
@@ -38,6 +128,15 @@ interface VocabularyOccurrenceRepo : JpaRepository<VocabularyOccurrenceEntity, L
             "where occurrence.entry.id in :entryIds and occurrence.lessonId = :lessonId",
     )
     fun findEntryIdsByLessonId(entryIds: Collection<UUID>, lessonId: UUID): List<UUID>
+
+    @Query("select distinct occurrence.entry.id from VocabularyOccurrenceEntity occurrence where occurrence.entry.ownerSubject = :ownerSubject and occurrence.lessonId = :lessonId")
+    fun findEntryIdsByOwnerSubjectAndLessonId(ownerSubject: String, lessonId: UUID): List<UUID>
+
+    @Query("select distinct occurrence.entry.id from VocabularyOccurrenceEntity occurrence where occurrence.entry.ownerSubject = :ownerSubject and occurrence.courseId = :courseId")
+    fun findEntryIdsByOwnerSubjectAndCourseId(ownerSubject: String, courseId: UUID): List<UUID>
+
+    @Query("select distinct occurrence.entry.id from VocabularyOccurrenceEntity occurrence where occurrence.entry.ownerSubject = :ownerSubject and occurrence.createdAt >= :since")
+    fun findEntryIdsByOwnerSubjectAndCreatedAtAfter(ownerSubject: String, since: Instant): List<UUID>
 }
 
 interface VocabularyUserRepo : JpaRepository<VocabularyUserProjection, UUID> {
@@ -145,7 +244,16 @@ interface VocabularyLessonAccessRepo : JpaRepository<VocabularyLessonAccessProje
 interface VocabularySkillStateRepo : JpaRepository<VocabularySkillStateEntity, UUID> {
     fun findAllByEntryIdIn(entryIds: Collection<UUID>): List<VocabularySkillStateEntity>
     fun findByEntryIdAndSkill(entryId: UUID, skill: com.playsay.vocabulary.dto.VocabularySkill): VocabularySkillStateEntity?
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select state from VocabularySkillStateEntity state where state.entryId = :entryId and state.skill = :skill")
+    fun lockByEntryIdAndSkill(entryId: UUID, skill: com.playsay.vocabulary.dto.VocabularySkill): VocabularySkillStateEntity?
     fun deleteByEntryOwnerSubject(ownerSubject: String): Long
+    @Query("select distinct state.entryId from VocabularySkillStateEntity state where state.ownerSubject = :ownerSubject and state.skillAvailable = true and state.dueAt <= :now")
+    fun findDueEntryIds(ownerSubject: String, now: Instant): List<UUID>
+    @Query("select distinct state.entryId from VocabularySkillStateEntity state where state.ownerSubject = :ownerSubject and state.reviewReason = :reason")
+    fun findEntryIdsByReviewReason(ownerSubject: String, reason: String): List<UUID>
+    @Query("select distinct state.entryId from VocabularySkillStateEntity state where state.ownerSubject = :ownerSubject and state.difficultyScore >= :threshold")
+    fun findDifficultEntryIds(ownerSubject: String, threshold: java.math.BigDecimal): List<UUID>
 }
 
 interface VocabularyPracticeRepo : JpaRepository<VocabularyPracticeEntity, UUID> {
@@ -183,8 +291,22 @@ interface VocabularyPracticeRepo : JpaRepository<VocabularyPracticeEntity, UUID>
     fun deleteByCreatedBySubject(subject: String): Long
 }
 
+interface VocabularyKeySnapshotRepo : JpaRepository<VocabularyKeySnapshotEntity, UUID> {
+    fun findBySessionId(sessionId: UUID): VocabularyKeySnapshotEntity?
+}
+
+interface VocabularyKeyTargetRepo : JpaRepository<VocabularyKeyTargetEntity, UUID> {
+    fun findAllBySnapshotIdOrderByPositionAsc(snapshotId: UUID): List<VocabularyKeyTargetEntity>
+}
+
+interface VocabularyKeyResultRepo : JpaRepository<VocabularyKeyResultEntity, UUID> {
+    fun existsByTargetId(targetId: UUID): Boolean
+    fun findAllBySessionIdOrderByPositionAsc(sessionId: UUID): List<VocabularyKeyResultEntity>
+}
+
 interface VocabularyPracticePlanRepo : JpaRepository<VocabularyPracticePlanEntity, UUID> {
     fun findByIdAndCreatedBySubject(id: UUID, createdBySubject: String): VocabularyPracticePlanEntity?
+    fun findByCreatedBySubjectAndMaterializationKey(createdBySubject: String, materializationKey: String): VocabularyPracticePlanEntity?
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         "select plan from VocabularyPracticePlanEntity plan where plan.id = :id and plan.createdBySubject = :createdBySubject",
@@ -254,4 +376,7 @@ interface VocabularyIntegrationOutboxRepo : JpaRepository<VocabularyIntegrationO
         status: String,
         nextAttemptAt: Instant,
     ): List<VocabularyIntegrationOutboxEntity>
+    fun countByStatus(status: String): Long
+    fun countByStatusAndNextAttemptAtBefore(status: String, nextAttemptAt: Instant): Long
+    fun findFirstByStatusOrderByCreatedAtAsc(status: String): VocabularyIntegrationOutboxEntity?
 }

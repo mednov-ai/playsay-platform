@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-08-20-001-vocabulary-delivery-policies" author="codex">
+        <addColumn tableName="assignment">
+            <column name="completion_policy" type="VARCHAR(32)" defaultValue="COMPLETE_SESSION"><constraints nullable="false"/></column>
+            <column name="completion_policy_version" type="VARCHAR(64)" defaultValue="legacy-v1"><constraints nullable="false"/></column>
+            <column name="completion_thresholds_json" type="TEXT" defaultValue="{}"><constraints nullable="false"/></column>
+        </addColumn>
+        <addColumn tableName="assignment_recipient">
+            <column name="learner_snapshot_id" type="UUID"/>
+            <column name="distinct_graded_prompts" type="INT"/>
+            <column name="distinct_entries" type="INT"/>
+            <column name="hints_used" type="INT"/>
+            <column name="active_duration_ms" type="BIGINT"/>
+            <column name="mastery_ratio" type="DECIMAL(7,4)"/>
+            <column name="review_state" type="VARCHAR(24)"/>
+            <column name="review_note" type="TEXT"/>
+            <column name="reviewed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="reviewed_by_subject" type="VARCHAR(255)"/>
+        </addColumn>
+        <createIndex tableName="assignment_recipient" indexName="idx_assignment_recipient_review_state"><column name="review_state"/></createIndex>
+        <createTable tableName="vocabulary_assignment_progress_event">
+            <column name="event_id" type="UUID"><constraints primaryKey="true" primaryKeyName="pk_vocabulary_assignment_progress_event" nullable="false"/></column>
+            <column name="assignment_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="session_revision" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="processed_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="vocabulary_assignment_progress_event" columnNames="assignment_id,session_id,session_revision" constraintName="uq_vocabulary_assignment_progress_revision"/>
+        <createIndex tableName="vocabulary_assignment_progress_event" indexName="idx_vocabulary_assignment_progress_assignment"><column name="assignment_id"/></createIndex>
+    </changeSet>
+</databaseChangeLog>

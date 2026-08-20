@@ -64,18 +64,18 @@ spec:
             sh "git checkout --detach ${requestedCommit}"
           }
           env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
-          if (env.CI_BRANCH.startsWith('release/') && !(env.CI_BRANCH ==~ /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/)) {
-            error 'Production release branches must match release/NN.NNN.NN.'
+          if (env.CI_BRANCH.startsWith('release/') && !(env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/)) {
+            error 'Production release branches must match release/<number>.<number>.<number>.'
           }
           if (env.JOB_NAME == 'playsay-platform-dispatch-develop' && env.CI_BRANCH != 'develop') {
             error 'The develop dispatcher accepts only the develop branch.'
           }
-          if (env.JOB_NAME == 'playsay-platform-dispatch-release' && !(env.CI_BRANCH ==~ /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/)) {
-            error 'The release dispatcher accepts only fixed-width release/NN.NNN.NN branches.'
+          if (env.JOB_NAME == 'playsay-platform-dispatch-release' && !(env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/)) {
+            error 'The release dispatcher accepts only numeric release branches.'
           }
           env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
-          if (env.CI_BRANCH ==~ /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/) {
+          if (env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/) {
             sh 'git fetch --no-tags origin +refs/heads/develop:refs/remotes/origin/develop'
             env.ACCEPTED_DEV_COMMIT = params.ACCEPTED_DEV_COMMIT?.trim() ?: sh(
               script: 'git rev-parse refs/remotes/origin/develop',
@@ -159,7 +159,7 @@ spec:
 
     stage('Prepare release candidate') {
       when {
-        expression { env.CI_BRANCH ==~ /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/ }
+        expression { env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/ }
       }
       agent {
         kubernetes {
@@ -309,7 +309,7 @@ spec:
 
     stage('Finalize release candidate') {
       when {
-        expression { env.CI_BRANCH ==~ /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/ }
+        expression { env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/ }
       }
       agent {
         kubernetes {
@@ -339,7 +339,7 @@ spec:
           memory: 64Mi
         limits:
           cpu: 300m
-          memory: 1Gi
+          memory: 512Mi
 """
         }
       }

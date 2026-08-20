@@ -68,6 +68,216 @@ export const Delivery = {
   LIVE: 'LIVE',
 } as const;
 
+export type HomeworkCompletionPolicy = typeof HomeworkCompletionPolicy[keyof typeof HomeworkCompletionPolicy];
+
+
+export const HomeworkCompletionPolicy = {
+  MEANINGFUL_ACTIVITY: 'MEANINGFUL_ACTIVITY',
+  COMPLETE_SESSION: 'COMPLETE_SESSION',
+  MASTERY_TARGET: 'MASTERY_TARGET',
+  TEACHER_REVIEW: 'TEACHER_REVIEW',
+} as const;
+
+export type KeyMode = typeof KeyMode[keyof typeof KeyMode];
+
+
+export const KeyMode = {
+  WHOLE_WORDS: 'WHOLE_WORDS',
+  CHARACTER_NGRAMS: 'CHARACTER_NGRAMS',
+  MIXED: 'MIXED',
+} as const;
+
+export type KeyTargetType = typeof KeyTargetType[keyof typeof KeyTargetType];
+
+
+export const KeyTargetType = {
+  WHOLE_WORD: 'WHOLE_WORD',
+  CHARACTER_NGRAM: 'CHARACTER_NGRAM',
+} as const;
+
+export type Imageability = typeof Imageability[keyof typeof Imageability];
+
+
+export const Imageability = {
+  UNKNOWN: 'UNKNOWN',
+  IMAGEABLE: 'IMAGEABLE',
+  NON_IMAGEABLE: 'NON_IMAGEABLE',
+  SUPPRESSED: 'SUPPRESSED',
+} as const;
+
+export type MediaAssetState = typeof MediaAssetState[keyof typeof MediaAssetState];
+
+
+export const MediaAssetState = {
+  GENERATING: 'GENERATING',
+  CANDIDATE: 'CANDIDATE',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  FAILED: 'FAILED',
+  SUPERSEDED: 'SUPERSEDED',
+} as const;
+
+export type MediaSafetyState = typeof MediaSafetyState[keyof typeof MediaSafetyState];
+
+
+export const MediaSafetyState = {
+  PENDING: 'PENDING',
+  SAFE: 'SAFE',
+  BLOCKED: 'BLOCKED',
+  PROVIDER_REJECTED: 'PROVIDER_REJECTED',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+
+export type MediaAssetAltText = {[key: string]: string};
+
+export type MediaAssetReviewHistoryItem = {
+  action: string;
+  actorSubject: string;
+  /** @nullable */
+  reasonCode?: string | null;
+  /** @nullable */
+  note?: string | null;
+  createdAt: string;
+};
+
+export interface MediaAsset {
+  id: string;
+  senseId: string;
+  state: MediaAssetState;
+  /** @nullable */
+  contentUrl?: string | null;
+  /** @nullable */
+  contentType?: string | null;
+  /** @nullable */
+  width?: number | null;
+  /** @nullable */
+  height?: number | null;
+  /**
+     * @nullable
+     * @pattern ^[a-f0-9]{64}$
+     */
+  checksumSha256?: string | null;
+  origin: string;
+  /** @nullable */
+  generatorType?: string | null;
+  /** @nullable */
+  generatorModel?: string | null;
+  /** @nullable */
+  promptTemplateVersion?: string | null;
+  safetyState: MediaSafetyState;
+  altText: MediaAssetAltText;
+  decorative: boolean;
+  createdAt: string;
+  reviewHistory: MediaAssetReviewHistoryItem[];
+}
+
+export type MediaViewState = typeof MediaViewState[keyof typeof MediaViewState];
+
+
+export const MediaViewState = {
+  UNRESOLVED_PRIVATE: 'UNRESOLVED_PRIVATE',
+  HIDDEN: 'HIDDEN',
+  APPROVED: 'APPROVED',
+  GENERATING: 'GENERATING',
+  FAILED: 'FAILED',
+  TEXT_ONLY: 'TEXT_ONLY',
+  NO_IMAGE: 'NO_IMAGE',
+} as const;
+
+export interface MediaView {
+  entryId: string;
+  /** @nullable */
+  senseId?: string | null;
+  imageability?: Imageability | null;
+  state: MediaViewState;
+  asset?: MediaAsset | null;
+  alternatives: MediaAsset[];
+  generationPending: boolean;
+  hidden: boolean;
+  /** @nullable */
+  failureCode?: string | null;
+}
+
+export type MediaOverrideKind = typeof MediaOverrideKind[keyof typeof MediaOverrideKind];
+
+
+export const MediaOverrideKind = {
+  DEFAULT: 'DEFAULT',
+  HIDE: 'HIDE',
+  APPROVED_ALTERNATIVE: 'APPROVED_ALTERNATIVE',
+} as const;
+
+export interface MediaOverride {
+  kind: MediaOverrideKind;
+  /** @nullable */
+  assetId?: string | null;
+}
+
+export type MediaReviewAction = typeof MediaReviewAction[keyof typeof MediaReviewAction];
+
+
+export const MediaReviewAction = {
+  APPROVE: 'APPROVE',
+  REJECT: 'REJECT',
+} as const;
+
+export interface MediaReview {
+  action: MediaReviewAction;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  reasonCode?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  note?: string | null;
+}
+
+export interface KeyNgramSettings {
+  /**
+     * @minimum 2
+     * @maximum 8
+     */
+  minLength?: number;
+  /**
+     * @minimum 2
+     * @maximum 8
+     */
+  maxLength?: number;
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  targetLimit?: number;
+  /**
+     * @minimum 1
+     * @maximum 4
+     */
+  maxRepetitions?: number;
+}
+
+export interface CompletionThresholds {
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  distinctGradedPrompts?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  distinctEntries?: number;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  masteryPercent?: number;
+  /** @maxLength 64 */
+  policyVersion?: string;
+}
+
 export type PracticeMode = typeof PracticeMode[keyof typeof PracticeMode];
 
 
@@ -125,6 +335,40 @@ export const SelectionReason = {
   RECENT_LESSON: 'RECENT_LESSON',
   NEW: 'NEW',
   CONTROL_REVIEW: 'CONTROL_REVIEW',
+  LAPSED: 'LAPSED',
+  DIFFICULT: 'DIFFICULT',
+  FAVORITE: 'FAVORITE',
+  LESSON: 'LESSON',
+  COURSE: 'COURSE',
+  EXPLICIT: 'EXPLICIT',
+  FULL_DICTIONARY: 'FULL_DICTIONARY',
+} as const;
+
+export type SelectionSource = typeof SelectionSource[keyof typeof SelectionSource];
+
+
+export const SelectionSource = {
+  RECENT: 'RECENT',
+  DUE: 'DUE',
+  FORGOTTEN: 'FORGOTTEN',
+  DIFFICULT: 'DIFFICULT',
+  NEW: 'NEW',
+  FAVORITE: 'FAVORITE',
+  LESSON: 'LESSON',
+  COURSE: 'COURSE',
+  FULL_DICTIONARY: 'FULL_DICTIONARY',
+  EXPLICIT: 'EXPLICIT',
+} as const;
+
+export type ReviewReason = typeof ReviewReason[keyof typeof ReviewReason];
+
+
+export const ReviewReason = {
+  NEW: 'NEW',
+  DUE: 'DUE',
+  LAPSED: 'LAPSED',
+  DIFFICULT: 'DIFFICULT',
+  STABLE: 'STABLE',
 } as const;
 
 export type ReadinessWarning = typeof ReadinessWarning[keyof typeof ReadinessWarning];
@@ -224,8 +468,11 @@ export type CreateEntry = SourceTerm & {
   lessonId?: string;
   assignmentId?: string;
   materialId?: string;
+  courseId?: string;
   /** @maxLength 120 */
   blockId?: string;
+  /** @maxLength 128 */
+  sourceRevision?: string;
 };
 
 export interface UpdateEntry {
@@ -252,6 +499,7 @@ export interface UpdateEntry {
   translationState?: TranslationState;
   status?: EntryStatus;
   practicePaused?: boolean;
+  favorite?: boolean;
 }
 
 export interface VocabularyOccurrence {
@@ -262,11 +510,18 @@ export interface VocabularyOccurrence {
   assignmentId?: string | null;
   /** @nullable */
   materialId?: string | null;
+  /** @nullable */
+  courseId?: string | null;
   /**
      * @maxLength 120
      * @nullable
      */
   blockId?: string | null;
+  /**
+     * @maxLength 128
+     * @nullable
+     */
+  sourceRevision?: string | null;
   /**
      * @maxLength 1000
      * @nullable
@@ -306,6 +561,7 @@ export interface VocabularyEntry {
   translationState: TranslationState;
   status: EntryStatus;
   practicePaused: boolean;
+  favorite?: boolean;
   occurrences: VocabularyOccurrence[];
   createdAt: string;
   updatedAt: string;
@@ -331,6 +587,14 @@ export interface SkillState {
   lastRating?: Rating | null;
   /** @nullable */
   lastPracticedAt?: string | null;
+  policyVersion?: string;
+  reviewReason?: ReviewReason;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  difficultyScore?: number;
+  available?: boolean;
 }
 
 export interface LearningEntry {
@@ -369,6 +633,42 @@ export type PracticeSettingsOwnerOverridesItem = {
   excludedEntryIds?: string[];
 };
 
+export type SelectionCriteriaMatch = typeof SelectionCriteriaMatch[keyof typeof SelectionCriteriaMatch];
+
+
+export const SelectionCriteriaMatch = {
+  ANY: 'ANY',
+  ALL: 'ALL',
+} as const;
+
+export interface SelectionCriteria {
+  sources?: SelectionSource[];
+  match?: SelectionCriteriaMatch;
+  /**
+     * @minimum 1
+     * @maximum 365
+     */
+  recentDays?: number;
+  /** @nullable */
+  lessonId?: string | null;
+  /** @nullable */
+  courseId?: string | null;
+  /** @maxItems 100 */
+  explicitEntryIds?: string[];
+  /**
+     * @minimum 0
+     * @maximum 30
+     */
+  maxNewItems?: number;
+  /**
+     * @minimum 1
+     * @maximum 120
+     * @nullable
+     */
+  targetMinutes?: number | null;
+  preferredSkills?: Skill[];
+}
+
 export interface PracticeSettings {
   /**
      * @maxItems 100
@@ -396,7 +696,45 @@ export interface PracticeSettings {
   planId?: string | null;
   /** @nullable */
   planRevision?: number | null;
+  selection?: SelectionCriteria | null;
+  /** @nullable */
+  recipeId?: string | null;
+  /**
+     * @maxLength 128
+     * @nullable
+     */
+  materializationKey?: string | null;
+  completionPolicy?: HomeworkCompletionPolicy;
+  completionThresholds?: CompletionThresholds;
+  keyMode?: KeyMode;
+  keyNgramSettings?: KeyNgramSettings;
 }
+
+export interface SelectionRecipeRequest {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  selection: SelectionCriteria;
+  /** @maxItems 100 */
+  pinnedEntryIds?: string[];
+  /** @maxItems 100 */
+  excludedEntryIds?: string[];
+  mode?: PracticeMode;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  wordLimit?: number;
+}
+
+export type SelectionRecipe = SelectionRecipeRequest & {
+  id: string;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type PracticePreviewOwnersItemSelectionItem = {
   entry: VocabularyEntry;
@@ -434,6 +772,13 @@ export type PracticePreviewOwnersItem = {
   sampleItems?: PracticePreviewOwnersItemSampleItemsItem[];
 };
 
+export type PracticePreviewCategoryCounts = {[key: string]: number};
+
+export type PracticePreviewExclusionsItem = {
+  entryId: string;
+  reason: string;
+};
+
 export interface PracticePreview {
   planId: string;
   revision: number;
@@ -442,6 +787,11 @@ export interface PracticePreview {
   delivery: Delivery;
   estimatedMinutes: number;
   owners: PracticePreviewOwnersItem[];
+  /** @nullable */
+  eligibilityWatermark?: string | null;
+  materializationSeed?: number;
+  categoryCounts?: PracticePreviewCategoryCounts;
+  exclusions?: PracticePreviewExclusionsItem[];
 }
 
 export interface PracticeCard {
@@ -523,6 +873,8 @@ export interface PracticeSession {
   lessonId?: string | null;
   /** @nullable */
   assignmentId?: string | null;
+  /** @minimum 0 */
+  lastAcknowledgedPosition?: number;
 }
 
 export interface Practice {
@@ -570,11 +922,91 @@ export type KeySetItemsItem = {
   sourceText: string;
 };
 
+export type KeySetLayout = typeof KeySetLayout[keyof typeof KeySetLayout];
+
+
+export const KeySetLayout = {
+  EN: 'EN',
+} as const;
+
+export type KeySetTargetsItemOffsetsItem = {
+  entryId: string;
+  itemId: string;
+  /** @minimum 0 */
+  start: number;
+  /** @minimum 1 */
+  endExclusive: number;
+};
+
+export type KeySetTargetsItem = {
+  targetId: string;
+  /** @minimum 0 */
+  position: number;
+  type: KeyTargetType;
+  /** @maxLength 255 */
+  text: string;
+  /** @maxItems 20 */
+  sourceEntryIds: string[];
+  /** @maxItems 20 */
+  sourceItemIds: string[];
+  offsets: KeySetTargetsItemOffsetsItem[];
+};
+
+/**
+ * @nullable
+ */
+export type KeySetCompletionContext = {
+  delivery: Delivery;
+  completionPolicy: HomeworkCompletionPolicy;
+  /** @maxLength 64 */
+  completionPolicyVersion: string;
+  /** @nullable */
+  assignmentId?: string | null;
+  /** @nullable */
+  lessonId?: string | null;
+  /** @minimum 0 */
+  lastAcknowledgedPosition: number;
+} | null;
+
+/**
+ * @nullable
+ */
+export type KeySetReturnContext = {
+  target: 'HONEY_SCHOOL_VOCABULARY' | 'HONEY_SCHOOL_LESSON' | 'HONEY_SCHOOL_HOMEWORK';
+  path: '/';
+} | null;
+
 export interface KeySet {
   sessionId: string;
   title: string;
   entries: VocabularyEntry[];
   items: KeySetItemsItem[];
+  mode: KeyMode;
+  layout: KeySetLayout;
+  /** @maxLength 64 */
+  materializerVersion: string;
+  materializerSeed: number;
+  ngramSettings: KeyNgramSettings;
+  targets: KeySetTargetsItem[];
+  /** @nullable */
+  completionContext?: KeySetCompletionContext;
+  /** @nullable */
+  returnContext?: KeySetReturnContext;
+}
+
+export interface KeyAcknowledgementRequest {
+  /** @minimum 0 */
+  position: number;
+  /** @nullable */
+  targetId?: string | null;
+}
+
+export interface KeyAcknowledgement {
+  sessionId: string;
+  /** @minimum 0 */
+  lastAcknowledgedPosition: number;
+  /** @minimum 0 */
+  revision: number;
 }
 
 export interface HomeworkPreparation {
@@ -603,6 +1035,8 @@ export interface HomeworkPreparation {
   planId?: string | null;
   /** @nullable */
   planRevision?: number | null;
+  completionPolicy?: HomeworkCompletionPolicy;
+  completionThresholds?: CompletionThresholds;
 }
 
 export type KeyResultAttemptsItem = {
@@ -610,6 +1044,24 @@ export type KeyResultAttemptsItem = {
   entryId: string;
   /** @minimum 0 */
   errors: number;
+  /** @nullable */
+  resultId?: string | null;
+  /** @nullable */
+  targetId?: string | null;
+  targetType?: KeyTargetType;
+  /** @minimum 0 */
+  durationMs?: number;
+  /** @minimum 0 */
+  position?: number;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  typedText?: string | null;
+  /** @maxItems 20 */
+  sourceEntryIds?: string[];
+  /** @maxItems 20 */
+  sourceItemIds?: string[];
 };
 
 export interface KeyResult {
@@ -628,6 +1080,28 @@ export type GetApiVocabularyEntriesParams = {
  */
 ownerSubject?: string;
 lessonId?: string;
+};
+
+export type PostApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportBody = {
+  /** @maxLength 64 */
+  reasonCode?: string;
+};
+
+export type GetApiVocabularyMediaCandidatesParams = {
+/**
+ * @minimum 0
+ * @maximum 10000
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+size?: number;
+};
+
+export type PatchApiVocabularyMediaSensesSenseIdImageabilityBody = {
+  imageability: Imageability;
 };
 
 export type GetApiVocabularyOverviewParams = {
@@ -905,6 +1379,452 @@ export const deleteApiVocabularyEntriesEntryId = async (entryId: string, options
 
 
 
+export type getApiVocabularyEntriesEntryIdMediaResponse200 = {
+  data: MediaView
+  status: 200
+}
+
+export type getApiVocabularyEntriesEntryIdMediaResponseSuccess = (getApiVocabularyEntriesEntryIdMediaResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getApiVocabularyEntriesEntryIdMediaResponse = (getApiVocabularyEntriesEntryIdMediaResponseSuccess)
+
+export const getGetApiVocabularyEntriesEntryIdMediaUrl = (entryId: string,) => {
+
+
+
+
+  return `/api/vocabulary/entries/${entryId}/media`
+}
+
+/**
+ * @summary Resolve approved sense media or trigger a non-blocking first-use request
+ */
+export const getApiVocabularyEntriesEntryIdMedia = async (entryId: string, options?: RequestInit): Promise<getApiVocabularyEntriesEntryIdMediaResponse> => {
+
+  const res = await fetch(getGetApiVocabularyEntriesEntryIdMediaUrl(entryId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getApiVocabularyEntriesEntryIdMediaResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getApiVocabularyEntriesEntryIdMediaResponse
+}
+
+
+
+export type postApiVocabularyEntriesEntryIdMediaRegenerateResponse202 = {
+  data: MediaView
+  status: 202
+}
+
+export type postApiVocabularyEntriesEntryIdMediaRegenerateResponse429 = {
+  data: void
+  status: 429
+}
+
+export type postApiVocabularyEntriesEntryIdMediaRegenerateResponseSuccess = (postApiVocabularyEntriesEntryIdMediaRegenerateResponse202) & {
+  headers: Headers;
+};
+export type postApiVocabularyEntriesEntryIdMediaRegenerateResponseError = (postApiVocabularyEntriesEntryIdMediaRegenerateResponse429) & {
+  headers: Headers;
+};
+
+export type postApiVocabularyEntriesEntryIdMediaRegenerateResponse = (postApiVocabularyEntriesEntryIdMediaRegenerateResponseSuccess | postApiVocabularyEntriesEntryIdMediaRegenerateResponseError)
+
+export const getPostApiVocabularyEntriesEntryIdMediaRegenerateUrl = (entryId: string,) => {
+
+
+
+
+  return `/api/vocabulary/entries/${entryId}/media/regenerate`
+}
+
+export const postApiVocabularyEntriesEntryIdMediaRegenerate = async (entryId: string, options?: RequestInit): Promise<postApiVocabularyEntriesEntryIdMediaRegenerateResponse> => {
+
+  const res = await fetch(getPostApiVocabularyEntriesEntryIdMediaRegenerateUrl(entryId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: postApiVocabularyEntriesEntryIdMediaRegenerateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as postApiVocabularyEntriesEntryIdMediaRegenerateResponse
+}
+
+
+
+export type putApiVocabularyEntriesEntryIdMediaOverrideResponse200 = {
+  data: MediaView
+  status: 200
+}
+
+export type putApiVocabularyEntriesEntryIdMediaOverrideResponseSuccess = (putApiVocabularyEntriesEntryIdMediaOverrideResponse200) & {
+  headers: Headers;
+};
+;
+
+export type putApiVocabularyEntriesEntryIdMediaOverrideResponse = (putApiVocabularyEntriesEntryIdMediaOverrideResponseSuccess)
+
+export const getPutApiVocabularyEntriesEntryIdMediaOverrideUrl = (entryId: string,) => {
+
+
+
+
+  return `/api/vocabulary/entries/${entryId}/media/override`
+}
+
+export const putApiVocabularyEntriesEntryIdMediaOverride = async (entryId: string,
+    mediaOverride: MediaOverride, options?: RequestInit): Promise<putApiVocabularyEntriesEntryIdMediaOverrideResponse> => {
+
+  const res = await fetch(getPutApiVocabularyEntriesEntryIdMediaOverrideUrl(entryId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mediaOverride)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: putApiVocabularyEntriesEntryIdMediaOverrideResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as putApiVocabularyEntriesEntryIdMediaOverrideResponse
+}
+
+
+
+export type postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponse200 = {
+  data: MediaView
+  status: 200
+}
+
+export type postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponseSuccess = (postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponse = (postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponseSuccess)
+
+export const getPostApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportUrl = (entryId: string,
+    assetId: string,) => {
+
+
+
+
+  return `/api/vocabulary/entries/${entryId}/media/assets/${assetId}/report`
+}
+
+export const postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReport = async (entryId: string,
+    assetId: string,
+    postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportBody: PostApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportBody, options?: RequestInit): Promise<postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponse> => {
+
+  const res = await fetch(getPostApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportUrl(entryId,assetId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportBody)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponse
+}
+
+
+
+export type getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse200ImagePng = {
+  data: Blob
+  status: 200
+}
+
+export type getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse200ImageJpeg = {
+  data: Blob
+  status: 200
+}
+
+export type getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse200ImageWebp = {
+  data: Blob
+  status: 200
+}
+
+export type getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse403 = {
+  data: void
+  status: 403
+}
+
+export type getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponseSuccess = (getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse200ImagePng | getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse200ImageJpeg | getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse200ImageWebp) & {
+  headers: Headers;
+};
+export type getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponseError = (getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse403) & {
+  headers: Headers;
+};
+
+export type getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse = (getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponseSuccess | getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponseError)
+
+export const getGetApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentUrl = (entryId: string,
+    assetId: string,) => {
+
+
+
+
+  return `/api/vocabulary/entries/${entryId}/media/assets/${assetId}/content`
+}
+
+/**
+ * @summary Authorized opaque delivery of an approved immutable asset revision
+ */
+export const getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContent = async (entryId: string,
+    assetId: string, options?: RequestInit): Promise<getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse> => {
+
+  const res = await fetch(getGetApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentUrl(entryId,assetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.blob();
+  const data: getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse['data'] = body as getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse['data']
+  return { data, status: res.status, headers: res.headers } as getApiVocabularyEntriesEntryIdMediaAssetsAssetIdContentResponse
+}
+
+
+
+export type getApiVocabularyMediaCandidatesResponse200 = {
+  data: MediaAsset[]
+  status: 200
+}
+
+export type getApiVocabularyMediaCandidatesResponseSuccess = (getApiVocabularyMediaCandidatesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getApiVocabularyMediaCandidatesResponse = (getApiVocabularyMediaCandidatesResponseSuccess)
+
+export const getGetApiVocabularyMediaCandidatesUrl = (params?: GetApiVocabularyMediaCandidatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/vocabulary/media/candidates?${stringifiedParams}` : `/api/vocabulary/media/candidates`
+}
+
+/**
+ * @summary Reviewer-only generated candidate queue
+ */
+export const getApiVocabularyMediaCandidates = async (params?: GetApiVocabularyMediaCandidatesParams, options?: RequestInit): Promise<getApiVocabularyMediaCandidatesResponse> => {
+
+  const res = await fetch(getGetApiVocabularyMediaCandidatesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getApiVocabularyMediaCandidatesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getApiVocabularyMediaCandidatesResponse
+}
+
+
+
+export type getApiVocabularyMediaCandidatesAssetIdResponse200 = {
+  data: MediaAsset
+  status: 200
+}
+
+export type getApiVocabularyMediaCandidatesAssetIdResponseSuccess = (getApiVocabularyMediaCandidatesAssetIdResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getApiVocabularyMediaCandidatesAssetIdResponse = (getApiVocabularyMediaCandidatesAssetIdResponseSuccess)
+
+export const getGetApiVocabularyMediaCandidatesAssetIdUrl = (assetId: string,) => {
+
+
+
+
+  return `/api/vocabulary/media/candidates/${assetId}`
+}
+
+export const getApiVocabularyMediaCandidatesAssetId = async (assetId: string, options?: RequestInit): Promise<getApiVocabularyMediaCandidatesAssetIdResponse> => {
+
+  const res = await fetch(getGetApiVocabularyMediaCandidatesAssetIdUrl(assetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getApiVocabularyMediaCandidatesAssetIdResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getApiVocabularyMediaCandidatesAssetIdResponse
+}
+
+
+
+export type patchApiVocabularyMediaCandidatesAssetIdResponse200 = {
+  data: MediaAsset
+  status: 200
+}
+
+export type patchApiVocabularyMediaCandidatesAssetIdResponseSuccess = (patchApiVocabularyMediaCandidatesAssetIdResponse200) & {
+  headers: Headers;
+};
+;
+
+export type patchApiVocabularyMediaCandidatesAssetIdResponse = (patchApiVocabularyMediaCandidatesAssetIdResponseSuccess)
+
+export const getPatchApiVocabularyMediaCandidatesAssetIdUrl = (assetId: string,) => {
+
+
+
+
+  return `/api/vocabulary/media/candidates/${assetId}`
+}
+
+export const patchApiVocabularyMediaCandidatesAssetId = async (assetId: string,
+    mediaReview: MediaReview, options?: RequestInit): Promise<patchApiVocabularyMediaCandidatesAssetIdResponse> => {
+
+  const res = await fetch(getPatchApiVocabularyMediaCandidatesAssetIdUrl(assetId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mediaReview)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: patchApiVocabularyMediaCandidatesAssetIdResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as patchApiVocabularyMediaCandidatesAssetIdResponse
+}
+
+
+
+export type getApiVocabularyMediaCandidatesAssetIdContentResponse200 = {
+  data: Blob
+  status: 200
+}
+
+export type getApiVocabularyMediaCandidatesAssetIdContentResponseSuccess = (getApiVocabularyMediaCandidatesAssetIdContentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getApiVocabularyMediaCandidatesAssetIdContentResponse = (getApiVocabularyMediaCandidatesAssetIdContentResponseSuccess)
+
+export const getGetApiVocabularyMediaCandidatesAssetIdContentUrl = (assetId: string,) => {
+
+
+
+
+  return `/api/vocabulary/media/candidates/${assetId}/content`
+}
+
+export const getApiVocabularyMediaCandidatesAssetIdContent = async (assetId: string, options?: RequestInit): Promise<getApiVocabularyMediaCandidatesAssetIdContentResponse> => {
+
+  const res = await fetch(getGetApiVocabularyMediaCandidatesAssetIdContentUrl(assetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.blob();
+  const data: getApiVocabularyMediaCandidatesAssetIdContentResponse['data'] = body as getApiVocabularyMediaCandidatesAssetIdContentResponse['data']
+  return { data, status: res.status, headers: res.headers } as getApiVocabularyMediaCandidatesAssetIdContentResponse
+}
+
+
+
+export type patchApiVocabularyMediaSensesSenseIdImageabilityResponse204 = {
+  data: void
+  status: 204
+}
+
+export type patchApiVocabularyMediaSensesSenseIdImageabilityResponseSuccess = (patchApiVocabularyMediaSensesSenseIdImageabilityResponse204) & {
+  headers: Headers;
+};
+;
+
+export type patchApiVocabularyMediaSensesSenseIdImageabilityResponse = (patchApiVocabularyMediaSensesSenseIdImageabilityResponseSuccess)
+
+export const getPatchApiVocabularyMediaSensesSenseIdImageabilityUrl = (senseId: string,) => {
+
+
+
+
+  return `/api/vocabulary/media/senses/${senseId}/imageability`
+}
+
+export const patchApiVocabularyMediaSensesSenseIdImageability = async (senseId: string,
+    patchApiVocabularyMediaSensesSenseIdImageabilityBody: PatchApiVocabularyMediaSensesSenseIdImageabilityBody, options?: RequestInit): Promise<patchApiVocabularyMediaSensesSenseIdImageabilityResponse> => {
+
+  const res = await fetch(getPatchApiVocabularyMediaSensesSenseIdImageabilityUrl(senseId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(patchApiVocabularyMediaSensesSenseIdImageabilityBody)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: patchApiVocabularyMediaSensesSenseIdImageabilityResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as patchApiVocabularyMediaSensesSenseIdImageabilityResponse
+}
+
+
+
 export type getApiVocabularyOverviewResponse200 = {
   data: VocabularyOverview
   status: 200
@@ -1145,6 +2065,257 @@ export const postApiVocabularyPracticesPreview = async (practiceSettings: Practi
 
   const data: postApiVocabularyPracticesPreviewResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as postApiVocabularyPracticesPreviewResponse
+}
+
+
+
+export type postApiVocabularyPracticesRecommendedPreviewResponse200 = {
+  data: PracticePreview
+  status: 200
+}
+
+export type postApiVocabularyPracticesRecommendedPreviewResponseSuccess = (postApiVocabularyPracticesRecommendedPreviewResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postApiVocabularyPracticesRecommendedPreviewResponse = (postApiVocabularyPracticesRecommendedPreviewResponseSuccess)
+
+export const getPostApiVocabularyPracticesRecommendedPreviewUrl = () => {
+
+
+
+
+  return `/api/vocabulary/practices/recommended-preview`
+}
+
+/**
+ * @summary Preview a balanced, explainable learner practice
+ */
+export const postApiVocabularyPracticesRecommendedPreview = async (practiceSettings: PracticeSettings, options?: RequestInit): Promise<postApiVocabularyPracticesRecommendedPreviewResponse> => {
+
+  const res = await fetch(getPostApiVocabularyPracticesRecommendedPreviewUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(practiceSettings)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: postApiVocabularyPracticesRecommendedPreviewResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as postApiVocabularyPracticesRecommendedPreviewResponse
+}
+
+
+
+export type getApiVocabularySelectionRecipesResponse200 = {
+  data: SelectionRecipe[]
+  status: 200
+}
+
+export type getApiVocabularySelectionRecipesResponseSuccess = (getApiVocabularySelectionRecipesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getApiVocabularySelectionRecipesResponse = (getApiVocabularySelectionRecipesResponseSuccess)
+
+export const getGetApiVocabularySelectionRecipesUrl = () => {
+
+
+
+
+  return `/api/vocabulary/selection-recipes`
+}
+
+export const getApiVocabularySelectionRecipes = async ( options?: RequestInit): Promise<getApiVocabularySelectionRecipesResponse> => {
+
+  const res = await fetch(getGetApiVocabularySelectionRecipesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getApiVocabularySelectionRecipesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getApiVocabularySelectionRecipesResponse
+}
+
+
+
+export type postApiVocabularySelectionRecipesResponse201 = {
+  data: SelectionRecipe
+  status: 201
+}
+
+export type postApiVocabularySelectionRecipesResponseSuccess = (postApiVocabularySelectionRecipesResponse201) & {
+  headers: Headers;
+};
+;
+
+export type postApiVocabularySelectionRecipesResponse = (postApiVocabularySelectionRecipesResponseSuccess)
+
+export const getPostApiVocabularySelectionRecipesUrl = () => {
+
+
+
+
+  return `/api/vocabulary/selection-recipes`
+}
+
+export const postApiVocabularySelectionRecipes = async (selectionRecipeRequest: SelectionRecipeRequest, options?: RequestInit): Promise<postApiVocabularySelectionRecipesResponse> => {
+
+  const res = await fetch(getPostApiVocabularySelectionRecipesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(selectionRecipeRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: postApiVocabularySelectionRecipesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as postApiVocabularySelectionRecipesResponse
+}
+
+
+
+export type getApiVocabularySelectionRecipesRecipeIdResponse200 = {
+  data: SelectionRecipe
+  status: 200
+}
+
+export type getApiVocabularySelectionRecipesRecipeIdResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getApiVocabularySelectionRecipesRecipeIdResponseSuccess = (getApiVocabularySelectionRecipesRecipeIdResponse200) & {
+  headers: Headers;
+};
+export type getApiVocabularySelectionRecipesRecipeIdResponseError = (getApiVocabularySelectionRecipesRecipeIdResponse404) & {
+  headers: Headers;
+};
+
+export type getApiVocabularySelectionRecipesRecipeIdResponse = (getApiVocabularySelectionRecipesRecipeIdResponseSuccess | getApiVocabularySelectionRecipesRecipeIdResponseError)
+
+export const getGetApiVocabularySelectionRecipesRecipeIdUrl = (recipeId: string,) => {
+
+
+
+
+  return `/api/vocabulary/selection-recipes/${recipeId}`
+}
+
+export const getApiVocabularySelectionRecipesRecipeId = async (recipeId: string, options?: RequestInit): Promise<getApiVocabularySelectionRecipesRecipeIdResponse> => {
+
+  const res = await fetch(getGetApiVocabularySelectionRecipesRecipeIdUrl(recipeId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getApiVocabularySelectionRecipesRecipeIdResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getApiVocabularySelectionRecipesRecipeIdResponse
+}
+
+
+
+export type putApiVocabularySelectionRecipesRecipeIdResponse200 = {
+  data: SelectionRecipe
+  status: 200
+}
+
+export type putApiVocabularySelectionRecipesRecipeIdResponseSuccess = (putApiVocabularySelectionRecipesRecipeIdResponse200) & {
+  headers: Headers;
+};
+;
+
+export type putApiVocabularySelectionRecipesRecipeIdResponse = (putApiVocabularySelectionRecipesRecipeIdResponseSuccess)
+
+export const getPutApiVocabularySelectionRecipesRecipeIdUrl = (recipeId: string,) => {
+
+
+
+
+  return `/api/vocabulary/selection-recipes/${recipeId}`
+}
+
+export const putApiVocabularySelectionRecipesRecipeId = async (recipeId: string,
+    selectionRecipeRequest: SelectionRecipeRequest, options?: RequestInit): Promise<putApiVocabularySelectionRecipesRecipeIdResponse> => {
+
+  const res = await fetch(getPutApiVocabularySelectionRecipesRecipeIdUrl(recipeId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(selectionRecipeRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: putApiVocabularySelectionRecipesRecipeIdResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as putApiVocabularySelectionRecipesRecipeIdResponse
+}
+
+
+
+export type deleteApiVocabularySelectionRecipesRecipeIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteApiVocabularySelectionRecipesRecipeIdResponseSuccess = (deleteApiVocabularySelectionRecipesRecipeIdResponse204) & {
+  headers: Headers;
+};
+;
+
+export type deleteApiVocabularySelectionRecipesRecipeIdResponse = (deleteApiVocabularySelectionRecipesRecipeIdResponseSuccess)
+
+export const getDeleteApiVocabularySelectionRecipesRecipeIdUrl = (recipeId: string,) => {
+
+
+
+
+  return `/api/vocabulary/selection-recipes/${recipeId}`
+}
+
+export const deleteApiVocabularySelectionRecipesRecipeId = async (recipeId: string, options?: RequestInit): Promise<deleteApiVocabularySelectionRecipesRecipeIdResponse> => {
+
+  const res = await fetch(getDeleteApiVocabularySelectionRecipesRecipeIdUrl(recipeId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteApiVocabularySelectionRecipesRecipeIdResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteApiVocabularySelectionRecipesRecipeIdResponse
 }
 
 
@@ -1533,6 +2704,57 @@ export const getApiVocabularyPracticeSessionsSessionIdKeySet = async (sessionId:
 
   const data: getApiVocabularyPracticeSessionsSessionIdKeySetResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getApiVocabularyPracticeSessionsSessionIdKeySetResponse
+}
+
+
+
+export type patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse200 = {
+  data: KeyAcknowledgement
+  status: 200
+}
+
+export type patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse409 = {
+  data: void
+  status: 409
+}
+
+export type patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponseSuccess = (patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse200) & {
+  headers: Headers;
+};
+export type patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponseError = (patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse409) & {
+  headers: Headers;
+};
+
+export type patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse = (patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponseSuccess | patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponseError)
+
+export const getPatchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/vocabulary/practice-sessions/${sessionId}/key-acknowledgement`
+}
+
+/**
+ * @summary Persist the owning learner's monotonic position in an immutable Key target stream
+ */
+export const patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgement = async (sessionId: string,
+    keyAcknowledgementRequest: KeyAcknowledgementRequest, options?: RequestInit): Promise<patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse> => {
+
+  const res = await fetch(getPatchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementUrl(sessionId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(keyAcknowledgementRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse
 }
 
 

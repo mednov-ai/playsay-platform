@@ -95,4 +95,31 @@ describe("training submit payload", () => {
       },
     });
   });
+
+  it("attributes whole-word and n-gram results separately with stable target ids", () => {
+    const vocabularySet: ChordSet = {
+      id: -900,
+      sourceChordSetId: 7,
+      layout: "EN",
+      title: "Homework",
+      difficulty: 1,
+      tier: "beginner",
+      chords: ["weather", "the"],
+      practiceKind: "VOCABULARY",
+      practiceContext: { practiceKind: "VOCABULARY", title: "Homework", vocabularySessionId: "session-1" },
+      vocabularyContext: {
+        sessionId: "session-1", mode: "MIXED", typedTargets: true, startPosition: 0, totalTargets: 2,
+        delivery: "HOMEWORK", completionPolicy: "MEANINGFUL_ACTIVITY",
+        targets: [
+          { targetId: "41111111-1111-4111-a111-111111111111", position: 0, type: "WHOLE_WORD", text: "weather", sourceEntryIds: ["entry-1"], sourceItemIds: ["item-1"], offsets: [] },
+          { targetId: "51111111-1111-4111-a111-111111111111", position: 1, type: "CHARACTER_NGRAM", text: "the", sourceEntryIds: ["entry-1"], sourceItemIds: ["item-1"], offsets: [] },
+        ],
+      },
+    };
+    const payload = buildTrainingSubmitPayload({ ...baseResult, perChord: { weather: 1, the: 2 } }, vocabularySet);
+    expect(payload?.vocabularyResults).toEqual([
+      expect.objectContaining({ resultId: "41111111-1111-4111-a111-111111111111", targetType: "WHOLE_WORD", errors: 1 }),
+      expect.objectContaining({ resultId: "51111111-1111-4111-a111-111111111111", targetType: "CHARACTER_NGRAM", errors: 2 }),
+    ]);
+  });
 });

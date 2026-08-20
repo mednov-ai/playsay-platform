@@ -14,6 +14,7 @@ import com.playsay.vocabulary.dto.VocabularyAttemptRequest
 import com.playsay.vocabulary.dto.VocabularyAttemptResponse
 import com.playsay.vocabulary.dto.VocabularyDashboardResponse
 import com.playsay.vocabulary.dto.VocabularyKeySetResponse
+import com.playsay.vocabulary.dto.VocabularyKeyAcknowledgementRequest
 import com.playsay.vocabulary.dto.VocabularyKeyItemResponse
 import com.playsay.vocabulary.dto.VocabularyKeyResultRequest
 import com.playsay.vocabulary.dto.VocabularyLearnerSummaryResponse
@@ -31,6 +32,10 @@ import com.playsay.vocabulary.dto.VocabularySkillStateResponse
 import com.playsay.vocabulary.dto.VocabularyHomeworkPreparationRequest
 import com.playsay.vocabulary.dto.VocabularyHomeworkPreparationResponse
 import com.playsay.vocabulary.dto.VocabularyHomeworkSessionRef
+import com.playsay.vocabulary.dto.VocabularySelectionCriteriaRequest
+import com.playsay.vocabulary.dto.VocabularySelectionRecipeRequest
+import com.playsay.vocabulary.dto.VocabularySelectionRecipeResponse
+import com.playsay.vocabulary.dto.VocabularySelectionSource
 import com.playsay.vocabulary.entity.VocabularyEntryEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeAttemptEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeEntity
@@ -69,6 +74,7 @@ class VocabularyPracticeService(
     private val attemptService: VocabularyPracticeAttemptService,
     private val keyboardService: VocabularyKeyboardPracticeService,
     private val homeworkService: VocabularyHomeworkPracticeService,
+    private val recipeService: VocabularySelectionRecipeService,
 ) {
     @Transactional
     fun dashboard(
@@ -86,6 +92,40 @@ class VocabularyPracticeService(
     fun preview(actorSubject: String, request: VocabularyPracticeSettingsRequest): VocabularyPracticePreviewResponse {
         return planService.preview(actorSubject, request)
     }
+
+    @Transactional
+    fun recommendedPreview(actorSubject: String, request: VocabularyPracticeSettingsRequest): VocabularyPracticePreviewResponse =
+        planService.preview(
+            actorSubject,
+            request.copy(
+                ownerSubjects = listOf(actorSubject),
+                delivery = PracticeDelivery.SELF,
+                selection = request.selection ?: VocabularySelectionCriteriaRequest(
+                    sources = setOf(
+                        VocabularySelectionSource.DUE,
+                        VocabularySelectionSource.FORGOTTEN,
+                        VocabularySelectionSource.DIFFICULT,
+                        VocabularySelectionSource.NEW,
+                    ),
+                ),
+            ),
+        )
+
+    @Transactional(readOnly = true)
+    fun recipes(actorSubject: String): List<VocabularySelectionRecipeResponse> = recipeService.list(actorSubject)
+
+    @Transactional(readOnly = true)
+    fun recipe(actorSubject: String, id: UUID): VocabularySelectionRecipeResponse = recipeService.get(actorSubject, id)
+
+    @Transactional
+    fun createRecipe(actorSubject: String, request: VocabularySelectionRecipeRequest) = recipeService.create(actorSubject, request)
+
+    @Transactional
+    fun updateRecipe(actorSubject: String, id: UUID, request: VocabularySelectionRecipeRequest) =
+        recipeService.update(actorSubject, id, request)
+
+    @Transactional
+    fun deleteRecipe(actorSubject: String, id: UUID) = recipeService.delete(actorSubject, id)
 
     @Transactional
     fun create(actorSubject: String, request: VocabularyPracticeSettingsRequest): VocabularyPracticeResponse =
@@ -146,7 +186,7 @@ class VocabularyPracticeService(
     fun attempt(actorSubject: String, sessionId: UUID, request: VocabularyAttemptRequest): VocabularyAttemptResponse =
         attemptService.attempt(actorSubject, sessionId, request)
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun reveal(actorSubject: String, sessionId: UUID, itemId: UUID): VocabularyPracticeRevealResponse =
         attemptService.reveal(actorSubject, sessionId, itemId)
 
@@ -161,6 +201,10 @@ class VocabularyPracticeService(
     @Transactional
     fun keySet(actorSubject: String, sessionId: UUID): VocabularyKeySetResponse =
         keyboardService.keySet(actorSubject, sessionId)
+
+    @Transactional
+    fun acknowledgeKeyPosition(actorSubject: String, sessionId: UUID, request: VocabularyKeyAcknowledgementRequest) =
+        keyboardService.acknowledgePosition(actorSubject, sessionId, request)
 
     @Transactional
     fun recordKeyResult(sessionId: UUID, request: VocabularyKeyResultRequest) =

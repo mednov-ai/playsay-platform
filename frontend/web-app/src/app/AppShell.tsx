@@ -7,12 +7,10 @@ import {
   startLogin,
   type AdminUserProfile,
   type AppUserProfile,
-  type AuthenticationMethods,
   type Course,
   type CourseInput,
   type CourseLesson,
   type CourseLessonInput,
-  type CompletedAuthAction,
   type CurriculumTopic,
   type CurriculumTopicInput,
   type LessonMaterial,
@@ -33,17 +31,14 @@ import {
   type PaymentInvoiceCreated,
   type ScheduledLesson,
   type ScheduledLessonInput,
-  type ScheduledLessonLinkOrigin,
   type ScheduledLessonScheduleInput,
   type UpdateUserProfileInput,
 } from "../shared/api/playsay";
-import type { ClipboardCopyResult } from "../shared/lib/clipboard";
 import { BrandMark } from "../shared/ui/BrandMark";
 import { WorkspaceTabs } from "../widgets/workspace-tabs/WorkspaceTabs";
 import { Button } from "../components/ui/button";
 import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
-import { PasskeyPrompt } from "../features/profile/ui/PasskeyPrompt";
-import type { ClassroomMediaChoices, LessonRoomSession } from "../features/classroom";
+import type { ClassroomMediaChoices, LessonDiceController, LessonRoomSession } from "../features/classroom";
 import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
@@ -80,18 +75,14 @@ export type AppShellProps = {
   adminLoading: boolean;
   adminMessage: string | null;
   adminUsers: AdminUserProfile[];
-  authenticationMethods: AuthenticationMethods | null;
-  authenticationMethodsLoading: boolean;
-  authenticationMethodsMessage: string | null;
   anyLessonLoading: boolean;
   appProfile: AppUserProfile | null;
   assignMaterialToScheduledLesson: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   cancelScheduledLesson: (lesson: ScheduledLesson) => Promise<void>;
   classroomLesson: ScheduledLesson | null;
-  completedAuthAction?: CompletedAuthAction | null;
   completeScheduledLesson: (lessonId: string) => Promise<void>;
   confirmScheduledLessonJoin: (lesson: ScheduledLesson, mediaChoices: ClassroomMediaChoices) => Promise<void>;
-  copyScheduledLessonLinks: (lesson: ScheduledLesson, linkOrigin?: ScheduledLessonLinkOrigin) => Promise<ClipboardCopyResult | null>;
+  copyScheduledLessonLinks: (lesson: ScheduledLesson) => Promise<boolean>;
   courseLessons: CourseLessonMap;
   courseLoading: boolean;
   courseMessage: string | null;
@@ -103,7 +94,6 @@ export type AppShellProps = {
   createScheduledLesson: (input: ScheduledLessonInput) => Promise<ScheduledLesson | null | void>;
   createManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   deleteCourse: (courseId: string) => Promise<void>;
-  deletePasskey: (credentialId: string) => Promise<boolean>;
   deleteLesson: (courseId: string, lessonId: string) => Promise<void>;
   deleteMaterial: (materialId: string) => Promise<void>;
   deleteTopic: (courseId: string, topicId: string) => Promise<void>;
@@ -116,6 +106,7 @@ export type AppShellProps = {
   isAuthenticated: boolean;
   isClassroomOpen: boolean;
   isProfileRoute: boolean;
+  lessonDice?: LessonDiceController;
   joinScheduledLesson: (lesson: ScheduledLesson, options?: { updateRoute?: boolean }) => Promise<void>;
   leaveScheduledLessonRoom: () => void;
   linkMaterialToCourseLesson: (courseId: string, lesson: CourseLesson, materialId: string | null) => Promise<void>;
@@ -134,13 +125,11 @@ export type AppShellProps = {
   profileMessage: string | null;
   profileSaving: boolean;
   refreshAdminUsers: () => Promise<void>;
-  refreshAuthenticationMethods: () => Promise<void>;
   refreshCourses: () => Promise<void>;
   refreshMaterials: () => Promise<void>;
   refreshPaymentInvoices: () => Promise<void>;
   refreshSchedule: () => Promise<void>;
   rescheduleScheduledLesson?: (lessonId: string, input: ScheduledLessonScheduleInput) => Promise<ScheduledLesson | null>;
-  renamePasskey: (credentialId: string, label: string) => Promise<boolean>;
   resetProfile: () => Promise<void>;
   roomLoadingLessonId: string | null;
   roomMessage: string | null;
@@ -175,15 +164,11 @@ export function AppShell(props: AppShellProps) {
     adminLoading,
     adminMessage,
     adminUsers,
-    authenticationMethods,
-    authenticationMethodsLoading,
-    authenticationMethodsMessage,
     anyLessonLoading,
     appProfile,
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     classroomLesson,
-    completedAuthAction = null,
     completeScheduledLesson,
     confirmScheduledLessonJoin,
     copyScheduledLessonLinks,
@@ -198,7 +183,6 @@ export function AppShell(props: AppShellProps) {
     createScheduledLesson,
     createManagedStudent,
     deleteCourse,
-    deletePasskey,
     deleteLesson,
     deleteMaterial,
     deleteTopic,
@@ -211,6 +195,7 @@ export function AppShell(props: AppShellProps) {
     isAuthenticated,
     isClassroomOpen,
     isProfileRoute,
+    lessonDice,
     joinScheduledLesson,
     leaveScheduledLessonRoom,
     linkMaterialToCourseLesson,
@@ -229,13 +214,11 @@ export function AppShell(props: AppShellProps) {
     profileMessage,
     profileSaving,
     refreshAdminUsers,
-    refreshAuthenticationMethods,
     refreshCourses,
     refreshMaterials,
     refreshPaymentInvoices,
     refreshSchedule,
     rescheduleScheduledLesson = async () => null,
-    renamePasskey,
     resetProfile,
     roomLoadingLessonId,
     roomMessage,
@@ -321,7 +304,7 @@ export function AppShell(props: AppShellProps) {
     >
       {hasGlobalTools && profile ? (
         <Suspense fallback={null}>
-          <GlobalToolsRail profile={profile} />
+          <GlobalToolsRail classroomDice={roomSession ? lessonDice : undefined} profile={profile} />
         </Suspense>
       ) : null}
       <section
@@ -400,14 +383,6 @@ export function AppShell(props: AppShellProps) {
           </header>
         )}
 
-        {isAuthenticated && profile && authenticationMethods && !isClassroomOpen && !isProfileRoute ? (
-          <PasskeyPrompt
-            key={profile.subject}
-            passkeyCount={authenticationMethods.passkeys.length}
-            subject={profile.subject}
-          />
-        ) : null}
-
         {roomSession ? (
           <Suspense fallback={<PanelFallback />}>
             <LiveLessonExperience
@@ -439,18 +414,11 @@ export function AppShell(props: AppShellProps) {
                 adminMessage={adminMessage}
                 adminUsers={adminUsers}
                 appProfile={appProfile}
-                authenticationMethods={authenticationMethods}
-                authenticationMethodsLoading={authenticationMethodsLoading}
-                authenticationMethodsMessage={authenticationMethodsMessage}
-                completedAuthAction={completedAuthAction}
                 error={error}
                 isAdmin={isAdmin}
                 isAuthenticated={isAuthenticated}
                 onBack={closeProfile}
                 onRefreshAdminUsers={() => void refreshAdminUsers()}
-                onRefreshAuthenticationMethods={refreshAuthenticationMethods}
-                onDeletePasskey={deletePasskey}
-                onRenamePasskey={renamePasskey}
                 onResetProfile={() => void resetProfile()}
                 onSaveProfile={saveProfile}
                 profile={profile}
@@ -498,7 +466,7 @@ export function AppShell(props: AppShellProps) {
                   onCreate={createScheduledLesson}
                   onCreateManagedStudent={createManagedStudent}
                   onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
-                  onCopyLinks={(lesson, linkOrigin) => copyScheduledLessonLinks(lesson, linkOrigin)}
+                  onCopyLinks={(lesson) => copyScheduledLessonLinks(lesson)}
                   onJoin={(lesson) => void joinScheduledLesson(lesson)}
                   onOpenMaterials={() => setWorkspaceTab("materials")}
                   onPrepare={openLessonPreparation}

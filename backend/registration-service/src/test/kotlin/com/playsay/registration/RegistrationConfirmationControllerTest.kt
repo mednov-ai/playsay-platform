@@ -90,12 +90,12 @@ class RegistrationConfirmationControllerTest : RegistrationControllerTestFixture
     @Test
     fun `confirmed registration returns allowed keyboard continue url`() {
         val email = "keyboard-return@example.com"
-        startRegistration(email, returnTo = "https://dev.key.honey.school/")
+        startRegistration(email, returnTo = "https://key.play-and-say.ru/")
 
         val confirmed = confirmRegistration(lastConfirmationToken())
 
         assertEquals(HttpStatus.OK.value(), confirmed.statusCode(), confirmed.body())
-        assertTrue(confirmed.body().contains("\"continueUrl\":\"https://dev.key.honey.school/\""))
+        assertTrue(confirmed.body().contains("\"continueUrl\":\"https://key.play-and-say.ru/\""))
     }
 
     @Test

@@ -29,7 +29,7 @@ test("module pipelines route numeric release branches to prod only", () => {
 
     assert.match(
       pipeline,
-      /DEPLOY_TO_PROD = \(env\.CI_BRANCH ==~ \/\^release\\\/\[0-9\]\{2\}\\\.\[0-9\]\{3\}\\\.\[0-9\]\{2\}\$\/\)/,
+      /DEPLOY_TO_PROD = \(env\.CI_BRANCH ==~ \^?\/\^release\\\/\[0-9\]\+/,
       pipelineName,
     );
     assert.match(pipeline, /env\.INFRA_BRANCH = env\.DEPLOY_TO_PROD == 'true' \? env\.CI_BRANCH : 'develop'/, pipelineName);
@@ -62,7 +62,7 @@ test("release routing never grants Jenkins production cluster credentials", () =
 test("image update helper pins dev and prod digests and matches release branches", () => {
   const helper = readFileSync(resolve(platformRoot, "scripts/ci/update-environment-image.sh"), "utf8");
   const routedHelper = readFileSync(resolve(platformRoot, "scripts/ci/update-routed-image-reference.sh"), "utf8");
-  assert.match(helper, /\^release\/\[0-9\]\{2\}\\\.\[0-9\]\{3\}\\\.\[0-9\]\{2\}\$/);
+  assert.match(helper, /\^release\/\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\$/);
   assert.match(helper, /if \[ "\$INFRA_BRANCH" != "\$CI_BRANCH" \]/);
   assert.match(helper, /\^sha256:\[0-9a-f\]\{64\}\$/);
   assert.match(helper, /\.image\.digest = strenv\(IMAGE_DIGEST\)/);
@@ -92,11 +92,6 @@ test("release candidate lifecycle preserves a manual production gate", () => {
   assert.match(prepare, /\.build = load\(strenv\(BASE_VALUES_FILE\)\)\.build/);
   assert.match(prepare, /previous_status.*!= "ready"/);
   assert.match(prepare, /RELEASE_AFFECTED_TARGETS=/);
-  assert.match(
-    prepare,
-    /TARGET_ORDER=.*game-adapter-service/,
-    "release candidate preparation must accept every routed product image target",
-  );
 
   assert.match(finalize, /manifest_status.*"building"/);
   assert.match(finalize, /acceptedDevCommit/);

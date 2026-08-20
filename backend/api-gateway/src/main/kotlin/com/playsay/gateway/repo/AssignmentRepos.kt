@@ -2,6 +2,7 @@ package com.playsay.gateway.repo
 
 import com.playsay.gateway.entity.AssignmentEntity
 import com.playsay.gateway.entity.AssignmentRecipientEntity
+import com.playsay.gateway.entity.VocabularyAssignmentProgressEventEntity
 import com.playsay.gateway.entity.AssignmentIntegrationOutboxEntity
 import com.playsay.gateway.entity.SubmissionEntity
 import java.math.BigDecimal
@@ -25,6 +26,8 @@ data class MaterialSubmissionRow(
     val createdAt: Instant,
     val updatedAt: Instant,
 )
+
+interface VocabularyAssignmentProgressEventRepo : JpaRepository<VocabularyAssignmentProgressEventEntity, UUID>
 
 interface AssignmentRepo : JpaRepository<AssignmentEntity, UUID> {
     fun findByTeacherUserId(teacherUserId: UUID): List<AssignmentEntity>

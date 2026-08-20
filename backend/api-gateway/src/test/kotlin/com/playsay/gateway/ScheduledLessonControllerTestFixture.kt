@@ -73,8 +73,6 @@ import liquibase.integration.spring.SpringLiquibase
         "playsay.livekit.api-key=test-key",
         "playsay.livekit.api-secret=01234567890123456789012345678901",
         "playsay.livekit.token-ttl-seconds=900",
-        "playsay.public-app-url=https://online.honey.school",
-        "playsay.public-app-rf-url=https://online.honeyschool.ru",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

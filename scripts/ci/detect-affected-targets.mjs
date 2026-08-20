@@ -22,8 +22,7 @@ export const TARGETS = Object.freeze([
 
 export const VALIDATION_SUITES = Object.freeze(["ci-contracts", "smoke-syntax"]);
 
-const NEW_RELEASE_PATTERN = /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/;
-const HISTORICAL_RELEASE_PATTERN = /^release\/[0-9]+\.[0-9]+\.[0-9]+$/;
+const NUMERIC_RELEASE_PATTERN = /^release\/[0-9]+\.[0-9]+\.[0-9]+$/;
 const ZERO_COMMIT_PATTERN = /^0{40}$/;
 const ALL_TARGETS = new Set(TARGETS);
 const BACKEND_TARGETS = new Set([
@@ -220,36 +219,6 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
-    if (path.startsWith("backend/contracts/email-internal-contract/")) {
-      addAll(deployTargets, ["api-gateway", "registration-service", "email-service"]);
-      continue;
-    }
-
-    if (path.startsWith("backend/contracts/media-internal-contract/")) {
-      addAll(deployTargets, ["api-gateway", "media-service"]);
-      continue;
-    }
-
-    if (path.startsWith("backend/contracts/payment-internal-contract/")) {
-      addAll(deployTargets, ["api-gateway", "payment-service"]);
-      continue;
-    }
-
-    if (path.startsWith("backend/contracts/registration-internal-contract/")) {
-      addAll(deployTargets, ["api-gateway", "registration-service"]);
-      continue;
-    }
-
-    if (path.startsWith("backend/integration-support/")) {
-      addAll(deployTargets, ["api-gateway", "vocabulary-service", "registration-service", "keyboard-service"]);
-      continue;
-    }
-
-    if (path.startsWith("backend/openai-support/")) {
-      addAll(deployTargets, ["api-gateway", "vocabulary-service"]);
-      continue;
-    }
-
     if (path.startsWith("backend/api-gateway/")) {
       deployTargets.add("api-gateway");
       continue;
@@ -296,12 +265,6 @@ export function detectTargetsForPaths(paths, options = {}) {
     }
 
     if (path.startsWith("frontend/keyboard-app/")) {
-      deployTargets.add("keyboard-app");
-      continue;
-    }
-
-    if (path.startsWith("frontend/shared-ui/")) {
-      deployTargets.add("web-app");
       deployTargets.add("keyboard-app");
       continue;
     }
@@ -433,7 +396,7 @@ export function resolveCurrentProductionBaseline({ infraRepo, platformRemote = "
   try {
     git(["clone", "--quiet", "--depth", "1", "--single-branch", "--branch", "develop", infraRepo, infraDir]);
     const releaseBranch = readFileSync(resolve(infraDir, "argocd-apps/prod/current-release.txt"), "utf8").trim();
-    if (!HISTORICAL_RELEASE_PATTERN.test(releaseBranch)) {
+    if (!NUMERIC_RELEASE_PATTERN.test(releaseBranch)) {
       throw new DetectionError(`Invalid current production release in infra develop: ${releaseBranch}`);
     }
     git(["fetch", "--quiet", "--no-tags", platformRemote, `+refs/heads/${releaseBranch}:refs/remotes/${platformRemote}/${releaseBranch}`]);
@@ -482,7 +445,7 @@ export function detectTargetsFromGitRange({
   let baseCommit = before ?? "";
   let detectionMode = "webhook-range";
   if (!baseCommit || isZeroCommit(baseCommit)) {
-    if (!NEW_RELEASE_PATTERN.test(branch) || !isCommitSha(releaseBaseCommit)) {
+    if (!NUMERIC_RELEASE_PATTERN.test(branch) || !isCommitSha(releaseBaseCommit)) {
       throw new DetectionError(
         "A zero or missing GITHUB_BEFORE is allowed only for a numeric release with a resolved current-production baseline. Retry with FORCE_TARGETS if the baseline cannot be resolved.",
       );
@@ -536,7 +499,7 @@ function main() {
   };
 
   try {
-    if (NEW_RELEASE_PATTERN.test(branch) && (!releaseBaseline.releaseBranch || !releaseBaseline.commit)) {
+    if (NUMERIC_RELEASE_PATTERN.test(branch) && (!releaseBaseline.releaseBranch || !releaseBaseline.commit)) {
       releaseBaseline = resolveCurrentProductionBaseline({
         infraRepo: process.env.INFRA_REPO,
         platformRemote: "origin",

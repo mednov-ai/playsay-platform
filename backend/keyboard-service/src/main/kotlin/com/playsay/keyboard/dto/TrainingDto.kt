@@ -4,6 +4,8 @@ import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.PositiveOrZero
+import jakarta.validation.constraints.Size
+import java.util.UUID
 
 data class SubmitResultRequest(
     val clientResultId: String? = null,
@@ -36,6 +38,19 @@ data class SubmitResultRequest(
     val clientTimezone: String = "UTC",
     val localTrainingDate: String? = null,
     val practiceContext: Map<String, Any?> = emptyMap(),
+    @field:Size(max = 200) val vocabularyResults: List<KeyboardVocabularyTargetResultRequest> = emptyList(),
+)
+
+data class KeyboardVocabularyTargetResultRequest(
+    val resultId: UUID,
+    val targetId: UUID,
+    val targetType: String,
+    @field:PositiveOrZero val errors: Int,
+    @field:PositiveOrZero val durationMs: Long,
+    @field:PositiveOrZero val position: Int,
+    @field:Size(max = 200) val typedText: String? = null,
+    @field:Size(max = 20) val sourceEntryIds: List<UUID> = emptyList(),
+    @field:Size(max = 20) val sourceItemIds: List<UUID> = emptyList(),
 )
 
 data class SubmitAnonymousResultRequest(

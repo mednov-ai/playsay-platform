@@ -1,0 +1,130 @@
+// @vitest-environment jsdom
+
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { RoomEvent } from "livekit-client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useExternalActivitySession } from "./useExternalActivitySession";
+
+type RoomHandler = (...args: unknown[]) => void;
+const handlers = new Map<string, Set<RoomHandler>>();
+const publishData = vi.fn<(
+  payload: Uint8Array,
+  options: { reliable: boolean; topic: string },
+) => Promise<void>>(async () => undefined);
+const room = {
+  localParticipant: {
+    identity: "teacher",
+    publishData,
+    publishTrack: vi.fn(async () => undefined),
+    unpublishTrack: vi.fn(async () => undefined),
+  },
+  off: vi.fn((event: string, handler: RoomHandler) => handlers.get(event)?.delete(handler)),
+  on: vi.fn((event: string, handler: RoomHandler) => {
+    const eventHandlers = handlers.get(event) ?? new Set<RoomHandler>();
+    eventHandlers.add(handler);
+    handlers.set(event, eventHandlers);
+  }),
+  remoteParticipants: new Map<string, unknown>(),
+};
+
+vi.mock("@livekit/components-react", () => ({
+  useRoomContext: () => room,
+}));
+
+function emit(event: RoomEvent, ...args: unknown[]) {
+  handlers.get(event)?.forEach((handler) => handler(...args));
+}
+
+function decodedMessages() {
+  return publishData.mock.calls.map(([payload]) => (
+    JSON.parse(new TextDecoder().decode(payload as Uint8Array)) as { type: string }
+  ));
+}
+
+const block = {
+  id: "external-1",
+  type: "externalActivity" as const,
+  title: "Wordwall",
+  url: "https://wordwall.net/resource/1",
+};
+
+describe("useExternalActivitySession", () => {
+  beforeEach(() => {
+    handlers.clear();
+    publishData.mockClear();
+    room.remoteParticipants.clear();
+    vi.stubGlobal("MediaStream", class {
+      constructor(public tracks: MediaStreamTrack[] = []) {}
+      getTracks() { return this.tracks; }
+    });
+  });
+
+  it("publishes STOPPED before the final HOST_IDLE state", async () => {
+    const { result } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: true,
+      participantColor: "#ff5c00",
+      participantName: "Teacher",
+    }));
+
+    act(() => result.current.open(block));
+    await waitFor(() => expect(result.current.active?.phase).toBe("AWAITING_EXTENSION"));
+    act(() => result.current.returnToLesson());
+    await waitFor(() => expect(decodedMessages().some(({ type }) => type === "HOST_IDLE")).toBe(true));
+
+    const stopIndex = decodedMessages().findIndex(({ type }) => type === "STOPPED");
+    const idleIndex = decodedMessages().findIndex(({ type }, index) => type === "HOST_IDLE" && index > stopIndex);
+    expect(stopIndex).toBeGreaterThanOrEqual(0);
+    expect(idleIndex).toBeGreaterThan(stopIndex);
+    expect(result.current.active).toBeNull();
+  });
+
+  it("clears a student session when a previously received host track disappears", async () => {
+    vi.useFakeTimers();
+    const publication = {
+      track: { mediaStreamTrack: {} as MediaStreamTrack },
+      trackName: "playsay-external-activity-session-1-video",
+    };
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map([["video", publication]]),
+    };
+    room.remoteParticipants.set("teacher", teacher);
+    const { result, unmount } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      trustedHostIdentity: "teacher",
+    }));
+
+    act(() => emit(RoomEvent.DataReceived, new TextEncoder().encode(JSON.stringify({
+      version: 1,
+      type: "HOST_STATE",
+      sessionId: "session-1",
+      blockId: block.id,
+      phase: "ACTIVE",
+      studentsLocked: false,
+      visible: true,
+    })), teacher, undefined, "playsay.external-activity.host.v1"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.active?.sessionId).toBe("session-1");
+
+    teacher.trackPublications.clear();
+    act(() => emit(RoomEvent.TrackUnsubscribed));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(result.current.active).toBeNull();
+    expect(result.current.mediaStream).toBeNull();
+    unmount();
+    vi.useRealTimers();
+  });
+});

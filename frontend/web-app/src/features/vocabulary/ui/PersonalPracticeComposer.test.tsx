@@ -3,13 +3,14 @@
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PersonalPracticeComposer } from "./PersonalPracticeComposer";
 
 const previewVocabularyPractice = vi.fn();
 
 vi.mock("../../../shared/api/playsay", () => ({
   fetchVocabularyDashboard: vi.fn().mockResolvedValue({ entries: [] }),
+  fetchVocabularySelectionRecipes: vi.fn().mockResolvedValue([]),
   previewVocabularyPractice: (...args: unknown[]) => previewVocabularyPractice(...args),
 }));
 
@@ -18,6 +19,7 @@ vi.mock("../../../shared/i18n", () => ({
 }));
 
 afterEach(cleanup);
+beforeEach(() => previewVocabularyPractice.mockReset());
 
 describe("PersonalPracticeComposer", () => {
   it("selects present learners by default and supports exclusion undo", async () => {
@@ -68,6 +70,52 @@ describe("PersonalPracticeComposer", () => {
     expect(undo).toBeInTheDocument();
     fireEvent.click(undo);
     expect(screen.queryByRole("button", { name: "steady" })).not.toBeInTheDocument();
+  });
+
+  it("publishes a frozen homework plan with the meaningful activity policy by default", async () => {
+    previewVocabularyPractice.mockResolvedValue({
+      delivery: "HOMEWORK",
+      estimatedMinutes: 2,
+      expiresAt: "2026-07-30T10:00:00Z",
+      mode: "BALANCED",
+      owners: [{
+        dueCount: 1,
+        entries: [entry],
+        estimatedItemCount: 2,
+        needsTranslationCount: 0,
+        newCount: 0,
+        ownerSubject: "student-present",
+        selectedCount: 1,
+        selection: [{ entry, readinessWarnings: [], reason: "DUE_TODAY" }],
+      }],
+      planId: "plan-homework",
+      revision: 3,
+    });
+    const onPublish = vi.fn().mockResolvedValue(undefined);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <PersonalPracticeComposer
+          actionLabel="assign"
+          delivery="HOMEWORK"
+          onPublish={onPublish}
+          owners={[{ name: "Anna", subject: "student-present" }]}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("steady")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "assign" }));
+
+    await waitFor(() => expect(onPublish).toHaveBeenCalledWith(
+      expect.objectContaining({ planId: "plan-homework", revision: 3 }),
+      expect.objectContaining({
+        completionPolicy: "MEANINGFUL_ACTIVITY",
+        completionThresholds: expect.objectContaining({ distinctEntries: 4, distinctGradedPrompts: 8 }),
+        planId: "plan-homework",
+        planRevision: 3,
+      }),
+    ));
   });
 });
 

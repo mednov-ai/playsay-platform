@@ -7,10 +7,12 @@ import type { VocabularyPracticeSession } from "../../../shared/api/playsay";
 import { VocabularyPracticePlayer } from "./VocabularyPracticePlayer";
 
 const revealVocabularyPracticeItem = vi.fn();
+const recordVocabularyAttempt = vi.fn();
+const fetchVocabularyPracticeSession = vi.fn();
 
 vi.mock("../../../shared/api/playsay", () => ({
-  fetchVocabularyPracticeSession: vi.fn(),
-  recordVocabularyAttempt: vi.fn(),
+  fetchVocabularyPracticeSession: (...args: unknown[]) => fetchVocabularyPracticeSession(...args),
+  recordVocabularyAttempt: (...args: unknown[]) => recordVocabularyAttempt(...args),
   revealVocabularyPracticeItem: (...args: unknown[]) => revealVocabularyPracticeItem(...args),
 }));
 
@@ -23,6 +25,8 @@ afterEach(cleanup);
 beforeEach(() => {
   revealVocabularyPracticeItem.mockReset();
   revealVocabularyPracticeItem.mockResolvedValue({ itemId: "item-1", expectedAnswer: "устойчивый" });
+  recordVocabularyAttempt.mockReset();
+  fetchVocabularyPracticeSession.mockReset();
 });
 
 describe("VocabularyPracticePlayer", () => {
@@ -78,6 +82,44 @@ describe("VocabularyPracticePlayer", () => {
     expect(take).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.phrase.remove" }));
     expect(take).toBeEnabled();
+  });
+
+  it("reuses the attempt id after a reconnect so the backend can deduplicate", async () => {
+    const initial = session({ exerciseType: "FORM_INPUT", prompt: "Write steady", skill: "FORM" });
+    recordVocabularyAttempt.mockRejectedValueOnce(new Error("offline"));
+    fetchVocabularyPracticeSession.mockResolvedValue(initial);
+    render(<VocabularyPracticePlayer initialSession={initial} />);
+
+    fireEvent.change(screen.getByLabelText("vocabulary.practice.answerLabel"), { target: { value: "steady" } });
+    fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.check" }));
+    await waitFor(() => expect(fetchVocabularyPracticeSession).toHaveBeenCalledWith("session-1"));
+    fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.check" }));
+    await waitFor(() => expect(recordVocabularyAttempt).toHaveBeenCalledTimes(2));
+
+    expect(recordVocabularyAttempt.mock.calls[0][1].clientAttemptId)
+      .toBe(recordVocabularyAttempt.mock.calls[1][1].clientAttemptId);
+  });
+
+  it("prevents a duplicate submit while the first answer is pending and announces progress", async () => {
+    let resolveAttempt: ((value: unknown) => void) | undefined;
+    recordVocabularyAttempt.mockImplementation(() => new Promise((resolve) => { resolveAttempt = resolve; }));
+    render(<VocabularyPracticePlayer initialSession={session({ exerciseType: "FORM_INPUT", prompt: "Write steady", skill: "FORM" })} />);
+
+    expect(screen.getByText("vocabulary.practice.progress").parentElement).toHaveAttribute("aria-live", "polite");
+    fireEvent.change(screen.getByLabelText("vocabulary.practice.answerLabel"), { target: { value: "steady" } });
+    const submit = screen.getByRole("button", { name: "vocabulary.practice.actions.check" });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    expect(recordVocabularyAttempt).toHaveBeenCalledTimes(1);
+    resolveAttempt?.({
+      attemptId: "attempt-1",
+      correct: true,
+      expectedAnswer: "steady",
+      rating: "GOOD",
+      session: { ...session({}), attemptCount: 1, completedItems: 1, correctCount: 1, currentItem: null, status: "COMPLETED" },
+    });
+    await waitFor(() => expect(screen.getByText("vocabulary.practice.complete.title")).toBeInTheDocument());
   });
 });
 

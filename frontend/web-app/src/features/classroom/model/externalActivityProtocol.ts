@@ -9,38 +9,9 @@ export const externalActivityExtensionChannel = "playsay.external-activity.exten
 
 export type ExternalActivityPhase = "REQUESTED" | "AWAITING_EXTENSION" | "STARTING" | "ACTIVE" | "ERROR";
 export type ExternalActivityInput =
-  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
-  | { type: "scroll"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
+  | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; normalizedX?: number; normalizedY?: number; button?: "left" | "middle" | "right"; clickCount?: number }
+  | { type: "scroll"; x: number; y: number; normalizedX?: number; normalizedY?: number; deltaX: number; deltaY: number }
   | { type: "key"; action: "down" | "up"; key: string; code?: string; text?: string; modifiers?: number };
-
-export type ExternalActivityRealtimeMessage =
-  | {
-      blockId: string;
-      eventId: string;
-      input: ExternalActivityInput;
-      kind: "external-input";
-      sessionId: string;
-    }
-  | {
-      blockId: string;
-      color: string;
-      identity: string;
-      kind: "external-cursor";
-      name: string;
-      sessionId: string;
-      x: number;
-      y: number;
-    };
-
-export type ExternalActivityRealtime = {
-  acquire: (onMessage: (message: ExternalActivityRealtimeMessage) => void) => () => void;
-  close: () => void;
-  publish: (message: ExternalActivityRealtimeMessage) => boolean;
-};
-
-export function externalActivityInputReliable(input: ExternalActivityInput): boolean {
-  return input.type !== "pointer" || input.action !== "move";
-}
 
 export type ExternalActivityMessage = {
   version: 1;
@@ -92,12 +63,6 @@ export function externalActivityTrackName(sessionId: string, kind: "video" | "au
   return `${externalActivityTrackPrefix}${sessionId}-${kind}`;
 }
 
-export function externalActivitySessionIdFromTrackName(trackName: string | undefined): string | null {
-  if (!trackName?.startsWith(externalActivityTrackPrefix)) return null;
-  const match = trackName.match(/^playsay-external-activity-(.+)-(?:video|audio)$/);
-  return match?.[1] && safeToken(match[1]) ? match[1] : null;
-}
-
 export function isCurrentExternalActivityCapture(
   generation: number,
   sessionId: string,
@@ -138,6 +103,14 @@ export function externalActivityCaptureConstraints(streamId: string): MediaStrea
 
 function validInput(input: ExternalActivityInput | undefined): input is ExternalActivityInput {
   if (!input || typeof input !== "object") return false;
+  const normalizedCoordinatesValid = (
+    (input.type !== "pointer" && input.type !== "scroll")
+    || (
+      (input.normalizedX === undefined || normalizedCoordinate(input.normalizedX))
+      && (input.normalizedY === undefined || normalizedCoordinate(input.normalizedY))
+    )
+  );
+  if (!normalizedCoordinatesValid) return false;
   if (input.type === "pointer") return ["move", "down", "up"].includes(input.action) && coordinate(input.x) && coordinate(input.y);
   if (input.type === "scroll") return coordinate(input.x) && coordinate(input.y) && finite(input.deltaX) && finite(input.deltaY);
   return input.type === "key" && ["down", "up"].includes(input.action) && typeof input.key === "string" && input.key.length <= 64;
@@ -157,4 +130,8 @@ function finite(value: unknown): value is number {
 
 function coordinate(value: unknown): value is number {
   return finite(value) && value >= 0;
+}
+
+function normalizedCoordinate(value: unknown): value is number {
+  return coordinate(value) && value <= 1;
 }

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.AssignmentRecipientProgressResponse
 import com.playsay.gateway.dto.AssignmentSubmissionResponse
 import com.playsay.gateway.dto.AssignmentSummaryResponse
+import com.playsay.gateway.dto.VocabularyCompletionThresholds
+import com.playsay.gateway.dto.VocabularyHomeworkCompletionPolicy
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.AssignmentEntity
 import com.playsay.gateway.entity.AssignmentRecipientEntity
@@ -90,6 +92,15 @@ class AssignmentProjectionService(
             completionRatio = recipient.completionRatio,
             accuracy = recipient.accuracy,
             difficultWordCount = recipient.difficultWordCount,
+            learnerSnapshotId = recipient.learnerSnapshotId,
+            distinctGradedPrompts = recipient.distinctGradedPrompts,
+            distinctEntries = recipient.distinctEntries,
+            hintsUsed = recipient.hintsUsed,
+            activeDurationMs = recipient.activeDurationMs,
+            masteryRatio = recipient.masteryRatio,
+            reviewState = recipient.reviewState,
+            reviewNote = recipient.reviewNote,
+            reviewedAt = recipient.reviewedAt,
         )
     }
 
@@ -244,6 +255,15 @@ class AssignmentProjectionService(
             myCompletionRatio = studentRecipient?.completionRatio,
             myAccuracy = studentRecipient?.accuracy,
             myDifficultWordCount = studentRecipient?.difficultWordCount,
+            completionPolicy = runCatching { VocabularyHomeworkCompletionPolicy.valueOf(assignment.completionPolicy) }.getOrNull(),
+            completionPolicyVersion = assignment.completionPolicyVersion,
+            completionThresholds = runCatching { objectMapper.readValue(assignment.completionThresholdsJson, VocabularyCompletionThresholds::class.java) }.getOrNull(),
+            myDistinctGradedPrompts = studentRecipient?.distinctGradedPrompts,
+            myDistinctEntries = studentRecipient?.distinctEntries,
+            myHintsUsed = studentRecipient?.hintsUsed,
+            myActiveDurationMs = studentRecipient?.activeDurationMs,
+            myMasteryRatio = studentRecipient?.masteryRatio,
+            myReviewState = studentRecipient?.reviewState,
         )
     }
 

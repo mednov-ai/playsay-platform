@@ -7,7 +7,6 @@ export * from "./exerciseEditor";
 export * from "./answers";
 export * from "./assets";
 export * from "./videoClip";
-export * from "./videoMeta";
 export * from "./fillGaps";
 export * from "./matchingPairs";
 export * from "./scoring";

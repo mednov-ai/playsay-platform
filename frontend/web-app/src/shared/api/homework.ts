@@ -79,6 +79,20 @@ export async function createVocabularyHomeworkAssignment(
   );
 }
 
+export async function reviewVocabularyHomeworkAssignment(
+  assignmentId: string,
+  studentSubject: string,
+  action: "ACCEPT" | "RETURN",
+  note?: string | null,
+  config = authConfig,
+): Promise<HomeworkAssignmentDetail> {
+  return apiJson<HomeworkAssignmentDetail>(
+    `/api/assignments/${assignmentId}/vocabulary-review/${encodeURIComponent(studentSubject)}`,
+    { method: "PATCH", body: JSON.stringify({ action, note: note?.trim() || null }) },
+    config,
+  );
+}
+
 export async function fetchMyHomeworkAssignments(config = authConfig): Promise<HomeworkAssignment[]> {
   return apiJson<HomeworkAssignment[]>("/api/me/assignments", { method: "GET" }, config);
 }

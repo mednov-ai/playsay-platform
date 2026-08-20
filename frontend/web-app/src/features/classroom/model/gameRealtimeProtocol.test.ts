@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { MaterialHtmlGameRealtimeMessage } from "../../materials/model/materialDocument";
 import {
   decodeGameRealtimeFrame,
-  encodeExternalActivityRealtimeMessage,
   encodeGameRealtimeMessage,
 } from "./gameRealtimeProtocol";
 
@@ -50,20 +49,5 @@ describe("game realtime browser protocol", () => {
     expect(() => decodeGameRealtimeFrame(
       encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength),
     )).toThrow(/Invalid game realtime message/);
-  });
-
-  it("round-trips external pointer input through the shared fast-lane envelope", () => {
-    const message = {
-      blockId: "external-a",
-      eventId: "event-a",
-      input: { action: "move", type: "pointer", x: 120, y: 80 },
-      kind: "external-input",
-      sessionId: "session-a",
-    } as const;
-    const encoded = encodeExternalActivityRealtimeMessage(message);
-
-    expect(decodeGameRealtimeFrame(
-      encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength),
-    )).toEqual({ kind: "message", message });
   });
 });

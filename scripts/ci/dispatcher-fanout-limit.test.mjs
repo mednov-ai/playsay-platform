@@ -65,7 +65,7 @@ test(
     assert.match(webhookXml, /<tokenCredentialId>github-webhook-token<\/tokenCredentialId>/);
     assert.match(
       webhookXml,
-      /\^refs\/heads\/\(develop\|release\/\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\) /,
+      /\^refs\/heads\/\(develop\|release\/\[0-9\]\{2\}\\\.\[0-9\]\{3\}\\\.\[0-9\]\{2\}\) /,
     );
     assert.match(webhookXml, /playsay-platform-dispatch-develop/);
     assert.match(webhookXml, /playsay-platform-dispatch-release/);
@@ -89,9 +89,4 @@ test("dispatcher validates CI-only changes and brackets release builds with cand
   assert.match(dispatcher, /prepare-release-candidate\.sh/);
   assert.match(dispatcher, /stage\('Finalize release candidate'\)/);
   assert.match(dispatcher, /finalize-release-candidate\.sh/);
-  assert.match(
-    dispatcher,
-    /stage\('Finalize release candidate'\)[\s\S]*?name: tools[\s\S]*?limits:[\s\S]*?memory: 1Gi/,
-    "release finalization needs enough memory to render every production chart",
-  );
 });

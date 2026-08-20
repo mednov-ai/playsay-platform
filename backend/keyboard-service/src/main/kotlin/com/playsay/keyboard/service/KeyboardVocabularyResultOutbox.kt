@@ -17,6 +17,8 @@ import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import io.micrometer.core.instrument.MeterRegistry
+import org.slf4j.LoggerFactory
 
 data class KeyboardVocabularyResultPayload(
     val clientResultId: String,
@@ -27,6 +29,14 @@ data class KeyboardVocabularyWordAttemptPayload(
     val itemId: UUID,
     val entryId: UUID,
     val errors: Int,
+    val resultId: UUID? = null,
+    val targetId: UUID? = null,
+    val targetType: String = "WHOLE_WORD",
+    val durationMs: Long = 0,
+    val position: Int = 0,
+    val typedText: String? = null,
+    val sourceEntryIds: List<UUID> = emptyList(),
+    val sourceItemIds: List<UUID> = emptyList(),
 )
 
 @Component
@@ -36,6 +46,7 @@ class KeyboardVocabularyResultOutbox(
     private val vocabularyBaseUrl: String,
     @param:Value("\${playsay.user-data.service-token:}")
     private val serviceToken: String,
+    private val meters: MeterRegistry,
 ) {
     private val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build()
 
@@ -43,17 +54,35 @@ class KeyboardVocabularyResultOutbox(
         if (request.practiceContext["practiceKind"] != "VOCABULARY") return
         if (outbox.existsByTrainingResultId(result.id)) return
         val sessionId = request.practiceContext.uuid("vocabularySessionId") ?: return
+        val typedAttempts = request.vocabularyResults.map { result ->
+            val itemId = result.sourceItemIds.firstOrNull() ?: UUID(0, 0)
+            val entryId = result.sourceEntryIds.firstOrNull() ?: UUID(0, 0)
+            KeyboardVocabularyWordAttemptPayload(
+                itemId = itemId,
+                entryId = entryId,
+                errors = result.errors.coerceIn(0, MAX_ERRORS),
+                resultId = result.resultId,
+                targetId = result.targetId,
+                targetType = result.targetType,
+                durationMs = result.durationMs,
+                position = result.position,
+                typedText = result.typedText,
+                sourceEntryIds = result.sourceEntryIds,
+                sourceItemIds = result.sourceItemIds,
+            )
+        }
         val itemIds = request.practiceContext.uuidList("vocabularyItemIds")
         val entryIds = request.practiceContext.uuidList("vocabularyEntryIds")
         val words = request.practiceContext.stringList("vocabularyWords")
-        if (itemIds.size != entryIds.size || itemIds.size != words.size || itemIds.isEmpty()) return
-        val attempts = itemIds.indices.map { index ->
+        if (typedAttempts.isEmpty() && (itemIds.size != entryIds.size || itemIds.size != words.size || itemIds.isEmpty())) return
+        val legacyAttempts = itemIds.indices.map { index ->
             KeyboardVocabularyWordAttemptPayload(
                 itemId = itemIds[index],
                 entryId = entryIds[index],
                 errors = (request.perChord[words[index]] ?: 0).coerceIn(0, MAX_ERRORS),
             )
         }
+        val attempts = typedAttempts.ifEmpty { legacyAttempts }
         val now = Instant.now()
         val clientResultId = result.clientResultId ?: "keyboard-result-${result.id}"
         outbox.save(
@@ -82,6 +111,8 @@ class KeyboardVocabularyResultOutbox(
     private fun deliver(eventId: UUID) {
         val event = outbox.findById(eventId).orElse(null) ?: return
         if (event.status != PENDING) return
+        meters.timer("playsay.keyboard.vocabulary.outbox.age")
+            .record(Duration.between(event.createdAt, Instant.now()).coerceAtLeast(Duration.ZERO))
         runCatching {
             check(serviceToken.isNotBlank()) { "Vocabulary integration token is not configured" }
             val request = HttpRequest.newBuilder(
@@ -101,6 +132,7 @@ class KeyboardVocabularyResultOutbox(
             }
         }.onSuccess {
             outbox.deleteById(eventId)
+            meters.counter("playsay.keyboard.vocabulary.outbox.delivery", "outcome", "delivered").increment()
         }.onFailure { error ->
             val current = outbox.findById(eventId).orElse(null) ?: return@onFailure
             val now = Instant.now()
@@ -109,6 +141,19 @@ class KeyboardVocabularyResultOutbox(
             current.nextAttemptAt = now.plus(exponentialRetryDelay(current.attemptCount))
             current.updatedAt = now
             outbox.save(current)
+            meters.counter(
+                "playsay.keyboard.vocabulary.outbox.delivery",
+                "outcome",
+                "retry",
+                "error",
+                error.javaClass.simpleName,
+            ).increment()
+            logger.warn(
+                "Keyboard vocabulary callback deferred: eventId={}, attemptCount={}, errorType={}",
+                current.id,
+                current.attemptCount,
+                error.javaClass.simpleName,
+            )
         }
     }
 
@@ -125,6 +170,7 @@ class KeyboardVocabularyResultOutbox(
             .orEmpty()
 
     private companion object {
+        val logger = LoggerFactory.getLogger(KeyboardVocabularyResultOutbox::class.java)
         val objectMapper = jacksonObjectMapper()
         val PENDING = IntegrationDeliveryState.PENDING.persistedValue
         const val MAX_ERRORS = 999

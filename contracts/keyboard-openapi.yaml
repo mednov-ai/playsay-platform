@@ -1,0 +1,98 @@
+openapi: 3.1.0
+info:
+  title: Honey School Key API
+  version: 1.1.0
+paths:
+  /api/training/results:
+    post:
+      operationId: submitTrainingResult
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitResult' }
+      responses:
+        '201':
+          description: Saved training result
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /internal/keyboard/weak-patterns/{subject}:
+    get:
+      operationId: getLearnerWeakPatterns
+      parameters:
+        - { name: subject, in: path, required: true, schema: { type: string, maxLength: 255 } }
+        - { name: X-PlaySay-Service-Token, in: header, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Aggregated authorized weak patterns
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeakPatterns' }
+        '403': { description: Invalid service token }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    VocabularyKeyTargetType: { type: string, enum: [WHOLE_WORD, CHARACTER_NGRAM] }
+    VocabularyKeyMode: { type: string, enum: [WHOLE_WORDS, CHARACTER_NGRAMS, MIXED] }
+    VocabularyTargetResult:
+      type: object
+      required: [resultId, targetId, targetType, errors, durationMs, position, sourceEntryIds, sourceItemIds]
+      properties:
+        resultId: { type: string, format: uuid }
+        targetId: { type: string, format: uuid }
+        targetType: { $ref: '#/components/schemas/VocabularyKeyTargetType' }
+        errors: { type: integer, minimum: 0 }
+        durationMs: { type: integer, format: int64, minimum: 0 }
+        position: { type: integer, minimum: 0 }
+        typedText: { type: [string, 'null'], maxLength: 200 }
+        sourceEntryIds: { type: array, maxItems: 20, items: { type: string, format: uuid } }
+        sourceItemIds: { type: array, maxItems: 20, items: { type: string, format: uuid } }
+    PracticeContext:
+      type: object
+      additionalProperties: false
+      properties:
+        practiceKind: { type: string, enum: [CODE, CODE_COMBO, VOCABULARY] }
+        title: { type: string, maxLength: 160 }
+        vocabularySessionId: { type: string, format: uuid }
+        vocabularyMode: { $ref: '#/components/schemas/VocabularyKeyMode' }
+        vocabularyMaterializerVersion: { type: string, maxLength: 64 }
+        vocabularyMaterializerSeed: { type: integer, format: int64 }
+        vocabularyCompletionPolicy: { type: string, enum: [MEANINGFUL_ACTIVITY, COMPLETE_SESSION, MASTERY_TARGET, TEACHER_REVIEW] }
+        vocabularyReturnTarget: { type: string, enum: [HONEY_SCHOOL_VOCABULARY, HONEY_SCHOOL_LESSON, HONEY_SCHOOL_HOMEWORK] }
+    SubmitResult:
+      type: object
+      required: [chordSetId, speedCpm, accuracy, errors, durationMs]
+      properties:
+        clientResultId: { type: [string, 'null'], maxLength: 128 }
+        chordSetId: { type: integer, format: int64, minimum: 1 }
+        lessonKind: { type: string, enum: [CALIBRATION, STANDARD, FOCUS], default: STANDARD }
+        speedCpm: { type: number, minimum: 0 }
+        averageCpm: { type: number, minimum: 0 }
+        cadence: { type: number, minimum: 0, maximum: 1 }
+        accuracy: { type: number, minimum: 0, maximum: 1 }
+        errors: { type: integer, minimum: 0 }
+        characterCount: { type: integer, minimum: 0 }
+        correctCount: { type: integer, minimum: 0 }
+        durationMs: { type: integer, format: int64, minimum: 1 }
+        perFinger: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+        perChar: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+        perChord: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+        focusProblemKeys: { type: array, items: { type: string } }
+        windowMetrics: { type: object, additionalProperties: { type: number } }
+        clientTimezone: { type: string, maxLength: 64 }
+        localTrainingDate: { type: [string, 'null'], format: date }
+        practiceContext: { $ref: '#/components/schemas/PracticeContext' }
+        vocabularyResults:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/VocabularyTargetResult' }
+    WeakPatterns:
+      type: object
+      required: [subject, patterns, evidenceSessions]
+      properties:
+        subject: { type: string }
+        patterns: { type: object, additionalProperties: { type: integer, minimum: 1 } }
+        evidenceSessions: { type: integer, minimum: 0 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../api/chatApi";
-import { mergeMessages, messageStatus } from "./GlobalToolsRail";
+import { availableGlobalToolIds, dicePips, mergeMessages, messageStatus } from "./GlobalToolsRail";
 
 describe("chat message state", () => {
   it("replaces an optimistic message with the persisted response and keeps chronological order", () => {
@@ -34,6 +34,26 @@ describe("chat message state", () => {
       deliveredAt: "2026-07-19T10:00:01Z",
       readAt: "2026-07-19T10:00:02Z",
     }))).toBe("read");
+  });
+});
+
+describe("dice pips", () => {
+  it("uses standard D6 layouts and no pips before the first roll", () => {
+    expect(dicePips(null)).toHaveLength(0);
+    expect(dicePips(1)).toEqual([[12, 12]]);
+    expect(dicePips(2)).toEqual([[7, 7], [17, 17]]);
+    expect(dicePips(3)).toEqual([[7, 7], [12, 12], [17, 17]]);
+    expect(dicePips(4)).toHaveLength(4);
+    expect(dicePips(5)).toHaveLength(5);
+    expect(dicePips(6)).toEqual([
+      [7, 7], [7, 12], [7, 17],
+      [17, 7], [17, 12], [17, 17],
+    ]);
+  });
+
+  it("places the dice after chat only when a live classroom tool is available", () => {
+    expect(availableGlobalToolIds(false)).toEqual(["chat"]);
+    expect(availableGlobalToolIds(true)).toEqual(["chat", "dice"]);
   });
 });
 

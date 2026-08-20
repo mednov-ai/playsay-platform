@@ -1,4 +1,4 @@
-import { BookOpen, Check, ChevronRight, CircleHelp, Home, Pause, Play, Square, Users, X } from "lucide-react";
+import { BookOpen, Check, ChevronRight, CircleHelp, Home, Pause, Play, Square, Users, Wifi, WifiOff, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -56,6 +56,8 @@ export function LessonActivityRail({
   const [tab, setTab] = useState<"MATERIALS" | "PERSONAL">("PERSONAL");
   const [saving, setSaving] = useState(false);
   const [continuedHome, setContinuedHome] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
   const selectedSession = practice?.sessions.find((session) => session.ownerSubject === selectedStudentSubject)
     ?? practice?.sessions[0]
     ?? null;
@@ -65,6 +67,9 @@ export function LessonActivityRail({
     setSaving(true);
     try {
       onPracticeChange(await updateVocabularyPracticeStatus(practice.id, status));
+      setDeliveryError(null);
+    } catch (caught) {
+      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
     } finally {
       setSaving(false);
     }
@@ -98,6 +103,36 @@ export function LessonActivityRail({
         wordLimit: 30,
       });
       setContinuedHome(true);
+      setDeliveryError(null);
+    } catch (caught) {
+      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function closePractice(continueAtHome: boolean) {
+    if (!practice) return;
+    setSaving(true);
+    setDeliveryError(null);
+    try {
+      const completed = await updateVocabularyPracticeStatus(practice.id, "COMPLETED");
+      onPracticeChange(completed);
+      setClosing(false);
+      if (!continueAtHome) return;
+      const remaining = completed.sessions.filter((session) => session.completedItems < session.totalItems);
+      if (!remaining.length) return;
+      await createVocabularyHomeworkAssignment({
+        completionPolicy: "MEANINGFUL_ACTIVITY",
+        mode: completed.mode,
+        sourcePracticeId: completed.id,
+        studentSubjects: remaining.map((session) => session.ownerSubject),
+        title: t("vocabulary.live.homeworkTitle"),
+        wordLimit: 30,
+      });
+      setContinuedHome(true);
+    } catch (caught) {
+      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
     } finally {
       setSaving(false);
     }
@@ -120,8 +155,18 @@ export function LessonActivityRail({
               ) : (
                 <Button className="min-h-9 px-3 py-1.5 text-sm" disabled={saving || practice.status === "COMPLETED"} onClick={() => void changeStatus("PAUSED")} type="button" variant="outline"><Pause className="h-4 w-4" />{t("vocabulary.live.pause")}</Button>
               )}
-              <Button className="min-h-9 px-3 py-1.5 text-sm" disabled={saving || practice.status === "COMPLETED"} onClick={() => void changeStatus("COMPLETED")} type="button" variant="outline"><Square className="h-4 w-4" />{t("vocabulary.live.stop")}</Button>
+              <Button className="min-h-9 px-3 py-1.5 text-sm" disabled={saving || practice.status === "COMPLETED"} onClick={() => setClosing(true)} type="button" variant="outline"><Square className="h-4 w-4" />{t("vocabulary.live.stop")}</Button>
             </div>
+            {closing ? (
+              <div className="grid gap-2 rounded-2xl border border-primary/20 bg-[#fff8f3] p-3">
+                <strong className="text-sm">{t("vocabulary.live.closeTitle")}</strong>
+                <p className="text-xs font-bold text-muted-foreground">{t("vocabulary.live.closeDescription")}</p>
+                <Button disabled={saving} onClick={() => void closePractice(true)} type="button"><Home className="h-4 w-4" />{t("vocabulary.live.stopAndContinueHome")}</Button>
+                <Button disabled={saving} onClick={() => void closePractice(false)} type="button" variant="outline"><Square className="h-4 w-4" />{t("vocabulary.live.stopOnly")}</Button>
+                <Button disabled={saving} onClick={() => setClosing(false)} type="button" variant="outline">{t("common.actions.cancel")}</Button>
+              </div>
+            ) : null}
+            {deliveryError ? <p aria-live="assertive" className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs font-bold text-destructive">{t("vocabulary.live.deliveryRecoverable")} {deliveryError}</p> : null}
             {practice.sessions.map((session) => (
               <button
                 className="rounded-2xl border border-border bg-white p-3 text-left"
@@ -140,6 +185,12 @@ export function LessonActivityRail({
                     completed: session.completedItems,
                     total: session.totalItems,
                   })}
+                </span>
+                <span className="mt-2 grid grid-cols-2 gap-1 text-[11px] font-bold text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">{isRecentlyConnected(session.updatedAt) ? <Wifi className="h-3 w-3 text-[#197a45]" /> : <WifiOff className="h-3 w-3" />}{t(`vocabulary.live.connection.${isRecentlyConnected(session.updatedAt) ? "ONLINE" : "STALE"}`)}</span>
+                  <span>{t("vocabulary.live.position", { current: Math.min(session.completedItems + 1, session.totalItems), total: session.totalItems })}</span>
+                  <span>{t("vocabulary.live.activity", { count: session.attemptCount })}</span>
+                  <span>{t("vocabulary.live.hints", { count: session.teacherHint ? 1 : 0 })}</span>
                 </span>
                 {session.helpRequested ? <span className="mt-2 inline-flex items-center gap-1 text-xs font-black text-primary"><CircleHelp className="h-3.5 w-3.5" />{t("vocabulary.live.helpRequested")}</span> : null}
                 <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-muted">
@@ -217,4 +268,8 @@ export function LessonActivityRail({
       </aside>
     </>
   );
+}
+
+function isRecentlyConnected(updatedAt: string): boolean {
+  return Date.now() - new Date(updatedAt).getTime() < 90_000;
 }

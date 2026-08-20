@@ -25,14 +25,12 @@ do
   require_env "$name"
 done
 
-if ! printf '%s\n' "$CI_BRANCH" | grep -Eq '^release/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$'; then
-  echo "New release candidate branches must match release/NN.NNN.NN: $CI_BRANCH" >&2
-  exit 1
-fi
-if ! printf '%s\n' "$BASE_RELEASE_BRANCH" | grep -Eq '^release/[0-9]+\.[0-9]+\.[0-9]+$'; then
-  echo "Invalid historical production baseline: $BASE_RELEASE_BRANCH" >&2
-  exit 1
-fi
+for branch in "$CI_BRANCH" "$BASE_RELEASE_BRANCH"; do
+  if ! printf '%s\n' "$branch" | grep -Eq '^release/[0-9]+\.[0-9]+\.[0-9]+$'; then
+    echo "Release candidate branches must match release/<number>.<number>.<number>: $branch" >&2
+    exit 1
+  fi
+done
 for commit in "$GIT_COMMIT" "$BASE_PLATFORM_COMMIT" "$ACCEPTED_DEV_COMMIT"; do
   if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
     echo "Release candidate commits must be full Git SHAs: $commit" >&2
@@ -40,7 +38,7 @@ for commit in "$GIT_COMMIT" "$BASE_PLATFORM_COMMIT" "$ACCEPTED_DEV_COMMIT"; do
   fi
 done
 
-TARGET_ORDER="api-gateway ai-tutor-service vocabulary-service web-app game-adapter-service collaboration-service media-service payment-service registration-service email-service keyboard-service keyboard-app"
+TARGET_ORDER="api-gateway ai-tutor-service vocabulary-service web-app collaboration-service media-service payment-service registration-service email-service keyboard-service keyboard-app"
 VALIDATION_ORDER="ci-contracts smoke-syntax"
 
 normalize_list() {

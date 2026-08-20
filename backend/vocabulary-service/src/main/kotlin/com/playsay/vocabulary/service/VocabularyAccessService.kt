@@ -39,6 +39,10 @@ class VocabularyAccessService(
     }
 
     @Transactional(readOnly = true)
+    fun canAccessOwner(actorSubject: String, ownerSubject: String): Boolean =
+        actorSubject == ownerSubject || users.canManageVocabulary(actorSubject, ownerSubject)
+
+    @Transactional(readOnly = true)
     fun requireLessonOwnerAccess(actorSubject: String, ownerSubject: String, lessonId: UUID): String {
         if (actorSubject == ownerSubject) throw ResponseStatusException(HttpStatus.FORBIDDEN)
         val actor = users.findByKeycloakSubject(actorSubject)

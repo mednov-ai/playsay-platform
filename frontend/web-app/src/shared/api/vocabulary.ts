@@ -1,5 +1,6 @@
 import { authConfig, getValidAccessToken } from "./auth";
-import { apiJson } from "./http";
+import { apiJson, authorizedOptions } from "./http";
+import { apiErrorFromResponse, apiFetch } from "./errors";
 import type {
   AttemptRequest as GeneratedAttemptRequest,
   AttemptResponse as GeneratedAttemptResponse,
@@ -28,6 +29,13 @@ import type {
   VocabularyDashboard as GeneratedVocabularyDashboard,
   VocabularyEntry as GeneratedVocabularyEntry,
   VocabularyOverview as GeneratedVocabularyOverview,
+  SelectionCriteria as GeneratedSelectionCriteria,
+  SelectionRecipe as GeneratedSelectionRecipe,
+  SelectionRecipeRequest as GeneratedSelectionRecipeRequest,
+  MediaView as GeneratedMediaView,
+  MediaAsset as GeneratedMediaAsset,
+  MediaOverride as GeneratedMediaOverride,
+  MediaReview as GeneratedMediaReview,
 } from "../../generated/vocabulary-api";
 
 export type VocabularySourceType = GeneratedSourceType;
@@ -58,6 +66,13 @@ export type VocabularyPracticeSettings = GeneratedPracticeSettings;
 export type VocabularyPracticePreview = GeneratedPracticePreview;
 export type VocabularyAttemptInput = GeneratedAttemptRequest;
 export type VocabularyAttemptResult = GeneratedAttemptResponse;
+export type VocabularySelectionCriteria = GeneratedSelectionCriteria;
+export type VocabularySelectionRecipe = GeneratedSelectionRecipe;
+export type VocabularySelectionRecipeInput = GeneratedSelectionRecipeRequest;
+export type VocabularyMediaView = GeneratedMediaView;
+export type VocabularyMediaAsset = GeneratedMediaAsset;
+export type VocabularyMediaOverride = GeneratedMediaOverride;
+export type VocabularyMediaReview = GeneratedMediaReview;
 
 export type VocabularyOverview = GeneratedVocabularyOverview;
 
@@ -108,9 +123,40 @@ export function archiveVocabularyEntry(id: string): Promise<void> {
 
 export function updateVocabularyEntry(
   id: string,
-  input: Partial<Pick<VocabularyEntry, "translation" | "partOfSpeech" | "example" | "exampleTranslation" | "translationState" | "status" | "practicePaused">>,
+  input: Partial<Pick<VocabularyEntry, "translation" | "partOfSpeech" | "example" | "exampleTranslation" | "translationState" | "status" | "practicePaused" | "favorite">>,
 ): Promise<VocabularyEntry> {
   return apiJson(`/api/vocabulary/entries/${id}`, { method: "PATCH", body: JSON.stringify(input) }, authConfig);
+}
+
+export function fetchVocabularyEntryMedia(entryId: string, signal?: AbortSignal): Promise<VocabularyMediaView> {
+  return apiJson(`/api/vocabulary/entries/${entryId}/media`, { method: "GET", signal }, authConfig);
+}
+
+export function regenerateVocabularyEntryMedia(entryId: string): Promise<VocabularyMediaView> {
+  return apiJson(`/api/vocabulary/entries/${entryId}/media/regenerate`, { method: "POST" }, authConfig, 202);
+}
+
+export function updateVocabularyEntryMediaOverride(entryId: string, input: VocabularyMediaOverride): Promise<VocabularyMediaView> {
+  return apiJson(`/api/vocabulary/entries/${entryId}/media/override`, { method: "PUT", body: JSON.stringify(input) }, authConfig);
+}
+
+export function reportVocabularyEntryMedia(entryId: string, assetId: string): Promise<VocabularyMediaView> {
+  return apiJson(`/api/vocabulary/entries/${entryId}/media/assets/${assetId}/report`, { method: "POST", body: JSON.stringify({ reasonCode: "WRONG_SENSE" }) }, authConfig);
+}
+
+export function fetchVocabularyMediaCandidates(signal?: AbortSignal): Promise<VocabularyMediaAsset[]> {
+  return apiJson("/api/vocabulary/media/candidates", { method: "GET", signal }, authConfig);
+}
+
+export function reviewVocabularyMediaCandidate(assetId: string, input: VocabularyMediaReview): Promise<VocabularyMediaAsset> {
+  return apiJson(`/api/vocabulary/media/candidates/${assetId}`, { method: "PATCH", body: JSON.stringify(input) }, authConfig);
+}
+
+export async function fetchVocabularyMediaBlob(contentUrl: string, signal?: AbortSignal): Promise<Blob> {
+  const authorized = await authorizedOptions(authConfig);
+  const response = await apiFetch(contentUrl, { method: "GET", signal, headers: authorized.headers });
+  if (!response.ok) throw await apiErrorFromResponse(response, "");
+  return response.blob();
 }
 
 export function fetchVocabularyLearners(query = "", signal?: AbortSignal): Promise<VocabularyLearnerSummary[]> {
@@ -129,6 +175,26 @@ export function fetchVocabularyDashboard(ownerSubject?: string, query = "", less
 
 export function previewVocabularyPractice(input: VocabularyPracticeSettings, signal?: AbortSignal): Promise<VocabularyPracticePreview> {
   return apiJson("/api/vocabulary/practices/preview", { method: "POST", body: JSON.stringify(input), signal }, authConfig);
+}
+
+export function previewRecommendedVocabularyPractice(input: VocabularyPracticeSettings, signal?: AbortSignal): Promise<VocabularyPracticePreview> {
+  return apiJson("/api/vocabulary/practices/recommended-preview", { method: "POST", body: JSON.stringify(input), signal }, authConfig);
+}
+
+export function fetchVocabularySelectionRecipes(signal?: AbortSignal): Promise<VocabularySelectionRecipe[]> {
+  return apiJson("/api/vocabulary/selection-recipes", { method: "GET", signal }, authConfig);
+}
+
+export function createVocabularySelectionRecipe(input: VocabularySelectionRecipeInput): Promise<VocabularySelectionRecipe> {
+  return apiJson("/api/vocabulary/selection-recipes", { method: "POST", body: JSON.stringify(input) }, authConfig, 201);
+}
+
+export function updateVocabularySelectionRecipe(id: string, input: VocabularySelectionRecipeInput): Promise<VocabularySelectionRecipe> {
+  return apiJson(`/api/vocabulary/selection-recipes/${id}`, { method: "PUT", body: JSON.stringify(input) }, authConfig);
+}
+
+export function deleteVocabularySelectionRecipe(id: string): Promise<void> {
+  return apiJson(`/api/vocabulary/selection-recipes/${id}`, { method: "DELETE" }, authConfig, 204);
 }
 
 export function createVocabularyPractice(input: VocabularyPracticeSettings): Promise<VocabularyPractice> {

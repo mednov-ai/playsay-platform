@@ -21,6 +21,7 @@ class VocabularyPracticeFactory(
     private val sessions: VocabularyPracticeSessionRepo,
     private val items: VocabularyPracticeItemRepo,
     private val objectMapper: ObjectMapper,
+    private val media: VocabularyMediaService,
 ) {
     fun create(
         actorSubject: String,
@@ -40,9 +41,11 @@ class VocabularyPracticeFactory(
         resolvedPlan: ResolvedVocabularyPracticePlan,
         lessonId: UUID?,
         now: Instant,
-    ) = practices.save(
+    ): VocabularyPracticeEntity {
+        val practiceId = UUID.randomUUID()
+        return practices.save(
         VocabularyPracticeEntity(
-            id = UUID.randomUUID(),
+            id = practiceId,
             createdBySubject = actorSubject,
             delivery = request.delivery,
             status = if (request.delivery in immediatePracticeDeliveries) PracticeStatus.ACTIVE else PracticeStatus.PUBLISHED,
@@ -59,11 +62,19 @@ class VocabularyPracticeFactory(
                     planRevision = resolvedPlan.entity.revision,
                 ),
             ),
+            completionPolicy = request.completionPolicy,
+            completionPolicyVersion = request.completionThresholds.policyVersion,
+            completionThresholdsJson = objectMapper.writeValueAsString(request.completionThresholds),
+            keyMode = request.keyMode,
+            keyNgramSettingsJson = objectMapper.writeValueAsString(request.keyNgramSettings),
+            keyMaterializerVersion = KEY_MATERIALIZER_VERSION,
+            keyMaterializerSeed = practiceId.mostSignificantBits xor practiceId.leastSignificantBits,
             startedAt = if (request.delivery in immediatePracticeDeliveries) now else null,
             createdAt = now,
             updatedAt = now,
         ),
     )
+    }
 
     private fun saveSession(
         practice: VocabularyPracticeEntity,
@@ -81,7 +92,7 @@ class VocabularyPracticeFactory(
                 updatedAt = now,
             ),
         )
-        items.saveAll(
+        val savedItems = items.saveAll(
             ownerPlan.items.mapIndexed { position, planned ->
                 VocabularyPracticeItemEntity(
                     id = UUID.randomUUID(),
@@ -97,13 +108,17 @@ class VocabularyPracticeFactory(
                     acceptedAnswersJson = objectMapper.writeValueAsString(planned.acceptedAnswers),
                     contentJson = objectMapper.writeValueAsString(planned.content),
                     affectsSchedule = planned.affectsSchedule,
+                    lexicalContentRevisionId = planned.lexicalContentRevisionId,
                     snapshotJson = objectMapper.writeValueAsString(planned.snapshot),
                     createdAt = now,
                     updatedAt = now,
                 )
             },
         )
+        savedItems.forEach { item -> item.entryId?.let { media.pinApprovedAsset(it, item.id) } }
     }
 }
+
+private const val KEY_MATERIALIZER_VERSION = "vocabulary-key-v1"
 
 private val immediatePracticeDeliveries = setOf(PracticeDelivery.SELF, PracticeDelivery.LIVE)

@@ -73,7 +73,11 @@ class VocabularyMediaServiceTest @Autowired constructor(
                         if (actor != owner) throw ResponseStatusException(HttpStatus.FORBIDDEN)
                         owner
                     }
-                    "canAccessOwner" -> invocation.arguments[0] == invocation.arguments[1]
+                    "canAccessOwner" -> {
+                        val actor = invocation.arguments[0] as String
+                        val owner = invocation.arguments[1] as String
+                        actor == owner || (actor == "teacher" && owner == "managed-owner")
+                    }
                     else -> Mockito.RETURNS_DEFAULTS.answer(invocation)
                 }
             }
@@ -176,6 +180,16 @@ class VocabularyMediaServiceTest @Autowired constructor(
         assertEquals("no-store", candidateResponse.headers.cacheControl)
     }
 
+    @Test
+    fun `teacher candidate queue resolves learner scope key to the managed owner subject`() {
+        val seeded = seed("capybara", "large rodent", "капибара", "private", "managed-owner")
+        media.view("managed-owner", seeded.entry.id)
+        media.processPending()
+
+        assertEquals(1, media.candidates("teacher", true).size)
+        assertTrue(media.candidates("other-teacher", true).isEmpty())
+    }
+
     private fun seed(
         lemma: String,
         meaning: String,
@@ -186,7 +200,7 @@ class VocabularyMediaServiceTest @Autowired constructor(
     ): Seeded {
         val sense = senses.save(VocabularyLexicalSenseEntity(
             catalogScope = LexicalCatalogScope.LEARNER,
-            scopeKey = owner,
+            scopeKey = "learner:$owner",
             normalizedLemma = lemma,
             normalizedMeaning = meaning,
             imageability = imageability,

@@ -371,11 +371,17 @@ class VocabularyMediaService(
 
     private fun requireReviewer(reviewer: Boolean) { if (!reviewer) throw ResponseStatusException(HttpStatus.FORBIDDEN) }
 
-    private fun canReviewScope(actorSubject: String, asset: VocabularyMediaAssetEntity): Boolean =
-        asset.catalogScope != com.playsay.vocabulary.dto.LexicalCatalogScope.LEARNER ||
-            access.canAccessOwner(actorSubject, asset.scopeKey)
+    private fun canReviewScope(actorSubject: String, asset: VocabularyMediaAssetEntity): Boolean {
+        if (asset.catalogScope != com.playsay.vocabulary.dto.LexicalCatalogScope.LEARNER) return true
+        val ownerSubject = asset.scopeKey.takeIf { it.startsWith(LEARNER_SCOPE_PREFIX) }
+            ?.removePrefix(LEARNER_SCOPE_PREFIX)
+            ?.takeIf(String::isNotBlank)
+            ?: return false
+        return access.canAccessOwner(actorSubject, ownerSubject)
+    }
 
     private companion object {
+        const val LEARNER_SCOPE_PREFIX = "learner:"
         val logger = LoggerFactory.getLogger(VocabularyMediaService::class.java)
         val stringMapType = object : TypeReference<Map<String, String>>() {}
     }

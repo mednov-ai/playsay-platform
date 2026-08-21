@@ -277,7 +277,7 @@ function StudentVocabularyPanel() {
   }
 
   return (
-    <section className="rounded-3xl border border-border bg-white/90 p-4 shadow-sm sm:p-6">
+    <section className="min-w-0 rounded-3xl border border-border bg-white/90 p-4 shadow-sm sm:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-black"><BookOpen className="h-6 w-6 text-primary" />{t("vocabulary.title")}</h1>
@@ -363,7 +363,7 @@ function VocabularyWordGrid({
           const nextSkill = skills.filter((skill) => skill.available !== false)
             .slice().sort((first, second) => Date.parse(first.dueAt) - Date.parse(second.dueAt))[0];
           return (
-        <article className="rounded-2xl border border-border bg-background p-4" key={entry.id}>
+        <article className="min-w-0 rounded-2xl border border-border bg-background p-4" key={entry.id}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="truncate text-lg font-extrabold">{entry.sourceText}</h2>

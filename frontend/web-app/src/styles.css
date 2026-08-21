@@ -20,7 +20,7 @@
 .vocabulary-media-card__viewport img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .vocabulary-media-card__placeholder {

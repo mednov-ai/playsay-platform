@@ -83,12 +83,17 @@ async function assertPageState(page, locale, label) {
   const state = await page.evaluate(() => ({
     horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     language: document.documentElement.lang,
+    mediaCardBounds: document.querySelector(".vocabulary-media-card")?.getBoundingClientRect().toJSON() ?? null,
     reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     text: document.body.innerText,
+    viewportWidth: document.documentElement.clientWidth,
   }));
   if (state.language !== locale) throw new Error(`${label}: expected lang=${locale}, got ${state.language}`);
   if (!state.reducedMotion) throw new Error(`${label}: reduced-motion preference was not applied`);
   if (state.horizontalOverflow > 1) throw new Error(`${label}: horizontal overflow is ${state.horizontalOverflow}px`);
+  if (state.mediaCardBounds && (state.mediaCardBounds.left < -1 || state.mediaCardBounds.right > state.viewportWidth + 1)) {
+    throw new Error(`${label}: media card is clipped outside the viewport (${JSON.stringify(state.mediaCardBounds)})`);
+  }
   if (/vocabulary\.(?:selfComposer|practice|studentFilters|occurrences|media)/.test(state.text)) {
     throw new Error(`${label}: an untranslated vocabulary key is visible`);
   }

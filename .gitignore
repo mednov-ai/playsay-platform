@@ -9,6 +9,11 @@ frontend/browser-extension/playsay-browser-extension.zip
 .env.*
 !.env.example
 contracts/generated/
+graphify-out/
+**/graphify-out/
+tmp/
+__pycache__/
+*.py[cod]
 
 # macOS
 .DS_Store

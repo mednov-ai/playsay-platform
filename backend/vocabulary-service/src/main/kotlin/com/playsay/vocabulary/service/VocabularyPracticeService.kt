@@ -133,10 +133,10 @@ class VocabularyPracticeService(
 
     @Transactional
     fun createLive(actorSubject: String, request: VocabularyPracticeSettingsRequest): VocabularyPracticeResponse {
-        if (request.delivery != PracticeDelivery.LIVE) {
+        if (request.planId == null && request.delivery != PracticeDelivery.LIVE) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Only LIVE practice may be created through this endpoint.")
         }
-        return create(actorSubject, request)
+        return creationService.create(actorSubject, request, PracticeDelivery.LIVE)
     }
 
     @Transactional

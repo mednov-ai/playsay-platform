@@ -200,6 +200,61 @@ h3,
   opacity: 0.62;
 }
 
+.vocabulary-search-field {
+  position: relative;
+}
+
+.vocabulary-search-field__input {
+  padding-inline-start: 2.75rem;
+  padding-inline-end: 1rem;
+}
+
+.vocabulary-search-field__input--clearable {
+  padding-inline-end: 2.75rem;
+}
+
+.vocabulary-search-field__input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.vocabulary-search-field__leading,
+.vocabulary-search-field__clear {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 1rem;
+  height: 1rem;
+  transform: translateY(-50%);
+}
+
+.vocabulary-search-field__leading {
+  inset-inline-start: 0.95rem;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.vocabulary-search-field__clear {
+  inset-inline-end: 0.65rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+
+.vocabulary-search-field__clear:hover,
+.vocabulary-search-field__clear:focus-visible {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 1px;
+}
+
 .playsay-file-input {
   width: 100%;
   border: 1px dashed rgb(255 92 0 / 0.34);

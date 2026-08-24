@@ -104,6 +104,7 @@ interface Props {
 
 const layouts: LayoutId[] = ["EN", "RU"];
 export const liveMasteryBootstrapChordThreshold = 3;
+export type VocabularyLaunchState = "idle" | "loading" | "active" | "error";
 
 type ClosingOverlay = {
   id: number;
@@ -341,7 +342,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const returnTarget = validatedReturnTarget() ?? publicSiteUrl;
   const [anonymousDeviceId, setAnonymousDeviceId] = useState(() => getOrCreateAnonymousDeviceId());
   const ownerKey = practiceOwnerKey({ subject: me?.subject, anonymousDeviceId });
-  const [layoutId, setLayoutId] = useState<LayoutId>(() => readPracticeState(ownerKey)?.layoutId ?? "EN");
+  const [layoutId, setLayoutId] = useState<LayoutId>(() => (
+    vocabularySessionId ? "EN" : readPracticeState(ownerKey)?.layoutId ?? "EN"
+  ));
   const [advancedPracticeEnabled, setAdvancedPracticeEnabled] = useState(false);
   const [showAdvancedSettingsModal, setShowAdvancedSettingsModal] = useState(false);
   const [numberRowEnabled, setNumberRowEnabled] = useState(false);
@@ -351,6 +354,9 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [sets, setSets] = useState<ChordSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(authError ?? null);
+  const [vocabularyLaunchState, setVocabularyLaunchState] = useState<VocabularyLaunchState>(
+    vocabularySessionId ? "loading" : "idle",
+  );
   const [progress, setProgress] = useState<Progress | null>(null);
   const [progressImportMessage, setProgressImportMessage] = useState<string | null>(null);
   const [guestSessionCount, setGuestSessionCount] = useState(() => readGuestSessionCount());
@@ -492,11 +498,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [stream, themeMode]);
 
   useEffect(() => {
+    if (vocabularySessionId) return;
     const persisted = readPracticeState(ownerKey);
     if (persisted?.layoutId && persisted.layoutId !== layoutId && sessionFlow.phase === "idle") {
       setLayoutId(persisted.layoutId);
     }
-  }, [layoutId, ownerKey, sessionFlow.phase]);
+  }, [layoutId, ownerKey, sessionFlow.phase, vocabularySessionId]);
 
   const advancedMode = advancedPracticeEnabled && layoutId === "EN";
   const codePracticeSet = useMemo(
@@ -508,6 +515,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
+    setVocabularyLaunchState(vocabularySessionId ? "loading" : "idle");
     setNextDecision(null);
     setSaved(false);
     setGuestRecorded(false);
@@ -535,8 +543,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       void vocabularyRequest.then((response) => {
         const entries = response.entries;
         const sessionResponse = isVocabularySessionPractice(response) ? response : null;
-        const sessionItems = sessionResponse?.items ?? [];
-        if (cancelled || (sessionItems.length === 0 && entries.length === 0)) return;
+        if (cancelled) return;
+        if (sessionResponse && !isUsableVocabularySessionPractice(sessionResponse)) {
+          throw new Error("Vocabulary session has no usable targets");
+        }
+        if (!sessionResponse && entries.length === 0) return;
         const vocabularyTitle = sessionResponse?.title ?? t("trainer.vocabularySet");
         const sourceChordSetId = loadedSets.find((item) => item.id > 0)?.id;
         const vocabularySet: ChordSet = sessionResponse
@@ -560,14 +571,19 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
         setSets((current) => [...current.filter((item) => item.practiceKind !== "VOCABULARY"), vocabularySet]);
         if (vocabularySessionId) {
           loadSet("EN", vocabularySet, visibleCapacityRef.current);
+          markPracticeIntroDismissed(ownerKey);
+          dispatchTrainerIntro({ type: "startReveal" });
+          setVocabularyLaunchState("active");
         }
-      }).catch((error: unknown) => {
+      }).catch(() => {
         if (!cancelled && vocabularySessionId) {
-          setLoadError(error instanceof Error ? error.message : String(error));
+          setVocabularyLaunchState("error");
+          setLoadError(t("trainer.vocabularyLaunchUnavailable"));
+          dispatchTrainerIntro({ type: "startReveal" });
         }
       });
     }
-    if (restoredSet || loadedSets.length > 0) {
+    if (!vocabularySessionId && (restoredSet || loadedSets.length > 0)) {
       const startSet = restoredSet ?? loadedSets[0];
       loadSet(
         startSet.layout,
@@ -1715,7 +1731,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             </div>
           ) : (
             <>
-          {loadError ? <div className="alert">{`${t("trainer.loadError")}: ${loadError}`}</div> : null}
+          {loadError ? vocabularyLaunchState === "error" ? (
+            <div className="alert vocabulary-launch-error" role="alert">
+              <span>{loadError}</span>
+              <a href={returnTarget}>{t("app.returnToSite")}</a>
+            </div>
+          ) : <div className="alert">{`${t("trainer.loadError")}: ${loadError}`}</div> : null}
 
           {vocabularyContext ? (
             <section className="vocabulary-context" aria-label={t("trainer.vocabularyContextAria")}>
@@ -2259,6 +2280,10 @@ function isVocabularySessionPractice(
   response: VocabularyPracticeResponse | VocabularySessionPracticeResponse,
 ): response is VocabularySessionPracticeResponse {
   return "sessionId" in response && Array.isArray(response.items);
+}
+
+export function isUsableVocabularySessionPractice(response: VocabularySessionPracticeResponse): boolean {
+  return (response.targets?.length ?? 0) > 0 || response.items.length > 0 || response.entries.length > 0;
 }
 
 export function validatedReturnTarget(search = window.location.search): string | null {

@@ -669,6 +669,9 @@ export interface SelectionCriteria {
   preferredSkills?: Skill[];
 }
 
+/**
+ * Preview settings or a publication reference. For publication with planId and planRevision, the frozen plan owns all practice settings; send a reference-only body unless lessonId or assignmentId is required as transport context.
+ */
 export interface PracticeSettings {
   /**
      * @maxItems 100
@@ -692,9 +695,15 @@ export interface PracticeSettings {
   excludedEntryIds?: string[];
   /** @maxItems 100 */
   ownerOverrides?: PracticeSettingsOwnerOverridesItem[];
-  /** @nullable */
+  /**
+     * Immutable preview plan to publish without regeneration
+     * @nullable
+     */
   planId?: string | null;
-  /** @nullable */
+  /**
+     * Exact frozen revision; stale revisions are rejected
+     * @nullable
+     */
   planRevision?: number | null;
   selection?: SelectionCriteria | null;
   /** @nullable */
@@ -2325,12 +2334,19 @@ export type postApiVocabularyPracticesResponse201 = {
   status: 201
 }
 
+export type postApiVocabularyPracticesResponse409 = {
+  data: void
+  status: 409
+}
+
 export type postApiVocabularyPracticesResponseSuccess = (postApiVocabularyPracticesResponse201) & {
   headers: Headers;
 };
-;
+export type postApiVocabularyPracticesResponseError = (postApiVocabularyPracticesResponse409) & {
+  headers: Headers;
+};
 
-export type postApiVocabularyPracticesResponse = (postApiVocabularyPracticesResponseSuccess)
+export type postApiVocabularyPracticesResponse = (postApiVocabularyPracticesResponseSuccess | postApiVocabularyPracticesResponseError)
 
 export const getPostApiVocabularyPracticesUrl = () => {
 
@@ -2340,6 +2356,10 @@ export const getPostApiVocabularyPracticesUrl = () => {
   return `/api/vocabulary/practices`
 }
 
+/**
+ * When planId and planRevision are supplied, the stored plan is authoritative for selection, delivery, completion, Key mode, and n-gram settings. Clients SHOULD send only the plan reference plus required lesson/assignment context. Repeated non-default settings must equal the frozen values or the server returns 409 without publishing.
+ * @summary Publish a frozen live vocabulary plan
+ */
 export const postApiVocabularyPractices = async (practiceSettings: PracticeSettings, options?: RequestInit): Promise<postApiVocabularyPracticesResponse> => {
 
   const res = await fetch(getPostApiVocabularyPracticesUrl(),
@@ -2365,12 +2385,19 @@ export type postApiVocabularyPracticesSelfResponse200 = {
   status: 200
 }
 
+export type postApiVocabularyPracticesSelfResponse409 = {
+  data: void
+  status: 409
+}
+
 export type postApiVocabularyPracticesSelfResponseSuccess = (postApiVocabularyPracticesSelfResponse200) & {
   headers: Headers;
 };
-;
+export type postApiVocabularyPracticesSelfResponseError = (postApiVocabularyPracticesSelfResponse409) & {
+  headers: Headers;
+};
 
-export type postApiVocabularyPracticesSelfResponse = (postApiVocabularyPracticesSelfResponseSuccess)
+export type postApiVocabularyPracticesSelfResponse = (postApiVocabularyPracticesSelfResponseSuccess | postApiVocabularyPracticesSelfResponseError)
 
 export const getPostApiVocabularyPracticesSelfUrl = () => {
 
@@ -2380,6 +2407,10 @@ export const getPostApiVocabularyPracticesSelfUrl = () => {
   return `/api/vocabulary/practices/self`
 }
 
+/**
+ * A planId/planRevision pair publishes the exact previewed configuration; omitted settings are never replaced with transport defaults. A repeated non-default setting that conflicts with the plan is rejected with 409.
+ * @summary Start or reuse a self practice from a frozen plan
+ */
 export const postApiVocabularyPracticesSelf = async (practiceSettings: PracticeSettings, options?: RequestInit): Promise<postApiVocabularyPracticesSelfResponse> => {
 
   const res = await fetch(getPostApiVocabularyPracticesSelfUrl(),

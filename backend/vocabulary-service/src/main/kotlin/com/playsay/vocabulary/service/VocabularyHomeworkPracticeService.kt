@@ -59,6 +59,7 @@ class VocabularyHomeworkPracticeService(
                 keyMode = request.keyMode,
                 keyNgramSettings = request.keyNgramSettings,
             ),
+            PracticeDelivery.HOMEWORK,
         )
         return VocabularyHomeworkPreparationResponse(
             practiceId = practice.id,

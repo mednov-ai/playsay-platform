@@ -1353,6 +1353,19 @@ input {
   font-weight: 700;
 }
 
+.vocabulary-launch-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.vocabulary-launch-error a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
 .vocabulary-context {
   display: grid;
   gap: 0.55rem;

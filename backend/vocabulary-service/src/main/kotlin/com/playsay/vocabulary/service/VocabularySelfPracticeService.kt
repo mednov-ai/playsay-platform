@@ -30,7 +30,9 @@ class VocabularySelfPracticeService(
             actorSubject,
             setOf(SessionStatus.NOT_STARTED, SessionStatus.IN_PROGRESS, SessionStatus.PAUSED),
         )
-        activeSession?.let { session -> reusablePractice(actorSubject, session.id, session.practiceId, request)?.let { return it } }
+        if (request.planId == null) {
+            activeSession?.let { session -> reusablePractice(actorSubject, session.id, session.practiceId, request)?.let { return it } }
+        }
         return creationService.create(
             actorSubject,
             request.copy(
@@ -39,6 +41,7 @@ class VocabularySelfPracticeService(
                 lessonId = null,
                 assignmentId = null,
             ),
+            PracticeDelivery.SELF,
         )
     }
 

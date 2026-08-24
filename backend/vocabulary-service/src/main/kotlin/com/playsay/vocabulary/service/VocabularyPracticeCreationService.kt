@@ -32,21 +32,35 @@ class VocabularyPracticeCreationService(
     private val completion: VocabularyPracticeCompletionService,
     private val eventPublisher: VocabularyPracticeEventPublisher,
 ) {
-    fun create(actorSubject: String, request: VocabularyPracticeSettingsRequest): VocabularyPracticeResponse {
+    fun create(
+        actorSubject: String,
+        request: VocabularyPracticeSettingsRequest,
+        requiredDelivery: PracticeDelivery? = null,
+    ): VocabularyPracticeResponse {
         val resolvedPlan = request.planId?.let {
             planService.requireForPublication(actorSubject, it, request.planRevision)
         } ?: planService.preview(actorSubject, request).let {
             planService.requireForPublication(actorSubject, it.planId, it.revision)
         }
+        val planRequest = resolvedPlan.payload.request
+        if (request.planId != null) requireCompatibleRepeatedSettings(request, planRequest)
         resolvedPlan.entity.publishedPracticeId?.let { publishedPracticeId ->
             val existing = practices.findById(publishedPracticeId).orElseThrow {
                 ResponseStatusException(HttpStatus.CONFLICT, "The published vocabulary practice is unavailable.")
             }
             return queryService.responseForActor(actorSubject, existing, queryService.practiceResponse(existing))
         }
-        val planRequest = resolvedPlan.payload.request
-        val delivery = request.delivery
-        val lessonId = request.lessonId ?: planRequest.lessonId
+        val effectiveRequest = planRequest.copy(
+            planId = resolvedPlan.entity.id,
+            planRevision = resolvedPlan.entity.revision,
+            assignmentId = request.assignmentId ?: planRequest.assignmentId,
+            lessonId = request.lessonId ?: planRequest.lessonId,
+        )
+        val delivery = effectiveRequest.delivery
+        val lessonId = effectiveRequest.lessonId
+        if (requiredDelivery != null && delivery != requiredDelivery) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Vocabulary practice plan delivery does not match the publish endpoint.")
+        }
         if (delivery == PracticeDelivery.LIVE && lessonId == null) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "lessonId is required for live vocabulary practice.")
         }
@@ -61,12 +75,45 @@ class VocabularyPracticeCreationService(
         }
 
         val now = Instant.now()
-        val practice = factory.create(actorSubject, request, resolvedPlan, lessonId, now)
+        val effective = EffectiveVocabularyPracticeConfiguration(effectiveRequest, resolvedPlan, lessonId)
+        val practice = factory.create(actorSubject, effective, now)
         planService.markPublished(resolvedPlan.entity.id, practice.id)
         completion.completeIfNeeded(practice.id, now)
         val refreshedPractice = practices.findById(practice.id).orElseThrow()
         val response = queryService.practiceResponse(refreshedPractice)
         eventPublisher.publish("vocabulary.practice.started", actorSubject, refreshedPractice, response)
         return queryService.responseForActor(actorSubject, refreshedPractice, response)
+    }
+
+    private fun requireCompatibleRepeatedSettings(
+        request: VocabularyPracticeSettingsRequest,
+        frozen: VocabularyPracticeSettingsRequest,
+    ) {
+        val defaults = VocabularyPracticeSettingsRequest()
+        val conflicts = buildList {
+            fun repeated(name: String, supplied: Any?, default: Any?, expected: Any?) {
+                if (supplied != default && supplied != expected) add(name)
+            }
+            repeated("ownerSubjects", request.ownerSubjects, defaults.ownerSubjects, frozen.ownerSubjects)
+            repeated("delivery", request.delivery, defaults.delivery, frozen.delivery)
+            repeated("mode", request.mode, defaults.mode, frozen.mode)
+            repeated("wordLimit", request.wordLimit, defaults.wordLimit, frozen.wordLimit)
+            repeated("pinnedEntryIds", request.pinnedEntryIds, defaults.pinnedEntryIds, frozen.pinnedEntryIds)
+            repeated("excludedEntryIds", request.excludedEntryIds, defaults.excludedEntryIds, frozen.excludedEntryIds)
+            repeated("ownerOverrides", request.ownerOverrides, defaults.ownerOverrides, frozen.ownerOverrides)
+            repeated("selection", request.selection, defaults.selection, frozen.selection)
+            repeated("recipeId", request.recipeId, defaults.recipeId, frozen.recipeId)
+            repeated("materializationKey", request.materializationKey, defaults.materializationKey, frozen.materializationKey)
+            repeated("completionPolicy", request.completionPolicy, defaults.completionPolicy, frozen.completionPolicy)
+            repeated("completionThresholds", request.completionThresholds, defaults.completionThresholds, frozen.completionThresholds)
+            repeated("keyMode", request.keyMode, defaults.keyMode, frozen.keyMode)
+            repeated("keyNgramSettings", request.keyNgramSettings, defaults.keyNgramSettings, frozen.keyNgramSettings)
+        }
+        if (conflicts.isNotEmpty()) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Published settings conflict with the frozen vocabulary plan: ${conflicts.joinToString()}.",
+            )
+        }
     }
 }

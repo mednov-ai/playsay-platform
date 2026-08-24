@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.playsay.vocabulary.dto.PracticeDelivery
 import com.playsay.vocabulary.dto.PracticeStatus
 import com.playsay.vocabulary.dto.SessionStatus
-import com.playsay.vocabulary.dto.VocabularyPracticeSettingsRequest
 import com.playsay.vocabulary.entity.VocabularyPracticeEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeItemEntity
 import com.playsay.vocabulary.entity.VocabularyPracticeSessionEntity
@@ -25,23 +24,21 @@ class VocabularyPracticeFactory(
 ) {
     fun create(
         actorSubject: String,
-        request: VocabularyPracticeSettingsRequest,
-        resolvedPlan: ResolvedVocabularyPracticePlan,
-        lessonId: UUID?,
+        effective: EffectiveVocabularyPracticeConfiguration,
         now: Instant,
     ): VocabularyPracticeEntity {
-        val practice = savePractice(actorSubject, request, resolvedPlan, lessonId, now)
-        resolvedPlan.payload.owners.forEach { ownerPlan -> saveSession(practice, ownerPlan, now) }
+        val practice = savePractice(actorSubject, effective, now)
+        effective.plan.payload.owners.forEach { ownerPlan -> saveSession(practice, ownerPlan, now) }
         return practice
     }
 
     private fun savePractice(
         actorSubject: String,
-        request: VocabularyPracticeSettingsRequest,
-        resolvedPlan: ResolvedVocabularyPracticePlan,
-        lessonId: UUID?,
+        effective: EffectiveVocabularyPracticeConfiguration,
         now: Instant,
     ): VocabularyPracticeEntity {
+        val request = effective.settings
+        val resolvedPlan = effective.plan
         val practiceId = UUID.randomUUID()
         return practices.save(
         VocabularyPracticeEntity(
@@ -49,7 +46,7 @@ class VocabularyPracticeFactory(
             createdBySubject = actorSubject,
             delivery = request.delivery,
             status = if (request.delivery in immediatePracticeDeliveries) PracticeStatus.ACTIVE else PracticeStatus.PUBLISHED,
-            lessonId = lessonId,
+            lessonId = effective.lessonId,
             assignmentId = request.assignmentId,
             mode = resolvedPlan.entity.mode,
             settingsJson = objectMapper.writeValueAsString(

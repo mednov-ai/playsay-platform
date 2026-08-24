@@ -3,6 +3,7 @@ package com.playsay.vocabulary.service
 import com.playsay.vocabulary.dto.LexicalCatalogScope
 import com.playsay.vocabulary.dto.LexicalContentStatus
 import com.playsay.vocabulary.dto.LexicalImageability
+import com.playsay.vocabulary.dto.CreateVocabularyEntryRequest
 import com.playsay.vocabulary.dto.VocabularyMediaAssetState
 import com.playsay.vocabulary.dto.VocabularyMediaOverrideKind
 import com.playsay.vocabulary.dto.VocabularyMediaOverrideRequest
@@ -12,6 +13,7 @@ import com.playsay.vocabulary.dto.VocabularyMediaSafetyState
 import com.playsay.vocabulary.entity.VocabularyEntryEntity
 import com.playsay.vocabulary.entity.VocabularyLexicalContentRevisionEntity
 import com.playsay.vocabulary.entity.VocabularyLexicalSenseEntity
+import com.playsay.vocabulary.entity.VocabularyMediaAssetEntity
 import com.playsay.vocabulary.repo.VocabularyEntryRepo
 import com.playsay.vocabulary.repo.VocabularyLexicalContentRevisionRepo
 import com.playsay.vocabulary.repo.VocabularyLexicalSenseRepo
@@ -52,6 +54,8 @@ import org.mockito.Mockito
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class VocabularyMediaServiceTest @Autowired constructor(
     private val media: VocabularyMediaService,
+    private val vocabulary: VocabularyService,
+    private val promotion: VocabularySharedSensePromotionService,
     private val senses: VocabularyLexicalSenseRepo,
     private val revisions: VocabularyLexicalContentRevisionRepo,
     private val entries: VocabularyEntryRepo,
@@ -188,6 +192,56 @@ class VocabularyMediaServiceTest @Autowired constructor(
 
         assertEquals(1, media.candidates("teacher", true).size)
         assertTrue(media.candidates("other-teacher", true).isEmpty())
+    }
+
+    @Test
+    fun `approved school asset is reused across private learner entries`() {
+        val first = vocabulary.create(
+            "owner-1",
+            CreateVocabularyEntryRequest(sourceText = "capybara", translation = "капибара", partOfSpeech = "noun"),
+        )
+        val second = vocabulary.create(
+            "owner-2",
+            CreateVocabularyEntryRequest(sourceText = "capybara", translation = "капибара", partOfSpeech = "noun"),
+        )
+        val firstEntry = entries.findById(first.id).orElseThrow()
+        val secondEntry = entries.findById(second.id).orElseThrow()
+
+        assertNotEquals(firstEntry.id, secondEntry.id)
+        assertEquals(firstEntry.lexicalSenseId, secondEntry.lexicalSenseId)
+
+        media.view("owner-1", firstEntry.id)
+        media.processPending()
+        val candidate = assets.findAllBySenseIdOrderByCreatedAtDesc(requireNotNull(firstEntry.lexicalSenseId)).single()
+        media.review("owner-1", true, candidate.id, VocabularyMediaReviewRequest(VocabularyMediaReviewAction.APPROVE))
+
+        assertEquals(candidate.id, media.view("owner-2", secondEntry.id).asset?.id)
+        assertEquals(1, generations.count())
+    }
+
+    @Test
+    fun `legacy learner senses promote to one school identity idempotently`() {
+        val first = seed("otter", "выдра", "выдра", "private one", "legacy-1")
+        val second = seed("otter", "выдра", "выдра", "private two", "legacy-2")
+        val approved = assets.save(
+            VocabularyMediaAssetEntity(
+                senseId = first.sense.id,
+                catalogScope = first.sense.catalogScope,
+                scopeKey = first.sense.scopeKey,
+                state = VocabularyMediaAssetState.APPROVED,
+                approvedAt = Instant.now(),
+            ),
+        )
+
+        val result = promotion.promote()
+        val firstEntry = entries.findById(first.entry.id).orElseThrow()
+        val secondEntry = entries.findById(second.entry.id).orElseThrow()
+
+        assertEquals(setOf(first.sense.id, second.sense.id), result.promotedSenseIds.toSet())
+        assertEquals(setOf(first.entry.id, second.entry.id), result.relinkedEntryIds.toSet())
+        assertEquals(firstEntry.lexicalSenseId, secondEntry.lexicalSenseId)
+        assertEquals(LexicalCatalogScope.SCHOOL, assets.findById(approved.id).orElseThrow().catalogScope)
+        assertTrue(promotion.promote().promotedSenseIds.isEmpty())
     }
 
     private fun seed(

@@ -51,6 +51,7 @@ export const de: TranslationResource = {
   trainer: {
     vocabularySet: "Mein Wörterbuch",
     vocabularyContextAria: "Kontext des Wortschatztrainings",
+    vocabularyLaunchUnavailable: "Diese Wortschatzübung konnte nicht geöffnet werden.",
     vocabularyOrigin_SELF: "Persönliches Wortschatztraining",
     vocabularyOrigin_LIVE: "Wortschatztraining im Unterricht",
     vocabularyOrigin_HOMEWORK: "Wortschatz-Hausaufgabe",

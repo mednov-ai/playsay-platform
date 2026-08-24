@@ -49,6 +49,7 @@ export const ru = {
   trainer: {
     vocabularySet: "Мой словарик",
     vocabularyContextAria: "Контекст словарной тренировки",
+    vocabularyLaunchUnavailable: "Не удалось открыть тренировку по словарю.",
     vocabularyOrigin_SELF: "Личная тренировка слов",
     vocabularyOrigin_LIVE: "Тренировка слов на уроке",
     vocabularyOrigin_HOMEWORK: "Домашнее задание по словам",

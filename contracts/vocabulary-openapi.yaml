@@ -251,6 +251,12 @@ paths:
         '204': { description: Recipe deleted without mutating launched plans }
   /api/vocabulary/practices:
     post:
+      summary: Publish a frozen live vocabulary plan
+      description: >-
+        When planId and planRevision are supplied, the stored plan is authoritative for
+        selection, delivery, completion, Key mode, and n-gram settings. Clients SHOULD send
+        only the plan reference plus required lesson/assignment context. Repeated non-default
+        settings must equal the frozen values or the server returns 409 without publishing.
       requestBody:
         required: true
         content:
@@ -262,8 +268,14 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Practice' }
+        '409': { description: 'Stale, foreign, already-invalid, or conflicting frozen plan reference' }
   /api/vocabulary/practices/self:
     post:
+      summary: Start or reuse a self practice from a frozen plan
+      description: >-
+        A planId/planRevision pair publishes the exact previewed configuration; omitted
+        settings are never replaced with transport defaults. A repeated non-default setting
+        that conflicts with the plan is rejected with 409.
       requestBody:
         required: true
         content:
@@ -275,6 +287,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Practice' }
+        '409': { description: 'Stale, foreign, or conflicting frozen plan reference' }
   /api/vocabulary/practices/active:
     get:
       parameters:
@@ -680,6 +693,10 @@ components:
             entries: { type: array, items: { $ref: '#/components/schemas/LearningEntry' } }
     PracticeSettings:
       type: object
+      description: >-
+        Preview settings or a publication reference. For publication with planId and
+        planRevision, the frozen plan owns all practice settings; send a reference-only body
+        unless lessonId or assignmentId is required as transport context.
       properties:
         ownerSubjects: { type: array, maxItems: 100, items: { type: string, maxLength: 255 } }
         delivery: { $ref: '#/components/schemas/Delivery' }
@@ -699,8 +716,8 @@ components:
               ownerSubject: { type: string, maxLength: 255 }
               pinnedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
               excludedEntryIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
-        planId: { type: [string, 'null'], format: uuid }
-        planRevision: { type: [integer, 'null'], format: int64 }
+        planId: { type: [string, 'null'], format: uuid, description: Immutable preview plan to publish without regeneration }
+        planRevision: { type: [integer, 'null'], format: int64, description: Exact frozen revision; stale revisions are rejected }
         selection: { anyOf: [{ $ref: '#/components/schemas/SelectionCriteria' }, { type: 'null' }] }
         recipeId: { type: [string, 'null'], format: uuid }
         materializationKey: { type: [string, 'null'], maxLength: 128 }

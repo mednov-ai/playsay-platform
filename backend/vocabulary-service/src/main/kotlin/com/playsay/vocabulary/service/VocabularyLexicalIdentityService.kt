@@ -1,6 +1,7 @@
 package com.playsay.vocabulary.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.playsay.vocabulary.config.VocabularyCatalogProperties
 import com.playsay.vocabulary.dto.LexicalCatalogScope
 import com.playsay.vocabulary.dto.LexicalContentStatus
 import com.playsay.vocabulary.entity.VocabularyLexicalContentRevisionEntity
@@ -17,11 +18,17 @@ data class ResolvedLexicalContent(
     val content: VocabularyLexicalContentRevisionEntity,
 )
 
+data class VocabularyCatalogIdentity(
+    val scope: LexicalCatalogScope,
+    val scopeKey: String,
+)
+
 @Service
 class VocabularyLexicalIdentityService(
     private val senses: VocabularyLexicalSenseRepo,
     private val revisions: VocabularyLexicalContentRevisionRepo,
     private val objectMapper: ObjectMapper,
+    private val catalog: VocabularyCatalogProperties,
 ) {
     @Transactional
     fun resolveLearnerContent(
@@ -36,10 +43,14 @@ class VocabularyLexicalIdentityService(
         exampleTranslation: String?,
     ): ResolvedLexicalContent? {
         val key = lexicalSenseKey(sourceText, sourceLanguage, targetLanguage, translation, partOfSpeech) ?: return null
-        val scopeKey = "learner:$ownerSubject"
+        val catalogIdentity = vocabularyCatalogIdentity(ownerSubject, catalog.schoolScopeKey)
+        val catalogScope = catalogIdentity.scope
+        val scopeKey = catalogIdentity.scopeKey
+        val reusableExample = example.takeIf { catalogScope == LexicalCatalogScope.LEARNER }
+        val reusableExampleTranslation = exampleTranslation.takeIf { catalogScope == LexicalCatalogScope.LEARNER }
         val now = Instant.now()
         val sense = senses.findByCatalogScopeAndScopeKeyAndSourceLanguageAndTargetLanguageAndNormalizedLemmaAndNormalizedPartOfSpeechAndNormalizedMeaning(
-            LexicalCatalogScope.LEARNER,
+            catalogScope,
             scopeKey,
             key.sourceLanguage,
             key.targetLanguage,
@@ -48,7 +59,7 @@ class VocabularyLexicalIdentityService(
             key.normalizedMeaning,
         ) ?: senses.save(
             VocabularyLexicalSenseEntity(
-                catalogScope = LexicalCatalogScope.LEARNER,
+                catalogScope = catalogScope,
                 scopeKey = scopeKey,
                 sourceLanguage = key.sourceLanguage,
                 targetLanguage = key.targetLanguage,
@@ -60,7 +71,7 @@ class VocabularyLexicalIdentityService(
             ),
         )
         val current = revisions.findTopBySenseIdOrderByRevisionDesc(sense.id)
-        if (current != null && current.matches(sourceText, translation, partOfSpeech, example, exampleTranslation)) {
+        if (current != null && current.matches(sourceText, translation, partOfSpeech, reusableExample, reusableExampleTranslation)) {
             return ResolvedLexicalContent(sense, current)
         }
         current?.status = LexicalContentStatus.SUPERSEDED
@@ -72,14 +83,23 @@ class VocabularyLexicalIdentityService(
                 sourceText = sourceText,
                 translation = translation?.trim()?.takeIf(String::isNotEmpty),
                 partOfSpeech = partOfSpeech?.trim()?.takeIf(String::isNotEmpty),
-                example = example?.trim()?.takeIf(String::isNotEmpty),
-                exampleTranslation = exampleTranslation?.trim()?.takeIf(String::isNotEmpty),
+                example = reusableExample?.trim()?.takeIf(String::isNotEmpty),
+                exampleTranslation = reusableExampleTranslation?.trim()?.takeIf(String::isNotEmpty),
                 acceptedAnswersJson = objectMapper.writeValueAsString(listOfNotNull(translation?.trim()?.takeIf(String::isNotEmpty)).distinct()),
-                createdBySubject = actorSubject,
+                createdBySubject = actorSubject.takeIf { catalogScope == LexicalCatalogScope.LEARNER },
                 createdAt = now,
             ),
         )
         return ResolvedLexicalContent(sense, revision)
+    }
+}
+
+fun vocabularyCatalogIdentity(ownerSubject: String, configuredSchoolScopeKey: String?): VocabularyCatalogIdentity {
+    val schoolScopeKey = configuredSchoolScopeKey?.trim().orEmpty()
+    return if (schoolScopeKey.isNotEmpty()) {
+        VocabularyCatalogIdentity(LexicalCatalogScope.SCHOOL, schoolScopeKey)
+    } else {
+        VocabularyCatalogIdentity(LexicalCatalogScope.LEARNER, "learner:$ownerSubject")
     }
 }
 

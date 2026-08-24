@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validatedReturnTarget, vocabularySessionIdFromLocation } from "./KeyboardTrainerShell";
+import { isUsableVocabularySessionPractice, validatedReturnTarget, vocabularySessionIdFromLocation } from "./KeyboardTrainerShell";
 
 describe("vocabulary launch boundary", () => {
   it("accepts only UUID session launches", () => {
@@ -13,5 +13,31 @@ describe("vocabulary launch boundary", () => {
     expect(validatedReturnTarget(`?returnTo=${encodeURIComponent("https://evil.example/steal")}`)).toBeNull();
     expect(validatedReturnTarget(`?returnTo=${encodeURIComponent("https://user:secret@online.honey.school/")}`)).toBeNull();
     expect(validatedReturnTarget(`?returnTo=${encodeURIComponent("javascript:alert(1)")}`)).toBeNull();
+  });
+
+  it("treats a targets-only successful snapshot as an activatable vocabulary launch", () => {
+    expect(isUsableVocabularySessionPractice({
+      sessionId: "11111111-1111-4111-a111-111111111111",
+      title: "Vocabulary",
+      entries: [],
+      items: [],
+      mode: "MIXED",
+      targets: [{
+        targetId: "22222222-2222-4222-a222-222222222222",
+        position: 0,
+        type: "CHARACTER_NGRAM",
+        text: "ing",
+        sourceEntryIds: [],
+        sourceItemIds: [],
+        offsets: [],
+      }],
+    })).toBe(true);
+    expect(isUsableVocabularySessionPractice({
+      sessionId: "11111111-1111-4111-a111-111111111111",
+      title: "Vocabulary",
+      entries: [],
+      items: [],
+      targets: [],
+    })).toBe(false);
   });
 });

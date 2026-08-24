@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArrowLeft, BookOpen, CalendarClock, Heart, Loader2, Pause, Pencil, Play, Search, UserRound } from "lucide-react";
+import { Archive, ArrowLeft, BookOpen, CalendarClock, Heart, Loader2, Pause, Pencil, Play, Search, UserRound, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -312,9 +312,27 @@ function StudentVocabularyPanel() {
         </div>
       ) : tab === "WORDS" ? (
         <div>
-          <label className="relative mt-5 block">
-            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <input aria-label={t("vocabulary.search")} className="playsay-input pl-9" onChange={(event) => setWordQuery(event.target.value)} placeholder={t("vocabulary.search")} value={wordQuery} />
+          <label className="vocabulary-search-field mt-5 block">
+            <Search aria-hidden className="vocabulary-search-field__leading" />
+            <input
+              aria-label={t("vocabulary.search")}
+              className={`playsay-input vocabulary-search-field__input${wordQuery ? " vocabulary-search-field__input--clearable" : ""}`}
+              data-testid="vocabulary-word-search"
+              onChange={(event) => setWordQuery(event.target.value)}
+              placeholder={t("vocabulary.search")}
+              type="search"
+              value={wordQuery}
+            />
+            {wordQuery ? (
+              <button
+                aria-label={t("vocabulary.actions.clearSearch")}
+                className="vocabulary-search-field__clear"
+                onClick={() => setWordQuery("")}
+                type="button"
+              >
+                <X aria-hidden className="h-4 w-4" />
+              </button>
+            ) : null}
           </label>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {(["ALL", "RECENT", "DUE", "FORGOTTEN", "DIFFICULT", "NEW", "FAVORITE"] as StudentEntryFilter[]).map((value) => (

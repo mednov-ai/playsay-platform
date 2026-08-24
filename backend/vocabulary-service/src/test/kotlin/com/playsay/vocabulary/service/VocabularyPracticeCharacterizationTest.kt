@@ -198,7 +198,7 @@ class VocabularyPracticeCharacterizationTest @Autowired constructor(
     }
 
     @Test
-    fun `learner lexical senses and private occurrence context do not cross owner boundaries`() {
+    fun `school lexical senses are shared while private occurrence context stays isolated`() {
         val firstOwner = seedOwner("sense-owner-a")
         val secondOwner = seedOwner("sense-owner-b")
         val privateContext = "private lesson note for one learner"
@@ -229,8 +229,8 @@ class VocabularyPracticeCharacterizationTest @Autowired constructor(
         val firstSense = lexicalSenses.findById(requireNotNull(firstEntity.lexicalSenseId)).orElseThrow()
         val firstContent = lexicalRevisions.findById(requireNotNull(firstEntity.lexicalContentRevisionId)).orElseThrow()
 
-        assertNotEquals(firstEntity.lexicalSenseId, secondEntity.lexicalSenseId)
-        assertNotEquals(firstSense.scopeKey, lexicalSenses.findById(requireNotNull(secondEntity.lexicalSenseId)).orElseThrow().scopeKey)
+        assertEquals(firstEntity.lexicalSenseId, secondEntity.lexicalSenseId)
+        assertEquals("honey-school", firstSense.scopeKey)
         assertFalse(firstSense.normalizedMeaning.contains(privateContext))
         assertFalse(firstContent.acceptedAnswersJson.contains(privateContext))
         assertEquals(privateContext, first.occurrences.single().context)
@@ -245,11 +245,11 @@ class VocabularyPracticeCharacterizationTest @Autowired constructor(
     }
 
     @Test
-    fun `changed reviewed lexical content creates a new revision while retaining the entry`() {
+    fun `learner examples stay private and do not revise shared school content`() {
         val owner = seedOwner("content-revision")
         val first = vocabulary.create(
             owner,
-            CreateVocabularyEntryRequest(sourceText = "steady", translation = "устойчивый", example = "Keep a steady pace."),
+            CreateVocabularyEntryRequest(sourceText = "unwavering", translation = "непоколебимый", example = "Keep an unwavering focus."),
         )
         val firstEntity = entries.findById(first.id).orElseThrow()
         val senseId = requireNotNull(firstEntity.lexicalSenseId)
@@ -257,17 +257,17 @@ class VocabularyPracticeCharacterizationTest @Autowired constructor(
 
         val updated = vocabulary.create(
             owner,
-            CreateVocabularyEntryRequest(sourceText = "steady", translation = "устойчивый", example = "She made steady progress."),
+            CreateVocabularyEntryRequest(sourceText = "unwavering", translation = "непоколебимый", example = "She showed unwavering resolve."),
         )
         val updatedEntity = entries.findById(updated.id).orElseThrow()
         val revisions = lexicalRevisions.findAllBySenseIdOrderByRevisionAsc(senseId)
 
         assertEquals(first.id, updated.id)
-        assertEquals(2, revisions.size)
+        assertEquals(1, revisions.size)
         assertEquals(firstRevisionId, revisions.first().id)
-        assertNotEquals(firstRevisionId, updatedEntity.lexicalContentRevisionId)
-        assertEquals("SUPERSEDED", revisions.first().status.name)
-        assertEquals("ACTIVE", revisions.last().status.name)
+        assertEquals(firstRevisionId, updatedEntity.lexicalContentRevisionId)
+        assertEquals(null, revisions.single().example)
+        assertEquals("ACTIVE", revisions.single().status.name)
     }
 
     @Test

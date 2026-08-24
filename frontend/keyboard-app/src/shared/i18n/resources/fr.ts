@@ -51,6 +51,7 @@ export const fr: TranslationResource = {
   trainer: {
     vocabularySet: "Mon vocabulaire",
     vocabularyContextAria: "Contexte de l’entraînement vocabulaire",
+    vocabularyLaunchUnavailable: "Impossible d’ouvrir cet exercice de vocabulaire.",
     vocabularyOrigin_SELF: "Entraînement vocabulaire personnel",
     vocabularyOrigin_LIVE: "Entraînement vocabulaire du cours",
     vocabularyOrigin_HOMEWORK: "Devoir de vocabulaire",

@@ -45,6 +45,7 @@ interface VocabularyEntryRepo : JpaRepository<VocabularyEntryEntity, UUID> {
     fun findAllByOwnerSubjectAndNormalizedSourceAndSourceLanguageAndTargetLanguageOrderByUpdatedAtDesc(ownerSubject: String, normalizedSource: String, sourceLanguage: String, targetLanguage: String): List<VocabularyEntryEntity>
     fun findByOwnerSubjectAndLexicalSenseId(ownerSubject: String, lexicalSenseId: UUID): VocabularyEntryEntity?
     fun findAllByLexicalSenseIdIsNullOrderByIdAsc(): List<VocabularyEntryEntity>
+    fun findAllByLexicalSenseIdOrderByIdAsc(lexicalSenseId: UUID): List<VocabularyEntryEntity>
     fun findAllByOwnerSubjectAndStatusOrderByUpdatedAtDesc(ownerSubject: String, status: EntryStatus): List<VocabularyEntryEntity>
     fun findByIdAndOwnerSubject(id: UUID, ownerSubject: String): VocabularyEntryEntity?
     fun findAllByOwnerSubjectInAndStatus(ownerSubjects: Collection<String>, status: EntryStatus): List<VocabularyEntryEntity>
@@ -54,6 +55,7 @@ interface VocabularyEntryRepo : JpaRepository<VocabularyEntryEntity, UUID> {
 }
 
 interface VocabularyLexicalSenseRepo : JpaRepository<VocabularyLexicalSenseEntity, UUID> {
+    fun findAllByCatalogScopeOrderByIdAsc(catalogScope: LexicalCatalogScope): List<VocabularyLexicalSenseEntity>
     fun findByCatalogScopeAndScopeKeyAndSourceLanguageAndTargetLanguageAndNormalizedLemmaAndNormalizedPartOfSpeechAndNormalizedMeaning(
         catalogScope: LexicalCatalogScope,
         scopeKey: String,
@@ -103,6 +105,7 @@ interface VocabularyMediaGenerationRequestRepo : JpaRepository<VocabularyMediaGe
     fun findByActiveFirstUseKey(activeFirstUseKey: String): VocabularyMediaGenerationRequestEntity?
     fun findTop50ByStateAndNextAttemptAtLessThanEqualOrderByCreatedAtAsc(state: VocabularyMediaGenerationState, nextAttemptAt: Instant): List<VocabularyMediaGenerationRequestEntity>
     fun findFirstBySenseIdOrderByCreatedAtDesc(senseId: UUID): VocabularyMediaGenerationRequestEntity?
+    fun findAllBySenseIdOrderByCreatedAtAsc(senseId: UUID): List<VocabularyMediaGenerationRequestEntity>
     fun countByState(state: VocabularyMediaGenerationState): Long
     fun countByStateAndNextAttemptAtBefore(state: VocabularyMediaGenerationState, nextAttemptAt: Instant): Long
     fun findFirstByStateOrderByCreatedAtAsc(state: VocabularyMediaGenerationState): VocabularyMediaGenerationRequestEntity?

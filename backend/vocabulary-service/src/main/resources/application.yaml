@@ -31,6 +31,9 @@ playsay.vocabulary.features:
   key-ngrams-enabled: ${PLAYSAY_VOCABULARY_KEY_NGRAMS_ENABLED:false}
   generated-media-enabled: ${PLAYSAY_VOCABULARY_GENERATED_MEDIA_ENABLED:false}
   lexical-backfill-enabled: ${PLAYSAY_VOCABULARY_LEXICAL_BACKFILL_ENABLED:false}
+  shared-sense-promotion-enabled: ${PLAYSAY_VOCABULARY_SHARED_SENSE_PROMOTION_ENABLED:false}
+playsay.vocabulary.catalog:
+  school-scope-key: ${PLAYSAY_VOCABULARY_SCHOOL_SCOPE_KEY:honey-school}
 playsay.vocabulary.media:
   generator: ${PLAYSAY_VOCABULARY_MEDIA_GENERATOR:disabled}
   api-key: ${PLAYSAY_VOCABULARY_MEDIA_API_KEY:}

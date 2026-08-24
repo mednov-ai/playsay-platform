@@ -53,6 +53,19 @@ try {
         await mediaCard.locator(".vocabulary-media-card__placeholder").waitFor();
       }
       await assertPageState(page, locale, `${locale}-${viewport.name}-media-${mediaState}`);
+
+      await assertSearchGeometry(page, `${locale}-${viewport.name}-search-empty`);
+      const search = page.getByTestId("vocabulary-word-search");
+      await search.fill("state-of-the-art vocabulary search");
+      await assertSearchGeometry(page, `${locale}-${viewport.name}-search-typed`);
+      const clearSearch = page.locator(".vocabulary-search-field__clear");
+      await clearSearch.focus();
+      if (!(await clearSearch.evaluate((element) => element === document.activeElement))) {
+        throw new Error(`${locale}-${viewport.name}: search clear action is not keyboard focusable`);
+      }
+      await clearSearch.click();
+      if (await search.inputValue()) throw new Error(`${locale}-${viewport.name}: search clear action did not empty the field`);
+      await assertSearchGeometry(page, `${locale}-${viewport.name}-search-cleared`);
       await page.locator("section > div.border-b button").first().click();
 
       await assertPageState(page, locale, `${locale}-${viewport.name}-workspace`);
@@ -77,6 +90,37 @@ try {
   process.stdout.write(`${JSON.stringify({ checks }, null, 2)}\n`);
 } finally {
   await browser.close();
+}
+
+async function assertSearchGeometry(page, label) {
+  const geometry = await page.locator(".vocabulary-search-field").evaluate((field) => {
+    const input = field.querySelector("input");
+    const leading = field.querySelector(".vocabulary-search-field__leading");
+    const clear = field.querySelector(".vocabulary-search-field__clear");
+    if (!(input instanceof HTMLInputElement) || !(leading instanceof SVGElement)) return null;
+    const inputBounds = input.getBoundingClientRect();
+    const leadingBounds = leading.getBoundingClientRect();
+    const clearBounds = clear?.getBoundingClientRect() ?? null;
+    const styles = getComputedStyle(input);
+    return {
+      clear: clearBounds?.toJSON() ?? null,
+      contentLeft: inputBounds.left + Number.parseFloat(styles.paddingLeft),
+      contentRight: inputBounds.right - Number.parseFloat(styles.paddingRight),
+      horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      input: inputBounds.toJSON(),
+      leading: leadingBounds.toJSON(),
+    };
+  });
+  if (!geometry) throw new Error(`${label}: search geometry is unavailable`);
+  if (geometry.leading.right > geometry.contentLeft + 1) {
+    throw new Error(`${label}: leading icon overlaps text/caret space (${JSON.stringify(geometry)})`);
+  }
+  if (geometry.clear && geometry.clear.left < geometry.contentRight - 1) {
+    throw new Error(`${label}: clear action overlaps text space (${JSON.stringify(geometry)})`);
+  }
+  if (geometry.input.left < -1 || geometry.input.right > page.viewportSize().width + 1 || geometry.horizontalOverflow > 1) {
+    throw new Error(`${label}: search causes clipping or horizontal overflow (${JSON.stringify(geometry)})`);
+  }
 }
 
 async function assertPageState(page, locale, label) {

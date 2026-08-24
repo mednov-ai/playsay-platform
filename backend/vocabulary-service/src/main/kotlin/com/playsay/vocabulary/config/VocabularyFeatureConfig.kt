@@ -14,6 +14,11 @@ data class VocabularyFeatureProperties(
     val lexicalBackfillEnabled: Boolean = false,
 )
 
+@ConfigurationProperties(prefix = "playsay.vocabulary.catalog")
+data class VocabularyCatalogProperties(
+    val schoolScopeKey: String = "honey-school",
+)
+
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(VocabularyFeatureProperties::class)
+@EnableConfigurationProperties(VocabularyFeatureProperties::class, VocabularyCatalogProperties::class)
 class VocabularyFeatureConfig

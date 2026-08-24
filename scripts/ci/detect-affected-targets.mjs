@@ -169,7 +169,12 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
-    if (path === "Jenkinsfile" || path === "Jenkinsfile.dispatcher" || path.startsWith(".github/")) {
+    if (
+      path === ".gitignore" ||
+      path === "Jenkinsfile" ||
+      path === "Jenkinsfile.dispatcher" ||
+      path.startsWith(".github/")
+    ) {
       addValidation(validationSuites, "ci-contracts");
       continue;
     }

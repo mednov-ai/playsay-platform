@@ -201,7 +201,11 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
 });
 
 test("CI-only and smoke-only changes run validations without product images", () => {
-  const ciOnly = detectTargetsForPaths(["Jenkinsfile.dispatcher", "scripts/ci/update-environment-image.sh"]);
+  const ciOnly = detectTargetsForPaths([
+    ".gitignore",
+    "Jenkinsfile.dispatcher",
+    "scripts/ci/update-environment-image.sh",
+  ]);
   assert.deepEqual(ciOnly.deployTargets, []);
   assert.deepEqual(ciOnly.downstreamJobs, []);
   assert.deepEqual(ciOnly.validationSuites, ["ci-contracts"]);

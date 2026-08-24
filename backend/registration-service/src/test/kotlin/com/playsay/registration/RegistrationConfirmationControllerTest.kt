@@ -73,7 +73,7 @@ class RegistrationConfirmationControllerTest : RegistrationControllerTestFixture
     }
 
     @Test
-    fun `confirming the same token twice is rejected`() {
+    fun `confirming the same token twice is idempotent`() {
         val email = "repeated@example.com"
         startRegistration(email)
         val token = lastConfirmationToken()
@@ -82,7 +82,8 @@ class RegistrationConfirmationControllerTest : RegistrationControllerTestFixture
         val secondConfirm = confirmRegistration(token)
 
         assertEquals(HttpStatus.OK.value(), firstConfirm.statusCode())
-        assertEquals(HttpStatus.BAD_REQUEST.value(), secondConfirm.statusCode())
+        assertEquals(HttpStatus.OK.value(), secondConfirm.statusCode())
+        assertTrue(secondConfirm.body().contains("CONFIRMED"))
         assertEquals(listOf(email), RecordingKeycloakRegistrationClient.enabledUsers)
         assertEquals(listOf("STUDENT"), RecordingKeycloakRegistrationClient.assignedRoles)
     }
@@ -90,12 +91,12 @@ class RegistrationConfirmationControllerTest : RegistrationControllerTestFixture
     @Test
     fun `confirmed registration returns allowed keyboard continue url`() {
         val email = "keyboard-return@example.com"
-        startRegistration(email, returnTo = "https://key.play-and-say.ru/")
+        startRegistration(email, returnTo = "https://dev.key.honey.school/")
 
         val confirmed = confirmRegistration(lastConfirmationToken())
 
         assertEquals(HttpStatus.OK.value(), confirmed.statusCode(), confirmed.body())
-        assertTrue(confirmed.body().contains("\"continueUrl\":\"https://key.play-and-say.ru/\""))
+        assertTrue(confirmed.body().contains("\"continueUrl\":\"https://dev.key.honey.school/\""))
     }
 
     @Test

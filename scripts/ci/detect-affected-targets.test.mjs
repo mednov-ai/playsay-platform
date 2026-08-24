@@ -116,6 +116,11 @@ test("contracts trigger their producers and frontend consumers", () => {
     ["web-app", "registration-service"],
     ["playsay-web-app-develop", "playsay-registration-service-develop"],
   );
+  assertDetection(
+    ["contracts/registration-password-policy.json"],
+    ["web-app", "registration-service"],
+    ["playsay-web-app-develop", "playsay-registration-service-develop"],
+  );
 });
 
 test("frontend and browser extension changes stay scoped", () => {

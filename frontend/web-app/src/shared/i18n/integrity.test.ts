@@ -45,7 +45,7 @@ describe("web-app i18n integrity", () => {
         `registration.${route}.title`,
         `registration.${route}.subtitle`,
       ]),
-      ...keys("registration.password", ["tooShort", "tooLong", "tooCommon", "containsEmail", "containsName", "needsVariety"]),
+      ...keys("registration.password", ["tooShort", "tooLong", "tooCommon", "containsEmail", "containsName", "needsVariety", "satisfied", "notSatisfied"]),
     ];
 
     Object.entries(translations).forEach(([language, resource]) => {

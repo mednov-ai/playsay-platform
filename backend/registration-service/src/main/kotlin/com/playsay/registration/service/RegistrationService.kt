@@ -132,8 +132,17 @@ class RegistrationService(
 
     @Transactional
     fun confirm(token: String): RegistrationResult {
-        val pending = repo.findByTokenHashAndStatus(tokenService.hash(token.trim()), registrationStatusPending)
+        val pending = repo.findByTokenHash(tokenService.hash(token.trim()))
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid registration token.")
+        if (pending.status == registrationStatusConfirmed) {
+            return RegistrationResult(
+                status = registrationStatusConfirmed,
+                continueUrl = allowedReturnTo(pending.returnTo),
+            )
+        }
+        if (pending.status != registrationStatusPending) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid registration token.")
+        }
         val now = Instant.now(clock)
         if (pending.expiresAt.isBefore(now)) {
             pending.status = registrationStatusExpired

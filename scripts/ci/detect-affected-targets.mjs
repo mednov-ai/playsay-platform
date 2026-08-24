@@ -231,6 +231,12 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path === "contracts/registration-password-policy.json") {
+      deployTargets.add("registration-service");
+      deployTargets.add("web-app");
+      continue;
+    }
+
     if (path.startsWith("backend/api-gateway/")) {
       deployTargets.add("api-gateway");
       continue;

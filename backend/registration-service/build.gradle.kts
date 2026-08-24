@@ -20,3 +20,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testRuntimeOnly("com.h2database:h2")
 }
+tasks.processTestResources {
+    from("../../contracts/registration-password-policy.json")
+}

@@ -12,6 +12,14 @@ export type PasswordCheck = {
   isValid: boolean;
 };
 
+export type PasswordReason =
+  | "PASSWORD_TOO_SHORT"
+  | "PASSWORD_TOO_LONG"
+  | "PASSWORD_TOO_COMMON"
+  | "PASSWORD_CONTAINS_EMAIL"
+  | "PASSWORD_CONTAINS_NAME"
+  | "PASSWORD_NEEDS_VARIETY";
+
 const weakFragments = ["password", "qwerty", "12345678", "letmein", "admin", "playsay", "play-and-say"];
 
 export function checkPassword(password: string, email: string, displayName?: string): PasswordCheck {
@@ -46,6 +54,10 @@ export function checkPassword(password: string, email: string, displayName?: str
   };
 }
 
+export function passwordIssueReason(issue: PasswordIssue): PasswordReason {
+  return passwordReasonByIssue[issue];
+}
+
 function characterClassCount(password: string): number {
   return [
     /\p{Ll}/u.test(password),
@@ -66,3 +78,12 @@ function displayNameFragments(displayName?: string): string[] {
     .map((part) => normalizedFragment(part))
     .filter((part): part is string => Boolean(part));
 }
+
+const passwordReasonByIssue: Record<PasswordIssue, PasswordReason> = {
+  tooShort: "PASSWORD_TOO_SHORT",
+  tooLong: "PASSWORD_TOO_LONG",
+  tooCommon: "PASSWORD_TOO_COMMON",
+  containsEmail: "PASSWORD_CONTAINS_EMAIL",
+  containsName: "PASSWORD_CONTAINS_NAME",
+  needsVariety: "PASSWORD_NEEDS_VARIETY",
+};

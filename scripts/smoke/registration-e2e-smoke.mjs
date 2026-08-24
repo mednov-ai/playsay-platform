@@ -64,8 +64,8 @@ try {
     (response) => response.url().includes("/api/registration/start") && response.request().method() === "POST",
     { timeout: timeoutMs },
   );
-  await submit.click();
   registrationMayExist = true;
+  await submit.click();
   const startResponse = await startResponsePromise;
   if (startResponse.status() !== 202) {
     throw new Error(`REGISTRATION_SERVICE: registration start returned HTTP ${startResponse.status()}`);
@@ -187,6 +187,7 @@ async function signInWithPassword(username, password) {
     body,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) {
     throw new Error(`OIDC_SIGN_IN: token endpoint returned HTTP ${response.status}`);
@@ -203,6 +204,7 @@ async function confirmRegistrationAgain(confirmationUrl) {
     body: JSON.stringify({ token }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (response.status !== 200) {
     throw new Error(`CONFIRMATION: repeated confirmation returned HTTP ${response.status}`);
@@ -212,6 +214,7 @@ async function confirmRegistrationAgain(confirmationUrl) {
 async function verifyStudentProfile(accessToken) {
   const response = await fetch(`${webBaseUrl}/api/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (response.status !== 200) {
     throw new Error(`OIDC_SIGN_IN: profile endpoint returned HTTP ${response.status}`);
@@ -232,10 +235,14 @@ function cleanupRegisteredIdentity(address) {
     `target_email=${shellQuote(address)}`,
     "service_token=$(sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n \"$target_namespace\" get secret playsay-registration -o jsonpath='{.data.service-token}' | base64 -d)",
     "service_ip=$(sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n \"$target_namespace\" get service registration-service -o jsonpath='{.spec.clusterIP}')",
-    "identity=$(curl -fsS -G -H \"X-PlaySay-Service-Token: $service_token\" --data-urlencode \"identifier=$target_email\" \"http://$service_ip:8080/api/internal/user-management/users/exact\")",
-    "subject=$(printf '%s' \"$identity\" | jq -r '.subject // empty')",
-    "if [ -n \"$subject\" ]; then curl -fsS -o /dev/null -X DELETE -H \"X-PlaySay-Service-Token: $service_token\" \"http://$service_ip:8080/api/internal/user-management/users/$subject\"; fi",
-    "unset service_token identity subject",
+    "service_port=$(sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n \"$target_namespace\" get service registration-service -o jsonpath='{.spec.ports[0].port}')",
+    "identity=$(curl --connect-timeout 5 --max-time 20 -fsS -G -H \"X-PlaySay-Service-Token: $service_token\" --data-urlencode \"identifier=$target_email\" \"http://$service_ip:$service_port/api/internal/user-management/users/exact\")",
+    "subject=$(printf '%s' \"$identity\" | jq -r '.subject // empty' 2>/dev/null || true)",
+    "if [ -n \"$subject\" ]; then curl --connect-timeout 5 --max-time 20 -fsS -o /dev/null -X DELETE -H \"X-PlaySay-Service-Token: $service_token\" \"http://$service_ip:$service_port/api/internal/user-management/users/$subject\"; fi",
+    "remaining=$(curl --connect-timeout 5 --max-time 20 -fsS -G -H \"X-PlaySay-Service-Token: $service_token\" --data-urlencode \"identifier=$target_email\" \"http://$service_ip:$service_port/api/internal/user-management/users/exact\")",
+    "remaining_subject=$(printf '%s' \"$remaining\" | jq -r '.subject // empty' 2>/dev/null || true)",
+    "test -z \"$remaining_subject\"",
+    "unset service_token identity subject remaining remaining_subject service_ip service_port target_email target_namespace",
   ].join("; ");
   execFileSync("ssh", [
     "-i", sshIdentityFile,
@@ -243,7 +250,7 @@ function cleanupRegisteredIdentity(address) {
     "-o", `ProxyCommand=ssh -i ${sshIdentityFile} -o IdentitiesOnly=yes -W %h:%p ${sshJumpHost}`,
     sshHost,
     remoteCommand,
-  ], { stdio: ["ignore", "ignore", "ignore"] });
+  ], { stdio: ["ignore", "ignore", "ignore"], timeout: 60_000 });
 }
 
 async function deleteDisposableMailbox(mailboxAccount) {
@@ -254,7 +261,10 @@ async function deleteDisposableMailbox(mailboxAccount) {
 }
 
 async function mailboxRequest(route, options = {}, expectedStatus = 200) {
-  const response = await fetch(`${mailboxApiBaseUrl}${route}`, options);
+  const response = await fetch(`${mailboxApiBaseUrl}${route}`, {
+    ...options,
+    signal: options.signal ?? AbortSignal.timeout(20_000),
+  });
   if (response.status !== expectedStatus) {
     throw new Error(`MAILBOX: ${route.split("?")[0]} returned HTTP ${response.status}`);
   }

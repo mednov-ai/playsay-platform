@@ -485,7 +485,7 @@ class RegistrationControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `confirming the same token twice is rejected`() {
+    fun `confirming the same token twice is idempotent`() {
         val email = "repeated@example.com"
         startRegistration(email)
         val token = lastConfirmationToken()
@@ -494,7 +494,8 @@ class RegistrationControllerTest @Autowired constructor(
         val secondConfirm = confirmRegistration(token)
 
         assertEquals(HttpStatus.OK.value(), firstConfirm.statusCode())
-        assertEquals(HttpStatus.BAD_REQUEST.value(), secondConfirm.statusCode())
+        assertEquals(HttpStatus.OK.value(), secondConfirm.statusCode())
+        assertTrue(secondConfirm.body().contains("CONFIRMED"))
         assertEquals(listOf(email), RecordingKeycloakRegistrationClient.enabledUsers)
         assertEquals(listOf("STUDENT"), RecordingKeycloakRegistrationClient.assignedRoles)
     }

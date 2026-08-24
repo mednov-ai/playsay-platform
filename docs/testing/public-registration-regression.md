@@ -37,4 +37,4 @@ Existing HTTP status, gateway/service logs, Mailjet delivery state, Keycloak hea
 
 ## Acceptance and cleanup
 
-`scripts/smoke/registration-e2e-smoke.mjs` creates a random disposable mailbox, drives the registration form with Playwright, confirms the received link, verifies first OIDC password sign-in and the `STUDENT` role, removes the synthetic Keycloak identity through the registration-service-owned internal lifecycle, and deletes the mailbox. It prints only a run id, origin, coarse checks, and sanitized failures. Cleanup failure fails the smoke.
+`scripts/smoke/registration-e2e-smoke.mjs` creates a random disposable mailbox, drives the registration form with Playwright, confirms the received link twice to prove idempotency, verifies first OIDC password sign-in and the `STUDENT` role, removes the synthetic Keycloak identity through the registration-service-owned internal lifecycle, and deletes the mailbox. It prints only a run id, origin, coarse checks, and sanitized failures. Cleanup failure fails the smoke.

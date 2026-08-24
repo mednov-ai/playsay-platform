@@ -244,13 +244,17 @@ function cleanupRegisteredIdentity(address) {
     "test -z \"$remaining_subject\"",
     "unset service_token identity subject remaining remaining_subject service_ip service_port target_email target_namespace",
   ].join("; ");
-  execFileSync("ssh", [
-    "-i", sshIdentityFile,
-    "-o", "IdentitiesOnly=yes",
-    "-o", `ProxyCommand=ssh -i ${sshIdentityFile} -o IdentitiesOnly=yes -W %h:%p ${sshJumpHost}`,
-    sshHost,
-    remoteCommand,
-  ], { stdio: ["ignore", "ignore", "ignore"], timeout: 60_000 });
+  try {
+    execFileSync("ssh", [
+      "-i", sshIdentityFile,
+      "-o", "IdentitiesOnly=yes",
+      "-o", `ProxyCommand=ssh -i ${sshIdentityFile} -o IdentitiesOnly=yes -W %h:%p ${sshJumpHost}`,
+      sshHost,
+      remoteCommand,
+    ], { stdio: ["ignore", "ignore", "ignore"], timeout: 60_000 });
+  } catch {
+    throw new Error("CLEANUP: approved identity cleanup command failed");
+  }
 }
 
 async function deleteDisposableMailbox(mailboxAccount) {

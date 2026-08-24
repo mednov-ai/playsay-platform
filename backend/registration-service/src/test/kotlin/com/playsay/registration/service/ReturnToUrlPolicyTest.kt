@@ -29,8 +29,15 @@ class ReturnToUrlPolicyTest {
             "https://online.play-and-say.ru/",
             "https://key.play-and-say.ru/",
             "https://dev.online.honey.school.evil.example/",
+            "https://subdomain.online.honey.school/",
+            "https://online-honey.school/",
             "https://user@dev.online.honey.school/",
             "http://dev.online.honey.school/",
+            "https://online.honey.school:443/",
+            "https://online.honey.school:8443/",
+            "ftp://online.honey.school/",
+            "not a URL",
+            "//online.honey.school/path",
         ).forEach { url ->
             assertNull(policy.allow(url))
         }

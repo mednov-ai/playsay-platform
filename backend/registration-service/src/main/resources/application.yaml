@@ -33,7 +33,7 @@ logging:
 playsay:
   registration:
     internal-service-token: ${PLAYSAY_REGISTRATION_SERVICE_TOKEN:}
-    public-base-url: ${PLAYSAY_REGISTRATION_PUBLIC_BASE_URL:https://online.play-and-say.ru}
+    public-base-url: ${PLAYSAY_REGISTRATION_PUBLIC_BASE_URL:https://online.honey.school}
     token-ttl-hours: ${PLAYSAY_REGISTRATION_TOKEN_TTL_HOURS:24}
     managed-student-invite-retention-days: ${PLAYSAY_REGISTRATION_MANAGED_STUDENT_INVITE_RETENTION_DAYS:30}
     resend-cooldown-seconds: ${PLAYSAY_REGISTRATION_RESEND_COOLDOWN_SECONDS:300}
@@ -44,7 +44,7 @@ playsay:
       max-per-email: ${PLAYSAY_REGISTRATION_RATE_LIMIT_MAX_PER_EMAIL:20}
       max-per-ip: ${PLAYSAY_REGISTRATION_RATE_LIMIT_MAX_PER_IP:30}
     keycloak:
-      base-url: ${PLAYSAY_KEYCLOAK_BASE_URL:https://ops.play-and-say.ru:18443/keycloak}
+      base-url: ${PLAYSAY_KEYCLOAK_BASE_URL:https://ops.honey.school/keycloak}
       realm: ${PLAYSAY_KEYCLOAK_REALM:playsay}
       client-id: ${PLAYSAY_KEYCLOAK_ADMIN_CLIENT_ID:playsay-registration-service}
       client-secret: ${PLAYSAY_KEYCLOAK_ADMIN_CLIENT_SECRET:}

@@ -77,6 +77,17 @@ export function isRegistrationRateLimitError(caught: unknown): boolean {
   return isApiStatus(caught, 429);
 }
 
+export function isRegistrationContractError(caught: unknown): boolean {
+  return isApiStatus(caught, 400) || isApiStatus(caught, 422);
+}
+
+export function isRegistrationUnavailableError(caught: unknown): boolean {
+  if (caught instanceof TypeError) {
+    return true;
+  }
+  return [0, 502, 503, 504].some((status) => isApiStatus(caught, status));
+}
+
 function registrationRequestError(status: number, message: string): ApiError {
   return new ApiError(
     status,

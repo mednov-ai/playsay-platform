@@ -30,6 +30,10 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.processTestResources {
+    from("../../contracts/registration-password-policy.json")
+}
+
 tasks.named("jar") {
     enabled = false
 }

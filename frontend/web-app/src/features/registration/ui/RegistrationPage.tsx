@@ -1,11 +1,13 @@
 import { publicSiteUrl } from "@playsay/shared-ui";
-import { CheckCircle2, KeyRound, Loader2, Mail, UserPlus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2, KeyRound, Loader2, Mail, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { startLogin } from "../../../shared/api/playsay";
 import {
   confirmRegistrationRequest,
   forgotPasswordRequest,
+  isRegistrationContractError,
   isRegistrationRateLimitError,
+  isRegistrationUnavailableError,
   resendRegistrationRequest,
   resetPasswordRequest,
   startRegistrationRequest,
@@ -18,6 +20,19 @@ import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
 import { useAppTheme } from "../../../app/AppProviders";
 import type { RegistrationRoute } from "../../../app/routes";
 import { checkPassword, type PasswordCheck, type PasswordIssue } from "../model/passwordPolicy";
+import {
+  validateStartRegistration,
+  type RegistrationField,
+  type RegistrationValidationError,
+} from "../model/registrationValidation";
+
+type StartFormStatus = "idle" | "validating" | "submitting" | "succeeded" | "failed";
+
+const initialTouchedFields: Record<RegistrationField, boolean> = {
+  email: false,
+  password: false,
+  passwordConfirm: false,
+};
 
 export function RegistrationPage({ route }: { route: RegistrationRoute }) {
   const { i18n, t } = useAppTranslation();
@@ -36,10 +51,18 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
   const [startSuccessHref, setStartSuccessHref] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmedContinueUrl, setConfirmedContinueUrl] = useState<string | null>(null);
-  const startPasswordCheck = useMemo(
-    () => checkPassword(password, email, displayName),
-    [displayName, email, password],
+  const [startSubmitted, setStartSubmitted] = useState(false);
+  const [startStatus, setStartStatus] = useState<StartFormStatus>("idle");
+  const [startTouched, setStartTouched] = useState(initialTouchedFields);
+  const startRequestInFlight = useRef(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const passwordConfirmInputRef = useRef<HTMLInputElement>(null);
+  const startValidation = useMemo(
+    () => validateStartRegistration(email, password, passwordConfirm, displayName),
+    [displayName, email, password, passwordConfirm],
   );
+  const startPasswordCheck = startValidation.passwordCheck;
   const resetPasswordCheck = useMemo(
     () => checkPassword(newPassword, email),
     [email, newPassword],
@@ -81,12 +104,20 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
   }, [params, route.kind, t]);
 
   async function submitStart() {
-    if (!startPasswordCheck.isValid || password !== passwordConfirm) {
-      setMessage(t("registration.messages.passwordInvalid"));
+    if (startRequestInFlight.current) {
       return;
     }
-    setLoading(true);
+    setStartSubmitted(true);
+    setStartStatus("validating");
     setMessage(null);
+    if (!startValidation.isValid) {
+      setStartStatus("failed");
+      focusStartField(startValidation.firstInvalidField);
+      return;
+    }
+    startRequestInFlight.current = true;
+    setStartStatus("submitting");
+    setLoading(true);
     try {
       await startRegistrationRequest({
         displayName: displayName.trim() || undefined,
@@ -101,11 +132,49 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
         next.searchParams.set("returnTo", initialReturnTo);
       }
       setStartSuccessHref(next.pathname + next.search);
+      setStartStatus("succeeded");
     } catch (caught) {
-      handleRegistrationError(caught, t("registration.messages.startFailed"));
+      setStartStatus("failed");
+      if (isRegistrationRateLimitError(caught)) {
+        setRateLimitDialogOpen(true);
+      } else if (isRegistrationContractError(caught)) {
+        setMessage(t("registration.messages.contractRejected"));
+      } else if (isRegistrationUnavailableError(caught)) {
+        setMessage(t("registration.messages.unavailable"));
+      } else {
+        setMessage(t("registration.messages.startFailed"));
+      }
     } finally {
+      startRequestInFlight.current = false;
       setLoading(false);
     }
+  }
+
+  function markStartFieldTouched(field: RegistrationField) {
+    setStartTouched((current) => current[field] ? current : { ...current, [field]: true });
+  }
+
+  function focusStartField(field: RegistrationField | null) {
+    const input = field === "email"
+      ? emailInputRef.current
+      : field === "password"
+        ? passwordInputRef.current
+        : field === "passwordConfirm"
+          ? passwordConfirmInputRef.current
+          : null;
+    input?.focus();
+  }
+
+  function visibleStartError(field: RegistrationField): RegistrationValidationError | null {
+    if (!startSubmitted && !startTouched[field]) {
+      return null;
+    }
+    return startValidation.fieldErrors[field] ?? null;
+  }
+
+  function startErrorMessage(field: RegistrationField): string | null {
+    const error = visibleStartError(field);
+    return error ? t(`registration.validation.${error}`) : null;
   }
 
   async function submitForgotPassword() {
@@ -216,33 +285,87 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
 
             {route.kind === "start" ? (
               <form
+                aria-busy={startStatus === "submitting"}
                 className="grid gap-4 pt-5"
+                noValidate
                 onSubmit={(event) => {
                   event.preventDefault();
                   void submitStart();
                 }}
               >
-                <label className="grid gap-1 text-sm font-bold">
-                  <span>{t("registration.form.email")}</span>
-                  <input className="playsay-input" disabled={loading} maxLength={320} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
-                </label>
-                <label className="grid gap-1 text-sm font-bold">
-                  <span>{t("registration.form.password")}</span>
-                  <input className="playsay-input" disabled={loading} minLength={8} maxLength={128} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} />
-                </label>
-                <label className="grid gap-1 text-sm font-bold">
-                  <span>{t("registration.form.confirmPassword")}</span>
-                  <input className="playsay-input" disabled={loading} minLength={8} maxLength={128} onChange={(event) => setPasswordConfirm(event.target.value)} required type="password" value={passwordConfirm} />
-                </label>
-                <PasswordHints check={startPasswordCheck} confirmValue={passwordConfirm} passwordValue={password} t={t} />
+                <div className="grid gap-1 text-sm font-bold">
+                  <label htmlFor="registration-email">{t("registration.form.email")}</label>
+                  <input
+                    aria-describedby={startErrorMessage("email") ? "registration-email-error" : undefined}
+                    aria-invalid={Boolean(startErrorMessage("email"))}
+                    className="playsay-input"
+                    disabled={loading}
+                    id="registration-email"
+                    maxLength={320}
+                    onBlur={() => markStartFieldTouched("email")}
+                    onChange={(event) => setEmail(event.target.value)}
+                    ref={emailInputRef}
+                    required
+                    type="email"
+                    value={email}
+                  />
+                  <RegistrationFieldError id="registration-email-error" message={startErrorMessage("email")} />
+                </div>
+                <div className="grid gap-1 text-sm font-bold">
+                  <label htmlFor="registration-password">{t("registration.form.password")}</label>
+                  <input
+                    aria-describedby={startErrorMessage("password") ? "registration-password-error registration-password-hints" : "registration-password-hints"}
+                    aria-invalid={Boolean(startErrorMessage("password"))}
+                    className="playsay-input"
+                    disabled={loading}
+                    id="registration-password"
+                    minLength={8}
+                    maxLength={128}
+                    onBlur={() => markStartFieldTouched("password")}
+                    onChange={(event) => setPassword(event.target.value)}
+                    ref={passwordInputRef}
+                    required
+                    type="password"
+                    value={password}
+                  />
+                  <RegistrationFieldError id="registration-password-error" message={startErrorMessage("password")} />
+                </div>
+                <div className="grid gap-1 text-sm font-bold">
+                  <label htmlFor="registration-password-confirm">{t("registration.form.confirmPassword")}</label>
+                  <input
+                    aria-describedby={startErrorMessage("passwordConfirm") ? "registration-password-confirm-error registration-password-hints" : "registration-password-hints"}
+                    aria-invalid={Boolean(startErrorMessage("passwordConfirm"))}
+                    className="playsay-input"
+                    disabled={loading}
+                    id="registration-password-confirm"
+                    minLength={8}
+                    maxLength={128}
+                    onBlur={() => markStartFieldTouched("passwordConfirm")}
+                    onChange={(event) => setPasswordConfirm(event.target.value)}
+                    ref={passwordConfirmInputRef}
+                    required
+                    type="password"
+                    value={passwordConfirm}
+                  />
+                  <RegistrationFieldError id="registration-password-confirm-error" message={startErrorMessage("passwordConfirm")} />
+                </div>
+                <PasswordHints check={startPasswordCheck} confirmValue={passwordConfirm} id="registration-password-hints" passwordValue={password} t={t} />
                 <label className="grid gap-1 text-sm font-bold">
                   <span>{t("registration.form.displayName")}</span>
                   <input className="playsay-input" disabled={loading} maxLength={120} onChange={(event) => setDisplayName(event.target.value)} type="text" value={displayName} />
                 </label>
+                {startSubmitted && !startValidation.isValid ? (
+                  <RegistrationValidationSummary
+                    errors={startValidation.fieldErrors}
+                    messageForError={(error) => t(`registration.validation.${error}`)}
+                    onFocusField={focusStartField}
+                    title={t("registration.validation.summary")}
+                  />
+                ) : null}
                 {message ? <RegistrationMessage message={message} /> : null}
-                <Button disabled={loading || !startPasswordCheck.isValid || password !== passwordConfirm} type="submit">
+                <Button disabled={loading} type="submit">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                  {t("registration.actions.create")}
+                  {t(loading ? "registration.actions.creating" : "registration.actions.create")}
                 </Button>
                 <a className="text-sm font-extrabold text-primary" href={`/forgot-password${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ""}`}>
                   {t("registration.actions.forgotPassword")}
@@ -511,14 +634,16 @@ function RegistrationMessage({ message }: { message: string }) {
   );
 }
 
-function PasswordHints({
+export function PasswordHints({
   check,
   confirmValue,
+  id,
   passwordValue,
   t,
 }: {
   check: PasswordCheck;
   confirmValue: string;
+  id?: string;
   passwordValue: string;
   t: (key: string) => string;
 }) {
@@ -526,7 +651,7 @@ function PasswordHints({
   const passwordsMatch = Boolean(passwordValue) && Boolean(confirmValue) && passwordValue === confirmValue;
 
   return (
-    <div className="grid gap-2 rounded-2xl border border-border bg-muted/60 p-3">
+    <div className="grid gap-2 rounded-2xl border border-border bg-muted/60 p-3" id={id}>
       <div className="flex gap-1" aria-hidden="true">
         {[0, 1, 2, 3].map((index) => (
           <span
@@ -536,12 +661,74 @@ function PasswordHints({
         ))}
       </div>
       <ul className="grid gap-1 text-xs font-semibold text-muted-foreground">
-        {issues.map((issue) => (
-          <li className={check.issues.includes(issue) ? "" : "text-primary"} key={issue}>
-            {t(`registration.password.${issue}`)}
+        {issues.map((issue) => {
+          const satisfied = !check.issues.includes(issue);
+          return (
+            <PasswordHintItem
+              key={issue}
+              label={t(`registration.password.${issue}`)}
+              satisfied={satisfied}
+              statusLabel={t(`registration.password.${satisfied ? "satisfied" : "notSatisfied"}`)}
+            />
+          );
+        })}
+        <PasswordHintItem
+          label={t("registration.password.match")}
+          satisfied={passwordsMatch}
+          statusLabel={t(`registration.password.${passwordsMatch ? "satisfied" : "notSatisfied"}`)}
+        />
+      </ul>
+    </div>
+  );
+}
+
+function PasswordHintItem({ label, satisfied, statusLabel }: { label: string; satisfied: boolean; statusLabel: string }) {
+  return (
+    <li className={`flex items-start gap-2 ${satisfied ? "text-primary" : ""}`} data-status={satisfied ? "satisfied" : "not-satisfied"}>
+      {satisfied ? (
+        <CheckCircle2 aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      ) : (
+        <AlertCircle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      )}
+      <span>{label}</span>
+      <span className="ml-auto shrink-0 pl-2">{statusLabel}</span>
+    </li>
+  );
+}
+
+function RegistrationFieldError({ id, message }: { id: string; message: string | null }) {
+  return message ? <span className="text-xs font-semibold text-destructive" id={id}>{message}</span> : null;
+}
+
+function RegistrationValidationSummary({
+  errors,
+  messageForError,
+  onFocusField,
+  title,
+}: {
+  errors: Partial<Record<RegistrationField, RegistrationValidationError>>;
+  messageForError: (error: RegistrationValidationError) => string;
+  onFocusField: (field: RegistrationField) => void;
+  title: string;
+}) {
+  return (
+    <div className="grid gap-2 rounded-2xl border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert">
+      <strong>{title}</strong>
+      <ul className="grid gap-1">
+        {(Object.entries(errors) as [RegistrationField, RegistrationValidationError][]).map(([field, error]) => (
+          <li key={field}>
+            <a
+              className="font-semibold text-destructive underline underline-offset-2"
+              href={`#registration-${field === "passwordConfirm" ? "password-confirm" : field}`}
+              onClick={(event) => {
+                event.preventDefault();
+                onFocusField(field);
+              }}
+            >
+              {messageForError(error)}
+            </a>
           </li>
         ))}
-        <li className={passwordsMatch ? "text-primary" : ""}>{t("registration.password.match")}</li>
       </ul>
     </div>
   );

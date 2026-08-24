@@ -13,7 +13,7 @@ class ReturnToUrlPolicy {
         }
 
         return when {
-            scheme == "https" && host in publicHosts -> cleaned
+            scheme == "https" && uri.port == -1 && host in publicHosts -> cleaned
             host in localHosts -> cleaned
             else -> null
         }

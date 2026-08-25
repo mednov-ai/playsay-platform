@@ -65,7 +65,7 @@ test(
     assert.match(webhookXml, /<tokenCredentialId>github-webhook-token<\/tokenCredentialId>/);
     assert.match(
       webhookXml,
-      /\^refs\/heads\/\(develop\|release\/\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\) /,
+      /\^refs\/heads\/\(develop\|release\/\[0-9\]\{2\}\\\.\[0-9\]\{3\}\\\.\[0-9\]\{2\}\) /,
     );
     assert.match(webhookXml, /playsay-platform-dispatch-develop/);
     assert.match(webhookXml, /playsay-platform-dispatch-release/);

@@ -78,3 +78,10 @@ test("migration launcher preserves nested changelog paths in the ConfigMap proje
   assert.match(script, /--arg path "\$changelog_dir\/\$relative_path"/);
   assert.doesNotMatch(script, /Nested changelog directories are not supported/);
 });
+
+test("worksheet image build uses its module context with the bootJar inside it", () => {
+  const pipeline = readFileSync(resolve(platformRoot, "Jenkinsfile.worksheet-import-service"), "utf8");
+  const dockerfile = readFileSync(resolve(platformRoot, "backend/worksheet-import-service/Dockerfile"), "utf8");
+  assert.match(pipeline, /KANIKO_CONTEXT="\$WORKSPACE\/backend\/worksheet-import-service"/);
+  assert.match(dockerfile, /^COPY build\/libs\/\*\.jar \/app\/app\.jar$/m);
+});

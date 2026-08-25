@@ -214,7 +214,7 @@ spec:
               cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-              KANIKO_CONTEXT="$WORKSPACE/backend" \
+              KANIKO_CONTEXT="$WORKSPACE/backend/worksheet-import-service" \
                 KANIKO_DOCKERFILE="$WORKSPACE/backend/worksheet-import-service/Dockerfile" \
                 IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${WORKSHEET_IMPORT_IMAGE_NAME}" \
                 /busybox/sh ./scripts/ci/run-kaniko-image-build.sh

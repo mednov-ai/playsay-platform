@@ -88,11 +88,22 @@ class WorksheetAnalysisProcessor(
             val orderedIds = pageEntities.map { it.id }
             val resolution = provider.resolvePacket(orderedIds, analyses)
             validator.validatePacket(resolution, orderedIds)
+            val answerKeyAssociations = resolution.answerKeyAssociations.associateBy { it.worksheetPageId }
+            pageEntities.forEach { page ->
+                page.answerKeyPageId = answerKeyAssociations[page.id]?.answerKeyPageId
+            }
             session.analysis = objectMapper.writeValueAsString(resolution)
             session.review = objectMapper.writeValueAsString(
                 WorksheetReview(
                     pages = resolution.pages.mapIndexed { index, page ->
-                        WorksheetReviewPage(page.pageId, index, page.role, sections = page.sections, groups = page.groups)
+                        WorksheetReviewPage(
+                            id = page.pageId,
+                            order = index,
+                            role = page.role,
+                            answerKeyPageId = answerKeyAssociations[page.pageId]?.answerKeyPageId,
+                            sections = page.sections,
+                            groups = page.groups,
+                        )
                     },
                 ),
             )

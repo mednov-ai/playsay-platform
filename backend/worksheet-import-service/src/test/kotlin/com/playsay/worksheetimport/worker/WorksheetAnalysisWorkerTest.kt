@@ -10,6 +10,7 @@ import com.playsay.worksheetimport.domain.WorksheetImportStatus
 import com.playsay.worksheetimport.domain.WorksheetPacketResolution
 import com.playsay.worksheetimport.domain.WorksheetPageAnalysis
 import com.playsay.worksheetimport.domain.WorksheetPageDescriptor
+import com.playsay.worksheetimport.domain.WorksheetReview
 import com.playsay.worksheetimport.entity.WorksheetImportPageEntity
 import com.playsay.worksheetimport.entity.WorksheetImportSessionEntity
 import com.playsay.worksheetimport.repo.WorksheetImportPageRepository
@@ -56,6 +57,35 @@ class WorksheetAnalysisWorkerTest {
         assertEquals(1, page.analysisAttempts)
         assertNull(session.leaseOwner)
         Files.deleteIfExists(raster)
+    }
+
+    @Test
+    fun `leased processor preserves answer key association in page and review`() {
+        val sessions = mock(WorksheetImportSessionRepository::class.java)
+        val pages = mock(WorksheetImportPageRepository::class.java)
+        val storage = InMemoryWorksheetStagingStorage()
+        val session = session("worker")
+        val worksheetPage = page(session.id, 0, "worksheet-raster")
+        val answerKeyPage = page(session.id, 1, "answer-key-raster")
+        val worksheetRaster = Files.createTempFile("worksheet-worker-", ".png")
+            .also { Files.writeString(it, "WORKSHEET_FIXTURE:MULTIPLE_CHOICE") }
+        val answerKeyRaster = Files.createTempFile("worksheet-worker-key-", ".png")
+            .also { Files.writeString(it, "WORKSHEET_FIXTURE:ANSWER_KEY") }
+        storage.put(worksheetPage.rasterStorageKey, worksheetRaster, "image/png")
+        storage.put(answerKeyPage.rasterStorageKey, answerKeyRaster, "image/png")
+        `when`(sessions.lockById(session.id)).thenReturn(session)
+        `when`(pages.findAllBySessionIdOrderByPageOrder(session.id)).thenReturn(listOf(worksheetPage, answerKeyPage))
+
+        processor(sessions, pages, storage, StubWorksheetAnalysisProvider(), WorksheetImportProperties())
+            .process(session.id, "worker")
+
+        val review = mapper.readValue(session.review, WorksheetReview::class.java)
+        assertEquals(answerKeyPage.id, worksheetPage.answerKeyPageId)
+        assertNull(answerKeyPage.answerKeyPageId)
+        assertEquals(answerKeyPage.id, review.pages.single { it.id == worksheetPage.id }.answerKeyPageId)
+        assertNull(review.pages.single { it.id == answerKeyPage.id }.answerKeyPageId)
+        Files.deleteIfExists(worksheetRaster)
+        Files.deleteIfExists(answerKeyRaster)
     }
 
     @Test
@@ -113,9 +143,9 @@ class WorksheetAnalysisWorkerTest {
         createdAt = now, updatedAt = now, expiresAt = now.plusSeconds(3600),
     )
 
-    private fun page(sessionId: UUID) = WorksheetImportPageEntity(
-        id = UUID.randomUUID(), sessionId = sessionId, sourceId = UUID.randomUUID(), pageOrder = 0,
-        rasterStorageKey = "opaque-raster", rasterMimeType = "image/png", rasterByteSize = 10,
+    private fun page(sessionId: UUID, order: Int = 0, storageKey: String = "opaque-raster") = WorksheetImportPageEntity(
+        id = UUID.randomUUID(), sessionId = sessionId, sourceId = UUID.randomUUID(), pageOrder = order,
+        rasterStorageKey = storageKey, rasterMimeType = "image/png", rasterByteSize = 10,
         rasterChecksumSha256 = "a".repeat(64), width = 100, height = 100, createdAt = now, updatedAt = now,
     )
 }

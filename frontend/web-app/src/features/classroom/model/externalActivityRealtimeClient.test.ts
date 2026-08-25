@@ -63,7 +63,7 @@ describe("createExternalActivityRealtimeClient", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uses the fast lane in primary and requests LiveKit fallback in shadow", async () => {
+  it("uses the fast lane in both server modes without a LiveKit duplicate", async () => {
     const client = createExternalActivityRealtimeClient({
       getUrl: async () => "ws://localhost/collab/ws",
     });
@@ -71,7 +71,7 @@ describe("createExternalActivityRealtimeClient", () => {
     await Promise.resolve();
     sockets[0]?.open("shadow");
 
-    expect(client.publish(inputMessage)).toBe(false);
+    expect(client.publish(inputMessage)).toBe(true);
     expect(sockets[0]?.sent).toHaveLength(1);
 
     sockets[0]?.open("primary");

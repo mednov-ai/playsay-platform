@@ -109,7 +109,10 @@ export function createExternalActivityRealtimeClient({
         || socket.bufferedAmount >= maximumBufferedBytes
       ) return false;
       socket.send(encodeExternalActivityRealtimeMessage(message));
-      return mode === "primary";
+      // External activity input does not need the game protocol's shadow
+      // comparison duplicate. The dedicated socket is already relayed in both
+      // shadow and primary modes; LiveKit remains the fallback when it is down.
+      return true;
     },
   };
 }

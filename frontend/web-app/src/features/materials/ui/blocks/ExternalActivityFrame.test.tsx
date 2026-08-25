@@ -66,6 +66,7 @@ describe("ExternalActivityFrame", () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it("positions remote cursors inside the same contain-fitted video rectangle as input", () => {
@@ -130,6 +131,40 @@ describe("ExternalActivityFrame", () => {
     expect(shouldSendExternalActivityPointerInput("move")).toBe(false);
     expect(shouldSendExternalActivityPointerInput("down")).toBe(true);
     expect(shouldSendExternalActivityPointerInput("up")).toBe(true);
+  });
+
+  it("coalesces wheel input into one summed event per animation frame", () => {
+    const animationFrames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      animationFrames.push(callback);
+      return 17;
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      bottom: 720,
+      height: 720,
+      left: 0,
+      right: 1280,
+      top: 0,
+      width: 1280,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    const sendInput = vi.fn();
+    render(<ExternalActivityFrame block={block} sync={sync({ sendInput })} />);
+    const surface = screen.getByRole("application");
+
+    fireEvent.wheel(surface, { clientX: 640, clientY: 360, deltaX: 2, deltaY: 10 });
+    fireEvent.wheel(surface, { clientX: 640, clientY: 360, deltaX: 3, deltaY: 15 });
+
+    expect(sendInput).not.toHaveBeenCalled();
+    animationFrames[0]?.(16);
+    expect(sendInput).toHaveBeenCalledTimes(1);
+    expect(sendInput).toHaveBeenCalledWith(expect.objectContaining({
+      deltaX: 5,
+      deltaY: 25,
+      type: "scroll",
+    }));
   });
 
   it("confirms extension detection before asking the teacher for the browser action", () => {

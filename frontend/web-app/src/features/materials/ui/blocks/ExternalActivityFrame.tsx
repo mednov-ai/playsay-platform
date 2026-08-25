@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2, RefreshCw, RotateCcw, Unplug } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import { Button } from "../../../../components/ui/button";
 import { useAppTranslation } from "../../../../shared/i18n";
-import type { ExternalActivityPhase } from "../../../classroom/model/externalActivityProtocol";
+import type { ExternalActivityInput, ExternalActivityPhase } from "../../../classroom/model/externalActivityProtocol";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../model/materialDocument";
 
 export function externalActivityContentRect({
@@ -74,6 +74,8 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
   const mobileInputRef = useRef<HTMLInputElement | null>(null);
   const retryButtonRef = useRef<HTMLButtonElement | null>(null);
   const lastMoveRef = useRef(0);
+  const pendingWheelInputRef = useRef<Extract<ExternalActivityInput, { type: "scroll" }> | null>(null);
+  const wheelFrameRef = useRef<number | null>(null);
   const [cursorFrame, setCursorFrame] = useState<{ height: number; left: number; top: number; width: number } | null>(null);
   const active = sync.active;
 
@@ -129,6 +131,12 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     }
   }, [active?.errorCode, active?.phase, sync.isHost]);
 
+  useEffect(() => () => {
+    if (wheelFrameRef.current !== null) window.cancelAnimationFrame(wheelFrameRef.current);
+    wheelFrameRef.current = null;
+    pendingWheelInputRef.current = null;
+  }, []);
+
   function point(event: PointerEvent | WheelEvent) {
     const surface = surfaceRef.current;
     const video = videoRef.current;
@@ -177,6 +185,20 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     });
   }
 
+  function queueWheelInput(input: Extract<ExternalActivityInput, { type: "scroll" }>) {
+    const pending = pendingWheelInputRef.current;
+    pendingWheelInputRef.current = pending
+      ? { ...input, deltaX: pending.deltaX + input.deltaX, deltaY: pending.deltaY + input.deltaY }
+      : input;
+    if (wheelFrameRef.current !== null) return;
+    wheelFrameRef.current = window.requestAnimationFrame(() => {
+      wheelFrameRef.current = null;
+      const next = pendingWheelInputRef.current;
+      pendingWheelInputRef.current = null;
+      if (next) sync.sendInput(next);
+    });
+  }
+
   const connectingStudentStream = !sync.isHost && active?.phase === "ACTIVE" && !sync.mediaStream;
   const waiting = !active || connectingStudentStream || ["REQUESTED", "OPENING_PROVIDER", "AWAITING_EXTENSION", "AWAITING_ACTION", "STARTING"].includes(active.phase);
   const waitingCopy = externalActivityWaitingCopy(t, active?.phase, sync.isHost, connectingStudentStream);
@@ -217,7 +239,7 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
         onPointerUp={(event) => pointer(event, "up")}
         onWheel={(event) => {
           const position = point(event);
-          if (position) sync.sendInput({
+          if (position) queueWheelInput({
             type: "scroll",
             normalizedX: position.normalizedX,
             normalizedY: position.normalizedY,

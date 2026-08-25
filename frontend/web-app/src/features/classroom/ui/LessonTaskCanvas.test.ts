@@ -387,7 +387,7 @@ describe("LessonTaskCanvas", () => {
       sendInput: vi.fn(),
       returnToLesson: vi.fn(),
     };
-    const { container } = render(createElement(LessonTaskCanvas, {
+    const view = render(createElement(LessonTaskCanvas, {
       externalActivitySync,
       lessonId: "lesson-1",
       material: externalActivityMaterial,
@@ -398,6 +398,7 @@ describe("LessonTaskCanvas", () => {
       submissionSaving: false,
       teacherName: "Teacher Demo",
     }));
+    const { container } = view;
 
     fireEvent.click(container.querySelector('[data-testid="external-activity-launch-external-1"]')!);
     await waitFor(() => expect(
@@ -407,6 +408,22 @@ describe("LessonTaskCanvas", () => {
     expect(container.querySelector(".playsay-annotation-toolbar")).toBeNull();
     expect(container.querySelector(".playsay-annotation-layer")).toBeNull();
     expect(container.querySelector(".playsay-presence-layer")).toBeNull();
+
+    view.rerender(createElement(LessonTaskCanvas, {
+      externalActivitySync: { ...externalActivitySync, active: null, mediaStream: null },
+      lessonId: "lesson-1",
+      material: externalActivityMaterial,
+      onSaveAnswers: () => undefined,
+      score: null,
+      submission: null,
+      submissionMessage: null,
+      submissionSaving: false,
+      teacherName: "Teacher Demo",
+    }));
+    await waitFor(() => expect(
+      container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode"),
+    ).toBe("default"));
+    expect(container.querySelector(".playsay-annotation-toolbar")).not.toBeNull();
   });
 
   it("anchors annotations to the rendered static image instead of the material viewport", async () => {

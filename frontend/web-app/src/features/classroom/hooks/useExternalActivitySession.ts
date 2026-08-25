@@ -1,5 +1,5 @@
 import { useRoomContext } from "@livekit/components-react";
-import { RoomEvent, Track, type RemoteParticipant, type RemoteTrack, type TrackPublishOptions } from "livekit-client";
+import { RoomEvent, Track, type RemoteParticipant, type RemoteTrack, type RemoteTrackPublication, type TrackPublishOptions } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../materials/model/materialDocument";
 import {
@@ -478,10 +478,11 @@ export function useExternalActivitySession({
   useEffect(() => {
     if (!enabled || isHost || !active) return undefined;
     const observedTracks = new Set<MediaStreamTrack>();
-    const matchingRemoteTracks = (excludedTrack?: MediaStreamTrack) => {
+    const matchingRemoteTracks = (excludedTrack?: MediaStreamTrack, excludedPublication?: RemoteTrackPublication) => {
       const tracks: Array<{ track: MediaStreamTrack; video: boolean }> = [];
       for (const participant of room.remoteParticipants.values()) {
         for (const publication of participant.trackPublications.values()) {
+          if (publication === excludedPublication) continue;
           if (!publication.trackName?.startsWith(`${externalActivityTrackPrefix}${active.sessionId}-`)) continue;
           const track = publication.track?.mediaStreamTrack;
           if (!track || track === excludedTrack || track.readyState === "ended") continue;
@@ -490,8 +491,8 @@ export function useExternalActivitySession({
       }
       return tracks;
     };
-    const updateRemoteStream = (excludedTrack?: MediaStreamTrack) => {
-      const matches = matchingRemoteTracks(excludedTrack);
+    const updateRemoteStream = (excludedTrack?: MediaStreamTrack, excludedPublication?: RemoteTrackPublication) => {
+      const matches = matchingRemoteTracks(excludedTrack, excludedPublication);
       if (matches.some(({ video }) => video)) {
         clearRemoteTrackLossTimer();
         remoteTrackSeenSessionRef.current = active.sessionId;
@@ -520,7 +521,7 @@ export function useExternalActivitySession({
         remoteTrackLossTimerRef.current = null;
         if (
           activeRef.current?.sessionId === active.sessionId
-          && !matchingRemoteTracks(excludedTrack).some(({ video }) => video)
+          && !matchingRemoteTracks(excludedTrack, excludedPublication).some(({ video }) => video)
         ) {
           clearRemoteSession(active.sessionId);
         }
@@ -529,12 +530,18 @@ export function useExternalActivitySession({
     const handleTrackEnded = (event: Event) => updateRemoteStream(event.currentTarget as MediaStreamTrack);
     const handleTrackSubscribed = () => updateRemoteStream();
     const handleTrackUnsubscribed = (track: RemoteTrack) => updateRemoteStream(track.mediaStreamTrack);
+    const handleTrackUnpublished = (publication: RemoteTrackPublication) => {
+      if (!publication.trackName?.startsWith(`${externalActivityTrackPrefix}${active.sessionId}-`)) return;
+      updateRemoteStream(publication.track?.mediaStreamTrack, publication);
+    };
     updateRemoteStream();
     room.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
     room.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+    room.on(RoomEvent.TrackUnpublished, handleTrackUnpublished);
     return () => {
       room.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       room.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      room.off(RoomEvent.TrackUnpublished, handleTrackUnpublished);
       observedTracks.forEach((track) => track.removeEventListener?.("ended", handleTrackEnded));
       clearRemoteTrackLossTimer();
     };

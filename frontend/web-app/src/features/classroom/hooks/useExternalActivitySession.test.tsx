@@ -398,4 +398,47 @@ describe("useExternalActivitySession", () => {
     expect(result.current.mediaStream).toBeNull();
     unmount();
   });
+
+  it("clears a student session when an unpublished host track remains stale in the publication map", async () => {
+    vi.useFakeTimers();
+    const mediaTrack = {} as MediaStreamTrack;
+    const publication = {
+      track: { mediaStreamTrack: mediaTrack },
+      trackName: "playsay-external-activity-session-1-video",
+    };
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map([["video", publication]]),
+    };
+    room.remoteParticipants.set("teacher", teacher);
+    const { result, unmount } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      trustedHostIdentity: "teacher",
+    }));
+
+    act(() => emit(RoomEvent.DataReceived, new TextEncoder().encode(JSON.stringify({
+      version: 1,
+      type: "HOST_STATE",
+      sessionId: "session-1",
+      blockId: block.id,
+      phase: "ACTIVE",
+      studentsLocked: false,
+      visible: true,
+    })), teacher, undefined, "playsay.external-activity.host.v1"));
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.active?.sessionId).toBe("session-1");
+
+    act(() => emit(RoomEvent.TrackUnpublished, publication));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+
+    expect(result.current.active).toBeNull();
+    expect(result.current.mediaStream).toBeNull();
+    unmount();
+  });
 });

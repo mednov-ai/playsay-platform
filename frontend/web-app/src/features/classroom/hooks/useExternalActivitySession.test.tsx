@@ -264,10 +264,70 @@ describe("useExternalActivitySession", () => {
     expect(result.current.active).toBeNull();
   });
 
-  it("clears a student session when a previously received host track disappears", async () => {
+  it("waits for STOPPED delivery before publishing HOST_IDLE", async () => {
+    let releaseStopped!: () => void;
+    const stoppedDelivery = new Promise<void>((resolve) => { releaseStopped = resolve; });
+    const { result } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: true,
+      participantColor: "#ff5c00",
+      participantName: "Teacher",
+    }));
+
+    act(() => result.current.open(block));
+    await waitFor(() => expect(result.current.active?.phase).toBe("OPENING_PROVIDER"));
+    publishData.mockClear();
+    publishData.mockImplementationOnce(() => stoppedDelivery).mockResolvedValue(undefined);
+
+    act(() => result.current.returnToLesson());
+    await waitFor(() => expect(decodedMessages().some(({ type }) => type === "STOPPED")).toBe(true));
+    expect(decodedMessages().some(({ type }) => type === "HOST_IDLE")).toBe(false);
+
+    releaseStopped();
+    await waitFor(() => expect(decodedMessages().some(({ type }) => type === "HOST_IDLE")).toBe(true));
+  });
+
+  it("ignores a stale HOST_IDLE after a replacement session starts", () => {
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map(),
+    };
+    const { result } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      trustedHostIdentity: "teacher",
+    }));
+    const hostMessage = (type: "HOST_STATE" | "HOST_IDLE", sessionId: string) => {
+      act(() => emit(RoomEvent.DataReceived, new TextEncoder().encode(JSON.stringify({
+        version: 1,
+        type,
+        sessionId,
+        blockId: block.id,
+        ...(type === "HOST_STATE" ? { phase: "ACTIVE", studentsLocked: false, visible: true } : {}),
+      })), teacher, undefined, "playsay.external-activity.host.v1"));
+    };
+
+    hostMessage("HOST_STATE", "session-old");
+    hostMessage("HOST_STATE", "session-new");
+    hostMessage("HOST_IDLE", "session-old");
+    expect(result.current.active?.sessionId).toBe("session-new");
+
+    hostMessage("HOST_IDLE", "session-new");
+    expect(result.current.active).toBeNull();
+  });
+
+  it("clears a student session when an unsubscribed host track remains stale in the publication map", async () => {
     vi.useFakeTimers();
+    const mediaTrack = {} as MediaStreamTrack;
+    const remoteTrack = { mediaStreamTrack: mediaTrack };
     const publication = {
-      track: { mediaStreamTrack: {} as MediaStreamTrack },
+      track: remoteTrack,
       trackName: "playsay-external-activity-session-1-video",
     };
     const teacher = {
@@ -300,8 +360,7 @@ describe("useExternalActivitySession", () => {
     });
     expect(result.current.active?.sessionId).toBe("session-1");
 
-    teacher.trackPublications.clear();
-    act(() => emit(RoomEvent.TrackUnsubscribed));
+    act(() => emit(RoomEvent.TrackUnsubscribed, remoteTrack));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000);
     });

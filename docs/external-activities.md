@@ -41,7 +41,7 @@ Version `0.1.7` is the current unpacked/Jenkins artifact. It keeps the version-1
 5. Honey School returns to the lesson and publishes named screen-share video/audio tracks. These tracks are excluded from the generic screen-share stage.
 6. Pointer, keyboard, drag, and scroll input from unlocked participants is sent reliably to the teacher host; cursor positions use lossy data at a maximum UI rate of 30 Hz.
 
-The teacher can lock/unlock student input, navigate back, reload, minimize, or stop the activity. Minimizing is synchronized and retains capture for 60 seconds; reopening resumes the same session. Opening a different activity or ending the retention window tears down tracks, debugger attachment, and the extension-created tab.
+The teacher can lock/unlock student input, navigate back, reload, minimize, or stop the activity. Minimizing is synchronized and retains capture for 60 seconds; reopening resumes the same session. Opening a different activity or ending the retention window tears down tracks, debugger attachment, and the extension-created tab. `STOPPED` and `HOST_IDLE` are ordered and session-scoped: a late idle event from the previous session cannot erase an immediate relaunch, and loss of the host video track clears the participant focus even while LiveKit still exposes a stale publication object.
 
 ## Status and recovery
 

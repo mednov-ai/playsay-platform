@@ -160,7 +160,7 @@ class WorksheetMaterializationBundleService(
                 put("id", "worksheet-$pageId"); put("type", "interactiveWorksheet")
                 put("sourceAsset", "material-asset:$assetId"); put("intrinsicWidth", page.width); put("intrinsicHeight", page.height)
                 put("alt", "Worksheet page")
-                set<JsonNode>("groups", objectMapper.valueToTree(groups))
+                set<JsonNode>("groups", objectMapper.valueToTree(groups.mapIndexed { index, group -> group.copy(order = index) }))
             })
         }
 

@@ -41,7 +41,9 @@ class WorksheetMaterializationBundleServiceTest {
         val session = session()
         val source = source(session.id)
         val stub = StubWorksheetAnalysisProvider()
-        val interactive = stub.fixture(UUID.randomUUID(), "MULTIPLE_CHOICE")
+        val interactive = stub.fixture(UUID.randomUUID(), "MULTIPLE_CHOICE").let { result ->
+            result.copy(groups = result.groups.map { it.copy(order = 7) })
+        }
         val static = stub.fixture(UUID.randomUUID(), "STATIC")
         val key = stub.fixture(UUID.randomUUID(), "ANSWER_KEY")
         val review = WorksheetReview(listOf(interactive, static, key).mapIndexed { index, result ->
@@ -59,6 +61,10 @@ class WorksheetMaterializationBundleServiceTest {
         assertEquals(first.assets.map { it.id }, second.assets.map { it.id })
         assertEquals(2, first.document["pages"].size())
         assertEquals(listOf("WORKSHEET", "STATIC_IMAGE"), first.document["pages"].map { it["layout"].asText() })
+        assertEquals(
+            listOf(0),
+            first.document["pages"][0]["blocks"][0]["groups"].map { it["order"].asInt() },
+        )
         assertEquals(1, first.assets.count { it.pageId == null && !it.learnerVisible })
         assertTrue(first.assets.first { it.pageId == key.pageId }.learnerVisible.not())
         assertTrue(first.sourceMeta["watermarksPreserved"].asBoolean())

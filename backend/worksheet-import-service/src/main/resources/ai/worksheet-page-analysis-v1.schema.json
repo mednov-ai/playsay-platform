@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "worksheet-analysis/v1/page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "pageId", "role", "roleConfidence", "sections", "words", "groups"],
+  "properties": {
+    "schemaVersion": { "const": "worksheet-analysis/v1" },
+    "pageId": { "type": "string", "format": "uuid" },
+    "role": { "enum": ["WORKSHEET", "ANSWER_KEY", "STATIC_REFERENCE"] },
+    "roleConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "sections": {
+      "type": "array", "maxItems": 100, "uniqueItems": true,
+      "items": { "enum": ["TYPED_GAPS", "SINGLE_CHOICE_GAPS", "WORD_BANK_GAPS", "FORM_TRANSFORM", "MATCHING_TEXT_TEXT", "MATCHING_TEXT_IMAGE", "MULTIPLE_CHOICE", "FLASHCARDS", "STATIC_CONTENT"] }
+    },
+    "words": {
+      "type": "array", "maxItems": 5000,
+      "items": { "$ref": "#/$defs/ocrWord" }
+    },
+    "groups": {
+      "type": "array", "maxItems": 100,
+      "items": { "$ref": "#/$defs/group" }
+    }
+  },
+  "$defs": {
+    "region": {
+      "type": "object", "additionalProperties": false,
+      "required": ["x", "y", "width", "height", "anchor"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "y": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "width": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "height": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "anchor": { "enum": ["OCR_WORD", "OCR_LINE", "PRINTED_BLANK", "ARTWORK", "GEOMETRY"] },
+        "anchorId": { "type": ["string", "null"], "maxLength": 120 }
+      }
+    },
+    "reviewedValue": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value", "provenance", "confidence", "confirmed"],
+      "properties": {
+        "value": { "type": "string", "maxLength": 500 },
+        "provenance": { "enum": ["ANSWER_KEY", "VISIBLE_TEXT", "AI_INFERENCE", "TEACHER"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "confirmed": { "type": "boolean" }
+      }
+    },
+    "ocrWord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "text", "region", "confidence"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 120 },
+        "text": { "type": "string", "maxLength": 500 },
+        "region": { "$ref": "#/$defs/region" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "group": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "order", "type", "gaps", "pairs", "questions", "cards", "wordBank"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 120 },
+        "order": { "type": "integer", "minimum": 0 },
+        "type": { "enum": ["FILL_GAPS", "MATCHING_PAIRS", "MULTIPLE_CHOICE", "FLASHCARDS"] },
+        "gapMode": { "type": ["string", "null"], "enum": ["TYPED", "SINGLE_CHOICE", "WORD_BANK", "FORM_TRANSFORM", null] },
+        "gaps": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/gap" } },
+        "pairs": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/pair" } },
+        "questions": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/question" } },
+        "cards": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/card" } },
+        "wordBank": { "type": "array", "maxItems": 300, "items": { "type": "string", "maxLength": 500 } }
+      }
+    },
+    "gap": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "region", "acceptedAnswers", "options", "distractors"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 120 }, "region": { "$ref": "#/$defs/region" },
+        "prompt": { "type": ["string", "null"], "maxLength": 1000 }, "answer": { "anyOf": [{ "$ref": "#/$defs/reviewedValue" }, { "type": "null" }] },
+        "acceptedAnswers": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 500 } },
+        "options": { "type": "array", "maxItems": 50, "items": { "type": "string", "maxLength": 500 } },
+        "distractors": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/reviewedValue" } },
+        "wordBankOptionId": { "type": ["string", "null"], "maxLength": 120 }, "baseForm": { "type": ["string", "null"], "maxLength": 500 }
+      }
+    },
+    "endpoint": {
+      "type": "object", "additionalProperties": false, "required": ["region", "kind"],
+      "properties": { "region": { "$ref": "#/$defs/region" }, "kind": { "enum": ["TEXT", "IMAGE"] }, "text": { "type": ["string", "null"], "maxLength": 1000 }, "imageAlt": { "type": ["string", "null"], "maxLength": 500 } }
+    },
+    "pair": {
+      "type": "object", "additionalProperties": false, "required": ["id", "number", "left", "right"],
+      "properties": { "id": { "type": "string", "maxLength": 120 }, "number": { "type": "integer", "minimum": 1 }, "left": { "$ref": "#/$defs/endpoint" }, "right": { "$ref": "#/$defs/endpoint" } }
+    },
+    "option": {
+      "type": "object", "additionalProperties": false, "required": ["id", "order", "text", "provenance", "confidence", "confirmed"],
+      "properties": { "id": { "type": "string", "maxLength": 120 }, "order": { "type": "integer", "minimum": 0 }, "region": { "anyOf": [{ "$ref": "#/$defs/region" }, { "type": "null" }] }, "text": { "type": "string", "maxLength": 1000 }, "provenance": { "enum": ["ANSWER_KEY", "VISIBLE_TEXT", "AI_INFERENCE", "TEACHER"] }, "confidence": { "type": "number", "minimum": 0, "maximum": 1 }, "confirmed": { "type": "boolean" } }
+    },
+    "question": {
+      "type": "object", "additionalProperties": false, "required": ["id", "prompt", "options", "correctOptionIds"],
+      "properties": { "id": { "type": "string", "maxLength": 120 }, "prompt": { "type": "string", "maxLength": 2000 }, "promptRegion": { "anyOf": [{ "$ref": "#/$defs/region" }, { "type": "null" }] }, "options": { "type": "array", "minItems": 2, "maxItems": 20, "items": { "$ref": "#/$defs/option" } }, "correctOptionIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "maxLength": 120 } } }
+    },
+    "side": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "provenance", "confidence", "confirmed"],
+      "properties": { "kind": { "enum": ["TEXT", "IMAGE"] }, "text": { "type": ["string", "null"], "maxLength": 2000 }, "region": { "anyOf": [{ "$ref": "#/$defs/region" }, { "type": "null" }] }, "provenance": { "enum": ["ANSWER_KEY", "VISIBLE_TEXT", "AI_INFERENCE", "TEACHER"] }, "confidence": { "type": "number", "minimum": 0, "maximum": 1 }, "confirmed": { "type": "boolean" } }
+    },
+    "card": {
+      "type": "object", "additionalProperties": false, "required": ["id", "order", "front", "back"],
+      "properties": { "id": { "type": "string", "maxLength": 120 }, "order": { "type": "integer", "minimum": 0 }, "front": { "$ref": "#/$defs/side" }, "back": { "$ref": "#/$defs/side" } }
+    }
+  }
+}

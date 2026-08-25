@@ -42,5 +42,22 @@ class OpenApiExportTest {
         assertTrue(Files.isRegularFile(output))
         assertTrue(yaml.contains("openapi:"))
         assertTrue(yaml.contains("operationId: getMe"))
+        listOf(
+            "operationId: listMaterials",
+            "operationId: createMaterial",
+            "operationId: getMaterial",
+            "operationId: updateMaterial",
+            "operationId: draftMaterialFromUrl",
+            "operationId: draftMaterialWithAi",
+            "operationId: appendMaterialImagePage",
+            "operationId: uploadMaterialImageAsset",
+            "operationId: getMaterialAssetContent",
+            "operationId: saveScheduledLessonMaterialSubmission",
+            "operationId: getScheduledLessonMaterialSubmission",
+            "operationId: createWorksheetImport",
+            "operationId: materializeWorksheetImport",
+        ).forEach { operation ->
+            assertTrue(yaml.contains(operation), "OpenAPI operation disappeared: $operation")
+        }
     }
 }

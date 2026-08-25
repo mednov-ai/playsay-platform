@@ -165,4 +165,20 @@ describe("RenderedMaterialBlock video playback", () => {
     expect(teacherMarkup).toContain("playsay-video-resize-handle");
     expect(learnerMarkup).not.toContain("playsay-video-resize-handle");
   });
+
+  it("renders worksheet overlays without embedding accepted answers", () => {
+    const markup = renderToStaticMarkup(<RenderedMaterialBlock
+      assetTags={{}}
+      assetUrls={{ "00000000-0000-0000-0000-000000000001": "blob:page" }}
+      block={{
+        id: "worksheet", type: "interactiveWorksheet", title: "Page", sourceAsset: "material-asset:00000000-0000-0000-0000-000000000001",
+        intrinsicWidth: 800, intrinsicHeight: 1200,
+        worksheetGroups: [{ id: "gaps", order: 0, type: "FILL_GAPS", gapMode: "TYPED", gaps: [{ id: "gap", region: { x: 100, y: 200, width: 250, height: 50 } }] }],
+      }}
+      mode="classroom"
+    />);
+    expect(markup).toContain("playsay-interactive-worksheet");
+    expect(markup).toContain("left:10%");
+    expect(markup).not.toContain("secret-answer");
+  });
 });

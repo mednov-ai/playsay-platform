@@ -3497,3 +3497,101 @@
     border-left: 0;
   }
 }
+/* Photo/PDF worksheet import stays visually separate from the ordinary block editor. */
+.material-creation-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; margin-bottom:.75rem; }
+.material-creation-actions > * { min-height:3rem; display:flex; align-items:center; justify-content:center; gap:.4rem; border:1px solid hsl(var(--border)); border-radius:.8rem; font-size:.8rem; font-weight:800; }
+.material-creation-actions svg { width:1rem; height:1rem; }
+.worksheet-import-workspace { overflow:hidden; border:1px solid hsl(var(--border)); border-radius:1.25rem; background:rgba(255,255,255,.92); }
+.worksheet-import-header,.worksheet-import-footer { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.75rem 1rem; border-bottom:1px solid hsl(var(--border)); }
+.worksheet-import-header h2 { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:900; }
+.worksheet-import-packet { max-width:46rem; margin:auto; padding:1.25rem; display:grid; gap:.85rem; }
+.worksheet-import-packet label,.worksheet-import-controls label { display:grid; gap:.3rem; font-size:.75rem; font-weight:900; }
+.worksheet-import-drop { min-height:8rem; place-content:center; place-items:center; border:2px dashed hsl(var(--primary)); border-radius:1rem; background:hsl(var(--primary)/.05); cursor:pointer; }
+.worksheet-import-drop.dragging { outline:4px solid hsl(var(--primary)/.25); background:hsl(var(--primary)/.12); }
+.worksheet-import-preserve-note { color:hsl(var(--muted-foreground)); font-size:.78rem; }
+.worksheet-import-drop input { position:absolute; width:1px; height:1px; opacity:0; }
+.worksheet-import-file { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.5rem .7rem; border:1px solid hsl(var(--border)); border-radius:.7rem; }
+.worksheet-import-file button,.worksheet-import-header > button:last-child { display:grid; width:2rem; height:2rem; place-items:center; border-radius:.5rem; }
+.worksheet-import-file svg,.worksheet-import-header > button:last-child svg { width:1rem; }
+.worksheet-import-status { padding:.45rem 1rem; background:hsl(var(--muted)); font-size:.8rem; font-weight:800; }
+.worksheet-import-review { display:grid; grid-template-columns:9rem minmax(0,1fr) 15rem; min-height:38rem; }
+.worksheet-import-filmstrip { overflow:auto; padding:.5rem; border-right:1px solid hsl(var(--border)); display:flex; flex-direction:column; gap:.5rem; }
+.worksheet-import-filmstrip > div { padding:.25rem; border:2px solid transparent; border-radius:.65rem; }
+.worksheet-import-filmstrip > div.active { border-color:hsl(var(--primary)); }
+.worksheet-import-filmstrip > div > button:first-child { width:100%; text-align:left; font-size:.7rem; font-weight:800; }
+.worksheet-import-page-order { display:flex; justify-content:center; gap:.25rem; }
+.worksheet-import-page-order button { display:grid; width:1.75rem; height:1.75rem; place-items:center; }
+.worksheet-import-page-order svg { width:.85rem; }
+.worksheet-import-filmstrip img { width:100%; aspect-ratio:3/4; object-fit:contain; background:white; }
+.worksheet-import-controls { display:flex; flex-wrap:wrap; gap:.55rem; padding:.6rem; }
+.worksheet-import-controls select { min-height:2.25rem; border:1px solid hsl(var(--border)); border-radius:.55rem; padding:0 .5rem; }
+.worksheet-import-tools { display:flex; flex-wrap:wrap; align-items:end; gap:.3rem; }
+.worksheet-import-tools button { display:flex; align-items:center; gap:.25rem; min-height:2.25rem; padding:0 .55rem; border:1px solid hsl(var(--border)); border-radius:.55rem; font-size:.72rem; font-weight:800; }
+.worksheet-import-tools button.active { color:white; background:hsl(var(--primary)); }
+.worksheet-import-tools svg { width:.9rem; }
+.worksheet-import-viewport-tools { display:flex; align-items:end; gap:.25rem; }
+.worksheet-import-viewport-tools button { display:grid; width:2.25rem; height:2.25rem; place-items:center; border:1px solid hsl(var(--border)); border-radius:.55rem; }
+.worksheet-import-viewport-tools svg { width:1rem; }
+.worksheet-import-viewport-tools output { min-width:3rem; text-align:center; font-size:.72rem; font-weight:900; }
+.worksheet-import-canvas-viewport { overflow:auto; max-height:70vh; padding:.5rem; overscroll-behavior:contain; }
+.worksheet-import-canvas { position:relative; margin:.25rem auto 1rem; max-width:none; touch-action:none; user-select:none; background:#fff; box-shadow:0 8px 30px rgba(0,0,0,.12); transform-origin:top left; }
+.worksheet-import-canvas > img { display:block; width:100%; height:auto; pointer-events:none; }
+.worksheet-import-canvas > svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.worksheet-import-canvas polyline { fill:none; stroke:hsl(var(--primary)); stroke-width:35; vector-effect:non-scaling-stroke; }
+.worksheet-import-region { position:absolute; display:grid; place-items:center; min-width:1.75rem; min-height:1.75rem; border:2px solid hsl(var(--primary)); border-radius:.35rem; background:hsl(var(--primary)/.18); color:hsl(var(--foreground)); font-size:.68rem; font-weight:900; }
+.worksheet-import-region[data-selected="true"] { outline:4px solid hsl(var(--primary)/.28); background:hsl(var(--primary)); color:white; }
+.worksheet-region-reclassify { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem; margin:.5rem; padding:.5rem; border:1px solid hsl(var(--primary)/.35); border-radius:.65rem; background:hsl(var(--primary)/.06); }
+.worksheet-region-reclassify > span { margin-right:auto; font-size:.75rem; font-weight:900; }
+.worksheet-import-blockers { padding:.75rem; border-left:1px solid hsl(var(--border)); font-size:.8rem; }
+.worksheet-import-blockers h3 { font-weight:900; }
+.worksheet-import-blockers li { margin-top:.4rem; color:hsl(var(--destructive)); }
+.worksheet-import-blockers button { text-align:left; text-decoration:underline; text-underline-offset:2px; }
+.worksheet-import-wait { min-height:25rem; display:grid; place-content:center; place-items:center; gap:.5rem; font-weight:800; }
+.worksheet-import-footer { border-top:1px solid hsl(var(--border)); border-bottom:0; flex-wrap:wrap; }
+.worksheet-import-footer label { display:flex; align-items:center; gap:.35rem; font-size:.8rem; font-weight:700; }
+@media (max-width:900px) { .worksheet-import-review { grid-template-columns:1fr; } .worksheet-import-filmstrip { flex-direction:row; border-right:0; border-bottom:1px solid hsl(var(--border)); } .worksheet-import-filmstrip button { flex:0 0 6rem; } .worksheet-import-blockers { border-left:0; border-top:1px solid hsl(var(--border)); } }
+@media (max-width:560px) { .material-creation-actions { grid-template-columns:1fr; } .worksheet-import-header { padding:.5rem; } .worksheet-import-header h2 { font-size:.9rem; } .worksheet-import-footer > * { flex:1 1 100%; } .worksheet-import-tools button { min-height:2.75rem; } .worksheet-import-viewport-tools button,.worksheet-import-page-order button,.worksheet-import-file button,.worksheet-import-header > button:last-child { width:2.75rem; height:2.75rem; } .worksheet-import-region { min-width:2.75rem; min-height:2.75rem; } }
+.playsay-render-block-worksheet,.playsay-interactive-worksheet-shell { width:100%; }
+.playsay-interactive-worksheet-viewport { overflow:auto; max-height:min(78vh,62rem); overscroll-behavior:contain; }
+.playsay-worksheet-zoom { display:flex; align-items:center; justify-content:flex-end; gap:.35rem; margin-bottom:.35rem; }
+.playsay-worksheet-zoom button { display:grid; width:2.5rem; height:2.5rem; place-items:center; border:1px solid hsl(var(--border)); border-radius:.55rem; }
+.playsay-worksheet-zoom svg { width:1rem; }
+.playsay-worksheet-zoom output { min-width:3rem; text-align:center; font-size:.75rem; font-weight:900; }
+.playsay-interactive-worksheet { position:relative; width:100%; overflow:hidden; background:#fff; }
+.playsay-interactive-worksheet > img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+.playsay-worksheet-overlay { position:absolute; inset:0; }
+.playsay-worksheet-overlay > input,.playsay-worksheet-overlay > select,.playsay-worksheet-overlay > button { position:absolute; min-width:2rem; min-height:2rem; border:2px solid hsl(var(--primary)); border-radius:.35rem; background:rgba(255,255,255,.94); padding:.1rem .25rem; font-weight:800; }
+.playsay-worksheet-overlay [data-status="selected"],.playsay-worksheet-overlay [data-status="solved"],.playsay-worksheet-overlay [aria-pressed="true"] { outline:3px solid hsl(var(--primary)/.3); background:hsl(var(--primary)); color:white; }
+.playsay-worksheet-overlay [data-status="wrong"] { border-color:hsl(var(--destructive)); }
+.playsay-worksheet-overlay [data-status="correct"],.playsay-worksheet-overlay [data-status="solved"] { border-color:hsl(142 55% 36%); }
+.playsay-worksheet-overlay [data-status="locked"] { border-style:dashed; opacity:.72; }
+.playsay-worksheet-overlay [data-live-active="true"] { box-shadow:0 0 0 4px var(--playsay-live-color,hsl(var(--primary))); }
+.playsay-worksheet-gap-input { position:absolute; display:grid; grid-template-columns:minmax(0,1fr) auto auto; min-width:5rem; min-height:2rem; border:2px solid hsl(var(--primary)); border-radius:.35rem; background:rgba(255,255,255,.96); overflow:visible; }
+.playsay-worksheet-gap-input input { min-width:0; width:100%; padding:0 .25rem; background:transparent; font-weight:800; }
+.playsay-worksheet-gap-input button { display:grid; width:1.75rem; place-items:center; border-left:1px solid hsl(var(--border)); background:hsl(var(--background)/.96); }
+.playsay-worksheet-gap-input svg { width:.8rem; }
+.worksheet-match-hotspot,.worksheet-choice-hotspot,.worksheet-choice-check { position:absolute; min-width:2rem; min-height:2rem; border:2px solid hsl(var(--primary)); border-radius:.35rem; background:rgba(255,255,255,.94); padding:.1rem .25rem; font-weight:900; }
+.playsay-worksheet-overlay > button.flashcard { border-style:dashed; }
+.playsay-worksheet-card-reveal { position:absolute; z-index:3; top:calc(100% + .3rem); left:0; min-width:max(10rem,100%); max-width:18rem; padding:.6rem; border:2px solid hsl(var(--primary)); border-radius:.6rem; background:hsl(var(--background)); color:hsl(var(--foreground)); box-shadow:0 8px 22px rgba(0,0,0,.2); white-space:normal; }
+.playsay-worksheet-word-bank { display:flex; flex-wrap:wrap; justify-content:center; gap:.35rem; margin-bottom:.4rem; padding:.45rem; border-radius:.6rem; background:hsl(var(--muted)/.45); }
+.playsay-worksheet-word-bank button { min-height:2.75rem; padding:.25rem .65rem; border:1px solid hsl(var(--border)); border-radius:.45rem; background:hsl(var(--background)); font-size:.75rem; font-weight:800; }
+.playsay-worksheet-word-bank button[data-selected="true"] { outline:3px solid hsl(var(--primary)/.25); border-color:hsl(var(--primary)); }
+.playsay-worksheet-image-missing { display:grid; height:100%; place-items:center; color:hsl(var(--muted-foreground)); }
+.worksheet-group-editors { display:grid; gap:.6rem; padding:.6rem; }
+.worksheet-group-editors section,.worksheet-item-editor,.worksheet-pair-editor,.worksheet-choice-editor,.worksheet-flashcard-editor { display:grid; gap:.45rem; padding:.65rem; border:1px solid hsl(var(--border)); border-radius:.75rem; }
+.worksheet-group-editors section > header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+.worksheet-group-editors section > header button,.worksheet-item-editor > button,.worksheet-choice-editor > button:first-of-type { display:grid; width:2rem; height:2rem; place-items:center; justify-self:end; }
+.worksheet-group-editors section svg { width:1rem; }
+.worksheet-group-editors h3 { font-size:.8rem; font-weight:900; }
+.worksheet-group-editors label { display:grid; grid-template-columns:minmax(6rem,auto) minmax(0,1fr); align-items:center; gap:.5rem; font-size:.75rem; font-weight:800; }
+.worksheet-item-editor { grid-template-columns:1fr; }
+.worksheet-item-editor legend,.worksheet-pair-editor legend,.worksheet-choice-editor legend,.worksheet-flashcard-editor legend { padding:0 .25rem; font-size:.76rem; font-weight:900; }
+.worksheet-pair-editor { grid-template-columns:minmax(8rem,.6fr) 1fr minmax(8rem,.6fr) 1fr auto auto; align-items:center; }
+.worksheet-choice-editor { display:grid; gap:.4rem; }
+.worksheet-choice-editor > div { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; align-items:center; gap:.35rem; }
+.worksheet-choice-editor label { grid-template-columns:auto auto; }
+.worksheet-flashcard-editor > div { display:grid; grid-template-columns:6rem 8rem minmax(0,1fr) auto; align-items:center; gap:.4rem; }
+.worksheet-provenance { color:hsl(var(--muted-foreground)); }
+@media (prefers-reduced-motion:reduce) { .worksheet-import-workspace *,.playsay-interactive-worksheet-shell * { scroll-behavior:auto!important; transition:none!important; animation-duration:.001ms!important; } }
+@media (max-width:900px) { .worksheet-pair-editor { grid-template-columns:1fr 1fr; } .worksheet-choice-editor > div { grid-template-columns:auto minmax(0,1fr); } .worksheet-flashcard-editor > div { grid-template-columns:1fr; } }
+@media (max-width:560px) { .worksheet-group-editors label { grid-template-columns:1fr; } .worksheet-pair-editor { grid-template-columns:1fr; } .worksheet-choice-editor > div { grid-template-columns:auto minmax(0,1fr); } .playsay-worksheet-overlay > input,.playsay-worksheet-overlay > select,.playsay-worksheet-overlay > button,.worksheet-match-hotspot,.worksheet-choice-hotspot,.worksheet-choice-check { min-width:2.75rem; min-height:2.75rem; } }

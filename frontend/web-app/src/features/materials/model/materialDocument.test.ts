@@ -9,6 +9,7 @@ import {
   materialAnswerStatus,
   appendMaterialAttempt,
   materialAssessmentForItem,
+  materialBlockContextLabel,
   materialBlockFromJson,
   newMaterialBlock,
   materialExerciseItemKey,
@@ -24,6 +25,23 @@ import {
 import type { MaterialEditorBlock } from "./types";
 
 describe("material document accepted answers", () => {
+  it("keeps worksheet answer data out of contextual labels", () => {
+    const block = {
+      id: "worksheet-label",
+      type: "interactiveWorksheet",
+      title: "To be practice",
+      worksheetGroups: [{
+        id: "group", order: 0, type: "MULTIPLE_CHOICE",
+        questions: [{ id: "q", prompt: "Choose a form", correctOptionIds: ["secret-correct"], options: [{ id: "secret-correct", order: 0, text: "answer" }] }],
+      }],
+    } as unknown as MaterialEditorBlock;
+
+    const label = materialBlockContextLabel(block);
+    expect(label).toContain("To be practice");
+    expect(label).not.toContain("secret-correct");
+    expect(label).not.toContain("answer");
+  });
+
   it("creates and serializes a shared external activity block", () => {
     const block = newMaterialBlock("externalActivity");
     expect(block).toMatchObject({
@@ -90,6 +108,49 @@ describe("material document accepted answers", () => {
       imageSize: "MEDIUM",
       objectFit: "contain",
       url: "material-asset:asset-1",
+    });
+  });
+
+  it("keeps native schema v1 multiple choice and flashcards through serde", () => {
+    const multipleChoice = materialBlockFromJson({
+      id: "choice-block",
+      type: "multipleChoice",
+      title: "Choose",
+      items: [
+        {
+          id: "choice-1",
+          prompt: "They ___ ready.",
+          answer: "are",
+          choices: ["am", "is", "are"],
+        },
+      ],
+    });
+    const flashcards = materialBlockFromJson({
+      id: "cards-block",
+      type: "flashcards",
+      title: "Words",
+      cards: [{ id: "card-1", front: "dog", back: "собака", example: "A friendly dog" }],
+    });
+
+    expect(multipleChoice).toMatchObject({
+      id: "choice-block",
+      type: "multipleChoice",
+      items: [{ id: "choice-1", answer: "are", options: ["am", "is", "are"] }],
+    });
+    expect(flashcards).toMatchObject({
+      id: "cards-block",
+      type: "flashcards",
+      cards: [{ id: "card-1", front: "dog", back: "собака", example: "A friendly dog" }],
+    });
+    expect(cleanMaterialBlock(multipleChoice as MaterialEditorBlock)).toMatchObject({
+      id: "choice-block",
+      type: "multipleChoice",
+      items: [{ id: "choice-1", answer: "are", options: ["am", "is", "are"] }],
+    });
+    expect(cleanMaterialBlock(flashcards as MaterialEditorBlock)).toMatchObject({
+      id: "cards-block",
+      type: "flashcards",
+      cards: [{ id: "card-1", front: "dog", back: "собака", example: "A friendly dog" }],
     });
   });
 
@@ -594,6 +655,37 @@ describe("material document accepted answers", () => {
     expect(score).toBe(7);
   });
 
+  it("scores worksheet gaps, pairs, and multi-answer choices while ignoring flashcard reveals", () => {
+    const material = {
+      id: "worksheet-score",
+      title: "Worksheet",
+      document: { schemaVersion: 2, pages: [{ id: "p", title: "Page", layout: "WORKSHEET", blocks: [{
+        id: "worksheet", type: "interactiveWorksheet", title: "Worksheet", sourceAsset: "material-asset:00000000-0000-0000-0000-000000000001", intrinsicWidth: 800, intrinsicHeight: 1200,
+        groups: [
+          { id: "g", order: 0, type: "FILL_GAPS", gapMode: "TYPED", gaps: [{ id: "gap", region: { x: 1, y: 1, width: 10, height: 10 }, acceptedAnswers: ["am", "'m"] }] },
+          { id: "m", order: 1, type: "MATCHING_PAIRS", pairs: [{ id: "pair", number: 1, left: { region: { x: 1, y: 20, width: 10, height: 10 } }, right: { region: { x: 20, y: 20, width: 10, height: 10 } } }] },
+          { id: "c", order: 2, type: "MULTIPLE_CHOICE", questions: [{ id: "choice", prompt: "Pick", correctOptionIds: ["a", "b"], options: [{ id: "a", order: 0, text: "A" }, { id: "b", order: 1, text: "B" }] }] },
+          { id: "f", order: 3, type: "FLASHCARDS", cards: [{ id: "card", order: 0, front: { kind: "TEXT", text: "front" }, back: { kind: "TEXT", text: "back" } }] },
+        ],
+      }] }] },
+      scoringRubric: { maxScore: 10 },
+    };
+
+    const score = materialLiveScore(material as never, { worksheet: {
+      items: { gap: "'m" },
+      matches: { pair: "pair" },
+      choiceItems: { choice: ["b", "a"] },
+      attempts: {
+        gap: [{ at: "2026-08-25T00:00:00Z", value: "'m", correct: true }],
+        pair: [{ at: "2026-08-25T00:00:00Z", value: "pair", correct: true }],
+        choice: [{ at: "2026-08-25T00:00:00Z", value: "a|b", correct: true }],
+      },
+      revealed: ["card"],
+    } });
+
+    expect(score).toBe(10);
+  });
+
   it("keeps matching pair error budget on the block instead of individual pairs", () => {
     const block = materialBlockFromJson({
       id: "matching",
@@ -645,5 +737,19 @@ describe("material document accepted answers", () => {
     expect(materialAcceptedAnswersWithCandidate(["going out"], "going", "going alone")).toEqual(["going out", "going alone"]);
     expect(materialAcceptedAnswersWithCandidate(["going out"], "going", "Going out")).toEqual(["going out"]);
     expect(materialAcceptedAnswersWithCandidate(["going out"], "going", " going ")).toEqual(["going out"]);
+  });
+
+  it("preserves schema v2 worksheet geometry while keeping schema v1 compatible", () => {
+    const document = editorDocumentFromJson({ schemaVersion: 2, pages: [{
+      id: "page-1", title: "Worksheet", layout: "WORKSHEET", blocks: [{
+        id: "worksheet-1", type: "interactiveWorksheet", title: "Worksheet",
+        sourceAsset: "material-asset:00000000-0000-0000-0000-000000000001", intrinsicWidth: 800, intrinsicHeight: 1200,
+        groups: [{ id: "gaps", order: 0, type: "FILL_GAPS", gapMode: "TYPED", gaps: [{ id: "gap-1", region: { x: 100, y: 200, width: 250, height: 50 } }] }],
+      }],
+    }] });
+    expect(document.schemaVersion).toBe(2);
+    expect(document.pages[0]?.blocks[0]).toMatchObject({ type: "interactiveWorksheet", intrinsicWidth: 800 });
+    expect(document.pages[0]?.blocks[0]?.worksheetGroups?.[0]?.gaps?.[0]?.region).toEqual({ x: 100, y: 200, width: 250, height: 50 });
+    expect(editorDocumentFromJson({ schemaVersion: 1, pages: [{ id: "old", title: "Old", layout: "FLOW", blocks: [] }] }).schemaVersion).toBe(1);
   });
 });

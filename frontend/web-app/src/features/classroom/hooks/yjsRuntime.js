@@ -584,11 +584,13 @@ export function normalizeExerciseInteraction(value) {
   if (kind === "matchingSelection") {
     const leftId = asString(interaction?.leftId);
     const rightId = asString(interaction?.rightId);
+    const worksheetGroupId = asString(interaction?.worksheetGroupId);
     return leftId ? {
       blockId,
       kind,
       leftId,
       ...(rightId ? { rightId } : {}),
+      ...(worksheetGroupId ? { worksheetGroupId } : {}),
     } : null;
   }
   return null;

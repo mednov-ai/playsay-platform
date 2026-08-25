@@ -50,9 +50,69 @@ class MaterialObjectiveScorer(
         return when (blockType) {
             "fillGaps", "multipleChoice" -> scoreAnswerItems(block, blockId, blockType, answerBlock)
             "matchingPairs" -> scoreMatchingPairs(block, blockId, answerBlock)
+            "interactiveWorksheet" -> scoreWorksheet(block, blockId, answerBlock)
             else -> emptyList()
         }
     }
+
+    private fun scoreWorksheet(block: JsonNode, blockId: String, answerBlock: JsonNode?): List<ObjectiveItemScore> {
+        val groups = block.get("groups") as? ArrayNode ?: return emptyList()
+        val answers = answerBlock?.get("items")?.takeIf(JsonNode::isObject)
+        val matches = answerBlock?.get("matches")?.takeIf(JsonNode::isObject)
+        val choices = answerBlock?.get("choiceItems")?.takeIf(JsonNode::isObject)
+        return groups.flatMap { group -> scoreWorksheetGroup(group, blockId, answerBlock, answers, matches, choices) }
+    }
+
+    private fun scoreWorksheetGroup(
+        group: JsonNode,
+        blockId: String,
+        answerBlock: JsonNode?,
+        answers: JsonNode?,
+        matches: JsonNode?,
+        choices: JsonNode?,
+    ): List<ObjectiveItemScore> = when (group.path("type").asText()) {
+        "FILL_GAPS" -> (group.get("gaps") as? ArrayNode).orEmpty().mapNotNull { gap ->
+            val id = gap.path("id").asText().takeIf(String::isNotBlank) ?: return@mapNotNull null
+            val expected = gap.acceptedAnswers().takeIf(List<String>::isNotEmpty) ?: return@mapNotNull null
+            scoreObjectiveItem(ObjectiveItemRequest(
+                block = ObjectiveBlock(group, blockId, "fillGaps"), item = gap,
+                answer = ObjectiveAnswer(id, expected, answers?.get(id)?.asText(), answerBlock),
+            ))
+        }
+        "MATCHING_PAIRS" -> (group.get("pairs") as? ArrayNode).orEmpty().mapNotNull { pair ->
+            val id = pair.path("id").asText().takeIf(String::isNotBlank) ?: return@mapNotNull null
+            scoreObjectiveItem(ObjectiveItemRequest(
+                block = ObjectiveBlock(group, blockId, "matchingPairs"), item = pair,
+                answer = ObjectiveAnswer(id, listOf(id), matches?.get(id)?.asText(), answerBlock),
+            ))
+        }
+        "MULTIPLE_CHOICE" -> (group.get("questions") as? ArrayNode).orEmpty().mapNotNull { question ->
+            scoreWorksheetChoice(group, blockId, answerBlock, choices, question)
+        }
+        else -> emptyList()
+    }
+
+    private fun scoreWorksheetChoice(
+        group: JsonNode,
+        blockId: String,
+        answerBlock: JsonNode?,
+        choices: JsonNode?,
+        question: JsonNode,
+    ): ObjectiveItemScore? {
+        val id = question.path("id").asText().takeIf(String::isNotBlank) ?: return null
+        val expected = question.path("correctOptionIds").takeIf(JsonNode::isArray)?.map { it.asText() }?.sorted().orEmpty()
+        if (expected.isEmpty()) return null
+        val actualNode = choices?.get(id)
+        val actual = if (actualNode?.isArray == true) actualNode.map { it.asText() }.sorted().joinToString("|") else actualNode?.asText()
+        val synthetic = (question as? ObjectNode)?.deepCopy() ?: objectMapper.createObjectNode()
+        synthetic.putArray("acceptedAnswers").add(expected.joinToString("|"))
+        return scoreObjectiveItem(ObjectiveItemRequest(
+            block = ObjectiveBlock(group, blockId, "multipleChoice"), item = synthetic,
+            answer = ObjectiveAnswer(id, listOf(expected.joinToString("|")), actual, answerBlock),
+        ))
+    }
+
+    private fun ArrayNode?.orEmpty(): List<JsonNode> = this?.toList().orEmpty()
 
     private fun scoreAnswerItems(
         block: JsonNode,

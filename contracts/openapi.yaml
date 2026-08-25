@@ -7,6 +7,37 @@ servers:
 - url: /api
   description: Honey School web-app API proxy
 paths:
+  /worksheet-imports/{sessionId}/review:
+    put:
+      tags:
+      - worksheet-import-controller
+      operationId: replaceWorksheetImportReview
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonNode"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JsonNode"
   /users/me/profile:
     get:
       tags:
@@ -832,6 +863,100 @@ paths:
       responses:
         "204":
           description: No Content
+  /worksheet-imports:
+    post:
+      tags:
+      - worksheet-import-controller
+      summary: "Create a worksheet import from photos, scans or PDFs"
+      operationId: createWorksheetImport
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  $ref: "#/components/schemas/WorksheetImportCreateRequest"
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+              required:
+              - files
+              - metadata
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonNode"
+      security:
+      - bearerAuth: []
+  /worksheet-imports/{sessionId}/retry:
+    post:
+      tags:
+      - worksheet-import-controller
+      operationId: retryWorksheetImportAnalysis
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JsonNode"
+  /worksheet-imports/{sessionId}/materialize:
+    post:
+      tags:
+      - worksheet-import-controller
+      operationId: materializeWorksheetImport
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorksheetMaterializeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorksheetMaterializeResponse"
+  /worksheet-imports/{sessionId}/continue-manually:
+    post:
+      tags:
+      - worksheet-import-controller
+      operationId: continueWorksheetImportManually
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JsonNode"
   /webhooks/unisender:
     get:
       tags:
@@ -2911,6 +3036,65 @@ paths:
                 $ref: "#/components/schemas/TeacherAssignmentDetailResponse"
       security:
       - bearerAuth: []
+  /worksheet-imports/{sessionId}:
+    get:
+      tags:
+      - worksheet-import-controller
+      operationId: getWorksheetImport
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JsonNode"
+    delete:
+      tags:
+      - worksheet-import-controller
+      operationId: cancelWorksheetImport
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /worksheet-imports/{sessionId}/pages/{pageId}/preview:
+    get:
+      tags:
+      - worksheet-import-controller
+      operationId: getWorksheetImportPagePreview
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
   /users/students:
     get:
       tags:
@@ -3201,6 +3385,59 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LessonMaterialResponse"
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/source-attachments:
+    get:
+      tags:
+      - material-source-attachment-controller
+      summary: List teacher-only worksheet source attachments
+      operationId: list
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorksheetSourceAttachmentResponse"
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/source-attachments/{attachmentId}/content:
+    get:
+      tags:
+      - material-source-attachment-controller
+      summary: Read a teacher-only worksheet source attachment
+      operationId: content
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: attachmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
       security:
       - bearerAuth: []
   /materials/{materialId}/assets:
@@ -3574,6 +3811,7 @@ paths:
           description: No Content
 components:
   schemas:
+    JsonNode: {}
     UpdateUserProfileRequest:
       type: object
       properties:
@@ -3966,7 +4204,6 @@ components:
       - type
       - updatedAt
       - workMode
-    JsonNode: {}
     MaterialSubmissionRequest:
       type: object
       properties:
@@ -4694,6 +4931,48 @@ components:
           minLength: 1
       required:
       - teacherSubject
+    WorksheetImportCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 160
+          minLength: 0
+        language:
+          type: string
+          maxLength: 16
+          minLength: 0
+        cefrLevel:
+          type: string
+          pattern: A1|A2|B1|B2|C1|C2
+        sourceNote:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - cefrLevel
+      - language
+      - sourceNote
+      - title
+    WorksheetMaterializeRequest:
+      type: object
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+        rightsConfirmed:
+          type: boolean
+      required:
+      - expectedRevision
+      - rightsConfirmed
+    WorksheetMaterializeResponse:
+      type: object
+      properties:
+        materialId:
+          type: string
+          format: uuid
+      required:
+      - materialId
     AttachStudentRequest:
       type: object
       properties:
@@ -6737,6 +7016,41 @@ components:
       - learnerSnapshotId
       - practiceId
       - sessionId
+    WorksheetSourceAttachmentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          format: uuid
+        pageId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        sourcePageNumber:
+          type:
+          - integer
+          - "null"
+          format: int32
+        kind:
+          type: string
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        byteSize:
+          type: integer
+          format: int64
+      required:
+      - byteSize
+      - fileName
+      - id
+      - kind
+      - mimeType
+      - sourceId
     HelloResponse:
       type: object
       properties:

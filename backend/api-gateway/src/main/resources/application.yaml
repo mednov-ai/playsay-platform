@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: api-gateway
+  servlet:
+    multipart:
+      max-file-size: ${PLAYSAY_WORKSHEET_GATEWAY_MULTIPART_MAX_FILE_SIZE:64MB}
+      max-request-size: ${PLAYSAY_WORKSHEET_GATEWAY_MULTIPART_MAX_REQUEST_SIZE:128MB}
+      file-size-threshold: ${PLAYSAY_WORKSHEET_GATEWAY_MULTIPART_FILE_SIZE_THRESHOLD:1MB}
   messages:
     fallback-to-system-locale: false
   datasource:
@@ -39,6 +44,14 @@ logging:
     org.hibernate.orm.connections.pooling: warn
 
 playsay:
+  worksheet-import:
+    enabled: ${PLAYSAY_WORKSHEET_IMPORT_ENABLED:false}
+    base-url: ${PLAYSAY_WORKSHEET_SERVICE_BASE_URL:http://worksheet-import-service.playsay-dev.svc.cluster.local}
+    service-token: ${PLAYSAY_WORKSHEET_SERVICE_TOKEN:}
+    connect-timeout: ${PLAYSAY_WORKSHEET_GATEWAY_CONNECT_TIMEOUT:PT5S}
+    request-timeout: ${PLAYSAY_WORKSHEET_GATEWAY_REQUEST_TIMEOUT:PT2M}
+    max-file-bytes: ${PLAYSAY_WORKSHEET_GATEWAY_MAX_FILE_BYTES:67108864}
+    max-request-bytes: ${PLAYSAY_WORKSHEET_GATEWAY_MAX_REQUEST_BYTES:134217728}
   websocket:
     allowed-origin-patterns: "${PLAYSAY_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:[*],http://127.0.0.1:[*]}"
   ai:

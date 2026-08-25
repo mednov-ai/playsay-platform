@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":contracts:media-internal-contract"))
     implementation(project(":contracts:registration-internal-contract"))
     implementation(project(":contracts:payment-internal-contract"))
+    implementation(project(":contracts:worksheet-import-internal-contract"))
     testImplementation(project(":architecture-testkit"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -24,7 +25,7 @@ dependencies {
     implementation("com.networknt:json-schema-validator:1.5.9")
     implementation("com.nimbusds:nimbus-jose-jwt")
     implementation("org.jsoup:jsoup:1.18.3")
-    implementation("org.liquibase:liquibase-core")
+    implementation("org.springframework.boot:spring-boot-starter-liquibase")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.3")
     implementation(platform("software.amazon.awssdk:bom:2.44.12"))
     implementation("software.amazon.awssdk:s3")
@@ -56,4 +57,15 @@ tasks.register<Test>("exportOpenApi") {
         "playsay.openapi.output",
         rootProject.layout.projectDirectory.file("../contracts/openapi.yaml").asFile.absolutePath,
     )
+}
+
+val verifyWorksheetImportGeneratedClient = tasks.register<Exec>("verifyWorksheetImportGeneratedClient") {
+    group = "contract verification"
+    description = "Verifies the checked-in worksheet-import gateway client matches the internal OpenAPI contract."
+    workingDir(rootProject.layout.projectDirectory.dir(".."))
+    commandLine("node", "scripts/contracts/generate-worksheet-import-client.mjs", "--check")
+}
+
+tasks.named("check") {
+    dependsOn(verifyWorksheetImportGeneratedClient)
 }

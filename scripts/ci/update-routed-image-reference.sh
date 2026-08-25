@@ -17,7 +17,7 @@ IMAGE_DIGEST="$(tr -d '[:space:]' < "$WORKSPACE/image-digest.txt")"
 export IMAGE_DIGEST
 
 case "$CHART_NAME" in
-  ai-tutor-service|api-gateway|collaboration-service|email-service|game-adapter-service|keyboard-app|keyboard-service|media-service|payment-service|registration-service|vocabulary-service|web-app) ;;
+  ai-tutor-service|worksheet-import-service|api-gateway|collaboration-service|email-service|game-adapter-service|keyboard-app|keyboard-service|media-service|payment-service|registration-service|vocabulary-service|web-app) ;;
   *) echo "Unsupported chart: $CHART_NAME" >&2; exit 1 ;;
 esac
 

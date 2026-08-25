@@ -1,0 +1,479 @@
+openapi: 3.0.3
+info:
+  title: Honey School Worksheet Import Internal API
+  version: 1.0.0
+  description: Versioned gateway-to-worksheet-import service boundary. Every route requires both the service token and the forwarded user bearer token.
+security:
+  - worksheetServiceToken: []
+    userBearer: []
+paths:
+  /internal/worksheet-imports:
+    post:
+      operationId: createWorksheetImport
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [metadata, files]
+              properties:
+                metadata:
+                  $ref: '#/components/schemas/WorksheetImportCreateRequest'
+                files:
+                  type: array
+                  items: { type: string, format: binary }
+      responses:
+        '201':
+          description: Created session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksheetImportCreateResponse' }
+        '400': { description: Invalid packet }
+        '401': { description: Missing service or user authentication }
+        '403': { description: Teacher or administrator role required }
+        '413': { description: Packet exceeds configured bounds }
+        '503': { description: Import creation disabled or temporarily unavailable }
+  /internal/worksheet-imports/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      operationId: getWorksheetImport
+      responses:
+        '200':
+          description: Authorized session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksheetImportSessionResponse' }
+        '404': { description: Missing or unauthorized session }
+    delete:
+      operationId: cancelWorksheetImport
+      responses:
+        '204': { description: Session cancelled }
+        '404': { description: Missing or unauthorized session }
+        '409': { description: Materialized session cannot be cancelled }
+  /internal/worksheet-imports/{sessionId}/pages/{pageId}/preview:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - name: pageId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getWorksheetPagePreview
+      responses:
+        '200':
+          description: Authorized raster preview
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '404': { description: Missing or unauthorized page }
+  /internal/worksheet-imports/{sessionId}/review:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    put:
+      operationId: replaceWorksheetReview
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorksheetReview' }
+      responses:
+        '200':
+          description: Saved review
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksheetImportSessionResponse' }
+        '409':
+          description: Revision conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksheetRevisionConflict' }
+        '422': { description: Review is structurally invalid }
+  /internal/worksheet-imports/{sessionId}/continue-manually:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: continueWorksheetImportManually
+      responses:
+        '200':
+          description: Session opened for manual review
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksheetImportSessionResponse' }
+        '409': { description: Session cannot transition to manual review }
+  /internal/worksheet-imports/{sessionId}/retry:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: retryWorksheetImportAnalysis
+      responses:
+        '200':
+          description: Failed session returned to the analysis queue while retaining completed page analysis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksheetImportSessionResponse' }
+        '409': { description: Only a failed session can be retried }
+  /internal/worksheet-imports/{sessionId}/materialization-bundle:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: getWorksheetMaterializationBundle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorksheetMaterializationRequest' }
+      responses:
+        '200':
+          description: Immutable revision-bound bundle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksheetMaterializationBundle' }
+        '409': { description: Session is not ready or revision is stale }
+        '422': { description: Rights are not confirmed or blockers remain }
+  /internal/worksheet-imports/{sessionId}/materialization-assets/{assetId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - name: assetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getWorksheetMaterializationAsset
+      responses:
+        '200':
+          description: Authorized bundle asset bytes
+          content:
+            application/octet-stream: { schema: { type: string, format: binary } }
+        '404': { description: Missing or unauthorized asset }
+  /internal/worksheet-imports/{sessionId}/materialization-acknowledgement:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: acknowledgeWorksheetMaterialization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MaterializationAcknowledgementRequest' }
+      responses:
+        '200':
+          description: Idempotent acknowledgement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorksheetImportSessionResponse' }
+        '409': { description: Conflicting material acknowledgement }
+components:
+  securitySchemes:
+    worksheetServiceToken:
+      type: apiKey
+      in: header
+      name: X-PlaySay-Worksheet-Service-Token
+    userBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    WorksheetImportStatus:
+      type: string
+      enum: [ANALYZING, REVIEW_REQUIRED, READY, FAILED, MATERIALIZED]
+    WorksheetSourceKind:
+      type: string
+      enum: [IMAGE, PDF]
+    WorksheetPageRole:
+      type: string
+      enum: [WORKSHEET, ANSWER_KEY, STATIC_REFERENCE]
+    WorksheetSectionType:
+      type: string
+      enum: [TYPED_GAPS, SINGLE_CHOICE_GAPS, WORD_BANK_GAPS, FORM_TRANSFORM, MATCHING_TEXT_TEXT, MATCHING_TEXT_IMAGE, MULTIPLE_CHOICE, FLASHCARDS, STATIC_CONTENT]
+    WorksheetInteractionType:
+      type: string
+      enum: [FILL_GAPS, MATCHING_PAIRS, MULTIPLE_CHOICE, FLASHCARDS]
+    WorksheetGapMode:
+      type: string
+      enum: [TYPED, SINGLE_CHOICE, WORD_BANK, FORM_TRANSFORM]
+    WorksheetContentKind:
+      type: string
+      enum: [TEXT, IMAGE]
+    WorksheetAnswerProvenance:
+      type: string
+      enum: [ANSWER_KEY, VISIBLE_TEXT, AI_INFERENCE, TEACHER]
+    WorksheetRegionAnchor:
+      type: string
+      enum: [OCR_WORD, OCR_LINE, PRINTED_BLANK, ARTWORK, GEOMETRY]
+    WorksheetBlockerCode:
+      type: string
+      enum: [MISSING_ANSWER, LOW_CONFIDENCE, UNCLASSIFIED_REGION, INCOMPLETE_PAIR, INCOMPLETE_MULTIPLE_CHOICE, INCOMPLETE_FLASHCARD, INVALID_WORD_BANK]
+    WorksheetImportCreateRequest:
+      type: object
+      required: [title, language, cefrLevel, sourceNote]
+      properties:
+        title: { type: string, maxLength: 160 }
+        language: { type: string, maxLength: 16 }
+        cefrLevel: { type: string, enum: [A1, A2, B1, B2, C1, C2] }
+        sourceNote: { type: string, maxLength: 1000 }
+    WorksheetUploadRejectionCode:
+      type: string
+      enum: [EMPTY, UNSUPPORTED_TYPE, CONTENT_MISMATCH, FILE_TOO_LARGE, PACKET_TOO_LARGE, INVALID_IMAGE, INVALID_PDF]
+    WorksheetUploadRejection:
+      type: object
+      required: [fileName, code]
+      properties:
+        fileName: { type: string, maxLength: 255 }
+        code: { $ref: '#/components/schemas/WorksheetUploadRejectionCode' }
+    WorksheetImportCreateResponse:
+      type: object
+      required: [session, rejectedSources]
+      properties:
+        session: { $ref: '#/components/schemas/WorksheetImportSessionResponse' }
+        rejectedSources:
+          type: array
+          items: { $ref: '#/components/schemas/WorksheetUploadRejection' }
+    NormalizedRegion:
+      type: object
+      required: [x, y, width, height, anchor, anchorId]
+      properties:
+        x: { type: integer, minimum: 0, maximum: 1000 }
+        y: { type: integer, minimum: 0, maximum: 1000 }
+        width: { type: integer, minimum: 1, maximum: 1000 }
+        height: { type: integer, minimum: 1, maximum: 1000 }
+        anchor: { $ref: '#/components/schemas/WorksheetRegionAnchor' }
+        anchorId: { type: string, nullable: true, maxLength: 100 }
+    ReviewedValue:
+      type: object
+      required: [value, provenance, confidence, confirmed]
+      properties:
+        value: { type: string, maxLength: 1000 }
+        provenance: { $ref: '#/components/schemas/WorksheetAnswerProvenance' }
+        confidence: { type: number, format: double, minimum: 0, maximum: 1 }
+        confirmed: { type: boolean }
+    WorksheetGapItem:
+      type: object
+      required: [id, region, prompt, answer, acceptedAnswers, options, distractors, wordBankOptionId, baseForm]
+      properties:
+        id: { type: string, maxLength: 100 }
+        region: { $ref: '#/components/schemas/NormalizedRegion' }
+        prompt: { type: string, nullable: true, maxLength: 2000 }
+        answer:
+          allOf: [{ $ref: '#/components/schemas/ReviewedValue' }]
+          nullable: true
+        acceptedAnswers: { type: array, maxItems: 20, items: { type: string, maxLength: 500 } }
+        options: { type: array, maxItems: 30, items: { type: string, maxLength: 500 } }
+        distractors: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/ReviewedValue' } }
+        wordBankOptionId: { type: string, nullable: true, maxLength: 100 }
+        baseForm: { type: string, nullable: true, maxLength: 500 }
+    WorksheetPairEndpoint:
+      type: object
+      required: [region, kind, text, imageAlt]
+      properties:
+        region: { $ref: '#/components/schemas/NormalizedRegion' }
+        kind: { $ref: '#/components/schemas/WorksheetContentKind' }
+        text: { type: string, nullable: true, maxLength: 1000 }
+        imageAlt: { type: string, nullable: true, maxLength: 500 }
+    WorksheetPair:
+      type: object
+      required: [id, number, left, right]
+      properties:
+        id: { type: string, maxLength: 100 }
+        number: { type: integer, minimum: 1 }
+        left: { $ref: '#/components/schemas/WorksheetPairEndpoint' }
+        right: { $ref: '#/components/schemas/WorksheetPairEndpoint' }
+    WorksheetChoiceOption:
+      type: object
+      required: [id, order, region, text, provenance, confidence, confirmed]
+      properties:
+        id: { type: string, maxLength: 100 }
+        order: { type: integer, minimum: 0 }
+        region:
+          allOf: [{ $ref: '#/components/schemas/NormalizedRegion' }]
+          nullable: true
+        text: { type: string, maxLength: 1000 }
+        provenance: { $ref: '#/components/schemas/WorksheetAnswerProvenance' }
+        confidence: { type: number, format: double, minimum: 0, maximum: 1 }
+        confirmed: { type: boolean }
+    WorksheetMultipleChoiceItem:
+      type: object
+      required: [id, prompt, promptRegion, options, correctOptionIds]
+      properties:
+        id: { type: string, maxLength: 100 }
+        prompt: { type: string, maxLength: 2000 }
+        promptRegion:
+          allOf: [{ $ref: '#/components/schemas/NormalizedRegion' }]
+          nullable: true
+        options: { type: array, minItems: 2, maxItems: 20, items: { $ref: '#/components/schemas/WorksheetChoiceOption' } }
+        correctOptionIds: { type: array, minItems: 1, maxItems: 20, uniqueItems: true, items: { type: string } }
+    WorksheetCardSide:
+      type: object
+      required: [kind, text, region, provenance, confidence, confirmed]
+      properties:
+        kind: { $ref: '#/components/schemas/WorksheetContentKind' }
+        text: { type: string, nullable: true, maxLength: 1000 }
+        region:
+          allOf: [{ $ref: '#/components/schemas/NormalizedRegion' }]
+          nullable: true
+        provenance: { $ref: '#/components/schemas/WorksheetAnswerProvenance' }
+        confidence: { type: number, format: double, minimum: 0, maximum: 1 }
+        confirmed: { type: boolean }
+    WorksheetFlashcard:
+      type: object
+      required: [id, order, front, back]
+      properties:
+        id: { type: string, maxLength: 100 }
+        order: { type: integer, minimum: 0 }
+        front: { $ref: '#/components/schemas/WorksheetCardSide' }
+        back: { $ref: '#/components/schemas/WorksheetCardSide' }
+    WorksheetInteractionGroup:
+      type: object
+      required: [id, order, type, gapMode, gaps, pairs, questions, cards, wordBank]
+      properties:
+        id: { type: string, maxLength: 100 }
+        order: { type: integer, minimum: 0 }
+        type: { $ref: '#/components/schemas/WorksheetInteractionType' }
+        gapMode:
+          allOf: [{ $ref: '#/components/schemas/WorksheetGapMode' }]
+          nullable: true
+        gaps: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/WorksheetGapItem' } }
+        pairs: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/WorksheetPair' } }
+        questions: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/WorksheetMultipleChoiceItem' } }
+        cards: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/WorksheetFlashcard' } }
+        wordBank: { type: array, maxItems: 100, items: { type: string, maxLength: 500 } }
+    WorksheetReviewPage:
+      type: object
+      required: [id, order, role, answerKeyPageId, sections, groups]
+      properties:
+        id: { type: string, format: uuid }
+        order: { type: integer, minimum: 0 }
+        role: { $ref: '#/components/schemas/WorksheetPageRole' }
+        answerKeyPageId: { type: string, format: uuid, nullable: true }
+        sections: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/WorksheetSectionType' } }
+        groups: { type: array, items: { $ref: '#/components/schemas/WorksheetInteractionGroup' } }
+    WorksheetReview:
+      type: object
+      required: [pages, attribution, rightsNote]
+      properties:
+        pages: { type: array, minItems: 1, maxItems: 100, items: { $ref: '#/components/schemas/WorksheetReviewPage' } }
+        attribution: { type: string, nullable: true, maxLength: 1000 }
+        rightsNote: { type: string, nullable: true, maxLength: 1000 }
+    WorksheetReviewBlocker:
+      type: object
+      required: [code, pageId, groupId, itemId]
+      properties:
+        code: { $ref: '#/components/schemas/WorksheetBlockerCode' }
+        pageId: { type: string, format: uuid }
+        groupId: { type: string, nullable: true }
+        itemId: { type: string, nullable: true }
+    WorksheetSourceResponse:
+      type: object
+      required: [id, order, kind, fileName, mimeType, byteSize, checksumSha256, pageCount]
+      properties:
+        id: { type: string, format: uuid }
+        order: { type: integer, minimum: 0 }
+        kind: { $ref: '#/components/schemas/WorksheetSourceKind' }
+        fileName: { type: string }
+        mimeType: { type: string }
+        byteSize: { type: integer, format: int64 }
+        checksumSha256: { type: string }
+        pageCount: { type: integer, minimum: 1 }
+    WorksheetPageResponse:
+      type: object
+      required: [id, sourceId, sourcePageNumber, order, width, height, previewUrl, snapCandidates]
+      properties:
+        id: { type: string, format: uuid }
+        sourceId: { type: string, format: uuid }
+        sourcePageNumber: { type: integer, nullable: true, minimum: 1 }
+        order: { type: integer, minimum: 0 }
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        previewUrl: { type: string }
+        snapCandidates:
+          type: array
+          maxItems: 1000
+          items: { $ref: '#/components/schemas/WorksheetOcrSnapCandidate' }
+    WorksheetOcrSnapCandidate:
+      type: object
+      required: [id, text, confidence, region]
+      properties:
+        id: { type: string, maxLength: 100 }
+        text: { type: string, maxLength: 1000 }
+        confidence: { type: number, format: double, minimum: 0, maximum: 1 }
+        region: { $ref: '#/components/schemas/NormalizedRegion' }
+    WorksheetImportSessionResponse:
+      type: object
+      required: [id, status, revision, title, language, cefrLevel, sources, pages, review, blockers, failureClass, materialId, createdAt, updatedAt, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/WorksheetImportStatus' }
+        revision: { type: integer, format: int64 }
+        title: { type: string }
+        language: { type: string }
+        cefrLevel: { type: string }
+        sources: { type: array, items: { $ref: '#/components/schemas/WorksheetSourceResponse' } }
+        pages: { type: array, items: { $ref: '#/components/schemas/WorksheetPageResponse' } }
+        review:
+          allOf: [{ $ref: '#/components/schemas/WorksheetReview' }]
+          nullable: true
+        blockers: { type: array, items: { $ref: '#/components/schemas/WorksheetReviewBlocker' } }
+        failureClass: { type: string, nullable: true }
+        materialId: { type: string, format: uuid, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+    WorksheetRevisionConflict:
+      type: object
+      required: [revision, status]
+      properties:
+        revision: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/WorksheetImportStatus' }
+    WorksheetMaterializationRequest:
+      type: object
+      required: [expectedRevision, rightsConfirmed]
+      properties:
+        expectedRevision: { type: integer, format: int64 }
+        rightsConfirmed: { type: boolean }
+    WorksheetMaterializationAsset:
+      type: object
+      required: [id, pageId, sourceId, sourcePageNumber, contentPath, fileName, mimeType, byteSize, checksumSha256, learnerVisible]
+      properties:
+        id: { type: string, format: uuid }
+        pageId: { type: string, format: uuid, nullable: true }
+        sourceId: { type: string, format: uuid }
+        sourcePageNumber: { type: integer, nullable: true }
+        contentPath: { type: string }
+        fileName: { type: string }
+        mimeType: { type: string }
+        byteSize: { type: integer, format: int64 }
+        checksumSha256: { type: string }
+        learnerVisible: { type: boolean }
+    WorksheetMaterializationBundle:
+      type: object
+      required: [version, sessionId, revision, ownerSubject, title, language, cefrLevel, document, sourceMeta, assets]
+      properties:
+        version: { type: string, enum: [worksheet-materialization/v1] }
+        sessionId: { type: string, format: uuid }
+        revision: { type: integer, format: int64 }
+        ownerSubject: { type: string, maxLength: 255 }
+        title: { type: string }
+        language: { type: string }
+        cefrLevel: { type: string }
+        document: { type: object, additionalProperties: true }
+        sourceMeta: { type: object, additionalProperties: true }
+        assets: { type: array, items: { $ref: '#/components/schemas/WorksheetMaterializationAsset' } }
+    MaterializationAcknowledgementRequest:
+      type: object
+      required: [revision, materialId]
+      properties:
+        revision: { type: integer, format: int64 }
+        materialId: { type: string, format: uuid }

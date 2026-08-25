@@ -24,6 +24,7 @@ import { MaterialImageInlineTools, MaterialImagePromptPopover } from "./Material
 import { RenderedChoiceExercise } from "./RenderedChoiceExercise";
 import { RenderedFillGapExercise } from "./RenderedFillGapExercise";
 import { RenderedMatchingPairsExercise } from "./RenderedMatchingPairsExercise";
+import { RenderedInteractiveWorksheet } from "./RenderedInteractiveWorksheet";
 import { useAppTranslation } from "../../../../shared/i18n";
 
 type MaterialVideoQuality = "LOW" | "MEDIUM" | "HIGH";
@@ -123,6 +124,19 @@ export function RenderedMaterialBlock({
   );
 
   switch (block.type) {
+    case "interactiveWorksheet":
+      return blockSection(
+        <RenderedInteractiveWorksheet
+          answer={answer}
+          assetUrls={assetUrls}
+          block={block}
+          mode={mode}
+          onAnswerChange={onAnswerChange}
+          onInteractionChange={onExerciseInteractionChange}
+          participants={exerciseParticipants}
+        />,
+        "playsay-render-block playsay-render-block-worksheet",
+      );
     case "text":
       return blockSection(
         <>

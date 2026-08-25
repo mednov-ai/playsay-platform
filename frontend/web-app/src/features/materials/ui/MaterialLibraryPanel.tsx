@@ -65,6 +65,7 @@ import { MaterialLibraryList } from "./MaterialLibraryList";
 import { MaterialPlayPreviewDialog } from "./MaterialPlayPreviewDialog";
 import { GameAdaptationReviewDialog } from "./GameAdaptationReviewDialog";
 import { MaterialReaderPreview } from "./MaterialReaderPreview";
+import { WorksheetImportWorkspace } from "./WorksheetImportWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function MaterialLibraryPanel({
@@ -116,6 +117,7 @@ export function MaterialLibraryPanel({
   const [draftImage, setDraftImage] = useState<MaterialDraftSourceImage | null>(null);
   const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<"library" | "edit" | "preview">("library");
+  const [worksheetImportOpen, setWorksheetImportOpen] = useState(false);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -906,6 +908,20 @@ export function MaterialLibraryPanel({
     );
   }
 
+  if (canManage && worksheetImportOpen) {
+    return <WorksheetImportWorkspace
+      disabled={disabled}
+      onClose={() => setWorksheetImportOpen(false)}
+      onMaterialized={(materialId) => {
+        setWorksheetImportOpen(false);
+        void fetchMaterial(materialId).then((material) => {
+          selectMaterial(material);
+          onRefresh();
+        });
+      }}
+    />;
+  }
+
   return (
     <section
       className="playsay-material-author-shell rounded-[1.25rem] border border-border bg-white/80"
@@ -958,8 +974,10 @@ export function MaterialLibraryPanel({
                 draftPrompt={draftPrompt}
                 draftUrl={draftUrl}
                 onDraftFromUrl={() => void generateDraftFromUrl()}
+                onCreateBlank={resetForm}
                 onDraftImageChange={(file) => void handleDraftImageChange(file)}
                 onGenerateDraft={() => void generateDraft()}
+                onOpenWorksheetImport={() => setWorksheetImportOpen(true)}
                 onRemoveDraftImage={() => setDraftImage(null)}
                 onUpdateDraftPrompt={setDraftPrompt}
                 onUpdateDraftUrl={setDraftUrl}

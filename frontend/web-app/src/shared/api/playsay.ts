@@ -5,6 +5,7 @@ export * from "./profile";
 export * from "./courses";
 export * from "./schedule";
 export * from "./materials";
+export * from "./worksheetImports";
 export * from "./homework";
 export * from "./collaboration";
 export * from "./payments";

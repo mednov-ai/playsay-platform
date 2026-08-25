@@ -624,12 +624,26 @@ describe("yjs workspace runtime annotations", () => {
         items: { first: "cloud", second: "rain" },
         optionIds: { first: "option-cloud" },
       });
+      runtime.setMaterialAnswer("worksheet-1", {
+        type: "interactiveWorksheet",
+        items: { gap: "am" },
+        matches: { pair: "pair" },
+        choiceItems: { choice: ["a", "b"] },
+        attempts: { gap: [{ at: "2026-08-25T00:00:00Z", value: "am", correct: true }] },
+      });
       const snapshot = runtime.snapshot();
       expect(answers.at(-1)).toEqual({
         "fill-1": {
           type: "fillGaps",
           items: { first: "cloud", second: "rain" },
           optionIds: { first: "option-cloud" },
+        },
+        "worksheet-1": {
+          type: "interactiveWorksheet",
+          items: { gap: "am" },
+          matches: { pair: "pair" },
+          choiceItems: { choice: ["a", "b"] },
+          attempts: { gap: [{ at: "2026-08-25T00:00:00Z", value: "am", correct: true }] },
         },
       });
       runtime.destroy();
@@ -720,13 +734,15 @@ describe("yjs workspace runtime annotations", () => {
       targetItemKey: "gap-1",
     });
     expect(normalizeExerciseInteraction({
-      blockId: "match-1",
+      blockId: "worksheet-1",
       kind: "matchingSelection",
       leftId: "pair-1",
+      worksheetGroupId: "group-1",
     })).toEqual({
-      blockId: "match-1",
+      blockId: "worksheet-1",
       kind: "matchingSelection",
       leftId: "pair-1",
+      worksheetGroupId: "group-1",
     });
     expect(normalizeExerciseInteraction({ blockId: "fill-1", kind: "unknown" })).toBeNull();
   });

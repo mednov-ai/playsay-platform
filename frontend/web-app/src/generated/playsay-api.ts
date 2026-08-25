@@ -5,6 +5,8 @@
  * Public contract for the Honey School API Gateway.
  * OpenAPI spec version: 0.1.0
  */
+export interface JsonNode {}
+
 export interface UpdateUserProfileRequest {
   /**
      * @maxLength 120
@@ -212,8 +214,6 @@ export interface ScheduledLessonResponse {
   createdAt: string;
   updatedAt: string;
 }
-
-export interface JsonNode {}
 
 export interface MaterialSubmissionRequest {
   content: JsonNode;
@@ -537,6 +537,35 @@ export interface UpdateUserRolesRequest {
 export interface AssignPrimaryTeacherRequest {
   /** @minLength 1 */
   teacherSubject: string;
+}
+
+export interface WorksheetImportCreateRequest {
+  /**
+     * @minLength 0
+     * @maxLength 160
+     */
+  title: string;
+  /**
+     * @minLength 0
+     * @maxLength 16
+     */
+  language: string;
+  /** @pattern A1|A2|B1|B2|C1|C2 */
+  cefrLevel: string;
+  /**
+     * @minLength 0
+     * @maxLength 1000
+     */
+  sourceNote: string;
+}
+
+export interface WorksheetMaterializeRequest {
+  expectedRevision: number;
+  rightsConfirmed: boolean;
+}
+
+export interface WorksheetMaterializeResponse {
+  materialId: string;
 }
 
 export interface AttachStudentRequest {
@@ -1760,6 +1789,19 @@ export interface StudentVocabularyAssignmentDetailResponse {
   learnerSnapshotId: string;
 }
 
+export interface WorksheetSourceAttachmentResponse {
+  id: string;
+  sourceId: string;
+  /** @nullable */
+  pageId?: string | null;
+  /** @nullable */
+  sourcePageNumber?: number | null;
+  kind: string;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+}
+
 export interface HelloResponse {
   service: string;
   message: string;
@@ -1854,6 +1896,11 @@ export interface EmailDeliveryDetailResponse {
   attempts: EmailProviderAttemptResponse[];
 }
 
+export type CreateWorksheetImportBody = {
+  metadata: WorksheetImportCreateRequest;
+  files: Blob[];
+};
+
 export type DelegationsParams = {
 direction?: string;
 status?: string;
@@ -1932,6 +1979,47 @@ createdTo?: string;
 export type _DeleteParams = {
 replacementTeacherSubject?: string;
 };
+
+export type replaceWorksheetImportReviewResponse200 = {
+  data: JsonNode
+  status: 200
+}
+
+export type replaceWorksheetImportReviewResponseSuccess = (replaceWorksheetImportReviewResponse200) & {
+  headers: Headers;
+};
+;
+
+export type replaceWorksheetImportReviewResponse = (replaceWorksheetImportReviewResponseSuccess)
+
+export const getReplaceWorksheetImportReviewUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/worksheet-imports/${sessionId}/review`
+}
+
+export const replaceWorksheetImportReview = async (sessionId: string,
+    jsonNode: JsonNode, options?: RequestInit): Promise<replaceWorksheetImportReviewResponse> => {
+
+  const res = await fetch(getReplaceWorksheetImportReviewUrl(sessionId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(jsonNode)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: replaceWorksheetImportReviewResponse['data'] = body !== null ? body : ''
+  return { data, status: res.status, headers: res.headers } as replaceWorksheetImportReviewResponse
+}
+
+
 
 export type getMyUserProfileResponse200 = {
   data: UserProfileResponse
@@ -3509,6 +3597,177 @@ export const removeTeacher = async (subject: string, options?: RequestInit): Pro
 
   const data: removeTeacherResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as removeTeacherResponse
+}
+
+
+
+export type createWorksheetImportResponse201 = {
+  data: JsonNode
+  status: 201
+}
+
+export type createWorksheetImportResponseSuccess = (createWorksheetImportResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createWorksheetImportResponse = (createWorksheetImportResponseSuccess)
+
+export const getCreateWorksheetImportUrl = () => {
+
+
+
+
+  return `/api/worksheet-imports`
+}
+
+/**
+ * @summary Create a worksheet import from photos, scans or PDFs
+ */
+export const createWorksheetImport = async (createWorksheetImportBody?: CreateWorksheetImportBody, options?: RequestInit): Promise<createWorksheetImportResponse> => {
+    const formData = new FormData();
+if(createWorksheetImportBody?.metadata !== undefined) {
+ formData.append(`metadata`, JSON.stringify(createWorksheetImportBody.metadata));
+ }
+if(createWorksheetImportBody?.files !== undefined) {
+ createWorksheetImportBody?.files.forEach(value => formData.append(`files`, value));
+ }
+
+  const res = await fetch(getCreateWorksheetImportUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createWorksheetImportResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createWorksheetImportResponse
+}
+
+
+
+export type retryWorksheetImportAnalysisResponse200 = {
+  data: JsonNode
+  status: 200
+}
+
+export type retryWorksheetImportAnalysisResponseSuccess = (retryWorksheetImportAnalysisResponse200) & {
+  headers: Headers;
+};
+;
+
+export type retryWorksheetImportAnalysisResponse = (retryWorksheetImportAnalysisResponseSuccess)
+
+export const getRetryWorksheetImportAnalysisUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/worksheet-imports/${sessionId}/retry`
+}
+
+export const retryWorksheetImportAnalysis = async (sessionId: string, options?: RequestInit): Promise<retryWorksheetImportAnalysisResponse> => {
+
+  const res = await fetch(getRetryWorksheetImportAnalysisUrl(sessionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: retryWorksheetImportAnalysisResponse['data'] = body !== null ? body : ''
+  return { data, status: res.status, headers: res.headers } as retryWorksheetImportAnalysisResponse
+}
+
+
+
+export type materializeWorksheetImportResponse200 = {
+  data: WorksheetMaterializeResponse
+  status: 200
+}
+
+export type materializeWorksheetImportResponseSuccess = (materializeWorksheetImportResponse200) & {
+  headers: Headers;
+};
+;
+
+export type materializeWorksheetImportResponse = (materializeWorksheetImportResponseSuccess)
+
+export const getMaterializeWorksheetImportUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/worksheet-imports/${sessionId}/materialize`
+}
+
+export const materializeWorksheetImport = async (sessionId: string,
+    worksheetMaterializeRequest: WorksheetMaterializeRequest, options?: RequestInit): Promise<materializeWorksheetImportResponse> => {
+
+  const res = await fetch(getMaterializeWorksheetImportUrl(sessionId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(worksheetMaterializeRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: materializeWorksheetImportResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as materializeWorksheetImportResponse
+}
+
+
+
+export type continueWorksheetImportManuallyResponse200 = {
+  data: JsonNode
+  status: 200
+}
+
+export type continueWorksheetImportManuallyResponseSuccess = (continueWorksheetImportManuallyResponse200) & {
+  headers: Headers;
+};
+;
+
+export type continueWorksheetImportManuallyResponse = (continueWorksheetImportManuallyResponseSuccess)
+
+export const getContinueWorksheetImportManuallyUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/worksheet-imports/${sessionId}/continue-manually`
+}
+
+export const continueWorksheetImportManually = async (sessionId: string, options?: RequestInit): Promise<continueWorksheetImportManuallyResponse> => {
+
+  const res = await fetch(getContinueWorksheetImportManuallyUrl(sessionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: continueWorksheetImportManuallyResponse['data'] = body !== null ? body : ''
+  return { data, status: res.status, headers: res.headers } as continueWorksheetImportManuallyResponse
 }
 
 
@@ -7484,6 +7743,128 @@ export const reviewVocabularyHomeworkAssignment = async (assignmentId: string,
 
 
 
+export type getWorksheetImportResponse200 = {
+  data: JsonNode
+  status: 200
+}
+
+export type getWorksheetImportResponseSuccess = (getWorksheetImportResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getWorksheetImportResponse = (getWorksheetImportResponseSuccess)
+
+export const getGetWorksheetImportUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/worksheet-imports/${sessionId}`
+}
+
+export const getWorksheetImport = async (sessionId: string, options?: RequestInit): Promise<getWorksheetImportResponse> => {
+
+  const res = await fetch(getGetWorksheetImportUrl(sessionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getWorksheetImportResponse['data'] = body !== null ? body : ''
+  return { data, status: res.status, headers: res.headers } as getWorksheetImportResponse
+}
+
+
+
+export type cancelWorksheetImportResponse200 = {
+  data: void
+  status: 200
+}
+
+export type cancelWorksheetImportResponseSuccess = (cancelWorksheetImportResponse200) & {
+  headers: Headers;
+};
+;
+
+export type cancelWorksheetImportResponse = (cancelWorksheetImportResponseSuccess)
+
+export const getCancelWorksheetImportUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/worksheet-imports/${sessionId}`
+}
+
+export const cancelWorksheetImport = async (sessionId: string, options?: RequestInit): Promise<cancelWorksheetImportResponse> => {
+
+  const res = await fetch(getCancelWorksheetImportUrl(sessionId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: cancelWorksheetImportResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as cancelWorksheetImportResponse
+}
+
+
+
+export type getWorksheetImportPagePreviewResponse200 = {
+  data: string
+  status: 200
+}
+
+export type getWorksheetImportPagePreviewResponseSuccess = (getWorksheetImportPagePreviewResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getWorksheetImportPagePreviewResponse = (getWorksheetImportPagePreviewResponseSuccess)
+
+export const getGetWorksheetImportPagePreviewUrl = (sessionId: string,
+    pageId: string,) => {
+
+
+
+
+  return `/api/worksheet-imports/${sessionId}/pages/${pageId}/preview`
+}
+
+export const getWorksheetImportPagePreview = async (sessionId: string,
+    pageId: string, options?: RequestInit): Promise<getWorksheetImportPagePreviewResponse> => {
+
+  const res = await fetch(getGetWorksheetImportPagePreviewUrl(sessionId,pageId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getWorksheetImportPagePreviewResponse['data'] = body !== null ? body : ''
+  return { data, status: res.status, headers: res.headers } as getWorksheetImportPagePreviewResponse
+}
+
+
+
 export type listStudentProfilesResponse200 = {
   data: UserProfileResponse[]
   status: 200
@@ -8105,6 +8486,94 @@ export const getMyHomeworkAssignmentMaterial = async (assignmentId: string, opti
 
   const data: getMyHomeworkAssignmentMaterialResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getMyHomeworkAssignmentMaterialResponse
+}
+
+
+
+export type listResponse200 = {
+  data: WorksheetSourceAttachmentResponse[]
+  status: 200
+}
+
+export type listResponseSuccess = (listResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listResponse = (listResponseSuccess)
+
+export const getListUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/source-attachments`
+}
+
+/**
+ * @summary List teacher-only worksheet source attachments
+ */
+export const list = async (materialId: string, options?: RequestInit): Promise<listResponse> => {
+
+  const res = await fetch(getListUrl(materialId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listResponse
+}
+
+
+
+export type contentResponse200 = {
+  data: string
+  status: 200
+}
+
+export type contentResponseSuccess = (contentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type contentResponse = (contentResponseSuccess)
+
+export const getContentUrl = (materialId: string,
+    attachmentId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/source-attachments/${attachmentId}/content`
+}
+
+/**
+ * @summary Read a teacher-only worksheet source attachment
+ */
+export const content = async (materialId: string,
+    attachmentId: string, options?: RequestInit): Promise<contentResponse> => {
+
+  const res = await fetch(getContentUrl(materialId,attachmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: contentResponse['data'] = body !== null ? body : ''
+  return { data, status: res.status, headers: res.headers } as contentResponse
 }
 
 

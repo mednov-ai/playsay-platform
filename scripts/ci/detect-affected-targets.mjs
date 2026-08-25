@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 export const TARGETS = Object.freeze([
   "api-gateway",
   "ai-tutor-service",
+  "worksheet-import-service",
   "vocabulary-service",
   "web-app",
   "game-adapter-service",
@@ -28,6 +29,7 @@ const ALL_TARGETS = new Set(TARGETS);
 const BACKEND_TARGETS = new Set([
   "api-gateway",
   "ai-tutor-service",
+  "worksheet-import-service",
   "vocabulary-service",
   "media-service",
   "payment-service",
@@ -39,6 +41,7 @@ const FRONTEND_TARGETS = new Set(["web-app", "game-adapter-service", "keyboard-a
 const TARGET_JOBS = Object.freeze({
   "api-gateway": "playsay-api-gateway-develop",
   "ai-tutor-service": "playsay-ai-tutor-service-develop",
+  "worksheet-import-service": "playsay-worksheet-import-service-develop",
   "vocabulary-service": "playsay-vocabulary-service-develop",
   "web-app": "playsay-web-app-develop",
   "game-adapter-service": "playsay-game-adapter-service-develop",
@@ -53,6 +56,7 @@ const TARGET_JOBS = Object.freeze({
 const MODULE_PIPELINES = Object.freeze({
   "Jenkinsfile.api-gateway": "api-gateway",
   "Jenkinsfile.ai-tutor-service": "ai-tutor-service",
+  "Jenkinsfile.worksheet-import-service": "worksheet-import-service",
   "Jenkinsfile.vocabulary-service": "vocabulary-service",
   "Jenkinsfile.web-app": "web-app",
   "Jenkinsfile.game-adapter-service": "game-adapter-service",
@@ -122,6 +126,7 @@ function isSharedBackendPath(path) {
     path === "backend/gradle.properties" ||
     path === "backend/.dockerignore" ||
     path.startsWith("backend/shared-kotlin/") ||
+    path.startsWith("backend/openai-support/") ||
     path.startsWith("backend/architecture-testkit/") ||
     path.startsWith("backend/build-logic/") ||
     path.startsWith("backend/config/") ||
@@ -187,6 +192,12 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path.startsWith("scripts/contracts/")) {
+      deployTargets.add("api-gateway");
+      addValidation(validationSuites, "ci-contracts");
+      continue;
+    }
+
     if (path.startsWith("scripts/smoke/")) {
       addValidation(validationSuites, "smoke-syntax");
       continue;
@@ -244,6 +255,17 @@ export function detectTargetsForPaths(paths, options = {}) {
 
     if (path.startsWith("backend/ai-tutor-service/")) {
       deployTargets.add("ai-tutor-service");
+      continue;
+    }
+
+    if (path.startsWith("backend/worksheet-import-service/")) {
+      deployTargets.add("worksheet-import-service");
+      continue;
+    }
+
+    if (path.startsWith("backend/contracts/worksheet-import-internal-contract/")) {
+      deployTargets.add("worksheet-import-service");
+      deployTargets.add("api-gateway");
       continue;
     }
 

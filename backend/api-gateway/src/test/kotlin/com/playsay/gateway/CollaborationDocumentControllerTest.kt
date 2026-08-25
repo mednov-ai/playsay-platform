@@ -51,7 +51,7 @@ import liquibase.integration.spring.SpringLiquibase
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.liquibase.enabled=true",
+        "spring.liquibase.enabled=false",
         "playsay.collaboration.websocket-url=wss://online.play-and-say.ru/collab/ws",
         "playsay.collaboration.token-secret=01234567890123456789012345678901",
         "playsay.collaboration.token-ttl-seconds=900",

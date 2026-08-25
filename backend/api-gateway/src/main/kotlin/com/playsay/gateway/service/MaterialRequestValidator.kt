@@ -32,6 +32,7 @@ class MaterialRequestValidator(
     private val messageProvider: MessageProvider,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
     private val externalActivityResolver: MaterialExternalActivityResolver = MaterialExternalActivityResolver(),
+    private val worksheetDocumentValidator: WorksheetMaterialDocumentValidator = WorksheetMaterialDocumentValidator(),
 ) {
     fun validate(request: LessonMaterialRequest): ValidatedLessonMaterialValues {
         val title = requiredClean(request.title, "title", 160)
@@ -54,6 +55,7 @@ class MaterialRequestValidator(
         val scoringRubric = request.scoringRubric ?: defaultScoringRubric(objectMapper, messageProvider)
 
         validateJsonSize("document", document, 6_000_000)
+        worksheetDocumentValidator.validate(document)
         normalizeExternalActivities(document)
         validateManualHtmlGameTitles(document)
         validateJsonSize("sourceMeta", sourceMeta, 40_000)

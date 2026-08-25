@@ -220,6 +220,7 @@ spec:
               def targetJobs = [
                 'api-gateway': 'playsay-api-gateway-develop',
                 'ai-tutor-service': 'playsay-ai-tutor-service-develop',
+                'worksheet-import-service': 'playsay-worksheet-import-service-develop',
                 'vocabulary-service': 'playsay-vocabulary-service-develop',
                 'web-app': 'playsay-web-app-develop',
                 'game-adapter-service': 'playsay-game-adapter-service-develop',

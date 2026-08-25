@@ -143,7 +143,7 @@ export function editorDocumentFromJson(value: LessonMaterialJson | unknown, fall
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: root.schemaVersion === 2 ? 2 : 1,
     pages,
   };
 }
@@ -265,7 +265,29 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
     result.pairs = block.items.map(materialMatchingPairFromJson).filter((pair): pair is MaterialMatchingPair => pair !== null);
   }
 
+  if (type === "interactiveWorksheet") {
+    result.sourceAsset = asString(block.sourceAsset);
+    result.intrinsicWidth = asPositiveNumber(block.intrinsicWidth) ?? undefined;
+    result.intrinsicHeight = asPositiveNumber(block.intrinsicHeight) ?? undefined;
+    result.worksheetGroups = normalizeWorksheetGroups(block.groups);
+  }
+
   return result;
+}
+
+function normalizeWorksheetGroups(value: unknown): MaterialEditorBlock["worksheetGroups"] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw, index) => {
+    const group = asJsonObject(raw);
+    const type = asString(group.type);
+    if (!["FILL_GAPS", "MATCHING_PAIRS", "MULTIPLE_CHOICE", "FLASHCARDS"].includes(type)) return [];
+    return [{
+      ...group,
+      id: asString(group.id) || createClientId("worksheet-group"),
+      order: asNumber(group.order) ?? index,
+      type,
+    } as NonNullable<MaterialEditorBlock["worksheetGroups"]>[number]];
+  });
 }
 
 export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBlock {
@@ -275,6 +297,12 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
     type: block.type,
     title,
   };
+  if (block.type === "interactiveWorksheet") {
+    clean.sourceAsset = block.sourceAsset;
+    clean.intrinsicWidth = block.intrinsicWidth;
+    clean.intrinsicHeight = block.intrinsicHeight;
+    clean.worksheetGroups = block.worksheetGroups;
+  }
   if (block.assessment || isObjectiveMaterialBlockType(block.type)) {
     clean.assessment = cleanMaterialAssessment(block.assessment ?? defaultObjectiveAssessmentPolicy());
     if (block.type === "fillGaps") {

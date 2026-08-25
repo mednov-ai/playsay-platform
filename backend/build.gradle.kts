@@ -8,6 +8,7 @@ val internalContractProjects = listOf(
     ":contracts:payment-internal-contract",
     ":contracts:email-internal-contract",
     ":contracts:media-internal-contract",
+    ":contracts:worksheet-import-internal-contract",
 )
 
 tasks.register("validateInternalContracts") {

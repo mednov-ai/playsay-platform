@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-  echo "Usage: $0 MODULE CHANGELOG_DIR playsay-app-db|playsay-keyboard-db" >&2
+  echo "Usage: $0 MODULE CHANGELOG_DIR playsay-app-db|playsay-keyboard-db|playsay-worksheet-import-db" >&2
   exit 2
 }
 
@@ -17,7 +17,7 @@ case "$module_name" in
   *[!a-z0-9-]*|'') usage ;;
 esac
 case "$db_secret" in
-  playsay-app-db|playsay-keyboard-db) ;;
+  playsay-app-db|playsay-keyboard-db|playsay-worksheet-import-db) ;;
   *) usage ;;
 esac
 [ -f "$changelog_dir/db.changelog-master.xml" ] || {

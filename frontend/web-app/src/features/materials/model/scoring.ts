@@ -242,6 +242,56 @@ export function materialLiveScore(material: LessonMaterial, answers: MaterialAns
           touchedWeight += policy.weight ?? 1;
           earnedWeight += (policy.weight ?? 1) * scoreFactor;
         });
+        return;
+      }
+
+      if (block.type === "interactiveWorksheet") {
+        const answerItems = materialAnswerItems(answerBlock);
+        const matches = materialAnswerMatches(answerBlock);
+        const attempts = materialAnswerAttempts(answerBlock);
+        const hints = materialAnswerHints(answerBlock);
+        const choiceItems = asJsonObject(answerBlock?.choiceItems);
+
+        (block.worksheetGroups ?? []).forEach((group) => {
+          const policy = cleanMaterialAssessment({ ...defaultObjectiveAssessmentPolicy(), ...block.assessment, ...group.assessment });
+          if (group.type === "FILL_GAPS") {
+            (group.gaps ?? []).forEach((gap) => {
+              const expected = [gap.answer, ...(gap.acceptedAnswers ?? [])].filter((value): value is string => Boolean(value?.trim()));
+              if (expected.length === 0) return;
+              const actual = answerItems[gap.id] ?? "";
+              const itemAttempts = attempts[gap.id] ?? [];
+              const itemHints = hints[gap.id] ?? [];
+              const requiresCheck = group.gapMode === "TYPED" || group.gapMode === "FORM_TRANSFORM";
+              const checked = itemAttempts.some((attempt) => normalizeScoredMaterialAnswer(attempt.value) === normalizeScoredMaterialAnswer(actual));
+              const touched = itemAttempts.length > 0 || itemHints.length > 0 || (!requiresCheck && actual.trim().length > 0);
+              if (!touched) return;
+              const correct = expected.some((value) => normalizeScoredMaterialAnswer(value) === normalizeScoredMaterialAnswer(actual)) && (!requiresCheck || checked);
+              touchedWeight += policy.weight ?? 1;
+              earnedWeight += (policy.weight ?? 1) * materialLiveScoreFactor(correct, itemAttempts.length || (actual ? 1 : 0), itemHints, policy);
+            });
+            return;
+          }
+          if (group.type === "MATCHING_PAIRS") {
+            (group.pairs ?? []).forEach((pair) => {
+              const actual = matches[pair.id] ?? "";
+              const itemAttempts = attempts[pair.id] ?? [];
+              if (!itemAttempts.length && !actual) return;
+              touchedWeight += policy.weight ?? 1;
+              earnedWeight += (policy.weight ?? 1) * materialLiveScoreFactor(actual === pair.id, itemAttempts.length || 1, hints[pair.id] ?? [], policy);
+            });
+            return;
+          }
+          if (group.type === "MULTIPLE_CHOICE") {
+            (group.questions ?? []).forEach((question) => {
+              const selected = Array.isArray(choiceItems[question.id]) ? (choiceItems[question.id] as unknown[]).map(String).sort() : [];
+              const expected = [...(question.correctOptionIds ?? [])].sort();
+              const itemAttempts = attempts[question.id] ?? [];
+              if (!itemAttempts.length) return;
+              touchedWeight += policy.weight ?? 1;
+              earnedWeight += (policy.weight ?? 1) * materialLiveScoreFactor(arraysMatch(selected, expected), itemAttempts.length, hints[question.id] ?? [], policy);
+            });
+          }
+        });
       }
     });
   });
@@ -252,6 +302,10 @@ export function materialLiveScore(material: LessonMaterial, answers: MaterialAns
 
   const maxScore = materialMaxScore(material.scoringRubric);
   return Math.round((maxScore * earnedWeight / touchedWeight) * 100) / 100;
+}
+
+function arraysMatch(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export function materialAssessmentForItem(

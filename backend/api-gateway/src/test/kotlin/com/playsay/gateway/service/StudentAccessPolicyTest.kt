@@ -29,7 +29,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.liquibase.enabled=true",
+        "spring.liquibase.enabled=false",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-08-24-001-create-worksheet-material-provenance" author="codex">
+        <createTable tableName="worksheet_import_material_link">
+            <column name="import_session_id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_worksheet_import_material_link"/></column>
+            <column name="material_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="import_revision" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="worksheet_import_material_link" baseColumnNames="material_id" referencedTableName="lesson_material" referencedColumnNames="id" constraintName="fk_worksheet_import_material_link_material" onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="worksheet_import_material_link" columnNames="material_id" constraintName="uq_worksheet_import_material_link_material"/>
+
+        <createTable tableName="material_source_attachment">
+            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_material_source_attachment"/></column>
+            <column name="material_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="import_session_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="source_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="page_id" type="UUID"/>
+            <column name="source_page_number" type="INT"/>
+            <column name="kind" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="file_name" type="VARCHAR(512)"><constraints nullable="false"/></column>
+            <column name="mime_type" type="VARCHAR(80)"><constraints nullable="false"/></column>
+            <column name="byte_size" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="checksum_sha256" type="CHAR(64)"><constraints nullable="false"/></column>
+            <column name="storage_key" type="VARCHAR(1024)"><constraints nullable="false"/></column>
+            <column name="metadata" type="TEXT"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="material_source_attachment" baseColumnNames="material_id" referencedTableName="lesson_material" referencedColumnNames="id" constraintName="fk_material_source_attachment_material" onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="material_source_attachment" columnNames="material_id, source_id, page_id, kind" constraintName="uq_material_source_attachment_identity"/>
+        <createIndex tableName="material_source_attachment" indexName="idx_material_source_attachment_material"><column name="material_id"/><column name="kind"/></createIndex>
+        <createIndex tableName="material_source_attachment" indexName="idx_material_source_attachment_import"><column name="import_session_id"/></createIndex>
+
+        <rollback>
+            <dropTable tableName="material_source_attachment"/>
+            <dropTable tableName="worksheet_import_material_link"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

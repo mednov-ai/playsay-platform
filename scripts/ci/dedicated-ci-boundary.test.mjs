@@ -8,6 +8,7 @@ const testDir = dirname(fileURLToPath(import.meta.url));
 const platformRoot = resolve(testDir, "../..");
 const modulePipelines = [
   "Jenkinsfile.ai-tutor-service",
+  "Jenkinsfile.worksheet-import-service",
   "Jenkinsfile.api-gateway",
   "Jenkinsfile.collaboration-service",
   "Jenkinsfile.email-service",
@@ -23,6 +24,7 @@ const modulePipelines = [
 const allPipelines = ["Jenkinsfile", "Jenkinsfile.dispatcher", ...modulePipelines];
 const databasePipelines = new Map([
   ["Jenkinsfile.ai-tutor-service", "ai-tutor-service"],
+  ["Jenkinsfile.worksheet-import-service", "worksheet-import-service"],
   ["Jenkinsfile.api-gateway", "api-gateway"],
   ["Jenkinsfile.email-service", "email-service"],
   ["Jenkinsfile.keyboard-backend", "keyboard-service"],

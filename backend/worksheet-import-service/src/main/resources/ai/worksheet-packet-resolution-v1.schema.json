@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "worksheet-analysis/v1/packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "orderedPageIds", "pages", "answerKeyAssociations"],
+  "properties": {
+    "schemaVersion": { "const": "worksheet-analysis/v1" },
+    "orderedPageIds": { "type": "array", "minItems": 1, "maxItems": 200, "uniqueItems": true, "items": { "type": "string", "format": "uuid" } },
+    "pages": { "type": "array", "minItems": 1, "maxItems": 200, "items": { "$ref": "worksheet-page-analysis-v1.schema.json" } },
+    "answerKeyAssociations": {
+      "type": "array", "maxItems": 200,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["worksheetPageId", "answerKeyPageId", "confidence"],
+        "properties": {
+          "worksheetPageId": { "type": "string", "format": "uuid" },
+          "answerKeyPageId": { "type": "string", "format": "uuid" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    }
+  }
+}

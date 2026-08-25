@@ -34,6 +34,11 @@ test("module source changes trigger only their deploy target", () => {
     ["playsay-ai-tutor-service-develop"],
   );
   assertDetection(
+    ["backend/worksheet-import-service/src/main/kotlin/com/playsay/worksheetimport/WorksheetImportServiceApplication.kt"],
+    ["worksheet-import-service"],
+    ["playsay-worksheet-import-service-develop"],
+  );
+  assertDetection(
     ["backend/vocabulary-service/src/main/kotlin/com/playsay/vocabulary/VocabularyService.kt"],
     ["vocabulary-service"],
     ["playsay-vocabulary-service-develop"],
@@ -70,6 +75,11 @@ test("module Jenkinsfiles trigger only the corresponding module", () => {
     ["Jenkinsfile.game-adapter-service"],
     ["game-adapter-service"],
     ["playsay-game-adapter-service-develop"],
+  );
+  assertDetection(
+    ["Jenkinsfile.worksheet-import-service"],
+    ["worksheet-import-service"],
+    ["playsay-worksheet-import-service-develop"],
   );
 });
 
@@ -147,6 +157,7 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
     [
       "api-gateway",
       "ai-tutor-service",
+      "worksheet-import-service",
       "vocabulary-service",
       "media-service",
       "payment-service",
@@ -157,6 +168,7 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
     [
       "playsay-api-gateway-develop",
       "playsay-ai-tutor-service-develop",
+      "playsay-worksheet-import-service-develop",
       "playsay-vocabulary-service-develop",
       "playsay-media-service-develop",
       "playsay-payment-service-develop",
@@ -175,6 +187,7 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
       [
         "api-gateway",
         "ai-tutor-service",
+        "worksheet-import-service",
         "vocabulary-service",
         "media-service",
         "payment-service",
@@ -185,6 +198,7 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
       [
         "playsay-api-gateway-develop",
         "playsay-ai-tutor-service-develop",
+        "playsay-worksheet-import-service-develop",
         "playsay-vocabulary-service-develop",
         "playsay-media-service-develop",
         "playsay-payment-service-develop",

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-08-24-001-create-worksheet-import" author="codex">
+        <createTable tableName="worksheet_import_session">
+            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_worksheet_import_session"/></column>
+            <column name="owner_subject" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="revision" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="title" type="VARCHAR(160)"><constraints nullable="false"/></column>
+            <column name="language" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="cefr_level" type="VARCHAR(8)"><constraints nullable="false"/></column>
+            <column name="source_note" type="VARCHAR(1000)"/>
+            <column name="analysis" type="TEXT"/>
+            <column name="review" type="TEXT"/>
+            <column name="failure_class" type="VARCHAR(80)"/>
+            <column name="retry_count" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="lease_owner" type="VARCHAR(120)"/>
+            <column name="lease_until" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="material_id" type="UUID"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="worksheet_import_session" columnNames="material_id" constraintName="uq_worksheet_import_material_ack"/>
+        <createIndex tableName="worksheet_import_session" indexName="idx_worksheet_import_owner_updated">
+            <column name="owner_subject"/><column name="updated_at"/>
+        </createIndex>
+        <createIndex tableName="worksheet_import_session" indexName="idx_worksheet_import_worker">
+            <column name="status"/><column name="lease_until"/><column name="created_at"/>
+        </createIndex>
+        <createIndex tableName="worksheet_import_session" indexName="idx_worksheet_import_expiry">
+            <column name="expires_at"/><column name="status"/>
+        </createIndex>
+
+        <createTable tableName="worksheet_import_source">
+            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_worksheet_import_source"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="source_order" type="INT"><constraints nullable="false"/></column>
+            <column name="kind" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="file_name" type="VARCHAR(512)"><constraints nullable="false"/></column>
+            <column name="mime_type" type="VARCHAR(80)"><constraints nullable="false"/></column>
+            <column name="byte_size" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="checksum_sha256" type="CHAR(64)"><constraints nullable="false"/></column>
+            <column name="storage_key" type="VARCHAR(1024)"><constraints nullable="false"/></column>
+            <column name="page_count" type="INT"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="worksheet_import_source" baseColumnNames="session_id" referencedTableName="worksheet_import_session" referencedColumnNames="id" constraintName="fk_worksheet_import_source_session" onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="worksheet_import_source" columnNames="session_id, source_order" constraintName="uq_worksheet_import_source_order"/>
+        <createIndex tableName="worksheet_import_source" indexName="idx_worksheet_import_source_session"><column name="session_id"/></createIndex>
+
+        <createTable tableName="worksheet_import_page">
+            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_worksheet_import_page"/></column>
+            <column name="session_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="source_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="page_order" type="INT"><constraints nullable="false"/></column>
+            <column name="source_page_number" type="INT"/>
+            <column name="raster_storage_key" type="VARCHAR(1024)"><constraints nullable="false"/></column>
+            <column name="raster_mime_type" type="VARCHAR(80)"><constraints nullable="false"/></column>
+            <column name="raster_byte_size" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="raster_checksum_sha256" type="CHAR(64)"><constraints nullable="false"/></column>
+            <column name="width" type="INT"><constraints nullable="false"/></column>
+            <column name="height" type="INT"><constraints nullable="false"/></column>
+            <column name="analysis" type="TEXT"/>
+            <column name="page_role" type="VARCHAR(32)"/>
+            <column name="answer_key_page_id" type="UUID"/>
+            <column name="analysis_attempts" type="INT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="analysis_failure_class" type="VARCHAR(80)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="worksheet_import_page" baseColumnNames="session_id" referencedTableName="worksheet_import_session" referencedColumnNames="id" constraintName="fk_worksheet_import_page_session" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="worksheet_import_page" baseColumnNames="source_id" referencedTableName="worksheet_import_source" referencedColumnNames="id" constraintName="fk_worksheet_import_page_source" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="worksheet_import_page" baseColumnNames="answer_key_page_id" referencedTableName="worksheet_import_page" referencedColumnNames="id" constraintName="fk_worksheet_import_page_answer_key" onDelete="SET NULL"/>
+        <addUniqueConstraint tableName="worksheet_import_page" columnNames="session_id, page_order" constraintName="uq_worksheet_import_page_order"/>
+        <addUniqueConstraint tableName="worksheet_import_page" columnNames="source_id, source_page_number" constraintName="uq_worksheet_import_source_page"/>
+        <createIndex tableName="worksheet_import_page" indexName="idx_worksheet_import_page_session"><column name="session_id"/><column name="page_order"/></createIndex>
+
+        <rollback>
+            <dropTable tableName="worksheet_import_page"/>
+            <dropTable tableName="worksheet_import_source"/>
+            <dropTable tableName="worksheet_import_session"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

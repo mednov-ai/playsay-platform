@@ -8,6 +8,7 @@ import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.AppUserRepo
+import com.playsay.gateway.repo.AppUserIdentityRepository
 import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.utils.MetaData
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class UserProfileStore(
     private val userRepo: AppUserRepo,
+    private val identityRepository: AppUserIdentityRepository,
     private val studentProfileRepo: StudentProfileRepo,
     private val registrationGateway: RegistrationGateway,
     private val delegationRepo: TeacherDelegationRepo,
@@ -155,16 +157,19 @@ class UserProfileStore(
                 delegationRepo.findActiveStudentIds(teacherUserId, Instant.now(clock))
             ).distinct()
 
-    @Transactional
     fun currentUserId(authentication: JwtAuthenticationToken): UUID {
         val identity = authentication.toIdentity()
-        val existing = userRepo.findByKeycloakSubject(identity.subject)
-        if (existing == null) {
-            return insertProfile(identity).id
-        }
-
-        updateIdentity(existing, identity)
-        return existing.id
+        return identityRepository.upsert(
+            id = UUID.randomUUID(),
+            subject = identity.subject,
+            username = identity.username,
+            email = identity.email,
+            name = identity.name,
+            roles = identity.roles.toStoredRoles(),
+            displayName = identity.defaultDisplayName(),
+            issuedAt = identity.issuedAt,
+            now = Instant.now(clock),
+        )
     }
 
     private fun clean(value: String?, maxLength: Int): String? {

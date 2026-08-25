@@ -20,7 +20,8 @@ export type MaterialBlockType =
   | "drawingArea"
   | "generatedImage"
   | "htmlGame"
-  | "externalActivity";
+  | "externalActivity"
+  | "interactiveWorksheet";
 
 export type ExternalActivityProvider =
   | "LIVEWORKSHEETS"
@@ -385,6 +386,41 @@ export type MaterialAnswerStatus = {
   maxAttempts: number;
 };
 
+export type MaterialWorksheetRegion = { x: number; y: number; width: number; height: number };
+export type MaterialWorksheetEndpoint = {
+  region: MaterialWorksheetRegion;
+  kind?: "TEXT" | "IMAGE";
+  text?: string;
+  imageAlt?: string;
+};
+export type MaterialWorksheetGroup = {
+  id: string;
+  order: number;
+  type: "FILL_GAPS" | "MATCHING_PAIRS" | "MULTIPLE_CHOICE" | "FLASHCARDS";
+  assessment?: MaterialAssessmentPolicy;
+  gapMode?: "TYPED" | "SINGLE_CHOICE" | "WORD_BANK" | "FORM_TRANSFORM";
+  gaps?: Array<{
+    id: string;
+    region: MaterialWorksheetRegion;
+    acceptedAnswers?: string[];
+    answer?: string;
+    options?: string[];
+    baseForm?: string;
+    hintCount?: number;
+    maxAttempts?: number;
+  }>;
+  pairs?: Array<{ id: string; number: number; left: MaterialWorksheetEndpoint; right: MaterialWorksheetEndpoint }>;
+  questions?: Array<{
+    id: string;
+    prompt: string;
+    promptRegion?: MaterialWorksheetRegion;
+    correctOptionIds?: string[];
+    options: Array<{ id: string; order: number; text: string; region?: MaterialWorksheetRegion }>;
+  }>;
+  cards?: Array<{ id: string; order: number; front: { kind: "TEXT" | "IMAGE"; text?: string; region?: MaterialWorksheetRegion }; back: { kind: "TEXT" | "IMAGE"; text?: string; region?: MaterialWorksheetRegion } }>;
+  wordBank?: string[];
+};
+
 export type MaterialEditorBlock = {
   id: string;
   type: MaterialBlockType;
@@ -426,6 +462,10 @@ export type MaterialEditorBlock = {
   gameAdaptationSourceAssetId?: string;
   gameAdaptationJobId?: string;
   gameTitleSource?: "FILE" | "HTML" | "AI" | "USER";
+  sourceAsset?: string;
+  intrinsicWidth?: number;
+  intrinsicHeight?: number;
+  worksheetGroups?: MaterialWorksheetGroup[];
 };
 
 export const MIN_MANUAL_INPUT_HINTS = 3;
@@ -444,7 +484,7 @@ export type MaterialEditorPage = {
 };
 
 export type MaterialEditorDocument = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   pages: MaterialEditorPage[];
 };
 
@@ -468,6 +508,7 @@ export type MaterialExerciseInteraction =
     kind: "matchingSelection";
     leftId: string;
     rightId?: string;
+    worksheetGroupId?: string;
   };
 
 export type MaterialExerciseParticipant = {

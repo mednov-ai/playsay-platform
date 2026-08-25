@@ -1,4 +1,4 @@
-import { Globe2, Paperclip, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { FileImage, FilePlus2, Globe2, Paperclip, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { formatFileSize, type MaterialDraftSourceImage } from "../model/materialDocument";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -12,8 +12,10 @@ export function MaterialDraftPanel({
   draftPrompt,
   draftUrl,
   onDraftFromUrl,
+  onCreateBlank,
   onDraftImageChange,
   onGenerateDraft,
+  onOpenWorksheetImport,
   onRemoveDraftImage,
   onUpdateDraftPrompt,
   onUpdateDraftUrl,
@@ -26,8 +28,10 @@ export function MaterialDraftPanel({
   draftPrompt: string;
   draftUrl: string;
   onDraftFromUrl: () => void;
+  onCreateBlank: () => void;
   onDraftImageChange: (file: File | null) => void;
   onGenerateDraft: () => void;
+  onOpenWorksheetImport: () => void;
   onRemoveDraftImage: () => void;
   onUpdateDraftPrompt: (value: string) => void;
   onUpdateDraftUrl: (value: string) => void;
@@ -39,6 +43,12 @@ export function MaterialDraftPanel({
       <div className="mb-2 flex items-center gap-2 text-sm font-extrabold">
         <Wand2 className="h-4 w-4 text-primary" />
         {t("materials.draft.title")}
+      </div>
+      <div className="material-creation-actions">
+        <Button disabled={disabled} onClick={onCreateBlank} type="button" variant="outline"><FilePlus2 />{t("materials.creation.blank")}</Button>
+        <Button data-testid="worksheet-import-create" disabled={disabled} onClick={onOpenWorksheetImport} type="button"><FileImage />{t("materials.creation.files")}</Button>
+        <div><Sparkles />{t("materials.creation.prompt")}</div>
+        <div><Globe2 />{t("materials.creation.url")}</div>
       </div>
       <textarea
         className="playsay-input min-h-28 resize-none py-3"

@@ -55,6 +55,7 @@ class SecurityConfig {
                         pathPattern(HttpMethod.POST, "/registration/reset-password"),
                         pathPattern(HttpMethod.POST, "/student-invites/consume"),
                     ).permitAll()
+                    .requestMatchers("/worksheet-imports/**").hasAnyRole("TEACHER", "ADMIN")
                     .anyRequest().authenticated()
             }
             .oauth2ResourceServer { resourceServer ->

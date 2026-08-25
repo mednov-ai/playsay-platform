@@ -104,6 +104,32 @@ class BackendArchitectureTest : KotlinSpringModuleArchitectureTest() {
     }
 
     @Test
+    fun `worksheet import heavy implementation stays outside gateway`() {
+        val forbiddenTokens = setOf(
+            "org.apache.pdfbox",
+            "PDFRenderer",
+            "WorksheetImportSessionEntity",
+            "WorksheetImportSourceEntity",
+            "WorksheetImportPageEntity",
+            "WorksheetAnalysisWorker",
+            "WorksheetStagingObjectStorage",
+        )
+        val violations = kotlinSources()
+            .flatMap { source ->
+                forbiddenTokens.filter(source.text::contains).map { token -> "${source.relativePath}: $token" }
+            }
+
+        assertTrue(violations.isEmpty(), "PDF, session, staging and worker implementation belongs to worksheet-import-service: $violations")
+        val buildFile = sourceRoot.parent.parent.parent.parent.parent.parent
+            .resolve("build.gradle.kts")
+            .readText()
+        assertTrue(
+            !buildFile.contains("project(\":worksheet-import-service\")"),
+            "Gateway may depend on the worksheet internal contract, never on the service implementation.",
+        )
+    }
+
+    @Test
     fun `backend kotlin files stay below tactical extraction threshold`() {
         val oversizedFiles = kotlinSources()
             .mapNotNull { source ->

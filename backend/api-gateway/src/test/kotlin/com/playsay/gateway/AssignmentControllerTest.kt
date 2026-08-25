@@ -70,7 +70,7 @@ import liquibase.integration.spring.SpringLiquibase
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.liquibase.enabled=true",
+        "spring.liquibase.enabled=false",
         "playsay.storage.provider=memory",
     ],
 )

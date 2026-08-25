@@ -2,5 +2,6 @@
 spring-jackson-configuration	backend/ai-tutor-service/src/main/kotlin/com/playsay/aitutor/config/JacksonConfig.kt
 spring-jackson-configuration	backend/api-gateway/src/main/kotlin/com/playsay/gateway/config/JacksonConfig.kt
 spring-jackson-configuration	backend/vocabulary-service/src/main/kotlin/com/playsay/vocabulary/config/JacksonConfig.kt
+spring-jackson-configuration	backend/worksheet-import-service/src/main/kotlin/com/playsay/worksheetimport/config/JacksonConfig.kt
 raw-webhook-request-body	backend/api-gateway/src/main/kotlin/com/playsay/gateway/utils/RawRequestBody.kt
 raw-webhook-request-body	backend/payment-service/src/main/kotlin/com/playsay/payment/utils/RawRequestBody.kt

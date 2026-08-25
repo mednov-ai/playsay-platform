@@ -28,6 +28,25 @@ class WorksheetReviewValidationServiceTest {
     }
 
     @Test
+    fun `confirmation of the proposed answer survives review merge`() {
+        val page = StubWorksheetAnalysisProvider().fixture(UUID.randomUUID(), "FORM_ENDING")
+        val proposal = WorksheetReview(
+            listOf(WorksheetReviewPage(page.pageId, 0, page.role, sections = page.sections, groups = page.groups)),
+        )
+        val submitted = proposal.copy(
+            pages = proposal.pages.map { reviewPage ->
+                reviewPage.copy(groups = reviewPage.groups.map { group ->
+                    group.copy(gaps = group.gaps.map { gap -> gap.copy(answer = gap.answer?.copy(confirmed = true)) })
+                })
+            },
+        )
+
+        val merged = WorksheetReviewCanonicalizer().merge(proposal, submitted)
+
+        assertTrue(merged.pages.single().groups.single().gaps.single().answer?.confirmed == true)
+    }
+
+    @Test
     fun `blocks incomplete low confidence and invalid editable exercise structures`() {
         val stub = StubWorksheetAnalysisProvider()
         val gapPage = stub.fixture(UUID.randomUUID(), "EXPLICIT_BLANK")

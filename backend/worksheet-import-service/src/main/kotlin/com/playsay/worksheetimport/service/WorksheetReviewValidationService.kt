@@ -26,7 +26,7 @@ class WorksheetReviewCanonicalizer {
                         val proposed = proposedGaps[gap.id]
                         gap.copy(
                             answer = chooseAnswer(
-                                listOfNotNull(proposed?.answer, gap.answer),
+                                listOfNotNull(gap.answer, proposed?.answer),
                                 gap.answer?.takeIf { it.provenance == WorksheetAnswerProvenance.TEACHER },
                             ),
                         )

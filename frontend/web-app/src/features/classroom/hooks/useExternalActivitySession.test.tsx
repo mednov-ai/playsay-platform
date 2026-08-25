@@ -322,6 +322,35 @@ describe("useExternalActivitySession", () => {
     expect(result.current.active).toBeNull();
   });
 
+  it.each(["STOPPED", "HOST_IDLE"] as const)("clears a student-first request on trusted host %s for a different session", (type) => {
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map(),
+    };
+    const { result } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      trustedHostIdentity: "teacher",
+    }));
+
+    act(() => result.current.open(block));
+    expect(result.current.active).toMatchObject({ hostIdentity: null, phase: "REQUESTED" });
+
+    act(() => emit(RoomEvent.DataReceived, new TextEncoder().encode(JSON.stringify({
+      version: 1,
+      type,
+      sessionId: "host-session",
+      blockId: block.id,
+    })), teacher, undefined, "playsay.external-activity.host.v1"));
+
+    expect(result.current.active).toBeNull();
+  });
+
   it("clears a student session when an unsubscribed host track remains stale in the publication map", async () => {
     vi.useFakeTimers();
     const mediaTrack = {} as MediaStreamTrack;

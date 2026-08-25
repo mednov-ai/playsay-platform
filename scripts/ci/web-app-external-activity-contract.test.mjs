@@ -8,13 +8,10 @@ const testDir = dirname(fileURLToPath(import.meta.url));
 const platformRoot = resolve(testDir, "../..");
 const pipeline = readFileSync(resolve(platformRoot, "Jenkinsfile.web-app"), "utf8");
 
-test("production web builds enable shared external activities and fail closed", () => {
+test("shared external activities stay enabled on dev and disabled in production", () => {
+  const developmentBranch = pipeline.match(/if \[ "\$DEPLOY_TO_DEV" = "true" \]; then([\s\S]*?)\n              elif/)?.[1] ?? "";
   const productionBranch = pipeline.match(/elif \[ "\$DEPLOY_TO_PROD" = "true" \]; then([\s\S]*?)\n              fi/)?.[1] ?? "";
 
-  assert.match(productionBranch, /export VITE_EXTERNAL_ACTIVITY_ENABLED=true/);
-  assert.match(
-    pipeline,
-    /if \[ "\$DEPLOY_TO_PROD" = "true" \] && \[ "\$\{VITE_EXTERNAL_ACTIVITY_ENABLED:-\}" != "true" \]; then/,
-  );
-  assert.match(pipeline, /Production web builds must enable shared external activities/);
+  assert.match(developmentBranch, /export VITE_EXTERNAL_ACTIVITY_ENABLED=true/);
+  assert.doesNotMatch(productionBranch, /VITE_EXTERNAL_ACTIVITY_ENABLED/);
 });

@@ -22,9 +22,9 @@ Chrome or Edge 116+ is required. The source directory is not itself an installab
 2. Open `chrome://extensions` or `edge://extensions`, enable developer mode, and choose **Load unpacked**.
 3. Select `frontend/browser-extension/dist` — do not select `frontend/browser-extension`.
 4. Pin the bee action through the browser's extensions menu.
-5. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for a production-mode web build. Local development enables the feature automatically, and Jenkins sets the flag for builds deployed to the shared dev stand.
+5. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for a production-mode build deployed to the shared dev stand. Local development enables the feature automatically, and Jenkins sets the flag only for dev deployments.
 
-Jenkins sets `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for both dev and numeric production release builds and fails a production build when that contract is absent. A build in which the feature is intentionally disabled must show an explicit unavailable state instead of accepting a launcher click that cannot start an extension session.
+Shared external activities remain dev-only while browser lifecycle acceptance is incomplete. Jenkins sets `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for dev deployments and deliberately leaves it unset for numeric production releases. A disabled build shows an explicit unavailable state instead of accepting a launcher click that cannot start an extension session.
 
 The packaged Jenkins artifact is `frontend/browser-extension/playsay-browser-extension.zip`. Extract it completely, then load the extracted directory that contains `manifest.json`; do not select the ZIP itself. The archive includes `INSTALL-RU.md` with the same installation, update, troubleshooting, and lesson-use steps.
 
@@ -41,7 +41,7 @@ Version `0.1.7` is the current unpacked/Jenkins artifact. It keeps the version-1
 5. Honey School returns to the lesson and publishes named screen-share video/audio tracks. These tracks are excluded from the generic screen-share stage.
 6. Pointer, keyboard, drag, and scroll input from unlocked participants is sent reliably to the teacher host; cursor positions use lossy data at a maximum UI rate of 30 Hz.
 
-The teacher can lock/unlock student input, navigate back, reload, minimize, or stop the activity. Minimizing is synchronized and retains capture for 60 seconds; reopening resumes the same session. Opening a different activity or ending the retention window tears down tracks, debugger attachment, and the extension-created tab. `STOPPED` and `HOST_IDLE` are ordered and session-scoped: a late idle event from the previous session cannot erase an immediate relaunch, and loss of the host video track clears the participant focus even while LiveKit still exposes a stale publication object.
+The teacher can lock/unlock student input, navigate back, reload, minimize, or stop the activity. Minimizing is synchronized and retains capture for 60 seconds; reopening resumes the same session. Opening a different activity or ending the retention window tears down tracks, debugger attachment, and the extension-created tab. `STOPPED` and `HOST_IDLE` are ordered and session-scoped: a late idle event from the previous session cannot erase an immediate relaunch, while an authoritative host stop clears a still-unowned `REQUESTED` state created when a student launched before the teacher joined. Loss of the host video track clears the participant focus even while LiveKit still exposes a stale publication object.
 
 ## Status and recovery
 
@@ -69,7 +69,7 @@ For `EXTENSION_NOT_DETECTED`, verify that the unpacked extension is installed an
 
 ## Manual smoke matrix
 
-Before production promotion, the web build contract must pass and browser acceptance must cover both `https://online.honeyschool.ru/` and `https://online.honey.school/`. Record only the displayed extension version, stable status codes, lifecycle outcome, and non-sensitive build identity. Exercise the installed `0.1.7` candidate shown on `chrome://extensions`, including a provider start action and participant input before accepting the release.
+Before any future production proposal, the dev web build contract and complete browser acceptance matrix must pass on `https://dev.online.honey.school/`. Production origins remain disabled and are not part of the current delivery. Record only the displayed extension version, stable status codes, lifecycle outcome, and non-sensitive build identity. Exercise the installed `0.1.7` candidate shown on `chrome://extensions`, including student-first launch before teacher connection, provider start, participant input, Return to lesson, and immediate relaunch.
 
 For each guaranteed provider, test with one teacher and three students in a group `SHARED` lesson:
 

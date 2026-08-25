@@ -229,16 +229,26 @@ export function useExternalActivitySession({
       if (message.type === "STOPPED") {
         if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
-        if (activeRef.current?.sessionId === message.sessionId && (!activeRef.current.hostIdentity || activeRef.current.hostIdentity === participant.identity)) {
-          clearRemoteSession(message.sessionId);
+        const current = activeRef.current;
+        if (
+          current
+          && (!current.hostIdentity || current.hostIdentity === participant.identity)
+          && (current.sessionId === message.sessionId || (!current.hostIdentity && current.phase === "REQUESTED"))
+        ) {
+          // A request published before the host joined is not replayed by LiveKit. The
+          // trusted host's stop is authoritative even when it belongs to another session.
+          if (!current.hostIdentity && current.phase === "REQUESTED") clearRemoteSession();
+          else clearRemoteSession(message.sessionId);
         }
         return;
       }
       if (message.type === "HOST_IDLE") {
         if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
+        const current = activeRef.current;
         if (message.sessionId === "current") clearRemoteSession();
-        else clearRemoteSession(message.sessionId);
+        else if (current?.sessionId === message.sessionId) clearRemoteSession(message.sessionId);
+        else if (!current?.hostIdentity && current?.phase === "REQUESTED") clearRemoteSession();
         return;
       }
       if (message.type === "HOST_STATE" && message.phase) {

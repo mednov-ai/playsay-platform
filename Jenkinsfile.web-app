@@ -206,12 +206,7 @@ spec:
                 export VITE_PERSONAL_PRACTICE_V2_ENABLED=true
                 export VITE_KEYBOARD_ORIGIN=https://dev.key.honey.school
               elif [ "$DEPLOY_TO_PROD" = "true" ]; then
-                export VITE_EXTERNAL_ACTIVITY_ENABLED=true
                 export VITE_KEYBOARD_ORIGIN=https://key.honey.school
-              fi
-              if [ "$DEPLOY_TO_PROD" = "true" ] && [ "${VITE_EXTERNAL_ACTIVITY_ENABLED:-}" != "true" ]; then
-                echo "Production web builds must enable shared external activities" >&2
-                exit 1
               fi
               npm --workspace web-app run build
             '''

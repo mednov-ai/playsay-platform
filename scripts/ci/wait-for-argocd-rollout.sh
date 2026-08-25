@@ -22,6 +22,8 @@ EXPECTED_BUILD="${EXPECTED_BUILD:-$BUILD_LABEL}"
 TIMEOUT_SECONDS="${PLAYSAY_DEV_ROLLOUT_TIMEOUT_SECONDS:-420}"
 POLL_SECONDS="${PLAYSAY_DEV_ROLLOUT_POLL_SECONDS:-10}"
 ARGOCD_REFRESH_MODE="${ARGOCD_REFRESH_MODE:-webhook}"
+ALLOW_MISSING_DEPLOYMENT="${ALLOW_MISSING_DEPLOYMENT:-false}"
+EXPECTED_ARGOCD_REVISION="${EXPECTED_ARGOCD_REVISION:-}"
 DEADLINE="$(( $(date +%s) + TIMEOUT_SECONDS ))"
 
 if [ "$ARGOCD_REFRESH_MODE" = "annotate" ]; then
@@ -38,10 +40,18 @@ while true; do
   for app in $APPS; do
     sync_status="$(kubectl -n argocd get application "$app" -o jsonpath='{.status.sync.status}' 2>/dev/null || true)"
     health_status="$(kubectl -n argocd get application "$app" -o jsonpath='{.status.health.status}' 2>/dev/null || true)"
+    sync_revision="$(kubectl -n argocd get application "$app" -o jsonpath='{.status.sync.revision}' 2>/dev/null || true)"
     deployment_json="$(kubectl -n playsay-dev get deployment "$app" -o json 2>/dev/null || true)"
 
     if [ -z "$deployment_json" ]; then
-      echo "  ${app}: deployment is not visible yet"
+      if [ "$ALLOW_MISSING_DEPLOYMENT" = "true" ] &&
+         [ "$sync_status" = "Synced" ] &&
+         [ "$health_status" = "Healthy" ] &&
+         { [ -z "$EXPECTED_ARGOCD_REVISION" ] || [ "$sync_revision" = "$EXPECTED_ARGOCD_REVISION" ]; }; then
+        echo "  ${app}: argocd=${sync_status}/${health_status} revision=${sync_revision} disabled deployment is expected"
+        continue
+      fi
+      echo "  ${app}: deployment is not visible yet; argocd=${sync_status}/${health_status} revision=${sync_revision}"
       all_ready="false"
       continue
     fi
@@ -54,10 +64,11 @@ while true; do
     ready_pods="$(kubectl -n playsay-dev get pods -l "app.kubernetes.io/name=${app},playsay.io/build-name=${EXPECTED_BUILD}" -o json \
       | jq -r '[.items[] | select(.status.phase == "Running") | select((.status.containerStatuses // []) | length > 0) | select([.status.containerStatuses[]?.ready] | all)] | length')"
 
-    echo "  ${app}: argocd=${sync_status}/${health_status} build=${deploy_build} replicas updated=${updated} ready=${ready} available=${available} expected=${desired} readyPods=${ready_pods}"
+    echo "  ${app}: argocd=${sync_status}/${health_status} revision=${sync_revision} build=${deploy_build} replicas updated=${updated} ready=${ready} available=${available} expected=${desired} readyPods=${ready_pods}"
 
     if [ "$sync_status" != "Synced" ] ||
        [ "$health_status" != "Healthy" ] ||
+       { [ -n "$EXPECTED_ARGOCD_REVISION" ] && [ "$sync_revision" != "$EXPECTED_ARGOCD_REVISION" ]; } ||
        [ "$deploy_build" != "$EXPECTED_BUILD" ] ||
        [ "$updated" -lt "$desired" ] ||
        [ "$ready" -lt "$desired" ] ||

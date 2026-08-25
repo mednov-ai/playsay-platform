@@ -153,6 +153,9 @@ for attempt in 1 2 3 4 5; do
   fi
 
   if git push origin "HEAD:${INFRA_BRANCH}"; then
+    if [ -n "${WORKSPACE:-}" ]; then
+      git rev-parse HEAD > "$WORKSPACE/infra-commit.txt"
+    fi
     if [ "${CREATE_INFRA_TAG:-true}" = "true" ]; then
       if git ls-remote --exit-code --tags origin "refs/tags/${BUILD_LABEL}" >/dev/null 2>&1; then
         echo "Infra tag ${BUILD_LABEL} already exists"

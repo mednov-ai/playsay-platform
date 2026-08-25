@@ -26,7 +26,7 @@ spec:
       tty: true
       env:
         - name: GRADLE_OPTS
-          value: "-Dorg.gradle.jvmargs=-Xmx384m -XX:MaxMetaspaceSize=256m"
+          value: "-Dorg.gradle.jvmargs=-Xmx768m -XX:MaxMetaspaceSize=256m"
         - name: JAVA_TOOL_OPTIONS
           value: "-XX:ActiveProcessorCount=1"
       volumeMounts:

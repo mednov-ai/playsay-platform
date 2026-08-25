@@ -256,7 +256,7 @@ EOF
       }
       steps {
         container('tools') {
-          sh 'apk add --no-cache jq kubectl && APP=worksheet-import-service ./scripts/ci/wait-for-argocd-rollout.sh'
+          sh 'apk add --no-cache jq kubectl && test -s "$WORKSPACE/infra-commit.txt" && EXPECTED_ARGOCD_REVISION="$(cat "$WORKSPACE/infra-commit.txt")" ALLOW_MISSING_DEPLOYMENT=true APP=worksheet-import-service ./scripts/ci/wait-for-argocd-rollout.sh'
         }
       }
     }

@@ -66,6 +66,8 @@ export function useExternalActivitySession({
   const handledInputEventsRef = useRef(new Set<string>());
   const stateResponseReceivedRef = useRef(false);
   const sessionGenerationRef = useRef(0);
+  const remoteTrackLossTimerRef = useRef<number | null>(null);
+  const remoteTrackSeenSessionRef = useRef<string | null>(null);
 
   useEffect(() => { blocksRef.current = blocks; }, [blocks]);
   useEffect(() => { activeRef.current = active; }, [active]);
@@ -95,13 +97,20 @@ export function useExternalActivitySession({
     extensionTimerRef.current = null;
   }, []);
 
+  const clearRemoteTrackLossTimer = useCallback(() => {
+    if (remoteTrackLossTimerRef.current !== null) window.clearTimeout(remoteTrackLossTimerRef.current);
+    remoteTrackLossTimerRef.current = null;
+  }, []);
+
   const clearRemoteSession = useCallback((sessionId?: string) => {
     if (sessionId && activeRef.current?.sessionId !== sessionId) return;
+    clearRemoteTrackLossTimer();
+    remoteTrackSeenSessionRef.current = null;
     activeRef.current = null;
     setActive(null);
     setMediaStream(null);
     setCursorsByIdentity({});
-  }, []);
+  }, [clearRemoteTrackLossTimer]);
 
   const unpublishLocalStream = useCallback(async () => {
     const stream = localStreamRef.current;
@@ -220,20 +229,14 @@ export function useExternalActivitySession({
         if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
         if (activeRef.current?.sessionId === message.sessionId && (!activeRef.current.hostIdentity || activeRef.current.hostIdentity === participant.identity)) {
-          setActive(null);
-          activeRef.current = null;
-          setMediaStream(null);
-          setCursorsByIdentity({});
+          clearRemoteSession(message.sessionId);
         }
         return;
       }
       if (message.type === "HOST_IDLE") {
         if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
-        setActive(null);
-        activeRef.current = null;
-        setMediaStream(null);
-        setCursorsByIdentity({});
+        clearRemoteSession();
         return;
       }
       if (message.type === "HOST_STATE" && message.phase) {
@@ -256,7 +259,7 @@ export function useExternalActivitySession({
     };
     room.on(RoomEvent.DataReceived, handleData);
     return () => { room.off(RoomEvent.DataReceived, handleData); };
-  }, [enabled, isHost, postExtensionCommand, room, startHostSession, stopHostSession, trustedHostIdentity]);
+  }, [clearRemoteSession, enabled, isHost, postExtensionCommand, room, startHostSession, stopHostSession, trustedHostIdentity]);
 
   useEffect(() => {
     if (!enabled || !realtime) return undefined;
@@ -325,10 +328,7 @@ export function useExternalActivitySession({
     }, 1_000);
     const handleParticipantDisconnected = (participant: RemoteParticipant) => {
       if (activeRef.current?.hostIdentity !== participant.identity) return;
-      activeRef.current = null;
-      setActive(null);
-      setMediaStream(null);
-      setCursorsByIdentity({});
+      clearRemoteSession();
       stateResponseReceivedRef.current = false;
     };
     room.on(RoomEvent.ParticipantConnected, announceOrRequestState);
@@ -341,7 +341,7 @@ export function useExternalActivitySession({
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
       room.off(RoomEvent.Reconnected, announceOrRequestState);
     };
-  }, [broadcastState, enabled, isHost, publish, room]);
+  }, [broadcastState, clearRemoteSession, enabled, isHost, publish, room]);
 
   useEffect(() => {
     if (!enabled || isHost) return undefined;
@@ -463,7 +463,7 @@ export function useExternalActivitySession({
 
   useEffect(() => {
     if (!enabled || isHost || !active) return undefined;
-    const updateRemoteStream = () => {
+    const matchingRemoteTracks = () => {
       const tracks: MediaStreamTrack[] = [];
       for (const participant of room.remoteParticipants.values()) {
         for (const publication of participant.trackPublications.values()) {
@@ -472,7 +472,38 @@ export function useExternalActivitySession({
           }
         }
       }
-      setMediaStream(tracks.length ? new MediaStream(tracks) : null);
+      return tracks;
+    };
+    const updateRemoteStream = () => {
+      const tracks = matchingRemoteTracks();
+      if (tracks.length) {
+        clearRemoteTrackLossTimer();
+        remoteTrackSeenSessionRef.current = active.sessionId;
+        setMediaStream(new MediaStream(tracks));
+        return;
+      }
+      setMediaStream(null);
+      if (
+        remoteTrackSeenSessionRef.current !== active.sessionId
+        || remoteTrackLossTimerRef.current !== null
+      ) {
+        return;
+      }
+      publish({
+        version: 1,
+        type: "REQUEST_STATE",
+        sessionId: active.sessionId,
+        blockId: active.blockId,
+      }, externalActivityHostTopic, true);
+      remoteTrackLossTimerRef.current = window.setTimeout(() => {
+        remoteTrackLossTimerRef.current = null;
+        if (
+          activeRef.current?.sessionId === active.sessionId
+          && matchingRemoteTracks().length === 0
+        ) {
+          clearRemoteSession(active.sessionId);
+        }
+      }, 1_000);
     };
     updateRemoteStream();
     room.on(RoomEvent.TrackSubscribed, updateRemoteStream);
@@ -480,13 +511,15 @@ export function useExternalActivitySession({
     return () => {
       room.off(RoomEvent.TrackSubscribed, updateRemoteStream);
       room.off(RoomEvent.TrackUnsubscribed, updateRemoteStream);
+      clearRemoteTrackLossTimer();
     };
-  }, [active?.sessionId, enabled, isHost, room]);
+  }, [active?.blockId, active?.sessionId, clearRemoteSession, clearRemoteTrackLossTimer, enabled, isHost, publish, room]);
 
   useEffect(() => () => {
     clearTimers();
+    clearRemoteTrackLossTimer();
     if (isHost) void stopHostSession();
-  }, [clearTimers, isHost, stopHostSession]);
+  }, [clearRemoteTrackLossTimer, clearTimers, isHost, stopHostSession]);
 
   const open = useCallback((block: MaterialEditorBlock) => {
     if (block.type !== "externalActivity" || !block.url) return;

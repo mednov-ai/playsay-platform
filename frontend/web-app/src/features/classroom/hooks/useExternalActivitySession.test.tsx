@@ -179,8 +179,10 @@ describe("useExternalActivitySession", () => {
     act(() => result.current.open(block));
     const firstSessionId = result.current.active!.sessionId;
     act(() => result.current.retry());
-    await waitFor(() => expect(result.current.active).toMatchObject({ phase: "OPENING_PROVIDER" }));
-    expect(result.current.active?.sessionId).not.toBe(firstSessionId);
+    await waitFor(() => {
+      expect(result.current.active).toMatchObject({ phase: "OPENING_PROVIDER" });
+      expect(result.current.active?.sessionId).not.toBe(firstSessionId);
+    });
     const secondSessionId = result.current.active!.sessionId;
 
     act(() => dispatchExtensionEvent({

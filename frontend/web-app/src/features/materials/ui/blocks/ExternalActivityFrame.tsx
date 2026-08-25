@@ -330,6 +330,7 @@ function externalActivityErrorMessage(t: TFunction, errorCode?: string): string 
   switch (errorCode) {
     case "FEATURE_UNAVAILABLE": return t("materials.externalActivity.errors.featureUnavailable");
     case "EXTENSION_NOT_DETECTED": return t("materials.externalActivity.errors.extensionNotDetected");
+    case "EXTENSION_UPDATE_REQUIRED": return t("materials.externalActivity.errors.extensionUpdateRequired");
     case "TARGET_TAB_CLOSED": return t("materials.externalActivity.errors.targetTabClosed");
     case "CAPTURE_PERMISSION_DENIED": return t("materials.externalActivity.errors.capturePermissionDenied");
     case "CAPTURE_NOT_SUPPORTED": return t("materials.externalActivity.errors.captureNotSupported");

@@ -30,14 +30,14 @@ const expectedIcons = {
 describe("extension manifest contract", () => {
   it("keeps package and manifest versions aligned", () => {
     expect(manifest.name).toBe("Honey.school");
-    expect(manifest.version).toBe("0.1.6");
+    expect(manifest.version).toBe("0.1.7");
     expect(extensionPackage.version).toBe(manifest.version);
     expect(frontendLock.packages["browser-extension"]?.version).toBe(manifest.version);
   });
 
   it("keeps manifest permissions and content-script origins aligned with the runtime guard", () => {
-    expect(manifest.permissions).toContain("scripting");
-    expect(manifest.permissions).not.toContain("debugger");
+    expect(manifest.permissions).toContain("debugger");
+    expect(manifest.permissions).not.toContain("scripting");
     expect(manifest.host_permissions).toEqual(TRUSTED_PLAY_SAY_MATCH_PATTERNS);
     expect(manifest.content_scripts).toHaveLength(1);
     expect(manifest.content_scripts[0]?.matches).toEqual(TRUSTED_PLAY_SAY_MATCH_PATTERNS);

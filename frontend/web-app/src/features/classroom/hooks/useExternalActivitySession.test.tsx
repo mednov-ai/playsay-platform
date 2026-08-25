@@ -95,7 +95,7 @@ describe("useExternalActivitySession", () => {
     postMessage.mockRestore();
   });
 
-  it("uses the 0.1.6 acknowledgement to distinguish extension readiness from detection timeout", async () => {
+  it("uses the 0.1.7 acknowledgement to distinguish extension readiness from detection timeout", async () => {
     vi.useFakeTimers();
     const { result, unmount } = renderHook(() => useExternalActivitySession({
       blocks: [block],
@@ -108,7 +108,7 @@ describe("useExternalActivitySession", () => {
     act(() => result.current.open(block));
     expect(result.current.active?.phase).toBe("OPENING_PROVIDER");
     const sessionId = result.current.active!.sessionId;
-    act(() => dispatchExtensionEvent({ version: 1, type: "AWAITING_ACTION", sessionId }));
+    act(() => dispatchExtensionEvent({ version: 1, type: "AWAITING_ACTION", sessionId, extensionVersion: "0.1.7" }));
     expect(result.current.active?.phase).toBe("AWAITING_ACTION");
 
     await act(async () => {
@@ -116,6 +116,25 @@ describe("useExternalActivitySession", () => {
     });
     expect(result.current.active?.phase).toBe("AWAITING_ACTION");
     unmount();
+  });
+
+  it("stops before capture with an actionable error for the old 0.1.6 extension", () => {
+    const { result } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: true,
+      participantColor: "#ff5c00",
+      participantName: "Teacher",
+    }));
+
+    act(() => result.current.open(block));
+    const sessionId = result.current.active!.sessionId;
+    act(() => dispatchExtensionEvent({ version: 1, type: "AWAITING_ACTION", sessionId }));
+
+    expect(result.current.active).toMatchObject({
+      errorCode: "EXTENSION_UPDATE_REQUIRED",
+      phase: "ERROR",
+    });
   });
 
   it("reports a bounded error when the extension does not acknowledge the request", async () => {

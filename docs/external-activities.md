@@ -30,7 +30,7 @@ The packaged Jenkins artifact is `frontend/browser-extension/playsay-browser-ext
 
 To update an unpacked installation, replace/rebuild its files and click **Reload** on the extension card. If Chrome reports `Manifest file is missing or unreadable`, the wrong directory was selected or the build has not produced `dist/manifest.json`.
 
-Version `0.1.6` is manually distributed as this unpacked/Jenkins artifact. The web lifecycle remains compatible with its version-1 events. If shipped extension source, manifest behavior or permissions, runtime bundle, or user-facing extension assets change, increment the manifest/package patch version (normally to `0.1.7`), synchronize the lockfile/tests/install guidance, and confirm the new version on `chrome://extensions`. Tests or documentation that do not change the shipped artifact leave `0.1.6` unchanged. Chrome Web Store and Edge Add-ons publication are not part of the current release flow.
+Version `0.1.7` is the current unpacked/Jenkins artifact. It keeps the version-1 web lifecycle used by 0.1.6 and replaces per-event MAIN-world script injection with a temporary Chrome Debugger attachment so trusted pointer, wheel, and keyboard input reaches canvas and nested-frame providers such as Wordwall without the former input latency. Chrome may show its standard debugging notice while sharing; stop/return detaches immediately. Any later shipped extension source, manifest behavior or permissions, runtime bundle, or user-facing asset change must increment the manifest/package patch version again, synchronize the lockfile/tests/install guidance, and confirm the new version on `chrome://extensions`. Chrome Web Store and Edge Add-ons publication are not part of the current release flow.
 
 ## Lesson flow
 
@@ -48,12 +48,12 @@ The teacher can lock/unlock student input, navigate back, reload, minimize, or s
 The teacher status distinguishes these stages:
 
 - opening the provider and checking the extension;
-- extension acknowledged through the 0.1.6 `AWAITING_ACTION` event and waiting for the explicit bee action;
+- extension acknowledged through the 0.1.6/0.1.7 `AWAITING_ACTION` event and waiting for the explicit bee action;
 - capture starting;
 - active sharing;
 - a recoverable failure.
 
-The extension-detection timer runs only until `AWAITING_ACTION`; it is cleared as soon as 0.1.6 acknowledges the session. Teacher failures use only the stable codes `FEATURE_UNAVAILABLE`, `EXTENSION_NOT_DETECTED`, `TARGET_TAB_CLOSED`, `CAPTURE_PERMISSION_DENIED`, `CAPTURE_NOT_SUPPORTED`, `CAPTURE_START_FAILED`, and `EXTENSION_ERROR_UNKNOWN`. The status includes localized guidance plus Retry and Return to lesson where applicable. Retry closes and cleans the stale attempt, creates a new session id/nonce, and ignores late events from the former session. Students see only localized waiting/stopped copy and never receive raw Chrome errors, the teacher diagnostic code, nonce, target tab id, or stream id.
+The extension-detection timer runs only until `AWAITING_ACTION`; it is cleared as soon as the extension acknowledges the session. Version 0.1.7 and later include their package version in that acknowledgement. An older or unidentifiable package stops before capture with `EXTENSION_UPDATE_REQUIRED` instead of presenting a false active state with unusable provider input. Teacher failures use only the stable codes `FEATURE_UNAVAILABLE`, `EXTENSION_NOT_DETECTED`, `EXTENSION_UPDATE_REQUIRED`, `TARGET_TAB_CLOSED`, `CAPTURE_PERMISSION_DENIED`, `CAPTURE_NOT_SUPPORTED`, `CAPTURE_START_FAILED`, and `EXTENSION_ERROR_UNKNOWN`. The status includes localized guidance plus Retry and Return to lesson where applicable. Retry closes and cleans the stale attempt, creates a new session id/nonce, and ignores late events from the former session. Students see only localized waiting/stopped copy and never receive raw Chrome errors, the extension package version, teacher diagnostic code, nonce, target tab id, or stream id.
 
 For `EXTENSION_NOT_DETECTED`, verify that the unpacked extension is installed and enabled, click **Reload** on its `chrome://extensions` card, reload the Honey School lesson page so its content script is present, and then use **Retry**. `CAPTURE_NOT_SUPPORTED` requires Chrome or Edge 116+; permission/start failures should be retried after checking browser permissions and reloading the extension. Return to lesson must remain available and leave the ordinary classroom usable.
 
@@ -69,7 +69,7 @@ For `EXTENSION_NOT_DETECTED`, verify that the unpacked extension is installed an
 
 ## Manual smoke matrix
 
-Before production promotion, the web build contract must pass and browser acceptance must cover both `https://online.honeyschool.ru/` and `https://online.honey.school/`. Record only the displayed extension version, stable status codes, lifecycle outcome, and non-sensitive build identity. Exercise the installed 0.1.6 baseline and, when the extension artifact changed, the incremented candidate shown on `chrome://extensions`.
+Before production promotion, the web build contract must pass and browser acceptance must cover both `https://online.honeyschool.ru/` and `https://online.honey.school/`. Record only the displayed extension version, stable status codes, lifecycle outcome, and non-sensitive build identity. Exercise the installed `0.1.7` candidate shown on `chrome://extensions`, including a provider start action and participant input before accepting the release.
 
 For each guaranteed provider, test with one teacher and three students in a group `SHARED` lesson:
 

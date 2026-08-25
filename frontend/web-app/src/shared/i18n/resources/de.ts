@@ -1347,6 +1347,7 @@ export const de = {
       errors: {
         featureUnavailable: "Gemeinsame Aktivitäten sind in diesem Build deaktiviert. Kehren Sie zum Unterricht zurück und informieren Sie die Administration.",
         extensionNotDetected: "Die Erweiterung hat nicht geantwortet. Prüfen Sie Installation und Aktivierung, klicken Sie unter chrome://extensions auf „Neu laden“, laden Sie die Unterrichtsseite neu und versuchen Sie es erneut.",
+        extensionUpdateRequired: "Die installierte Erweiterung ist veraltet. Aktualisieren Sie Honey.school auf Version 0.1.7, klicken Sie unter chrome://extensions auf „Neu laden“, laden Sie die Unterrichtsseite neu und versuchen Sie es erneut.",
         targetTabClosed: "Der Aktivitäts-Tab wurde geschlossen. Versuchen Sie es erneut, um einen neuen Tab zu öffnen.",
         capturePermissionDenied: "Chrome hat die Tab-Aufnahme nicht erlaubt. Prüfen Sie die Browserberechtigungen und versuchen Sie es erneut.",
         captureNotSupported: "Dieser Browser unterstützt die erforderliche Tab-Aufnahme nicht. Verwenden Sie Chrome oder Edge ab Version 116.",

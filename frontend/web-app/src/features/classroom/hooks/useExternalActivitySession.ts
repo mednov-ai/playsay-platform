@@ -16,6 +16,7 @@ import {
   externalActivityParticipantPhase,
   externalActivityTrackName,
   externalActivityTrackPrefix,
+  extensionSupportsTrustedInput,
   isCurrentExternalActivityCapture,
   parseExternalActivityMessage,
   parseExtensionEvent,
@@ -386,7 +387,9 @@ export function useExternalActivitySession({
       if (!extensionEvent) return;
       if (extensionEvent.type === "AWAITING_ACTION" && current.phase === "OPENING_PROVIDER") {
         clearTimers();
-        broadcastState({ ...current, phase: "AWAITING_ACTION" });
+        broadcastState(extensionSupportsTrustedInput(extensionEvent.extensionVersion)
+          ? { ...current, phase: "AWAITING_ACTION" }
+          : { ...current, phase: "ERROR", errorCode: "EXTENSION_UPDATE_REQUIRED" });
       } else if (extensionEvent.type === "CAPTURE_READY") {
         const generation = sessionGenerationRef.current;
         if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);

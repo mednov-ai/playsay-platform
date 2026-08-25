@@ -12,6 +12,7 @@ export type ExternalActivityPhase = ExternalActivityWirePhase | "OPENING_PROVIDE
 export type ExternalActivityErrorCode =
   | "FEATURE_UNAVAILABLE"
   | "EXTENSION_NOT_DETECTED"
+  | "EXTENSION_UPDATE_REQUIRED"
   | "TARGET_TAB_CLOSED"
   | "CAPTURE_PERMISSION_DENIED"
   | "CAPTURE_NOT_SUPPORTED"
@@ -100,6 +101,20 @@ export function parseExtensionEvent(value: unknown, sessionId: string): Record<s
   ) return null;
   if (event.type === "CAPTURE_READY" && (typeof event.streamId !== "string" || !event.streamId)) return null;
   return event;
+}
+
+export const minimumTrustedInputExtensionVersion = "0.1.7";
+
+export function extensionSupportsTrustedInput(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const candidate = value.match(/^(\d+)\.(\d+)\.(\d+)$/)?.slice(1).map(Number);
+  const minimum = minimumTrustedInputExtensionVersion.split(".").map(Number);
+  if (!candidate || candidate.length !== minimum.length) return false;
+  for (let index = 0; index < minimum.length; index += 1) {
+    if (candidate[index]! > minimum[index]!) return true;
+    if (candidate[index]! < minimum[index]!) return false;
+  }
+  return true;
 }
 
 export function externalActivityParticipantPhase(phase: ExternalActivityPhase): ExternalActivityWirePhase {

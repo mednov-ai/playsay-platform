@@ -1347,6 +1347,7 @@ export const en = {
       errors: {
         featureUnavailable: "Shared activities are disabled in this build. Return to the lesson and tell an administrator.",
         extensionNotDetected: "The extension did not respond. Make sure it is installed and enabled, click Reload on chrome://extensions, reload the lesson page, and retry.",
+        extensionUpdateRequired: "The installed extension is outdated. Update Honey.school to version 0.1.7, click Reload on chrome://extensions, reload the lesson page, and retry.",
         targetTabClosed: "The activity tab was closed. Retry to open a new tab.",
         capturePermissionDenied: "Chrome did not allow tab capture. Check browser permissions and retry.",
         captureNotSupported: "This browser does not support the required tab capture. Use Chrome or Edge 116 or newer.",

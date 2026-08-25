@@ -1347,6 +1347,7 @@ export const fr = {
       errors: {
         featureUnavailable: "Les activités partagées sont désactivées dans cette version. Revenez au cours et informez un administrateur.",
         extensionNotDetected: "L’extension n’a pas répondu. Vérifiez son installation et son activation, cliquez sur Recharger dans chrome://extensions, rechargez la page du cours, puis réessayez.",
+        extensionUpdateRequired: "L’extension installée est obsolète. Mettez Honey.school à jour vers la version 0.1.7, cliquez sur Recharger dans chrome://extensions, rechargez la page du cours, puis réessayez.",
         targetTabClosed: "L’onglet de l’activité a été fermé. Réessayez pour ouvrir un nouvel onglet.",
         capturePermissionDenied: "Chrome n’a pas autorisé la capture de l’onglet. Vérifiez les autorisations du navigateur et réessayez.",
         captureNotSupported: "Ce navigateur ne prend pas en charge la capture requise. Utilisez Chrome ou Edge 116 ou une version ultérieure.",

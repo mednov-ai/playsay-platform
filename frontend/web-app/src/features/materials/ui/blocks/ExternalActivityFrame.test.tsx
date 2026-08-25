@@ -220,6 +220,24 @@ describe("ExternalActivityFrame", () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
+  it("shows the required extension version for a trusted-input update", () => {
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: "teacher",
+        phase: "ERROR",
+        studentsLocked: false,
+        errorCode: "EXTENSION_UPDATE_REQUIRED",
+        visible: true,
+      },
+    })} />);
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("EXTENSION_UPDATE_REQUIRED");
+    expect(alert).toHaveTextContent("0.1.7");
+  });
+
   it("keeps teacher-only diagnostics out of the student failure state", () => {
     const returnToLesson = vi.fn();
     render(<ExternalActivityFrame block={block} sync={sync({

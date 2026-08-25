@@ -5,6 +5,7 @@ import {
   externalActivityInputReliable,
   externalActivitySessionIdFromTrackName,
   externalActivityExtensionErrorCode,
+  extensionSupportsTrustedInput,
   externalActivityParticipantPhase,
   externalActivityTrackName,
   isCurrentExternalActivityCapture,
@@ -91,6 +92,14 @@ describe("external activity classroom protocol", () => {
     expect(parseExtensionEvent({ version: 1, type: "CAPTURE_READY", sessionId: "session-1", streamId: "stream-1" }, "session-1")).toMatchObject({ streamId: "stream-1" });
     expect(parseExtensionEvent({ version: 1, type: "CAPTURE_READY", sessionId: "other", streamId: "stream-1" }, "session-1")).toBeNull();
     expect(parseExtensionEvent({ version: 1, type: "PRIVATE_EVENT", sessionId: "session-1" }, "session-1")).toBeNull();
+  });
+
+  it("requires the trusted-input extension patch while accepting later versions", () => {
+    expect(extensionSupportsTrustedInput(undefined)).toBe(false);
+    expect(extensionSupportsTrustedInput("0.1.6")).toBe(false);
+    expect(extensionSupportsTrustedInput("0.1.7")).toBe(true);
+    expect(extensionSupportsTrustedInput("0.2.0")).toBe(true);
+    expect(extensionSupportsTrustedInput("invalid")).toBe(false);
   });
 
   it("rejects a late capture after either session or generation changes", () => {

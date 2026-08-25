@@ -43,6 +43,8 @@ class WorksheetOpenAiAnalysisProviderTest {
         assertFalse(transport.requests.first().contains("private-key"))
         assertFalse(transport.requests.first().contains("%PDF"))
         assertTrue(transport.requests.all { it.contains("\"strict\":true") })
+        assertTrue(transport.requests.all { !it.contains("\"uniqueItems\"") })
+        assertTrue(transport.requests.all { it.contains("\"schemaVersion\":{\"const\":\"worksheet-analysis/v1\",\"type\":\"string\"}") })
         assertEquals(listOf(4 * 1024 * 1024, 4 * 1024 * 1024), transport.responseBounds)
     }
 

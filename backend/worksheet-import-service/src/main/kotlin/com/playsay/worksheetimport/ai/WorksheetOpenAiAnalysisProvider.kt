@@ -115,6 +115,7 @@ class OpenAiWorksheetAnalysisProvider(
     private fun requireAllObjectProperties(node: JsonNode) {
         if (node.isObject) {
             val objectNode = node as ObjectNode
+            normalizeOpenAiSchemaNode(objectNode)
             val properties = objectNode.get("properties") as? ObjectNode
             if (objectNode.path("type").asText() == "object" && properties != null) {
                 val required = objectMapper.createArrayNode()
@@ -125,6 +126,29 @@ class OpenAiWorksheetAnalysisProvider(
         } else if (node.isArray) {
             node.forEach(::requireAllObjectProperties)
         }
+    }
+
+    private fun normalizeOpenAiSchemaNode(node: ObjectNode) {
+        node.remove("uniqueItems")
+        if (node.has("type")) return
+        if (node.has("const")) {
+            node.put("type", jsonSchemaType(node.get("const")))
+            return
+        }
+        if (!node.path("enum").isArray) return
+        val types = node.path("enum").map(::jsonSchemaType).distinct()
+        if (types.size == 1) node.put("type", types.single())
+        else node.putArray("type").also { typeArray -> types.forEach(typeArray::add) }
+    }
+
+    private fun jsonSchemaType(node: JsonNode): String = when {
+        node.isNull -> "null"
+        node.isTextual -> "string"
+        node.isIntegralNumber -> "integer"
+        node.isNumber -> "number"
+        node.isBoolean -> "boolean"
+        node.isArray -> "array"
+        else -> "object"
     }
 
     private fun JsonNode.outputText(): String? {

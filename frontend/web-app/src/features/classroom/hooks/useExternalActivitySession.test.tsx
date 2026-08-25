@@ -351,6 +351,70 @@ describe("useExternalActivitySession", () => {
     expect(result.current.active).toBeNull();
   });
 
+  it("converges a student-first request from the trusted host video track when host state is missed", async () => {
+    const studentSessionId = "00000000-0000-4000-8000-000000000001";
+    const mediaTrack = {} as MediaStreamTrack;
+    const publication = {
+      setSubscribed: vi.fn(),
+      track: { mediaStreamTrack: mediaTrack },
+      trackName: `playsay-external-activity-${studentSessionId}-video`,
+    };
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map([["video", publication]]),
+    };
+    room.remoteParticipants.set("teacher", teacher);
+    const { result } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      trustedHostIdentity: "teacher",
+    }));
+
+    vi.spyOn(crypto, "randomUUID").mockReturnValueOnce(studentSessionId);
+    act(() => result.current.open(block));
+    expect(result.current.active).toMatchObject({ phase: "REQUESTED", sessionId: studentSessionId });
+
+    act(() => emit(RoomEvent.TrackSubscribed, publication.track, publication, teacher));
+    await waitFor(() => expect(result.current.active).toMatchObject({
+      hostIdentity: "teacher",
+      phase: "ACTIVE",
+      sessionId: studentSessionId,
+    }));
+    expect(result.current.mediaStream).not.toBeNull();
+  });
+
+  it("explicitly subscribes to a trusted published activity video track", () => {
+    const publication = {
+      setSubscribed: vi.fn(),
+      track: undefined,
+      trackName: "playsay-external-activity-session-1-video",
+    };
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map([["video", publication]]),
+    };
+    room.remoteParticipants.set("teacher", teacher);
+    renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      trustedHostIdentity: "teacher",
+    }));
+
+    act(() => emit(RoomEvent.TrackPublished, publication, teacher));
+
+    expect(publication.setSubscribed).toHaveBeenCalledWith(true);
+  });
+
   it("clears a student session when an unsubscribed host track remains stale in the publication map", async () => {
     vi.useFakeTimers();
     const mediaTrack = {} as MediaStreamTrack;

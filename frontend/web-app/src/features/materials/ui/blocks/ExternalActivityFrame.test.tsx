@@ -196,6 +196,24 @@ describe("ExternalActivityFrame", () => {
     expect(screen.queryByText(/расширен/i)).toBeNull();
   });
 
+  it("shows a distinct participant status while the active media track is connecting", () => {
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: "teacher",
+        phase: "ACTIVE",
+        studentsLocked: false,
+        visible: true,
+      },
+      isHost: false,
+      mediaStream: null,
+    })} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Подключаем показ задания");
+    expect(screen.getByRole("status")).toHaveTextContent("несколько секунд");
+  });
+
   it("shows a stable teacher diagnostic and focuses the retry action", () => {
     const retry = vi.fn();
     render(<ExternalActivityFrame block={block} sync={sync({

@@ -1340,6 +1340,8 @@ export const de = {
       startingCaptureHint: "Sie kehren zum Unterricht zurück; Bild und Ton des Tabs werden verbunden.",
       waitingForTeacher: "Die Lehrkraft teilt die Aktivität gleich",
       waitingHint: "Lassen Sie dieses Fenster geöffnet. Die gemeinsame Seite erscheint hier für alle.",
+      connectingStream: "Gemeinsame Aktivität wird verbunden",
+      connectingStreamHint: "Die Lehrkraft hat die Aktivität gestartet. Das Verbinden von Bild und Ton kann einige Sekunden dauern.",
       error: "Die gemeinsame Aktivität wurde beendet",
       studentStopped: "Die gemeinsame Aktivität ist vorerst nicht verfügbar",
       studentStoppedHint: "Die Lehrkraft muss die Erweiterung prüfen. Kehren Sie zum Unterricht zurück und versuchen Sie es später erneut.",

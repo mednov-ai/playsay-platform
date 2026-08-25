@@ -358,16 +358,30 @@ export function useExternalActivitySession({
   useEffect(() => {
     if (!enabled || isHost) return undefined;
     const discoverPublishedSession = () => {
-      if (activeRef.current) return;
-      const block = blocksRef.current.find((candidate): candidate is ExternalActivityBlock => (
-        candidate.type === "externalActivity" && Boolean(candidate.url?.trim())
-      ));
-      if (!block) return;
+      const current = activeRef.current;
       for (const participant of room.remoteParticipants.values()) {
         if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) continue;
         for (const publication of participant.trackPublications.values()) {
           const sessionId = externalActivitySessionIdFromTrackName(publication.trackName);
-          if (!sessionId || !publication.track?.mediaStreamTrack) continue;
+          if (!sessionId || !publication.trackName.endsWith("-video")) continue;
+          if (current?.hostIdentity && current.hostIdentity !== participant.identity) continue;
+          if (
+            current
+            && current.sessionId !== sessionId
+            && (current.hostIdentity || current.phase !== "REQUESTED")
+          ) continue;
+          const block = blocksRef.current.find((candidate): candidate is ExternalActivityBlock => (
+            candidate.id === current?.blockId
+            && candidate.type === "externalActivity"
+            && Boolean(candidate.url?.trim())
+          )) ?? blocksRef.current.find((candidate): candidate is ExternalActivityBlock => (
+            candidate.type === "externalActivity" && Boolean(candidate.url?.trim())
+          ));
+          if (!block) return;
+          if (!publication.track?.mediaStreamTrack) {
+            publication.setSubscribed(true);
+            continue;
+          }
           const discovered: ExternalActivityState = {
             blockId: block.id,
             sessionId,
@@ -384,8 +398,12 @@ export function useExternalActivitySession({
       }
     };
     discoverPublishedSession();
+    room.on(RoomEvent.TrackPublished, discoverPublishedSession);
     room.on(RoomEvent.TrackSubscribed, discoverPublishedSession);
-    return () => { room.off(RoomEvent.TrackSubscribed, discoverPublishedSession); };
+    return () => {
+      room.off(RoomEvent.TrackPublished, discoverPublishedSession);
+      room.off(RoomEvent.TrackSubscribed, discoverPublishedSession);
+    };
   }, [enabled, isHost, room, trustedHostIdentity]);
 
   useEffect(() => {

@@ -177,8 +177,9 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     });
   }
 
-  const waiting = !active || ["REQUESTED", "OPENING_PROVIDER", "AWAITING_EXTENSION", "AWAITING_ACTION", "STARTING"].includes(active.phase);
-  const waitingCopy = externalActivityWaitingCopy(t, active?.phase, sync.isHost);
+  const connectingStudentStream = !sync.isHost && active?.phase === "ACTIVE" && !sync.mediaStream;
+  const waiting = !active || connectingStudentStream || ["REQUESTED", "OPENING_PROVIDER", "AWAITING_EXTENSION", "AWAITING_ACTION", "STARTING"].includes(active.phase);
+  const waitingCopy = externalActivityWaitingCopy(t, active?.phase, sync.isHost, connectingStudentStream);
   const errorMessage = externalActivityErrorMessage(t, active?.errorCode);
 
   return (
@@ -301,8 +302,15 @@ function externalActivityWaitingCopy(
   t: TFunction,
   phase: ExternalActivityPhase | undefined,
   isHost: boolean,
+  connectingStudentStream = false,
 ): { title: string; hint: string } {
   if (!isHost) {
+    if (connectingStudentStream) {
+      return {
+        title: t("materials.externalActivity.connectingStream"),
+        hint: t("materials.externalActivity.connectingStreamHint"),
+      };
+    }
     return {
       title: t("materials.externalActivity.waitingForTeacher"),
       hint: t("materials.externalActivity.waitingHint"),

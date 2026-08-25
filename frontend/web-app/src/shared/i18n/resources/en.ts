@@ -1340,6 +1340,8 @@ export const en = {
       startingCaptureHint: "Returning you to the lesson and connecting the tab's video and audio.",
       waitingForTeacher: "Waiting for the teacher to share the activity",
       waitingHint: "Keep this window open. The shared page will appear here for everyone.",
+      connectingStream: "Connecting the shared activity",
+      connectingStreamHint: "The teacher has started the activity. Connecting its video and audio may take a few seconds.",
       error: "The shared activity stopped",
       studentStopped: "The shared activity is unavailable for now",
       studentStoppedHint: "The teacher needs to check the extension. You can return to the lesson and try later.",

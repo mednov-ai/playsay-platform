@@ -1340,6 +1340,8 @@ export const fr = {
       startingCaptureHint: "Retour au cours et connexion de l’image et du son de l’onglet.",
       waitingForTeacher: "En attente du partage par l’enseignant",
       waitingHint: "Gardez cette fenêtre ouverte. La page partagée apparaîtra ici pour tous.",
+      connectingStream: "Connexion à l’activité partagée",
+      connectingStreamHint: "L’enseignant a démarré l’activité. La connexion de l’image et du son peut prendre quelques secondes.",
       error: "L’activité partagée s’est arrêtée",
       studentStopped: "L’activité partagée est momentanément indisponible",
       studentStoppedHint: "L’enseignant doit vérifier l’extension. Vous pouvez revenir au cours et réessayer plus tard.",

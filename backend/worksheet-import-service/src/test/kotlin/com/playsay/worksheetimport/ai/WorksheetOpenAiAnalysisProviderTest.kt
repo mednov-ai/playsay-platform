@@ -45,6 +45,9 @@ class WorksheetOpenAiAnalysisProviderTest {
         assertTrue(transport.requests.all { it.contains("\"strict\":true") })
         assertTrue(transport.requests.all { !it.contains("\"uniqueItems\"") })
         assertTrue(transport.requests.all { it.contains("\"schemaVersion\":{\"const\":\"worksheet-analysis/v1\",\"type\":\"string\"}") })
+        val packetRequestSchema = mapper.readTree(transport.requests.last()).path("text").path("format").path("schema")
+        assertTrue(packetRequestSchema.has("\$defs"))
+        assertFalse(packetRequestSchema.path("properties").path("pages").path("items").has("\$defs"))
         assertEquals(listOf(4 * 1024 * 1024, 4 * 1024 * 1024), transport.responseBounds)
     }
 

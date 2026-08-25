@@ -35,7 +35,9 @@ class OpenAiWorksheetAnalysisProvider(
     private val packetSchema: ObjectNode by lazy {
         strictSchema(resource("/ai/worksheet-packet-resolution-v1.schema.json")).also { packet ->
             val pages = packet.path("properties").path("pages") as ObjectNode
-            pages.set<JsonNode>("items", pageSchema.deepCopy())
+            val embeddedPageSchema: ObjectNode = pageSchema.deepCopy()
+            packet.set<JsonNode>("\$defs", embeddedPageSchema.remove("\$defs"))
+            pages.set<JsonNode>("items", embeddedPageSchema)
         }
     }
 

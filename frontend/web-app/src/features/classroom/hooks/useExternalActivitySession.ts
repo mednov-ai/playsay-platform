@@ -7,11 +7,13 @@ import {
   externalActivityCaptureConstraints,
   externalActivityCursorTopic,
   externalActivityExtensionChannel,
+  externalActivityExtensionErrorCode,
   externalActivityHostTopic,
   externalActivityInputReliable,
   externalActivityInputTopic,
   externalActivityPageChannel,
   externalActivitySessionIdFromTrackName,
+  externalActivityParticipantPhase,
   externalActivityTrackName,
   externalActivityTrackPrefix,
   isCurrentExternalActivityCapture,
@@ -77,12 +79,28 @@ export function useExternalActivitySession({
   const broadcastState = useCallback((state: ExternalActivityState) => {
     activeRef.current = state;
     setActive(state);
-    publish({ version: 1, type: "HOST_STATE", ...state }, externalActivityHostTopic, true);
+    void publish({
+      version: 1,
+      type: "HOST_STATE",
+      blockId: state.blockId,
+      sessionId: state.sessionId,
+      phase: externalActivityParticipantPhase(state.phase),
+      studentsLocked: state.studentsLocked,
+      visible: state.visible,
+    }, externalActivityHostTopic, true);
   }, [publish]);
 
   const clearTimers = useCallback(() => {
     if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);
     extensionTimerRef.current = null;
+  }, []);
+
+  const clearRemoteSession = useCallback((sessionId?: string) => {
+    if (sessionId && activeRef.current?.sessionId !== sessionId) return;
+    activeRef.current = null;
+    setActive(null);
+    setMediaStream(null);
+    setCursorsByIdentity({});
   }, []);
 
   const unpublishLocalStream = useCallback(async () => {
@@ -108,11 +126,12 @@ export function useExternalActivitySession({
     const nonce = extensionNonceRef.current;
     if (nonce) postExtensionCommand({ version: 1, type: "STOP", sessionId: current.sessionId, nonce });
     extensionNonceRef.current = null;
+    if (notify) publish({ version: 1, type: "STOPPED", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true);
     await unpublishLocalStream();
     activeRef.current = null;
     setActive(null);
     setCursorsByIdentity({});
-    if (notify) publish({ version: 1, type: "STOPPED", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true);
+    if (notify) publish({ version: 1, type: "HOST_IDLE", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true);
   }, [clearTimers, isHost, postExtensionCommand, publish, unpublishLocalStream]);
 
   const startHostSession = useCallback(async (blockId: string, sessionId: string) => {
@@ -130,7 +149,7 @@ export function useExternalActivitySession({
       blockId,
       sessionId,
       hostIdentity: room.localParticipant.identity,
-      phase: "AWAITING_EXTENSION",
+      phase: "OPENING_PROVIDER",
       studentsLocked: false,
       visible: true,
     };
@@ -140,9 +159,9 @@ export function useExternalActivitySession({
       if (
         sessionGenerationRef.current === generation
         && activeRef.current?.sessionId === sessionId
-        && activeRef.current.phase === "AWAITING_EXTENSION"
+        && activeRef.current.phase === "OPENING_PROVIDER"
       ) {
-        broadcastState({ ...next, phase: "ERROR", errorCode: "EXTENSION_NOT_AVAILABLE" });
+        broadcastState({ ...next, phase: "ERROR", errorCode: "EXTENSION_NOT_DETECTED" });
       }
     }, 10_000);
   }, [broadcastState, clearTimers, isHost, postExtensionCommand, room.localParticipant.identity, stopHostSession]);
@@ -365,7 +384,10 @@ export function useExternalActivitySession({
       if (!current) return;
       const extensionEvent = parseExtensionEvent(event.data.event, current.sessionId);
       if (!extensionEvent) return;
-      if (extensionEvent.type === "CAPTURE_READY") {
+      if (extensionEvent.type === "AWAITING_ACTION" && current.phase === "OPENING_PROVIDER") {
+        clearTimers();
+        broadcastState({ ...current, phase: "AWAITING_ACTION" });
+      } else if (extensionEvent.type === "CAPTURE_READY") {
         const generation = sessionGenerationRef.current;
         if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);
         extensionTimerRef.current = null;
@@ -427,7 +449,12 @@ export function useExternalActivitySession({
             }
           });
       } else if (["TAB_CLOSED", "DEBUGGER_DETACHED", "ERROR"].includes(String(extensionEvent.type))) {
-        broadcastState({ ...current, phase: "ERROR", errorCode: String(extensionEvent.type) });
+        clearTimers();
+        broadcastState({
+          ...current,
+          phase: "ERROR",
+          errorCode: externalActivityExtensionErrorCode(extensionEvent.type, extensionEvent.error),
+        });
       }
     };
     window.addEventListener("message", handleExtensionEvent);
@@ -462,8 +489,22 @@ export function useExternalActivitySession({
   }, [clearTimers, isHost, stopHostSession]);
 
   const open = useCallback((block: MaterialEditorBlock) => {
-    if (!enabled || block.type !== "externalActivity" || !block.url) return;
+    if (block.type !== "externalActivity" || !block.url) return;
     const sessionId = crypto.randomUUID();
+    if (!enabled) {
+      const unavailable: ExternalActivityState = {
+        blockId: block.id,
+        sessionId,
+        hostIdentity: isHost ? room.localParticipant.identity : null,
+        phase: "ERROR",
+        studentsLocked: false,
+        errorCode: "FEATURE_UNAVAILABLE",
+        visible: true,
+      };
+      activeRef.current = unavailable;
+      setActive(unavailable);
+      return;
+    }
     if (isHost) {
       void startHostSession(block.id, sessionId);
     } else {
@@ -472,7 +513,21 @@ export function useExternalActivitySession({
       setActive(requested);
       publish({ version: 1, type: "REQUEST_OPEN", sessionId, blockId: block.id }, externalActivityHostTopic, true);
     }
-  }, [enabled, isHost, publish, startHostSession]);
+  }, [enabled, isHost, publish, room.localParticipant.identity, startHostSession]);
+
+  const retry = useCallback(() => {
+    const current = activeRef.current;
+    if (!current || !isHost || !enabled) return;
+    void startHostSession(current.blockId, crypto.randomUUID());
+  }, [enabled, isHost, startHostSession]);
+
+  const returnToLesson = useCallback(() => {
+    if (isHost) {
+      void stopHostSession();
+    } else {
+      clearRemoteSession();
+    }
+  }, [clearRemoteSession, isHost, stopHostSession]);
 
   const sendInput = useCallback((input: ExternalActivityInput) => {
     const current = activeRef.current;
@@ -532,10 +587,11 @@ export function useExternalActivitySession({
     mediaStream,
     open,
     reload,
-    returnToLesson: () => { if (isHost) void stopHostSession(); },
+    retry,
+    returnToLesson,
     sendCursor,
     sendInput: sendInput as MaterialExternalActivitySync["sendInput"],
-  }), [active, cursorsByIdentity, isHost, mediaStream, open, reload, sendCursor, sendInput, stopHostSession]);
+  }), [active, cursorsByIdentity, isHost, mediaStream, open, reload, retry, returnToLesson, sendCursor, sendInput]);
 }
 
 async function consumeCapture(streamId: string, sessionId: string): Promise<MediaStream> {

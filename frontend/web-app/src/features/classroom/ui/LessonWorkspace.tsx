@@ -15,6 +15,7 @@ import { useLessonSubmission } from "../hooks/useLessonSubmission";
 import { useYjsWorkspace } from "../hooks/useYjsWorkspace";
 import { useExternalActivitySession } from "../hooks/useExternalActivitySession";
 import { collaborationParticipantColor } from "../model/collaboration";
+import { externalActivityFeatureEnabled } from "../model/externalActivityAvailability";
 import type { LessonRoomSession } from "../model/session";
 import {
   acknowledgeStudentHealth,
@@ -418,7 +419,7 @@ export function LessonWorkspace({
                 exerciseSync={isParallelWork ? undefined : teacherAnnotationWorkspace.exerciseSync}
                 htmlGameSync={isParallelWork ? undefined : teacherHtmlGameSync}
                 videoSync={isParallelWork ? undefined : teacherAnnotationWorkspace.videoSync}
-                externalActivitySync={isParallelWork || !externalActivitiesEnabled ? undefined : teacherExternalActivitySync}
+                externalActivitySync={isParallelWork ? undefined : teacherExternalActivitySync}
                 liveActivePageId={liveActivePageId}
                 onSaveAnswers={(content) => void saveMaterialAnswers(content, activeParticipant?.subject)}
                 onPresentationModeChange={onPresentationModeChange}
@@ -530,10 +531,6 @@ export function LessonWorkspace({
       </div>
     </section>
   );
-}
-
-function externalActivityFeatureEnabled(): boolean {
-  return import.meta.env.DEV || import.meta.env.VITE_EXTERNAL_ACTIVITY_ENABLED === "true";
 }
 
 export function teacherTaskVisibilityAfterLiveUpload(

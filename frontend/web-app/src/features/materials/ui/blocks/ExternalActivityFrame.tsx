@@ -1,7 +1,9 @@
-import { ArrowLeft, RefreshCw, Unplug } from "lucide-react";
+import type { TFunction } from "i18next";
+import { ArrowLeft, Loader2, RefreshCw, RotateCcw, Unplug } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import { Button } from "../../../../components/ui/button";
 import { useAppTranslation } from "../../../../shared/i18n";
+import type { ExternalActivityPhase } from "../../../classroom/model/externalActivityProtocol";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../model/materialDocument";
 
 export function externalActivityContentRect({
@@ -70,6 +72,7 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const mobileInputRef = useRef<HTMLInputElement | null>(null);
+  const retryButtonRef = useRef<HTMLButtonElement | null>(null);
   const lastMoveRef = useRef(0);
   const [cursorFrame, setCursorFrame] = useState<{ height: number; left: number; top: number; width: number } | null>(null);
   const active = sync.active;
@@ -120,6 +123,12 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     };
   }, [sync.mediaStream, updateCursorFrame]);
 
+  useEffect(() => {
+    if (active?.phase === "ERROR" && sync.isHost && active.errorCode !== "FEATURE_UNAVAILABLE") {
+      retryButtonRef.current?.focus();
+    }
+  }, [active?.errorCode, active?.phase, sync.isHost]);
+
   function point(event: PointerEvent | WheelEvent) {
     const surface = surfaceRef.current;
     const video = videoRef.current;
@@ -168,7 +177,9 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     });
   }
 
-  const waiting = !active || active.phase === "REQUESTED" || active.phase === "AWAITING_EXTENSION" || active.phase === "STARTING";
+  const waiting = !active || ["REQUESTED", "OPENING_PROVIDER", "AWAITING_EXTENSION", "AWAITING_ACTION", "STARTING"].includes(active.phase);
+  const waitingCopy = externalActivityWaitingCopy(t, active?.phase, sync.isHost);
+  const errorMessage = externalActivityErrorMessage(t, active?.errorCode);
 
   return (
     <section className="playsay-external-activity-frame" data-phase={active?.phase ?? "IDLE"}>
@@ -179,8 +190,12 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
         </div>
         {sync.isHost ? (
           <div className="playsay-external-activity-actions">
-            <Button onClick={sync.reload} type="button" variant="outline"><RefreshCw className="h-4 w-4" />{t("materials.externalActivity.reload")}</Button>
-            <Button onClick={sync.returnToLesson} type="button"><ArrowLeft className="h-4 w-4" />{t("materials.externalActivity.returnToLesson")}</Button>
+            {active?.phase === "ACTIVE" ? (
+              <Button onClick={sync.reload} type="button" variant="outline"><RefreshCw className="h-4 w-4" />{t("materials.externalActivity.reload")}</Button>
+            ) : null}
+            {active?.phase !== "ERROR" ? (
+              <Button onClick={sync.returnToLesson} type="button"><ArrowLeft className="h-4 w-4" />{t("materials.externalActivity.returnToLesson")}</Button>
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -249,22 +264,76 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
           </span>
         ))}
         {waiting ? (
-          <div className="playsay-external-activity-state" data-testid="external-activity-waiting">
-            <Unplug className="h-8 w-8 text-primary" />
-            <strong>{active?.phase === "AWAITING_EXTENSION" && sync.isHost
-              ? t("materials.externalActivity.clickExtension")
-              : t("materials.externalActivity.waitingForTeacher")}</strong>
-            <span>{t("materials.externalActivity.waitingHint")}</span>
+          <div aria-live="polite" className="playsay-external-activity-state" data-testid="external-activity-waiting" role="status">
+            {active?.phase === "OPENING_PROVIDER" || active?.phase === "STARTING"
+              ? <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              : <Unplug className="h-8 w-8 text-primary" />}
+            <strong>{waitingCopy.title}</strong>
+            <span>{waitingCopy.hint}</span>
           </div>
         ) : null}
         {active?.phase === "ERROR" ? (
-          <div className="playsay-external-activity-state" role="alert">
+          <div className="playsay-external-activity-state" data-error-code={sync.isHost ? active.errorCode : undefined} role="alert">
             <Unplug className="h-8 w-8 text-destructive" />
-            <strong>{t("materials.externalActivity.error")}</strong>
-            <span>{active.errorCode ?? t("materials.externalActivity.errorUnknown")}</span>
+            <strong>{sync.isHost ? t("materials.externalActivity.error") : t("materials.externalActivity.studentStopped")}</strong>
+            <span>{sync.isHost ? errorMessage : t("materials.externalActivity.studentStoppedHint")}</span>
+            {sync.isHost && active.errorCode ? (
+              <code aria-label={t("materials.externalActivity.diagnosticCode", { code: active.errorCode })}>{active.errorCode}</code>
+            ) : null}
+            <div className="playsay-external-activity-state-actions">
+              {sync.isHost && active.errorCode !== "FEATURE_UNAVAILABLE" ? (
+                <Button onClick={sync.retry} ref={retryButtonRef} type="button">
+                  <RotateCcw className="h-4 w-4" />{t("materials.externalActivity.retry")}
+                </Button>
+              ) : null}
+              <Button onClick={sync.returnToLesson} type="button" variant="outline">
+                <ArrowLeft className="h-4 w-4" />{t("materials.externalActivity.returnToLesson")}
+              </Button>
+            </div>
           </div>
         ) : null}
       </div>
     </section>
   );
+}
+
+function externalActivityWaitingCopy(
+  t: TFunction,
+  phase: ExternalActivityPhase | undefined,
+  isHost: boolean,
+): { title: string; hint: string } {
+  if (!isHost) {
+    return {
+      title: t("materials.externalActivity.waitingForTeacher"),
+      hint: t("materials.externalActivity.waitingHint"),
+    };
+  }
+  if (phase === "OPENING_PROVIDER") {
+    return {
+      title: t("materials.externalActivity.checkingExtension"),
+      hint: t("materials.externalActivity.checkingExtensionHint"),
+    };
+  }
+  if (phase === "STARTING") {
+    return {
+      title: t("materials.externalActivity.startingCapture"),
+      hint: t("materials.externalActivity.startingCaptureHint"),
+    };
+  }
+  return {
+    title: t("materials.externalActivity.clickExtension"),
+    hint: t("materials.externalActivity.clickExtensionHint"),
+  };
+}
+
+function externalActivityErrorMessage(t: TFunction, errorCode?: string): string {
+  switch (errorCode) {
+    case "FEATURE_UNAVAILABLE": return t("materials.externalActivity.errors.featureUnavailable");
+    case "EXTENSION_NOT_DETECTED": return t("materials.externalActivity.errors.extensionNotDetected");
+    case "TARGET_TAB_CLOSED": return t("materials.externalActivity.errors.targetTabClosed");
+    case "CAPTURE_PERMISSION_DENIED": return t("materials.externalActivity.errors.capturePermissionDenied");
+    case "CAPTURE_NOT_SUPPORTED": return t("materials.externalActivity.errors.captureNotSupported");
+    case "CAPTURE_START_FAILED": return t("materials.externalActivity.errors.captureStartFailed");
+    default: return t("materials.externalActivity.errors.extensionUnknown");
+  }
 }

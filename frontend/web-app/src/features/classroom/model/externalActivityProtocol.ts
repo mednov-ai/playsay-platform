@@ -7,7 +7,16 @@ export const externalActivityTrackPrefix = "playsay-external-activity-";
 export const externalActivityPageChannel = "playsay.external-activity.page.v1";
 export const externalActivityExtensionChannel = "playsay.external-activity.extension.v1";
 
-export type ExternalActivityPhase = "REQUESTED" | "AWAITING_EXTENSION" | "STARTING" | "ACTIVE" | "ERROR";
+export type ExternalActivityWirePhase = "REQUESTED" | "AWAITING_EXTENSION" | "STARTING" | "ACTIVE" | "ERROR";
+export type ExternalActivityPhase = ExternalActivityWirePhase | "OPENING_PROVIDER" | "AWAITING_ACTION";
+export type ExternalActivityErrorCode =
+  | "FEATURE_UNAVAILABLE"
+  | "EXTENSION_NOT_DETECTED"
+  | "TARGET_TAB_CLOSED"
+  | "CAPTURE_PERMISSION_DENIED"
+  | "CAPTURE_NOT_SUPPORTED"
+  | "CAPTURE_START_FAILED"
+  | "EXTENSION_ERROR_UNKNOWN";
 export type ExternalActivityInput =
   | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
   | { type: "scroll"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
@@ -50,7 +59,7 @@ export type ExternalActivityMessage = {
   eventId?: string;
   input?: ExternalActivityInput;
   cursor?: { x: number; y: number; name?: string; color?: string };
-  phase?: ExternalActivityPhase;
+  phase?: ExternalActivityWirePhase;
   studentsLocked?: boolean;
   errorCode?: string;
   visible?: boolean;
@@ -83,9 +92,19 @@ export function parseExternalActivityMessage(value: unknown): ExternalActivityMe
 export function parseExtensionEvent(value: unknown, sessionId: string): Record<string, unknown> | null {
   if (!value || typeof value !== "object") return null;
   const event = value as Record<string, unknown>;
-  if (event.version !== 1 || event.sessionId !== sessionId || typeof event.type !== "string") return null;
+  if (
+    event.version !== 1
+    || event.sessionId !== sessionId
+    || typeof event.type !== "string"
+    || !["AWAITING_ACTION", "CAPTURE_READY", "TAB_CLOSED", "DEBUGGER_DETACHED", "ERROR", "STOPPED"].includes(event.type)
+  ) return null;
   if (event.type === "CAPTURE_READY" && (typeof event.streamId !== "string" || !event.streamId)) return null;
   return event;
+}
+
+export function externalActivityParticipantPhase(phase: ExternalActivityPhase): ExternalActivityWirePhase {
+  if (phase === "OPENING_PROVIDER" || phase === "AWAITING_ACTION") return "AWAITING_EXTENSION";
+  return phase;
 }
 
 export function externalActivityTrackName(sessionId: string, kind: "video" | "audio"): string {
@@ -122,10 +141,27 @@ export function participantCanHostExternalActivity(
   }
 }
 
-export function externalActivityCaptureErrorCode(error: unknown): string {
+export function externalActivityCaptureErrorCode(error: unknown): ExternalActivityErrorCode {
   const name = error instanceof Error ? error.name : "UnknownError";
-  const normalized = name.replace(/([a-z])([A-Z])/g, "$1_$2").replace(/[^A-Za-z0-9]+/g, "_").toUpperCase().slice(0, 48);
-  return `CAPTURE_FAILED_${normalized || "UNKNOWN_ERROR"}`;
+  if (name === "NotAllowedError" || name === "SecurityError") return "CAPTURE_PERMISSION_DENIED";
+  if (name === "NotSupportedError") return "CAPTURE_NOT_SUPPORTED";
+  return "CAPTURE_START_FAILED";
+}
+
+export function externalActivityExtensionErrorCode(
+  eventType: unknown,
+  rawError?: unknown,
+): ExternalActivityErrorCode {
+  if (eventType === "TAB_CLOSED") return "TARGET_TAB_CLOSED";
+  const normalized = typeof rawError === "string" ? rawError.toLowerCase() : "";
+  if (normalized.includes("notallowed") || normalized.includes("permission") || normalized.includes("denied")) {
+    return "CAPTURE_PERMISSION_DENIED";
+  }
+  if (normalized.includes("notsupported") || normalized.includes("not supported") || normalized.includes("unsupported")) {
+    return "CAPTURE_NOT_SUPPORTED";
+  }
+  if (eventType === "DEBUGGER_DETACHED") return "CAPTURE_START_FAILED";
+  return "EXTENSION_ERROR_UNKNOWN";
 }
 
 export function externalActivityCaptureConstraints(streamId: string): MediaStreamConstraints {

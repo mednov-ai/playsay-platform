@@ -1,5 +1,12 @@
+// @vitest-environment jsdom
+
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "../../../../shared/i18n";
+import { resources } from "../../../../shared/i18n/resources";
+import type { MaterialExternalActivitySync } from "../../model/materialDocument";
 import {
   ExternalActivityFrame,
   externalActivityContentRect,
@@ -7,7 +14,60 @@ import {
   shouldSendExternalActivityPointerInput,
 } from "./ExternalActivityFrame";
 
+vi.hoisted(() => {
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      clear: () => values.clear(),
+      getItem: (key: string) => values.get(key) ?? null,
+      key: (index: number) => Array.from(values.keys())[index] ?? null,
+      get length() { return values.size; },
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
+  });
+});
+
+const block = {
+  id: "external-1",
+  type: "externalActivity" as const,
+  title: "Wordwall",
+  url: "https://wordwall.net/resource/1",
+};
+
+function sync(overrides: Partial<MaterialExternalActivitySync> = {}): MaterialExternalActivitySync {
+  return {
+    active: {
+      blockId: block.id,
+      sessionId: "s-1",
+      hostIdentity: "teacher",
+      phase: "AWAITING_ACTION",
+      studentsLocked: false,
+      visible: true,
+    },
+    cursors: [],
+    isHost: true,
+    mediaStream: null,
+    open: vi.fn(),
+    reload: vi.fn(),
+    retry: vi.fn(),
+    returnToLesson: vi.fn(),
+    sendCursor: vi.fn(),
+    sendInput: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe("ExternalActivityFrame", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("ru");
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
   it("positions remote cursors inside the same contain-fitted video rectangle as input", () => {
     expect(externalActivityContentRect({
       surfaceHeight: 900,
@@ -72,31 +132,143 @@ describe("ExternalActivityFrame", () => {
     expect(shouldSendExternalActivityPointerInput("up")).toBe(true);
   });
 
-  it("shows the teacher extension action while capture is waiting", () => {
-    const markup = renderToStaticMarkup(
-      <ExternalActivityFrame
-        block={{ id: "external-1", type: "externalActivity", title: "Wordwall", url: "https://wordwall.net/resource/1" }}
-        sync={{
-          active: { blockId: "external-1", sessionId: "s-1", hostIdentity: "teacher", phase: "AWAITING_EXTENSION", studentsLocked: false, visible: true },
-          cursors: [], isHost: true, mediaStream: null, open: vi.fn(), reload: vi.fn(), returnToLesson: vi.fn(),
-          sendCursor: vi.fn(), sendInput: vi.fn(),
-        }}
-      />,
-    );
+  it("confirms extension detection before asking the teacher for the browser action", () => {
+    render(<ExternalActivityFrame block={block} sync={sync()} />);
 
-    expect(markup).toContain("data-testid=\"external-activity-waiting\"");
-    expect(markup).toContain("Обновить");
-    expect(markup).toContain("Вернуться к уроку");
-    expect(markup).not.toContain("Заблокировать учеников");
-    expect(markup).not.toContain("Завершить показ");
-    expect(markup).not.toContain("<iframe");
+    expect(screen.getByRole("status")).toHaveTextContent("Расширение найдено");
+    expect(screen.getByRole("status")).toHaveTextContent("значок с пчёлкой");
+    expect(screen.getByRole("button", { name: "Вернуться к уроку" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Обновить" })).toBeNull();
+    expect(document.querySelector("iframe")).toBeNull();
+  });
+
+  it.each([
+    ["OPENING_PROVIDER", "Открываем задание и проверяем расширение"],
+    ["STARTING", "Запускаем показ задания"],
+  ] as const)("renders the teacher %s lifecycle state", (phase, expected) => {
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: "teacher",
+        phase,
+        studentsLocked: false,
+        visible: true,
+      },
+    })} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(expected);
+    expect(screen.getByRole("button", { name: "Вернуться к уроку" })).toBeEnabled();
+  });
+
+  it("renders active sharing without covering the interaction surface", () => {
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: "teacher",
+        phase: "ACTIVE",
+        studentsLocked: false,
+        visible: true,
+      },
+    })} />);
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Обновить" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Вернуться к уроку" })).toBeEnabled();
+  });
+
+  it("uses generic waiting copy for a participant request", () => {
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: null,
+        phase: "REQUESTED",
+        studentsLocked: false,
+        visible: true,
+      },
+      isHost: false,
+    })} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Ждём, когда учитель поделится заданием");
+    expect(screen.queryByText(/расширен/i)).toBeNull();
+  });
+
+  it("shows a stable teacher diagnostic and focuses the retry action", () => {
+    const retry = vi.fn();
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: "teacher",
+        phase: "ERROR",
+        studentsLocked: false,
+        errorCode: "EXTENSION_NOT_DETECTED",
+        visible: true,
+      },
+      retry,
+    })} />);
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("EXTENSION_NOT_DETECTED");
+    expect(alert).toHaveTextContent("chrome://extensions");
+    const retryButton = screen.getByRole("button", { name: "Повторить" });
+    expect(retryButton).toHaveFocus();
+    fireEvent.click(retryButton);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps teacher-only diagnostics out of the student failure state", () => {
+    const returnToLesson = vi.fn();
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: "teacher",
+        phase: "ERROR",
+        studentsLocked: false,
+        errorCode: "CAPTURE_PERMISSION_DENIED",
+        visible: true,
+      },
+      isHost: false,
+      returnToLesson,
+    })} />);
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Показ задания пока недоступен");
+    expect(alert).not.toHaveTextContent("CAPTURE_PERMISSION_DENIED");
+    expect(screen.queryByRole("button", { name: "Повторить" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Вернуться к уроку" }));
+    expect(returnToLesson).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["ru", "en", "de", "fr"] as const)("renders localized error status in %s", async (language) => {
+    await i18n.changeLanguage(language);
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: "teacher",
+        phase: "ERROR",
+        studentsLocked: false,
+        errorCode: "CAPTURE_NOT_SUPPORTED",
+        visible: true,
+      },
+    })} />);
+
+    const copy = resources[language].translation.materials.externalActivity;
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.error);
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.errors.captureNotSupported);
+    expect(screen.getByRole("button", { name: copy.retry })).toBeEnabled();
   });
 
   it("mutes the local teacher preview but plays captured page audio for students", () => {
     const block = { id: "external-1", type: "externalActivity" as const, title: "Wordwall", url: "https://wordwall.net/resource/1" };
     const sync = {
       active: { blockId: "external-1", sessionId: "s-1", hostIdentity: "teacher", phase: "ACTIVE" as const, studentsLocked: false, visible: true },
-      cursors: [], mediaStream: null, open: vi.fn(), reload: vi.fn(), returnToLesson: vi.fn(),
+      cursors: [], mediaStream: null, open: vi.fn(), reload: vi.fn(), retry: vi.fn(), returnToLesson: vi.fn(),
       sendCursor: vi.fn(), sendInput: vi.fn(),
     };
 

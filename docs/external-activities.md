@@ -24,11 +24,13 @@ Chrome or Edge 116+ is required. The source directory is not itself an installab
 4. Pin the bee action through the browser's extensions menu.
 5. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for a production-mode web build. Local development enables the feature automatically, and Jenkins sets the flag for builds deployed to the shared dev stand.
 
+Jenkins sets `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for both dev and numeric production release builds and fails a production build when that contract is absent. A build in which the feature is intentionally disabled must show an explicit unavailable state instead of accepting a launcher click that cannot start an extension session.
+
 The packaged Jenkins artifact is `frontend/browser-extension/playsay-browser-extension.zip`. Extract it completely, then load the extracted directory that contains `manifest.json`; do not select the ZIP itself. The archive includes `INSTALL-RU.md` with the same installation, update, troubleshooting, and lesson-use steps.
 
 To update an unpacked installation, replace/rebuild its files and click **Reload** on the extension card. If Chrome reports `Manifest file is missing or unreadable`, the wrong directory was selected or the build has not produced `dist/manifest.json`.
 
-Version `0.1.2` is manually distributed as this unpacked/Jenkins artifact. Chrome Web Store and Edge Add-ons publication are not part of the current release flow.
+Version `0.1.6` is manually distributed as this unpacked/Jenkins artifact. The web lifecycle remains compatible with its version-1 events. If shipped extension source, manifest behavior or permissions, runtime bundle, or user-facing extension assets change, increment the manifest/package patch version (normally to `0.1.7`), synchronize the lockfile/tests/install guidance, and confirm the new version on `chrome://extensions`. Tests or documentation that do not change the shipped artifact leave `0.1.6` unchanged. Chrome Web Store and Edge Add-ons publication are not part of the current release flow.
 
 ## Lesson flow
 
@@ -41,6 +43,20 @@ Version `0.1.2` is manually distributed as this unpacked/Jenkins artifact. Chrom
 
 The teacher can lock/unlock student input, navigate back, reload, minimize, or stop the activity. Minimizing is synchronized and retains capture for 60 seconds; reopening resumes the same session. Opening a different activity or ending the retention window tears down tracks, debugger attachment, and the extension-created tab.
 
+## Status and recovery
+
+The teacher status distinguishes these stages:
+
+- opening the provider and checking the extension;
+- extension acknowledged through the 0.1.6 `AWAITING_ACTION` event and waiting for the explicit bee action;
+- capture starting;
+- active sharing;
+- a recoverable failure.
+
+The extension-detection timer runs only until `AWAITING_ACTION`; it is cleared as soon as 0.1.6 acknowledges the session. Teacher failures use only the stable codes `FEATURE_UNAVAILABLE`, `EXTENSION_NOT_DETECTED`, `TARGET_TAB_CLOSED`, `CAPTURE_PERMISSION_DENIED`, `CAPTURE_NOT_SUPPORTED`, `CAPTURE_START_FAILED`, and `EXTENSION_ERROR_UNKNOWN`. The status includes localized guidance plus Retry and Return to lesson where applicable. Retry closes and cleans the stale attempt, creates a new session id/nonce, and ignores late events from the former session. Students see only localized waiting/stopped copy and never receive raw Chrome errors, the teacher diagnostic code, nonce, target tab id, or stream id.
+
+For `EXTENSION_NOT_DETECTED`, verify that the unpacked extension is installed and enabled, click **Reload** on its `chrome://extensions` card, reload the Honey School lesson page so its content script is present, and then use **Retry**. `CAPTURE_NOT_SUPPORTED` requires Chrome or Edge 116+; permission/start failures should be retried after checking browser permissions and reloading the extension. Return to lesson must remain available and leave the ordinary classroom usable.
+
 ## Security and privacy
 
 - The extension has no `<all_urls>` host permission. Its content bridge is installed only on the current HoneySchool application and localhost origins.
@@ -52,6 +68,8 @@ The teacher can lock/unlock student input, navigate back, reload, minimize, or s
 - The provider runs in the teacher's normal browser profile. Existing provider cookies, account state, and visible page content can therefore be shown to lesson participants; the editor displays this warning explicitly. Honey School does not read or manage provider credentials.
 
 ## Manual smoke matrix
+
+Before production promotion, the web build contract must pass and browser acceptance must cover both `https://online.honeyschool.ru/` and `https://online.honey.school/`. Record only the displayed extension version, stable status codes, lifecycle outcome, and non-sensitive build identity. Exercise the installed 0.1.6 baseline and, when the extension artifact changed, the incremented candidate shown on `chrome://extensions`.
 
 For each guaranteed provider, test with one teacher and three students in a group `SHARED` lesson:
 

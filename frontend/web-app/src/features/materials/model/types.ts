@@ -276,7 +276,7 @@ export type MaterialExternalActivitySync = {
     blockId: string;
     sessionId: string;
     hostIdentity: string | null;
-    phase: "REQUESTED" | "AWAITING_EXTENSION" | "STARTING" | "ACTIVE" | "ERROR";
+    phase: "REQUESTED" | "OPENING_PROVIDER" | "AWAITING_EXTENSION" | "AWAITING_ACTION" | "STARTING" | "ACTIVE" | "ERROR";
     studentsLocked: boolean;
     errorCode?: string;
     visible: boolean;
@@ -285,6 +285,7 @@ export type MaterialExternalActivitySync = {
   isHost: boolean;
   mediaStream: MediaStream | null;
   open: (block: MaterialEditorBlock) => void;
+  retry: () => void;
   sendInput: (input: {
     type: "pointer" | "scroll" | "key";
     [key: string]: unknown;

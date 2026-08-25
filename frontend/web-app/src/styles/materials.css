@@ -1221,6 +1221,25 @@
   font-weight: 700;
 }
 
+.playsay-external-activity-state code {
+  max-width: min(34rem, 100%);
+  overflow-wrap: anywhere;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.45rem;
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.72rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.playsay-external-activity-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
 .playsay-external-activity-cursor {
   position: absolute;
   z-index: 4;
@@ -1261,6 +1280,19 @@
     max-width: 100%;
     overflow-x: auto;
     flex-wrap: nowrap;
+  }
+
+  .playsay-external-activity-state {
+    gap: 0.5rem;
+    padding: 1.25rem;
+  }
+
+  .playsay-external-activity-state-actions {
+    width: 100%;
+  }
+
+  .playsay-external-activity-state-actions button {
+    flex: 1 1 9rem;
   }
 }
 

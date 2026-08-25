@@ -382,6 +382,7 @@ describe("LessonTaskCanvas", () => {
       mediaStream: null,
       open: vi.fn(),
       reload: vi.fn(),
+      retry: vi.fn(),
       sendCursor: vi.fn(),
       sendInput: vi.fn(),
       returnToLesson: vi.fn(),

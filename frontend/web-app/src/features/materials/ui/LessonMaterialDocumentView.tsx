@@ -275,7 +275,8 @@ export function LessonMaterialDocumentView({
       htmlGameSync?.setPresentedBlock(null);
     }
     if (focusedBlock?.kind === "externalActivity") {
-      if (!externalActivitySync?.isHost) return;
+      if (!externalActivitySync) return;
+      if (!externalActivitySync.isHost && externalActivitySync.active?.phase !== "ERROR") return;
       externalActivitySync.returnToLesson();
     }
     setFocusedBlock(null);

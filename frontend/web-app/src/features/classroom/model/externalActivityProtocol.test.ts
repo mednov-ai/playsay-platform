@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   externalActivityCaptureConstraints,
   externalActivityCaptureErrorCode,
+  externalActivityInputReliable,
+  externalActivitySessionIdFromTrackName,
+  externalActivityExtensionErrorCode,
+  extensionSupportsTrustedInput,
+  externalActivityParticipantPhase,
   externalActivityTrackName,
   isCurrentExternalActivityCapture,
   parseExternalActivityMessage,
@@ -12,9 +17,29 @@ import {
 describe("external activity classroom protocol", () => {
   it("reports a safe browser capture error name without exposing its message", () => {
     expect(externalActivityCaptureErrorCode(new DOMException("private device detail", "NotReadableError")))
-      .toBe("CAPTURE_FAILED_NOT_READABLE_ERROR");
+      .toBe("CAPTURE_START_FAILED");
+    expect(externalActivityCaptureErrorCode(new DOMException("private permission detail", "NotAllowedError")))
+      .toBe("CAPTURE_PERMISSION_DENIED");
+    expect(externalActivityCaptureErrorCode(new DOMException("private browser detail", "NotSupportedError")))
+      .toBe("CAPTURE_NOT_SUPPORTED");
     expect(externalActivityCaptureErrorCode("unexpected"))
-      .toBe("CAPTURE_FAILED_UNKNOWN_ERROR");
+      .toBe("CAPTURE_START_FAILED");
+  });
+
+  it("normalizes extension failures without returning raw browser text", () => {
+    expect(externalActivityExtensionErrorCode("TAB_CLOSED")).toBe("TARGET_TAB_CLOSED");
+    expect(externalActivityExtensionErrorCode("ERROR", "NotAllowedError: private permission detail"))
+      .toBe("CAPTURE_PERMISSION_DENIED");
+    expect(externalActivityExtensionErrorCode("ERROR", "NotSupportedError: private browser detail"))
+      .toBe("CAPTURE_NOT_SUPPORTED");
+    expect(externalActivityExtensionErrorCode("ERROR", "private unknown detail"))
+      .toBe("EXTENSION_ERROR_UNKNOWN");
+  });
+
+  it("maps host-only readiness detail to the backward-compatible participant phase", () => {
+    expect(externalActivityParticipantPhase("OPENING_PROVIDER")).toBe("AWAITING_EXTENSION");
+    expect(externalActivityParticipantPhase("AWAITING_ACTION")).toBe("AWAITING_EXTENSION");
+    expect(externalActivityParticipantPhase("ACTIVE")).toBe("ACTIVE");
   });
 
   it("uses Chrome tab-capture constraints without incompatible camera constraints", () => {
@@ -22,6 +47,12 @@ describe("external activity classroom protocol", () => {
       audio: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: "stream-1" } },
       video: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: "stream-1" } },
     });
+  });
+
+  it("keeps click and keyboard delivery reliable while pointer moves stay realtime", () => {
+    expect(externalActivityInputReliable({ type: "pointer", action: "move", x: 1, y: 2 })).toBe(false);
+    expect(externalActivityInputReliable({ type: "pointer", action: "down", x: 1, y: 2 })).toBe(true);
+    expect(externalActivityInputReliable({ type: "key", action: "down", key: "a" })).toBe(true);
   });
 
   it("accepts versioned requests and rejects untrusted shapes", () => {
@@ -49,22 +80,6 @@ describe("external activity classroom protocol", () => {
     })).toMatchObject({ eventId: "event-1", type: "INPUT" });
     expect(parseExternalActivityMessage({
       version: 1,
-      type: "INPUT",
-      eventId: "event-2",
-      sessionId: "session-1",
-      blockId: "block-1",
-      input: { type: "pointer", action: "down", x: 640, y: 360, normalizedX: 0.5, normalizedY: 0.5 },
-    })).toMatchObject({ input: { normalizedX: 0.5, normalizedY: 0.5 } });
-    expect(parseExternalActivityMessage({
-      version: 1,
-      type: "INPUT",
-      eventId: "event-3",
-      sessionId: "session-1",
-      blockId: "block-1",
-      input: { type: "pointer", action: "down", x: 640, y: 360, normalizedX: 1.1, normalizedY: 0.5 },
-    })).toBeNull();
-    expect(parseExternalActivityMessage({
-      version: 1,
       type: "REQUEST_STATE",
       sessionId: "current",
       blockId: "current",
@@ -72,8 +87,19 @@ describe("external activity classroom protocol", () => {
   });
 
   it("accepts extension capture only for the expected session", () => {
+    expect(parseExtensionEvent({ version: 1, type: "AWAITING_ACTION", sessionId: "session-1" }, "session-1"))
+      .toMatchObject({ type: "AWAITING_ACTION" });
     expect(parseExtensionEvent({ version: 1, type: "CAPTURE_READY", sessionId: "session-1", streamId: "stream-1" }, "session-1")).toMatchObject({ streamId: "stream-1" });
     expect(parseExtensionEvent({ version: 1, type: "CAPTURE_READY", sessionId: "other", streamId: "stream-1" }, "session-1")).toBeNull();
+    expect(parseExtensionEvent({ version: 1, type: "PRIVATE_EVENT", sessionId: "session-1" }, "session-1")).toBeNull();
+  });
+
+  it("requires the trusted-input extension patch while accepting later versions", () => {
+    expect(extensionSupportsTrustedInput(undefined)).toBe(false);
+    expect(extensionSupportsTrustedInput("0.1.6")).toBe(false);
+    expect(extensionSupportsTrustedInput("0.1.7")).toBe(true);
+    expect(extensionSupportsTrustedInput("0.2.0")).toBe(true);
+    expect(extensionSupportsTrustedInput("invalid")).toBe(false);
   });
 
   it("rejects a late capture after either session or generation changes", () => {
@@ -84,6 +110,8 @@ describe("external activity classroom protocol", () => {
 
   it("uses a reserved track prefix", () => {
     expect(externalActivityTrackName("session-1", "video")).toBe("playsay-external-activity-session-1-video");
+    expect(externalActivitySessionIdFromTrackName("playsay-external-activity-session-1-video")).toBe("session-1");
+    expect(externalActivitySessionIdFromTrackName("camera-video")).toBeNull();
   });
 
   it("trusts host state only from teacher or admin LiveKit metadata", () => {

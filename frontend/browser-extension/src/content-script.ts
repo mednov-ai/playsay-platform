@@ -11,5 +11,8 @@ if (isTrustedPlaySayOrigin(window.location.origin)) {
     window.postMessage({ channel: EXTENSION_CHANNEL, event: message }, window.location.origin);
   });
 
-  window.postMessage({ channel: EXTENSION_CHANNEL, event: { version: 1, type: "EXTENSION_READY" } }, window.location.origin);
+  window.postMessage({
+    channel: EXTENSION_CHANNEL,
+    event: { version: 1, type: "EXTENSION_READY", extensionVersion: chrome.runtime.getManifest().version },
+  }, window.location.origin);
 }

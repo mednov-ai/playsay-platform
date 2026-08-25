@@ -10,6 +10,7 @@ import { useYjsWorkspace } from "../hooks/useYjsWorkspace";
 import { useExternalActivitySession } from "../hooks/useExternalActivitySession";
 import { materialDocumentBlocks } from "../../materials";
 import { collaborationParticipantColor } from "../model/collaboration";
+import { externalActivityFeatureEnabled } from "../model/externalActivityAvailability";
 import { LessonTaskCanvas, type LessonPresentationMode } from "./LessonTaskCanvas";
 
 export function StudentLiveWorkspace({
@@ -102,7 +103,7 @@ export function StudentLiveWorkspace({
     () => materialDocumentBlocks(material),
     [material.document, material.id, material.title],
   );
-  const externalActivitiesEnabled = import.meta.env.DEV || import.meta.env.VITE_EXTERNAL_ACTIVITY_ENABLED === "true";
+  const externalActivitiesEnabled = externalActivityFeatureEnabled();
   const externalActivitySync = useExternalActivitySession({
     blocks: externalActivityBlocks,
     enabled: externalActivitiesEnabled,
@@ -125,7 +126,7 @@ export function StudentLiveWorkspace({
         exerciseSync={groupAnnotationWorkspace.exerciseSync}
         htmlGameSync={htmlGameSync}
         videoSync={groupAnnotationWorkspace.videoSync}
-        externalActivitySync={externalActivitiesEnabled ? externalActivitySync : undefined}
+        externalActivitySync={externalActivitySync}
         onSaveAnswers={onSaveAnswers}
         onPresentationModeChange={onPresentationModeChange}
         score={score}

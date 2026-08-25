@@ -382,6 +382,7 @@ describe("LessonTaskCanvas", () => {
       mediaStream: null,
       open: vi.fn(),
       reload: vi.fn(),
+      retry: vi.fn(),
       sendCursor: vi.fn(),
       sendInput: vi.fn(),
       returnToLesson: vi.fn(),
@@ -397,7 +398,6 @@ describe("LessonTaskCanvas", () => {
       submissionSaving: false,
       teacherName: "Teacher Demo",
     }));
-
     fireEvent.click(container.querySelector('[data-testid="external-activity-launch-external-1"]')!);
     await waitFor(() => expect(
       container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode"),
@@ -422,6 +422,7 @@ describe("LessonTaskCanvas", () => {
       container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode"),
     ).toBe("default"));
     expect(container.querySelector(".playsay-external-activity-frame")).toBeNull();
+    expect(container.querySelector(".playsay-annotation-toolbar")).not.toBeNull();
   });
 
   it("anchors annotations to the rendered static image instead of the material viewport", async () => {

@@ -1,5 +1,5 @@
 import { useRoomContext } from "@livekit/components-react";
-import { RoomEvent, Track, type RemoteParticipant } from "livekit-client";
+import { RoomEvent, Track, type RemoteParticipant, type RemoteTrack, type RemoteTrackPublication, type TrackPublishOptions } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../materials/model/materialDocument";
 import {
@@ -7,11 +7,16 @@ import {
   externalActivityCaptureConstraints,
   externalActivityCursorTopic,
   externalActivityExtensionChannel,
+  externalActivityExtensionErrorCode,
   externalActivityHostTopic,
+  externalActivityInputReliable,
   externalActivityInputTopic,
   externalActivityPageChannel,
+  externalActivitySessionIdFromTrackName,
+  externalActivityParticipantPhase,
   externalActivityTrackName,
   externalActivityTrackPrefix,
+  extensionSupportsTrustedInput,
   isCurrentExternalActivityCapture,
   parseExternalActivityMessage,
   parseExtensionEvent,
@@ -19,8 +24,19 @@ import {
   type ExternalActivityBlock,
   type ExternalActivityInput,
   type ExternalActivityMessage,
+  type ExternalActivityRealtime,
   type ExternalActivityState,
 } from "../model/externalActivityProtocol";
+
+export const externalActivityVideoPublishOptions = {
+  degradationPreference: "maintain-framerate",
+  screenShareEncoding: {
+    maxBitrate: 2_500_000,
+    maxFramerate: 30,
+  },
+  simulcast: false,
+  videoCodec: "vp8",
+} satisfies TrackPublishOptions;
 
 export function useExternalActivitySession({
   blocks,
@@ -28,6 +44,7 @@ export function useExternalActivitySession({
   isHost,
   participantColor,
   participantName,
+  realtime,
   trustedHostIdentity,
 }: {
   blocks: MaterialEditorBlock[];
@@ -35,6 +52,7 @@ export function useExternalActivitySession({
   isHost: boolean;
   participantColor: string;
   participantName: string;
+  realtime?: ExternalActivityRealtime | null;
   trustedHostIdentity?: string | null;
 }): MaterialExternalActivitySync {
   const room = useRoomContext();
@@ -55,16 +73,24 @@ export function useExternalActivitySession({
   useEffect(() => { blocksRef.current = blocks; }, [blocks]);
   useEffect(() => { activeRef.current = active; }, [active]);
 
-  const publish = useCallback((message: ExternalActivityMessage, topic: string, reliable: boolean): Promise<void> => {
-    if (!enabled) return Promise.resolve();
+  const publish = useCallback(async (message: ExternalActivityMessage, topic: string, reliable: boolean) => {
+    if (!enabled) return;
     const bytes = new TextEncoder().encode(JSON.stringify(message));
-    return room.localParticipant.publishData(bytes, { reliable, topic });
+    await room.localParticipant.publishData(bytes, { reliable, topic }).catch(() => undefined);
   }, [enabled, room.localParticipant]);
 
   const broadcastState = useCallback((state: ExternalActivityState) => {
     activeRef.current = state;
     setActive(state);
-    void publish({ version: 1, type: "HOST_STATE", ...state }, externalActivityHostTopic, true);
+    void publish({
+      version: 1,
+      type: "HOST_STATE",
+      blockId: state.blockId,
+      sessionId: state.sessionId,
+      phase: externalActivityParticipantPhase(state.phase),
+      studentsLocked: state.studentsLocked,
+      visible: state.visible,
+    }, externalActivityHostTopic, true);
   }, [publish]);
 
   const clearTimers = useCallback(() => {
@@ -110,17 +136,12 @@ export function useExternalActivitySession({
     const nonce = extensionNonceRef.current;
     if (nonce) postExtensionCommand({ version: 1, type: "STOP", sessionId: current.sessionId, nonce });
     extensionNonceRef.current = null;
+    if (notify) await publish({ version: 1, type: "STOPPED", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true);
+    await unpublishLocalStream();
     activeRef.current = null;
     setActive(null);
     setCursorsByIdentity({});
-    const stoppedNotice = notify
-      ? publish({ version: 1, type: "STOPPED", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true)
-      : Promise.resolve();
-    await Promise.allSettled([stoppedNotice, unpublishLocalStream()]);
-    if (notify) {
-      await publish({ version: 1, type: "HOST_IDLE", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true)
-        .catch(() => undefined);
-    }
+    if (notify) await publish({ version: 1, type: "HOST_IDLE", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true);
   }, [clearTimers, isHost, postExtensionCommand, publish, unpublishLocalStream]);
 
   const startHostSession = useCallback(async (blockId: string, sessionId: string) => {
@@ -138,7 +159,7 @@ export function useExternalActivitySession({
       blockId,
       sessionId,
       hostIdentity: room.localParticipant.identity,
-      phase: "AWAITING_EXTENSION",
+      phase: "OPENING_PROVIDER",
       studentsLocked: false,
       visible: true,
     };
@@ -148,9 +169,9 @@ export function useExternalActivitySession({
       if (
         sessionGenerationRef.current === generation
         && activeRef.current?.sessionId === sessionId
-        && activeRef.current.phase === "AWAITING_EXTENSION"
+        && activeRef.current.phase === "OPENING_PROVIDER"
       ) {
-        broadcastState({ ...next, phase: "ERROR", errorCode: "EXTENSION_NOT_AVAILABLE" });
+        broadcastState({ ...next, phase: "ERROR", errorCode: "EXTENSION_NOT_DETECTED" });
       }
     }, 10_000);
   }, [broadcastState, clearTimers, isHost, postExtensionCommand, room.localParticipant.identity, stopHostSession]);
@@ -169,7 +190,7 @@ export function useExternalActivitySession({
         if (current) {
           broadcastState(current);
         } else {
-          publish({ version: 1, type: "HOST_IDLE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
+          void publish({ version: 1, type: "HOST_IDLE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
         }
         return;
       }
@@ -208,15 +229,26 @@ export function useExternalActivitySession({
       if (message.type === "STOPPED") {
         if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
-        if (activeRef.current?.sessionId === message.sessionId && (!activeRef.current.hostIdentity || activeRef.current.hostIdentity === participant.identity)) {
-          clearRemoteSession(message.sessionId);
+        const current = activeRef.current;
+        if (
+          current
+          && (!current.hostIdentity || current.hostIdentity === participant.identity)
+          && (current.sessionId === message.sessionId || (!current.hostIdentity && current.phase === "REQUESTED"))
+        ) {
+          // A request published before the host joined is not replayed by LiveKit. The
+          // trusted host's stop is authoritative even when it belongs to another session.
+          if (!current.hostIdentity && current.phase === "REQUESTED") clearRemoteSession();
+          else clearRemoteSession(message.sessionId);
         }
         return;
       }
       if (message.type === "HOST_IDLE") {
         if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) return;
         stateResponseReceivedRef.current = true;
-        clearRemoteSession();
+        const current = activeRef.current;
+        if (message.sessionId === "current") clearRemoteSession();
+        else if (current?.sessionId === message.sessionId) clearRemoteSession(message.sessionId);
+        else if (!current?.hostIdentity && current?.phase === "REQUESTED") clearRemoteSession();
         return;
       }
       if (message.type === "HOST_STATE" && message.phase) {
@@ -242,15 +274,59 @@ export function useExternalActivitySession({
   }, [clearRemoteSession, enabled, isHost, postExtensionCommand, room, startHostSession, stopHostSession, trustedHostIdentity]);
 
   useEffect(() => {
+    if (!enabled || !realtime) return undefined;
+    return realtime.acquire((message) => {
+      const current = activeRef.current;
+      if (!current || current.sessionId !== message.sessionId || current.blockId !== message.blockId) return;
+      if (message.kind === "external-input") {
+        if (!isHost || handledInputEventsRef.current.has(message.eventId)) return;
+        handledInputEventsRef.current.add(message.eventId);
+        if (handledInputEventsRef.current.size > 500) {
+          const oldest = handledInputEventsRef.current.values().next().value;
+          if (oldest) handledInputEventsRef.current.delete(oldest);
+        }
+        const nonce = extensionNonceRef.current;
+        if (nonce) postExtensionCommand({
+          version: 1,
+          type: "INPUT",
+          sessionId: message.sessionId,
+          nonce,
+          input: message.input,
+        });
+        return;
+      }
+      if (
+        Number.isFinite(message.x)
+        && Number.isFinite(message.y)
+        && message.x >= 0
+        && message.x <= 1
+        && message.y >= 0
+        && message.y <= 1
+      ) {
+        setCursorsByIdentity((currentCursors) => ({
+          ...currentCursors,
+          [message.identity]: {
+            identity: message.identity,
+            name: message.name || message.identity,
+            color: message.color || "#ff5c00",
+            x: message.x,
+            y: message.y,
+          },
+        }));
+      }
+    });
+  }, [enabled, isHost, postExtensionCommand, realtime]);
+
+  useEffect(() => {
     if (!enabled) return undefined;
     const announceOrRequestState = () => {
       if (isHost) {
         const current = activeRef.current;
         if (current) broadcastState(current);
-        else publish({ version: 1, type: "HOST_IDLE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
+        else void publish({ version: 1, type: "HOST_IDLE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
       } else {
         stateResponseReceivedRef.current = false;
-        publish({ version: 1, type: "REQUEST_STATE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
+        void publish({ version: 1, type: "REQUEST_STATE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
       }
     };
     let retryCount = 0;
@@ -260,7 +336,7 @@ export function useExternalActivitySession({
         return;
       }
       retryCount += 1;
-      publish({ version: 1, type: "REQUEST_STATE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
+      void publish({ version: 1, type: "REQUEST_STATE", sessionId: "current", blockId: "current" }, externalActivityHostTopic, true);
     }, 1_000);
     const handleParticipantDisconnected = (participant: RemoteParticipant) => {
       if (activeRef.current?.hostIdentity !== participant.identity) return;
@@ -280,6 +356,57 @@ export function useExternalActivitySession({
   }, [broadcastState, clearRemoteSession, enabled, isHost, publish, room]);
 
   useEffect(() => {
+    if (!enabled || isHost) return undefined;
+    const discoverPublishedSession = () => {
+      const current = activeRef.current;
+      for (const participant of room.remoteParticipants.values()) {
+        if (!participantCanHostExternalActivity(participant.metadata, participant.identity, trustedHostIdentity)) continue;
+        for (const publication of participant.trackPublications.values()) {
+          const sessionId = externalActivitySessionIdFromTrackName(publication.trackName);
+          if (!sessionId || !publication.trackName.endsWith("-video")) continue;
+          if (current?.hostIdentity && current.hostIdentity !== participant.identity) continue;
+          if (
+            current
+            && current.sessionId !== sessionId
+            && (current.hostIdentity || current.phase !== "REQUESTED")
+          ) continue;
+          const block = blocksRef.current.find((candidate): candidate is ExternalActivityBlock => (
+            candidate.id === current?.blockId
+            && candidate.type === "externalActivity"
+            && Boolean(candidate.url?.trim())
+          )) ?? blocksRef.current.find((candidate): candidate is ExternalActivityBlock => (
+            candidate.type === "externalActivity" && Boolean(candidate.url?.trim())
+          ));
+          if (!block) return;
+          if (!publication.track?.mediaStreamTrack) {
+            publication.setSubscribed(true);
+            continue;
+          }
+          const discovered: ExternalActivityState = {
+            blockId: block.id,
+            sessionId,
+            hostIdentity: participant.identity,
+            phase: "ACTIVE",
+            studentsLocked: false,
+            visible: true,
+          };
+          stateResponseReceivedRef.current = true;
+          activeRef.current = discovered;
+          setActive(discovered);
+          return;
+        }
+      }
+    };
+    discoverPublishedSession();
+    room.on(RoomEvent.TrackPublished, discoverPublishedSession);
+    room.on(RoomEvent.TrackSubscribed, discoverPublishedSession);
+    return () => {
+      room.off(RoomEvent.TrackPublished, discoverPublishedSession);
+      room.off(RoomEvent.TrackSubscribed, discoverPublishedSession);
+    };
+  }, [enabled, isHost, room, trustedHostIdentity]);
+
+  useEffect(() => {
     if (!enabled || !isHost) return undefined;
     const handleExtensionEvent = (event: MessageEvent) => {
       if (event.source !== window || event.origin !== window.location.origin || event.data?.channel !== externalActivityExtensionChannel) return;
@@ -287,7 +414,12 @@ export function useExternalActivitySession({
       if (!current) return;
       const extensionEvent = parseExtensionEvent(event.data.event, current.sessionId);
       if (!extensionEvent) return;
-      if (extensionEvent.type === "CAPTURE_READY") {
+      if (extensionEvent.type === "AWAITING_ACTION" && current.phase === "OPENING_PROVIDER") {
+        clearTimers();
+        broadcastState(extensionSupportsTrustedInput(extensionEvent.extensionVersion)
+          ? { ...current, phase: "AWAITING_ACTION" }
+          : { ...current, phase: "ERROR", errorCode: "EXTENSION_UPDATE_REQUIRED" });
+      } else if (extensionEvent.type === "CAPTURE_READY") {
         const generation = sessionGenerationRef.current;
         if (extensionTimerRef.current !== null) window.clearTimeout(extensionTimerRef.current);
         extensionTimerRef.current = null;
@@ -308,7 +440,14 @@ export function useExternalActivitySession({
             setMediaStream(stream);
             const video = stream.getVideoTracks()[0];
             const audio = stream.getAudioTracks()[0];
-            if (video) await room.localParticipant.publishTrack(video, { name: externalActivityTrackName(current.sessionId, "video"), source: Track.Source.ScreenShare });
+            if (video) {
+              video.contentHint = "motion";
+              await room.localParticipant.publishTrack(video, {
+                ...externalActivityVideoPublishOptions,
+                name: externalActivityTrackName(current.sessionId, "video"),
+                source: Track.Source.ScreenShare,
+              });
+            }
             if (!isCurrentExternalActivityCapture(
               generation,
               current.sessionId,
@@ -342,7 +481,12 @@ export function useExternalActivitySession({
             }
           });
       } else if (["TAB_CLOSED", "DEBUGGER_DETACHED", "ERROR"].includes(String(extensionEvent.type))) {
-        broadcastState({ ...current, phase: "ERROR", errorCode: String(extensionEvent.type) });
+        clearTimers();
+        broadcastState({
+          ...current,
+          phase: "ERROR",
+          errorCode: externalActivityExtensionErrorCode(extensionEvent.type, extensionEvent.error),
+        });
       }
     };
     window.addEventListener("message", handleExtensionEvent);
@@ -351,23 +495,31 @@ export function useExternalActivitySession({
 
   useEffect(() => {
     if (!enabled || isHost || !active) return undefined;
-    const matchingRemoteTracks = () => {
-      const tracks: MediaStreamTrack[] = [];
+    const observedTracks = new Set<MediaStreamTrack>();
+    const matchingRemoteTracks = (excludedTrack?: MediaStreamTrack, excludedPublication?: RemoteTrackPublication) => {
+      const tracks: Array<{ track: MediaStreamTrack; video: boolean }> = [];
       for (const participant of room.remoteParticipants.values()) {
         for (const publication of participant.trackPublications.values()) {
-          if (publication.trackName?.startsWith(`${externalActivityTrackPrefix}${active.sessionId}-`) && publication.track?.mediaStreamTrack) {
-            tracks.push(publication.track.mediaStreamTrack);
-          }
+          if (publication === excludedPublication) continue;
+          if (!publication.trackName?.startsWith(`${externalActivityTrackPrefix}${active.sessionId}-`)) continue;
+          const track = publication.track?.mediaStreamTrack;
+          if (!track || track === excludedTrack || track.readyState === "ended") continue;
+          tracks.push({ track, video: publication.trackName.endsWith("-video") });
         }
       }
       return tracks;
     };
-    const updateRemoteStream = () => {
-      const tracks = matchingRemoteTracks();
-      if (tracks.length) {
+    const updateRemoteStream = (excludedTrack?: MediaStreamTrack, excludedPublication?: RemoteTrackPublication) => {
+      const matches = matchingRemoteTracks(excludedTrack, excludedPublication);
+      if (matches.some(({ video }) => video)) {
         clearRemoteTrackLossTimer();
         remoteTrackSeenSessionRef.current = active.sessionId;
-        setMediaStream(new MediaStream(tracks));
+        for (const { track } of matches) {
+          if (observedTracks.has(track) || typeof track.addEventListener !== "function") continue;
+          observedTracks.add(track);
+          track.addEventListener("ended", handleTrackEnded, { once: true });
+        }
+        setMediaStream(new MediaStream(matches.map(({ track }) => track)));
         return;
       }
       setMediaStream(null);
@@ -387,18 +539,28 @@ export function useExternalActivitySession({
         remoteTrackLossTimerRef.current = null;
         if (
           activeRef.current?.sessionId === active.sessionId
-          && matchingRemoteTracks().length === 0
+          && !matchingRemoteTracks(excludedTrack, excludedPublication).some(({ video }) => video)
         ) {
           clearRemoteSession(active.sessionId);
         }
       }, 1_000);
     };
+    const handleTrackEnded = (event: Event) => updateRemoteStream(event.currentTarget as MediaStreamTrack);
+    const handleTrackSubscribed = () => updateRemoteStream();
+    const handleTrackUnsubscribed = (track: RemoteTrack) => updateRemoteStream(track.mediaStreamTrack);
+    const handleTrackUnpublished = (publication: RemoteTrackPublication) => {
+      if (!publication.trackName?.startsWith(`${externalActivityTrackPrefix}${active.sessionId}-`)) return;
+      updateRemoteStream(publication.track?.mediaStreamTrack, publication);
+    };
     updateRemoteStream();
-    room.on(RoomEvent.TrackSubscribed, updateRemoteStream);
-    room.on(RoomEvent.TrackUnsubscribed, updateRemoteStream);
+    room.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+    room.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+    room.on(RoomEvent.TrackUnpublished, handleTrackUnpublished);
     return () => {
-      room.off(RoomEvent.TrackSubscribed, updateRemoteStream);
-      room.off(RoomEvent.TrackUnsubscribed, updateRemoteStream);
+      room.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+      room.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      room.off(RoomEvent.TrackUnpublished, handleTrackUnpublished);
+      observedTracks.forEach((track) => track.removeEventListener?.("ended", handleTrackEnded));
       clearRemoteTrackLossTimer();
     };
   }, [active?.blockId, active?.sessionId, clearRemoteSession, clearRemoteTrackLossTimer, enabled, isHost, publish, room]);
@@ -410,8 +572,22 @@ export function useExternalActivitySession({
   }, [clearRemoteTrackLossTimer, clearTimers, isHost, stopHostSession]);
 
   const open = useCallback((block: MaterialEditorBlock) => {
-    if (!enabled || block.type !== "externalActivity" || !block.url) return;
+    if (block.type !== "externalActivity" || !block.url) return;
     const sessionId = crypto.randomUUID();
+    if (!enabled) {
+      const unavailable: ExternalActivityState = {
+        blockId: block.id,
+        sessionId,
+        hostIdentity: isHost ? room.localParticipant.identity : null,
+        phase: "ERROR",
+        studentsLocked: false,
+        errorCode: "FEATURE_UNAVAILABLE",
+        visible: true,
+      };
+      activeRef.current = unavailable;
+      setActive(unavailable);
+      return;
+    }
     if (isHost) {
       void startHostSession(block.id, sessionId);
     } else {
@@ -420,7 +596,21 @@ export function useExternalActivitySession({
       setActive(requested);
       void publish({ version: 1, type: "REQUEST_OPEN", sessionId, blockId: block.id }, externalActivityHostTopic, true);
     }
-  }, [enabled, isHost, publish, startHostSession]);
+  }, [enabled, isHost, publish, room.localParticipant.identity, startHostSession]);
+
+  const retry = useCallback(() => {
+    const current = activeRef.current;
+    if (!current || !isHost || !enabled) return;
+    void startHostSession(current.blockId, crypto.randomUUID());
+  }, [enabled, isHost, startHostSession]);
+
+  const returnToLesson = useCallback(() => {
+    if (isHost) {
+      void stopHostSession();
+    } else {
+      clearRemoteSession();
+    }
+  }, [clearRemoteSession, isHost, stopHostSession]);
 
   const sendInput = useCallback((input: ExternalActivityInput) => {
     const current = activeRef.current;
@@ -429,13 +619,35 @@ export function useExternalActivitySession({
       const nonce = extensionNonceRef.current;
       if (nonce) postExtensionCommand({ version: 1, type: "INPUT", sessionId: current.sessionId, nonce, input });
     } else {
-      void publish({ version: 1, type: "INPUT", sessionId: current.sessionId, blockId: current.blockId, eventId: crypto.randomUUID(), input }, externalActivityInputTopic, true);
+      const eventId = crypto.randomUUID();
+      if (realtime?.publish({
+        blockId: current.blockId,
+        eventId,
+        input,
+        kind: "external-input",
+        sessionId: current.sessionId,
+      })) return;
+      void publish(
+        { version: 1, type: "INPUT", sessionId: current.sessionId, blockId: current.blockId, eventId, input },
+        externalActivityInputTopic,
+        externalActivityInputReliable(input),
+      );
     }
-  }, [isHost, postExtensionCommand, publish]);
+  }, [isHost, postExtensionCommand, publish, realtime]);
 
   const sendCursor = useCallback((x: number, y: number) => {
     const current = activeRef.current;
     if (!current || current.phase !== "ACTIVE") return;
+    if (realtime?.publish({
+      blockId: current.blockId,
+      color: participantColor,
+      identity: room.localParticipant.identity,
+      kind: "external-cursor",
+      name: participantName,
+      sessionId: current.sessionId,
+      x,
+      y,
+    })) return;
     void publish({
       version: 1,
       type: "CURSOR",
@@ -443,7 +655,7 @@ export function useExternalActivitySession({
       blockId: current.blockId,
       cursor: { x, y, name: participantName, color: participantColor },
     }, externalActivityCursorTopic, false);
-  }, [participantColor, participantName, publish]);
+  }, [participantColor, participantName, publish, realtime, room.localParticipant.identity]);
 
   const reload = useCallback(() => {
     const current = activeRef.current;
@@ -458,10 +670,11 @@ export function useExternalActivitySession({
     mediaStream,
     open,
     reload,
-    returnToLesson: () => { if (isHost) void stopHostSession(); },
+    retry,
+    returnToLesson,
     sendCursor,
     sendInput: sendInput as MaterialExternalActivitySync["sendInput"],
-  }), [active, cursorsByIdentity, isHost, mediaStream, open, reload, sendCursor, sendInput, stopHostSession]);
+  }), [active, cursorsByIdentity, isHost, mediaStream, open, reload, retry, returnToLesson, sendCursor, sendInput]);
 }
 
 async function consumeCapture(streamId: string, sessionId: string): Promise<MediaStream> {

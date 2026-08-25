@@ -1,5 +1,6 @@
-import { applyExternalInput } from "./main-world-input";
+import { applyCaptureHardening } from "./capture-hardening";
 import { parsePageCommand, sessionsToReplace, type PageCommand } from "./protocol";
+import { pointerButtonMask, trustedInputCommand } from "./trusted-input";
 
 type HostSession = {
   sessionId: string;
@@ -8,6 +9,9 @@ type HostSession = {
   targetTabId: number;
   expectedUrl: string;
   inputEnabled: boolean;
+  pressedButtons?: number;
+  viewportHeight?: number;
+  viewportWidth?: number;
 };
 
 const sessions = new Map<string, HostSession>();
@@ -31,9 +35,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.action.onClicked.addListener((tab) => {
   if (tab.id === undefined) return;
-  void hydration.then(() => {
+  void hydration.then(async () => {
     const session = [...sessions.values()].find((candidate) => candidate.targetTabId === tab.id);
-    if (session) return activateCapture(session);
+    if (!session) return;
+    if (session.inputEnabled) {
+      await chrome.tabs.update(session.consumerTabId, { active: true });
+      return;
+    }
+    await activateCapture(session);
   });
 });
 
@@ -57,6 +66,17 @@ chrome.tabs.onCreated.addListener((tab) => {
     if ([...sessions.values()].some((session) => session.targetTabId === tab.openerTabId)) {
       return chrome.tabs.remove(tab.id!);
     }
+  });
+});
+
+chrome.debugger.onDetach.addListener((source, reason) => {
+  if (source.tabId === undefined || reason === "target_closed") return;
+  void hydration.then(async () => {
+    const session = [...sessions.values()].find((candidate) => candidate.targetTabId === source.tabId);
+    if (!session || !session.inputEnabled) return;
+    session.inputEnabled = false;
+    await persistSessions();
+    sendStatus(session.consumerTabId, session.sessionId, "DEBUGGER_DETACHED");
   });
 });
 
@@ -86,35 +106,42 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
     await stopSession(session, true);
   } else if (command.type === "RELOAD") {
     await chrome.tabs.reload(session.targetTabId);
+    await refreshViewport(session).catch(() => undefined);
   } else if (command.type === "BACK") {
     await chrome.tabs.goBack(session.targetTabId);
+    await refreshViewport(session).catch(() => undefined);
   } else if (command.type === "INPUT" && command.input && session.inputEnabled) {
-    await chrome.scripting.executeScript({
-      args: [command.input],
-      func: applyExternalInput,
-      target: { tabId: session.targetTabId },
-      world: "MAIN",
-    });
+    if (command.input.type === "pointer") {
+      const nextMask = pointerButtonMask(command.input);
+      if (nextMask >= 0) session.pressedButtons = nextMask;
+    }
+    const trusted = trustedInputCommand(command.input, {
+      height: session.viewportHeight ?? 720,
+      width: session.viewportWidth ?? 1280,
+    }, session.pressedButtons ?? 0);
+    await chrome.debugger.sendCommand({ tabId: session.targetTabId }, trusted.method, trusted.params);
   }
   return { ok: true };
 }
 
 async function activateCapture(session: HostSession) {
   try {
+    const debuggee = { tabId: session.targetTabId };
+    await chrome.debugger.attach(debuggee, "1.3");
+    await applyCaptureHardening((method, params) => chrome.debugger.sendCommand(debuggee, method, params));
+    await refreshViewport(session);
     const streamId = await chrome.tabCapture.getMediaStreamId({
       targetTabId: session.targetTabId,
       consumerTabId: session.consumerTabId,
     });
-    await chrome.scripting.executeScript({
-      func: () => true,
-      target: { tabId: session.targetTabId },
-      world: "MAIN",
-    });
     session.inputEnabled = true;
+    session.pressedButtons = 0;
     await persistSessions();
     sendStatus(session.consumerTabId, session.sessionId, "CAPTURE_READY", undefined, { streamId });
     await chrome.tabs.update(session.consumerTabId, { active: true });
   } catch (error) {
+    session.inputEnabled = false;
+    await chrome.debugger.detach({ tabId: session.targetTabId }).catch(() => undefined);
     sendStatus(session.consumerTabId, session.sessionId, "ERROR", String(error));
   }
 }
@@ -122,8 +149,20 @@ async function activateCapture(session: HostSession) {
 async function stopSession(session: HostSession, closeTarget: boolean) {
   sessions.delete(session.sessionId);
   await persistSessions();
+  await chrome.debugger.detach({ tabId: session.targetTabId }).catch(() => undefined);
   if (closeTarget) await chrome.tabs.remove(session.targetTabId).catch(() => undefined);
   sendStatus(session.consumerTabId, session.sessionId, "STOPPED");
+}
+
+async function refreshViewport(session: HostSession) {
+  const result = await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Runtime.evaluate", {
+    expression: "({width: window.innerWidth, height: window.innerHeight})",
+    returnByValue: true,
+  }) as { result?: { value?: { height?: number; width?: number } } };
+  const height = result.result?.value?.height;
+  const width = result.result?.value?.width;
+  if (typeof height === "number" && height > 0) session.viewportHeight = height;
+  if (typeof width === "number" && width > 0) session.viewportWidth = width;
 }
 
 async function persistSessions() {
@@ -131,5 +170,12 @@ async function persistSessions() {
 }
 
 function sendStatus(tabId: number, sessionId: string, type: string, error?: string, payload: Record<string, unknown> = {}) {
-  void chrome.tabs.sendMessage(tabId, { version: 1, type, sessionId, error, ...payload }).catch(() => undefined);
+  void chrome.tabs.sendMessage(tabId, {
+    version: 1,
+    type,
+    sessionId,
+    extensionVersion: chrome.runtime.getManifest().version,
+    error,
+    ...payload,
+  }).catch(() => undefined);
 }

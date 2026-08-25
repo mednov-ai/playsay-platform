@@ -19,6 +19,7 @@ dependencies {
     implementation("org.apache.pdfbox:pdfbox:3.0.8")
     implementation(platform("software.amazon.awssdk:bom:2.44.12"))
     implementation("software.amazon.awssdk:s3")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")

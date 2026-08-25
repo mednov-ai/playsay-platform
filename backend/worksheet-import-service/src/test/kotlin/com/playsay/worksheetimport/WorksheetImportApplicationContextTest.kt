@@ -1,7 +1,9 @@
 package com.playsay.worksheetimport
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -20,9 +22,15 @@ import org.springframework.boot.test.context.SpringBootTest
 )
 class WorksheetImportApplicationContextTest {
     @Autowired private lateinit var objectMapper: ObjectMapper
+    @Autowired private lateinit var meterRegistry: MeterRegistry
 
     @Test
     fun `application context provides the shared Kotlin and Java-time mapper`() {
         assertNotNull(objectMapper.registeredModuleIds.find { it.toString().contains("jsr310", ignoreCase = true) })
+    }
+
+    @Test
+    fun `application context exposes a Prometheus meter registry`() {
+        assertTrue(meterRegistry.javaClass.name.contains("Prometheus"))
     }
 }

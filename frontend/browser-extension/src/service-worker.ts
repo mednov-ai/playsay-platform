@@ -1,4 +1,5 @@
-import { parsePageCommand, sessionsToReplace, type ExternalInput, type PageCommand } from "./protocol";
+import { applyExternalInput } from "./main-world-input";
+import { parsePageCommand, sessionsToReplace, type PageCommand } from "./protocol";
 
 type HostSession = {
   sessionId: string;
@@ -53,7 +54,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.tabs.onCreated.addListener((tab) => {
   if (tab.id === undefined || tab.openerTabId === undefined) return;
   void hydration.then(() => {
-    if ([...sessions.values()].some((session) => session.targetTabId === tab.openerTabId)) return chrome.tabs.remove(tab.id!);
+    if ([...sessions.values()].some((session) => session.targetTabId === tab.openerTabId)) {
+      return chrome.tabs.remove(tab.id!);
+    }
   });
 });
 
@@ -86,7 +89,12 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
   } else if (command.type === "BACK") {
     await chrome.tabs.goBack(session.targetTabId);
   } else if (command.type === "INPUT" && command.input && session.inputEnabled) {
-    await sendInput(session.targetTabId, command.input);
+    await chrome.scripting.executeScript({
+      args: [command.input],
+      func: applyExternalInput,
+      target: { tabId: session.targetTabId },
+      world: "MAIN",
+    });
   }
   return { ok: true };
 }
@@ -98,9 +106,9 @@ async function activateCapture(session: HostSession) {
       consumerTabId: session.consumerTabId,
     });
     await chrome.scripting.executeScript({
+      func: () => true,
       target: { tabId: session.targetTabId },
       world: "MAIN",
-      func: () => true,
     });
     session.inputEnabled = true;
     await persistSessions();
@@ -116,93 +124,6 @@ async function stopSession(session: HostSession, closeTarget: boolean) {
   await persistSessions();
   if (closeTarget) await chrome.tabs.remove(session.targetTabId).catch(() => undefined);
   sendStatus(session.consumerTabId, session.sessionId, "STOPPED");
-}
-
-async function sendInput(tabId: number, input: ExternalInput) {
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    world: "MAIN",
-    args: [input],
-    func: (next: ExternalInput) => {
-      if (next.type === "key") {
-        const keyboardTarget = document.activeElement instanceof HTMLElement ? document.activeElement : document.body;
-        keyboardTarget.dispatchEvent(new KeyboardEvent(next.action === "down" ? "keydown" : "keyup", {
-          bubbles: true,
-          cancelable: true,
-          code: next.code ?? "",
-          key: next.key,
-          altKey: Boolean(next.modifiers && (next.modifiers & 1)),
-          ctrlKey: Boolean(next.modifiers && (next.modifiers & 2)),
-          metaKey: Boolean(next.modifiers && (next.modifiers & 4)),
-          shiftKey: Boolean(next.modifiers && (next.modifiers & 8)),
-        }));
-        if (
-          next.action === "down"
-          && next.text
-          && (keyboardTarget instanceof HTMLInputElement || keyboardTarget instanceof HTMLTextAreaElement)
-        ) {
-          const start = keyboardTarget.selectionStart ?? keyboardTarget.value.length;
-          const end = keyboardTarget.selectionEnd ?? start;
-          keyboardTarget.setRangeText(next.text, start, end, "end");
-          keyboardTarget.dispatchEvent(new InputEvent("input", { bubbles: true, data: next.text, inputType: "insertText" }));
-        }
-        return;
-      }
-
-      const normalizedX = typeof next.normalizedX === "number"
-        ? next.normalizedX
-        : next.sourceWidth ? next.x / next.sourceWidth : next.x / window.innerWidth;
-      const normalizedY = typeof next.normalizedY === "number"
-        ? next.normalizedY
-        : next.sourceHeight ? next.y / next.sourceHeight : next.y / window.innerHeight;
-      const x = Math.min(window.innerWidth - 1, Math.max(0, normalizedX * window.innerWidth));
-      const y = Math.min(window.innerHeight - 1, Math.max(0, normalizedY * window.innerHeight));
-
-      if (next.type === "scroll") {
-        window.scrollBy({ left: next.deltaX, top: next.deltaY, behavior: "auto" });
-        return;
-      }
-
-      const target = document.elementFromPoint(x, y);
-      if (!(target instanceof HTMLElement)) return;
-
-      if (next.type === "pointer") {
-        const button = next.button === "middle" ? 1 : next.button === "right" ? 2 : 0;
-        if (next.action === "down") {
-          target.focus({ preventScroll: true });
-          return;
-        }
-        const common = {
-          bubbles: true,
-          button,
-          buttons: button === 1 ? 4 : button === 2 ? 2 : 1,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-          detail: next.clickCount ?? 1,
-          view: window,
-        };
-        target.dispatchEvent(new PointerEvent("pointerdown", {
-          ...common,
-          pointerId: 1,
-          pointerType: "mouse",
-          isPrimary: true,
-        }));
-        target.dispatchEvent(new MouseEvent("mousedown", common));
-        target.dispatchEvent(new PointerEvent("pointerup", {
-          ...common,
-          buttons: 0,
-          pointerId: 1,
-          pointerType: "mouse",
-          isPrimary: true,
-        }));
-        target.dispatchEvent(new MouseEvent("mouseup", { ...common, buttons: 0 }));
-        if (button === 0) target.click();
-        return;
-      }
-
-    },
-  });
 }
 
 async function persistSessions() {

@@ -36,10 +36,10 @@ spec:
       resources:
         requests:
           cpu: 450m
-          memory: 1Gi
+          memory: 1536Mi
         limits:
           cpu: "1"
-          memory: 2Gi
+          memory: 3Gi
 
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug

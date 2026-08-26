@@ -107,6 +107,7 @@ class ChatEmailDigestMessageEntity(
 
 @Entity
 @Table(name = "chat_push_subscription")
+@Suppress("LongParameterList")
 class ChatPushSubscriptionEntity(
     @Id
     @Column(name = "id", nullable = false)
@@ -133,6 +134,7 @@ class ChatPushSubscriptionEntity(
 
 @Entity
 @Table(name = "chat_push_delivery")
+@Suppress("LongParameterList")
 class ChatPushDeliveryEntity(
     @Id
     @Column(name = "id", nullable = false)

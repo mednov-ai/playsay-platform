@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
+@Suppress("LongParameterList")
 class ChatService(
     private val appUserRepo: AppUserRepo,
     private val conversationRepo: ChatConversationRepo,

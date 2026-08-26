@@ -21,6 +21,8 @@ spec:
       command: ["cat"]
       tty: true
       env:
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.jvmargs=-Xmx768m -XX:MaxMetaspaceSize=256m"
         - name: JAVA_TOOL_OPTIONS
           value: "-XX:ActiveProcessorCount=1"
       volumeMounts:
@@ -28,8 +30,8 @@ spec:
           mountPath: /home/gradle/.gradle
           subPath: gradle-keycloak-lesson-authenticator
       resources:
-        requests: { cpu: 250m, memory: 512Mi }
-        limits: { cpu: "1", memory: 1536Mi }
+        requests: { cpu: 450m, memory: 1Gi }
+        limits: { cpu: "1", memory: 2Gi }
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]
@@ -136,7 +138,7 @@ spec:
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :keycloak-lesson-authenticator:clean :keycloak-lesson-authenticator:test :keycloak-lesson-authenticator:jar --no-daemon --stacktrace --max-workers=1'
+            sh 'gradle :keycloak-lesson-authenticator:clean :keycloak-lesson-authenticator:test :keycloak-lesson-authenticator:jar -Pkotlin.compiler.execution.strategy=in-process --no-daemon --stacktrace --max-workers=1'
           }
         }
       }

@@ -73,6 +73,7 @@ class CollaborationTokenService(
 }
 
 @Component
+@Suppress("LongParameterList")
 class CollaborationDocumentService(
     private val appUserRepo: AppUserRepo,
     private val collaborationDocumentRepo: CollaborationDocumentRepo,

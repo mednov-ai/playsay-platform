@@ -18,6 +18,7 @@ class InvalidLessonAdmissionTransition(
 ) : IllegalStateException("Lesson admission transition is not allowed")
 
 object LessonAdmissionStateMachine {
+    @Suppress("CyclomaticComplexMethod")
     fun transition(current: LessonAdmissionStatus?, event: LessonAdmissionEvent): LessonAdmissionStatus =
         when (event) {
             LessonAdmissionEvent.REQUEST_LOBBY -> when (current) {

@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
+@Suppress("LongParameterList")
 class LessonAccessLinkService(
     private val linkRepo: LessonAccessLinkRepo,
     private val attemptRepo: LessonEntryAttemptRepo,

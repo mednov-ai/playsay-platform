@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
+@Suppress("LongParameterList")
 class ScheduledLessonStore(
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,

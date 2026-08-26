@@ -10,6 +10,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "lesson_access_link")
+@Suppress("LongParameterList")
 class LessonAccessLinkEntity(
     @Id
     @Column(name = "id", nullable = false)
@@ -36,6 +37,7 @@ class LessonAccessLinkEntity(
 
 @Entity
 @Table(name = "lesson_entry_attempt")
+@Suppress("LongParameterList")
 class LessonEntryAttemptEntity(
     @Id
     @Column(name = "id", nullable = false)
@@ -73,6 +75,7 @@ class LessonEntryAttemptEntity(
 
 @Entity
 @Table(name = "lesson_email_challenge")
+@Suppress("LongParameterList")
 class LessonEmailChallengeEntity(
     @Id
     @Column(name = "id", nullable = false)
@@ -97,6 +100,7 @@ class LessonEmailChallengeEntity(
 
 @Entity
 @Table(name = "lesson_admission")
+@Suppress("LongParameterList")
 class LessonAdmissionEntity(
     @Id
     @Column(name = "id", nullable = false)

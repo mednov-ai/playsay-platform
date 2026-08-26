@@ -10,6 +10,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "lesson_auth_assertion")
+@Suppress("LongParameterList")
 class LessonAuthAssertionEntity(
     @Id
     @Column(name = "id", nullable = false)

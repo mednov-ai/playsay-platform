@@ -177,15 +177,12 @@ export function GlobalToolsRail({
     }));
     try {
       const page = await fetchChatMessages(conversationId, older ? current.nextCursor : null);
-      let visibleItems: ChatMessage[] = [];
-      setMessagesByConversation((all) => {
-        const previous = all[conversationId]?.items ?? [];
-        visibleItems = older ? mergeMessages(page.items, previous) : mergeMessages(previous, page.items);
-        return {
-          ...all,
-          [conversationId]: { items: visibleItems, loading: false, nextCursor: page.nextCursor },
-        };
-      });
+      const previous = messagesRef.current[conversationId]?.items ?? [];
+      const visibleItems = older ? mergeMessages(page.items, previous) : mergeMessages(previous, page.items);
+      setMessagesByConversation((all) => ({
+        ...all,
+        [conversationId]: { items: visibleItems, loading: false, nextCursor: page.nextCursor },
+      }));
       if (openRef.current && activeConversationIdRef.current === conversationId) {
         void markVisibleConversationRead(conversationId, visibleItems);
       }

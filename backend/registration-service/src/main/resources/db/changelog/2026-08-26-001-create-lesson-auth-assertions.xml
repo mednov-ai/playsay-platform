@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-08-26-001-create-lesson-auth-assertions" author="codex">
+        <createTable tableName="lesson_auth_assertion">
+            <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="handle_hash" type="varchar(64)"><constraints nullable="false" unique="true" uniqueConstraintName="uk_lesson_auth_assertion_handle"/></column>
+            <column name="subject" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="browser_attempt_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="client_id" type="varchar(128)"><constraints nullable="false"/></column>
+            <column name="issuer" type="varchar(512)"><constraints nullable="false"/></column>
+            <column name="callback" type="varchar(1024)"><constraints nullable="false"/></column>
+            <column name="remember_me" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="expires_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="created_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="redeemed_at" type="timestamp with time zone"/>
+            <column name="row_version" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="lesson_auth_assertion" indexName="idx_lesson_auth_assertion_expiry"><column name="expires_at"/></createIndex>
+    </changeSet>
+</databaseChangeLog>

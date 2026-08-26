@@ -4,6 +4,7 @@ export {
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  consumeCompletedLoginReturnPath,
   consumeSkipSilentLogin,
   defaultAuthIssuer,
   getValidAccessToken,
@@ -13,6 +14,7 @@ export {
   readTokens,
   skipSilentLoginOnce,
   startLogin,
+  startLessonAssertionLogin,
   startSilentLogin,
   storeTokens,
 } from "../api/auth";

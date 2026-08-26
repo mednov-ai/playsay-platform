@@ -4,6 +4,7 @@ import { Button } from "../../../components/ui/button";
 import { formatDateTime, isJoinableScheduledLesson, isScheduledLessonReadyToStart, lessonAccessOpensAt } from "../../../entities/schedule/model";
 import type { LessonMaterial, ScheduledLesson } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
+import { LessonAdmissionPanel } from "../../lesson-access/ui/LessonAdmissionPanel";
 
 const MaterialPlayPreviewDialog = lazy(() => (
   import("../../materials/ui/MaterialPlayPreviewDialog").then((module) => ({ default: module.MaterialPlayPreviewDialog }))
@@ -147,6 +148,7 @@ export function LessonPreparationPanel({
           <Button disabled={disabled || currentLesson.participants.length === 0} onClick={() => void copyLinks()} type="button" variant="outline">
             <Copy className="h-4 w-4" />{linksCopied ? t("schedule.clipboard.copied") : t("schedule.preparation.copyLinks")}
           </Button>
+          <LessonAdmissionPanel lesson={currentLesson} />
         </aside>
       </div>
 

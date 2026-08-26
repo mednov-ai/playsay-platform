@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import java.time.Instant
+import java.util.UUID
 
 data class StartRegistrationRequest(
     @field:Email
@@ -66,4 +68,49 @@ data class ResetPasswordRequest(
 data class RegistrationResponse(
     val status: String,
     val continueUrl: String? = null,
+)
+data class LessonIdentityResolveRequest(
+    @field:Email @field:NotBlank @field:Size(max = 320)
+    val email: String,
+)
+
+data class LessonIdentityResolveResponse(
+    val subject: String,
+    val email: String,
+    val displayName: String?,
+    val roles: Set<String>,
+)
+
+data class LessonAuthAssertionCreateRequest(
+    @field:NotBlank @field:Size(max = 255)
+    val subject: String,
+    val browserAttemptId: UUID,
+    @field:NotBlank @field:Size(max = 128)
+    val clientId: String,
+    @field:NotBlank @field:Size(max = 512)
+    val issuer: String,
+    @field:NotBlank @field:Size(max = 1024)
+    val callback: String,
+    val rememberMe: Boolean = false,
+)
+
+data class LessonAuthAssertionCreateResponse(
+    val handle: String,
+    val expiresAt: Instant,
+)
+
+data class LessonAuthAssertionRedeemRequest(
+    @field:NotBlank @field:Size(max = 255)
+    val handle: String,
+    @field:NotBlank @field:Size(max = 128)
+    val clientId: String,
+    @field:NotBlank @field:Size(max = 512)
+    val issuer: String,
+    @field:NotBlank @field:Size(max = 1024)
+    val callback: String,
+)
+
+data class LessonAuthAssertionRedeemResponse(
+    val subject: String,
+    val rememberMe: Boolean,
 )

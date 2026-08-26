@@ -73,6 +73,9 @@ import liquibase.integration.spring.SpringLiquibase
         "playsay.livekit.api-key=test-key",
         "playsay.livekit.api-secret=01234567890123456789012345678901",
         "playsay.livekit.token-ttl-seconds=900",
+        "playsay.lesson-access.enabled=true",
+        "playsay.lesson-access.hmac-secret-base64=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "playsay.lesson-access.environment-issuer=https://dev.ops.honey.school/keycloak/realms/playsay",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -88,6 +91,12 @@ abstract class ScheduledLessonControllerTestFixture {
     @Autowired protected lateinit var lessonParticipantRepo: LessonParticipantRepo
     @Autowired protected lateinit var lessonRepo: LessonRepo
     @Autowired protected lateinit var lessonEmailReminderRepo: LessonEmailReminderRepo
+    @Autowired protected lateinit var lessonEmailChallengeRepo: LessonEmailChallengeRepo
+    @Autowired protected lateinit var lessonEntryAttemptRepo: LessonEntryAttemptRepo
+    @Autowired protected lateinit var lessonAdmissionRepo: LessonAdmissionRepo
+    @Autowired protected lateinit var lessonAccessLinkRepo: LessonAccessLinkRepo
+    @Autowired protected lateinit var lessonAccessAuditRepo: LessonAccessAuditRepo
+    @Autowired protected lateinit var lessonChallengeRateLimitRepo: LessonChallengeRateLimitRepo
     @Autowired protected lateinit var lessonReminderScheduler: LessonReminderScheduler
     @Autowired protected lateinit var lessonTemplateRepo: LessonTemplateRepo
     @Autowired protected lateinit var courseRepo: CourseRepo
@@ -123,6 +132,12 @@ abstract class ScheduledLessonControllerTestFixture {
         RecordingLessonReminderEmailClient.sent.clear()
         RecordingLessonReminderEmailClient.failFor = null
         RecordingScheduledLessonRegistrationGateway.reset()
+        lessonEmailChallengeRepo.deleteAllInBatch()
+        lessonEntryAttemptRepo.deleteAllInBatch()
+        lessonAdmissionRepo.deleteAllInBatch()
+        lessonAccessLinkRepo.deleteAllInBatch()
+        lessonAccessAuditRepo.deleteAllInBatch()
+        lessonChallengeRateLimitRepo.deleteAllInBatch()
         lessonEmailReminderRepo.deleteAllInBatch()
         lessonParticipantRepo.deleteAllInBatch()
         lessonRepo.deleteAllInBatch()

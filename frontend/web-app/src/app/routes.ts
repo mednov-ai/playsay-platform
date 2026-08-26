@@ -120,6 +120,11 @@ export function isStudentInvitePath(pathname: string): boolean {
   return /^\/join\/?$/.test(pathname);
 }
 
+export function lessonAccessRouteFromPath(pathname: string): { lessonId: string; auth: boolean } | null {
+  const match = /^\/lesson-access\/([^/]+)(\/auth)?\/?$/.exec(pathname);
+  return match ? { lessonId: decodeURIComponent(match[1]), auth: Boolean(match[2]) } : null;
+}
+
 export type RegistrationRoute =
   | { kind: "start" }
   | { kind: "check-email" }

@@ -15,6 +15,7 @@ const modulePipelines = [
   "Jenkinsfile.email-service",
   "Jenkinsfile.keyboard-backend",
   "Jenkinsfile.keyboard-frontend",
+  "Jenkinsfile.keycloak",
   "Jenkinsfile.media-service",
   "Jenkinsfile.game-adapter-service",
   "Jenkinsfile.payment-service",
@@ -27,11 +28,9 @@ test("module pipelines route numeric release branches to prod only", () => {
   for (const pipelineName of modulePipelines) {
     const pipeline = readFileSync(resolve(platformRoot, pipelineName), "utf8");
 
-    assert.match(
-      pipeline,
-      /DEPLOY_TO_PROD = \(env\.CI_BRANCH ==~ \^?\/\^release\\\/\[0-9\]\+/,
-      pipelineName,
-    );
+    const prodRouting = pipeline.match(/DEPLOY_TO_PROD = \(env\.CI_BRANCH ==~ ([^\n]+)/)?.[1] ?? "";
+    assert.match(prodRouting, /release\\\//, pipelineName);
+    assert.match(prodRouting, /\[0-9\]/, pipelineName);
     assert.match(pipeline, /env\.INFRA_BRANCH = env\.DEPLOY_TO_PROD == 'true' \? env\.CI_BRANCH : 'develop'/, pipelineName);
     assert.doesNotMatch(
       pipeline,

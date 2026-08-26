@@ -10,6 +10,8 @@ import type {
 } from "../../../shared/api/playsay";
 import { normalizeLanguage, useAppTranslation } from "../../../shared/i18n";
 import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
+import { revokeAllLessonSessions, revokeCurrentLessonSession } from "../../../shared/api/lessonAccess";
+import { clearTokens } from "../../../shared/auth/oidc";
 
 export type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggingOut" | "error";
 
@@ -95,6 +97,7 @@ export function ProfileAccountPanel({
             <h2 className="text-lg font-extrabold">{t("profile.sections.user")}</h2>
           </div>
           <IdentityPanel error={error} profile={profile} status={status} />
+          {isAuthenticated ? <RememberedLessonSessionsPanel /> : null}
         </section>
 
         <section className="min-w-0">
@@ -123,6 +126,45 @@ export function ProfileAccountPanel({
           />
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function RememberedLessonSessionsPanel() {
+  const { t } = useAppTranslation();
+  const [busy, setBusy] = useState<"current" | "all" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function revoke(scope: "current" | "all") {
+    setBusy(scope);
+    setMessage(null);
+    try {
+      if (scope === "current") await revokeCurrentLessonSession();
+      else await revokeAllLessonSessions();
+      clearTokens();
+      setMessage(t("profile.lessonSessions.revoked"));
+      window.location.assign("/");
+    } catch {
+      setMessage(t("profile.lessonSessions.error"));
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="mt-4 rounded-2xl border border-border bg-muted/50 p-4" aria-labelledby="lesson-session-title">
+      <h3 className="font-extrabold" id="lesson-session-title">{t("profile.lessonSessions.title")}</h3>
+      <p className="mt-1 text-sm text-muted-foreground">{t("profile.lessonSessions.description")}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button disabled={busy !== null} onClick={() => void revoke("current")} type="button" variant="outline">
+          {busy === "current" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {t("profile.lessonSessions.current")}
+        </Button>
+        <Button disabled={busy !== null} onClick={() => void revoke("all")} type="button" variant="outline">
+          {busy === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {t("profile.lessonSessions.all")}
+        </Button>
+      </div>
+      {message ? <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">{message}</p> : null}
     </section>
   );
 }

@@ -13,6 +13,39 @@ import kotlin.test.assertTrue
 
 class KeycloakAdminRegistrationClientTest {
     @Test
+    fun `current device revocation deletes only a session owned by the exact subject`() {
+        val requests = mutableListOf<CapturedRequest>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            requests += CapturedRequest(exchange.requestMethod, exchange.requestURI.path, exchange.requestBody.readBytes().toString(Charsets.UTF_8))
+            when {
+                exchange.requestURI.path.endsWith("/protocol/openid-connect/token") ->
+                    exchange.respondJson(200, """{"access_token":"admin-token"}""")
+                exchange.requestMethod == "GET" && exchange.requestURI.path.endsWith("/users/student-1/sessions") ->
+                    exchange.respondJson(200, """[{"id":"owned-session"}]""")
+                exchange.requestMethod == "DELETE" && exchange.requestURI.path.endsWith("/sessions/owned-session") ->
+                    exchange.respondJson(204, "")
+                else -> exchange.respondJson(404, """{"error":"not-found"}""")
+            }
+        }
+        server.start()
+        try {
+            val client = KeycloakAdminRegistrationClient(
+                HttpClient.newHttpClient(), jacksonObjectMapper(),
+                "http://127.0.0.1:${server.address.port}/keycloak", "playsay", "client", "secret",
+            )
+
+            client.revokeSession("student-1", "other-session")
+            client.revokeSession("student-1", "owned-session")
+
+            assertFalse(requests.any { it.method == "DELETE" && it.path.endsWith("/sessions/other-session") })
+            assertTrue(requests.any { it.method == "DELETE" && it.path.endsWith("/sessions/owned-session") })
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `managed student create payload completes required keycloak profile`() {
         val objectMapper = jacksonObjectMapper()
         val requests = mutableListOf<CapturedRequest>()

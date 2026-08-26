@@ -166,7 +166,7 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
     }
 
     @Test
-    fun `managed student invite is one time and returns keycloak tokens`() {
+    fun `legacy managed student invite consume is disabled without issuing keycloak tokens`() {
         provisionManagedStudent("invitee", "Invitee")
         val invite = createManagedStudentInvite(
             subject = "managed-subject-1",
@@ -180,29 +180,11 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
 
         val consumed = consumeManagedStudentInvite(token)
         val repeated = consumeManagedStudentInvite(token)
-        val manualInvite = createManagedStudentInvite(
-            subject = "managed-subject-1",
-            username = "invitee",
-            email = null,
-            displayName = "Invitee",
-            lessonId = "3f20a6e4-a861-49ab-aa70-8300b589f61f",
-            continueUrl = "https://dev.online.honey.school/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom",
-        )
-        val manualToken = assertNotNull(manualInvite.token)
-        val manualEntry = "${manualToken.substring(0, 3).lowercase()} ${manualToken.substring(3).lowercase()}"
-        val manualConsumed = consumeManagedStudentInvite(manualEntry)
-
         assertTrue(Regex("^[A-Z0-9]{6}$").matches(token))
-        assertTrue(Regex("^[A-Z0-9]{6}$").matches(manualToken))
-        assertEquals(HttpStatus.OK.value(), consumed.statusCode(), consumed.body())
-        assertEquals(HttpStatus.OK.value(), manualConsumed.statusCode(), manualConsumed.body())
-        assertTrue(consumed.body().contains("access-token-invitee"))
-        assertTrue(consumed.body().contains("https://dev.online.honey.school/lessons/3f20a6e4-a861-49ab-aa70-8300b589f61f/classroom"))
-        assertEquals(HttpStatus.BAD_REQUEST.value(), repeated.statusCode(), repeated.body())
-        assertEquals(
-            listOf("invitee", "invitee"),
-            RecordingKeycloakRegistrationClient.passwordGrantUsers,
-        )
+        assertEquals(HttpStatus.GONE.value(), consumed.statusCode(), consumed.body())
+        assertEquals(HttpStatus.GONE.value(), repeated.statusCode(), repeated.body())
+        assertTrue(consumed.body().contains("LESSON_LINK_REPLACED"))
+        assertTrue(RecordingKeycloakRegistrationClient.passwordGrantUsers.isEmpty())
     }
 
     @Test
@@ -222,13 +204,15 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
 
         val lookup = lookupManagedStudentInvite(token)
         val consumed = consumeManagedStudentInvite(token)
+        val repeatedLookup = lookupManagedStudentInvite(token)
 
         assertEquals(HttpStatus.OK.value(), lookup.statusCode(), lookup.body())
         assertTrue(lookup.body().contains("managed-subject-1"))
         assertTrue(lookup.body().contains(lessonId))
         assertTrue(lookup.body().contains(continueUrl))
-        assertEquals(HttpStatus.OK.value(), consumed.statusCode(), consumed.body())
-        assertTrue(consumed.body().contains("access-token-lookup"))
+        assertEquals(HttpStatus.GONE.value(), consumed.statusCode(), consumed.body())
+        assertTrue(consumed.body().contains("LESSON_LINK_REPLACED"))
+        assertEquals(HttpStatus.OK.value(), repeatedLookup.statusCode(), repeatedLookup.body())
     }
 
     @Test

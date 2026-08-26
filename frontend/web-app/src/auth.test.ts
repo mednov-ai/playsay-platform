@@ -68,6 +68,19 @@ describe("auth helpers", () => {
     expect(url.searchParams.get("prompt")).toBe("none");
   });
 
+  it("binds a lesson assertion to an ordinary PKCE authorization request", () => {
+    const url = buildAuthorizeUrl({
+      config,
+      redirectUri: "https://online.play-and-say.ru/auth/callback",
+      state: "state-1",
+      codeChallenge: "challenge-1",
+      lessonAssertion: "opaque-assertion",
+    });
+
+    expect(url.searchParams.get("lesson_assertion")).toBe("opaque-assertion");
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
   it("passes the selected app theme to Keycloak authorization", () => {
     const url = buildAuthorizeUrl({
       config,

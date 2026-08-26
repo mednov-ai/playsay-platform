@@ -207,6 +207,30 @@ class LessonRealtimeHub(
         presenceBySession.values.forEach { presence -> presence.remove(lessonId) }
     }
 
+    fun revokeLessonSubject(lessonId: UUID, subject: String) {
+        principals.entries
+            .filter { (_, principal) -> principal.subject == subject }
+            .map { (sessionId) -> sessionId }
+            .forEach { sessionId ->
+                sessions[sessionId]?.let { session ->
+                    sendToSession(session, LessonRealtimeOutboundMessage(type = "lesson.kicked", lessonId = lessonId))
+                }
+                lessonSubscriptions[lessonId]?.remove(sessionId)
+                subscriptionsBySession[sessionId]?.remove(lessonId)
+                presenceBySession[sessionId]?.remove(lessonId)
+            }
+        publishLessonPresence(lessonId)
+    }
+
+    fun publishLobbyChanged(lessonId: UUID) {
+        principals.forEach { (sessionId, principal) ->
+            if (!principal.canManagePresence()) return@forEach
+            sessions[sessionId]?.let { session ->
+                sendToSession(session, LessonRealtimeOutboundMessage(type = "lesson.lobby.changed", lessonId = lessonId))
+            }
+        }
+    }
+
     fun broadcastScheduleChanged() {
         sessions.values.forEach { session ->
             sendToSession(session, LessonRealtimeOutboundMessage(type = "schedule.changed"))

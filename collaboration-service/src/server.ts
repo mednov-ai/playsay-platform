@@ -1,4 +1,5 @@
 import http from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
 import * as awarenessProtocol from "y-protocols/awareness";
@@ -21,6 +22,7 @@ import { CollaborationMetrics } from "./metrics.js";
 import { SnapshotQueue } from "./snapshots.js";
 import type { CollaborationClaims } from "./rooms.js";
 import { assertRoomMatchesClaims } from "./rooms.js";
+import { disconnectLessonSubject } from "./disconnect.js";
 
 const messageSync = 0;
 const messageAwareness = 1;
@@ -37,6 +39,7 @@ interface CollaborationRoom {
 }
 
 const rooms = new Map<string, Promise<CollaborationRoom>>();
+const connectionClaims = new Map<WebSocket, CollaborationClaims>();
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -81,6 +84,29 @@ async function main(): Promise<void> {
       });
       return;
     }
+    if (request.url === "/internal/disconnect" && request.method === "POST") {
+      if (!serviceTokenMatches(request.headers["x-playsay-collaboration-token"], config.collaborationServiceToken)) {
+        response.writeHead(401);
+        response.end();
+        return;
+      }
+      void readJsonBody(request, 4096).then((body) => {
+        const lessonId = typeof body.lessonId === "string" ? body.lessonId : "";
+        const subject = typeof body.subject === "string" ? body.subject : "";
+        if (!lessonId || !subject) {
+          response.writeHead(400);
+          response.end();
+          return;
+        }
+        const disconnected = disconnectLessonSubject(connectionClaims, lessonId, subject);
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ disconnected }));
+      }).catch(() => {
+        response.writeHead(400);
+        response.end();
+      });
+      return;
+    }
     response.writeHead(404);
     response.end();
   });
@@ -119,6 +145,8 @@ async function main(): Promise<void> {
   });
 
   wss.on("connection", (ws: WebSocket, request: http.IncomingMessage, claims: CollaborationClaims) => {
+    connectionClaims.set(ws, claims);
+    ws.once("close", () => connectionClaims.delete(ws));
     request.socket.setNoDelay(true);
     request.socket.setKeepAlive(true, 30_000);
     const pendingMessages: RawData[] = [];
@@ -157,6 +185,27 @@ async function main(): Promise<void> {
   server.listen(config.port, () => {
     console.log(`collaboration-service listening on :${config.port}`);
   });
+}
+
+function serviceTokenMatches(presented: string | string[] | undefined, expected: string): boolean {
+  const value = Array.isArray(presented) ? "" : presented ?? "";
+  const left = Buffer.from(value);
+  const right = Buffer.from(expected);
+  return left.length === right.length && right.length > 0 && timingSafeEqual(left, right);
+}
+
+async function readJsonBody(request: http.IncomingMessage, limit: number): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > limit) throw new Error("request body too large");
+    chunks.push(buffer);
+  }
+  const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid request body");
+  return parsed as Record<string, unknown>;
 }
 
 function getRoom(

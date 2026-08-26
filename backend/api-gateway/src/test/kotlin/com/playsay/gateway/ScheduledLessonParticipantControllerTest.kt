@@ -84,7 +84,7 @@ class ScheduledLessonParticipantControllerTest : ScheduledLessonControllerTestFi
     }
 
     @Test
-    fun `teacher creates participant magic link for managed student`() {
+    fun `teacher creates the same shared lesson link for every assigned participant`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val teacherUserId = userProfileStore.currentUserId(teacher)
         val now = Instant.parse("2026-05-24T10:00:00Z")
@@ -117,18 +117,13 @@ class ScheduledLessonParticipantControllerTest : ScheduledLessonControllerTestFi
 
         assertEquals(1, links.links.size)
         assertEquals("managed-student-1", links.links.single().subject)
-        assertEquals("MAGIC_LINK", links.links.single().mode)
-        assertTrue(links.links.single().url.endsWith("/join#A7K2Q9"))
-        assertFalse(links.links.single().url.contains("?token="))
-        assertEquals(lesson.id, RecordingScheduledLessonRegistrationGateway.invites.single().lessonId)
-        assertEquals("managed-student-1", RecordingScheduledLessonRegistrationGateway.invites.single().subject)
-        assertEquals("new.student", RecordingScheduledLessonRegistrationGateway.invites.single().username)
-        assertEquals(null, RecordingScheduledLessonRegistrationGateway.invites.single().email)
-        assertTrue(RecordingScheduledLessonRegistrationGateway.invites.single().continueUrl.endsWith("/lessons/${lesson.id}/classroom"))
+        assertEquals("SHARED_LESSON_LINK", links.links.single().mode)
+        assertTrue(links.links.single().url.startsWith("https://online.honey.school/lesson-access/${lesson.id}#"))
+        assertTrue(RecordingScheduledLessonRegistrationGateway.invites.isEmpty())
     }
 
     @Test
-    fun `student invite waits before lesson access window without consuming registration invite`() {
+    fun `legacy student invite redirects to the shared lesson link flow before access window`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val studentSubject = "managed-student-1"
         userProfileStore.currentUserId(authentication(subject = studentSubject, username = "managed.one", role = "ROLE_STUDENT"))
@@ -158,17 +153,13 @@ class ScheduledLessonParticipantControllerTest : ScheduledLessonControllerTestFi
             jakarta.servlet.http.HttpServletRequestWrapper(org.springframework.mock.web.MockHttpServletRequest()),
         )
 
-        assertEquals("WAITING", response.status)
-        assertEquals(scheduledStart.minusSeconds(LESSON_ACCESS_GRACE_SECONDS), response.opensAt)
-        assertEquals(scheduledStart, response.scheduledStart)
-        assertEquals(scheduledEnd, response.scheduledEnd)
-        assertTrue((response.retryAfterSeconds ?: 0) > 0)
-        assertEquals(listOf("A7K2Q9"), RecordingScheduledLessonRegistrationGateway.lookups.map { it.token })
+        assertEquals("LESSON_LINK_REPLACED", response.status)
+        assertTrue(RecordingScheduledLessonRegistrationGateway.lookups.isEmpty())
         assertTrue(RecordingScheduledLessonRegistrationGateway.consumes.isEmpty())
     }
 
     @Test
-    fun `student invite authenticates inside current lesson access window`() {
+    fun `legacy student invite never authenticates inside current lesson access window`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val studentSubject = "managed-student-1"
         userProfileStore.currentUserId(authentication(subject = studentSubject, username = "managed.one", role = "ROLE_STUDENT"))
@@ -196,10 +187,9 @@ class ScheduledLessonParticipantControllerTest : ScheduledLessonControllerTestFi
             jakarta.servlet.http.HttpServletRequestWrapper(org.springframework.mock.web.MockHttpServletRequest()),
         )
 
-        assertEquals("AUTHENTICATED", response.status)
-        assertEquals("access-token", response.accessToken)
-        assertEquals(listOf("A7K2Q9"), RecordingScheduledLessonRegistrationGateway.lookups.map { it.token })
-        assertEquals(listOf("A7K2Q9"), RecordingScheduledLessonRegistrationGateway.consumes.map { it.token })
+        assertEquals("LESSON_LINK_REPLACED", response.status)
+        assertTrue(RecordingScheduledLessonRegistrationGateway.lookups.isEmpty())
+        assertTrue(RecordingScheduledLessonRegistrationGateway.consumes.isEmpty())
     }
 
 }

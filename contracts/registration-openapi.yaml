@@ -109,11 +109,80 @@ paths:
                 $ref: "#/components/schemas/RegistrationResponse"
         "400":
           description: Invalid code, expired code, or weak password.
+  /api/internal/lesson-auth/identities/resolve:
+    post:
+      operationId: resolveLessonIdentity
+      summary: Resolve one exact verified account identity for lesson admission
+      security: [{ internalServiceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LessonIdentityResolveRequest" }
+      responses:
+        "200":
+          description: Exact enabled identity or an empty response when none exists.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LessonIdentityResolveResponse" }
+  /api/internal/lesson-auth/assertions:
+    post:
+      operationId: createLessonAuthAssertion
+      summary: Create a one-time subject-bound lesson authentication assertion
+      security: [{ internalServiceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LessonAuthAssertionCreateRequest" }
+      responses:
+        "201":
+          description: Opaque assertion created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LessonAuthAssertionCreateResponse" }
+  /api/provider/lesson-auth/assertions/redeem:
+    post:
+      operationId: redeemLessonAuthAssertion
+      summary: Atomically redeem a lesson assertion from the pinned Keycloak provider
+      security: [{ lessonProviderToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LessonAuthAssertionRedeemRequest" }
+      responses:
+        "200":
+          description: Exact enabled realm subject and remember choice.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LessonAuthAssertionRedeemResponse" }
+        "400": { description: "Assertion is invalid, expired, replayed, or bound to another environment/client/callback." }
+  /api/internal/lesson-auth/users/{subject}/sessions/{sessionId}:
+    delete:
+      operationId: revokeLessonSession
+      summary: Revoke one owner-selected remembered browser session
+      security: [{ internalServiceToken: [] }]
+      parameters:
+        - { in: path, name: subject, required: true, schema: { type: string } }
+        - { in: path, name: sessionId, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Session revoked. }
+  /api/internal/lesson-auth/users/{subject}/sessions:
+    delete:
+      operationId: revokeAllLessonSessions
+      summary: Revoke all remembered sessions for the exact owner subject
+      security: [{ internalServiceToken: [] }]
+      parameters:
+        - { in: path, name: subject, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Sessions revoked. }
   /student-invites/consume:
     post:
       operationId: consumeStudentInvite
-      summary: Consume managed-student lesson invite
-      description: Exchanges a one-time managed-student invite code for a Keycloak token set and the lesson continue URL. The public link carries the code in the URL fragment, while this request keeps the legacy `token` field name for client compatibility.
+      deprecated: true
+      summary: Reject a legacy managed-student lesson invite
+      description: Legacy compatibility endpoint. It never resolves the invite, mutates credentials, or issues tokens; clients must request the reusable shared lesson link.
       requestBody:
         required: true
         content:
@@ -121,16 +190,68 @@ paths:
             schema:
               $ref: "#/components/schemas/StudentInviteConsumeRequest"
       responses:
-        "200":
-          description: Invite consumed.
+        "410":
+          description: Legacy link replaced by the reusable shared lesson-link flow.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StudentInviteConsumeResponse"
+                $ref: "#/components/schemas/RegistrationResponse"
         "400":
           description: Invalid, expired, or already consumed invite code.
 components:
+  securitySchemes:
+    internalServiceToken:
+      type: apiKey
+      in: header
+      name: X-PlaySay-Service-Token
+    lessonProviderToken:
+      type: apiKey
+      in: header
+      name: X-PlaySay-Lesson-Provider-Token
   schemas:
+    LessonIdentityResolveRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+    LessonIdentityResolveResponse:
+      type: object
+      required: [subject, email, roles]
+      properties:
+        subject: { type: string }
+        email: { type: string, format: email }
+        displayName: { type: string, nullable: true }
+        roles: { type: array, uniqueItems: true, items: { type: string } }
+    LessonAuthAssertionCreateRequest:
+      type: object
+      required: [subject, browserAttemptId, clientId, issuer, callback, rememberMe]
+      properties:
+        subject: { type: string, maxLength: 255 }
+        browserAttemptId: { type: string, format: uuid }
+        clientId: { type: string, maxLength: 128 }
+        issuer: { type: string, format: uri, maxLength: 512 }
+        callback: { type: string, format: uri, maxLength: 1024 }
+        rememberMe: { type: boolean, default: false }
+    LessonAuthAssertionCreateResponse:
+      type: object
+      required: [handle, expiresAt]
+      properties:
+        handle: { type: string }
+        expiresAt: { type: string, format: date-time }
+    LessonAuthAssertionRedeemRequest:
+      type: object
+      required: [handle, clientId, issuer, callback]
+      properties:
+        handle: { type: string, maxLength: 255 }
+        clientId: { type: string, maxLength: 128 }
+        issuer: { type: string, format: uri, maxLength: 512 }
+        callback: { type: string, format: uri, maxLength: 1024 }
+    LessonAuthAssertionRedeemResponse:
+      type: object
+      required: [subject, rememberMe]
+      properties:
+        subject: { type: string }
+        rememberMe: { type: boolean }
     StartRegistrationRequest:
       type: object
       required:
@@ -238,23 +359,3 @@ components:
           description: One-time managed-student invite code. New codes are at most 6 characters; longer legacy pending tokens remain accepted for compatibility.
           minLength: 1
           maxLength: 255
-    StudentInviteConsumeResponse:
-      type: object
-      required:
-        - accessToken
-        - expiresIn
-        - continueUrl
-      properties:
-        accessToken:
-          type: string
-        refreshToken:
-          type: string
-          nullable: true
-        idToken:
-          type: string
-          nullable: true
-        expiresIn:
-          type: integer
-          format: int64
-        continueUrl:
-          type: string

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-08-26-001-add-lesson-entry-code-template" author="codex">
+        <sql><![CDATA[
+INSERT INTO email_templates (id, template_key, locale, subject_template, text_template, html_template, version, enabled, created_at, updated_at) VALUES
+('20000000-0000-0000-0000-000000000701', 'lesson-entry-code', 'ru', 'Код входа в урок Honey School',
+'Ваш код подтверждения для входа в урок: ${code}
+
+Время урока: ${lessonTime!"уточните у учителя"}
+Код действует ${expiresMinutes} минут. Никому не сообщайте этот код.',
+'<p>Ваш код подтверждения для входа в урок:</p><p><strong>${code}</strong></p><p>Время урока: ${lessonTime!"уточните у учителя"}</p><p>Код действует ${expiresMinutes} минут. Никому не сообщайте этот код.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('20000000-0000-0000-0000-000000000702', 'lesson-entry-code', 'en', 'Your Honey School lesson access code',
+'Your confirmation code for entering the lesson is: ${code}
+
+Lesson time: ${lessonTime!"ask your teacher"}
+The code is valid for ${expiresMinutes} minutes. Do not share this code.',
+'<p>Your confirmation code for entering the lesson is:</p><p><strong>${code}</strong></p><p>Lesson time: ${lessonTime!"ask your teacher"}</p><p>The code is valid for ${expiresMinutes} minutes. Do not share this code.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('20000000-0000-0000-0000-000000000703', 'lesson-entry-code', 'de', 'Ihr Zugangscode für die Honey School-Unterrichtsstunde',
+'Ihr Bestätigungscode für den Unterricht lautet: ${code}
+
+Unterrichtszeit: ${lessonTime!"fragen Sie Ihre Lehrkraft"}
+Der Code ist ${expiresMinutes} Minuten gültig. Geben Sie diesen Code nicht weiter.',
+'<p>Ihr Bestätigungscode für den Unterricht lautet:</p><p><strong>${code}</strong></p><p>Unterrichtszeit: ${lessonTime!"fragen Sie Ihre Lehrkraft"}</p><p>Der Code ist ${expiresMinutes} Minuten gültig. Geben Sie diesen Code nicht weiter.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('20000000-0000-0000-0000-000000000704', 'lesson-entry-code', 'fr', 'Votre code d’accès au cours Honey School',
+'Votre code de confirmation pour accéder au cours est : ${code}
+
+Heure du cours : ${lessonTime!"demandez à votre professeur"}
+Le code est valable ${expiresMinutes} minutes. Ne partagez pas ce code.',
+'<p>Votre code de confirmation pour accéder au cours est :</p><p><strong>${code}</strong></p><p>Heure du cours : ${lessonTime!"demandez à votre professeur"}</p><p>Le code est valable ${expiresMinutes} minutes. Ne partagez pas ce code.</p>',
+1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

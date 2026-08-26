@@ -229,6 +229,7 @@ spec:
                 'payment-service': 'playsay-payment-service-develop',
                 'registration-service': 'playsay-registration-service-develop',
                 'email-service': 'playsay-email-service-develop',
+                'keycloak': 'playsay-keycloak-develop',
                 'keyboard-service': 'playsay-keyboard-backend-develop',
                 'keyboard-app': 'playsay-keyboard-frontend-develop'
               ]

@@ -1,6 +1,7 @@
 export type CollaborationScope = "INDIVIDUAL" | "GROUP";
 
 export interface CollaborationClaims {
+  subject: string;
   documentId: string;
   lessonId: string;
   materialId: string;
@@ -29,6 +30,7 @@ export function assertRoomMatchesClaims(roomName: string, claims: CollaborationC
 }
 
 export function validateCollaborationClaims(payload: Record<string, unknown>): CollaborationClaims {
+  const subject = requiredString(payload, "sub");
   const documentId = requiredString(payload, "documentId");
   const lessonId = requiredString(payload, "lessonId");
   const materialId = requiredString(payload, "materialId");
@@ -37,6 +39,7 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
   const yjsDocumentId = requiredString(payload, "yjsDocumentId");
   const studentUserId = optionalString(payload, "studentUserId");
   const claims: CollaborationClaims = {
+    subject,
     documentId,
     lessonId,
     materialId,

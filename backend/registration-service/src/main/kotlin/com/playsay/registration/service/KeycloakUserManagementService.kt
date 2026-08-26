@@ -14,6 +14,7 @@ data class KeycloakManagedIdentity(
     val displayName: String?,
     val roles: Set<String>,
     val enabled: Boolean,
+    val emailVerified: Boolean,
 )
 
 data class CreateKeycloakManagedIdentityCommand(
@@ -93,7 +94,7 @@ class KeycloakUserManagementService(
     }
 
     private fun KeycloakRegistrationUser.toManagedIdentity(): KeycloakManagedIdentity =
-        KeycloakManagedIdentity(subject, username, email, displayName, roles, enabled)
+        KeycloakManagedIdentity(subject, username, email, displayName, roles, enabled, emailVerified)
 
     private companion object {
         const val studentRole = "STUDENT"

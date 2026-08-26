@@ -114,6 +114,16 @@ for attempt in 1 2 3 4 5; do
   git config user.email "jenkins@play-and-say.ru"
   git config user.name "Play&Say Jenkins"
 
+  if [ -n "${IMAGE_REPOSITORY_OVERRIDE:-}" ]; then
+    case "$IMAGE_REPOSITORY_OVERRIDE" in
+      ghcr.io/mednov-ai/*) ;;
+      *) echo "Unexpected image repository override: $IMAGE_REPOSITORY_OVERRIDE" >&2; exit 1 ;;
+    esac
+    IMAGE_REPOSITORY_OVERRIDE="$IMAGE_REPOSITORY_OVERRIDE" yq -i \
+      '.image.repository = strenv(IMAGE_REPOSITORY_OVERRIDE)' \
+      "$CHART_VALUES_FILE"
+  fi
+
   if [ "$DEPLOY_ENVIRONMENT" = "prod" ]; then
     for app_manifest in argocd-apps/prod/root-app.yaml argocd-apps/prod/apps/*.yaml; do
       INFRA_BRANCH="$INFRA_BRANCH" yq -i '.spec.source.targetRevision = strenv(INFRA_BRANCH)' "$app_manifest"

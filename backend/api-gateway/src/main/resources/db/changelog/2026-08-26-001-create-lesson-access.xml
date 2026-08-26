@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-08-26-001-create-lesson-access" author="codex">
+        <createTable tableName="lesson_access_link">
+            <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="lesson_id" type="uuid"><constraints nullable="false" referencedTableName="lesson" referencedColumnNames="id" foreignKeyName="fk_lesson_access_link_lesson"/></column>
+            <column name="token_hash" type="varchar(64)"><constraints nullable="false" unique="true" uniqueConstraintName="uk_lesson_access_link_token"/></column>
+            <column name="revision" type="bigint"><constraints nullable="false"/></column>
+            <column name="key_version" type="int"><constraints nullable="false"/></column>
+            <column name="origin" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="created_by_subject" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="created_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="rotated_at" type="timestamp with time zone"/>
+            <column name="revoked_at" type="timestamp with time zone"/>
+        </createTable>
+        <addUniqueConstraint tableName="lesson_access_link" columnNames="lesson_id,revision" constraintName="uk_lesson_access_link_revision"/>
+        <sql dbms="postgresql">CREATE UNIQUE INDEX uk_lesson_access_link_active ON lesson_access_link (lesson_id) WHERE revoked_at IS NULL</sql>
+        <createIndex tableName="lesson_access_link" indexName="idx_lesson_access_link_active"><column name="lesson_id"/><column name="revoked_at"/></createIndex>
+
+        <createTable tableName="lesson_entry_attempt">
+            <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="lesson_id" type="uuid"><constraints nullable="false" referencedTableName="lesson" referencedColumnNames="id" foreignKeyName="fk_lesson_entry_attempt_lesson"/></column>
+            <column name="link_revision" type="bigint"><constraints nullable="false"/></column>
+            <column name="browser_secret_hash" type="varchar(64)"><constraints nullable="false"/></column>
+            <column name="target_subject" type="varchar(255)"/>
+            <column name="confirmation_method" type="varchar(32)"/>
+            <column name="state" type="varchar(32)"><constraints nullable="false"/></column>
+            <column name="lobby_label" type="varchar(120)"/>
+            <column name="remember_me" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="attempt_count" type="int" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="assertion_issued_at" type="timestamp with time zone"/>
+            <column name="expires_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="created_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="updated_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="row_version" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="lesson_entry_attempt" indexName="idx_lesson_entry_attempt_lobby"><column name="lesson_id"/><column name="state"/><column name="created_at"/></createIndex>
+        <createIndex tableName="lesson_entry_attempt" indexName="idx_lesson_entry_attempt_expiry"><column name="expires_at"/></createIndex>
+
+        <createTable tableName="lesson_email_challenge">
+            <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="attempt_id" type="uuid"><constraints nullable="false" referencedTableName="lesson_entry_attempt" referencedColumnNames="id" foreignKeyName="fk_lesson_email_challenge_attempt"/></column>
+            <column name="email_digest" type="varchar(64)"><constraints nullable="false"/></column>
+            <column name="code_hash" type="varchar(64)"><constraints nullable="false"/></column>
+            <column name="target_subject" type="varchar(255)"/>
+            <column name="attempt_count" type="int" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="expires_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="consumed_at" type="timestamp with time zone"/>
+            <column name="created_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="lesson_email_challenge" indexName="idx_lesson_email_challenge_attempt"><column name="attempt_id"/><column name="created_at"/></createIndex>
+        <createIndex tableName="lesson_email_challenge" indexName="idx_lesson_email_challenge_expiry"><column name="expires_at"/></createIndex>
+
+        <createTable tableName="lesson_admission">
+            <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="lesson_id" type="uuid"><constraints nullable="false" referencedTableName="lesson" referencedColumnNames="id" foreignKeyName="fk_lesson_admission_lesson"/></column>
+            <column name="subject" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="status" type="varchar(32)"><constraints nullable="false"/></column>
+            <column name="admission_method" type="varchar(32)"/>
+            <column name="approving_actor_subject" type="varchar(255)"/>
+            <column name="revision" type="bigint"><constraints nullable="false"/></column>
+            <column name="created_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="updated_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="row_version" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="lesson_admission" columnNames="lesson_id,subject" constraintName="uk_lesson_admission_subject"/>
+        <createIndex tableName="lesson_admission" indexName="idx_lesson_admission_status"><column name="lesson_id"/><column name="status"/></createIndex>
+
+        <createTable tableName="lesson_access_audit">
+            <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="lesson_id" type="uuid"/>
+            <column name="event_code" type="varchar(64)"><constraints nullable="false"/></column>
+            <column name="outcome" type="varchar(32)"><constraints nullable="false"/></column>
+            <column name="actor_kind" type="varchar(32)"><constraints nullable="false"/></column>
+            <column name="created_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="lesson_access_audit" indexName="idx_lesson_access_audit_time"><column name="created_at"/></createIndex>
+
+        <createTable tableName="lesson_challenge_rate_limit">
+            <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="dimension_hash" type="varchar(64)"><constraints nullable="false"/></column>
+            <column name="window_start" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="request_count" type="int"><constraints nullable="false"/></column>
+            <column name="expires_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="row_version" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="lesson_challenge_rate_limit" columnNames="dimension_hash,window_start" constraintName="uk_lesson_challenge_rate_window"/>
+        <createIndex tableName="lesson_challenge_rate_limit" indexName="idx_lesson_challenge_rate_expiry"><column name="expires_at"/></createIndex>
+    </changeSet>
+</databaseChangeLog>

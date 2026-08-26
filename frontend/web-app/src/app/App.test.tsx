@@ -12,6 +12,10 @@ vi.mock("../features/registration", () => ({
 vi.mock("../features/payments", () => ({
   PublicPaymentPage: () => <div>payment</div>,
 }));
+vi.mock("../features/lesson-access", () => ({
+  LessonAccessPage: ({ lessonId }: { lessonId: string }) => <div>lesson-access:{lessonId}</div>,
+  LessonAssertionPage: ({ lessonId }: { lessonId: string }) => <div>lesson-assertion:{lessonId}</div>,
+}));
 vi.mock("./AppShell", () => ({ AppShell: () => <div>authenticated</div> }));
 vi.mock("./useAppController", () => ({ useAppController: () => ({}) }));
 

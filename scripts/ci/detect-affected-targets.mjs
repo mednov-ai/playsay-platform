@@ -17,6 +17,7 @@ export const TARGETS = Object.freeze([
   "payment-service",
   "registration-service",
   "email-service",
+  "keycloak",
   "keyboard-service",
   "keyboard-app",
 ]);
@@ -50,6 +51,7 @@ const TARGET_JOBS = Object.freeze({
   "payment-service": "playsay-payment-service-develop",
   "registration-service": "playsay-registration-service-develop",
   "email-service": "playsay-email-service-develop",
+  "keycloak": "playsay-keycloak-develop",
   "keyboard-service": "playsay-keyboard-backend-develop",
   "keyboard-app": "playsay-keyboard-frontend-develop",
 });
@@ -65,6 +67,7 @@ const MODULE_PIPELINES = Object.freeze({
   "Jenkinsfile.payment-service": "payment-service",
   "Jenkinsfile.registration-service": "registration-service",
   "Jenkinsfile.email-service": "email-service",
+  "Jenkinsfile.keycloak": "keycloak",
   "Jenkinsfile.keyboard-backend": "keyboard-service",
   "Jenkinsfile.keyboard-frontend": "keyboard-app",
 });
@@ -291,6 +294,11 @@ export function detectTargetsForPaths(paths, options = {}) {
 
     if (path.startsWith("backend/email-service/")) {
       deployTargets.add("email-service");
+      continue;
+    }
+
+    if (path.startsWith("backend/keycloak-lesson-authenticator/")) {
+      deployTargets.add("keycloak");
       continue;
     }
 

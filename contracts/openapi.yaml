@@ -1263,9 +1263,9 @@ paths:
     post:
       tags:
       - Schedule
-      summary: Create scheduled lesson participant links
-      description: Returns per-participant lesson links. Teacher-managed students
-        receive one-time magic links. Requires TEACHER or ADMIN role.
+      summary: Get the shared scheduled lesson link
+      description: Compatibility endpoint returning the same reusable shared link
+        for every participant. Requires TEACHER or ADMIN role.
       operationId: createScheduledLessonParticipantLinks
       parameters:
       - name: lessonId
@@ -1289,6 +1289,62 @@ paths:
           description: Scheduled lesson not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/lobby/{attemptId}/deny:
+    post:
+      tags:
+      - lesson-admission-controller
+      operationId: deny
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessStatusResponse"
+  /schedule/lessons/{lessonId}/lobby/{attemptId}/approve:
+    post:
+      tags:
+      - lesson-admission-controller
+      operationId: approve
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonLobbyDecisionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessStatusResponse"
   /schedule/lessons/{lessonId}/image-page:
     post:
       tags:
@@ -1616,6 +1672,113 @@ paths:
           description: Current user cannot access the document
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/admissions/{subject}/readmit:
+    post:
+      tags:
+      - lesson-admission-controller
+      operationId: readmit
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonAdmissionActionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessStatusResponse"
+  /schedule/lessons/{lessonId}/admissions/{subject}/kick:
+    post:
+      tags:
+      - lesson-admission-controller
+      operationId: kick
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonAdmissionActionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessStatusResponse"
+  /schedule/lessons/{lessonId}/access-link/rotate:
+    post:
+      tags:
+      - lesson-access-controller
+      operationId: rotate
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessLinkResponse"
+  /schedule/lessons/{lessonId}/access-attempts/{attemptId}/remembered:
+    post:
+      tags:
+      - lesson-admission-controller
+      operationId: remembered
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Honey-Lesson-Attempt
+        in: header
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessAttemptResponse"
   /public/payment-invoices/{publicToken}/checkout:
     post:
       tags:
@@ -1634,6 +1797,144 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublicPaymentCheckoutResponse"
+  /public/lesson-access/{lessonId}/start:
+    post:
+      tags:
+      - lesson-access-controller
+      operationId: start
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Origin
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonAccessStartRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessAttemptResponse"
+  /public/lesson-access/{lessonId}/attempts/{attemptId}/lobby:
+    post:
+      tags:
+      - lesson-entry-controller
+      operationId: requestLobby
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Honey-Lesson-Attempt
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonLobbyRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessStatusResponse"
+  /public/lesson-access/{lessonId}/attempts/{attemptId}/email-code:
+    post:
+      tags:
+      - lesson-entry-controller
+      operationId: requestEmailCode
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Honey-Lesson-Attempt
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonEmailCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessStatusResponse"
+  /public/lesson-access/{lessonId}/attempts/{attemptId}/email-code/verify:
+    post:
+      tags:
+      - lesson-entry-controller
+      operationId: verifyEmailCode
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Honey-Lesson-Attempt
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonEmailCodeVerifyRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessAttemptResponse"
   /payments/admin/invoices:
     get:
       tags:
@@ -2674,7 +2975,7 @@ paths:
     post:
       tags:
       - registration-controller
-      operationId: start
+      operationId: start_1
       requestBody:
         content:
           application/json:
@@ -2692,7 +2993,7 @@ paths:
     post:
       tags:
       - registration-controller
-      operationId: start_1
+      operationId: start_2
       requestBody:
         content:
           application/json:
@@ -3277,6 +3578,58 @@ paths:
           description: Current user cannot access the lesson material
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/admissions:
+    get:
+      tags:
+      - lesson-admission-controller
+      operationId: overview
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAdmissionOverviewResponse"
+  /schedule/lessons/{lessonId}/access-link:
+    get:
+      tags:
+      - lesson-access-controller
+      operationId: getOrCreate
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessLinkResponse"
+    delete:
+      tags:
+      - lesson-access-controller
+      operationId: revoke
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
   /public/payment-invoices/{publicToken}:
     get:
       tags:
@@ -3295,6 +3648,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublicPaymentInvoiceResponse"
+  /public/lesson-access/{lessonId}/attempts/{attemptId}/status:
+    get:
+      tags:
+      - lesson-entry-controller
+      operationId: status
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Honey-Lesson-Attempt
+        in: header
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessAttemptResponse"
   /payments/admin/invoices/{invoiceId}:
     get:
       tags:
@@ -3789,6 +4172,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EmailDeliveryDetailResponse"
+  /users/me/lesson-sessions:
+    delete:
+      tags:
+      - lesson-remembered-session-controller
+      operationId: revokeAll
+      responses:
+        "200":
+          description: OK
+  /users/me/lesson-sessions/current:
+    delete:
+      tags:
+      - lesson-remembered-session-controller
+      operationId: revokeCurrent
+      responses:
+        "200":
+          description: OK
   /teacher/students/{subject}:
     delete:
       tags:
@@ -5256,6 +5655,27 @@ components:
       required:
       - lessonId
       - links
+    LessonAccessStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+      - status
+    LessonLobbyDecisionRequest:
+      type: object
+      properties:
+        studentSubject:
+          type: string
+          maxLength: 255
+          minLength: 0
+        expectedRevision:
+          type:
+          - integer
+          - "null"
+          format: int64
+      required:
+      - studentSubject
     LiveLessonImagePageResponse:
       type: object
       properties:
@@ -5722,6 +6142,72 @@ components:
       - documentKind
       - materialId
       - scope
+    LessonAdmissionActionRequest:
+      type: object
+      properties:
+        expectedRevision:
+          type:
+          - integer
+          - "null"
+          format: int64
+    LessonAccessLinkResponse:
+      type: object
+      properties:
+        lessonId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        revision:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - createdAt
+      - lessonId
+      - revision
+      - url
+    LessonAccessAttemptResponse:
+      type: object
+      properties:
+        attemptId:
+          type: string
+          format: uuid
+        attemptSecret:
+          type:
+          - string
+          - "null"
+        status:
+          type: string
+        lessonId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        opensAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        retryAfterSeconds:
+          type:
+          - integer
+          - "null"
+          format: int64
+        authorizationUrl:
+          type:
+          - string
+          - "null"
+      required:
+      - attemptId
+      - status
     PublicPaymentCheckoutResponse:
       type: object
       properties:
@@ -5729,6 +6215,52 @@ components:
           type: string
       required:
       - confirmationUrl
+    LessonAccessStartRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          maxLength: 255
+          minLength: 0
+      required:
+      - token
+    LessonLobbyRequest:
+      type: object
+      properties:
+        displayLabel:
+          type: string
+          maxLength: 120
+          minLength: 0
+      required:
+      - displayLabel
+    LessonEmailCodeRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          minLength: 0
+        locale:
+          type:
+          - string
+          - "null"
+          maxLength: 16
+          minLength: 0
+      required:
+      - email
+    LessonEmailCodeVerifyRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 12
+          minLength: 6
+        rememberMe:
+          type: boolean
+      required:
+      - code
+      - rememberMe
     PaymentInvoiceCreateRequest:
       type: object
       properties:
@@ -6957,6 +7489,65 @@ components:
           minLength: 0
       required:
       - action
+    LessonAdmissionOverviewResponse:
+      type: object
+      properties:
+        lessonId:
+          type: string
+          format: uuid
+        pendingLobby:
+          type: array
+          items:
+            $ref: "#/components/schemas/LessonLobbyEntryResponse"
+        admissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LessonAdmissionResponse"
+      required:
+      - admissions
+      - lessonId
+      - pendingLobby
+    LessonAdmissionResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        status:
+          type: string
+        revision:
+          type: integer
+          format: int64
+        admissionMethod:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - revision
+      - status
+      - subject
+      - updatedAt
+    LessonLobbyEntryResponse:
+      type: object
+      properties:
+        attemptId:
+          type: string
+          format: uuid
+        displayLabel:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - attemptId
+      - createdAt
+      - displayLabel
+      - expiresAt
     PublicPaymentInvoiceResponse:
       type: object
       properties:

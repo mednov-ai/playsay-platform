@@ -12,4 +12,5 @@
     <include file="2026-07-19-002-add-password-reset-link.xml" relativeToChangelogFile="true"/>
     <include file="2026-07-19-003-track-provider-delivery.xml" relativeToChangelogFile="true"/>
     <include file="2026-08-06-001-rebrand-email-templates.xml" relativeToChangelogFile="true"/>
+    <include file="2026-08-26-001-add-lesson-entry-code-template.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

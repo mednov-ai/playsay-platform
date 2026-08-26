@@ -64,6 +64,13 @@ export type ScheduledLessonParticipantLinks = {
   lessonId: string;
   links: ScheduledLessonParticipantLink[];
 };
+export type LessonAccessLink = {
+  lessonId: string;
+  url: string;
+  revision: number;
+  createdAt: string;
+  revokedAt?: string | null;
+};
 export type ScheduledLessonMaterialAssignmentInput = ScheduledLessonMaterialAssignmentRequest;
 export type ScheduledLessonRecurrenceInput = {
   mode: "WEEKLY_COUNT" | "WEEKLY_BY_WEEK";
@@ -95,7 +102,10 @@ export type StudentInviteWaitingResult = {
   retryAfterSeconds?: number | null;
   continueUrl?: string | null;
 };
-export type StudentInviteConsumeResult = StudentInviteAuthenticatedResult | StudentInviteWaitingResult;
+export type StudentInviteReplacedResult = {
+  status: "LESSON_LINK_REPLACED";
+};
+export type StudentInviteConsumeResult = StudentInviteAuthenticatedResult | StudentInviteWaitingResult | StudentInviteReplacedResult;
 export type LessonMaterialJson = Record<string, unknown>;
 export type LessonMaterial = {
   id: string;

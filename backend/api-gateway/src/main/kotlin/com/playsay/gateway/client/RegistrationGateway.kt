@@ -27,6 +27,10 @@ import com.playsay.gateway.dto.ResendRegistrationRequest
 import com.playsay.gateway.dto.StartRegistrationRequest
 import com.playsay.gateway.dto.StudentInviteConsumeRequest
 import com.playsay.gateway.dto.StudentInviteConsumeResponse
+import com.playsay.gateway.dto.LessonAuthAssertionRequest
+import com.playsay.gateway.dto.LessonAuthAssertionResponse
+import com.playsay.gateway.dto.LessonIdentityResolveRequest
+import com.playsay.gateway.dto.LessonIdentityResolveResponse
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData
 import java.net.URI
@@ -59,6 +63,15 @@ interface RegistrationGateway {
         throw UnsupportedOperationException("User management is not supported by this registration gateway.")
     fun deleteUser(subject: String) {
         throw UnsupportedOperationException("User management is not supported by this registration gateway.")
+    }
+    fun resolveLessonIdentity(email: String): LessonIdentityResolveResponse? = null
+    fun createLessonAuthAssertion(request: LessonAuthAssertionRequest): LessonAuthAssertionResponse =
+        throw UnsupportedOperationException("Lesson authentication is not supported by this registration gateway.")
+    fun revokeLessonSession(subject: String, sessionId: String) {
+        throw UnsupportedOperationException("Session revocation is not supported by this registration gateway.")
+    }
+    fun revokeAllLessonSessions(subject: String) {
+        throw UnsupportedOperationException("Session revocation is not supported by this registration gateway.")
     }
 }
 
@@ -183,6 +196,37 @@ class HttpRegistrationGateway(
         val path = "/api/internal/user-management/users/${subject.urlEncoded()}"
         val response = send(path, deleteMethod, null, null)
         requireExpected(path, response, HttpStatus.NO_CONTENT)
+    }
+
+    override fun resolveLessonIdentity(email: String): LessonIdentityResolveResponse? {
+        val path = "/api/internal/lesson-auth/identities/resolve"
+        val response = send(
+            path,
+            "POST",
+            objectMapper.writeValueAsString(LessonIdentityResolveRequest(email)),
+            null,
+        )
+        requireExpected(path, response, HttpStatus.OK)
+        if (response.body().isBlank()) return null
+        return parse(path, response.body(), LessonIdentityResolveResponse::class.java)
+    }
+
+    override fun createLessonAuthAssertion(request: LessonAuthAssertionRequest): LessonAuthAssertionResponse =
+        postJson(
+            "/api/internal/lesson-auth/assertions",
+            request,
+            HttpStatus.CREATED,
+            LessonAuthAssertionResponse::class.java,
+        )
+
+    override fun revokeLessonSession(subject: String, sessionId: String) {
+        val path = "/api/internal/lesson-auth/users/${subject.urlEncoded()}/sessions/${sessionId.urlEncoded()}"
+        requireExpected(path, send(path, deleteMethod, null, null), HttpStatus.NO_CONTENT)
+    }
+
+    override fun revokeAllLessonSessions(subject: String) {
+        val path = "/api/internal/lesson-auth/users/${subject.urlEncoded()}/sessions"
+        requireExpected(path, send(path, deleteMethod, null, null), HttpStatus.NO_CONTENT)
     }
 
     private fun <T : Any> postJson(

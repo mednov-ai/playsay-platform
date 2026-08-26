@@ -7,6 +7,7 @@ import {
   buildLogoutUrl,
   clearTokens,
   completeLogin,
+  consumeCompletedLoginReturnPath,
   consumeSkipSilentLogin,
   fetchAdminUserProfiles,
   fetchMaterials,
@@ -97,8 +98,9 @@ export function useAppController(): AppShellProps {
         const currentUrl = new URL(window.location.href);
         if (isAuthCallback(currentUrl)) {
           await completeLogin(currentUrl);
-          window.history.replaceState({}, document.title, "/");
-          setCurrentPath("/");
+          const returnPath = consumeCompletedLoginReturnPath() ?? "/";
+          window.history.replaceState({}, document.title, returnPath);
+          setCurrentPath(returnPath);
         }
 
         if (!readTokens()) {
@@ -165,8 +167,9 @@ export function useAppController(): AppShellProps {
         }
       } catch (caught) {
         if (isSilentLoginUnavailable(caught)) {
-          window.history.replaceState({}, document.title, "/");
-          setCurrentPath("/");
+          const returnPath = consumeCompletedLoginReturnPath() ?? "/";
+          window.history.replaceState({}, document.title, returnPath);
+          setCurrentPath(returnPath);
           if (!cancelled) {
             setStatus("anonymous");
           }

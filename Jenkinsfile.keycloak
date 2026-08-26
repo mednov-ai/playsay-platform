@@ -1,0 +1,204 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  activeDeadlineSeconds: 2400
+  securityContext:
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+  containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
+      resources:
+        requests: { cpu: 50m, memory: 128Mi }
+        limits: { cpu: 300m, memory: 384Mi }
+    - name: gradle
+      image: gradle:8-jdk21
+      command: ["cat"]
+      tty: true
+      env:
+        - name: JAVA_TOOL_OPTIONS
+          value: "-XX:ActiveProcessorCount=1"
+      volumeMounts:
+        - name: jenkins-agent-cache
+          mountPath: /home/gradle/.gradle
+          subPath: gradle-keycloak-lesson-authenticator
+      resources:
+        requests: { cpu: 250m, memory: 512Mi }
+        limits: { cpu: "1", memory: 1536Mi }
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:debug
+      command: ["/busybox/cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests: { cpu: 250m, memory: 512Mi }
+        limits: { cpu: "1", memory: 2Gi }
+    - name: tools
+      image: alpine:3.20
+      command: ["cat"]
+      tty: true
+      resources:
+        requests: { cpu: 25m, memory: 32Mi }
+        limits: { cpu: 200m, memory: 128Mi }
+  volumes:
+    - name: kaniko-docker-config
+      emptyDir: {}
+    - name: jenkins-agent-cache
+      persistentVolumeClaim:
+        claimName: jenkins-agent-cache
+"""
+    }
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timestamps()
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  parameters {
+    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build; dev branches deploy to dev and numeric release branches prepare production.', trim: true)
+    string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
+    string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
+    string(name: 'ARGOCD_REFRESH_MODE', defaultValue: 'webhook', description: 'ArgoCD refresh mode: webhook or annotate.', trim: true)
+  }
+
+  environment {
+    PLAYSAY_DEDICATED_CI = 'true'
+    KUBECONFIG = credentials('dev-kubeconfig')
+    GITHUB_OWNER = 'mednov-ai'
+    KEYCLOAK_IMAGE_NAME = 'playsay-keycloak'
+    PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
+    INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script {
+          def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
+          def requestedCommit = params.GITHUB_AFTER?.trim()
+          checkout([
+            $class: 'GitSCM',
+            branches: [[name: "*/${requestedBranch}"]],
+            doGenerateSubmoduleConfigurations: false,
+            extensions: [],
+            submoduleCfg: [],
+            userRemoteConfigs: [[url: env.PLATFORM_REPO]]
+          ])
+          if (requestedCommit) {
+            sh "git fetch --no-tags origin +refs/heads/${requestedBranch}:refs/remotes/origin/${requestedBranch}"
+            sh "git checkout --detach ${requestedCommit}"
+          }
+          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
+          env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
+
+          def buildPrefix = env.CI_BRANCH == 'develop' ? 'keycloak-dev' : "keycloak-${env.CI_BRANCH}"
+          buildPrefix = buildPrefix.replaceAll(/[^A-Za-z0-9_.-]/, '-')
+          buildPrefix = buildPrefix.replaceAll(/^[^A-Za-z0-9]+/, '').replaceAll(/[^A-Za-z0-9]+$/, '')
+          int maxPrefixLength = 63 - env.BUILD_NUMBER.length() - 1
+          if (buildPrefix.length() > maxPrefixLength) {
+            buildPrefix = buildPrefix.take(maxPrefixLength).replaceAll(/[^A-Za-z0-9]+$/, '')
+          }
+          env.BUILD_LABEL_PREFIX = buildPrefix ?: 'keycloak'
+          env.BUILD_LABEL = "${env.BUILD_LABEL_PREFIX}-${env.BUILD_NUMBER}"
+          env.DEPLOY_TO_PROD = (env.CI_BRANCH ==~ /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/).toString()
+          if (env.CI_BRANCH.startsWith('release/') && env.DEPLOY_TO_PROD != 'true') {
+            error 'Production release branches must match release/NN.NNN.NN.'
+          }
+          env.DEPLOY_TO_DEV = (
+            env.CI_BRANCH == 'develop' ||
+            env.CI_BRANCH.startsWith('codex/') ||
+            env.CI_BRANCH.startsWith('feature/') ||
+            env.CI_BRANCH.startsWith('hotfix/')
+          ).toString()
+          env.DEPLOY_IMAGE = (env.DEPLOY_TO_DEV == 'true' || env.DEPLOY_TO_PROD == 'true').toString()
+          env.DEPLOY_ENVIRONMENT = env.DEPLOY_TO_PROD == 'true' ? 'prod' : (env.DEPLOY_TO_DEV == 'true' ? 'dev' : 'none')
+          env.INFRA_BRANCH = env.DEPLOY_TO_PROD == 'true' ? env.CI_BRANCH : 'develop'
+
+          currentBuild.displayName = env.BUILD_LABEL
+          currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
+        }
+      }
+    }
+
+    stage('Provider tests') {
+      steps {
+        container('gradle') {
+          dir('backend') {
+            sh 'gradle :keycloak-lesson-authenticator:clean :keycloak-lesson-authenticator:test :keycloak-lesson-authenticator:jar --no-daemon --stacktrace --max-workers=1'
+          }
+        }
+      }
+    }
+
+    stage('Build and push image') {
+      when { expression { env.DEPLOY_IMAGE == 'true' } }
+      steps {
+        container('kaniko') {
+          withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+            sh '''
+              set -eu
+              mkdir -p /kaniko/.docker
+              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\n')"
+              cat > /kaniko/.docker/config.json <<EOF
+{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
+EOF
+              KANIKO_CONTEXT="$WORKSPACE/backend/keycloak-lesson-authenticator" \
+                KANIKO_DOCKERFILE="$WORKSPACE/backend/keycloak-lesson-authenticator/Dockerfile" \
+                IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYCLOAK_IMAGE_NAME}" \
+                /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Tag source commit') {
+      when { expression { env.DEPLOY_IMAGE == 'true' } }
+      steps {
+        container('tools') {
+          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+            sh 'apk add --no-cache git && ./scripts/ci/tag-source-commit.sh'
+          }
+        }
+      }
+    }
+
+    stage('Update environment image reference') {
+      when { expression { env.DEPLOY_IMAGE == 'true' } }
+      steps {
+        container('tools') {
+          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+            sh 'apk add --no-cache git yq && ./scripts/ci/assert-current-branch-head.sh && CHART_NAME=keycloak IMAGE_REPOSITORY_OVERRIDE=ghcr.io/mednov-ai/playsay-keycloak ./scripts/ci/update-routed-image-reference.sh'
+          }
+        }
+      }
+    }
+
+    stage('Wait for rollout') {
+      when { expression { env.DEPLOY_TO_DEV == 'true' } }
+      steps {
+        container('tools') {
+          sh 'apk add --no-cache jq kubectl && APP=keycloak ./scripts/ci/wait-for-argocd-rollout.sh'
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
+    }
+  }
+}

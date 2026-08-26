@@ -49,6 +49,11 @@ test("module source changes trigger only their deploy target", () => {
     ["playsay-registration-service-develop"],
   );
   assertDetection(
+    ["backend/keycloak-lesson-authenticator/src/main/java/com/playsay/keycloak/LessonAuthenticator.java"],
+    ["keycloak"],
+    ["playsay-keycloak-develop"],
+  );
+  assertDetection(
     ["collaboration-service/src/server.ts"],
     ["collaboration-service"],
     ["playsay-collaboration-service-develop"],
@@ -80,6 +85,11 @@ test("module Jenkinsfiles trigger only the corresponding module", () => {
     ["Jenkinsfile.worksheet-import-service"],
     ["worksheet-import-service"],
     ["playsay-worksheet-import-service-develop"],
+  );
+  assertDetection(
+    ["Jenkinsfile.keycloak"],
+    ["keycloak"],
+    ["playsay-keycloak-develop"],
   );
 });
 

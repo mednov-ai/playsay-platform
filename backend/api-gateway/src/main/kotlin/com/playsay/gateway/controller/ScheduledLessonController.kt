@@ -223,8 +223,8 @@ class ScheduledLessonController(
     @PostMapping("/schedule/lessons/{lessonId}/participant-links", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
         operationId = "createScheduledLessonParticipantLinks",
-        summary = "Create scheduled lesson participant links",
-        description = "Returns per-participant lesson links. Teacher-managed students receive one-time magic links. Requires TEACHER or ADMIN role.",
+        summary = "Get the shared scheduled lesson link",
+        description = "Compatibility endpoint returning the same reusable shared link for every participant. Requires TEACHER or ADMIN role.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(

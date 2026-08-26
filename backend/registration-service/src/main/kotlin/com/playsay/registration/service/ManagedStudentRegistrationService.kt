@@ -19,7 +19,6 @@ class ManagedStudentRegistrationService(
     private val rateLimiter: InMemoryRegistrationRateLimiter,
     private val clock: Clock,
     @param:Value("\${playsay.registration.managed-student-invite-retention-days:30}") private val inviteRetentionDays: Long,
-    @param:Value("\${playsay.registration.keycloak.student-token-client-id:playsay-web}") private val studentTokenClientId: String,
 ) {
     private val returnToPolicy = ReturnToUrlPolicy()
 
@@ -131,37 +130,6 @@ class ManagedStudentRegistrationService(
         )
     }
 
-    @Transactional
-    fun consumeManagedStudentInvite(token: String, remoteAddress: String? = null): ConsumeStudentInviteResult {
-        val invite = resolvePendingInvite(token, remoteAddress, lockForUpdate = true)
-        val now = Instant.now(clock)
-
-        if (invite.createdAt.plusSeconds(inviteRetentionDays.coerceAtLeast(1) * secondsPerDay).isBefore(now)) {
-            invite.status = managedInviteStatusExpired
-            invite.updatedAt = now
-            managedStudentInviteRepo.saveAndFlush(invite)
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Student invite token expired.")
-        }
-
-        val password = newManagedStudentPassword()
-        keycloak.enableVerifiedUser(invite.usernameNormalized)
-        keycloak.assignRealmRole(invite.usernameNormalized, studentRole)
-        keycloak.updatePassword(invite.usernameNormalized, password)
-        val tokens = keycloak.passwordGrant(invite.usernameNormalized, password, studentTokenClientId)
-
-        invite.status = managedInviteStatusConsumed
-        invite.consumedAt = now
-        invite.updatedAt = now
-        managedStudentInviteRepo.saveAndFlush(invite)
-        return ConsumeStudentInviteResult(
-            accessToken = tokens.accessToken,
-            refreshToken = tokens.refreshToken,
-            idToken = tokens.idToken,
-            expiresIn = tokens.expiresIn,
-            continueUrl = invite.continueUrl,
-        )
-    }
-
     private fun resolvePendingInvite(
         token: String,
         remoteAddress: String?,
@@ -229,8 +197,6 @@ class ManagedStudentRegistrationService(
 
     private companion object {
         const val managedInviteStatusPending = "PENDING"
-        const val managedInviteStatusConsumed = "CONSUMED"
-        const val managedInviteStatusExpired = "EXPIRED"
         const val studentRole = "STUDENT"
         const val studentInviteCodeGenerationAttempts = 10
         const val secondsPerDay: Long = 24 * 60 * 60

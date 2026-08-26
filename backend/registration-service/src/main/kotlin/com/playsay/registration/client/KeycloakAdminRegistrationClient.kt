@@ -159,6 +159,38 @@ class KeycloakAdminRegistrationClient(
         )
     }
 
+    override fun revokeSession(subject: String, sessionId: String) {
+        val sessionsResponse = sendAdmin(
+            path = "/admin/realms/$realm/users/${subject.urlEncoded()}/sessions",
+            method = "GET",
+        )
+        if (sessionsResponse.statusCode() == 404) return
+        require(sessionsResponse.statusCode() in 200..299) {
+            "Keycloak session lookup failed with HTTP ${sessionsResponse.statusCode()}"
+        }
+        val ownsSession = objectMapper.readTree(sessionsResponse.body()).any { session ->
+            session.get("id")?.asText() == sessionId
+        }
+        if (!ownsSession) return
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/sessions/${sessionId.urlEncoded()}",
+            method = "DELETE",
+        )
+        require(response.statusCode() in 200..299 || response.statusCode() == 404) {
+            "Keycloak session revocation failed with HTTP ${response.statusCode()}"
+        }
+    }
+
+    override fun revokeAllSessions(subject: String) {
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/users/${subject.urlEncoded()}/logout",
+            method = "POST",
+        )
+        require(response.statusCode() in 200..299 || response.statusCode() == 404) {
+            "Keycloak session revocation failed with HTTP ${response.statusCode()}"
+        }
+    }
+
     private fun userIdByUsername(username: String): String {
         return userByUsername(username)?.get("id")?.asText()
             ?: error("Keycloak user not found for registration username.")
@@ -171,7 +203,7 @@ class KeycloakAdminRegistrationClient(
         )
         require(response.statusCode() in 200..299) { "Keycloak user lookup failed with HTTP ${response.statusCode()}" }
         val users = objectMapper.readTree(response.body())
-        return users.firstOrNull()
+        return users.takeIf { it.isArray && it.size() == 1 }?.first()
     }
 
     private fun userByEmail(email: String): JsonNode? {
@@ -181,7 +213,7 @@ class KeycloakAdminRegistrationClient(
         )
         require(response.statusCode() in 200..299) { "Keycloak user lookup failed with HTTP ${response.statusCode()}" }
         val users = objectMapper.readTree(response.body())
-        return users.firstOrNull()
+        return users.takeIf { it.isArray && it.size() == 1 }?.first()
     }
 
     private fun realmRoles(subject: String): Set<String> =

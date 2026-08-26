@@ -28,6 +28,7 @@ class ScheduledLessonStore(
     private val lessonReminderService: LessonReminderService,
     private val lessonEmailReminderRepo: LessonEmailReminderRepo,
     private val participantLinkService: ScheduledLessonParticipantLinkService,
+    private val lessonAccessLinkService: LessonAccessLinkService,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional(readOnly = true)
@@ -263,7 +264,8 @@ class ScheduledLessonStore(
         requireLessonManagement(authentication, lessonId)
         val lesson = find(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        return participantLinkService.createLinks(lesson, participantsFor(listOf(lessonId)))
+        val sharedLink = lessonAccessLinkService.getOrCreate(authentication, lessonId)
+        return participantLinkService.createLinks(lesson, participantsFor(listOf(lessonId)), sharedLink.url)
     }
 
     private fun findVisible(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonRow? {

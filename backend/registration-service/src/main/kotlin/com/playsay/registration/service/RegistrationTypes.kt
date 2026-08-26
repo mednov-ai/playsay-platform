@@ -104,14 +104,6 @@ data class ManagedStudentInviteLookupResult(
     val expiresAt: java.time.Instant,
 )
 
-data class ConsumeStudentInviteResult(
-    val accessToken: String,
-    val refreshToken: String?,
-    val idToken: String?,
-    val expiresIn: Long,
-    val continueUrl: String,
-)
-
 data class KeycloakTokenSet(
     val accessToken: String,
     val refreshToken: String?,
@@ -146,6 +138,13 @@ interface KeycloakRegistrationClient {
 
     fun sendRequiredActionsEmail(subject: String, actions: List<String>) {
         error("Required actions email is not supported by this Keycloak client.")
+    }
+    fun revokeSession(subject: String, sessionId: String) {
+        error("Session revocation is not supported by this Keycloak client.")
+    }
+
+    fun revokeAllSessions(subject: String) {
+        error("Session revocation is not supported by this Keycloak client.")
     }
 }
 

@@ -18,6 +18,7 @@ class ScheduledLessonAuthorizationService(
     @Transactional(readOnly = true)
     fun canManageLesson(authentication: JwtAuthenticationToken, lessonId: UUID): Boolean {
         if (authentication.authorities.any { it.authority == MetaData.Authorities.ADMIN }) return true
+        if (authentication.authorities.none { it.authority == MetaData.Authorities.TEACHER }) return false
         val actorId = userProfileStore.currentUserId(authentication)
         val lesson = lessonRepo.findById(lessonId).orElse(null) ?: return false
         if (lesson.teacherUserId == actorId) return true
@@ -28,6 +29,7 @@ class ScheduledLessonAuthorizationService(
     @Transactional(readOnly = true)
     fun canManageStudents(authentication: JwtAuthenticationToken, studentUserIds: Collection<UUID>): Boolean {
         if (authentication.authorities.any { it.authority == MetaData.Authorities.ADMIN }) return true
+        if (authentication.authorities.none { it.authority == MetaData.Authorities.TEACHER }) return false
         return studentAccessPolicy.canAccessEveryStudent(
             userProfileStore.currentUserId(authentication),
             studentUserIds,

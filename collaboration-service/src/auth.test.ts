@@ -22,6 +22,7 @@ describe("verifyCollaborationToken", () => {
     });
 
     expect(claims.documentId).toBe("11111111-1111-4111-8111-111111111111");
+    expect(claims.subject).toBe("student-1");
     expect(collaborationRoomName(claims)).toBe(claims.yjsDocumentId);
   });
 

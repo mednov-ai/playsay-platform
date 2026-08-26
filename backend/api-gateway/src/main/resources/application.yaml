@@ -2,6 +2,7 @@ server:
   port: 8080
   tomcat:
     max-part-count: ${PLAYSAY_WORKSHEET_GATEWAY_MULTIPART_MAX_PART_COUNT:101}
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -54,6 +55,14 @@ playsay:
     request-timeout: ${PLAYSAY_WORKSHEET_GATEWAY_REQUEST_TIMEOUT:PT2M}
     max-file-bytes: ${PLAYSAY_WORKSHEET_GATEWAY_MAX_FILE_BYTES:67108864}
     max-request-bytes: ${PLAYSAY_WORKSHEET_GATEWAY_MAX_REQUEST_BYTES:134217728}
+  lesson-access:
+    enabled: ${PLAYSAY_LESSON_ACCESS_ENABLED:false}
+    hmac-secret-base64: ${PLAYSAY_LESSON_ACCESS_HMAC_SECRET_BASE64:}
+    hmac-key-version: ${PLAYSAY_LESSON_ACCESS_HMAC_KEY_VERSION:1}
+    environment-issuer: ${PLAYSAY_AUTH_ISSUER_URI:https://ops.play-and-say.ru:18443/keycloak/realms/playsay}
+    attempt-ttl-seconds: ${PLAYSAY_LESSON_ACCESS_ATTEMPT_TTL_SECONDS:900}
+    oidc-client-id: ${PLAYSAY_WEB_OIDC_CLIENT_ID:playsay-web}
+    oidc-callback: ${PLAYSAY_WEB_OIDC_CALLBACK:${PLAYSAY_PUBLIC_APP_URL:https://online.honey.school}/auth/callback}
   websocket:
     allowed-origin-patterns: "${PLAYSAY_WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:[*],http://127.0.0.1:[*]}"
   ai:
@@ -83,6 +92,7 @@ playsay:
     base-url: ${PLAYSAY_LESSON_TRANSLATION_BASE_URL:${OPENAI_BASE_URL:https://api.openai.com/v1}}
   collaboration:
     websocket-url: ${PLAYSAY_COLLABORATION_WEBSOCKET_URL:wss://online.honey.school/collab/ws}
+    http-base-url: ${PLAYSAY_COLLABORATION_HTTP_BASE_URL:http://collaboration-service.playsay-dev.svc.cluster.local}
     token-secret: ${PLAYSAY_COLLABORATION_TOKEN_SECRET:}
     service-token: ${PLAYSAY_COLLABORATION_SERVICE_TOKEN:}
     token-ttl-seconds: ${PLAYSAY_COLLABORATION_TOKEN_TTL_SECONDS:900}

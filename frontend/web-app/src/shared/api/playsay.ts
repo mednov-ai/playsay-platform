@@ -11,3 +11,4 @@ export * from "./collaboration";
 export * from "./payments";
 export * from "./registration";
 export * from "./vocabulary";
+export * from "./lessonAccess";

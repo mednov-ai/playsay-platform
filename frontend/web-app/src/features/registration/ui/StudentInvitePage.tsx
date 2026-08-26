@@ -61,6 +61,11 @@ export function StudentInvitePage() {
           }, retryDelay);
           return;
         }
+        if (result.status === "LESSON_LINK_REPLACED") {
+          setStatus("error");
+          setMessage(t("registration.studentInvite.replaced"));
+          return;
+        }
         storeTokens({
           accessToken: result.accessToken,
           refreshToken: result.refreshToken ?? undefined,

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "./AppShell";
 import { useAppController } from "./useAppController";
-import { isStudentInvitePath, paymentTokenFromPath, registrationRouteFromPath, subscribeToPathnameHistory } from "./routes";
+import { isStudentInvitePath, lessonAccessRouteFromPath, paymentTokenFromPath, registrationRouteFromPath, subscribeToPathnameHistory } from "./routes";
 import { PublicPaymentPage } from "../features/payments";
 import { RegistrationPage, StudentInvitePage } from "../features/registration";
+import { LessonAccessPage, LessonAssertionPage } from "../features/lesson-access";
 
 export function App() {
   const [publicLocation, setPublicLocation] = useState(() => currentPublicLocation());
@@ -16,6 +17,12 @@ export function App() {
   const publicPaymentToken = paymentTokenFromPath(pathname);
   if (publicPaymentToken) {
     return <PublicPaymentPage publicToken={publicPaymentToken} />;
+  }
+  const lessonAccessRoute = lessonAccessRouteFromPath(pathname);
+  if (lessonAccessRoute) {
+    return lessonAccessRoute.auth
+      ? <LessonAssertionPage lessonId={lessonAccessRoute.lessonId} />
+      : <LessonAccessPage lessonId={lessonAccessRoute.lessonId} />;
   }
   const registrationRoute = registrationRouteFromPath(pathname);
   if (registrationRoute) {

@@ -8,13 +8,13 @@ import type { ScheduledLesson } from "../../shared/api/playsay";
 import { useScheduleActions } from "./useScheduleActions";
 
 const apiMocks = vi.hoisted(() => ({
-  createScheduledLessonParticipantLinks: vi.fn(),
+  fetchLessonAccessLink: vi.fn(),
   enterScheduledLessonRoom: vi.fn(),
 }));
 
 vi.mock("../../shared/api/playsay", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/api/playsay")>()),
-  createScheduledLessonParticipantLinks: apiMocks.createScheduledLessonParticipantLinks,
+  fetchLessonAccessLink: apiMocks.fetchLessonAccessLink,
   enterScheduledLessonRoom: apiMocks.enterScheduledLessonRoom,
 }));
 
@@ -27,7 +27,7 @@ const originalClipboard = navigator.clipboard;
 describe("useScheduleActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    apiMocks.createScheduledLessonParticipantLinks.mockResolvedValue({ links: [] });
+    apiMocks.fetchLessonAccessLink.mockResolvedValue({ lessonId: "lesson-1", url: "https://online.honey.school/lesson-access/lesson-1#token", revision: 1, createdAt: "2026-08-26T10:00:00Z" });
     apiMocks.enterScheduledLessonRoom.mockResolvedValue({
       expiresAt: "2026-07-17T12:00:00Z",
       identity: "student-demo",
@@ -70,9 +70,9 @@ describe("useScheduleActions", () => {
     }));
   });
 
-  it("starts copying participant links while the click still has clipboard permission", async () => {
-    let resolveLinks: ((value: { links: Array<{ mode: "AUTHENTICATED"; subject: string; url: string }> }) => void) | undefined;
-    apiMocks.createScheduledLessonParticipantLinks.mockImplementation(() => new Promise((resolve) => {
+  it("starts copying the shared lesson link while the click still has clipboard permission", async () => {
+    let resolveLinks: ((value: { lessonId: string; url: string; revision: number; createdAt: string }) => void) | undefined;
+    apiMocks.fetchLessonAccessLink.mockImplementation(() => new Promise((resolve) => {
       resolveLinks = resolve;
     }));
 
@@ -108,14 +108,13 @@ describe("useScheduleActions", () => {
     expect(write).toHaveBeenCalledOnce();
     expect(resolveLinks).toBeTypeOf("function");
 
-    resolveLinks?.({
-      links: [{ mode: "AUTHENTICATED", subject: "student-demo", url: "https://online.honey.school/join#lesson-1" }],
-    });
+    resolveLinks?.({ lessonId: "lesson-1", url: "https://online.honey.school/lesson-access/lesson-1#token", revision: 1, createdAt: "2026-08-26T10:00:00Z" });
     await act(async () => {
       await expect(copied).resolves.toBe(true);
     });
 
-    expect(copiedText).toBe("https://online.honey.school/join#lesson-1");
+    expect(copiedText).toBe("https://online.honey.school/lesson-access/lesson-1#token");
+    expect(apiMocks.fetchLessonAccessLink).toHaveBeenCalledWith("lesson-1");
     expect(writeText).not.toHaveBeenCalled();
     expect(input.props.setScheduleMessage).toHaveBeenLastCalledWith("schedule.messages.linksCopied");
   });

@@ -3,6 +3,7 @@ package com.playsay.gateway.realtime
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.playsay.gateway.service.ScheduledLessonStore
+import com.playsay.gateway.service.LessonAdmissionGuard
 import com.playsay.gateway.utils.MetaData
 import java.util.UUID
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -18,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException
 class LessonRealtimeWebSocketHandler(
     private val store: ScheduledLessonStore,
     private val hub: LessonRealtimeHub,
+    private val admissionGuard: LessonAdmissionGuard,
     private val objectMapper: ObjectMapper,
 ) : TextWebSocketHandler(), SubProtocolCapable {
     override fun getSubProtocols(): List<String> = listOf(PLAY_SAY_WEBSOCKET_PROTOCOL)
@@ -78,6 +80,10 @@ class LessonRealtimeWebSocketHandler(
         }
 
         try {
+            if (admissionGuard.isKicked(lessonId, authentication)) {
+                hub.sendError(session, "Lesson is not available.")
+                return
+            }
             val lesson = store.get(authentication, lessonId)
             hub.subscribe(session, lesson)
             hub.sendLessonSnapshot(session, lesson)
@@ -100,6 +106,10 @@ class LessonRealtimeWebSocketHandler(
         }
 
         try {
+            if (admissionGuard.isKicked(validLessonId, authentication)) {
+                hub.sendError(session, "Lesson is not available.")
+                return
+            }
             val lesson = store.get(authentication, validLessonId)
             if (!authentication.lessonRealtimePrincipal().canReportPresence(lesson)) {
                 hub.sendError(session, "Lesson presence is not available.")

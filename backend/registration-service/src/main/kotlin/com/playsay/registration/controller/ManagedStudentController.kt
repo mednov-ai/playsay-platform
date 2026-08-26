@@ -6,7 +6,7 @@ import com.playsay.contract.registration.model.ManagedStudentInviteResponse
 import com.playsay.contract.registration.model.ManagedStudentRequest
 import com.playsay.contract.registration.model.ManagedStudentResponse
 import com.playsay.contract.registration.model.StudentInviteConsumeRequest
-import com.playsay.contract.registration.model.StudentInviteConsumeResponse
+import com.playsay.registration.dto.RegistrationResponse
 import com.playsay.registration.service.ManagedStudentCommand
 import com.playsay.registration.service.ManagedStudentInviteCommand
 import com.playsay.registration.service.ManagedStudentRegistrationService
@@ -99,20 +99,9 @@ class ManagedStudentController(
         consumes = [MediaType.APPLICATION_JSON_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE],
     )
+    @ResponseStatus(HttpStatus.GONE)
     fun consumeStudentInvite(
         @Valid @RequestBody request: StudentInviteConsumeRequest,
-        servletRequest: HttpServletRequest,
-    ): StudentInviteConsumeResponse {
-        val result = registrationService.consumeManagedStudentInvite(
-            request.token,
-            clientIpResolver.resolve(servletRequest),
-        )
-        return StudentInviteConsumeResponse(
-            accessToken = result.accessToken,
-            refreshToken = result.refreshToken,
-            idToken = result.idToken,
-            expiresIn = result.expiresIn,
-            continueUrl = result.continueUrl,
-        )
-    }
+        @Suppress("UNUSED_PARAMETER") servletRequest: HttpServletRequest,
+    ): RegistrationResponse = RegistrationResponse(status = "LESSON_LINK_REPLACED")
 }

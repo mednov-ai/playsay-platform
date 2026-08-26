@@ -80,6 +80,7 @@ class CollaborationDocumentService(
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val userProfileStore: UserProfileStore,
     private val lessonAuthorizationService: ScheduledLessonAuthorizationService,
+    private val admissionGuard: LessonAdmissionGuard,
     private val tokenService: CollaborationTokenService,
     private val objectMapper: ObjectMapper,
 ) {
@@ -191,6 +192,9 @@ class CollaborationDocumentService(
         lessonId: UUID,
         materialId: UUID,
     ): ScheduledMaterialLookupRow {
+        if (admissionGuard.isKicked(lessonId, authentication)) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
+        }
         if (authentication.canManageCollaboration()) {
             if (!lessonAuthorizationService.canManageLesson(authentication, lessonId)) {
                 throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)

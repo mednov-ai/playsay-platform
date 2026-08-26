@@ -7,7 +7,7 @@ import {
 import { participantAssignmentsFromLesson } from "../../entities/schedule/model";
 import {
   createManagedStudentProfile,
-  createScheduledLessonParticipantLinks,
+  fetchLessonAccessLink,
   editScheduledLesson,
   completeScheduledLesson as completeScheduledLessonRequest,
   enterScheduledLessonRoom,
@@ -23,7 +23,6 @@ import {
   type ScheduledLesson,
   type ScheduledLessonInput,
   type ScheduledLessonScheduleInput,
-  type ScheduledLessonParticipantLink,
 } from "../../shared/api/playsay";
 import { useAppTranslation } from "../../shared/i18n";
 import type { SessionErrorHandler } from "./types";
@@ -137,8 +136,7 @@ export function useScheduleActions({
   async function copyScheduledLessonLinks(lesson: ScheduledLesson): Promise<boolean> {
     setScheduleMessage(null);
     try {
-      const text = createScheduledLessonParticipantLinks(lesson.id)
-        .then((links) => formatLessonLinks(lesson, links.links));
+      const text = fetchLessonAccessLink(lesson.id).then((link) => link.url);
       await copyText(text, t("schedule.messages.linksPromptTitle"));
       setScheduleMessage(t("schedule.messages.linksCopied"));
       return true;
@@ -358,20 +356,6 @@ function upsertUserProfile(users: AdminUserProfile[], user: AdminUserProfile): A
   return nextUsers.sort((left, right) => userLabel(left).localeCompare(userLabel(right)));
 }
 
-function formatLessonLinks(lesson: ScheduledLesson, links: ScheduledLessonParticipantLink[]): string {
-  if (links.length === 0) {
-    return new URL(classroomPath(lesson.id), window.location.origin).toString();
-  }
-
-  if (links.length === 1) {
-    return links[0].url;
-  }
-
-  return links
-    .map((link) => `${link.displayName ?? link.email ?? link.subject}: ${link.url}`)
-    .join("\n");
-}
-
 async function copyText(text: Promise<string>, promptTitle: string): Promise<void> {
   if (typeof ClipboardItem === "function" && typeof navigator.clipboard?.write === "function") {
     try {
@@ -391,7 +375,6 @@ async function copyText(text: Promise<string>, promptTitle: string): Promise<voi
     window.prompt(promptTitle, value);
   }
 }
-
 function userLabel(user: AdminUserProfile): string {
   return user.displayName ?? user.name ?? user.username ?? user.email ?? user.subject;
 }

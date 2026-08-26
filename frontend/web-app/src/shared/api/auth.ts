@@ -27,6 +27,7 @@ type LoginFlow = {
   state: string;
   redirectUri: string;
   silent?: boolean;
+  returnPath?: string;
 };
 
 type CompletedLoginFlow = {
@@ -62,6 +63,7 @@ export const authConfig: AuthConfig = {
 const tokenStorageKey = "playsay.auth.tokens";
 const flowStorageKey = "playsay.auth.loginFlow";
 const completedFlowStorageKey = "playsay.auth.completedLoginFlow";
+const completedLoginReturnPathStorageKey = "playsay.auth.completedLoginReturnPath";
 const skipSilentLoginStorageKey = "playsay.auth.skipSilentLoginOnce";
 const themeStorageKey = "playsay.theme";
 const expirySkewMs = 30_000;
@@ -100,6 +102,7 @@ export function clearTokens(): void {
   window.sessionStorage.removeItem(tokenStorageKey);
   window.sessionStorage.removeItem(flowStorageKey);
   window.sessionStorage.removeItem(completedFlowStorageKey);
+  window.sessionStorage.removeItem(completedLoginReturnPathStorageKey);
 }
 
 export function storeTokens(tokens: TokenSet): void {
@@ -128,12 +131,36 @@ export async function startLogin(config = authConfig): Promise<void> {
   );
 }
 
-export async function startSilentLogin(config = authConfig): Promise<void> {
+export async function startLessonAssertionLogin(
+  assertion: string,
+  returnPath: string,
+  config = authConfig,
+): Promise<void> {
   const redirectUri = getRedirectUri(config);
   const codeVerifier = createCodeVerifier();
   const codeChallenge = await createCodeChallenge(codeVerifier);
   const state = createCodeVerifier();
-  const flow: LoginFlow = { codeVerifier, state, redirectUri, silent: true };
+  const language = currentApiLanguage();
+  const flow: LoginFlow = { codeVerifier, state, redirectUri, returnPath: safeReturnPath(returnPath) };
+  rememberPendingLoginLanguage(language);
+  window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
+  window.location.assign(buildAuthorizeUrl({
+    config,
+    redirectUri,
+    state,
+    codeChallenge,
+    lessonAssertion: assertion,
+    themeMode: readStoredThemeMode(),
+    uiLocales: language,
+  }).toString());
+}
+
+export async function startSilentLogin(config = authConfig, returnPath?: string): Promise<void> {
+  const redirectUri = getRedirectUri(config);
+  const codeVerifier = createCodeVerifier();
+  const codeChallenge = await createCodeChallenge(codeVerifier);
+  const state = createCodeVerifier();
+  const flow: LoginFlow = { codeVerifier, state, redirectUri, silent: true, returnPath: safeReturnPath(returnPath) };
 
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
   window.location.assign(
@@ -155,6 +182,9 @@ export async function completeLogin(url: URL, config = authConfig): Promise<Toke
     const state = url.searchParams.get("state");
     const flow = readLoginFlow();
     if (flow?.silent && state === flow.state && isKeycloakSilentLoginError(error)) {
+      if (flow.returnPath) {
+        window.sessionStorage.setItem(completedLoginReturnPathStorageKey, safeReturnPath(flow.returnPath));
+      }
       window.sessionStorage.removeItem(flowStorageKey);
       throw new SilentLoginUnavailableError(url.searchParams.get("error_description") ?? error);
     }
@@ -190,6 +220,11 @@ export async function completeLogin(url: URL, config = authConfig): Promise<Toke
   }
 }
 
+export function consumeCompletedLoginReturnPath(): string | null {
+  const value = window.sessionStorage.getItem(completedLoginReturnPathStorageKey);
+  window.sessionStorage.removeItem(completedLoginReturnPathStorageKey);
+  return value ? safeReturnPath(value) : null;
+}
 export function skipSilentLoginOnce(): void {
   window.sessionStorage.setItem(skipSilentLoginStorageKey, "true");
 }
@@ -254,6 +289,7 @@ export function buildAuthorizeUrl(input: {
   prompt?: "none";
   themeMode?: string;
   uiLocales?: string;
+  lessonAssertion?: string;
 }): URL {
   const url = new URL(`${trimTrailingSlash(input.config.issuer)}/protocol/openid-connect/auth`);
   url.searchParams.set("client_id", input.config.clientId);
@@ -265,6 +301,9 @@ export function buildAuthorizeUrl(input: {
   url.searchParams.set("code_challenge_method", "S256");
   if (input.prompt) {
     url.searchParams.set("prompt", input.prompt);
+  }
+  if (input.lessonAssertion) {
+    url.searchParams.set("lesson_assertion", input.lessonAssertion);
   }
   if (input.uiLocales) {
     url.searchParams.set("ui_locales", normalizeLanguage(input.uiLocales));
@@ -332,6 +371,9 @@ async function exchangeLoginCode(config: AuthConfig, code: string, state: string
   });
 
   const tokens = await parseTokenResponse(response);
+  if (flow.returnPath) {
+    window.sessionStorage.setItem(completedLoginReturnPathStorageKey, safeReturnPath(flow.returnPath));
+  }
   window.sessionStorage.removeItem(flowStorageKey);
   storeTokens(tokens);
   writeCompletedLoginFlow({
@@ -411,4 +453,11 @@ function base64UrlEncode(bytes: Uint8Array): string {
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+function safeReturnPath(value: string | null | undefined): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/";
+  }
+  return value;
 }

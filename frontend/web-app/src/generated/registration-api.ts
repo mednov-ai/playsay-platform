@@ -4,6 +4,53 @@
  * Honey School Registration API
  * OpenAPI spec version: 0.1.0
  */
+export interface LessonIdentityResolveRequest {
+  /** @maxLength 320 */
+  email: string;
+}
+
+export interface LessonIdentityResolveResponse {
+  subject: string;
+  email: string;
+  /** @nullable */
+  displayName?: string | null;
+  roles: string[];
+}
+
+export interface LessonAuthAssertionCreateRequest {
+  /** @maxLength 255 */
+  subject: string;
+  browserAttemptId: string;
+  /** @maxLength 128 */
+  clientId: string;
+  /** @maxLength 512 */
+  issuer: string;
+  /** @maxLength 1024 */
+  callback: string;
+  rememberMe: boolean;
+}
+
+export interface LessonAuthAssertionCreateResponse {
+  handle: string;
+  expiresAt: string;
+}
+
+export interface LessonAuthAssertionRedeemRequest {
+  /** @maxLength 255 */
+  handle: string;
+  /** @maxLength 128 */
+  clientId: string;
+  /** @maxLength 512 */
+  issuer: string;
+  /** @maxLength 1024 */
+  callback: string;
+}
+
+export interface LessonAuthAssertionRedeemResponse {
+  subject: string;
+  rememberMe: boolean;
+}
+
 export interface StartRegistrationRequest {
   /** @maxLength 320 */
   email: string;
@@ -92,16 +139,6 @@ export interface StudentInviteConsumeRequest {
      * @maxLength 255
      */
   token: string;
-}
-
-export interface StudentInviteConsumeResponse {
-  accessToken: string;
-  /** @nullable */
-  refreshToken?: string | null;
-  /** @nullable */
-  idToken?: string | null;
-  expiresIn: number;
-  continueUrl: string;
 }
 
 export type startRegistrationResponse202 = {
@@ -374,24 +411,246 @@ export const resetPassword = async (resetPasswordRequest: ResetPasswordRequest, 
 
 
 
-export type consumeStudentInviteResponse200 = {
-  data: StudentInviteConsumeResponse
+export type resolveLessonIdentityResponse200 = {
+  data: LessonIdentityResolveResponse
   status: 200
 }
+
+export type resolveLessonIdentityResponseSuccess = (resolveLessonIdentityResponse200) & {
+  headers: Headers;
+};
+;
+
+export type resolveLessonIdentityResponse = (resolveLessonIdentityResponseSuccess)
+
+export const getResolveLessonIdentityUrl = () => {
+
+
+
+
+  return `/api/api/internal/lesson-auth/identities/resolve`
+}
+
+/**
+ * @summary Resolve one exact verified account identity for lesson admission
+ */
+export const resolveLessonIdentity = async (lessonIdentityResolveRequest: LessonIdentityResolveRequest, options?: RequestInit): Promise<resolveLessonIdentityResponse> => {
+
+  const res = await fetch(getResolveLessonIdentityUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(lessonIdentityResolveRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: resolveLessonIdentityResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as resolveLessonIdentityResponse
+}
+
+
+
+export type createLessonAuthAssertionResponse201 = {
+  data: LessonAuthAssertionCreateResponse
+  status: 201
+}
+
+export type createLessonAuthAssertionResponseSuccess = (createLessonAuthAssertionResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createLessonAuthAssertionResponse = (createLessonAuthAssertionResponseSuccess)
+
+export const getCreateLessonAuthAssertionUrl = () => {
+
+
+
+
+  return `/api/api/internal/lesson-auth/assertions`
+}
+
+/**
+ * @summary Create a one-time subject-bound lesson authentication assertion
+ */
+export const createLessonAuthAssertion = async (lessonAuthAssertionCreateRequest: LessonAuthAssertionCreateRequest, options?: RequestInit): Promise<createLessonAuthAssertionResponse> => {
+
+  const res = await fetch(getCreateLessonAuthAssertionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(lessonAuthAssertionCreateRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createLessonAuthAssertionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createLessonAuthAssertionResponse
+}
+
+
+
+export type redeemLessonAuthAssertionResponse200 = {
+  data: LessonAuthAssertionRedeemResponse
+  status: 200
+}
+
+export type redeemLessonAuthAssertionResponse400 = {
+  data: void
+  status: 400
+}
+
+export type redeemLessonAuthAssertionResponseSuccess = (redeemLessonAuthAssertionResponse200) & {
+  headers: Headers;
+};
+export type redeemLessonAuthAssertionResponseError = (redeemLessonAuthAssertionResponse400) & {
+  headers: Headers;
+};
+
+export type redeemLessonAuthAssertionResponse = (redeemLessonAuthAssertionResponseSuccess | redeemLessonAuthAssertionResponseError)
+
+export const getRedeemLessonAuthAssertionUrl = () => {
+
+
+
+
+  return `/api/api/provider/lesson-auth/assertions/redeem`
+}
+
+/**
+ * @summary Atomically redeem a lesson assertion from the pinned Keycloak provider
+ */
+export const redeemLessonAuthAssertion = async (lessonAuthAssertionRedeemRequest: LessonAuthAssertionRedeemRequest, options?: RequestInit): Promise<redeemLessonAuthAssertionResponse> => {
+
+  const res = await fetch(getRedeemLessonAuthAssertionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(lessonAuthAssertionRedeemRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: redeemLessonAuthAssertionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as redeemLessonAuthAssertionResponse
+}
+
+
+
+export type revokeLessonSessionResponse204 = {
+  data: void
+  status: 204
+}
+
+export type revokeLessonSessionResponseSuccess = (revokeLessonSessionResponse204) & {
+  headers: Headers;
+};
+;
+
+export type revokeLessonSessionResponse = (revokeLessonSessionResponseSuccess)
+
+export const getRevokeLessonSessionUrl = (subject: string,
+    sessionId: string,) => {
+
+
+
+
+  return `/api/api/internal/lesson-auth/users/${subject}/sessions/${sessionId}`
+}
+
+/**
+ * @summary Revoke one owner-selected remembered browser session
+ */
+export const revokeLessonSession = async (subject: string,
+    sessionId: string, options?: RequestInit): Promise<revokeLessonSessionResponse> => {
+
+  const res = await fetch(getRevokeLessonSessionUrl(subject,sessionId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: revokeLessonSessionResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as revokeLessonSessionResponse
+}
+
+
+
+export type revokeAllLessonSessionsResponse204 = {
+  data: void
+  status: 204
+}
+
+export type revokeAllLessonSessionsResponseSuccess = (revokeAllLessonSessionsResponse204) & {
+  headers: Headers;
+};
+;
+
+export type revokeAllLessonSessionsResponse = (revokeAllLessonSessionsResponseSuccess)
+
+export const getRevokeAllLessonSessionsUrl = (subject: string,) => {
+
+
+
+
+  return `/api/api/internal/lesson-auth/users/${subject}/sessions`
+}
+
+/**
+ * @summary Revoke all remembered sessions for the exact owner subject
+ */
+export const revokeAllLessonSessions = async (subject: string, options?: RequestInit): Promise<revokeAllLessonSessionsResponse> => {
+
+  const res = await fetch(getRevokeAllLessonSessionsUrl(subject),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: revokeAllLessonSessionsResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as revokeAllLessonSessionsResponse
+}
+
+
 
 export type consumeStudentInviteResponse400 = {
   data: void
   status: 400
 }
 
-export type consumeStudentInviteResponseSuccess = (consumeStudentInviteResponse200) & {
-  headers: Headers;
-};
-export type consumeStudentInviteResponseError = (consumeStudentInviteResponse400) & {
+export type consumeStudentInviteResponse410 = {
+  data: RegistrationResponse
+  status: 410
+}
+
+;
+export type consumeStudentInviteResponseError = (consumeStudentInviteResponse400 | consumeStudentInviteResponse410) & {
   headers: Headers;
 };
 
-export type consumeStudentInviteResponse = (consumeStudentInviteResponseSuccess | consumeStudentInviteResponseError)
+export type consumeStudentInviteResponse = (consumeStudentInviteResponseError)
 
 export const getConsumeStudentInviteUrl = () => {
 
@@ -402,8 +661,9 @@ export const getConsumeStudentInviteUrl = () => {
 }
 
 /**
- * Exchanges a one-time managed-student invite code for a Keycloak token set and the lesson continue URL. The public link carries the code in the URL fragment, while this request keeps the legacy `token` field name for client compatibility.
- * @summary Consume managed-student lesson invite
+ * Legacy compatibility endpoint. It never resolves the invite, mutates credentials, or issues tokens; clients must request the reusable shared lesson link.
+ * @deprecated
+ * @summary Reject a legacy managed-student lesson invite
  */
 export const consumeStudentInvite = async (studentInviteConsumeRequest: StudentInviteConsumeRequest, options?: RequestInit): Promise<consumeStudentInviteResponse> => {
 

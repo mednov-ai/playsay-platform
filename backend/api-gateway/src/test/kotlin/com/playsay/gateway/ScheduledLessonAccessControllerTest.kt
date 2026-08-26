@@ -230,6 +230,23 @@ class ScheduledLessonAccessControllerTest : ScheduledLessonControllerTestFixture
     }
 
     @Test
+    fun `teacher deletes scheduled lesson after creating shared access link`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
+                scheduledEnd = Instant.parse("2026-05-25T10:45:00Z"),
+            ),
+        ).body!!
+        lessonAccessController.getOrCreate(teacher, lesson.id)
+
+        assertEquals(HttpStatus.NO_CONTENT, scheduleController.delete(teacher, lesson.id).statusCode)
+        assertFalse(lessonRepo.existsById(lesson.id))
+        assertEquals(emptyList(), lessonAccessLinkRepo.findAll())
+    }
+
+    @Test
     fun `create and general update cannot perform lifecycle transitions`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val now = Instant.now()

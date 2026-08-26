@@ -33,7 +33,11 @@ class KeycloakUserManagementService(
 ) {
     fun findExact(identifier: String): KeycloakManagedIdentity? {
         val normalized = identifier.trim()
-        val user = if ('@' in normalized) keycloak.findUserByEmail(normalized) else keycloak.findUserByUsername(normalized)
+        val user = when {
+            '@' in normalized -> keycloak.findUserByEmail(normalized)
+            runCatching { UUID.fromString(normalized) }.isSuccess -> keycloak.findUserBySubject(normalized)
+            else -> keycloak.findUserByUsername(normalized)
+        }
         return user?.let { keycloak.findUserBySubject(it.subject) ?: it }?.toManagedIdentity()
     }
 

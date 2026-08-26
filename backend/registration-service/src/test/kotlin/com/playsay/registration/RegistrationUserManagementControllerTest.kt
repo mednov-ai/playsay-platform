@@ -136,6 +136,33 @@ class RegistrationUserManagementControllerTest : RegistrationControllerTestFixtu
     }
 
     @Test
+    fun `internal exact lookup resolves a keycloak subject`() {
+        val subject = "6e8cb962-6ab1-4455-9a63-63e9327030fd"
+        RecordingKeycloakRegistrationClient.existingUsers["student.one"] = KeycloakRegistrationUser(
+            subject = subject,
+            username = "student.one",
+            email = "student.one@example.com",
+            roles = setOf("STUDENT"),
+            enabled = true,
+            emailVerified = true,
+        )
+
+        val response = httpClient.send(
+            HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:$port/api/internal/user-management/users/exact?identifier=$subject"),
+            )
+                .header("X-PlaySay-Service-Token", "test-internal-token")
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
+        assertEquals(HttpStatus.OK.value(), response.statusCode(), response.body())
+        assertTrue(response.body().contains(subject))
+        assertTrue(response.body().contains("STUDENT"))
+    }
+
+    @Test
     fun `managed student provisioning rejects invalid or occupied identity`() {
         val invalid = provisionManagedStudent("bad login", "Mia")
         assertEquals(HttpStatus.BAD_REQUEST.value(), invalid.statusCode(), invalid.body())

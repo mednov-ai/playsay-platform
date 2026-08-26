@@ -82,6 +82,7 @@ import liquibase.integration.spring.SpringLiquibase
 @Import(ScheduledLessonControllerTestFixture.LessonReminderTestConfig::class)
 abstract class ScheduledLessonControllerTestFixture {
     @Autowired protected lateinit var scheduleController: ScheduledLessonController
+    @Autowired protected lateinit var lessonAccessController: LessonAccessController
     @Autowired protected lateinit var studentInviteController: StudentInviteController
     @Autowired protected lateinit var liveKitRoomController: LiveKitRoomController
     @Autowired protected lateinit var liveKitWebhookController: LiveKitWebhookController

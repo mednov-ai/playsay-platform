@@ -466,8 +466,7 @@ export function GlobalToolsRail({
     activeConversationIdRef.current = conversationId;
     setDraft("");
     setError(null);
-    if (!messagesRef.current[conversationId]) await loadMessages(conversationId);
-    else void markVisibleConversationRead(conversationId);
+    await loadMessages(conversationId);
   }
 
   async function startConversation(contact: ChatContact) {

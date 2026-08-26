@@ -1,3 +1,8 @@
+export const frChatPushNotification = {
+  title: "Honey School",
+  body: "Nouveau message dans le chat",
+};
+
 export const fr = {
   common: {
     appName: "Honey School",
@@ -153,6 +158,17 @@ export const fr = {
     read: "Lu",
     toast: {
       title: "Nouveau message",
+    },
+    notifications: {
+      enable: "Activer les notifications",
+      disable: "Désactiver les notifications",
+      enabled: "Notifications activées",
+      denied: "Les notifications sont bloquées dans le navigateur",
+      unsupported: "Ce navigateur ne prend pas en charge les notifications",
+      unavailable: "Les notifications sont temporairement indisponibles",
+      pending: "Configuration des notifications",
+      error: "Impossible de modifier les notifications",
+      push: frChatPushNotification,
     },
     errors: {
       load: "Impossible de charger le chat",

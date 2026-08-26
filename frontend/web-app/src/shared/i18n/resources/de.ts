@@ -1,3 +1,8 @@
+export const deChatPushNotification = {
+  title: "Honey School",
+  body: "Neue Chatnachricht",
+};
+
 export const de = {
   common: {
     appName: "Honey School",
@@ -153,6 +158,17 @@ export const de = {
     read: "Gelesen",
     toast: {
       title: "Neue Nachricht",
+    },
+    notifications: {
+      enable: "Benachrichtigungen aktivieren",
+      disable: "Benachrichtigungen deaktivieren",
+      enabled: "Benachrichtigungen aktiviert",
+      denied: "Benachrichtigungen sind im Browser blockiert",
+      unsupported: "Dieser Browser unterstützt keine Benachrichtigungen",
+      unavailable: "Benachrichtigungen sind vorübergehend nicht verfügbar",
+      pending: "Benachrichtigungen werden eingerichtet",
+      error: "Benachrichtigungen konnten nicht geändert werden",
+      push: deChatPushNotification,
     },
     errors: {
       load: "Chat konnte nicht geladen werden",

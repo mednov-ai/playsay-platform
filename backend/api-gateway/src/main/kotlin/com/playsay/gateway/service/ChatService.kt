@@ -6,6 +6,7 @@ import com.playsay.gateway.dto.ChatMessagePageResponse
 import com.playsay.gateway.dto.ChatMessageRequest
 import com.playsay.gateway.dto.ChatMessageResponse
 import com.playsay.gateway.dto.ChatReadReceiptResponse
+import com.playsay.gateway.dto.ChatUnreadStateResponse
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.ChatConversationEntity
 import com.playsay.gateway.entity.ChatMessageEntity
@@ -13,6 +14,7 @@ import com.playsay.gateway.entity.ChatParticipantStateEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.realtime.ChatConversationReadEvent
 import com.playsay.gateway.realtime.ChatMessageCreatedEvent
+import com.playsay.gateway.realtime.ChatUnreadChangedEvent
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.ChatConversationRepo
 import com.playsay.gateway.repo.ChatMessageRepo
@@ -41,6 +43,7 @@ class ChatService(
     private val delegationRepo: TeacherDelegationRepo,
     private val studentAccessPolicy: StudentAccessPolicy,
     private val userProfileStore: UserProfileStore,
+    private val chatPushDeliveryService: ChatPushDeliveryService,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
@@ -79,6 +82,12 @@ class ChatService(
                 teacherUserId = teacher.id,
                 studentUserId = student.id,
                 createdAt = Instant.now(clock),
+            ),
+        )
+        participantStateRepo.saveAllAndFlush(
+            listOf(
+                participantState(created.id, teacher.id, created.createdAt),
+                participantState(created.id, student.id, created.createdAt),
             ),
         )
         return summary(created, actor)
@@ -149,7 +158,19 @@ class ChatService(
         )
         conversation.lastMessageAt = now
         conversationRepo.save(conversation)
+        val recipientState = participantStateRepo.lockByConversationIdAndUserId(conversation.id, counterpart.id)
+            ?: participantState(conversation.id, counterpart.id, now)
+        recipientState.unreadVersion += 1
+        recipientState.updatedAt = now
+        participantStateRepo.saveAndFlush(recipientState)
         val response = message(saved, conversation, states(conversation))
+        val unread = ChatUnreadStateResponse(
+            conversationId = conversation.id,
+            unreadCount = unreadCount(conversation.id, counterpart.id, recipientState),
+            unreadVersion = recipientState.unreadVersion,
+            causeMessageId = saved.id,
+        )
+        chatPushDeliveryService.enqueue(saved, counterpart.id)
         eventPublisher.publishEvent(
             ChatMessageCreatedEvent(
                 message = response,
@@ -158,6 +179,7 @@ class ChatService(
                 recipientUserId = counterpart.id,
             ),
         )
+        eventPublisher.publishEvent(ChatUnreadChangedEvent(unread, counterpart.keycloakSubject))
         return response
     }
 
@@ -168,21 +190,17 @@ class ChatService(
         lastReadMessageId: UUID,
     ): ChatReadReceiptResponse {
         val actor = actor(authentication)
-        val conversation = conversation(conversationId, actor)
+        val conversation = conversationForUpdate(conversationId, actor)
         val target = messageRepo.findById(lastReadMessageId).orElse(null)
             ?.takeIf { it.conversationId == conversation.id }
             ?: fail(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.CHAT_MESSAGE_NOT_FOUND)
         val now = Instant.now(clock)
-        val state = participantStateRepo.findByConversationIdAndUserId(conversation.id, actor.id)
-            ?: ChatParticipantStateEntity(
-                id = UUID.randomUUID(),
-                conversationId = conversation.id,
-                userId = actor.id,
-                createdAt = now,
-            )
-        if (state.readAt == null || target.createdAt > state.readAt) {
+        val state = participantStateRepo.lockByConversationIdAndUserId(conversation.id, actor.id)
+            ?: participantState(conversation.id, actor.id, now)
+        if (isAfterReadMarker(target, state)) {
             state.lastReadMessageId = target.id
             state.readAt = target.createdAt
+            state.unreadVersion += 1
             state.updatedAt = now
             participantStateRepo.saveAndFlush(state)
         }
@@ -196,6 +214,8 @@ class ChatService(
             readerSubject = actor.keycloakSubject,
             lastReadMessageId = state.lastReadMessageId ?: target.id,
             readAt = state.readAt ?: target.createdAt,
+            unreadCount = unreadCount(conversation.id, actor.id, state),
+            unreadVersion = state.unreadVersion,
         )
         eventPublisher.publishEvent(
             ChatConversationReadEvent(receipt, participantSubjects(conversation)),
@@ -269,19 +289,44 @@ class ChatService(
     private fun summary(conversation: ChatConversationEntity, actor: AppUserEntity): ChatConversationResponse {
         val states = states(conversation)
         val latest = messageRepo.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.id)
-        val actorReadAt = states[actor.id]?.readAt
-        val unreadCount = if (actorReadAt == null) {
-            messageRepo.countByConversationIdAndSenderUserIdNot(conversation.id, actor.id)
-        } else {
-            messageRepo.countByConversationIdAndSenderUserIdNotAndCreatedAtAfter(conversation.id, actor.id, actorReadAt)
-        }
+        val actorState = states[actor.id]
         return ChatConversationResponse(
             id = conversation.id,
             counterpart = contact(counterpart(conversation, actor)),
             lastMessage = latest?.let { message(it, conversation, states) },
-            unreadCount = unreadCount,
+            unreadCount = unreadCount(conversation.id, actor.id, actorState),
+            unreadVersion = actorState?.unreadVersion ?: 0,
             createdAt = conversation.createdAt,
         )
+    }
+
+    private fun unreadCount(
+        conversationId: UUID,
+        actorId: UUID,
+        state: ChatParticipantStateEntity?,
+    ): Long {
+        val readAt = state?.readAt
+        val lastReadMessageId = state?.lastReadMessageId
+        return if (readAt == null || lastReadMessageId == null) {
+            messageRepo.countByConversationIdAndSenderUserIdNot(conversationId, actorId)
+        } else {
+            messageRepo.countUnreadAfter(conversationId, actorId, readAt, lastReadMessageId)
+        }
+    }
+
+    private fun participantState(conversationId: UUID, userId: UUID, now: Instant) = ChatParticipantStateEntity(
+        id = UUID.randomUUID(),
+        conversationId = conversationId,
+        userId = userId,
+        createdAt = now,
+        updatedAt = now,
+        unreadVersion = 0,
+    )
+
+    private fun isAfterReadMarker(message: ChatMessageEntity, state: ChatParticipantStateEntity): Boolean {
+        val readAt = state.readAt ?: return true
+        if (message.createdAt != readAt) return message.createdAt > readAt
+        return state.lastReadMessageId?.let { message.id > it } ?: true
     }
 
     private fun states(conversation: ChatConversationEntity): Map<UUID, ChatParticipantStateEntity> =

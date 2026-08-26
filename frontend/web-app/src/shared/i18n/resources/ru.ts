@@ -1,3 +1,8 @@
+export const ruChatPushNotification = {
+  title: "Honey School",
+  body: "Новое сообщение в чате",
+};
+
 export const ru = {
   common: {
     appName: "Honey School",
@@ -153,6 +158,17 @@ export const ru = {
     read: "Прочитано",
     toast: {
       title: "Новое сообщение",
+    },
+    notifications: {
+      enable: "Включить уведомления",
+      disable: "Отключить уведомления",
+      enabled: "Уведомления включены",
+      denied: "Уведомления запрещены в браузере",
+      unsupported: "Браузер не поддерживает уведомления",
+      unavailable: "Уведомления временно недоступны",
+      pending: "Настройка уведомлений",
+      error: "Не удалось изменить уведомления",
+      push: ruChatPushNotification,
     },
     errors: {
       load: "Не удалось загрузить чат",

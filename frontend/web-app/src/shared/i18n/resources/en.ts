@@ -1,3 +1,8 @@
+export const enChatPushNotification = {
+  title: "Honey School",
+  body: "New chat message",
+};
+
 export const en = {
   common: {
     appName: "Honey School",
@@ -153,6 +158,17 @@ export const en = {
     read: "Read",
     toast: {
       title: "New message",
+    },
+    notifications: {
+      enable: "Enable notifications",
+      disable: "Disable notifications",
+      enabled: "Notifications enabled",
+      denied: "Notifications are blocked in the browser",
+      unsupported: "This browser does not support notifications",
+      unavailable: "Notifications are temporarily unavailable",
+      pending: "Setting up notifications",
+      error: "Could not change notifications",
+      push: enChatPushNotification,
     },
     errors: {
       load: "Could not load chat",

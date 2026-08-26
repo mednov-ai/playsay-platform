@@ -61,6 +61,8 @@ class ChatParticipantStateEntity(
     var createdAt: Instant = Instant.EPOCH,
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant = Instant.EPOCH,
+    @Column(name = "unread_version", nullable = false)
+    var unreadVersion: Long = 0,
 )
 
 @Entity
@@ -101,4 +103,58 @@ class ChatEmailDigestMessageEntity(
     var messageId: UUID = UUID.randomUUID(),
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.EPOCH,
+)
+
+@Entity
+@Table(name = "chat_push_subscription")
+class ChatPushSubscriptionEntity(
+    @Id
+    @Column(name = "id", nullable = false)
+    var id: UUID = UUID.randomUUID(),
+    @Column(name = "user_id", nullable = false)
+    var userId: UUID = UUID.randomUUID(),
+    @Column(name = "endpoint", nullable = false, length = 2_048)
+    var endpoint: String = "",
+    @Column(name = "endpoint_hash", nullable = false, unique = true, length = 64)
+    var endpointHash: String = "",
+    @Column(name = "p256dh", nullable = false, length = 512)
+    var p256dh: String = "",
+    @Column(name = "auth_secret", nullable = false, length = 512)
+    var authSecret: String = "",
+    @Column(name = "locale", nullable = false, length = 16)
+    var locale: String = "ru",
+    @Column(name = "active", nullable = false)
+    var active: Boolean = true,
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant = Instant.EPOCH,
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: Instant = Instant.EPOCH,
+)
+
+@Entity
+@Table(name = "chat_push_delivery")
+class ChatPushDeliveryEntity(
+    @Id
+    @Column(name = "id", nullable = false)
+    var id: UUID = UUID.randomUUID(),
+    @Column(name = "message_id", nullable = false)
+    var messageId: UUID = UUID.randomUUID(),
+    @Column(name = "subscription_id", nullable = false)
+    var subscriptionId: UUID = UUID.randomUUID(),
+    @Column(name = "status", nullable = false, length = 32)
+    var status: String = "PENDING",
+    @Column(name = "attempts", nullable = false)
+    var attempts: Int = 0,
+    @Column(name = "next_attempt_at", nullable = false)
+    var nextAttemptAt: Instant = Instant.EPOCH,
+    @Column(name = "lease_until")
+    var leaseUntil: Instant? = null,
+    @Column(name = "last_error_class", length = 128)
+    var lastErrorClass: String? = null,
+    @Column(name = "sent_at")
+    var sentAt: Instant? = null,
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant = Instant.EPOCH,
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: Instant = Instant.EPOCH,
 )

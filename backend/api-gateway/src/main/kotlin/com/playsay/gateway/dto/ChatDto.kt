@@ -1,6 +1,8 @@
 package com.playsay.gateway.dto
 
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
+import jakarta.validation.constraints.Size
 import io.swagger.v3.oas.annotations.media.Schema
 import java.time.Instant
 import java.util.UUID
@@ -42,6 +44,7 @@ data class ChatConversationResponse(
     val counterpart: ChatContactResponse,
     val lastMessage: ChatMessageResponse?,
     val unreadCount: Long,
+    val unreadVersion: Long,
     val createdAt: Instant,
 )
 
@@ -55,6 +58,16 @@ data class ChatReadReceiptResponse(
     val readerSubject: String,
     val lastReadMessageId: UUID,
     val readAt: Instant,
+    val unreadCount: Long,
+    val unreadVersion: Long,
+)
+
+data class ChatUnreadStateResponse(
+    val conversationId: UUID,
+    val unreadCount: Long,
+    val unreadVersion: Long,
+    val causeMessageId: UUID? = null,
+    val lastReadMessageId: UUID? = null,
 )
 
 data class ChatDeliveryReceiptResponse(
@@ -62,4 +75,33 @@ data class ChatDeliveryReceiptResponse(
     val recipientSubject: String,
     val messageIds: List<UUID>,
     val deliveredAt: Instant,
+)
+
+data class ChatPushCapabilityResponse(
+    val available: Boolean,
+    val publicKey: String? = null,
+)
+
+data class ChatPushSubscriptionRequest(
+    @field:NotBlank
+    @field:Size(max = 2_048)
+    val endpoint: String,
+    @field:NotBlank
+    @field:Size(max = 512)
+    val p256dh: String,
+    @field:NotBlank
+    @field:Size(max = 512)
+    val auth: String,
+    @field:Pattern(regexp = "(?i)^(ru|en|de|fr)([-_][a-z]{2})?$")
+    val locale: String,
+)
+
+data class ChatPushSubscriptionResponse(
+    val enabled: Boolean,
+)
+
+data class ChatPushUnsubscribeRequest(
+    @field:NotBlank
+    @field:Size(max = 2_048)
+    val endpoint: String,
 )

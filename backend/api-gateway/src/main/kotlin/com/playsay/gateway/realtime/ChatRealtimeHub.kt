@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.playsay.gateway.dto.ChatDeliveryReceiptResponse
 import com.playsay.gateway.dto.ChatMessageResponse
 import com.playsay.gateway.dto.ChatReadReceiptResponse
+import com.playsay.gateway.dto.ChatUnreadStateResponse
 import java.util.concurrent.ConcurrentHashMap
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.TextMessage
@@ -16,6 +17,7 @@ data class ChatRealtimeOutboundMessage(
     val message: ChatMessageResponse? = null,
     val delivery: ChatDeliveryReceiptResponse? = null,
     val receipt: ChatReadReceiptResponse? = null,
+    val unread: ChatUnreadStateResponse? = null,
 )
 
 @Component
@@ -61,6 +63,13 @@ class ChatRealtimeHub(
         broadcast(
             event.participantSubjects,
             ChatRealtimeOutboundMessage(type = "chat.conversation.read", receipt = event.receipt),
+        )
+    }
+
+    fun publish(event: ChatUnreadChangedEvent) {
+        broadcast(
+            setOf(event.recipientSubject),
+            ChatRealtimeOutboundMessage(type = "chat.unread.changed", unread = event.unread),
         )
     }
 

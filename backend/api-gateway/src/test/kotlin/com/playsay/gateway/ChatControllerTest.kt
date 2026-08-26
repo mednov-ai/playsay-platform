@@ -4,7 +4,10 @@ import com.playsay.gateway.controller.ChatController
 import com.playsay.gateway.dto.ChatMessageRequest
 import com.playsay.gateway.dto.CreateChatConversationRequest
 import com.playsay.gateway.dto.MarkChatReadRequest
+import com.playsay.gateway.dto.ChatPushSubscriptionRequest
+import com.playsay.gateway.dto.ChatPushUnsubscribeRequest
 import com.playsay.gateway.entity.AppUserEntity
+import com.playsay.gateway.entity.ChatMessageEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.realtime.ChatRealtimeHub
 import com.playsay.gateway.realtime.ChatRecordingSession
@@ -16,7 +19,15 @@ import com.playsay.gateway.repo.ChatMessageRepo
 import com.playsay.gateway.repo.ChatParticipantStateRepo
 import com.playsay.gateway.client.ChatEmailClient
 import com.playsay.gateway.client.ChatEmailCommand
+import com.playsay.gateway.client.ChatWebPushClient
+import com.playsay.gateway.client.ChatWebPushCommand
+import com.playsay.gateway.client.ChatWebPushResult
 import com.playsay.gateway.service.ChatEmailDigestScheduler
+import com.playsay.gateway.service.ChatPushDeliveryService
+import com.playsay.gateway.service.ChatPushDeliveryWorker
+import com.playsay.gateway.repo.ChatPushDeliveryRepo
+import com.playsay.gateway.repo.ChatPushSubscriptionRepo
+import java.util.Base64
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant
 import java.util.UUID
@@ -48,6 +59,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=false",
+        "playsay.chat-push.enabled=true",
+        "playsay.chat-push.public-key=test-public-key",
+        "playsay.chat-push.private-key=test-private-key",
+        "playsay.chat-push.subject=mailto:test@honey.school",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -61,6 +76,9 @@ class ChatControllerTest @Autowired constructor(
     private val digests: ChatEmailDigestRepo,
     private val digestMessages: ChatEmailDigestMessageRepo,
     private val digestScheduler: ChatEmailDigestScheduler,
+    private val pushSubscriptions: ChatPushSubscriptionRepo,
+    private val pushDeliveries: ChatPushDeliveryRepo,
+    private val pushWorker: ChatPushDeliveryWorker,
     private val realtimeHub: ChatRealtimeHub,
     private val dataSource: DataSource,
 ) {
@@ -69,6 +87,10 @@ class ChatControllerTest @Autowired constructor(
         @Bean
         @Primary
         fun chatEmailClient(): ChatEmailClient = RecordingChatEmailClient
+
+        @Bean
+        @Primary
+        fun chatWebPushClient(): ChatWebPushClient = RecordingChatWebPushClient
     }
 
     @BeforeAll
@@ -83,6 +105,10 @@ class ChatControllerTest @Autowired constructor(
     fun cleanDatabase() {
         RecordingChatEmailClient.sent.clear()
         RecordingChatEmailClient.failuresRemaining = 0
+        RecordingChatWebPushClient.commands.clear()
+        RecordingChatWebPushClient.result = ChatWebPushResult.Success
+        pushDeliveries.deleteAllInBatch()
+        pushSubscriptions.deleteAllInBatch()
         digestMessages.deleteAllInBatch()
         digests.deleteAllInBatch()
         states.deleteAllInBatch()
@@ -125,14 +151,145 @@ class ChatControllerTest @Autowired constructor(
         assertEquals(sent.id, retried.id)
         assertEquals("Hello!", sent.text)
         assertEquals(1, controller.conversations(studentAuth).single().unreadCount)
+        assertEquals(1, controller.conversations(studentAuth).single().unreadVersion)
 
         val page = controller.messages(studentAuth, first.id, null, 50)
         assertEquals(listOf(sent.id), page.items.map { it.id })
         val receipt = controller.markRead(studentAuth, first.id, MarkChatReadRequest(sent.id))
         assertEquals(sent.id, receipt.lastReadMessageId)
+        assertEquals(0, receipt.unreadCount)
+        assertEquals(2, receipt.unreadVersion)
         assertEquals(0, controller.conversations(studentAuth).single().unreadCount)
         assertNotNull(controller.messages(teacherAuth, first.id, null, 50).items.single().readAt)
     }
+
+    @Test
+    fun `read marker keeps a later same timestamp message unread`() {
+        val teacher = user("teacher-same-time", "TEACHER")
+        val student = user("student-same-time", "STUDENT", teacher)
+        val teacherAuth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val studentAuth = authentication(student.keycloakSubject, "ROLE_STUDENT")
+        val conversation = controller.createConversation(
+            teacherAuth,
+            CreateChatConversationRequest(student.keycloakSubject),
+        )
+        val createdAt = Instant.parse("2026-08-26T05:00:00Z")
+        val first = messages.saveAndFlush(
+            ChatMessageEntity(
+                id = UUID.fromString("00000000-0000-4000-8000-000000000001"),
+                conversationId = conversation.id,
+                senderUserId = teacher.id,
+                clientMessageId = UUID.randomUUID(),
+                body = "First",
+                createdAt = createdAt,
+            ),
+        )
+        messages.saveAndFlush(
+            ChatMessageEntity(
+                id = UUID.fromString("00000000-0000-4000-8000-000000000002"),
+                conversationId = conversation.id,
+                senderUserId = teacher.id,
+                clientMessageId = UUID.randomUUID(),
+                body = "Second",
+                createdAt = createdAt,
+            ),
+        )
+
+        val receipt = controller.markRead(studentAuth, conversation.id, MarkChatReadRequest(first.id))
+
+        assertEquals(1, receipt.unreadCount)
+        assertEquals(1, controller.conversations(studentAuth).single().unreadCount)
+    }
+
+    @Test
+    fun `browser push subscription is private durable and contains no message text`() {
+        val teacher = user("teacher-push", "TEACHER")
+        val student = user("student-push", "STUDENT", teacher)
+        val teacherAuth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val studentAuth = authentication(student.keycloakSubject, "ROLE_STUDENT")
+        val endpoint = "https://push.example.test/subscription-1"
+
+        assertTrue(controller.pushCapability(studentAuth).available)
+        assertTrue(controller.upsertPushSubscription(studentAuth, pushRequest(endpoint)).enabled)
+        val conversation = controller.createConversation(
+            teacherAuth,
+            CreateChatConversationRequest(student.keycloakSubject),
+        )
+        controller.sendMessage(
+            teacherAuth,
+            conversation.id,
+            ChatMessageRequest(UUID.randomUUID(), "secret lesson message"),
+        )
+
+        assertEquals(ChatPushDeliveryService.STATUS_PENDING, pushDeliveries.findAll().single().status)
+        pushWorker.dispatchDue()
+
+        val command = RecordingChatWebPushClient.commands.single()
+        assertTrue(command.payload.contains(conversation.id.toString()))
+        assertTrue(!command.payload.contains("secret lesson message"))
+        assertTrue(!command.payload.contains(teacher.keycloakSubject))
+        assertEquals(ChatPushDeliveryService.STATUS_SENT, pushDeliveries.findAll().single().status)
+        assertTrue(messages.findAll().single().deliveredAt == null)
+    }
+
+    @Test
+    fun `push worker skips a message read before dispatch`() {
+        val teacher = user("teacher-push-read", "TEACHER")
+        val student = user("student-push-read", "STUDENT", teacher)
+        val teacherAuth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val studentAuth = authentication(student.keycloakSubject, "ROLE_STUDENT")
+        controller.upsertPushSubscription(studentAuth, pushRequest("https://push.example.test/read"))
+        val conversation = controller.createConversation(
+            teacherAuth,
+            CreateChatConversationRequest(student.keycloakSubject),
+        )
+        val sent = controller.sendMessage(
+            teacherAuth,
+            conversation.id,
+            ChatMessageRequest(UUID.randomUUID(), "Read first"),
+        )
+        controller.markRead(studentAuth, conversation.id, MarkChatReadRequest(sent.id))
+
+        pushWorker.dispatchDue()
+
+        assertTrue(RecordingChatWebPushClient.commands.isEmpty())
+        assertEquals(ChatPushDeliveryService.STATUS_SKIPPED, pushDeliveries.findAll().single().status)
+    }
+
+    @Test
+    fun `invalid push subscription is deactivated and cannot be removed by another user`() {
+        val teacher = user("teacher-push-invalid", "TEACHER")
+        val student = user("student-push-invalid", "STUDENT", teacher)
+        val teacherAuth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val studentAuth = authentication(student.keycloakSubject, "ROLE_STUDENT")
+        val endpoint = "https://push.example.test/invalid"
+        controller.upsertPushSubscription(studentAuth, pushRequest(endpoint))
+
+        controller.removePushSubscription(teacherAuth, ChatPushUnsubscribeRequest(endpoint))
+        assertEquals(1, pushSubscriptions.count())
+
+        val conversation = controller.createConversation(
+            teacherAuth,
+            CreateChatConversationRequest(student.keycloakSubject),
+        )
+        RecordingChatWebPushClient.result = ChatWebPushResult.PermanentFailure(410)
+        controller.sendMessage(
+            teacherAuth,
+            conversation.id,
+            ChatMessageRequest(UUID.randomUUID(), "Invalidate endpoint"),
+        )
+        pushWorker.dispatchDue()
+
+        assertTrue(!pushSubscriptions.findAll().single().active)
+        assertEquals(ChatPushDeliveryService.STATUS_INVALID, pushDeliveries.findAll().single().status)
+    }
+
+    private fun pushRequest(endpoint: String) = ChatPushSubscriptionRequest(
+        endpoint = endpoint,
+        p256dh = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(65) { 1 }),
+        auth = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(16) { 2 }),
+        locale = "en",
+    )
 
     @Test
     fun `existing conversation remains active after teaching relationship ends`() {
@@ -384,5 +541,15 @@ private object RecordingChatEmailClient : ChatEmailClient {
             throw IllegalStateException("simulated chat email failure")
         }
         sent += command
+    }
+}
+
+private object RecordingChatWebPushClient : ChatWebPushClient {
+    val commands = mutableListOf<ChatWebPushCommand>()
+    var result: ChatWebPushResult = ChatWebPushResult.Success
+
+    override fun send(command: ChatWebPushCommand): ChatWebPushResult {
+        commands += command
+        return result
     }
 }

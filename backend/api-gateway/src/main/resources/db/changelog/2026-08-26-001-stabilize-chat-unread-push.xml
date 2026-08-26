@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-08-26-001-chat-unread-version" author="codex">
+        <addColumn tableName="chat_participant_state">
+            <column name="unread_version" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <createIndex tableName="chat_message" indexName="idx_chat_message_unread_count">
+            <column name="conversation_id"/>
+            <column name="sender_user_id"/>
+            <column name="created_at"/>
+            <column name="id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2026-08-26-002-chat-state-backfill-postgresql" author="codex" dbms="postgresql">
+        <sql>
+            INSERT INTO chat_participant_state
+                (id, conversation_id, user_id, unread_version, created_at, updated_at)
+            SELECT gen_random_uuid(), c.id, participant.user_id, 0, c.created_at, c.created_at
+              FROM chat_conversation c
+              CROSS JOIN LATERAL (VALUES (c.teacher_user_id), (c.student_user_id)) participant(user_id)
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM chat_participant_state s
+                  WHERE s.conversation_id = c.id AND s.user_id = participant.user_id
+             )
+        </sql>
+    </changeSet>
+
+    <changeSet id="2026-08-26-003-chat-state-backfill-h2" author="codex" dbms="h2">
+        <sql>
+            INSERT INTO chat_participant_state
+                (id, conversation_id, user_id, unread_version, created_at, updated_at)
+            SELECT random_uuid(), c.id, c.teacher_user_id, 0, c.created_at, c.created_at
+              FROM chat_conversation c
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM chat_participant_state s
+                  WHERE s.conversation_id = c.id AND s.user_id = c.teacher_user_id
+             );
+            INSERT INTO chat_participant_state
+                (id, conversation_id, user_id, unread_version, created_at, updated_at)
+            SELECT random_uuid(), c.id, c.student_user_id, 0, c.created_at, c.created_at
+              FROM chat_conversation c
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM chat_participant_state s
+                  WHERE s.conversation_id = c.id AND s.user_id = c.student_user_id
+             )
+        </sql>
+    </changeSet>
+
+    <changeSet id="2026-08-26-004-chat-push-subscriptions" author="codex">
+        <createTable tableName="chat_push_subscription">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_chat_push_subscription"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_chat_push_subscription_user" deleteCascade="true"/>
+            </column>
+            <column name="endpoint" type="VARCHAR(2048)"><constraints nullable="false"/></column>
+            <column name="endpoint_hash" type="VARCHAR(64)"><constraints nullable="false" unique="true" uniqueConstraintName="uq_chat_push_subscription_endpoint_hash"/></column>
+            <column name="p256dh" type="VARCHAR(512)"><constraints nullable="false"/></column>
+            <column name="auth_secret" type="VARCHAR(512)"><constraints nullable="false"/></column>
+            <column name="locale" type="VARCHAR(16)" defaultValue="ru"><constraints nullable="false"/></column>
+            <column name="active" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="chat_push_subscription" indexName="idx_chat_push_subscription_user_active">
+            <column name="user_id"/>
+            <column name="active"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="2026-08-26-005-chat-push-deliveries" author="codex">
+        <createTable tableName="chat_push_delivery">
+            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_chat_push_delivery"/></column>
+            <column name="message_id" type="UUID"><constraints nullable="false" referencedTableName="chat_message" referencedColumnNames="id" foreignKeyName="fk_chat_push_delivery_message" deleteCascade="true"/></column>
+            <column name="subscription_id" type="UUID"><constraints nullable="false" referencedTableName="chat_push_subscription" referencedColumnNames="id" foreignKeyName="fk_chat_push_delivery_subscription" deleteCascade="true"/></column>
+            <column name="status" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="attempts" type="INTEGER" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="next_attempt_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="lease_until" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_error_class" type="VARCHAR(128)"/>
+            <column name="sent_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="chat_push_delivery" columnNames="message_id,subscription_id" constraintName="uq_chat_push_delivery_message_subscription"/>
+        <createIndex tableName="chat_push_delivery" indexName="idx_chat_push_delivery_due">
+            <column name="status"/>
+            <column name="next_attempt_at"/>
+            <column name="lease_until"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

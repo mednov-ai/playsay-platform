@@ -23,6 +23,7 @@ export type ChatConversation = {
   counterpart: ChatContact;
   lastMessage: ChatMessage | null;
   unreadCount: number;
+  unreadVersion: number;
   createdAt: string;
 };
 
@@ -36,6 +37,16 @@ export type ChatReadReceipt = {
   readerSubject: string;
   lastReadMessageId: string;
   readAt: string;
+  unreadCount: number;
+  unreadVersion: number;
+};
+
+export type ChatUnreadState = {
+  conversationId: string;
+  unreadCount: number;
+  unreadVersion: number;
+  causeMessageId?: string | null;
+  lastReadMessageId?: string | null;
 };
 
 export type ChatDeliveryReceipt = {
@@ -46,10 +57,20 @@ export type ChatDeliveryReceipt = {
 };
 
 export type ChatRealtimeMessage = {
-  type?: "connected" | "chat.message.created" | "chat.messages.delivered" | "chat.conversation.read";
+  type?: "connected" | "chat.message.created" | "chat.messages.delivered" | "chat.conversation.read" | "chat.unread.changed";
   message?: ChatMessage;
   delivery?: ChatDeliveryReceipt;
   receipt?: ChatReadReceipt;
+  unread?: ChatUnreadState;
+};
+
+export type ChatPushCapability = {
+  available: boolean;
+  publicKey: string | null;
+};
+
+export type ChatPushSubscriptionState = {
+  enabled: boolean;
 };
 
 export function fetchChatContacts(): Promise<ChatContact[]> {
@@ -101,4 +122,26 @@ export async function openChatSocket(): Promise<WebSocket | null> {
   if (!accessToken) return null;
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return new WebSocket(`${protocol}//${window.location.host}/api/ws/chat`, ["playsay", accessToken]);
+}
+
+export function fetchChatPushCapability(): Promise<ChatPushCapability> {
+  return apiJson("/api/chat/push/capability", { method: "GET" }, authConfig);
+}
+
+export function upsertChatPushSubscription(
+  subscription: { endpoint: string; p256dh: string; auth: string; locale: string },
+): Promise<ChatPushSubscriptionState> {
+  return apiJson(
+    "/api/chat/push/subscription",
+    { body: JSON.stringify(subscription), method: "PUT" },
+    authConfig,
+  );
+}
+
+export function removeChatPushSubscription(endpoint: string): Promise<ChatPushSubscriptionState> {
+  return apiJson(
+    "/api/chat/push/subscription",
+    { body: JSON.stringify({ endpoint }), method: "DELETE" },
+    authConfig,
+  );
 }

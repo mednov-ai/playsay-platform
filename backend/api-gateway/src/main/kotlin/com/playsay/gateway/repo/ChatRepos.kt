@@ -5,6 +5,8 @@ import com.playsay.gateway.entity.ChatEmailDigestEntity
 import com.playsay.gateway.entity.ChatEmailDigestMessageEntity
 import com.playsay.gateway.entity.ChatMessageEntity
 import com.playsay.gateway.entity.ChatParticipantStateEntity
+import com.playsay.gateway.entity.ChatPushDeliveryEntity
+import com.playsay.gateway.entity.ChatPushSubscriptionEntity
 import jakarta.persistence.LockModeType
 import java.time.Instant
 import java.util.UUID
@@ -12,6 +14,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 
 interface ChatConversationRepo : JpaRepository<ChatConversationEntity, UUID> {
     fun findByTeacherUserIdAndStudentUserId(teacherUserId: UUID, studentUserId: UUID): ChatConversationEntity?
@@ -75,6 +78,21 @@ interface ChatMessageRepo : JpaRepository<ChatMessageEntity, UUID> {
 
     @Query(
         """
+        select count(m) from ChatMessageEntity m
+         where m.conversationId = :conversationId
+           and m.senderUserId <> :recipientUserId
+           and (m.createdAt > :readAt or (m.createdAt = :readAt and m.id > :lastReadMessageId))
+        """,
+    )
+    fun countUnreadAfter(
+        conversationId: UUID,
+        recipientUserId: UUID,
+        readAt: Instant,
+        lastReadMessageId: UUID,
+    ): Long
+
+    @Query(
+        """
         select m
           from ChatMessageEntity m, ChatConversationEntity c
          where m.conversationId = c.id
@@ -90,6 +108,10 @@ interface ChatMessageRepo : JpaRepository<ChatMessageEntity, UUID> {
 interface ChatParticipantStateRepo : JpaRepository<ChatParticipantStateEntity, UUID> {
     fun findByConversationIdAndUserId(conversationId: UUID, userId: UUID): ChatParticipantStateEntity?
     fun findByConversationIdInAndUserId(conversationIds: Collection<UUID>, userId: UUID): List<ChatParticipantStateEntity>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from ChatParticipantStateEntity s where s.conversationId = :conversationId and s.userId = :userId")
+    fun lockByConversationIdAndUserId(conversationId: UUID, userId: UUID): ChatParticipantStateEntity?
 }
 
 interface ChatEmailDigestRepo : JpaRepository<ChatEmailDigestEntity, UUID> {
@@ -122,4 +144,34 @@ interface ChatEmailDigestRepo : JpaRepository<ChatEmailDigestEntity, UUID> {
 interface ChatEmailDigestMessageRepo : JpaRepository<ChatEmailDigestMessageEntity, UUID> {
     fun existsByMessageId(messageId: UUID): Boolean
     fun findByDigestIdOrderByCreatedAtAsc(digestId: UUID): List<ChatEmailDigestMessageEntity>
+}
+
+interface ChatPushSubscriptionRepo : JpaRepository<ChatPushSubscriptionEntity, UUID> {
+    fun findByEndpointHash(endpointHash: String): ChatPushSubscriptionEntity?
+    fun findByUserIdAndActiveTrue(userId: UUID): List<ChatPushSubscriptionEntity>
+}
+
+interface ChatPushDeliveryRepo : JpaRepository<ChatPushDeliveryEntity, UUID> {
+    fun existsByMessageIdAndSubscriptionId(messageId: UUID, subscriptionId: UUID): Boolean
+
+    @Query(
+        """
+        select d.id from ChatPushDeliveryEntity d
+         where d.status in :statuses
+           and d.nextAttemptAt <= :now
+           and (d.leaseUntil is null or d.leaseUntil <= :now)
+         order by d.nextAttemptAt, d.createdAt, d.id
+        """,
+    )
+    fun findDueIds(
+        @Param("statuses") statuses: Collection<String>,
+        @Param("now") now: Instant,
+        pageable: Pageable,
+    ): List<UUID>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from ChatPushDeliveryEntity d where d.id = :id")
+    fun lockById(id: UUID): ChatPushDeliveryEntity?
+
+    fun countByStatus(status: String): Long
 }

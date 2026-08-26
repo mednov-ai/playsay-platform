@@ -31,4 +31,5 @@
     <include file="2026-08-05-001-add-game-mechanics-validation.xml" relativeToChangelogFile="true"/>
     <include file="2026-08-20-001-vocabulary-delivery-policies.xml" relativeToChangelogFile="true"/>
     <include file="2026-08-24-001-create-worksheet-material-provenance.xml" relativeToChangelogFile="true"/>
+    <include file="2026-08-26-001-stabilize-chat-unread-push.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

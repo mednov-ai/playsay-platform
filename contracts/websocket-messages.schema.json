@@ -69,12 +69,34 @@
         "receipt": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["conversationId", "readerSubject", "lastReadMessageId", "readAt"],
+          "required": ["conversationId", "readerSubject", "lastReadMessageId", "readAt", "unreadCount", "unreadVersion"],
           "properties": {
             "conversationId": { "type": "string", "format": "uuid" },
             "readerSubject": { "type": "string" },
             "lastReadMessageId": { "type": "string", "format": "uuid" },
-            "readAt": { "type": "string", "format": "date-time" }
+            "readAt": { "type": "string", "format": "date-time" },
+            "unreadCount": { "type": "integer", "minimum": 0 },
+            "unreadVersion": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "unread"],
+      "properties": {
+        "type": { "const": "chat.unread.changed" },
+        "unread": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["conversationId", "unreadCount", "unreadVersion"],
+          "properties": {
+            "conversationId": { "type": "string", "format": "uuid" },
+            "unreadCount": { "type": "integer", "minimum": 0 },
+            "unreadVersion": { "type": "integer", "minimum": 0 },
+            "causeMessageId": { "type": ["string", "null"], "format": "uuid" },
+            "lastReadMessageId": { "type": ["string", "null"], "format": "uuid" }
           }
         }
       }

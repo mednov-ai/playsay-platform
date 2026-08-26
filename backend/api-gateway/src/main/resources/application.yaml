@@ -122,6 +122,15 @@ playsay:
     cooldown: ${PLAYSAY_CHAT_EMAIL_COOLDOWN:PT10M}
     poll-delay-ms: ${PLAYSAY_CHAT_EMAIL_POLL_DELAY_MS:30000}
     retry-delays: ${PLAYSAY_CHAT_EMAIL_RETRY_DELAYS:PT1M,PT5M,PT15M}
+  chat-push:
+    enabled: ${PLAYSAY_CHAT_PUSH_ENABLED:false}
+    public-key: ${PLAYSAY_CHAT_PUSH_PUBLIC_KEY:}
+    private-key: ${PLAYSAY_CHAT_PUSH_PRIVATE_KEY:}
+    subject: ${PLAYSAY_CHAT_PUSH_SUBJECT:}
+    poll-delay-ms: ${PLAYSAY_CHAT_PUSH_POLL_DELAY_MS:3000}
+    initial-delay-ms: ${PLAYSAY_CHAT_PUSH_INITIAL_DELAY_MS:3000}
+    lease: ${PLAYSAY_CHAT_PUSH_LEASE:PT1M}
+    retry-delays: ${PLAYSAY_CHAT_PUSH_RETRY_DELAYS:PT10S,PT1M,PT5M}
   storage:
     provider: ${PLAYSAY_STORAGE_PROVIDER:memory}
     s3:

@@ -19,5 +19,8 @@ class ChatRealtimeEventListener(
     fun onConversationRead(event: ChatConversationReadEvent) = hub.publish(event)
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun onUnreadChanged(event: ChatUnreadChangedEvent) = hub.publish(event)
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onMessagesDelivered(event: ChatMessagesDeliveredEvent) = hub.publish(event)
 }

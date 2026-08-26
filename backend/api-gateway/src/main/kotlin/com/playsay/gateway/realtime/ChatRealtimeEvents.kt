@@ -3,6 +3,7 @@ package com.playsay.gateway.realtime
 import com.playsay.gateway.dto.ChatMessageResponse
 import com.playsay.gateway.dto.ChatDeliveryReceiptResponse
 import com.playsay.gateway.dto.ChatReadReceiptResponse
+import com.playsay.gateway.dto.ChatUnreadStateResponse
 import java.util.UUID
 
 data class ChatMessageCreatedEvent(
@@ -15,6 +16,11 @@ data class ChatMessageCreatedEvent(
 data class ChatConversationReadEvent(
     val receipt: ChatReadReceiptResponse,
     val participantSubjects: Set<String>,
+)
+
+data class ChatUnreadChangedEvent(
+    val unread: ChatUnreadStateResponse,
+    val recipientSubject: String,
 )
 
 data class ChatMessagesDeliveredEvent(

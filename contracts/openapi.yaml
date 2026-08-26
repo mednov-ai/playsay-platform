@@ -777,6 +777,41 @@ paths:
                 $ref: "#/components/schemas/CourseLessonResponse"
       security:
       - bearerAuth: []
+  /chat/push/subscription:
+    put:
+      tags:
+      - chat-controller
+      operationId: upsertPushSubscription
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatPushSubscriptionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatPushSubscriptionResponse"
+    delete:
+      tags:
+      - chat-controller
+      operationId: removePushSubscription
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatPushUnsubscribeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatPushSubscriptionResponse"
   /chat/conversations/{conversationId}/read:
     put:
       tags:
@@ -3549,6 +3584,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HelloResponse"
+  /chat/push/capability:
+    get:
+      tags:
+      - chat-controller
+      operationId: pushCapability
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatPushCapabilityResponse"
   /chat/contacts:
     get:
       tags:
@@ -4881,6 +4928,36 @@ components:
             $ref: "#/components/schemas/LessonTemplateCardRequest"
       required:
       - cards
+    ChatPushSubscriptionRequest:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          maxLength: 2048
+          minLength: 0
+        p256dh:
+          type: string
+          maxLength: 512
+          minLength: 0
+        auth:
+          type: string
+          maxLength: 512
+          minLength: 0
+        locale:
+          type: string
+          pattern: "(?i)^(ru|en|de|fr)([-_][a-z]{2})?$"
+      required:
+      - auth
+      - endpoint
+      - locale
+      - p256dh
+    ChatPushSubscriptionResponse:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required:
+      - enabled
     MarkChatReadRequest:
       type: object
       properties:
@@ -4903,11 +4980,19 @@ components:
         readAt:
           type: string
           format: date-time
+        unreadCount:
+          type: integer
+          format: int64
+        unreadVersion:
+          type: integer
+          format: int64
       required:
       - conversationId
       - lastReadMessageId
       - readAt
       - readerSubject
+      - unreadCount
+      - unreadVersion
     UpdateUserRolesRequest:
       type: object
       properties:
@@ -6394,6 +6479,9 @@ components:
         unreadCount:
           type: integer
           format: int64
+        unreadVersion:
+          type: integer
+          format: int64
         createdAt:
           type: string
           format: date-time
@@ -6402,6 +6490,7 @@ components:
       - createdAt
       - id
       - unreadCount
+      - unreadVersion
     ChatMessageResponse:
       type: object
       properties:
@@ -7065,6 +7154,17 @@ components:
       - message
       - service
       - timestamp
+    ChatPushCapabilityResponse:
+      type: object
+      properties:
+        available:
+          type: boolean
+        publicKey:
+          type:
+          - string
+          - "null"
+      required:
+      - available
     ChatMessagePageResponse:
       type: object
       properties:
@@ -7286,6 +7386,15 @@ components:
       - provider
       - providerStatus
       - updatedAt
+    ChatPushUnsubscribeRequest:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          maxLength: 2048
+          minLength: 0
+      required:
+      - endpoint
   securitySchemes:
     bearerAuth:
       type: http

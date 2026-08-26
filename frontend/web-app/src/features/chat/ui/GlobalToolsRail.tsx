@@ -1,5 +1,7 @@
 import {
   ArrowLeft,
+  Bell,
+  BellOff,
   Check,
   CheckCheck,
   Loader2,
@@ -9,10 +11,20 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { TFunction } from "i18next";
 import type { MeProfile } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { LessonDiceController, LessonDiceRoll } from "../../classroom";
 import { consumePendingChatTarget, readPendingChatTarget } from "../model/chatDeepLink";
+import {
+  applyConversationSnapshot,
+  applyReadReceipt,
+  applyUnreadUpdate,
+  totalUnreadCount,
+  unreadCountFor,
+  type ChatUnreadMap,
+} from "../model/chatUnreadState";
+import { useChatPushSubscription } from "../model/useChatPushSubscription";
 import {
   createChatConversation,
   fetchChatContacts,
@@ -63,6 +75,7 @@ export function GlobalToolsRail({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [unreadByConversation, setUnreadByConversation] = useState<ChatUnreadMap>({});
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ConversationMessages>>({});
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
@@ -82,7 +95,10 @@ export function GlobalToolsRail({
   const activeConversationIdRef = useRef(activeConversationId);
   const messagesRef = useRef(messagesByConversation);
   const conversationsRef = useRef(conversations);
+  const recoveryInFlightRef = useRef<Promise<ChatConversation[]> | null>(null);
+  const recoveryPendingRef = useRef(false);
   const initialChatTargetRef = useRef(readPendingChatTarget());
+  const chatPush = useChatPushSubscription(profile.subject, i18n.language);
 
   useEffect(() => {
     openRef.current = chatOpen;
@@ -100,42 +116,57 @@ export function GlobalToolsRail({
     conversationsRef.current = conversations;
   }, [conversations]);
 
-  const refreshConversations = useCallback(async () => {
-    const next = await fetchChatConversations();
-    setConversations(next);
-    return next;
+  const refreshConversations = useCallback((): Promise<ChatConversation[]> => {
+    if (recoveryInFlightRef.current) {
+      recoveryPendingRef.current = true;
+      return recoveryInFlightRef.current;
+    }
+    const run = async () => {
+      let latest: ChatConversation[] = [];
+      do {
+        recoveryPendingRef.current = false;
+        latest = await fetchChatConversations();
+        setConversations(latest);
+        setUnreadByConversation((current) => applyConversationSnapshot(current, latest));
+      } while (recoveryPendingRef.current);
+      return latest;
+    };
+    const promise = run();
+    recoveryInFlightRef.current = promise;
+    void promise.finally(() => {
+      if (recoveryInFlightRef.current === promise) recoveryInFlightRef.current = null;
+    });
+    return promise;
   }, []);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
-    Promise.all([fetchChatContacts(), fetchChatConversations()])
-      .then(([nextContacts, nextConversations]) => {
+    Promise.all([fetchChatContacts(), refreshConversations()])
+      .then(([nextContacts]) => {
         if (!active) return;
         setContacts(nextContacts);
-        setConversations(nextConversations);
       })
       .catch(() => active && setError(t("chat.errors.load")))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [profile.subject, t]);
+  }, [profile.subject, refreshConversations, t]);
 
   const markVisibleConversationRead = useCallback(async (conversationId: string, items?: ChatMessage[]) => {
+    if (!openRef.current || activeConversationIdRef.current !== conversationId || document.visibilityState !== "visible") return;
     const visibleItems = items ?? messagesRef.current[conversationId]?.items ?? [];
     const latest = visibleItems[visibleItems.length - 1];
     if (!latest || latest.senderSubject === profile.subject) return;
     try {
-      await markChatRead(conversationId, latest.id);
-      setConversations((current) => current.map((conversation) => (
-        conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation
-      )));
+      const receipt = await markChatRead(conversationId, latest.id);
+      setUnreadByConversation((current) => applyReadReceipt(current, receipt));
     } catch {
-      // A later refresh reconciles the badge; reading the chat itself remains available.
+      void refreshConversations().catch(() => undefined);
     }
-  }, [profile.subject]);
+  }, [profile.subject, refreshConversations]);
 
   const loadMessages = useCallback(async (conversationId: string, older = false) => {
     const current = messagesRef.current[conversationId] ?? emptyMessages;
@@ -210,8 +241,18 @@ export function GlobalToolsRail({
           }
           void refreshConversations();
         }
+        if (realtime.type === "chat.unread.changed" && realtime.unread) {
+          const unread = realtime.unread;
+          setUnreadByConversation((current) => applyUnreadUpdate(current, unread));
+          if (!conversationsRef.current.some((conversation) => conversation.id === unread.conversationId)) {
+            void refreshConversations().catch(() => undefined);
+          }
+        }
         if (realtime.type === "chat.conversation.read" && realtime.receipt) {
           const receipt = realtime.receipt;
+          if (receipt.readerSubject === profile.subject) {
+            setUnreadByConversation((current) => applyReadReceipt(current, receipt));
+          }
           setMessagesByConversation((all) => {
             const state = all[receipt.conversationId];
             if (!state || receipt.readerSubject === profile.subject) return all;
@@ -264,6 +305,26 @@ export function GlobalToolsRail({
       socket?.close();
     };
   }, [markVisibleConversationRead, profile.subject, refreshConversations, t]);
+
+  useEffect(() => {
+    function reconcileFromServiceWorker(event: MessageEvent) {
+      if (event.data?.type !== "chat.push.received") return;
+      void refreshConversations().catch(() => undefined);
+    }
+    navigator.serviceWorker?.addEventListener("message", reconcileFromServiceWorker);
+    return () => navigator.serviceWorker?.removeEventListener("message", reconcileFromServiceWorker);
+  }, [refreshConversations]);
+
+  useEffect(() => {
+    function markReadWhenVisible() {
+      const conversationId = activeConversationIdRef.current;
+      if (document.visibilityState === "visible" && openRef.current && conversationId) {
+        void markVisibleConversationRead(conversationId);
+      }
+    }
+    document.addEventListener("visibilitychange", markReadWhenVisible);
+    return () => document.removeEventListener("visibilitychange", markReadWhenVisible);
+  }, [markVisibleConversationRead]);
 
   useEffect(() => {
     if (loading) return;
@@ -337,7 +398,7 @@ export function GlobalToolsRail({
   const activeMessages = activeConversationId
     ? messagesByConversation[activeConversationId] ?? emptyMessages
     : emptyMessages;
-  const unreadCount = conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
+  const unreadCount = totalUnreadCount(unreadByConversation);
   const diceValue = classroomDice?.lastRoll?.value ?? null;
   const diceLabel = diceValue === null
     ? t("dice.open")
@@ -405,6 +466,7 @@ export function GlobalToolsRail({
 
   async function selectConversation(conversationId: string) {
     setActiveConversationId(conversationId);
+    activeConversationIdRef.current = conversationId;
     setDraft("");
     setError(null);
     if (!messagesRef.current[conversationId]) await loadMessages(conversationId);
@@ -417,6 +479,7 @@ export function GlobalToolsRail({
     try {
       const conversation = await createChatConversation(contact.subject);
       setConversations((current) => sortConversations(upsertConversation(current, conversation)));
+      setUnreadByConversation((current) => applyConversationSnapshot(current, [conversation]));
       await selectConversation(conversation.id);
     } catch {
       setError(t("chat.errors.create"));
@@ -530,6 +593,22 @@ export function GlobalToolsRail({
               <h2>{activeConversation?.counterpart.displayName ?? t("chat.title")}</h2>
               <p>{activeConversation ? t(`chat.roles.${activeConversation.counterpart.role.toLowerCase()}`) : t("chat.subtitle")}</p>
             </div>
+            <button
+              aria-label={pushControlLabel(chatPush.status, t)}
+              aria-pressed={chatPush.status === "enabled"}
+              className="playsay-chat-icon-button"
+              data-state={chatPush.status}
+              disabled={["checking", "denied", "unsupported", "unavailable"].includes(chatPush.status)}
+              onClick={() => void (chatPush.status === "enabled" ? chatPush.disable() : chatPush.enable())}
+              title={pushControlLabel(chatPush.status, t)}
+              type="button"
+            >
+              {chatPush.status === "checking"
+                ? <Loader2 aria-hidden="true" className="animate-spin" />
+                : chatPush.status === "enabled"
+                  ? <Bell aria-hidden="true" />
+                  : <BellOff aria-hidden="true" />}
+            </button>
             <button aria-label={t("common.actions.close")} className="playsay-chat-icon-button" onClick={closePanel} type="button">
               <X aria-hidden="true" />
             </button>
@@ -622,7 +701,9 @@ export function GlobalToolsRail({
                       </span>
                       <span className="playsay-chat-list-meta">
                         {conversation.lastMessage ? <time>{formatConversationTime(conversation.lastMessage.createdAt, i18n.language)}</time> : null}
-                        {conversation.unreadCount > 0 ? <b>{compactCount(conversation.unreadCount)}</b> : null}
+                        {unreadCountFor(unreadByConversation, conversation) > 0
+                          ? <b>{compactCount(unreadCountFor(unreadByConversation, conversation))}</b>
+                          : null}
                       </span>
                     </button>
                   ))}
@@ -805,6 +886,12 @@ function sortConversations(conversations: ChatConversation[]): ChatConversation[
 
 function compactCount(value: number): string {
   return value > 99 ? "99+" : String(value);
+}
+
+function pushControlLabel(status: ReturnType<typeof useChatPushSubscription>["status"], t: TFunction): string {
+  if (status === "enabled") return t("chat.notifications.disable");
+  if (status === "disabled") return t("chat.notifications.enable");
+  return t(`chat.notifications.${status === "checking" ? "pending" : status}`);
 }
 
 function formatMessageTime(value: string, locale: string): string {

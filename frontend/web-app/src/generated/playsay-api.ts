@@ -516,6 +516,30 @@ export interface LessonTemplateCardsRequest {
   cards: LessonTemplateCardRequest[];
 }
 
+export interface ChatPushSubscriptionRequest {
+  /**
+     * @minLength 0
+     * @maxLength 2048
+     */
+  endpoint: string;
+  /**
+     * @minLength 0
+     * @maxLength 512
+     */
+  p256dh: string;
+  /**
+     * @minLength 0
+     * @maxLength 512
+     */
+  auth: string;
+  /** @pattern (?i)^(ru|en|de|fr)([-_][a-z]{2})?$ */
+  locale: string;
+}
+
+export interface ChatPushSubscriptionResponse {
+  enabled: boolean;
+}
+
 export interface MarkChatReadRequest {
   lastReadMessageId: string;
 }
@@ -525,6 +549,8 @@ export interface ChatReadReceiptResponse {
   readerSubject: string;
   lastReadMessageId: string;
   readAt: string;
+  unreadCount: number;
+  unreadVersion: number;
 }
 
 export interface UpdateUserRolesRequest {
@@ -1399,6 +1425,7 @@ export interface ChatConversationResponse {
   counterpart: ChatContactResponse;
   lastMessage?: ChatMessageResponse | null;
   unreadCount: number;
+  unreadVersion: number;
   createdAt: string;
 }
 
@@ -1808,6 +1835,12 @@ export interface HelloResponse {
   timestamp: string;
 }
 
+export interface ChatPushCapabilityResponse {
+  available: boolean;
+  /** @nullable */
+  publicKey?: string | null;
+}
+
 export interface ChatMessagePageResponse {
   items: ChatMessageResponse[];
   /** @nullable */
@@ -1894,6 +1927,14 @@ export interface EmailProviderAttemptResponse {
 export interface EmailDeliveryDetailResponse {
   delivery: EmailDeliverySummaryResponse;
   attempts: EmailProviderAttemptResponse[];
+}
+
+export interface ChatPushUnsubscribeRequest {
+  /**
+     * @minLength 0
+     * @maxLength 2048
+     */
+  endpoint: string;
 }
 
 export type CreateWorksheetImportBody = {
@@ -3434,6 +3475,86 @@ export const replaceCourseLessonCards = async (courseId: string,
 
   const data: replaceCourseLessonCardsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as replaceCourseLessonCardsResponse
+}
+
+
+
+export type upsertPushSubscriptionResponse200 = {
+  data: ChatPushSubscriptionResponse
+  status: 200
+}
+
+export type upsertPushSubscriptionResponseSuccess = (upsertPushSubscriptionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type upsertPushSubscriptionResponse = (upsertPushSubscriptionResponseSuccess)
+
+export const getUpsertPushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/chat/push/subscription`
+}
+
+export const upsertPushSubscription = async (chatPushSubscriptionRequest: ChatPushSubscriptionRequest, options?: RequestInit): Promise<upsertPushSubscriptionResponse> => {
+
+  const res = await fetch(getUpsertPushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(chatPushSubscriptionRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: upsertPushSubscriptionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as upsertPushSubscriptionResponse
+}
+
+
+
+export type removePushSubscriptionResponse200 = {
+  data: ChatPushSubscriptionResponse
+  status: 200
+}
+
+export type removePushSubscriptionResponseSuccess = (removePushSubscriptionResponse200) & {
+  headers: Headers;
+};
+;
+
+export type removePushSubscriptionResponse = (removePushSubscriptionResponseSuccess)
+
+export const getRemovePushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/chat/push/subscription`
+}
+
+export const removePushSubscription = async (chatPushUnsubscribeRequest: ChatPushUnsubscribeRequest, options?: RequestInit): Promise<removePushSubscriptionResponse> => {
+
+  const res = await fetch(getRemovePushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(chatPushUnsubscribeRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: removePushSubscriptionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as removePushSubscriptionResponse
 }
 
 
@@ -8771,6 +8892,46 @@ export const getHello = async ( options?: RequestInit): Promise<getHelloResponse
 
   const data: getHelloResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getHelloResponse
+}
+
+
+
+export type pushCapabilityResponse200 = {
+  data: ChatPushCapabilityResponse
+  status: 200
+}
+
+export type pushCapabilityResponseSuccess = (pushCapabilityResponse200) & {
+  headers: Headers;
+};
+;
+
+export type pushCapabilityResponse = (pushCapabilityResponseSuccess)
+
+export const getPushCapabilityUrl = () => {
+
+
+
+
+  return `/api/chat/push/capability`
+}
+
+export const pushCapability = async ( options?: RequestInit): Promise<pushCapabilityResponse> => {
+
+  const res = await fetch(getPushCapabilityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: pushCapabilityResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as pushCapabilityResponse
 }
 
 

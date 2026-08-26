@@ -1,6 +1,7 @@
 FROM gradle:8.14.3-jdk21-alpine AS provider-build
 WORKDIR /workspace
 COPY build.gradle.kts /workspace/build.gradle.kts
+COPY settings.gradle.kts /workspace/settings.gradle.kts
 COPY src /workspace/src
 RUN gradle --no-daemon clean jar
 

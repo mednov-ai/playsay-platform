@@ -9,18 +9,30 @@ import { useAppTranslation } from "../../../shared/i18n";
 import { LanguageSwitcher } from "../../../shared/i18n/ui/LanguageSwitcher";
 import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
 import { BrandMark } from "../../../shared/ui/BrandMark";
-import { clearStudentInviteSecretFromAddressBar, studentInviteTokenFromLocation } from "../model/studentInviteToken";
+import {
+  clearStudentInviteSecretFromAddressBar,
+  studentInviteTokenFromLocation,
+  subscribeToStudentInviteToken,
+} from "../model/studentInviteToken";
 
 const inviteConsumeRequests = new Map<string, Promise<StudentInviteConsumeResult>>();
 
 export function StudentInvitePage() {
   const { t } = useAppTranslation();
   const theme = useAppTheme();
-  const [token] = useState(() => studentInviteTokenFromLocation(window.location));
+  const [token, setToken] = useState(() => studentInviteTokenFromLocation(window.location));
   const [status, setStatus] = useState<"loading" | "waiting" | "success" | "error">("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [continueUrl, setContinueUrl] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => subscribeToStudentInviteToken(window, (nextToken) => {
+    setStatus("loading");
+    setMessage(null);
+    setContinueUrl(null);
+    setToken(nextToken);
+    setAttempt((value) => value + 1);
+  }), []);
 
   useEffect(() => {
     if (!token) {

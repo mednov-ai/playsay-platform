@@ -4,6 +4,11 @@ import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import path from "node:path";
+import {
+  assertOldPasswordRejected,
+  assertPasswordResetAccepted,
+  pollForPasswordResetCode,
+} from "./registration-smoke-helpers.mjs";
 
 const webBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_REGISTRATION_SMOKE_WEB_BASE_URL ?? "https://dev.online.honey.school");
 const authIssuer = stripTrailingSlash(
@@ -99,6 +104,34 @@ try {
   await verifyStudentProfile(tokenSet.access_token);
   summary.checks.push("student-profile-verified");
 
+  const passwordResetRequestedAt = Date.now();
+  const forgotResponse = await fetch(`${webBaseUrl}/api/registration/forgot-password`, {
+    body: JSON.stringify({ email: mailbox.address, locale: "en" }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (forgotResponse.status !== 202) {
+    throw new Error(`PASSWORD_RESET_REQUEST: forgot-password returned HTTP ${forgotResponse.status}`);
+  }
+  summary.checks.push("PASSWORD_RESET_REQUEST");
+
+  const resetCode = await waitForPasswordResetCode(mailbox, passwordResetRequestedAt);
+  summary.checks.push("PASSWORD_RESET_EMAIL");
+  const newPassword = `Meadow${randomBytes(8).toString("hex")}Q7!`;
+  const resetResponse = await fetch(`${webBaseUrl}/api/registration/reset-password`, {
+    body: JSON.stringify({ code: resetCode, email: mailbox.address, newPassword }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  assertPasswordResetAccepted(resetResponse.status);
+  summary.checks.push("PASSWORD_RESET_CONFIRM");
+
+  await expectPasswordSignInRejected(mailbox.address, accountPassword);
+  await signInWithPassword(mailbox.address, newPassword);
+  summary.checks.push("PASSWORD_RESET_SIGN_IN");
+
   await context.close();
 } catch (error) {
   console.error(`Registration smoke failed: ${sanitizeError(error)}`);
@@ -176,6 +209,23 @@ async function waitForConfirmationUrl(mailboxAccount) {
   throw new Error("EMAIL_DELIVERY: confirmation email did not arrive before the deadline");
 }
 
+async function waitForPasswordResetCode(mailboxAccount, requestedAfter) {
+  return pollForPasswordResetCode({
+    deadlineAt: Date.now() + mailboxTimeoutMs,
+    loadMessage: async (messageId) => mailboxRequest(`/messages/${encodeURIComponent(messageId)}`, {
+      headers: { Authorization: `Bearer ${mailboxAccount.token}` },
+    }),
+    loadMessages: async () => {
+      const messages = await mailboxRequest("/messages?page=1", {
+        headers: { Authorization: `Bearer ${mailboxAccount.token}` },
+      });
+      return messages["hydra:member"] ?? [];
+    },
+    pause: () => delay(4_000),
+    requestedAfter,
+  });
+}
+
 async function signInWithPassword(username, password) {
   const body = new URLSearchParams({
     client_id: authClientId,
@@ -193,6 +243,17 @@ async function signInWithPassword(username, password) {
     throw new Error(`OIDC_SIGN_IN: token endpoint returned HTTP ${response.status}`);
   }
   return response.json();
+}
+
+async function expectPasswordSignInRejected(username, password) {
+  const body = new URLSearchParams({ client_id: authClientId, grant_type: "password", password, username });
+  const response = await fetch(`${authIssuer}/protocol/openid-connect/token`, {
+    body,
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  assertOldPasswordRejected(response.status);
 }
 
 async function confirmRegistrationAgain(confirmationUrl) {

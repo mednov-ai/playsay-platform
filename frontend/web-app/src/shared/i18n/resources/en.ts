@@ -67,6 +67,7 @@ export const en = {
       newPassword: "New password",
       code: "Email code",
       displayName: "Lesson name",
+      fullProfileEmailHint: "Use the full email address from your profile.",
     },
     actions: {
       create: "Create account",

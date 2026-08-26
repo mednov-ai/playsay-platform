@@ -67,6 +67,7 @@ export const fr = {
       newPassword: "Nouveau mot de passe",
       code: "Code reçu par email",
       displayName: "Nom en cours",
+      fullProfileEmailHint: "Utilisez l’adresse e-mail complète de votre profil.",
     },
     actions: {
       create: "Créer le compte",

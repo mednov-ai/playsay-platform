@@ -22,6 +22,8 @@ const i18nMock = vi.hoisted(() => {
     "registration.form.password": "Password",
     "registration.form.confirmPassword": "Repeat password",
     "registration.form.displayName": "Lesson name",
+    "registration.form.fullProfileEmailHint": "Use the full email address from your profile.",
+    "registration.actions.sendResetCode": "Send reset code",
     "registration.actions.create": "Create account",
     "registration.actions.creating": "Creating account",
     "registration.actions.forgotPassword": "Forgot password?",
@@ -45,6 +47,7 @@ const i18nMock = vi.hoisted(() => {
     "registration.messages.contractRejected": "The details were not accepted.",
     "registration.messages.unavailable": "Registration is temporarily unavailable.",
     "registration.messages.startFailed": "Could not start registration.",
+    "registration.messages.resetCodeSent": "If the account exists, a code has been sent to the email.",
     "registration.rateLimit.title": "Too many attempts",
     "registration.rateLimit.body": "Please wait and try again.",
     "registration.startSuccess.title": "Email sent",
@@ -78,6 +81,52 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+describe("RegistrationPage password recovery", () => {
+  it("prefills the exact email and exposes the localized hint to assistive technology", () => {
+    window.history.replaceState({}, "", "/forgot-password?email=learner%2Bone%40example.test");
+
+    render(<RegistrationPage route={{ kind: "forgot-password" }} />);
+
+    const input = screen.getByLabelText("Email");
+    expect(input).toHaveValue("learner+one@example.test");
+    expect(input).toHaveAttribute("aria-describedby", "password-recovery-email-hint");
+    expect(screen.getByText("Use the full email address from your profile.")).toHaveAttribute(
+      "id",
+      "password-recovery-email-hint",
+    );
+  });
+
+  it("does not call the recovery API for a malformed email", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    render(<RegistrationPage route={{ kind: "forgot-password" }} />);
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "not-an-email" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Send reset code" }).closest("form") as HTMLFormElement);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps the conditional generic success message after an accepted request", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "CHECK_EMAIL" }), {
+      headers: { "Content-Type": "application/json" },
+      status: 202,
+    }));
+    render(<RegistrationPage route={{ kind: "forgot-password" }} />);
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "learner@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send reset code" }));
+
+    expect(await screen.findByText("If the account exists, a code has been sent to the email.")).toBeVisible();
+  });
+
+  it("uses the same localized email hint on the reset form", () => {
+    render(<RegistrationPage route={{ kind: "reset-password" }} />);
+
+    expect(screen.getByLabelText("Email")).toHaveAttribute("aria-describedby", "password-recovery-email-hint");
+    expect(screen.getByText("Use the full email address from your profile.")).toBeVisible();
+  });
 });
 
 describe("RegistrationPage start form", () => {

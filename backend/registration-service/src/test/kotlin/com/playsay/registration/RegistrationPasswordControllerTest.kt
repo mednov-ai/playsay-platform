@@ -1,5 +1,8 @@
 package com.playsay.registration
 
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.playsay.registration.service.KeycloakRegistrationClient
 import com.playsay.registration.service.KeycloakRegistrationUser
 import com.playsay.registration.service.KeycloakTokenSet
@@ -9,6 +12,7 @@ import com.playsay.registration.repo.PendingRegistrationRepo
 import com.playsay.registration.service.RegistrationEmailClient
 import com.playsay.registration.service.RegistrationEmailCommand
 import com.playsay.registration.service.PasswordResetEmailCommand
+import com.playsay.registration.service.RegistrationService
 import java.time.Instant
 import java.net.URI
 import java.net.http.HttpClient
@@ -30,6 +34,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.http.HttpStatus
+import org.slf4j.LoggerFactory
 
 class RegistrationPasswordControllerTest : RegistrationControllerTestFixture() {
     @Test
@@ -115,6 +120,84 @@ class RegistrationPasswordControllerTest : RegistrationControllerTestFixture() {
         assertEquals("en", reset.locale)
         assertEquals(6, reset.code.length)
         assertEquals("https://dev.online.honey.school/reset-password?email=forgot%40example.com", reset.resetUrl)
+    }
+
+    @Test
+    fun `forgot password keeps a generic response for unknown inactive and cooldown outcomes`() {
+        val inactive = "inactive@example.test"
+        RecordingKeycloakRegistrationClient.existingUsers[inactive] = KeycloakRegistrationUser(
+            username = inactive,
+            email = inactive,
+            enabled = false,
+            emailVerified = true,
+        )
+        val active = "cooldown@example.test"
+        RecordingKeycloakRegistrationClient.existingUsers[active] = KeycloakRegistrationUser(
+            username = active,
+            email = active,
+            enabled = true,
+            emailVerified = true,
+        )
+
+        val unknownResponse = forgotPassword("unknown@example.test")
+        val inactiveResponse = forgotPassword(inactive)
+        val firstActiveResponse = forgotPassword(active)
+        val cooldownResponse = forgotPassword(active)
+
+        listOf(unknownResponse, inactiveResponse, firstActiveResponse, cooldownResponse).forEach { response ->
+            assertEquals(HttpStatus.ACCEPTED.value(), response.statusCode(), response.body())
+            assertTrue(response.body().contains("CHECK_EMAIL"))
+        }
+        assertEquals(listOf(active), RecordingRegistrationEmailClient.passwordResets.map { it.to })
+    }
+
+    @Test
+    fun `forgot password logs only sanitized outcome categories`() {
+        val active = "log-active@example.test"
+        val inactive = "log-inactive@example.test"
+        val deliveryFailure = "log-failure@example.test"
+        listOf(active, deliveryFailure).forEach { email ->
+            RecordingKeycloakRegistrationClient.existingUsers[email] = KeycloakRegistrationUser(
+                username = email,
+                email = email,
+                enabled = true,
+                emailVerified = true,
+            )
+        }
+        RecordingKeycloakRegistrationClient.existingUsers[inactive] = KeycloakRegistrationUser(
+            username = inactive,
+            email = inactive,
+            enabled = false,
+            emailVerified = true,
+        )
+        val logger = LoggerFactory.getLogger(RegistrationService::class.java) as Logger
+        val appender = ListAppender<ILoggingEvent>().apply { start() }
+        logger.addAppender(appender)
+        try {
+            forgotPassword(active)
+            forgotPassword(active)
+            forgotPassword(inactive)
+            forgotPassword("log-unknown@example.test")
+            RecordingRegistrationEmailClient.passwordResetFailure = RuntimeException(
+                "mail provider rejected $deliveryFailure with code 654321",
+            )
+            val failed = forgotPassword(deliveryFailure)
+
+            assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), failed.statusCode())
+            RecordingRegistrationEmailClient.passwordResetFailure = null
+            val retryAfterRollback = forgotPassword(deliveryFailure)
+            assertEquals(HttpStatus.ACCEPTED.value(), retryAfterRollback.statusCode(), retryAfterRollback.body())
+            assertEquals(listOf(active, deliveryFailure), RecordingRegistrationEmailClient.passwordResets.map { it.to })
+            val logText = appender.list.joinToString("\n") { it.formattedMessage }
+            listOf("CODE_SENT", "COOLDOWN", "ACCOUNT_NOT_ACTIVE", "EMAIL_DELIVERY_FAILED").forEach {
+                assertTrue(logText.contains("outcome=$it"), logText)
+            }
+            listOf(active, inactive, deliveryFailure, "log-unknown@example.test", "654321").forEach {
+                assertFalse(logText.contains(it), logText)
+            }
+        } finally {
+            logger.detachAppender(appender)
+        }
     }
 
     @Test

@@ -35,6 +35,12 @@ data class RegistrationResult(
     val continueUrl: String? = null,
 )
 
+internal enum class PasswordResetRequestOutcome {
+    CODE_SENT,
+    COOLDOWN,
+    ACCOUNT_NOT_ACTIVE,
+}
+
 data class KeycloakUserCreateCommand(
     val username: String,
     val email: String?,

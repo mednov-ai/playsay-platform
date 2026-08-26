@@ -12,6 +12,7 @@ import java.time.Instant
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
@@ -32,6 +33,7 @@ class RegistrationService(
     @param:Value("\${playsay.registration.password-reset-code-ttl-minutes}") private val passwordResetCodeTtlMinutes: Long,
     @param:Value("\${playsay.registration.password-reset-max-attempts}") private val passwordResetMaxAttempts: Int,
 ) {
+    private val logger = LoggerFactory.getLogger(RegistrationService::class.java)
     private val resetCodeRandom = SecureRandom()
     private val returnToPolicy = ReturnToUrlPolicy()
 
@@ -166,14 +168,23 @@ class RegistrationService(
         val email = command.email.normalizedEmail()
         rateLimiter.check(email, command.remoteAddress)
         val now = Instant.now(clock)
-        sendPasswordResetForActiveUser(
-            email = email,
-            emailOriginal = command.email.trim(),
-            displayName = null,
-            locale = command.locale.normalizedLocale(),
-            returnTo = allowedReturnTo(command.returnTo),
-            now = now,
-        )
+        val outcome = try {
+            sendPasswordResetForActiveUser(
+                email = email,
+                emailOriginal = command.email.trim(),
+                displayName = null,
+                locale = command.locale.normalizedLocale(),
+                returnTo = allowedReturnTo(command.returnTo),
+                now = now,
+            )
+        } catch (failure: PasswordResetEmailDeliveryException) {
+            logger.warn(
+                "event=password_reset_request outcome=EMAIL_DELIVERY_FAILED exceptionClass={}",
+                failure.deliveryExceptionClass,
+            )
+            throw failure
+        }
+        logger.info("event=password_reset_request outcome={}", outcome)
         return RegistrationResult(status = registrationStatusCheckEmail)
     }
 
@@ -236,10 +247,10 @@ class RegistrationService(
         locale: String,
         returnTo: String?,
         now: Instant,
-    ) {
+    ): PasswordResetRequestOutcome {
         val user = keycloak.findUserByEmail(email)
         if (user?.enabled != true) {
-            return
+            return PasswordResetRequestOutcome.ACCOUNT_NOT_ACTIVE
         }
 
         val latest = passwordResetCodeRepo
@@ -250,10 +261,10 @@ class RegistrationService(
                 latest.updatedAt = now
                 passwordResetCodeRepo.saveAndFlush(latest)
             } else if (latest.emailSentAt?.plusSeconds(resendCooldownSeconds)?.isAfter(now) == true) {
-                return
+                return PasswordResetRequestOutcome.COOLDOWN
             } else {
                 refreshPasswordResetCode(latest, displayName, locale, returnTo, now)
-                return
+                return PasswordResetRequestOutcome.CODE_SENT
             }
         }
 
@@ -275,7 +286,8 @@ class RegistrationService(
             updatedAt = now,
         )
         passwordResetCodeRepo.saveAndFlush(resetCode)
-        emailClient.sendPasswordResetCode(resetCode.toEmailCommand(code))
+        sendPasswordResetEmail(resetCode.toEmailCommand(code))
+        return PasswordResetRequestOutcome.CODE_SENT
     }
 
     private fun refreshPasswordResetCode(
@@ -295,7 +307,15 @@ class RegistrationService(
         resetCode.expiresAt = now.plusSeconds(passwordResetCodeTtlMinutes * 60)
         resetCode.updatedAt = now
         passwordResetCodeRepo.saveAndFlush(resetCode)
-        emailClient.sendPasswordResetCode(resetCode.toEmailCommand(code))
+        sendPasswordResetEmail(resetCode.toEmailCommand(code))
+    }
+
+    private fun sendPasswordResetEmail(command: PasswordResetEmailCommand) {
+        try {
+            emailClient.sendPasswordResetCode(command)
+        } catch (failure: RuntimeException) {
+            throw PasswordResetEmailDeliveryException(failure.javaClass.simpleName)
+        }
     }
 
     private fun rejectInvalidPasswordReset(email: String, now: Instant): Nothing {
@@ -400,3 +420,7 @@ class RegistrationService(
         val passwordResetCodeRegex = Regex("\\d{6}")
     }
 }
+
+private class PasswordResetEmailDeliveryException(
+    val deliveryExceptionClass: String,
+) : RuntimeException("Password reset email delivery failed.")

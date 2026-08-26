@@ -67,6 +67,7 @@ export const ru = {
       newPassword: "Новый пароль",
       code: "Код из письма",
       displayName: "Имя на уроках",
+      fullProfileEmailHint: "Введите полный email из профиля.",
     },
     actions: {
       create: "Создать аккаунт",

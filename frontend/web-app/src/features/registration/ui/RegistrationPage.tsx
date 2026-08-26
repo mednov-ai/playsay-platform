@@ -406,13 +406,30 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
                 className="grid gap-4 pt-5"
                 onSubmit={(event) => {
                   event.preventDefault();
+                  if (!event.currentTarget.checkValidity()) {
+                    event.currentTarget.reportValidity();
+                    return;
+                  }
                   void submitForgotPassword();
                 }}
               >
-                <label className="grid gap-1 text-sm font-bold">
-                  <span>{t("registration.form.email")}</span>
-                  <input className="playsay-input" disabled={loading} maxLength={320} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
-                </label>
+                <div className="grid gap-1 text-sm font-bold">
+                  <label htmlFor="password-recovery-email">{t("registration.form.email")}</label>
+                  <input
+                    aria-describedby="password-recovery-email-hint"
+                    className="playsay-input"
+                    disabled={loading}
+                    id="password-recovery-email"
+                    maxLength={320}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                    type="email"
+                    value={email}
+                  />
+                  <p className="text-xs font-semibold text-muted-foreground" id="password-recovery-email-hint">
+                    {t("registration.form.fullProfileEmailHint")}
+                  </p>
+                </div>
                 {message ? <RegistrationMessage message={message} /> : null}
                 <Button disabled={loading || !email.trim()} type="submit">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
@@ -432,10 +449,23 @@ export function RegistrationPage({ route }: { route: RegistrationRoute }) {
                   void submitResetPassword();
                 }}
               >
-                <label className="grid gap-1 text-sm font-bold">
-                  <span>{t("registration.form.email")}</span>
-                  <input className="playsay-input" disabled={loading} maxLength={320} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
-                </label>
+                <div className="grid gap-1 text-sm font-bold">
+                  <label htmlFor="password-recovery-email">{t("registration.form.email")}</label>
+                  <input
+                    aria-describedby="password-recovery-email-hint"
+                    className="playsay-input"
+                    disabled={loading}
+                    id="password-recovery-email"
+                    maxLength={320}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                    type="email"
+                    value={email}
+                  />
+                  <p className="text-xs font-semibold text-muted-foreground" id="password-recovery-email-hint">
+                    {t("registration.form.fullProfileEmailHint")}
+                  </p>
+                </div>
                 <label className="grid gap-1 text-sm font-bold">
                   <span>{t("registration.form.code")}</span>
                   <input className="playsay-input" disabled={loading} inputMode="numeric" maxLength={12} minLength={6} onChange={(event) => setResetCode(event.target.value)} required type="text" value={resetCode} />

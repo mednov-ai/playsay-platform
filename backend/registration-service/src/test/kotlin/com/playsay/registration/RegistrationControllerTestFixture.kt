@@ -384,10 +384,12 @@ internal object RecordingKeycloakRegistrationClient : KeycloakRegistrationClient
 internal object RecordingRegistrationEmailClient : RegistrationEmailClient {
     val registrationConfirmations = mutableListOf<RegistrationEmailCommand>()
     val passwordResets = mutableListOf<PasswordResetEmailCommand>()
+    var passwordResetFailure: RuntimeException? = null
 
     fun reset() {
         registrationConfirmations.clear()
         passwordResets.clear()
+        passwordResetFailure = null
     }
 
     override fun sendRegistrationConfirmation(command: RegistrationEmailCommand) {
@@ -395,6 +397,7 @@ internal object RecordingRegistrationEmailClient : RegistrationEmailClient {
     }
 
     override fun sendPasswordResetCode(command: PasswordResetEmailCommand) {
+        passwordResetFailure?.let { throw it }
         passwordResets += command
     }
 }

@@ -211,6 +211,7 @@ spec:
                 export VITE_VOCABULARY_GENERATED_MEDIA_ENABLED=true
                 export VITE_KEYBOARD_ORIGIN=https://dev.key.honey.school
               elif [ "$DEPLOY_TO_PROD" = "true" ]; then
+                export VITE_EXTERNAL_ACTIVITY_ENABLED=true
                 export VITE_KEYBOARD_ORIGIN=https://key.honey.school
               fi
               npm --workspace web-app run build

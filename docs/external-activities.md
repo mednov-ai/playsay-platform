@@ -14,7 +14,7 @@ The following hosts are classified as `GUARANTEED`:
 
 Other public HTTPS hosts are stored as `EXPERIMENTAL`. Localhost, `.local`, private/reserved IP literals, credentialed URLs, non-HTTPS URLs, control characters, and URLs longer than 2048 characters are rejected. The API never fetches the submitted URL.
 
-## Install the development extension
+## Install the extension
 
 Chrome or Edge 116+ is required. The source directory is not itself an installable extension: the browser must receive a directory with `manifest.json` at its root.
 
@@ -22,9 +22,9 @@ Chrome or Edge 116+ is required. The source directory is not itself an installab
 2. Open `chrome://extensions` or `edge://extensions`, enable developer mode, and choose **Load unpacked**.
 3. Select `frontend/browser-extension/dist` — do not select `frontend/browser-extension`.
 4. Pin the bee action through the browser's extensions menu.
-5. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for a production-mode build deployed to the shared dev stand. Local development enables the feature automatically, and Jenkins sets the flag only for dev deployments.
+5. Set `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for production-mode builds. Local development enables the feature automatically, and Jenkins sets the flag for deployable dev builds and fixed-width numeric production releases.
 
-Shared external activities remain dev-only while browser lifecycle acceptance is incomplete. Jenkins sets `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for dev deployments and deliberately leaves it unset for numeric production releases. A disabled build shows an explicit unavailable state instead of accepting a launcher click that cannot start an extension session.
+Shared external activities are eligible for production only after the complete dev browser lifecycle matrix passes. Jenkins sets `VITE_EXTERNAL_ACTIVITY_ENABLED=true` for dev deployments and numeric production releases, and the CI contract rejects a release pipeline that omits it. Promotion remains a separate reviewed GitOps action followed by a canary on both supported production origins. A deliberately disabled rollback build shows an explicit unavailable state instead of accepting a launcher click that cannot start an extension session.
 
 The packaged Jenkins artifact is `frontend/browser-extension/playsay-browser-extension.zip`. Extract it completely, then load the extracted directory that contains `manifest.json`; do not select the ZIP itself. The archive includes `INSTALL-RU.md` with the same installation, update, troubleshooting, and lesson-use steps.
 
@@ -69,7 +69,7 @@ For `EXTENSION_NOT_DETECTED`, verify that the unpacked extension is installed an
 
 ## Manual smoke matrix
 
-Before any future production proposal, the dev web build contract and complete browser acceptance matrix must pass on `https://dev.online.honey.school/`. Production origins remain disabled and are not part of the current delivery. Record only the displayed extension version, stable status codes, lifecycle outcome, and non-sensitive build identity. Exercise the installed `0.1.7` candidate shown on `chrome://extensions`, including student-first launch before teacher connection, provider start, participant input, Return to lesson, and immediate relaunch.
+Before production promotion, the dev web build contract and complete browser acceptance matrix must pass on `https://dev.online.honey.school/`. After a separately authorized promotion, repeat a bounded canary on both `https://online.honeyschool.ru/` and `https://online.honey.school/`. Record only the displayed extension version, stable status codes, lifecycle outcome, and non-sensitive build identity. Exercise the installed `0.1.7` candidate shown on `chrome://extensions`, including student-first launch before teacher connection, provider start, participant input, Return to lesson, and immediate relaunch.
 
 For each guaranteed provider, test with one teacher and three students in a group `SHARED` lesson:
 

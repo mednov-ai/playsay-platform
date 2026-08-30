@@ -53,12 +53,37 @@ import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+import org.springframework.security.web.FilterChainProxy
+import org.springframework.test.web.servlet.MockMvc
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import org.springframework.web.context.WebApplicationContext
 
 class ScheduledLessonAccessControllerTest : ScheduledLessonControllerTestFixture() {
+    @Autowired private lateinit var webApplicationContext: WebApplicationContext
+    @Autowired private lateinit var securityFilterChain: FilterChainProxy
+    private lateinit var securedMockMvc: MockMvc
+
+    @BeforeEach
+    fun configureSecuredMockMvc() {
+        val builder = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+        builder.addFilters<DefaultMockMvcBuilder>(securityFilterChain)
+        securedMockMvc = builder.build()
+    }
+
+    @Test
+    fun `compact resolver is public and returns a generic missing-link response without bearer auth`() {
+        securedMockMvc.perform(
+            post("/public/lesson-access/start")
+                .header("Origin", "https://online.honeyschool.ru")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"alias":"abcdefghijklmnop"}"""),
+        ).andExpect(status().isNotFound)
+    }
+
     @Test
     fun `rotate and revoke invalidate compact aliases for new attempts`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")

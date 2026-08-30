@@ -54,6 +54,7 @@ class SecurityConfig {
                         pathPattern(HttpMethod.POST, "/registration/forgot-password"),
                         pathPattern(HttpMethod.POST, "/registration/reset-password"),
                         pathPattern(HttpMethod.POST, "/student-invites/consume"),
+                        pathPattern(HttpMethod.POST, "/public/lesson-access/start"),
                         pathPattern(HttpMethod.POST, "/public/lesson-access/*/start"),
                         pathPattern(HttpMethod.POST, "/public/lesson-access/*/attempts/*/email-code"),
                         pathPattern(HttpMethod.POST, "/public/lesson-access/*/attempts/*/email-code/verify"),

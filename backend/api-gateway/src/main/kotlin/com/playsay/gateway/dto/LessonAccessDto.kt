@@ -12,6 +12,11 @@ data class LessonAccessStartRequest(
     val token: String,
 )
 
+data class LessonCompactAccessStartRequest(
+    @field:NotBlank @field:Size(min = 16, max = 16)
+    val alias: String,
+)
+
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class LessonAccessAttemptResponse(
     val attemptId: UUID,
@@ -48,9 +53,17 @@ data class LessonAccessStatusResponse(val status: String)
 data class LessonAccessLinkResponse(
     val lessonId: UUID,
     val url: String,
+    val alias: String,
+    val defaultOrigin: String,
+    val urls: LessonAccessLinkUrls,
     val revision: Long,
     val createdAt: Instant,
     val revokedAt: Instant? = null,
+)
+
+data class LessonAccessLinkUrls(
+    val ru: String,
+    val school: String,
 )
 
 data class LessonAdmissionResponse(

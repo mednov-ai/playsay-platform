@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, BookOpen, CalendarClock, Check, CircleAlert, Copy, Loader2, Play, Users } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { formatDateTime, isJoinableScheduledLesson, isScheduledLessonReadyToStart, lessonAccessOpensAt } from "../../../entities/schedule/model";
-import type { LessonMaterial, ScheduledLesson } from "../../../shared/api/playsay";
+import type { LessonAccessOrigin, LessonMaterial, ScheduledLesson } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import { LessonAdmissionPanel } from "../../lesson-access/ui/LessonAdmissionPanel";
 
@@ -27,7 +27,7 @@ export function LessonPreparationPanel({
   message: string | null;
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   onBack: () => void;
-  onCopyLinks: (lesson: ScheduledLesson) => Promise<boolean>;
+  onCopyLinks: (lesson: ScheduledLesson, origin?: LessonAccessOrigin) => Promise<boolean>;
   onOpenMaterials: () => void;
   onStart: (lesson: ScheduledLesson) => Promise<void>;
 }) {
@@ -53,8 +53,8 @@ export function LessonPreparationPanel({
     }
   }
 
-  async function copyLinks() {
-    if (await onCopyLinks(currentLesson)) {
+  async function copyLinks(origin: LessonAccessOrigin) {
+    if (await onCopyLinks(currentLesson, origin)) {
       setLinksCopied(true);
       window.setTimeout(() => setLinksCopied(false), 1800);
     }
@@ -145,9 +145,14 @@ export function LessonPreparationPanel({
               <li data-ready="true"><Check />{t("schedule.preparation.videoReady")}</li>
             </ul>
           </section>
-          <Button disabled={disabled || currentLesson.participants.length === 0} onClick={() => void copyLinks()} type="button" variant="outline">
-            <Copy className="h-4 w-4" />{linksCopied ? t("schedule.clipboard.copied") : t("schedule.preparation.copyLinks")}
-          </Button>
+          <div className="grid gap-2">
+            <Button disabled={disabled || currentLesson.participants.length === 0} onClick={() => void copyLinks("RU")} type="button" variant="outline">
+              <Copy className="h-4 w-4" />{linksCopied ? t("schedule.clipboard.copied") : t("schedule.lessonAccessPanel.copyRu")}
+            </Button>
+            <Button disabled={disabled || currentLesson.participants.length === 0} onClick={() => void copyLinks("SCHOOL")} type="button" variant="outline">
+              <Copy className="h-4 w-4" />{t("schedule.lessonAccessPanel.copySchool")}
+            </Button>
+          </div>
           <LessonAdmissionPanel lesson={currentLesson} />
         </aside>
       </div>

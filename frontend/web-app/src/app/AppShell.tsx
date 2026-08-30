@@ -24,6 +24,7 @@ import {
   type LessonMaterialInput,
   type LessonTemplateCardsInput,
   type LessonMaterialUrlDraftInput,
+  type LessonAccessOrigin,
   type ManagedStudentInput,
   type MeProfile,
   type PaymentInvoice,
@@ -82,7 +83,7 @@ export type AppShellProps = {
   classroomLesson: ScheduledLesson | null;
   completeScheduledLesson: (lessonId: string) => Promise<void>;
   confirmScheduledLessonJoin: (lesson: ScheduledLesson, mediaChoices: ClassroomMediaChoices) => Promise<void>;
-  copyScheduledLessonLinks: (lesson: ScheduledLesson) => Promise<boolean>;
+  copyScheduledLessonLinks: (lesson: ScheduledLesson, origin?: LessonAccessOrigin) => Promise<boolean>;
   courseLessons: CourseLessonMap;
   courseLoading: boolean;
   courseMessage: string | null;
@@ -466,7 +467,7 @@ export function AppShell(props: AppShellProps) {
                   onCreate={createScheduledLesson}
                   onCreateManagedStudent={createManagedStudent}
                   onDelete={(lessonId) => void deleteScheduledLesson(lessonId)}
-                  onCopyLinks={(lesson) => copyScheduledLessonLinks(lesson)}
+                  onCopyLinks={(lesson, origin) => copyScheduledLessonLinks(lesson, origin)}
                   onJoin={(lesson) => void joinScheduledLesson(lesson)}
                   onOpenMaterials={() => setWorkspaceTab("materials")}
                   onPrepare={openLessonPreparation}

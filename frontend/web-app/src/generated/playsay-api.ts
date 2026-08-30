@@ -994,9 +994,17 @@ export interface LessonAdmissionActionRequest {
   expectedRevision?: number | null;
 }
 
+export interface LessonAccessLinkUrls {
+  ru: string;
+  school: string;
+}
+
 export interface LessonAccessLinkResponse {
   lessonId: string;
   url: string;
+  alias: string;
+  defaultOrigin: string;
+  urls: LessonAccessLinkUrls;
   revision: number;
   createdAt: string;
   /** @nullable */
@@ -1059,6 +1067,14 @@ export interface LessonEmailCodeVerifyRequest {
      */
   code: string;
   rememberMe: boolean;
+}
+
+export interface LessonCompactAccessStartRequest {
+  /**
+     * @minLength 16
+     * @maxLength 16
+     */
+  alias: string;
 }
 
 export interface PaymentInvoiceCreateRequest {
@@ -5698,6 +5714,46 @@ export const verifyEmailCode = async (lessonId: string,
 
   const data: verifyEmailCodeResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as verifyEmailCodeResponse
+}
+
+
+
+export type startCompactResponse200 = {
+  data: LessonAccessAttemptResponse
+  status: 200
+}
+
+export type startCompactResponseSuccess = (startCompactResponse200) & {
+  headers: Headers;
+};
+;
+
+export type startCompactResponse = (startCompactResponseSuccess)
+
+export const getStartCompactUrl = () => {
+
+
+
+
+  return `/api/public/lesson-access/start`
+}
+
+export const startCompact = async (lessonCompactAccessStartRequest: LessonCompactAccessStartRequest, options?: RequestInit): Promise<startCompactResponse> => {
+
+  const res = await fetch(getStartCompactUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(lessonCompactAccessStartRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: startCompactResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as startCompactResponse
 }
 
 

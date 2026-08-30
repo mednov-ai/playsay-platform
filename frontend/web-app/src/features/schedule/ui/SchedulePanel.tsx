@@ -16,6 +16,7 @@ import type {
   ScheduledLesson,
   ScheduledLessonInput,
   ScheduledLessonScheduleInput,
+  LessonAccessOrigin,
 } from "../../../shared/api/playsay";
 import { LessonAssignmentWizard } from "./LessonAssignmentWizard";
 import { LessonRescheduleDialog } from "./LessonRescheduleDialog";
@@ -57,7 +58,7 @@ export function SchedulePanel({
   nowMs: number;
   onCancel: (lesson: ScheduledLesson) => void;
   onComplete: (lesson: ScheduledLesson) => void;
-  onCopyLinks: (lesson: ScheduledLesson) => Promise<boolean>;
+  onCopyLinks: (lesson: ScheduledLesson, origin?: LessonAccessOrigin) => Promise<boolean>;
   onCreate: (input: ScheduledLessonInput) => Promise<ScheduledLesson | null | void> | void;
   onCreateManagedStudent: (input: ManagedStudentInput) => Promise<AdminUserProfile | null>;
   onDelete: (lessonId: string) => void;
@@ -89,9 +90,9 @@ export function SchedulePanel({
     return () => window.removeEventListener("playsay:assign-lesson", openWizard);
   }, []);
 
-  async function copyLessonLink(lesson: ScheduledLesson) {
+  async function copyLessonLink(lesson: ScheduledLesson, origin: LessonAccessOrigin = "RU") {
     if (canManage) {
-      if (await onCopyLinks(lesson)) {
+      if (await onCopyLinks(lesson, origin)) {
         markCopied(lesson.id);
       }
       return;
@@ -123,7 +124,7 @@ export function SchedulePanel({
       nowMs={nowMs}
       onCancel={() => onCancel(lesson)}
       onComplete={() => onComplete(lesson)}
-      onCopyLink={() => void copyLessonLink(lesson)}
+      onCopyLink={(origin) => void copyLessonLink(lesson, origin)}
       onDelete={() => onDelete(lesson.id)}
       onJoin={() => onJoin(lesson)}
       onPrepare={() => onPrepare?.(lesson.id)}

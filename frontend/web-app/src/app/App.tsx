@@ -20,9 +20,9 @@ export function App() {
   }
   const lessonAccessRoute = lessonAccessRouteFromPath(pathname);
   if (lessonAccessRoute) {
-    return lessonAccessRoute.auth
+    return lessonAccessRoute.kind === "legacy" && lessonAccessRoute.auth
       ? <LessonAssertionPage lessonId={lessonAccessRoute.lessonId} />
-      : <LessonAccessPage lessonId={lessonAccessRoute.lessonId} />;
+      : <LessonAccessPage lessonId={lessonAccessRoute.kind === "legacy" ? lessonAccessRoute.lessonId : undefined} />;
   }
   const registrationRoute = registrationRouteFromPath(pathname);
   if (registrationRoute) {

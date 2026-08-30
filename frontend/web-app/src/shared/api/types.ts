@@ -67,10 +67,14 @@ export type ScheduledLessonParticipantLinks = {
 export type LessonAccessLink = {
   lessonId: string;
   url: string;
+  alias: string;
+  defaultOrigin: LessonAccessOrigin;
+  urls: { ru: string; school: string };
   revision: number;
   createdAt: string;
   revokedAt?: string | null;
 };
+export type LessonAccessOrigin = "RU" | "SCHOOL";
 export type ScheduledLessonMaterialAssignmentInput = ScheduledLessonMaterialAssignmentRequest;
 export type ScheduledLessonRecurrenceInput = {
   mode: "WEEKLY_COUNT" | "WEEKLY_BY_WEEK";

@@ -495,7 +495,7 @@ export const de = {
     lessonAccessPanel: {
       title: "Zulassung zum Unterricht",
       description: "Bestätigen Sie Gäste und verwalten Sie den gemeinsamen Link sowie den Zugang zugewiesener Lernender.",
-      copy: "Link kopieren", rotate: "Link wechseln", revoke: "Link widerrufen",
+      copy: "Link kopieren", copyRu: "Kopieren · honeyschool.ru", copySchool: "Kopieren · honey.school", rotate: "Link wechseln", revoke: "Link widerrufen",
       mapStudent: "Zugewiesener Lernender", chooseStudent: "Lernenden auswählen", approve: "Zulassen", deny: "Ablehnen",
       kick: "Entfernen", readmit: "Erneut zulassen", noPending: "Keine neuen Lobby-Anfragen.",
       copied: "Link kopiert.", copyFailed: "Kopieren Sie den Link manuell.", rotated: "Link gewechselt.", revoked: "Link widerrufen.",

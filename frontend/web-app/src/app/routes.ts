@@ -120,9 +120,16 @@ export function isStudentInvitePath(pathname: string): boolean {
   return /^\/join\/?$/.test(pathname);
 }
 
-export function lessonAccessRouteFromPath(pathname: string): { lessonId: string; auth: boolean } | null {
+export type LessonAccessRoute =
+  | { kind: "compact"; auth: false }
+  | { kind: "legacy"; lessonId: string; auth: boolean };
+
+export function lessonAccessRouteFromPath(pathname: string): LessonAccessRoute | null {
+  if (/^\/l\/?$/.test(pathname)) {
+    return { kind: "compact", auth: false };
+  }
   const match = /^\/lesson-access\/([^/]+)(\/auth)?\/?$/.exec(pathname);
-  return match ? { lessonId: decodeURIComponent(match[1]), auth: Boolean(match[2]) } : null;
+  return match ? { kind: "legacy", lessonId: decodeURIComponent(match[1]), auth: Boolean(match[2]) } : null;
 }
 
 export type RegistrationRoute =

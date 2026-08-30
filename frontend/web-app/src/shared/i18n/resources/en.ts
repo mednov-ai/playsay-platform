@@ -495,7 +495,7 @@ export const en = {
     lessonAccessPanel: {
       title: "Lesson admission",
       description: "Confirm visitors and manage the shared link and assigned-student access.",
-      copy: "Copy link", rotate: "Rotate link", revoke: "Revoke link",
+      copy: "Copy link", copyRu: "Copy · honeyschool.ru", copySchool: "Copy · honey.school", rotate: "Rotate link", revoke: "Revoke link",
       mapStudent: "Assigned student", chooseStudent: "Choose a student", approve: "Admit", deny: "Deny",
       kick: "Kick", readmit: "Re-admit", noPending: "There are no new Lobby requests.",
       copied: "Link copied.", copyFailed: "Copy the link manually.", rotated: "Link rotated.", revoked: "Link revoked.",

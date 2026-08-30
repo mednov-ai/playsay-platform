@@ -34,4 +34,5 @@
     <include file="2026-08-26-001-stabilize-chat-unread-push.xml" relativeToChangelogFile="true"/>
     <include file="2026-08-26-001-create-lesson-access.xml" relativeToChangelogFile="true"/>
     <include file="2026-08-26-002-cascade-lesson-access.xml" relativeToChangelogFile="true"/>
+    <include file="2026-08-30-001-add-compact-lesson-access.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

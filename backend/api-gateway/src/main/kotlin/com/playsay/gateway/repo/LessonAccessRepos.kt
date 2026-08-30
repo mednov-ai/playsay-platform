@@ -15,6 +15,7 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 
 interface LessonAccessLinkRepo : JpaRepository<LessonAccessLinkEntity, UUID> {
+    fun findFirstByAliasHashAndRevokedAtIsNull(aliasHash: String): LessonAccessLinkEntity?
     fun findFirstByLessonIdAndRevokedAtIsNullOrderByRevisionDesc(lessonId: UUID): LessonAccessLinkEntity?
     fun findFirstByLessonIdOrderByRevisionDesc(lessonId: UUID): LessonAccessLinkEntity?
     @Lock(LockModeType.PESSIMISTIC_WRITE)

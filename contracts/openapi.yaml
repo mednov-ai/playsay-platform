@@ -1935,6 +1935,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LessonAccessAttemptResponse"
+  /public/lesson-access/start:
+    post:
+      tags:
+      - lesson-access-controller
+      operationId: startCompact
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonCompactAccessStartRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonAccessAttemptResponse"
   /payments/admin/invoices:
     get:
       tags:
@@ -6158,6 +6182,12 @@ components:
           format: uuid
         url:
           type: string
+        alias:
+          type: string
+        defaultOrigin:
+          type: string
+        urls:
+          $ref: "#/components/schemas/LessonAccessLinkUrls"
         revision:
           type: integer
           format: int64
@@ -6170,10 +6200,23 @@ components:
           - "null"
           format: date-time
       required:
+      - alias
       - createdAt
+      - defaultOrigin
       - lessonId
       - revision
       - url
+      - urls
+    LessonAccessLinkUrls:
+      type: object
+      properties:
+        ru:
+          type: string
+        school:
+          type: string
+      required:
+      - ru
+      - school
     LessonAccessAttemptResponse:
       type: object
       properties:
@@ -6261,6 +6304,15 @@ components:
       required:
       - code
       - rememberMe
+    LessonCompactAccessStartRequest:
+      type: object
+      properties:
+        alias:
+          type: string
+          maxLength: 16
+          minLength: 16
+      required:
+      - alias
     PaymentInvoiceCreateRequest:
       type: object
       properties:

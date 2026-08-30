@@ -13,7 +13,7 @@ vi.mock("../features/payments", () => ({
   PublicPaymentPage: () => <div>payment</div>,
 }));
 vi.mock("../features/lesson-access", () => ({
-  LessonAccessPage: ({ lessonId }: { lessonId: string }) => <div>lesson-access:{lessonId}</div>,
+  LessonAccessPage: ({ lessonId }: { lessonId?: string }) => <div>lesson-access:{lessonId ?? "compact"}</div>,
   LessonAssertionPage: ({ lessonId }: { lessonId: string }) => <div>lesson-assertion:{lessonId}</div>,
 }));
 vi.mock("./AppShell", () => ({ AppShell: () => <div>authenticated</div> }));
@@ -22,7 +22,16 @@ vi.mock("./useAppController", () => ({ useAppController: () => ({}) }));
 afterEach(() => cleanup());
 
 describe("public SPA routing", () => {
+  it("routes the compact lesson alias entry without a lesson id in the path", () => {
+    window.history.replaceState({}, "", "/l#abcdefghijklmnop");
+
+    render(<App />);
+
+    expect(screen.getByText("lesson-access:compact")).toBeTruthy();
+  });
+
   it("rerenders the password reset page after history navigation and keeps query parameters", () => {
+    window.history.replaceState({}, "", "/forgot-password?email=student%40example.com");
     render(<App />);
     expect(screen.getByText("forgot-password:?email=student%40example.com")).toBeTruthy();
 

@@ -9,6 +9,7 @@ import {
   scheduleStateLabel,
 } from "../../../entities/schedule/model";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
+import type { LessonAccessOrigin } from "../../../shared/api/types";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export function ScheduledLessonCard({
@@ -34,7 +35,7 @@ export function ScheduledLessonCard({
   nowMs: number;
   onCancel: () => void;
   onComplete: () => void;
-  onCopyLink: () => void;
+  onCopyLink: (origin?: LessonAccessOrigin) => void;
   onDelete: () => void;
   onJoin: () => void;
   onStart: () => void;
@@ -137,14 +138,15 @@ export function ScheduledLessonCard({
             </span>
           )}
           {!canManage ? (
-            <Button disabled={disabled} onClick={onCopyLink} type="button" variant="outline">
+            <Button disabled={disabled} onClick={() => onCopyLink()} type="button" variant="outline">
               <Copy className="h-4 w-4" />{linkCopied ? t("schedule.clipboard.copied") : t("schedule.clipboard.link")}
             </Button>
           ) : (
             <details className="playsay-schedule-card-menu">
               <summary aria-label={t("schedule.actions.more")}><EllipsisVertical className="h-4 w-4" /></summary>
               <div>
-                <button disabled={disabled} onClick={onCopyLink} type="button"><Copy />{linkCopied ? t("schedule.clipboard.copied") : t("schedule.actions.copyLinks")}</button>
+                <button disabled={disabled} onClick={() => onCopyLink("RU")} type="button"><Copy />{linkCopied ? t("schedule.clipboard.copied") : t("schedule.lessonAccessPanel.copyRu")}</button>
+                <button disabled={disabled} onClick={() => onCopyLink("SCHOOL")} type="button"><Copy />{t("schedule.lessonAccessPanel.copySchool")}</button>
                 {!archived ? <button disabled={disabled} onClick={onReschedule} type="button"><CalendarClock />{t("schedule.actions.reschedule")}</button> : null}
                 {!archived ? <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.complete")) && onComplete()} type="button"><CheckCircle2 />{t("schedule.actions.complete")}</button> : null}
                 {!archived ? <button disabled={disabled} onClick={() => window.confirm(t("schedule.confirm.cancel")) && onCancel()} type="button"><RotateCcw />{t("schedule.actions.cancel")}</button> : null}

@@ -23,11 +23,10 @@ class LessonAssertionHandoffService(
     private val admissionService: LessonAdmissionService,
     private val registrationGateway: RegistrationGateway,
     private val auditService: LessonAccessAuditService,
+    private val originPolicy: LessonAccessOriginPolicy,
     private val clock: Clock,
-    @param:Value("\${playsay.public-app-url}") private val publicAppUrl: String,
     @param:Value("\${playsay.lesson-access.oidc-client-id:playsay-web}") private val clientId: String,
     @param:Value("\${playsay.lesson-access.environment-issuer:}") private val issuer: String,
-    @param:Value("\${playsay.lesson-access.oidc-callback:\${playsay.public-app-url}/auth/callback}") private val callback: String,
 ) {
     @Transactional
     fun issue(attempt: LessonEntryAttemptEntity): LessonAccessAttemptResponse {
@@ -47,8 +46,16 @@ class LessonAssertionHandoffService(
             )
         }
         if (attempt.assertionIssuedAt != null) return response(attempt, "AUTHORIZATION_ALREADY_ISSUED")
+        val requestOrigin = originPolicy.resolve(attempt.requestOrigin ?: "") ?: return response(attempt, "CLOSED")
         val assertion = registrationGateway.createLessonAuthAssertion(
-            LessonAuthAssertionRequest(subject, attempt.id, clientId, issuer, callback, attempt.rememberMe),
+            LessonAuthAssertionRequest(
+                subject,
+                attempt.id,
+                clientId,
+                issuer,
+                originPolicy.callback(requestOrigin),
+                attempt.rememberMe,
+            ),
         )
         attempt.assertionIssuedAt = now
         attempt.state = "ASSERTION_ISSUED"
@@ -59,7 +66,7 @@ class LessonAssertionHandoffService(
             attempt.id,
             status = "AUTHORIZATION_READY",
             lessonId = attempt.lessonId,
-            authorizationUrl = "${publicAppUrl.trimEnd('/')}/lesson-access/${attempt.lessonId}/auth#assertion=${assertion.handle}",
+            authorizationUrl = "$requestOrigin/lesson-access/${attempt.lessonId}/auth#assertion=${assertion.handle}",
         )
     }
 

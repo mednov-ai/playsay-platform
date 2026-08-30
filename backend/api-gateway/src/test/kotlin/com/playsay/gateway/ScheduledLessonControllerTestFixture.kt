@@ -76,6 +76,8 @@ import liquibase.integration.spring.SpringLiquibase
         "playsay.lesson-access.enabled=true",
         "playsay.lesson-access.hmac-secret-base64=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         "playsay.lesson-access.environment-issuer=https://dev.ops.honey.school/keycloak/realms/playsay",
+        "playsay.public-app-url=https://online.honey.school",
+        "playsay.public-app-rf-url=https://online.honeyschool.ru",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -83,6 +85,7 @@ import liquibase.integration.spring.SpringLiquibase
 abstract class ScheduledLessonControllerTestFixture {
     @Autowired protected lateinit var scheduleController: ScheduledLessonController
     @Autowired protected lateinit var lessonAccessController: LessonAccessController
+    @Autowired protected lateinit var lessonAccessTokenService: LessonAccessTokenService
     @Autowired protected lateinit var studentInviteController: StudentInviteController
     @Autowired protected lateinit var liveKitRoomController: LiveKitRoomController
     @Autowired protected lateinit var liveKitWebhookController: LiveKitWebhookController

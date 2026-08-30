@@ -14,6 +14,7 @@ import {
 import { fetchLessonAccessLink } from "../../../shared/api/schedule";
 import { useAppTranslation } from "../../../shared/i18n";
 import { copyTextFromPromise } from "../../../shared/lib/clipboard";
+import type { LessonAccessOrigin } from "../../../shared/api/types";
 
 export function LessonAdmissionPanel({ lesson }: { lesson: ScheduledLesson }) {
   const { t } = useAppTranslation();
@@ -55,10 +56,12 @@ export function LessonAdmissionPanel({ lesson }: { lesson: ScheduledLesson }) {
     }
   }
 
-  async function copyLink() {
+  async function copyLink(origin: LessonAccessOrigin) {
     setBusy(true);
     try {
-      const result = await copyTextFromPromise(fetchLessonAccessLink(lesson.id).then((link) => link.url));
+      const result = await copyTextFromPromise(fetchLessonAccessLink(lesson.id).then((link) => (
+        origin === "SCHOOL" ? link.urls.school : link.urls.ru
+      )));
       setMessage(t(result.copied ? "schedule.lessonAccessPanel.copied" : "schedule.lessonAccessPanel.copyFailed"));
     } catch {
       setMessage(t("schedule.lessonAccessPanel.error"));
@@ -78,7 +81,8 @@ export function LessonAdmissionPanel({ lesson }: { lesson: ScheduledLesson }) {
       <p className="mt-1 text-sm text-muted-foreground">{t("schedule.lessonAccessPanel.description")}</p>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button disabled={busy} onClick={() => void copyLink()} type="button" variant="outline"><Copy className="h-4 w-4" />{t("schedule.lessonAccessPanel.copy")}</Button>
+        <Button disabled={busy} onClick={() => void copyLink("RU")} type="button" variant="outline"><Copy className="h-4 w-4" />{t("schedule.lessonAccessPanel.copyRu")}</Button>
+        <Button disabled={busy} onClick={() => void copyLink("SCHOOL")} type="button" variant="outline"><Copy className="h-4 w-4" />{t("schedule.lessonAccessPanel.copySchool")}</Button>
         <Button disabled={busy} onClick={() => void act(() => rotateLessonAccessLink(lesson.id), "schedule.lessonAccessPanel.rotated")} type="button" variant="outline"><RotateCw className="h-4 w-4" />{t("schedule.lessonAccessPanel.rotate")}</Button>
         <Button disabled={busy} onClick={() => void act(() => revokeLessonAccessLink(lesson.id), "schedule.lessonAccessPanel.revoked")} type="button" variant="outline"><Ban className="h-4 w-4" />{t("schedule.lessonAccessPanel.revoke")}</Button>
       </div>

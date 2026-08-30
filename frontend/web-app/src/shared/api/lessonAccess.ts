@@ -32,6 +32,13 @@ export async function startLessonAccess(lessonId: string, token: string): Promis
   });
 }
 
+export async function startCompactLessonAccess(alias: string): Promise<LessonAccessAttempt> {
+  return publicApiJson("/api/public/lesson-access/start", {
+    method: "POST",
+    body: JSON.stringify({ alias }),
+  });
+}
+
 export async function requestLessonEmailCode(
   lessonId: string,
   attemptId: string,
@@ -138,7 +145,7 @@ export async function changeLessonAdmission(
   }, authConfig);
 }
 
-export async function rotateLessonAccessLink(lessonId: string): Promise<{ url: string; revision: number }> {
+export async function rotateLessonAccessLink(lessonId: string): Promise<import("./types").LessonAccessLink> {
   return apiJson(`/api/schedule/lessons/${encodeURIComponent(lessonId)}/access-link/rotate`, { method: "POST" }, authConfig);
 }
 

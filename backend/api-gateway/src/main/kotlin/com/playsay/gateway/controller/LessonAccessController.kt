@@ -2,6 +2,7 @@ package com.playsay.gateway.controller
 
 import com.playsay.gateway.dto.LessonAccessAttemptResponse
 import com.playsay.gateway.dto.LessonAccessLinkResponse
+import com.playsay.gateway.dto.LessonCompactAccessStartRequest
 import com.playsay.gateway.dto.LessonAccessStartRequest
 import com.playsay.gateway.service.LessonAccessLinkService
 import jakarta.validation.Valid
@@ -44,4 +45,10 @@ class LessonAccessController(private val service: LessonAccessLinkService) {
         @RequestHeader(HttpHeaders.ORIGIN) origin: String,
         @Valid @RequestBody request: LessonAccessStartRequest,
     ): LessonAccessAttemptResponse = service.start(lessonId, request.token, origin)
+
+    @PostMapping("/public/lesson-access/start")
+    fun startCompact(
+        @RequestHeader(HttpHeaders.ORIGIN) origin: String,
+        @Valid @RequestBody request: LessonCompactAccessStartRequest,
+    ): LessonAccessAttemptResponse = service.startCompact(request.alias, origin)
 }

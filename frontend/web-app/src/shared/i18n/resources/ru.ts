@@ -495,7 +495,7 @@ export const ru = {
     lessonAccessPanel: {
       title: "Допуск в урок",
       description: "Подтверждайте гостей, управляйте общей ссылкой и доступом назначенных учеников.",
-      copy: "Копировать ссылку", rotate: "Сменить ссылку", revoke: "Отозвать ссылку",
+      copy: "Копировать ссылку", copyRu: "Копировать · honeyschool.ru", copySchool: "Копировать · honey.school", rotate: "Сменить ссылку", revoke: "Отозвать ссылку",
       mapStudent: "Назначенный ученик", chooseStudent: "Выберите ученика", approve: "Допустить", deny: "Отклонить",
       kick: "Исключить", readmit: "Допустить снова", noPending: "Новых запросов в Lobby нет.",
       copied: "Ссылка скопирована.", copyFailed: "Скопируйте ссылку вручную.", rotated: "Ссылка сменена.", revoked: "Ссылка отозвана.",

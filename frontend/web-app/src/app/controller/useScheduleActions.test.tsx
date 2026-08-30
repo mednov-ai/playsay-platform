@@ -27,7 +27,7 @@ const originalClipboard = navigator.clipboard;
 describe("useScheduleActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    apiMocks.fetchLessonAccessLink.mockResolvedValue({ lessonId: "lesson-1", url: "https://online.honey.school/lesson-access/lesson-1#token", revision: 1, createdAt: "2026-08-26T10:00:00Z" });
+    apiMocks.fetchLessonAccessLink.mockResolvedValue(lessonAccessLink());
     apiMocks.enterScheduledLessonRoom.mockResolvedValue({
       expiresAt: "2026-07-17T12:00:00Z",
       identity: "student-demo",
@@ -71,7 +71,7 @@ describe("useScheduleActions", () => {
   });
 
   it("starts copying the shared lesson link while the click still has clipboard permission", async () => {
-    let resolveLinks: ((value: { lessonId: string; url: string; revision: number; createdAt: string }) => void) | undefined;
+    let resolveLinks: ((value: ReturnType<typeof lessonAccessLink>) => void) | undefined;
     apiMocks.fetchLessonAccessLink.mockImplementation(() => new Promise((resolve) => {
       resolveLinks = resolve;
     }));
@@ -108,17 +108,43 @@ describe("useScheduleActions", () => {
     expect(write).toHaveBeenCalledOnce();
     expect(resolveLinks).toBeTypeOf("function");
 
-    resolveLinks?.({ lessonId: "lesson-1", url: "https://online.honey.school/lesson-access/lesson-1#token", revision: 1, createdAt: "2026-08-26T10:00:00Z" });
+    resolveLinks?.(lessonAccessLink());
     await act(async () => {
       await expect(copied).resolves.toBe(true);
     });
 
-    expect(copiedText).toBe("https://online.honey.school/lesson-access/lesson-1#token");
+    expect(copiedText).toBe("https://online.honeyschool.ru/l#abcdefghijklmnop");
     expect(apiMocks.fetchLessonAccessLink).toHaveBeenCalledWith("lesson-1");
     expect(writeText).not.toHaveBeenCalled();
     expect(input.props.setScheduleMessage).toHaveBeenLastCalledWith("schedule.messages.linksCopied");
   });
+
+  it("copies the explicit honey school variant with the same compact alias", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const input = setup();
+    const { result } = renderHook(() => useScheduleActions(input.props));
+
+    await act(() => result.current.copyScheduledLessonLinks(input.lesson, "SCHOOL"));
+
+    expect(writeText).toHaveBeenCalledWith("https://online.honey.school/l#abcdefghijklmnop");
+  });
 });
+
+function lessonAccessLink() {
+  return {
+    lessonId: "lesson-1",
+    url: "https://online.honeyschool.ru/l#abcdefghijklmnop",
+    alias: "abcdefghijklmnop",
+    defaultOrigin: "RU" as const,
+    urls: {
+      ru: "https://online.honeyschool.ru/l#abcdefghijklmnop",
+      school: "https://online.honey.school/l#abcdefghijklmnop",
+    },
+    revision: 1,
+    createdAt: "2026-08-26T10:00:00Z",
+  };
+}
 
 const mediaChoices: ClassroomMediaChoices = {
   audioDeviceId: "mic-1",

@@ -125,6 +125,7 @@ playsay:
       webhook-username: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_USERNAME:}
       webhook-password: ${PLAYSAY_EMAIL_MAILJET_WEBHOOK_PASSWORD:}
   public-app-url: ${PLAYSAY_PUBLIC_APP_URL:https://online.honey.school}
+  public-app-rf-url: ${PLAYSAY_PUBLIC_APP_RF_URL:${PLAYSAY_PUBLIC_APP_URL:https://online.honey.school}}
   lesson-reminders:
     poll-delay-ms: ${PLAYSAY_LESSON_REMINDERS_POLL_DELAY_MS:60000}
   chat-email:

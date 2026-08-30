@@ -4,6 +4,7 @@ import {
   type ClassroomMediaChoices,
   type LessonRoomSession,
 } from "../../features/classroom";
+import type { LessonAccessOrigin } from "../../shared/api/types";
 import { participantAssignmentsFromLesson } from "../../entities/schedule/model";
 import {
   createManagedStudentProfile,
@@ -133,10 +134,10 @@ export function useScheduleActions({
     }
   }
 
-  async function copyScheduledLessonLinks(lesson: ScheduledLesson): Promise<boolean> {
+  async function copyScheduledLessonLinks(lesson: ScheduledLesson, origin: LessonAccessOrigin = "RU"): Promise<boolean> {
     setScheduleMessage(null);
     try {
-      const text = fetchLessonAccessLink(lesson.id).then((link) => link.url);
+      const text = fetchLessonAccessLink(lesson.id).then((link) => origin === "SCHOOL" ? link.urls.school : link.urls.ru);
       await copyText(text, t("schedule.messages.linksPromptTitle"));
       setScheduleMessage(t("schedule.messages.linksCopied"));
       return true;

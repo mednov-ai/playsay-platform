@@ -118,7 +118,7 @@ class ScheduledLessonParticipantControllerTest : ScheduledLessonControllerTestFi
         assertEquals(1, links.links.size)
         assertEquals("managed-student-1", links.links.single().subject)
         assertEquals("SHARED_LESSON_LINK", links.links.single().mode)
-        assertTrue(links.links.single().url.startsWith("https://online.honey.school/lesson-access/${lesson.id}#"))
+        assertTrue(links.links.single().url.matches(Regex("https://online\\.honeyschool\\.ru/l#[A-Za-z0-9_-]{16}")))
         assertTrue(RecordingScheduledLessonRegistrationGateway.invites.isEmpty())
     }
 

@@ -7,6 +7,7 @@ import {
   requestLessonEmailCode,
   requestLessonLobby,
   resumeRememberedLessonAccess,
+  startCompactLessonAccess,
   startLessonAccess,
   verifyLessonEmailCode,
   type LessonAccessAttempt,
@@ -21,11 +22,12 @@ import { accountLabelFromIdToken, lessonTokenFromHash, stepForStatus, type Lesso
 
 type AttemptBinding = { id: string; secret: string };
 
-export function LessonAccessPage({ lessonId }: { lessonId: string }) {
+export function LessonAccessPage({ lessonId }: { lessonId?: string }) {
   const { t, i18n } = useAppTranslation();
   const theme = useAppTheme();
-  const started = useRef(false);
+  const lastResolution = useRef<string | null>(null);
   const [attempt, setAttempt] = useState<AttemptBinding | null>(null);
+  const [resolvedLessonId, setResolvedLessonId] = useState<string | null>(lessonId ?? null);
   const [step, setStep] = useState<LessonEntryStep>("starting");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -33,14 +35,15 @@ export function LessonAccessPage({ lessonId }: { lessonId: string }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showLobby, setShowLobby] = useState(false);
+  const [resolutionRevision, setResolutionRevision] = useState(0);
   const [activeAccount, setActiveAccount] = useState<string | null>(() => accountLabelFromIdToken(readTokens()?.idToken));
+  const compact = !lessonId;
+  const entryPath = compact ? "/l" : `/lesson-access/${encodeURIComponent(lessonId)}`;
+  const pendingTokenKey = compact ? "honey.lesson-access.alias" : `honey.lesson-access.token:${lessonId}`;
+  const silentAttemptKey = compact ? "honey.lesson-access.silent:compact" : `honey.lesson-access.silent:${lessonId}`;
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    const fragmentToken = tokenFromFragment();
-    const pendingTokenKey = `honey.lesson-access.token:${lessonId}`;
-    const silentAttemptKey = `honey.lesson-access.silent:${lessonId}`;
+    const fragmentToken = tokenFromFragment(compact);
     if (fragmentToken) window.sessionStorage.setItem(pendingTokenKey, fragmentToken);
     clearFragment();
     const token = fragmentToken ?? window.sessionStorage.getItem(pendingTokenKey);
@@ -48,21 +51,28 @@ export function LessonAccessPage({ lessonId }: { lessonId: string }) {
       setStep("error");
       return;
     }
+    const resolutionKey = `${resolutionRevision}:${token}`;
+    if (lastResolution.current === resolutionKey) return;
+    lastResolution.current = resolutionKey;
     if (!readTokens() && window.sessionStorage.getItem(silentAttemptKey) !== "done") {
       window.sessionStorage.setItem(silentAttemptKey, "done");
-      void startSilentLogin(authConfig, `/lesson-access/${encodeURIComponent(lessonId)}`);
+      void startSilentLogin(authConfig, entryPath);
       return;
     }
     window.sessionStorage.removeItem(silentAttemptKey);
-    void startLessonAccess(lessonId, token)
+    const start = compact ? startCompactLessonAccess(token) : startLessonAccess(lessonId, token);
+    void start
       .then(async (result) => {
         if (!result.attemptSecret) throw new Error("attempt secret missing");
+        const activeLessonId = result.lessonId ?? lessonId;
+        if (!activeLessonId) throw new Error("lesson id missing");
+        setResolvedLessonId(activeLessonId);
         const binding = { id: result.attemptId, secret: result.attemptSecret };
         setAttempt(binding);
         if (readTokens()) {
           setActiveAccount(accountLabelFromIdToken(readTokens()?.idToken));
           try {
-            const remembered = await resumeRememberedLessonAccess(lessonId, binding.id, binding.secret);
+            const remembered = await resumeRememberedLessonAccess(activeLessonId, binding.id, binding.secret);
             if (remembered.status === "AUTHENTICATED_READY") window.sessionStorage.removeItem(pendingTokenKey);
             acceptResult(remembered, setStep);
             return;
@@ -73,37 +83,41 @@ export function LessonAccessPage({ lessonId }: { lessonId: string }) {
         acceptResult(result, setStep);
       })
       .catch(() => setStep("error"));
-  }, [lessonId]);
+  }, [compact, entryPath, lessonId, pendingTokenKey, resolutionRevision, silentAttemptKey]);
 
   useEffect(() => {
     function restartForNewFragment() {
-      const token = tokenFromFragment();
+      const token = tokenFromFragment(compact);
       if (!token) return;
-      window.sessionStorage.setItem(`honey.lesson-access.token:${lessonId}`, token);
+      window.sessionStorage.setItem(pendingTokenKey, token);
+      window.sessionStorage.setItem(silentAttemptKey, "done");
       clearFragment();
-      window.location.reload();
+      setAttempt(null);
+      setResolvedLessonId(lessonId ?? null);
+      setStep("starting");
+      setResolutionRevision((revision) => revision + 1);
     }
     window.addEventListener("hashchange", restartForNewFragment);
     return () => window.removeEventListener("hashchange", restartForNewFragment);
-  }, [lessonId]);
+  }, [compact, lessonId, pendingTokenKey, silentAttemptKey]);
 
   useEffect(() => {
-    if (step !== "waiting" || !attempt) return;
+    if (step !== "waiting" || !attempt || !resolvedLessonId) return;
     const timer = window.setInterval(() => {
-      void getLessonAccessStatus(lessonId, attempt.id, attempt.secret)
+      void getLessonAccessStatus(resolvedLessonId, attempt.id, attempt.secret)
         .then((result) => acceptResult(result, setStep))
         .catch(() => setStep("error"));
     }, 3000);
     return () => window.clearInterval(timer);
-  }, [attempt, lessonId, step]);
+  }, [attempt, resolvedLessonId, step]);
 
   async function submitEmail(event: FormEvent) {
     event.preventDefault();
-    if (!attempt) return;
+    if (!attempt || !resolvedLessonId) return;
     setBusy(true);
     try {
-      const result = await requestLessonEmailCode(lessonId, attempt.id, attempt.secret, email, i18n.language);
-      window.sessionStorage.removeItem(`honey.lesson-access.token:${lessonId}`);
+      const result = await requestLessonEmailCode(resolvedLessonId, attempt.id, attempt.secret, email, i18n.language);
+      window.sessionStorage.removeItem(pendingTokenKey);
       setStep(stepForStatus(result.status));
     } catch {
       setStep("error");
@@ -114,10 +128,10 @@ export function LessonAccessPage({ lessonId }: { lessonId: string }) {
 
   async function submitCode(event: FormEvent) {
     event.preventDefault();
-    if (!attempt) return;
+    if (!attempt || !resolvedLessonId) return;
     setBusy(true);
     try {
-      acceptResult(await verifyLessonEmailCode(lessonId, attempt.id, attempt.secret, code, rememberMe), setStep);
+      acceptResult(await verifyLessonEmailCode(resolvedLessonId, attempt.id, attempt.secret, code, rememberMe), setStep);
     } catch {
       setStep("error");
     } finally {
@@ -127,11 +141,11 @@ export function LessonAccessPage({ lessonId }: { lessonId: string }) {
 
   async function submitLobby(event: FormEvent) {
     event.preventDefault();
-    if (!attempt) return;
+    if (!attempt || !resolvedLessonId) return;
     setBusy(true);
     try {
-      const result = await requestLessonLobby(lessonId, attempt.id, attempt.secret, displayLabel);
-      window.sessionStorage.removeItem(`honey.lesson-access.token:${lessonId}`);
+      const result = await requestLessonLobby(resolvedLessonId, attempt.id, attempt.secret, displayLabel);
+      window.sessionStorage.removeItem(pendingTokenKey);
       setStep(stepForStatus(result.status));
     } catch {
       setStep("error");
@@ -142,7 +156,7 @@ export function LessonAccessPage({ lessonId }: { lessonId: string }) {
 
   function useAnotherAccount() {
     const logoutUrl = new URL(buildLogoutUrl(authConfig));
-    logoutUrl.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/lesson-access/${encodeURIComponent(lessonId)}`);
+    logoutUrl.searchParams.set("post_logout_redirect_uri", `${window.location.origin}${entryPath}`);
     clearTokens();
     window.location.assign(logoutUrl.toString());
   }
@@ -236,8 +250,10 @@ function acceptResult(result: LessonAccessAttempt, setStep: (step: LessonEntrySt
   setStep(stepForStatus(result.status));
 }
 
-function tokenFromFragment(): string | null {
-  return lessonTokenFromHash(window.location.hash);
+function tokenFromFragment(compact: boolean): string | null {
+  if (!compact) return lessonTokenFromHash(window.location.hash);
+  const alias = window.location.hash.replace(/^#/, "");
+  return /^[A-Za-z0-9_-]{16}$/.test(alias) ? alias : null;
 }
 
 function clearFragment() {

@@ -2,6 +2,7 @@ package com.playsay.gateway.service
 
 import com.playsay.gateway.dto.LessonAccessAttemptResponse
 import com.playsay.gateway.dto.LessonAccessLinkResponse
+import com.playsay.gateway.dto.LessonAccessLinkUrls
 import com.playsay.gateway.entity.LessonAccessLinkEntity
 import com.playsay.gateway.entity.LessonEntryAttemptEntity
 import com.playsay.gateway.error.ProjectResponseException
@@ -9,7 +10,6 @@ import com.playsay.gateway.utils.MetaData
 import com.playsay.gateway.repo.LessonAccessLinkRepo
 import com.playsay.gateway.repo.LessonEntryAttemptRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
-import java.net.URI
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.Instant
@@ -29,8 +29,8 @@ class LessonAccessLinkService(
     private val lessonRepo: LessonRepo,
     private val authorizationService: ScheduledLessonAuthorizationService,
     private val tokenService: LessonAccessTokenService,
+    private val originPolicy: LessonAccessOriginPolicy,
     private val auditService: LessonAccessAuditService,
-    @param:Value("\${playsay.public-app-url}") private val publicAppUrl: String,
     @param:Value("\${playsay.lesson-access.enabled:false}") private val enabled: Boolean,
     @param:Value("\${playsay.lesson-access.attempt-ttl-seconds:900}") private val attemptTtlSeconds: Long,
     private val clock: Clock = Clock.systemUTC(),
@@ -52,7 +52,7 @@ class LessonAccessLinkService(
             }
             createLink(lessonId, authentication.token.subject, now)
         } else {
-            requireNotNull(existing)
+            ensureAliasHash(requireNotNull(existing))
         }
         if (created) auditService.record(lessonId, LessonAccessAuditEvent.LINK_CREATED, LessonAccessAuditOutcome.ACCEPTED, authentication.actorKind())
         return active.toResponse()
@@ -90,17 +90,34 @@ class LessonAccessLinkService(
     @Transactional
     fun start(lessonId: UUID, token: String, requestOrigin: String): LessonAccessAttemptResponse {
         requireEnabled()
-        requireSameOrigin(requestOrigin)
-        val now = Instant.now(clock)
-        val lesson = lessonRepo.findById(lessonId).orElse(null) ?: throw invalidLink()
-        if (lesson.status in closedStatuses || lesson.scheduledEnd?.isBefore(lessonAccessEndsAfter(now)) != false) {
-            throw ProjectResponseException.localized(HttpStatus.GONE, MetaData.ErrorCodes.LESSON_ACCESS_CLOSED)
-        }
+        val acceptedOrigin = originPolicy.resolve(requestOrigin) ?: throw invalidLink()
         val link = linkRepo.findFirstByLessonIdAndRevokedAtIsNullOrderByRevisionDesc(lessonId) ?: throw invalidLink()
         if (!tokenService.matches(token, lessonId, link.revision, link.keyVersion) ||
             !tokenService.matchesHash(token, link.tokenHash)
         ) {
             throw invalidLink()
+        }
+        return createAttempt(lessonId, link, acceptedOrigin)
+    }
+
+    @Transactional
+    fun startCompact(alias: String, requestOrigin: String): LessonAccessAttemptResponse {
+        requireEnabled()
+        val acceptedOrigin = originPolicy.resolve(requestOrigin) ?: throw invalidLink()
+        val link = linkRepo.findFirstByAliasHashAndRevokedAtIsNull(tokenService.hash(alias)) ?: throw invalidLink()
+        if (!tokenService.matchesAlias(alias, link.lessonId, link.revision, link.keyVersion)) throw invalidLink()
+        return createAttempt(link.lessonId, link, acceptedOrigin)
+    }
+
+    private fun createAttempt(
+        lessonId: UUID,
+        link: LessonAccessLinkEntity,
+        acceptedOrigin: String,
+    ): LessonAccessAttemptResponse {
+        val now = Instant.now(clock)
+        val lesson = lessonRepo.findById(lessonId).orElse(null) ?: throw invalidLink()
+        if (lesson.status in closedStatuses || lesson.scheduledEnd?.isBefore(lessonAccessEndsAfter(now)) != false) {
+            throw ProjectResponseException.localized(HttpStatus.GONE, MetaData.ErrorCodes.LESSON_ACCESS_CLOSED)
         }
 
         val browserSecret = randomSecret()
@@ -110,6 +127,7 @@ class LessonAccessLinkService(
                 lessonId = lessonId,
                 linkRevision = link.revision,
                 browserSecretHash = tokenService.hash(browserSecret),
+                requestOrigin = acceptedOrigin,
                 state = "STARTED",
                 expiresAt = expiry,
                 createdAt = now,
@@ -132,13 +150,15 @@ class LessonAccessLinkService(
     private fun createLink(lessonId: UUID, actorSubject: String, now: Instant): LessonAccessLinkEntity {
         val revision = (linkRepo.findFirstByLessonIdOrderByRevisionDesc(lessonId)?.revision ?: 0) + 1
         val token = tokenService.derive(lessonId, revision)
+        val alias = tokenService.deriveAlias(lessonId, revision)
         return linkRepo.save(
             LessonAccessLinkEntity(
                 lessonId = lessonId,
                 tokenHash = tokenService.hash(token),
+                aliasHash = tokenService.hash(alias),
                 revision = revision,
                 keyVersion = tokenService.keyVersion,
-                origin = normalizedPublicOrigin(),
+                origin = originPolicy.defaultOrigin,
                 createdBySubject = actorSubject,
                 createdAt = now,
             ),
@@ -146,33 +166,30 @@ class LessonAccessLinkService(
     }
 
     private fun LessonAccessLinkEntity.toResponse(): LessonAccessLinkResponse {
-        val token = tokenService.derive(lessonId, revision, keyVersion)
+        val alias = tokenService.deriveAlias(lessonId, revision, keyVersion)
+        val ruUrl = originPolicy.compactUrl(originPolicy.rfOrigin, alias)
+        val schoolUrl = originPolicy.compactUrl(originPolicy.directOrigin, alias)
         return LessonAccessLinkResponse(
             lessonId = lessonId,
-            url = "${publicAppUrl.trimEnd('/')}/lesson-access/$lessonId#token=$token",
+            url = ruUrl,
+            alias = alias,
+            defaultOrigin = "RU",
+            urls = LessonAccessLinkUrls(ru = ruUrl, school = schoolUrl),
             revision = revision,
             createdAt = createdAt,
             revokedAt = revokedAt,
         )
     }
 
+    private fun ensureAliasHash(link: LessonAccessLinkEntity): LessonAccessLinkEntity {
+        if (link.aliasHash != null) return link
+        val alias = tokenService.deriveAlias(link.lessonId, link.revision, link.keyVersion)
+        link.aliasHash = tokenService.hash(alias)
+        return linkRepo.save(link)
+    }
+
     private fun requireManager(authentication: JwtAuthenticationToken, lessonId: UUID) {
         if (!authorizationService.canManageLesson(authentication, lessonId)) throw notFound()
-    }
-
-    private fun requireSameOrigin(requestOrigin: String) {
-        val normalized = try {
-            val uri = URI(requestOrigin)
-            "${uri.scheme}://${uri.authority}"
-        } catch (_: IllegalArgumentException) {
-            ""
-        }
-        if (normalized != normalizedPublicOrigin()) throw invalidLink()
-    }
-
-    private fun normalizedPublicOrigin(): String {
-        val uri = URI(publicAppUrl)
-        return "${uri.scheme}://${uri.authority}"
     }
 
     private fun randomSecret(): String = ByteArray(32)

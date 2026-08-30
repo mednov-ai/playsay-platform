@@ -53,7 +53,8 @@ describe("ScheduledLessonCard", () => {
       </AppProviders>,
     );
 
-    expect(markup).toContain("Ссылки");
+    expect(markup).toContain("honeyschool.ru");
+    expect(markup).toContain("honey.school");
   });
 
   it("promotes direct lesson start during the live access window", () => {

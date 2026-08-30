@@ -19,6 +19,8 @@ class LessonAccessLinkEntity(
     var lessonId: UUID = UUID.randomUUID(),
     @Column(name = "token_hash", nullable = false, length = 64, unique = true)
     var tokenHash: String = "",
+    @Column(name = "alias_hash", length = 64, unique = true)
+    var aliasHash: String? = null,
     @Column(name = "revision", nullable = false)
     var revision: Long = 1,
     @Column(name = "key_version", nullable = false)
@@ -48,6 +50,8 @@ class LessonEntryAttemptEntity(
     var linkRevision: Long = 1,
     @Column(name = "browser_secret_hash", nullable = false, length = 64)
     var browserSecretHash: String = "",
+    @Column(name = "request_origin", length = 255)
+    var requestOrigin: String? = null,
     @Column(name = "target_subject", length = 255)
     var targetSubject: String? = null,
     @Column(name = "confirmation_method", length = 32)

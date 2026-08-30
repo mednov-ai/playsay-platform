@@ -10,6 +10,7 @@ import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.entity.TeacherDelegationEntity
 import com.playsay.gateway.entity.TeacherDelegationStudentEntity
+import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.*
 import com.playsay.gateway.repo.schedule.*
 import com.playsay.gateway.service.*
@@ -36,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeAll
@@ -57,6 +59,107 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 
 class ScheduledLessonAccessControllerTest : ScheduledLessonControllerTestFixture() {
+    @Test
+    fun `rotate and revoke invalidate compact aliases for new attempts`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+            ),
+        ).body!!
+        val original = lessonAccessController.getOrCreate(teacher, lesson.id)
+        val rotated = lessonAccessController.rotate(teacher, lesson.id)
+
+        assertNotEquals(original.alias, rotated.alias)
+        assertEquals(original.revision + 1, rotated.revision)
+        assertFailsWith<ProjectResponseException> {
+            lessonAccessController.startCompact(
+                "https://online.honeyschool.ru",
+                LessonCompactAccessStartRequest(original.alias),
+            )
+        }
+        lessonAccessController.startCompact(
+            "https://online.honeyschool.ru",
+            LessonCompactAccessStartRequest(rotated.alias),
+        )
+
+        lessonAccessController.revoke(teacher, lesson.id)
+        assertFailsWith<ProjectResponseException> {
+            lessonAccessController.startCompact(
+                "https://online.honeyschool.ru",
+                LessonCompactAccessStartRequest(rotated.alias),
+            )
+        }
+    }
+
+    @Test
+    fun `legacy lesson token remains valid on both production origins and foreign origin fails`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+            ),
+        ).body!!
+        lessonAccessController.getOrCreate(teacher, lesson.id)
+        val active = lessonAccessLinkRepo.findAll().single()
+        val token = lessonAccessTokenService.derive(lesson.id, active.revision, active.keyVersion)
+
+        lessonAccessController.start(lesson.id, "https://online.honeyschool.ru", LessonAccessStartRequest(token))
+        lessonAccessController.start(lesson.id, "https://online.honey.school", LessonAccessStartRequest(token))
+
+        assertEquals(
+            setOf("https://online.honeyschool.ru", "https://online.honey.school"),
+            lessonEntryAttemptRepo.findAll().mapNotNull { it.requestOrigin }.toSet(),
+        )
+        assertFailsWith<ProjectResponseException> {
+            lessonAccessController.start(
+                lesson.id,
+                "https://online.honeyschool.ru.example",
+                LessonAccessStartRequest(token),
+            )
+        }
+    }
+
+    @Test
+    fun `teacher receives one compact alias for both origins and each start is origin bound`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(60),
+                scheduledEnd = futureEnd(60),
+            ),
+        ).body!!
+
+        val link = lessonAccessController.getOrCreate(teacher, lesson.id)
+        val ru = lessonAccessController.startCompact(
+            "https://online.honeyschool.ru",
+            LessonCompactAccessStartRequest(link.alias),
+        )
+        val school = lessonAccessController.startCompact(
+            "https://online.honey.school",
+            LessonCompactAccessStartRequest(link.alias),
+        )
+
+        assertEquals("RU", link.defaultOrigin)
+        assertEquals("https://online.honeyschool.ru/l#${link.alias}", link.url)
+        assertEquals("https://online.honeyschool.ru/l#${link.alias}", link.urls.ru)
+        assertEquals("https://online.honey.school/l#${link.alias}", link.urls.school)
+        assertEquals(16, link.alias.length)
+        assertNotEquals(ru.attemptId, school.attemptId)
+        assertEquals(
+            setOf("https://online.honeyschool.ru", "https://online.honey.school"),
+            lessonEntryAttemptRepo.findAll().mapNotNull { it.requestOrigin }.toSet(),
+        )
+        val persisted = lessonAccessLinkRepo.findAll().single()
+        assertNotNull(persisted.aliasHash)
+        assertNotEquals(link.alias, persisted.aliasHash)
+    }
+
     @Test
     fun `student sees only own scheduled lessons`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")

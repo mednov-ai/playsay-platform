@@ -42,6 +42,29 @@ class LessonAccessTokenServiceTest {
     }
 
     @Test
+    fun `compact alias is a stable 96 bit url safe capability separated from the full token`() {
+        val service = service()
+        val alias = service.deriveAlias(lessonId, 3)
+
+        assertEquals(16, alias.length)
+        assertTrue(alias.matches(Regex("[A-Za-z0-9_-]{16}")))
+        assertTrue(service.matchesAlias(alias, lessonId, 3, 7))
+        assertNotEquals(service.derive(lessonId, 3).take(16), alias)
+    }
+
+    @Test
+    fun `compact alias changes across revision environment and key context`() {
+        val prod = service()
+        val dev = service("https://auth.dev.honey-school.ru/realms/playsay")
+        val alias = prod.deriveAlias(lessonId, 3)
+
+        assertNotEquals(alias, prod.deriveAlias(lessonId, 4))
+        assertNotEquals(alias, dev.deriveAlias(lessonId, 3))
+        assertFalse(prod.matchesAlias(alias, lessonId, 4, 7))
+        assertFalse(prod.matchesAlias(alias, lessonId, 3, 6))
+    }
+
+    @Test
     fun `key version mismatch fails closed`() {
         val service = service()
 

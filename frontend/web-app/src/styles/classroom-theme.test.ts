@@ -36,6 +36,8 @@ describe("classroom video theme", () => {
   });
 
   it("keeps the portrait connection popup outside the clipped video rail", () => {
+    expect(responsiveCss).toContain('.playsay-classroom-shell[data-viewport-mode="mobilePortrait"] .playsay-video-header {');
+    expect(responsiveCss).toContain("z-index: 31;");
     expect(responsiveCss).toContain('.playsay-classroom-shell[data-viewport-mode="mobilePortrait"] .playsay-connection-popover {');
     expect(responsiveCss).toContain("position: fixed;");
     expect(responsiveCss).toContain("top: calc(clamp(9.75rem, 25dvh, 12rem) + 0.45rem);");

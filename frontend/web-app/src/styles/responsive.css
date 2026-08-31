@@ -664,6 +664,10 @@
 }
 
 @media (max-width: 640px) and (orientation: portrait) {
+  .playsay-classroom-shell[data-viewport-mode="mobilePortrait"] .playsay-video-header {
+    z-index: 31;
+  }
+
   .playsay-classroom-shell[data-viewport-mode="mobilePortrait"] .playsay-connection-popover {
     position: fixed;
     top: calc(clamp(9.75rem, 25dvh, 12rem) + 0.45rem);

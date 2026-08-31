@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "namespace": "playsay-prod",
+  "workloads": [
+    {"module": "api-gateway", "changelogDir": "backend/api-gateway/src/main/resources/db/changelog", "dbSecret": "playsay-app-db"},
+    {"module": "registration-service", "changelogDir": "backend/registration-service/src/main/resources/db/changelog", "dbSecret": "playsay-app-db"},
+    {"module": "email-service", "changelogDir": "backend/email-service/src/main/resources/db/changelog", "dbSecret": "playsay-app-db"},
+    {"module": "ai-tutor-service", "changelogDir": "backend/ai-tutor-service/src/main/resources/db/changelog", "dbSecret": "playsay-app-db"},
+    {"module": "vocabulary-service", "changelogDir": "backend/vocabulary-service/src/main/resources/db/changelog", "dbSecret": "playsay-app-db"},
+    {"module": "keyboard-service", "changelogDir": "backend/keyboard-service/src/main/resources/db/changelog", "dbSecret": "playsay-keyboard-db"},
+    {"module": "worksheet-import-service", "changelogDir": "backend/worksheet-import-service/src/main/resources/db/changelog", "dbSecret": "playsay-worksheet-import-db"}
+  ]
+}

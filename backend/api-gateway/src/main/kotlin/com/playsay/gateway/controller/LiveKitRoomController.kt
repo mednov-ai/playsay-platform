@@ -17,6 +17,7 @@ import java.time.Instant
 import java.util.Date
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RestController
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.service.*
@@ -54,6 +56,7 @@ class LiveKitRoomController(
     fun createToken(
         authentication: JwtAuthenticationToken,
         @PathVariable lessonId: UUID,
+        @RequestHeader(name = HttpHeaders.ORIGIN, required = false) origin: String? = null,
     ): LiveKitRoomTokenResponse =
-        store.createToken(authentication, lessonId)
+        store.createToken(authentication, lessonId, origin)
 }

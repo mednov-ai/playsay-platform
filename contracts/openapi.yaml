@@ -1244,6 +1244,11 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Origin
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           description: LiveKit room token
@@ -5630,6 +5635,10 @@ components:
           format: date-time
         lessonTranslationAllowed:
           type: boolean
+        mediaRouting:
+          oneOf:
+          - $ref: "#/components/schemas/MediaRoutingResponse"
+          - type: "null"
       required:
       - expiresAt
       - identity
@@ -5637,6 +5646,57 @@ components:
       - roomName
       - serverUrl
       - token
+    MediaRoutingIceServerResponse:
+      type: object
+      properties:
+        urls:
+          type: array
+          items:
+            type: string
+          maxItems: 3
+          minItems: 1
+        username:
+          type: string
+          maxLength: 128
+          minLength: 3
+        credential:
+          type: string
+          maxLength: 128
+          minLength: 20
+      required:
+      - credential
+      - urls
+      - username
+    MediaRoutingResponse:
+      type: object
+      properties:
+        policy:
+          type: string
+          enum:
+          - REGIONAL_RELAY
+        revision:
+          type: string
+          enum:
+          - selectel-rf-v1
+        iceTransportPolicy:
+          type: string
+          enum:
+          - relay
+        iceServers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaRoutingIceServerResponse"
+          maxItems: 1
+          minItems: 1
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - iceServers
+      - iceTransportPolicy
+      - policy
+      - revision
     ScheduledLessonParticipantLinkResponse:
       type: object
       properties:

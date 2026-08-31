@@ -99,9 +99,10 @@ class LiveKitRoomStore(
     private val authorizationService: ScheduledLessonAuthorizationService,
     private val admissionGuard: LessonAdmissionGuard,
     private val tokenService: LiveKitTokenService,
+    private val regionalMediaRoutingService: RegionalMediaRoutingService,
 ) {
     @Transactional
-    fun createToken(authentication: JwtAuthenticationToken, lessonId: UUID): LiveKitRoomTokenResponse {
+    fun createToken(authentication: JwtAuthenticationToken, lessonId: UUID, origin: String? = null): LiveKitRoomTokenResponse {
         if (admissionGuard.isKicked(lessonId, authentication)) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
@@ -110,7 +111,9 @@ class LiveKitRoomStore(
         val roomName = lesson.livekitRoomName?.trim()?.takeIf { room -> room.isNotEmpty() }
             ?: ensureRoomName(lesson)
 
-        return tokenService.createToken(authentication, roomName, lessonTranslationAllowed(lesson))
+        return tokenService.createToken(authentication, roomName, lessonTranslationAllowed(lesson)).copy(
+            mediaRouting = regionalMediaRoutingService.routingFor(origin),
+        )
     }
 
     private fun lessonTranslationAllowed(lesson: LessonEntity): Boolean {

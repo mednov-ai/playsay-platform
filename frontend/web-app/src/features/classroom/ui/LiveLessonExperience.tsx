@@ -8,7 +8,7 @@ import {
   type ScheduledLesson,
 } from "../../../shared/api/playsay";
 import type { LessonRoomSession } from "../model/session";
-import { lessonLiveKitRoomOptions } from "../model/liveKitRoomOptions";
+import { lessonLiveKitRoomConnectOptions, lessonLiveKitRoomOptions, liveKitRoomInstanceKey } from "../model/liveKitRoomOptions";
 import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoStage";
 import { LessonWorkspace } from "./LessonWorkspace";
 import type { LessonPresentationMode } from "./LessonTaskCanvas";
@@ -85,6 +85,11 @@ export function LiveLessonExperience({
     () => lessonLiveKitRoomOptions(session.mediaChoices.audioOutputDeviceId),
     [session.mediaChoices.audioOutputDeviceId],
   );
+  const liveKitRoomConnectOptions = useMemo(
+    () => lessonLiveKitRoomConnectOptions(session.mediaRouting),
+    [session.mediaRouting],
+  );
+  const liveKitInstanceKey = liveKitRoomInstanceKey(session.roomName, session.expiresAt, session.mediaRouting);
 
   useEffect(() => {
     document.body.classList.toggle("playsay-classroom-video-expanded", videoExpanded);
@@ -154,7 +159,9 @@ export function LiveLessonExperience({
         } : false}
         className="playsay-livekit-context"
         connect
+        connectOptions={liveKitRoomConnectOptions}
         data-lk-theme="default"
+        key={liveKitInstanceKey}
         options={liveKitRoomOptions}
         serverUrl={session.serverUrl}
         token={session.token}

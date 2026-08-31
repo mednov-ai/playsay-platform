@@ -85,6 +85,8 @@ class ScheduledLessonLiveKitControllerTest : ScheduledLessonControllerTestFixtur
         assertEquals("teacher-1", teacherToken.identity)
         assertFalse(teacherToken.lessonTranslationAllowed)
         assertFalse(studentToken.lessonTranslationAllowed)
+        assertNull(teacherToken.mediaRouting)
+        assertNull(studentToken.mediaRouting)
         assertEquals("lesson-${lesson.id}", studentToken.roomName)
         assertEquals("IN_PROGRESS", started.status)
         assertEquals("test-key", claims.issuer)
@@ -95,6 +97,38 @@ class ScheduledLessonLiveKitControllerTest : ScheduledLessonControllerTestFixtur
         assertEquals(true, videoGrant["canSubscribe"])
         assertEquals("""{"playsayRole":"TEACHER"}""", claims.getStringClaim("metadata"))
         assertEquals("""{"playsayRole":"STUDENT"}""", studentClaims.getStringClaim("metadata"))
+    }
+
+    @Test
+    fun `authorized rf origin receives regional relay while direct origin remains unchanged`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val otherStudent = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        userProfileStore.currentUserId(otherStudent)
+        val now = Instant.now()
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = now.plusSeconds(5 * 60),
+                scheduledEnd = now.plusSeconds(50 * 60),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+        scheduleController.start(teacher, lesson.id)
+
+        val direct = liveKitRoomController.createToken(student, lesson.id, "https://online.honey.school")
+        val regional = liveKitRoomController.createToken(student, lesson.id, "https://online.honeyschool.ru")
+
+        assertNull(direct.mediaRouting)
+        assertEquals("REGIONAL_RELAY", regional.mediaRouting?.policy)
+        assertEquals("relay", regional.mediaRouting?.iceTransportPolicy)
+        assertEquals(3, regional.mediaRouting?.iceServers?.single()?.urls?.size)
+        assertTrue(regional.mediaRouting!!.expiresAt.isAfter(now))
+        assertFalse(regional.mediaRouting!!.iceServers.single().username.contains("student-1"))
+        assertFailsWith<ResponseStatusException> {
+            liveKitRoomController.createToken(otherStudent, lesson.id, "https://online.honeyschool.ru")
+        }.also { error -> assertEquals(HttpStatus.NOT_FOUND, error.statusCode) }
     }
 
     @Test

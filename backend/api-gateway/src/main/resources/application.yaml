@@ -84,6 +84,11 @@ playsay:
     api-key: ${PLAYSAY_LIVEKIT_API_KEY:}
     api-secret: ${PLAYSAY_LIVEKIT_API_SECRET:}
     token-ttl-seconds: ${PLAYSAY_LIVEKIT_TOKEN_TTL_SECONDS:3600}
+    regional-relay:
+      environment: ${PLAYSAY_REGIONAL_RELAY_ENVIRONMENT:local}
+      mode: ${PLAYSAY_REGIONAL_RELAY_MODE:off}
+      shared-secret: ${PLAYSAY_REGIONAL_RELAY_SHARED_SECRET:}
+      credential-ttl-seconds: ${PLAYSAY_REGIONAL_RELAY_CREDENTIAL_TTL_SECONDS:900}
   lesson-translation:
     enabled: ${PLAYSAY_LESSON_TRANSLATION_ENABLED:false}
     provider: ${PLAYSAY_LESSON_TRANSLATION_PROVIDER:stub}

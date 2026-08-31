@@ -663,6 +663,57 @@ export interface LessonTranslationSessionResponse {
   sourceParticipantIdentity: string;
 }
 
+export type MediaRoutingResponsePolicy = typeof MediaRoutingResponsePolicy[keyof typeof MediaRoutingResponsePolicy];
+
+
+export const MediaRoutingResponsePolicy = {
+  REGIONAL_RELAY: 'REGIONAL_RELAY',
+} as const;
+
+export type MediaRoutingResponseRevision = typeof MediaRoutingResponseRevision[keyof typeof MediaRoutingResponseRevision];
+
+
+export const MediaRoutingResponseRevision = {
+  'selectel-rf-v1': 'selectel-rf-v1',
+} as const;
+
+export type MediaRoutingResponseIceTransportPolicy = typeof MediaRoutingResponseIceTransportPolicy[keyof typeof MediaRoutingResponseIceTransportPolicy];
+
+
+export const MediaRoutingResponseIceTransportPolicy = {
+  relay: 'relay',
+} as const;
+
+export interface MediaRoutingIceServerResponse {
+  /**
+     * @minItems 1
+     * @maxItems 3
+     */
+  urls: string[];
+  /**
+     * @minLength 3
+     * @maxLength 128
+     */
+  username: string;
+  /**
+     * @minLength 20
+     * @maxLength 128
+     */
+  credential: string;
+}
+
+export interface MediaRoutingResponse {
+  policy: MediaRoutingResponsePolicy;
+  revision: MediaRoutingResponseRevision;
+  iceTransportPolicy: MediaRoutingResponseIceTransportPolicy;
+  /**
+     * @minItems 1
+     * @maxItems 1
+     */
+  iceServers: MediaRoutingIceServerResponse[];
+  expiresAt: string;
+}
+
 export interface LiveKitRoomTokenResponse {
   serverUrl: string;
   token: string;
@@ -670,6 +721,7 @@ export interface LiveKitRoomTokenResponse {
   identity: string;
   expiresAt: string;
   lessonTranslationAllowed: boolean;
+  mediaRouting?: MediaRoutingResponse | null;
 }
 
 export type ScheduledLessonParticipantLinkResponseMode = typeof ScheduledLessonParticipantLinkResponseMode[keyof typeof ScheduledLessonParticipantLinkResponseMode];

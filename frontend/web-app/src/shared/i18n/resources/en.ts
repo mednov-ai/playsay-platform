@@ -1486,6 +1486,25 @@ export const en = {
   classroom: {
     live: "Live",
     participantFallback: "Participant",
+    connection: {
+      overviewTitle: "Connection status",
+      openOverview: "Connection status: {{status}}. Open details",
+      overallAnnouncement: "Connection: {{status}}",
+      teacher: "Teacher",
+      server: "Server",
+      learners: "Learners",
+      serverHint: "This device's connection to the lesson server",
+      rowAnnouncement: "{{label}}: {{status}}",
+      participantAnnouncement: "{{name}} connection: {{status}}",
+      states: {
+        excellent: "Excellent",
+        good: "Good",
+        poor: "Unstable",
+        lost: "Lost",
+        unknown: "Checking",
+        reconnecting: "Reconnecting",
+      },
+    },
     activityRail: { aria: "Materials and individual tasks", title: "Lesson activities", open: "Open activities", materials: "Materials", personal: "Individual" },
     presence: {
       offline: "Not connected yet",

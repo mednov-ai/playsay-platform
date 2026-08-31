@@ -1486,6 +1486,25 @@ export const fr = {
   classroom: {
     live: "En direct",
     participantFallback: "Participant",
+    connection: {
+      overviewTitle: "État de la connexion",
+      openOverview: "État de la connexion : {{status}}. Ouvrir les détails",
+      overallAnnouncement: "Connexion : {{status}}",
+      teacher: "Enseignant",
+      server: "Serveur",
+      learners: "Élèves",
+      serverHint: "Connexion de cet appareil au serveur du cours",
+      rowAnnouncement: "{{label}} : {{status}}",
+      participantAnnouncement: "Connexion de {{name}} : {{status}}",
+      states: {
+        excellent: "Excellente",
+        good: "Bonne",
+        poor: "Instable",
+        lost: "Perdue",
+        unknown: "Vérification",
+        reconnecting: "Rétablissement",
+      },
+    },
     activityRail: { aria: "Supports et exercices individuels", title: "Activités du cours", open: "Ouvrir les activités", materials: "Supports", personal: "Individuel" },
     presence: {
       offline: "Pas encore connecté",

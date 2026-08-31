@@ -1514,6 +1514,25 @@ export const ru = {
   classroom: {
     live: "В эфире",
     participantFallback: "Участник",
+    connection: {
+      overviewTitle: "Состояние связи",
+      openOverview: "Состояние связи: {{status}}. Открыть подробности",
+      overallAnnouncement: "Связь: {{status}}",
+      teacher: "Учитель",
+      server: "Сервер",
+      learners: "Ученики",
+      serverHint: "Соединение этого устройства с сервером урока",
+      rowAnnouncement: "{{label}}: {{status}}",
+      participantAnnouncement: "Связь у {{name}}: {{status}}",
+      states: {
+        excellent: "Отличная",
+        good: "Хорошая",
+        poor: "Нестабильная",
+        lost: "Потеряна",
+        unknown: "Определяется",
+        reconnecting: "Восстанавливается",
+      },
+    },
     activityRail: { aria: "Материалы и индивидуальные задания", title: "Работа на уроке", open: "Открыть задания", materials: "Материалы", personal: "Индивидуально" },
     presence: {
       offline: "Ещё не подключился",

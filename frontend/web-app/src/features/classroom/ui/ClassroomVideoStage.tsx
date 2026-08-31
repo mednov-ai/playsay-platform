@@ -9,6 +9,7 @@ import type { TranslationRole } from "../model/realtimeTranslation";
 import type { LessonParticipantPresenceMap, LessonParticipantPresenceState } from "../model/session";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
 import { externalActivityTrackPrefix } from "../model/externalActivityProtocol";
+import { ClassroomParticipantConnectionDot } from "./ClassroomConnectionStatus";
 
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
 type ExpectedParticipant = ScheduledLesson["participants"][number];
@@ -38,6 +39,7 @@ export function ClassroomVideoStage({
   onToggleFullscreen,
   participantPresence,
   showExpectedParticipants,
+  showLearnerConnectionDots,
   translationAllowed,
   translationRole,
 }: {
@@ -55,6 +57,7 @@ export function ClassroomVideoStage({
   onToggleFullscreen: () => void;
   participantPresence: LessonParticipantPresenceMap;
   showExpectedParticipants: boolean;
+  showLearnerConnectionDots: boolean;
   translationAllowed: boolean;
   translationRole: TranslationRole | null;
 }) {
@@ -251,7 +254,11 @@ export function ClassroomVideoStage({
               ref={stripRef}
               style={pipStyle}
             >
-              <ClassroomMiniVideoTile layout="single" slot={externalActivityVideo.featuredSlot} />
+              <ClassroomMiniVideoTile
+                layout="single"
+                showLearnerConnectionDots={showLearnerConnectionDots}
+                slot={externalActivityVideo.featuredSlot}
+              />
               {externalActivityVideo.additionalCount > 0 ? (
                 <span className="playsay-external-activity-participant-count">
                   +{externalActivityVideo.additionalCount}
@@ -279,7 +286,11 @@ export function ClassroomVideoStage({
         <div className="playsay-video-grid" data-count={cameraSlots.length || 1}>
           {cameraSlots.length > 0
             ? cameraSlots.map((slot) => (
-              <ClassroomGridVideoSlot key={classroomSlotKey(slot)} slot={slot} />
+              <ClassroomGridVideoSlot
+                key={classroomSlotKey(slot)}
+                showLearnerConnectionDots={showLearnerConnectionDots}
+                slot={slot}
+              />
             ))
             : (
               <div className="playsay-video-grid-empty">
@@ -316,8 +327,20 @@ export function ClassroomVideoStage({
     >
       <div className="playsay-video-focus" ref={focusRef}>
         {activeScreenShareTrack ? <ParticipantTile trackRef={activeScreenShareTrack} /> : featuredSlot ? <ClassroomVideoSlotView slot={featuredSlot} /> : null}
+        {!activeScreenShareTrack && featuredSlot?.kind === "track" ? (
+          <span className="playsay-video-focus-connection-dot">
+            <ClassroomParticipantConnectionDot
+              enabled={showLearnerConnectionDots}
+              participant={featuredSlot.trackRef.participant}
+            />
+          </span>
+        ) : null}
         {activeScreenShareTrack ? (
           <div className="playsay-screen-share-label">
+            <ClassroomParticipantConnectionDot
+              enabled={showLearnerConnectionDots}
+              participant={activeScreenShareTrack.participant}
+            />
             <ScreenShare className="h-4 w-4" />
             {participantDisplayName(activeScreenShareTrack, t("classroom.participantFallback"))}
           </div>
@@ -339,6 +362,7 @@ export function ClassroomVideoStage({
               <ClassroomMiniVideoTile
                 key={classroomSlotKey(slot)}
                 layout={stripLayout}
+                showLearnerConnectionDots={showLearnerConnectionDots}
                 slot={slot}
               />
             ))
@@ -428,7 +452,13 @@ function translationStatusText(
   return t("classroom.translation.waiting");
 }
 
-function ClassroomGridVideoSlot({ slot }: { slot: ClassroomVideoSlot }) {
+function ClassroomGridVideoSlot({
+  showLearnerConnectionDots,
+  slot,
+}: {
+  showLearnerConnectionDots: boolean;
+  slot: ClassroomVideoSlot;
+}) {
   const { t } = useAppTranslation();
   const label = slot.kind === "track"
     ? participantDisplayName(slot.trackRef, t("classroom.participantFallback"))
@@ -437,16 +467,26 @@ function ClassroomGridVideoSlot({ slot }: { slot: ClassroomVideoSlot }) {
   return (
     <div className="playsay-video-grid-card">
       <ClassroomVideoSlotView slot={slot} />
-      {slot.kind === "track" ? <div className="playsay-video-card-label" title={label}>{label}</div> : null}
+      {slot.kind === "track" ? (
+        <div className="playsay-video-card-label" title={label}>
+          <ClassroomParticipantConnectionDot
+            enabled={showLearnerConnectionDots}
+            participant={slot.trackRef.participant}
+          />
+          <span>{label}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function ClassroomMiniVideoTile({
   layout,
+  showLearnerConnectionDots,
   slot,
 }: {
   layout: ClassroomStripLayout;
+  showLearnerConnectionDots: boolean;
   slot: ClassroomVideoSlot;
 }) {
   const { t } = useAppTranslation();
@@ -457,7 +497,15 @@ function ClassroomMiniVideoTile({
   return (
     <div className="playsay-video-card" data-layout={layout}>
       <ClassroomVideoSlotView slot={slot} />
-      {slot.kind === "track" ? <div className="playsay-video-card-label" title={label}>{label}</div> : null}
+      {slot.kind === "track" ? (
+        <div className="playsay-video-card-label" title={label}>
+          <ClassroomParticipantConnectionDot
+            enabled={showLearnerConnectionDots}
+            participant={slot.trackRef.participant}
+          />
+          <span>{label}</span>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import type { LessonRoomSession } from "../model/session";
 import { lessonLiveKitRoomConnectOptions, lessonLiveKitRoomOptions, liveKitRoomInstanceKey } from "../model/liveKitRoomOptions";
 import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoStage";
+import { ClassroomConnectionStatus } from "./ClassroomConnectionStatus";
 import { LessonWorkspace } from "./LessonWorkspace";
 import type { LessonPresentationMode } from "./LessonTaskCanvas";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -144,6 +145,7 @@ export function LiveLessonExperience({
     <div
       className="playsay-classroom-shell"
       data-presentation-mode={presentationMode}
+      data-connection-role={canManageLesson ? "teacher" : "learner"}
       data-screen-share-active={screenShareActive ? "true" : "false"}
       data-video-expanded={videoExpanded ? "true" : "false"}
       data-video-only={videoOnly ? "true" : "false"}
@@ -173,6 +175,10 @@ export function LiveLessonExperience({
               <Radio className="h-3.5 w-3.5" />
               {t("classroom.live")}
             </span>
+            <ClassroomConnectionStatus
+              canManageLesson={canManageLesson}
+              learnerSubjects={session.participants.map((participant) => participant.subject)}
+            />
             <h1 title={session.lessonTitle}>{session.lessonTitle}</h1>
           </div>
 
@@ -192,6 +198,7 @@ export function LiveLessonExperience({
               onToggleFullscreen={() => void toggleFullscreen()}
               participantPresence={session.participantPresence}
               showExpectedParticipants={canManageLesson}
+              showLearnerConnectionDots={canManageLesson}
               translationAllowed={session.lessonTranslationAllowed}
               translationRole={translationRole}
             />

@@ -44,6 +44,10 @@ vi.mock("./ClassroomVideoStage", () => ({
   ClassroomVideoStage: ({ mode }: { mode: string }) => <div data-mode={mode} data-testid="video-stage" />,
 }));
 
+vi.mock("./ClassroomConnectionStatus", () => ({
+  ClassroomConnectionStatus: () => <div data-testid="connection-status" />,
+}));
+
 vi.mock("./LessonWorkspace", () => ({
   LessonWorkspace: ({ onPresentationModeChange }: { onPresentationModeChange: (mode: string) => void }) => (
     <div data-testid="lesson-workspace">

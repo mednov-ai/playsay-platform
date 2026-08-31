@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const classroomCss = readFileSync(resolve(process.cwd(), "src/styles/classroom.css"), "utf8");
 const materialsCss = readFileSync(resolve(process.cwd(), "src/styles/materials.css"), "utf8");
+const responsiveCss = readFileSync(resolve(process.cwd(), "src/styles/responsive.css"), "utf8");
 const appCss = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
 
 function cssRule(selector: string): string {
@@ -32,6 +33,11 @@ describe("classroom video theme", () => {
   it("keeps media letterboxing dark in either theme", () => {
     expect(cssRule('.playsay-video-focus > .lk-participant-tile .lk-participant-media-video[data-lk-source="camera"]')).toContain("background: #111111;");
     expect(cssRule('.playsay-video-focus > .lk-participant-tile .lk-participant-media-video[data-lk-source="screen_share"]')).toContain("background: #111111;");
+  });
+
+  it("places the portrait connection popup below the compact video controls", () => {
+    expect(responsiveCss).toContain('.playsay-classroom-shell[data-viewport-mode="mobilePortrait"] .playsay-connection-popover {');
+    expect(responsiveCss).toContain("top: calc(clamp(9.75rem, 25dvh, 12rem) + 0.45rem);");
   });
 });
 

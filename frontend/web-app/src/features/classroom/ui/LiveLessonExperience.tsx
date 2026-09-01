@@ -1,6 +1,6 @@
 import { LiveKitRoom } from "@livekit/components-react";
 import { Radio } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import {
   type LessonMaterial,
@@ -11,9 +11,11 @@ import type { LessonRoomSession } from "../model/session";
 import { lessonLiveKitRoomConnectOptions, lessonLiveKitRoomOptions, liveKitRoomInstanceKey } from "../model/liveKitRoomOptions";
 import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoStage";
 import { ClassroomConnectionStatus } from "./ClassroomConnectionStatus";
+import { ClassroomMediaTransportProbe } from "./ClassroomMediaTransportProbe";
 import { LessonWorkspace } from "./LessonWorkspace";
 import type { LessonPresentationMode } from "./LessonTaskCanvas";
 import { useAppTranslation } from "../../../shared/i18n";
+import type { MediaTransportEvidence } from "../model/mediaTransportEvidence";
 
 export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
 
@@ -62,6 +64,20 @@ export function LiveLessonExperience({
   const [fullscreenPending, setFullscreenPending] = useState(false);
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const [screenShareActive, setScreenShareActive] = useState(false);
+  const [mediaTransportEvidence, setMediaTransportEvidence] = useState<MediaTransportEvidence>({
+    allRelayed: false,
+    peerConnectionCount: 0,
+    transportClass: "unknown",
+  });
+  const updateMediaTransportEvidence = useCallback((next: MediaTransportEvidence) => {
+    setMediaTransportEvidence((current) => (
+      current.allRelayed === next.allRelayed
+      && current.peerConnectionCount === next.peerConnectionCount
+      && current.transportClass === next.transportClass
+        ? current
+        : next
+    ));
+  }, []);
   const displayName = profile?.name ?? profile?.username ?? t("classroom.participantFallback");
   const canManageLesson = canAssignLessons(profile);
   const translationRole = session.identity === session.teacherSubject
@@ -151,6 +167,9 @@ export function LiveLessonExperience({
       className="playsay-classroom-shell"
       data-presentation-mode={presentationMode}
       data-connection-role={canManageLesson ? "teacher" : "learner"}
+      data-media-all-relayed={mediaTransportEvidence.allRelayed ? "true" : "false"}
+      data-media-peer-connections={mediaTransportEvidence.peerConnectionCount}
+      data-media-transport-class={mediaTransportEvidence.transportClass}
       data-screen-share-active={screenShareActive ? "true" : "false"}
       data-video-expanded={videoExpanded ? "true" : "false"}
       data-video-only={videoOnly ? "true" : "false"}
@@ -174,6 +193,7 @@ export function LiveLessonExperience({
         token={session.token}
         video={session.mediaChoices.videoEnabled ? { deviceId: session.mediaChoices.videoDeviceId } : false}
       >
+        <ClassroomMediaTransportProbe onEvidence={updateMediaTransportEvidence} />
         <section className="playsay-video-rail">
           <div className="playsay-video-header">
             <span className="playsay-video-live-badge">

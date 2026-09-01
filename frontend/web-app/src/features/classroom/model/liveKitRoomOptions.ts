@@ -49,9 +49,10 @@ export function regionalRelayPolicyKey(mediaRouting?: MediaRoutingResponse | nul
 export function liveKitRoomInstanceKey(
   roomName: string,
   tokenExpiresAt: string,
+  serverUrl: string,
   mediaRouting?: MediaRoutingResponse | null,
 ): string {
-  return `${roomName}:${tokenExpiresAt}:${regionalRelayPolicyKey(mediaRouting)}`;
+  return `${roomName}:${tokenExpiresAt}:${serverUrl}:${regionalRelayPolicyKey(mediaRouting)}`;
 }
 
 function regionalRelayRtcConfiguration(

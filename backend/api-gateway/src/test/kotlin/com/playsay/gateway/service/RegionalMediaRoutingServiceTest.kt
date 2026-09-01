@@ -1,10 +1,12 @@
 package com.playsay.gateway.service
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -18,8 +20,8 @@ class RegionalMediaRoutingServiceTest {
         val service = service(environment = "prod", mode = "off", sharedSecret = "")
         service.validateConfiguration()
 
-        assertNull(service.routingFor("https://online.honeyschool.ru"))
-        assertNull(service.routingFor("https://online.honey.school"))
+        assertNull(service.selectionFor("https://online.honeyschool.ru"))
+        assertNull(service.selectionFor("https://online.honey.school"))
     }
 
     @Test
@@ -27,11 +29,13 @@ class RegionalMediaRoutingServiceTest {
         val service = service(environment = "prod", mode = "rf-origin-relay", sharedSecret = secret)
         service.validateConfiguration()
 
-        assertNull(service.routingFor("https://online.honey.school"))
-        assertNull(service.routingFor("https://online.honeyschool.ru.evil.example"))
-        assertNull(service.routingFor(null))
+        assertNull(service.selectionFor("https://online.honey.school"))
+        assertNull(service.selectionFor("https://online.honeyschool.ru.evil.example"))
+        assertNull(service.selectionFor(null))
 
-        val routing = requireNotNull(service.routingFor("https://online.honeyschool.ru"))
+        val selection = requireNotNull(service.selectionFor("https://online.honeyschool.ru"))
+        assertEquals("wss://online.honeyschool.ru/livekit", selection.serverUrl)
+        val routing = selection.mediaRouting
         assertEquals("REGIONAL_RELAY", routing.policy)
         assertEquals("selectel-rf-v1", routing.revision)
         assertEquals("relay", routing.iceTransportPolicy)
@@ -60,10 +64,63 @@ class RegionalMediaRoutingServiceTest {
         }
     }
 
+    @Test
+    fun `enabled routing rejects missing or non allowlisted signaling url without echoing it`() {
+        val missing = assertFailsWith<IllegalArgumentException> {
+            service(
+                environment = "prod",
+                mode = "rf-origin-relay",
+                sharedSecret = secret,
+                signalingUrl = "",
+            ).validateConfiguration()
+        }
+        assertEquals("Regional classroom signaling URL is invalid", missing.message)
+
+        val supplied = "wss://online.honey.school/livekit?access_token=prohibited"
+        val untrusted = assertFailsWith<IllegalArgumentException> {
+            service(
+                environment = "prod",
+                mode = "rf-origin-relay",
+                sharedSecret = secret,
+                signalingUrl = supplied,
+            ).validateConfiguration()
+        }
+        assertEquals("Regional classroom signaling URL is invalid", untrusted.message)
+        assertFalse(untrusted.message.orEmpty().contains(supplied))
+    }
+
+    @Test
+    fun `route metrics expose only bounded contour classes`() {
+        val registry = SimpleMeterRegistry()
+        val service = service(
+            environment = "prod",
+            mode = "rf-origin-relay",
+            sharedSecret = secret,
+            meterRegistry = registry,
+        )
+
+        service.selectionFor("https://online.honey.school")
+        val selection = requireNotNull(service.selectionFor("https://online.honeyschool.ru"))
+
+        val meters = registry.meters.filter { it.id.name == "playsay.classroom.route.selections" }
+        assertEquals(setOf("direct-school", "rf-two-hop"), meters.map { it.id.getTag("route") }.toSet())
+        val exposedMetadata = meters.flatMap { meter ->
+            listOf(meter.id.name) + meter.id.tags.flatMap { tag -> listOf(tag.key, tag.value) }
+        }.joinToString(" ")
+        listOf(
+            selection.serverUrl,
+            selection.mediaRouting.iceServers.single().username,
+            selection.mediaRouting.iceServers.single().credential,
+            "https://online.honey.school",
+        ).forEach { sensitiveValue -> assertFalse(exposedMetadata.contains(sensitiveValue)) }
+    }
+
     private fun service(
         environment: String,
         mode: String,
         sharedSecret: String,
         ttlSeconds: Long = 900,
-    ) = RegionalMediaRoutingService(environment, mode, sharedSecret, ttlSeconds, fixedClock)
+        signalingUrl: String = "wss://online.honeyschool.ru/livekit",
+        meterRegistry: SimpleMeterRegistry = SimpleMeterRegistry(),
+    ) = RegionalMediaRoutingService(environment, mode, signalingUrl, sharedSecret, ttlSeconds, fixedClock, meterRegistry)
 }

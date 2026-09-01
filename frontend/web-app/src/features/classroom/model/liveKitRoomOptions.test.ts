@@ -65,12 +65,21 @@ describe("lessonLiveKitRoomOptions", () => {
   });
 
   it("replaces the room instance for a fresh-token retry or routing-policy change", () => {
-    const baseline = liveKitRoomInstanceKey("lesson-1", "2026-08-31T10:15:00Z");
-    const freshToken = liveKitRoomInstanceKey("lesson-1", "2026-08-31T10:16:00Z");
-    const regional = liveKitRoomInstanceKey("lesson-1", "2026-08-31T10:16:00Z", routing);
+    const directUrl = "wss://online.honey.school/livekit";
+    const regionalUrl = "wss://online.honeyschool.ru/livekit";
+    const baseline = liveKitRoomInstanceKey("lesson-1", "2026-08-31T10:15:00Z", directUrl);
+    const freshToken = liveKitRoomInstanceKey("lesson-1", "2026-08-31T10:16:00Z", directUrl);
+    const regional = liveKitRoomInstanceKey("lesson-1", "2026-08-31T10:16:00Z", regionalUrl, routing);
+    const signalingOnlyChange = liveKitRoomInstanceKey(
+      "lesson-1",
+      "2026-08-31T10:16:00Z",
+      regionalUrl,
+    );
 
     expect(freshToken).not.toBe(baseline);
     expect(regional).not.toBe(freshToken);
+    expect(signalingOnlyChange).not.toBe(freshToken);
+    expect(regional).not.toBe(signalingOnlyChange);
     expect(regional).not.toContain(routing.iceServers[0].credential);
   });
 });

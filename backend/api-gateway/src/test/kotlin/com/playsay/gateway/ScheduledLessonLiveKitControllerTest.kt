@@ -80,7 +80,7 @@ class ScheduledLessonLiveKitControllerTest : ScheduledLessonControllerTestFixtur
         val studentClaims = SignedJWT.parse(studentToken.token).jwtClaimsSet
         val videoGrant = claims.getJSONObjectClaim("video")
 
-        assertEquals("wss://online.play-and-say.ru/livekit", teacherToken.serverUrl)
+        assertEquals("wss://online.honey.school/livekit", teacherToken.serverUrl)
         assertEquals("lesson-${lesson.id}", teacherToken.roomName)
         assertEquals("teacher-1", teacherToken.identity)
         assertFalse(teacherToken.lessonTranslationAllowed)
@@ -120,7 +120,9 @@ class ScheduledLessonLiveKitControllerTest : ScheduledLessonControllerTestFixtur
         val direct = liveKitRoomController.createToken(student, lesson.id, "https://online.honey.school")
         val regional = liveKitRoomController.createToken(student, lesson.id, "https://online.honeyschool.ru")
 
+        assertEquals("wss://online.honey.school/livekit", direct.serverUrl)
         assertNull(direct.mediaRouting)
+        assertEquals("wss://online.honeyschool.ru/livekit", regional.serverUrl)
         assertEquals("REGIONAL_RELAY", regional.mediaRouting?.policy)
         assertEquals("relay", regional.mediaRouting?.iceTransportPolicy)
         assertEquals(3, regional.mediaRouting?.iceServers?.single()?.urls?.size)

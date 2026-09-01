@@ -34,8 +34,9 @@ class LiveKitTokenService(
         authentication: JwtAuthenticationToken,
         roomName: String,
         lessonTranslationAllowed: Boolean = false,
+        selectedServerUrl: String? = null,
     ): LiveKitRoomTokenResponse {
-        val cleanServerUrl = serverUrl.trim()
+        val cleanServerUrl = selectedServerUrl?.trim()?.takeIf { it.isNotEmpty() } ?: serverUrl.trim()
         val cleanApiKey = apiKey.trim()
         val cleanApiSecret = apiSecret.trim()
         val secretBytes = cleanApiSecret.toByteArray(StandardCharsets.UTF_8)
@@ -111,9 +112,13 @@ class LiveKitRoomStore(
         val roomName = lesson.livekitRoomName?.trim()?.takeIf { room -> room.isNotEmpty() }
             ?: ensureRoomName(lesson)
 
-        return tokenService.createToken(authentication, roomName, lessonTranslationAllowed(lesson)).copy(
-            mediaRouting = regionalMediaRoutingService.routingFor(origin),
-        )
+        val regionalSelection = regionalMediaRoutingService.selectionFor(origin)
+        return tokenService.createToken(
+            authentication = authentication,
+            roomName = roomName,
+            lessonTranslationAllowed = lessonTranslationAllowed(lesson),
+            selectedServerUrl = regionalSelection?.serverUrl,
+        ).copy(mediaRouting = regionalSelection?.mediaRouting)
     }
 
     private fun lessonTranslationAllowed(lesson: LessonEntity): Boolean {

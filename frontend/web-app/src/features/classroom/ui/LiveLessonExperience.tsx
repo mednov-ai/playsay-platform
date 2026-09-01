@@ -90,7 +90,12 @@ export function LiveLessonExperience({
     () => lessonLiveKitRoomConnectOptions(session.mediaRouting),
     [session.mediaRouting],
   );
-  const liveKitInstanceKey = liveKitRoomInstanceKey(session.roomName, session.expiresAt, session.mediaRouting);
+  const liveKitInstanceKey = liveKitRoomInstanceKey(
+    session.roomName,
+    session.expiresAt,
+    session.serverUrl,
+    session.mediaRouting,
+  );
 
   useEffect(() => {
     document.body.classList.toggle("playsay-classroom-video-expanded", videoExpanded);

@@ -70,6 +70,7 @@ export function useYjsWorkspace({
   const [videoPlaybackStates, setVideoPlaybackStates] = useState<Record<string, MaterialVideoPlaybackState>>({});
   const [workspaceClientId, setWorkspaceClientId] = useState<number | null>(null);
   const [annotationUndoState, setAnnotationUndoState] = useState({ canRedo: false, canUndo: false });
+  const [reconnectCount, setReconnectCount] = useState(0);
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -91,6 +92,7 @@ export function useYjsWorkspace({
       setVideoPlaybackStates({});
       setWorkspaceClientId(null);
       setAnnotationUndoState({ canRedo: false, canUndo: false });
+      setReconnectCount(0);
       exerciseInteractionRef.current = null;
       return undefined;
     }
@@ -98,6 +100,7 @@ export function useYjsWorkspace({
     let disposed = false;
     let reconnectTimer: number | null = null;
     let reconnectAttempt = 0;
+    let connectInFlight = false;
     let gameSyncController: ReturnType<typeof createGameSyncSessionController> | null = null;
     let latestHtmlGameSdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint> = {};
     const runtime = createYjsWorkspaceRuntime({
@@ -148,6 +151,7 @@ export function useYjsWorkspace({
     gameSyncControllerRef.current = gameSyncController;
     setWorkspaceClientId(runtime.getClientId());
     setStatus("connecting");
+    setReconnectCount(0);
 
     const clearReconnectTimer = () => {
       if (reconnectTimer !== null) {
@@ -158,6 +162,7 @@ export function useYjsWorkspace({
     const scheduleReconnect = () => {
       if (disposed || reconnectTimer !== null) return;
       setStatus("reconnecting");
+      setReconnectCount((current) => current + 1);
       const delay = realtimeReconnectDelayMs(reconnectAttempt);
       reconnectAttempt += 1;
       reconnectTimer = window.setTimeout(() => {
@@ -165,11 +170,26 @@ export function useYjsWorkspace({
         void connect();
       }, delay);
     };
+    const detachSocket = (socket: WebSocket) => {
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onclose = null;
+      socket.onerror = null;
+    };
+    const retireSocket = (socket: WebSocket | null) => {
+      if (!socket) return;
+      detachSocket(socket);
+      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        socket.close();
+      }
+    };
     const connect = async () => {
+      if (connectInFlight) return;
       if (disposed || !navigator.onLine) {
         scheduleReconnect();
         return;
       }
+      connectInFlight = true;
       clearReconnectTimer();
       setStatus(reconnectAttempt === 0 ? "connecting" : "reconnecting");
       try {
@@ -177,6 +197,10 @@ export function useYjsWorkspace({
         if (disposed) return;
         const socket = new WebSocket(collaborationWebSocketUrl(tokenResponse));
         socket.binaryType = "arraybuffer";
+        const previous = socketRef.current;
+        if (previous && previous !== socket) {
+          retireSocket(previous);
+        }
         socketRef.current = socket;
         socket.onopen = () => {
           if (disposed || socketRef.current !== socket) {
@@ -191,10 +215,9 @@ export function useYjsWorkspace({
           if (socketRef.current === socket) runtime.handleSocketMessage(event.data);
         };
         socket.onclose = () => {
-          if (socketRef.current === socket) {
-            socketRef.current = null;
-            runtime.setSocket(null);
-          }
+          if (socketRef.current !== socket) return;
+          socketRef.current = null;
+          runtime.setSocket(null);
           if (!disposed) scheduleReconnect();
         };
         socket.onerror = () => {
@@ -211,13 +234,19 @@ export function useYjsWorkspace({
           setStatus("error");
           scheduleReconnect();
         }
+      } finally {
+        connectInFlight = false;
       }
     };
     const reconnectNow = () => {
       if (disposed) return;
-      clearReconnectTimer();
       const current = socketRef.current;
-      if (current?.readyState === WebSocket.OPEN || current?.readyState === WebSocket.CONNECTING) return;
+      if (
+        connectInFlight ||
+        current?.readyState === WebSocket.OPEN ||
+        current?.readyState === WebSocket.CONNECTING
+      ) return;
+      clearReconnectTimer();
       void connect();
     };
     const handleVisibilityChange = () => {
@@ -232,7 +261,7 @@ export function useYjsWorkspace({
       clearReconnectTimer();
       window.removeEventListener("online", reconnectNow);
       globalThis.document.removeEventListener("visibilitychange", handleVisibilityChange);
-      socketRef.current?.close();
+      retireSocket(socketRef.current);
       socketRef.current = null;
       runtime.setSocket(null);
       runtime.destroy();
@@ -406,6 +435,7 @@ export function useYjsWorkspace({
     annotationUndoState,
     connected: status === "connected",
     participants,
+    reconnectCount,
     htmlGameSync,
     exerciseSync,
     videoSync,

@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import java.util.UUID
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.GetMapping
@@ -213,6 +214,7 @@ class CollaborationDocumentController(
         authentication: JwtAuthenticationToken,
         @PathVariable lessonId: UUID,
         @PathVariable documentId: UUID,
+        @RequestHeader(name = HttpHeaders.ORIGIN, required = false) origin: String? = null,
     ): CollaborationTokenResponse =
-        service.token(authentication, lessonId, documentId)
+        service.token(authentication, lessonId, documentId, origin)
 }

@@ -9,6 +9,11 @@ import type {
   CollaborationBackpressureObserver,
 } from "./backpressure.js";
 import type { SnapshotMetrics } from "./snapshots.js";
+import type {
+  CollaborationChannel,
+  CollaborationCloseClass,
+  CollaborationConnectionObserver,
+} from "./heartbeat.js";
 
 interface RealtimeMetricSnapshot {
   activeConnections: number;
@@ -18,7 +23,7 @@ interface RealtimeMetricSnapshot {
   gameBufferedBytes: number;
 }
 
-export class CollaborationMetrics implements CollaborationBackpressureObserver, SnapshotMetrics {
+export class CollaborationMetrics implements CollaborationBackpressureObserver, CollaborationConnectionObserver, SnapshotMetrics {
   private readonly registry = new Registry();
   private readonly activeConnections = new Gauge({
     help: "Number of active collaboration websocket connections.",
@@ -28,6 +33,12 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
   private readonly activeGameConnections = new Gauge({
     help: "Number of active low-latency game websocket connections.",
     name: "playsay_collaboration_game_active_connections",
+    registers: [this.registry],
+  });
+  private readonly activeConnectionsByChannel = new Gauge({
+    help: "Number of active collaboration websocket connections by channel class.",
+    labelNames: ["channel"] as const,
+    name: "playsay_collaboration_channel_active_connections",
     registers: [this.registry],
   });
   private readonly activeRooms = new Gauge({
@@ -101,6 +112,31 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     name: "playsay_collaboration_snapshot_flush_duration_seconds",
     registers: [this.registry],
   });
+  private readonly connectionOpens = new Counter({
+    help: "Collaboration websocket connections opened by channel class.",
+    labelNames: ["channel"] as const,
+    name: "playsay_collaboration_connection_opens_total",
+    registers: [this.registry],
+  });
+  private readonly connectionCloses = new Counter({
+    help: "Collaboration websocket connections closed by channel and close class.",
+    labelNames: ["channel", "close_class"] as const,
+    name: "playsay_collaboration_connection_closes_total",
+    registers: [this.registry],
+  });
+  private readonly connectionAge = new Histogram({
+    buckets: [1, 5, 15, 30, 60, 300, 900, 1800, 3600, 7200],
+    help: "Age of collaboration websocket connections when closed.",
+    labelNames: ["channel", "close_class"] as const,
+    name: "playsay_collaboration_connection_age_seconds",
+    registers: [this.registry],
+  });
+  private readonly heartbeatTerminations = new Counter({
+    help: "Stale collaboration websocket connections terminated by heartbeat.",
+    labelNames: ["channel"] as const,
+    name: "playsay_collaboration_heartbeat_terminations_total",
+    registers: [this.registry],
+  });
 
   constructor() {
     collectDefaultMetrics({
@@ -141,9 +177,34 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     this.snapshotQueueSize.set(size);
   }
 
+  recordConnectionOpened(channel: CollaborationChannel): void {
+    this.connectionOpens.inc({ channel });
+  }
+
+  recordConnectionClosed(
+    channel: CollaborationChannel,
+    closeClass: CollaborationCloseClass,
+    ageSeconds: number,
+  ): void {
+    this.connectionCloses.inc({ channel, close_class: closeClass });
+    this.connectionAge.observe({ channel, close_class: closeClass }, ageSeconds);
+  }
+
+  recordHeartbeatTermination(channel: CollaborationChannel): void {
+    this.heartbeatTerminations.inc({ channel });
+  }
+
   async render(snapshot: RealtimeMetricSnapshot): Promise<string> {
     this.activeConnections.set(snapshot.activeConnections);
     this.activeGameConnections.set(snapshot.activeGameConnections);
+    this.activeConnectionsByChannel.set(
+      { channel: "game" },
+      snapshot.activeGameConnections,
+    );
+    this.activeConnectionsByChannel.set(
+      { channel: "yjs" },
+      snapshot.activeConnections - snapshot.activeGameConnections,
+    );
     this.activeRooms.set(snapshot.activeRooms);
     this.bufferedBytes.set(snapshot.bufferedBytes);
     this.gameBufferedBytes.set(snapshot.gameBufferedBytes);

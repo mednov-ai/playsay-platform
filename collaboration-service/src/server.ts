@@ -19,6 +19,7 @@ import {
   type GameRealtimeMode,
 } from "./gameProtocol.js";
 import { CollaborationMetrics } from "./metrics.js";
+import { CollaborationHeartbeat } from "./heartbeat.js";
 import { SnapshotQueue } from "./snapshots.js";
 import type { CollaborationClaims } from "./rooms.js";
 import { assertRoomMatchesClaims } from "./rooms.js";
@@ -110,8 +111,15 @@ async function main(): Promise<void> {
     response.writeHead(404);
     response.end();
   });
+  const heartbeat = new CollaborationHeartbeat(
+    wss,
+    config.websocketHeartbeatIntervalMs,
+    config.websocketHeartbeatMissedPongs,
+    metrics,
+  );
 
   snapshots.start();
+  heartbeat.start();
 
   server.on("upgrade", (request, socket, head) => {
     const requestUrl = new URL(request.url ?? "/", "http://localhost");
@@ -145,6 +153,7 @@ async function main(): Promise<void> {
   });
 
   wss.on("connection", (ws: WebSocket, request: http.IncomingMessage, claims: CollaborationClaims) => {
+    heartbeat.track(ws, isGameSocket(ws) ? "game" : "yjs");
     connectionClaims.set(ws, claims);
     ws.once("close", () => connectionClaims.delete(ws));
     request.socket.setNoDelay(true);
@@ -176,10 +185,10 @@ async function main(): Promise<void> {
   });
 
   process.on("SIGTERM", () => {
-    shutdown(server, wss, snapshots);
+    shutdown(server, wss, snapshots, heartbeat);
   });
   process.on("SIGINT", () => {
-    shutdown(server, wss, snapshots);
+    shutdown(server, wss, snapshots, heartbeat);
   });
 
   server.listen(config.port, () => {
@@ -561,7 +570,9 @@ function shutdown(
   server: http.Server,
   wss: WebSocketServer,
   snapshots: SnapshotQueue,
+  heartbeat: CollaborationHeartbeat,
 ): void {
+  heartbeat.stop();
   snapshots.stop();
   void snapshots.flushAll().finally(() => {
     wss.close();

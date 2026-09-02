@@ -14,6 +14,8 @@ describe("loadConfig", () => {
       websocketHardLimitBytes: 4 * 1024 * 1024,
       websocketMaxPayloadBytes: 4 * 1024 * 1024,
       websocketSoftLimitBytes: 1024 * 1024,
+      websocketHeartbeatIntervalMs: 20_000,
+      websocketHeartbeatMissedPongs: 2,
     });
   });
 
@@ -32,5 +34,21 @@ describe("loadConfig", () => {
       WEBSOCKET_HARD_LIMIT_BYTES: "1024",
       WEBSOCKET_SOFT_LIMIT_BYTES: "1024",
     })).toThrow(/hard limit/);
+  });
+
+  it("bounds stale websocket cleanup to sixty seconds", () => {
+    expect(() => loadConfig({
+      ...requiredEnv,
+      WEBSOCKET_HEARTBEAT_INTERVAL_MS: "30000",
+      WEBSOCKET_HEARTBEAT_MISSED_PONGS: "2",
+    })).toThrow(/within 60 seconds/);
+    expect(() => loadConfig({
+      ...requiredEnv,
+      WEBSOCKET_HEARTBEAT_MISSED_PONGS: "1.5",
+    })).toThrow(/invalid integer/);
+    expect(() => loadConfig({
+      ...requiredEnv,
+      WEBSOCKET_HEARTBEAT_MISSED_PONGS: "1",
+    })).toThrow(/more than one missed pong/);
   });
 });

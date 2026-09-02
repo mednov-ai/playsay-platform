@@ -1535,6 +1535,11 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Origin
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           description: Collaboration token

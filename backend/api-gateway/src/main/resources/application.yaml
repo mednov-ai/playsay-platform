@@ -98,6 +98,10 @@ playsay:
     base-url: ${PLAYSAY_LESSON_TRANSLATION_BASE_URL:${OPENAI_BASE_URL:https://api.openai.com/v1}}
   collaboration:
     websocket-url: ${PLAYSAY_COLLABORATION_WEBSOCKET_URL:wss://online.honey.school/collab/ws}
+    regional-routing:
+      environment: ${PLAYSAY_COLLABORATION_REGIONAL_ROUTING_ENVIRONMENT:local}
+      mode: ${PLAYSAY_COLLABORATION_REGIONAL_ROUTING_MODE:off}
+      websocket-url: ${PLAYSAY_COLLABORATION_REGIONAL_WEBSOCKET_URL:}
     http-base-url: ${PLAYSAY_COLLABORATION_HTTP_BASE_URL:http://collaboration-service.playsay-dev.svc.cluster.local}
     token-secret: ${PLAYSAY_COLLABORATION_TOKEN_SECRET:}
     service-token: ${PLAYSAY_COLLABORATION_SERVICE_TOKEN:}

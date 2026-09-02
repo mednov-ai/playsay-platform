@@ -49,10 +49,12 @@ type LiveAnnotationSync = {
   elements: AnnotationElement[];
   participants: CollaborationParticipant[];
   ready: boolean;
+  reconnectCount?: number;
   redo?: () => void;
   setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
   undo?: () => void;
   updateCursor: (cursor: CollaborationCursor | null) => void;
+  status?: string;
 };
 
 type MaterialViewportSync = {
@@ -604,6 +606,8 @@ export function LessonTaskCanvas({
         <div className="playsay-task-document" ref={taskDocumentRef}>
           <div
             className="playsay-task-document-surface"
+            data-collaboration-reconnect-count={annotationSync?.reconnectCount ?? 0}
+            data-collaboration-status={annotationSync?.status ?? "idle"}
             data-live-presence={annotationSync && presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? "true" : "false"}
             data-live-presence-ready={annotationSync?.ready && presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? "true" : "false"}
             data-testid="lesson-material-surface"

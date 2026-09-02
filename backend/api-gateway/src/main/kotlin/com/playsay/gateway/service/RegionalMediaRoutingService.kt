@@ -20,6 +20,7 @@ data class RegionalClassroomRoutingSelection(
 )
 
 @Component
+@Suppress("LongParameterList")
 class RegionalMediaRoutingService(
     @param:Value("\${playsay.livekit.regional-relay.environment:local}") private val environment: String,
     @param:Value("\${playsay.livekit.regional-relay.mode:off}") private val legacyMode: String,

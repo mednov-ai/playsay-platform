@@ -31,11 +31,15 @@ import org.springframework.transaction.annotation.Transactional
 
 @Component
 class CollaborationTokenService(
-    @param:Value("\${playsay.collaboration.websocket-url:/collab/ws}") private val websocketUrl: String,
     @param:Value("\${playsay.collaboration.token-secret:}") private val tokenSecret: String,
     @param:Value("\${playsay.collaboration.token-ttl-seconds:900}") private val tokenTtlSeconds: Long,
+    private val routingService: RegionalCollaborationRoutingService,
 ) {
-    fun createToken(authentication: JwtAuthenticationToken, document: CollaborationDocumentEntity): CollaborationTokenResponse {
+    fun createToken(
+        authentication: JwtAuthenticationToken,
+        document: CollaborationDocumentEntity,
+        origin: String?,
+    ): CollaborationTokenResponse {
         val secretBytes = tokenSecret.trim().toByteArray(StandardCharsets.UTF_8)
         if (secretBytes.size < 32) {
             throw ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.COLLABORATION_NOT_CONFIGURED)
@@ -65,7 +69,7 @@ class CollaborationTokenService(
         return CollaborationTokenResponse(
             documentId = document.id,
             yjsDocumentId = document.yjsDocumentId,
-            websocketUrl = websocketUrl.trim().ifEmpty { "/collab/ws" },
+            websocketUrl = routingService.websocketUrlFor(origin),
             token = jwt.serialize(),
             expiresAt = expiresAt,
         )
@@ -172,9 +176,10 @@ class CollaborationDocumentService(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,
         documentId: UUID,
+        origin: String? = null,
     ): CollaborationTokenResponse {
         val document = visibleDocument(authentication, lessonId, documentId)
-        return tokenService.createToken(authentication, document)
+        return tokenService.createToken(authentication, document, origin)
     }
 
     fun requireDocumentAccess(

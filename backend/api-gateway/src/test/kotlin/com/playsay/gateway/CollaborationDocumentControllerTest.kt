@@ -1,6 +1,7 @@
 package com.playsay.gateway
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.nimbusds.jwt.SignedJWT
 import com.playsay.gateway.controller.CollaborationDocumentController
 import com.playsay.gateway.controller.MaterialCrudController
 import com.playsay.gateway.controller.ScheduledLessonController
@@ -52,7 +53,10 @@ import liquibase.integration.spring.SpringLiquibase
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=false",
-        "playsay.collaboration.websocket-url=wss://online.play-and-say.ru/collab/ws",
+        "playsay.collaboration.websocket-url=wss://online.honey.school/collab/ws",
+        "playsay.collaboration.regional-routing.environment=prod",
+        "playsay.collaboration.regional-routing.mode=rf-two-hop",
+        "playsay.collaboration.regional-routing.websocket-url=wss://online.honeyschool.ru/collab/ws",
         "playsay.collaboration.token-secret=01234567890123456789012345678901",
         "playsay.collaboration.token-ttl-seconds=900",
         "playsay.collaboration.service-token=service-token-01234567890123456789",
@@ -328,12 +332,23 @@ class CollaborationDocumentControllerTest @Autowired constructor(
         )
 
         val token = collaborationController.token(student, classroom.lessonId, document.id)
+        val regionalToken = collaborationController.token(
+            student,
+            classroom.lessonId,
+            document.id,
+            "https://online.honeyschool.ru",
+        )
 
         assertEquals(document.id, token.documentId)
         assertEquals(document.yjsDocumentId, token.yjsDocumentId)
-        assertEquals("wss://online.play-and-say.ru/collab/ws", token.websocketUrl)
+        assertEquals("wss://online.honey.school/collab/ws", token.websocketUrl)
+        assertEquals("wss://online.honeyschool.ru/collab/ws", regionalToken.websocketUrl)
         assertTrue(token.token.count { char -> char == '.' } == 2)
         assertTrue(token.expiresAt.isAfter(Instant.now()))
+        val directClaims = SignedJWT.parse(token.token).jwtClaimsSet
+        val regionalClaims = SignedJWT.parse(regionalToken.token).jwtClaimsSet
+        listOf("sub", "documentId", "lessonId", "materialId", "documentKind", "scope", "yjsDocumentId", "room")
+            .forEach { claim -> assertEquals(directClaims.getClaim(claim), regionalClaims.getClaim(claim)) }
     }
 
     private fun classroom(teacher: JwtAuthenticationToken, participantSubjects: List<String>): ClassroomFixture {

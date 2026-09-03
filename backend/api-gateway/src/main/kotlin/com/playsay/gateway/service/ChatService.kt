@@ -45,6 +45,7 @@ class ChatService(
     private val studentAccessPolicy: StudentAccessPolicy,
     private val userProfileStore: UserProfileStore,
     private val chatPushDeliveryService: ChatPushDeliveryService,
+    private val chatEmailDigestService: ChatEmailDigestService,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
@@ -172,6 +173,7 @@ class ChatService(
             causeMessageId = saved.id,
         )
         chatPushDeliveryService.enqueue(saved, counterpart.id)
+        chatEmailDigestService.enqueue(counterpart.id, saved.id)
         eventPublisher.publishEvent(
             ChatMessageCreatedEvent(
                 message = response,
@@ -225,12 +227,7 @@ class ChatService(
     }
 
     private fun actor(authentication: JwtAuthenticationToken): AppUserEntity {
-        if (authentication.authorities.any { it.authority == MetaData.Authorities.ADMIN }) {
-            fail(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.CHAT_ROLE_REQUIRED)
-        }
-        val isTeacher = authentication.authorities.any { it.authority == MetaData.Authorities.TEACHER }
-        val isStudent = authentication.authorities.any { it.authority == MetaData.Authorities.STUDENT }
-        if (!isTeacher && !isStudent) fail(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.CHAT_ROLE_REQUIRED)
+        ChatAccessPolicy.requireAccess(authentication)
         return appUserRepo.findById(userProfileStore.currentUserId(authentication)).orElseThrow()
     }
 
@@ -372,6 +369,7 @@ class ChatService(
     private fun contact(user: AppUserEntity): ChatContactResponse = ChatContactResponse(
         subject = user.keycloakSubject,
         displayName = displayName(user),
+        username = user.username,
         role = if (user.roles.hasApplicationRole(MetaData.Roles.TEACHER)) MetaData.Roles.TEACHER else MetaData.Roles.STUDENT,
     )
 

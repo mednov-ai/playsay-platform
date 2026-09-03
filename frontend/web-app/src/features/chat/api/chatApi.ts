@@ -4,6 +4,7 @@ import { apiJson } from "../../../shared/api/http";
 export type ChatContact = {
   subject: string;
   displayName: string;
+  username?: string | null;
   role: "TEACHER" | "STUDENT";
 };
 

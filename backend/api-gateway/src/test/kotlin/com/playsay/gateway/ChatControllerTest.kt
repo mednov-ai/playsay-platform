@@ -30,6 +30,9 @@ import com.playsay.gateway.repo.ChatPushSubscriptionRepo
 import java.util.Base64
 import com.playsay.gateway.utils.MetaData
 import java.time.Instant
+import java.time.Clock
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.UUID
 import javax.sql.DataSource
 import kotlin.test.Test
@@ -51,6 +54,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 
 @SpringBootTest(
     properties = [
@@ -81,9 +86,14 @@ class ChatControllerTest @Autowired constructor(
     private val pushWorker: ChatPushDeliveryWorker,
     private val realtimeHub: ChatRealtimeHub,
     private val dataSource: DataSource,
+    private val transactionManager: PlatformTransactionManager,
 ) {
     @TestConfiguration
     class ChatEmailTestConfiguration {
+        @Bean
+        @Primary
+        fun chatClock(): Clock = ChatTestClock
+
         @Bean
         @Primary
         fun chatEmailClient(): ChatEmailClient = RecordingChatEmailClient
@@ -103,6 +113,7 @@ class ChatControllerTest @Autowired constructor(
 
     @BeforeEach
     fun cleanDatabase() {
+        ChatTestClock.current = null
         RecordingChatEmailClient.sent.clear()
         RecordingChatEmailClient.failuresRemaining = 0
         RecordingChatWebPushClient.commands.clear()
@@ -368,7 +379,7 @@ class ChatControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `online recipient receives delivery receipt without email digest`() {
+    fun `online recipient receives delivery receipt and keeps email eligibility`() {
         val teacher = user("teacher-online", "TEACHER")
         val student = user("student-online", "STUDENT", teacher)
         val teacherSession = ChatRecordingSession()
@@ -393,7 +404,7 @@ class ChatControllerTest @Autowired constructor(
                 50,
             ).items.single { it.id == sent.id }.deliveredAt)
             assertTrue(teacherSession.sentMessages.any { it.contains("chat.messages.delivered") })
-            assertTrue(digests.findAll().isEmpty())
+            assertEquals(1, digests.findAll().size)
         } finally {
             realtimeHub.unregister(teacherSession)
             realtimeHub.unregister(studentSession)
@@ -437,7 +448,7 @@ class ChatControllerTest @Autowired constructor(
         )
         val secondDigest = digests.findAll().single { it.id != firstDigest.id }
         val firstSentAt = digests.findById(firstDigest.id).orElseThrow().sentAt!!
-        assertTrue(!secondDigest.dueAt.isBefore(firstSentAt.plusSeconds(600)))
+        assertTrue(!secondDigest.dueAt.isBefore(firstSentAt.plusSeconds(1800)))
         digestScheduler.dispatchDueDigests(secondDigest.dueAt.minusSeconds(1))
         assertEquals(1, RecordingChatEmailClient.sent.size)
         digestScheduler.dispatchDueDigests(secondDigest.dueAt.plusSeconds(1))
@@ -445,7 +456,7 @@ class ChatControllerTest @Autowired constructor(
     }
 
     @Test
-    fun `pending digest is skipped when recipient returns online`() {
+    fun `pending unread digest is sent even when recipient returns online`() {
         val teacher = user("teacher-return", "TEACHER")
         val student = user("student-return", "STUDENT", teacher).apply {
             email = "student-return@example.com"
@@ -464,8 +475,8 @@ class ChatControllerTest @Autowired constructor(
         realtimeHub.register(studentSession, student.keycloakSubject)
         try {
             digestScheduler.dispatchDueDigests(digest.dueAt.plusSeconds(1))
-            assertTrue(RecordingChatEmailClient.sent.isEmpty())
-            assertEquals("SKIPPED", digests.findById(digest.id).orElseThrow().status)
+            assertEquals(1, RecordingChatEmailClient.sent.size)
+            assertEquals("SENT", digests.findById(digest.id).orElseThrow().status)
         } finally {
             realtimeHub.unregister(studentSession)
         }
@@ -502,6 +513,119 @@ class ChatControllerTest @Autowired constructor(
         assertEquals(1, RecordingChatEmailClient.sent.size)
     }
 
+    @Test
+    fun `admin teacher retains private teacher chat without administrative override`() {
+        val teacher = user("mixed-teacher", "ADMIN,TEACHER")
+        val student = user("mixed-student", "STUDENT", teacher)
+        val foreign = user("foreign-student", "STUDENT")
+        val auth = authentication(teacher.keycloakSubject, "ROLE_ADMIN", "ROLE_TEACHER")
+        val studentAuth = authentication(student.keycloakSubject, "ROLE_STUDENT")
+        assertEquals(listOf(student.username), controller.contacts(auth).map { it.username })
+        assertTrue(controller.pushCapability(auth).available)
+        assertFailsWith<ProjectResponseException> {
+            controller.createConversation(auth, CreateChatConversationRequest(foreign.keycloakSubject))
+        }
+        val conversation = controller.createConversation(studentAuth, CreateChatConversationRequest(teacher.keycloakSubject))
+        val incoming = controller.sendMessage(studentAuth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "Mixed role test"))
+        assertEquals(1, controller.conversations(auth).single().unreadCount)
+        assertEquals(incoming.id, controller.messages(auth, conversation.id, null, 50).items.single().id)
+        controller.markRead(auth, conversation.id, MarkChatReadRequest(incoming.id))
+        assertEquals(0, controller.conversations(auth).single().unreadCount)
+        controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "Reply"))
+        assertEquals(2, controller.messages(studentAuth, conversation.id, null, 50).items.size)
+    }
+
+    @Test
+    fun `reading batch suppresses email and no new messages means no repeat`() {
+        val teacher = user("read-teacher", "TEACHER")
+        val student = user("read-student", "STUDENT", teacher).apply {
+            email = "read-student@example.com"
+        }.let(users::saveAndFlush)
+        val auth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val conversation = controller.createConversation(auth, CreateChatConversationRequest(student.keycloakSubject))
+        val request = ChatMessageRequest(UUID.randomUUID(), "Read before email")
+        val sent = controller.sendMessage(auth, conversation.id, request)
+        controller.sendMessage(auth, conversation.id, request)
+        assertEquals(1, digestMessages.count())
+        val digest = digests.findAll().single()
+        assertTrue(digest.dueAt >= digest.createdAt.plusSeconds(120))
+        controller.markRead(authentication(student.keycloakSubject, "ROLE_STUDENT"), conversation.id, MarkChatReadRequest(sent.id))
+        digestScheduler.dispatchDueDigests(digest.dueAt.plusSeconds(1))
+        digestScheduler.dispatchDueDigests(digest.dueAt.plusSeconds(7200))
+        assertEquals("SKIPPED", digests.findById(digest.id).orElseThrow().status)
+        assertTrue(RecordingChatEmailClient.sent.isEmpty())
+        assertEquals(1, digests.count())
+    }
+
+    @Test
+    fun `email uses exact two minute grace and minute 29 arrival waits until minute 31`() {
+        val start = Instant.parse("2026-09-03T10:00:00Z")
+        ChatTestClock.current = start
+        val teacher = user("clock-teacher", "TEACHER")
+        val student = user("clock-student", "STUDENT", teacher).apply {
+            email = "clock-student@example.com"
+        }.let(users::saveAndFlush)
+        val auth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val conversation = controller.createConversation(auth, CreateChatConversationRequest(student.keycloakSubject))
+        controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "First"))
+        val first = digests.findAll().single()
+        assertEquals(start.plusSeconds(120), first.dueAt)
+        digestScheduler.dispatchDueDigests(start.plusSeconds(119))
+        assertTrue(RecordingChatEmailClient.sent.isEmpty())
+        ChatTestClock.current = first.dueAt
+        digestScheduler.dispatchDueDigests(first.dueAt)
+        assertEquals(1, RecordingChatEmailClient.sent.size)
+        ChatTestClock.current = first.dueAt.plusSeconds(29 * 60)
+        controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "New"))
+        val second = digests.findAll().single { it.id != first.id }
+        assertEquals(first.dueAt.plusSeconds(31 * 60), second.dueAt)
+        digestScheduler.dispatchDueDigests(second.dueAt.minusSeconds(1))
+        assertEquals(1, RecordingChatEmailClient.sent.size)
+        digestScheduler.dispatchDueDigests(second.dueAt)
+        digestScheduler.dispatchDueDigests(second.dueAt.plusSeconds(7200))
+        assertEquals(2, RecordingChatEmailClient.sent.size)
+    }
+
+    @Test
+    fun `rollback discards message and both notification queues`() {
+        val teacher = user("rollback-teacher", "TEACHER")
+        val student = user("rollback-student", "STUDENT", teacher)
+        val auth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val conversation = controller.createConversation(auth, CreateChatConversationRequest(student.keycloakSubject))
+        TransactionTemplate(transactionManager).executeWithoutResult { transaction ->
+            controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "Rolled back"))
+            transaction.setRollbackOnly()
+        }
+        assertEquals(0, messages.count())
+        assertEquals(0, digests.count())
+        assertEquals(0, digestMessages.count())
+        assertEquals(0, pushDeliveries.count())
+    }
+
+    @Test
+    fun `new messages do not join an attempted digest and retries keep the same idempotency key`() {
+        val teacher = user("retry-new-teacher", "TEACHER")
+        val student = user("retry-new-student", "STUDENT", teacher).apply {
+            email = "retry-new-student@example.com"
+        }.let(users::saveAndFlush)
+        val auth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val conversation = controller.createConversation(auth, CreateChatConversationRequest(student.keycloakSubject))
+        controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "First"))
+        val first = digests.findAll().single()
+        RecordingChatEmailClient.failuresRemaining = 1
+        digestScheduler.dispatchDueDigests(first.dueAt)
+        controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "After failure"))
+        assertEquals(2, digests.count())
+        assertEquals(1, digestMessages.findByDigestIdOrderByCreatedAtAsc(first.id).size)
+        val retry = digests.findById(first.id).orElseThrow()
+        assertEquals(first.idempotencyKey, retry.idempotencyKey)
+        digestScheduler.dispatchDueDigests(retry.dueAt.plusSeconds(1))
+        assertEquals(1, RecordingChatEmailClient.sent.size)
+        val pending = digests.findAll().single { it.status == "PENDING" }
+        val sentAt = digests.findAll().single { it.status == "SENT" }.sentAt!!
+        assertTrue(pending.dueAt >= sentAt.plusSeconds(1800))
+    }
+
     private fun user(subject: String, roles: String, primaryTeacher: AppUserEntity? = null): AppUserEntity {
         val now = Instant.now()
         return users.saveAndFlush(
@@ -529,6 +653,13 @@ class ChatControllerTest @Autowired constructor(
             .build()
         return JwtAuthenticationToken(jwt, roles.map(::SimpleGrantedAuthority))
     }
+}
+
+private object ChatTestClock : Clock() {
+    var current: Instant? = null
+    override fun getZone(): ZoneId = ZoneOffset.UTC
+    override fun withZone(zone: ZoneId): Clock = this
+    override fun instant(): Instant = current ?: Instant.now()
 }
 
 private object RecordingChatEmailClient : ChatEmailClient {

@@ -13,9 +13,11 @@ const ownerStorageKey = "playsay.chat-push.owner.v1";
 export function useChatPushSubscription(subject: string, locale: string) {
   const [status, setStatus] = useState<ChatPushStatus>("checking");
   const [capability, setCapability] = useState<ChatPushCapability | null>(null);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setStatus("checking");
     async function initialize() {
       if (!supportsChatPush()) {
         if (active) setStatus("unsupported");
@@ -60,7 +62,7 @@ export function useChatPushSubscription(subject: string, locale: string) {
     }
     void initialize();
     return () => { active = false; };
-  }, [locale, subject]);
+  }, [locale, subject, revision]);
 
   const enable = useCallback(async () => {
     if (!supportsChatPush()) {
@@ -69,9 +71,8 @@ export function useChatPushSubscription(subject: string, locale: string) {
     }
     setStatus("checking");
     try {
-      const nextCapability = capability ?? await fetchChatPushCapability();
-      setCapability(nextCapability);
-      if (!nextCapability.available || !nextCapability.publicKey) {
+      const nextCapability = capability;
+      if (!nextCapability?.available || !nextCapability.publicKey) {
         setStatus("unavailable");
         return;
       }
@@ -111,7 +112,8 @@ export function useChatPushSubscription(subject: string, locale: string) {
     }
   }, []);
 
-  return { disable, enable, status };
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  return { disable, enable, refresh, status };
 }
 
 export function supportsChatPush(): boolean {
@@ -122,7 +124,14 @@ export function supportsChatPush(): boolean {
 }
 
 async function registerChatServiceWorker(): Promise<ServiceWorkerRegistration> {
-  return navigator.serviceWorker.register("/chat-service-worker.js", { scope: "/", type: "module" });
+  await navigator.serviceWorker.register("/chat-service-worker.js", { scope: "/", type: "module" });
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("service worker activation timed out")), 15_000);
+    navigator.serviceWorker.ready.then((registration) => {
+      window.clearTimeout(timer);
+      resolve(registration);
+    }, (error: unknown) => { window.clearTimeout(timer); reject(error); });
+  });
 }
 
 async function registerSubscription(subscription: PushSubscription, locale: string): Promise<void> {

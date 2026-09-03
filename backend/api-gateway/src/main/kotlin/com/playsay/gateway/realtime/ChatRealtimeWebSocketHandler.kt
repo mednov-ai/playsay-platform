@@ -1,6 +1,7 @@
 package com.playsay.gateway.realtime
 
 import com.playsay.gateway.service.ChatDeliveryService
+import com.playsay.gateway.service.ChatAccessPolicy
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
@@ -14,7 +15,7 @@ class ChatRealtimeWebSocketHandler(
 ) : TextWebSocketHandler() {
     override fun afterConnectionEstablished(session: WebSocketSession) {
         val authentication = session.attributes[authenticationAttribute] as? JwtAuthenticationToken
-        if (authentication == null) {
+        if (authentication == null || !ChatAccessPolicy.allows(authentication)) {
             session.close(CloseStatus.NOT_ACCEPTABLE)
             return
         }

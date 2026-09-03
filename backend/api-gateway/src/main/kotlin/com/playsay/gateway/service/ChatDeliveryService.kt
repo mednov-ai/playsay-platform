@@ -19,17 +19,13 @@ class ChatDeliveryService(
     private val appUserRepo: AppUserRepo,
     private val conversationRepo: ChatConversationRepo,
     private val messageRepo: ChatMessageRepo,
-    private val emailDigestService: ChatEmailDigestService,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handlePublishedMessage(event: ChatMessageCreatedEvent, delivered: Boolean) {
         val message = messageRepo.findById(event.message.id).orElse(null) ?: return
-        if (!delivered) {
-            emailDigestService.enqueue(event.recipientUserId, message.id)
-            return
-        }
+        if (!delivered) return
         if (message.deliveredAt != null) return
         val deliveredAt = Instant.now(clock)
         message.deliveredAt = deliveredAt

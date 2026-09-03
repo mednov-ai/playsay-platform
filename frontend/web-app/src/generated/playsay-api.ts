@@ -1555,6 +1555,8 @@ export interface ChatContactResponse {
   subject: string;
   displayName: string;
   role: string;
+  /** @nullable */
+  username?: string | null;
 }
 
 export interface ChatMessageResponse {

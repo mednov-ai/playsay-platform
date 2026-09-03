@@ -89,12 +89,7 @@ class ChatPushSubscriptionService(
     }
 
     private fun requireChatRole(authentication: JwtAuthenticationToken) {
-        val hasRole = authentication.authorities.any {
-            it.authority == MetaData.Authorities.TEACHER || it.authority == MetaData.Authorities.STUDENT
-        }
-        if (!hasRole || authentication.authorities.any { it.authority == MetaData.Authorities.ADMIN }) {
-            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.CHAT_ROLE_REQUIRED)
-        }
+        ChatAccessPolicy.requireAccess(authentication)
     }
 
     private fun validatedEndpoint(value: String): String {

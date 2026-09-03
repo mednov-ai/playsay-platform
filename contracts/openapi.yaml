@@ -7109,6 +7109,10 @@ components:
           type: string
         role:
           type: string
+        username:
+          type:
+          - string
+          - "null"
       required:
       - displayName
       - role

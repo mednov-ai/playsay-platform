@@ -4,6 +4,7 @@ import {
   BellOff,
   Check,
   CheckCheck,
+  Dices,
   Loader2,
   MessageCircle,
   Search,
@@ -25,6 +26,7 @@ import {
   type ChatUnreadMap,
 } from "../model/chatUnreadState";
 import { useChatPushSubscription } from "../model/useChatPushSubscription";
+import { matchesChatContact } from "../model/chatContactSearch";
 import {
   createChatConversation,
   fetchChatContacts,
@@ -82,6 +84,8 @@ export function GlobalToolsRail({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contactsFailed, setContactsFailed] = useState(false);
+  const [conversationsFailed, setConversationsFailed] = useState(false);
   const [toast, setToast] = useState<ChatToast | null>(null);
   const [diceNow, setDiceNow] = useState(() => Date.now());
   const [visibleDiceRoll, setVisibleDiceRoll] = useState<LessonDiceRoll | null>(null);
@@ -127,15 +131,20 @@ export function GlobalToolsRail({
         recoveryPendingRef.current = false;
         latest = await fetchChatConversations();
         setConversations(latest);
+        setConversationsFailed(false);
         setUnreadByConversation((current) => applyConversationSnapshot(current, latest));
       } while (recoveryPendingRef.current);
       return latest;
     };
-    const promise = run();
-    recoveryInFlightRef.current = promise;
-    void promise.finally(() => {
-      if (recoveryInFlightRef.current === promise) recoveryInFlightRef.current = null;
+    const promise = run().catch((error: unknown) => {
+      setConversationsFailed(true);
+      throw error;
     });
+    recoveryInFlightRef.current = promise;
+    const clearRecovery = () => {
+      if (recoveryInFlightRef.current === promise) recoveryInFlightRef.current = null;
+    };
+    void promise.then(clearRecovery, clearRecovery);
     return promise;
   }, []);
 
@@ -143,12 +152,12 @@ export function GlobalToolsRail({
     let active = true;
     setLoading(true);
     setError(null);
-    Promise.all([fetchChatContacts(), refreshConversations()])
-      .then(([nextContacts]) => {
-        if (!active) return;
-        setContacts(nextContacts);
-      })
-      .catch(() => active && setError(t("chat.errors.load")))
+    Promise.allSettled([
+      fetchChatContacts().then((nextContacts) => {
+        if (active) { setContacts(nextContacts); setContactsFailed(false); }
+      }).catch(() => { if (active) setContactsFailed(true); }),
+      refreshConversations(),
+    ])
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -236,7 +245,7 @@ export function GlobalToolsRail({
               text: incoming.text,
             });
           }
-          void refreshConversations();
+          void refreshConversations().catch(() => undefined);
         }
         if (realtime.type === "chat.unread.changed" && realtime.unread) {
           const unread = realtime.unread;
@@ -398,7 +407,7 @@ export function GlobalToolsRail({
   const unreadCount = totalUnreadCount(unreadByConversation);
   const diceValue = classroomDice?.lastRoll?.value ?? null;
   const diceLabel = diceValue === null
-    ? t("dice.open")
+    ? t("dice.roll")
     : diceCoolingDown
       ? t("dice.aria.valueCooling", { value: diceValue })
       : t("dice.aria.value", { value: diceValue });
@@ -412,13 +421,13 @@ export function GlobalToolsRail({
     dice: {
       id: "dice",
       label: diceLabel,
-      icon: <DiceFaceIcon value={diceValue} />,
+      icon: diceValue === null ? <Dices aria-hidden="true" /> : <DiceFaceIcon value={diceValue} />,
     },
   };
   const tools = availableGlobalToolIds(Boolean(classroomDice)).map((toolId) => toolDefinitions[toolId]);
   const query = search.trim().toLocaleLowerCase(i18n.language);
   const filteredConversations = useMemo(() => conversations.filter((conversation) => (
-    !query || conversation.counterpart.displayName.toLocaleLowerCase(i18n.language).includes(query)
+    matchesChatContact(conversation.counterpart, query, i18n.language)
   )), [conversations, i18n.language, query]);
   const conversationSubjects = useMemo(
     () => new Set(conversations.map((conversation) => conversation.counterpart.subject)),
@@ -426,12 +435,13 @@ export function GlobalToolsRail({
   );
   const availableContacts = useMemo(() => contacts.filter((contact) => (
     !conversationSubjects.has(contact.subject) &&
-    (!query || contact.displayName.toLocaleLowerCase(i18n.language).includes(query))
+    matchesChatContact(contact, query, i18n.language)
   )), [contacts, conversationSubjects, i18n.language, query]);
 
   function toggleTool(toolId: GlobalToolId) {
     const next = activeTool === toolId ? null : toolId;
     setActiveTool(next);
+    if (next === "chat") void refreshConversations().catch(() => undefined);
     if (next === "chat" && !activeConversationIdRef.current && conversationsRef.current.length === 1) {
       void selectConversation(conversationsRef.current[0].id);
     }
@@ -521,7 +531,7 @@ export function GlobalToolsRail({
           )),
         },
       }));
-      void refreshConversations();
+      void refreshConversations().catch(() => undefined);
     } catch {
       setMessagesByConversation((all) => ({
         ...all,
@@ -611,6 +621,26 @@ export function GlobalToolsRail({
           </header>
 
           {error ? <p className="playsay-chat-error" role="alert">{error}</p> : null}
+          {contactsFailed || conversationsFailed ? (
+            <div className="playsay-chat-error" role="alert">
+              <p>{t(contactsFailed ? "chat.errors.contacts" : "chat.errors.conversations")}</p>
+              <button type="button" onClick={() => {
+                if (contactsFailed) void fetchChatContacts().then((items) => {
+                  setContacts(items); setContactsFailed(false);
+                }).catch(() => setContactsFailed(true));
+                if (conversationsFailed) void refreshConversations().catch(() => undefined);
+              }}>{t("chat.retry")}</button>
+            </div>
+          ) : null}
+          {!["checking", "enabled", "disabled"].includes(chatPush.status) ? (
+            <p className="playsay-chat-notification-status" role="status">
+              {pushControlLabel(chatPush.status, t)}
+              {chatPush.status === "denied" ? ` ${t("chat.notifications.browserSettings")}` : null}
+              {["error", "unavailable", "denied"].includes(chatPush.status) ? (
+                <button type="button" onClick={chatPush.refresh}>{t("chat.retry")}</button>
+              ) : null}
+            </p>
+          ) : null}
 
           {activeConversation ? (
             <div className="playsay-chat-conversation">
@@ -679,7 +709,7 @@ export function GlobalToolsRail({
                 <input onChange={(event) => setSearch(event.target.value)} placeholder={t("chat.search")} type="search" value={search} />
               </label>
               {loading ? <ChatLoading label={t("common.status.loading")} /> : null}
-              {!loading && filteredConversations.length === 0 && availableContacts.length === 0 ? (
+              {!loading && !contactsFailed && !conversationsFailed && filteredConversations.length === 0 && availableContacts.length === 0 ? (
                 <div className="playsay-chat-empty">
                   <MessageCircle aria-hidden="true" />
                   <h3>{t("chat.emptyTitle")}</h3>

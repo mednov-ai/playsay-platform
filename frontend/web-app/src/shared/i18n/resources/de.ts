@@ -159,6 +159,7 @@ export const de = {
     returnToSite: "Zur Website zurück",
   },
   chat: {
+    retry: "Erneut versuchen",
     toolsAria: "Wichtige Werkzeuge",
     open: "Chat öffnen",
     title: "Nachrichten",
@@ -186,6 +187,7 @@ export const de = {
       title: "Neue Nachricht",
     },
     notifications: {
+      browserSettings: "Erlauben Sie Benachrichtigungen in den Website-Einstellungen Ihres Browsers.",
       enable: "Benachrichtigungen aktivieren",
       disable: "Benachrichtigungen deaktivieren",
       enabled: "Benachrichtigungen aktiviert",
@@ -198,6 +200,8 @@ export const de = {
     },
     errors: {
       load: "Chat konnte nicht geladen werden",
+      contacts: "Kontakte konnten nicht geladen werden",
+      conversations: "Gespräche konnten nicht geladen werden",
       messages: "Nachrichten konnten nicht geladen werden",
       create: "Unterhaltung konnte nicht geöffnet werden",
       send: "Nachricht konnte nicht gesendet werden",

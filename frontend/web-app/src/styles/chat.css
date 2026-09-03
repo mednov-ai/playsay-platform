@@ -13,7 +13,7 @@ main[data-playsay-tools-layout="true"] {
   width: 3.5rem;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.35rem;
   border-right: 1px solid hsl(var(--border));
   background: color-mix(in srgb, hsl(var(--surface)) 94%, transparent);
@@ -21,6 +21,20 @@ main[data-playsay-tools-layout="true"] {
   pointer-events: none;
   box-shadow: 8px 0 30px rgb(63 36 18 / 0.06);
   backdrop-filter: blur(18px);
+}
+
+.playsay-chat-notification-status {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+}
+
+.playsay-chat-notification-status button,
+.playsay-chat-error button {
+  margin-left: 0.5rem;
+  color: hsl(var(--primary));
+  text-decoration: underline;
 }
 
 .playsay-tools-button {

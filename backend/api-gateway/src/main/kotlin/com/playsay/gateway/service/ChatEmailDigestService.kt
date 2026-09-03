@@ -7,7 +7,6 @@ import com.playsay.gateway.entity.ChatEmailDigestEntity
 import com.playsay.gateway.entity.ChatEmailDigestMessageEntity
 import com.playsay.gateway.entity.ChatMessageEntity
 import com.playsay.gateway.entity.ChatParticipantStateEntity
-import com.playsay.gateway.realtime.ChatRealtimeHub
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.ChatEmailDigestMessageRepo
 import com.playsay.gateway.repo.ChatEmailDigestRepo
@@ -23,6 +22,9 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.support.TransactionTemplate
 
 @Service
 class ChatEmailDigestService(
@@ -32,7 +34,7 @@ class ChatEmailDigestService(
     private val clock: Clock,
     @param:Value("\${playsay.chat-email.initial-delay:PT2M}")
     private val initialDelay: Duration,
-    @param:Value("\${playsay.chat-email.cooldown:PT10M}")
+    @param:Value("\${playsay.chat-email.cooldown:PT30M}")
     private val cooldown: Duration,
 ) {
     @Transactional
@@ -43,7 +45,7 @@ class ChatEmailDigestService(
         val digest = digestRepo.findFirstByRecipientUserIdAndStatusInOrderByCreatedAtDesc(
             recipientUserId,
             listOf(STATUS_PENDING),
-        ) ?: createDigest(recipientUserId, now)
+        )?.takeIf { it.attempts == 0 } ?: createDigest(recipientUserId, now)
         digest.updatedAt = now
         digestRepo.save(digest)
         digestMessageRepo.save(
@@ -87,35 +89,54 @@ class ChatEmailDigestService(
 }
 
 @Component
+// Explicit dependencies keep each recipient dispatch in its own transaction.
+@Suppress("LongParameterList")
 class ChatEmailDigestScheduler(
     private val appUserRepo: AppUserRepo,
     private val digestRepo: ChatEmailDigestRepo,
     private val digestMessageRepo: ChatEmailDigestMessageRepo,
     private val messageRepo: ChatMessageRepo,
     private val participantStateRepo: ChatParticipantStateRepo,
-    private val hub: ChatRealtimeHub,
     private val emailClient: ChatEmailClient,
     private val clock: Clock,
     @param:Value("\${playsay.public-app-url:https://online.honey.school}")
     private val publicAppUrl: String,
     @Value("\${playsay.chat-email.retry-delays:PT1M,PT5M,PT15M}")
     retryDelaysValue: String,
+    transactionManager: PlatformTransactionManager,
+    @param:Value("\${playsay.chat-email.cooldown:PT30M}")
+    private val cooldown: Duration,
 ) {
     private val retryDelays = retryDelaysValue.split(',').map { value -> Duration.parse(value.trim()) }
+    private val transaction = TransactionTemplate(transactionManager).apply {
+        propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
+    }
 
     @Scheduled(fixedDelayString = "\${playsay.chat-email.poll-delay-ms:30000}")
-    @Transactional
     fun dispatchDueDigests() {
         dispatchDueDigests(Instant.now(clock))
     }
 
-    @Transactional
     fun dispatchDueDigests(now: Instant) {
         digestRepo.findDue(ChatEmailDigestService.STATUS_PENDING, now).forEach { candidate ->
-            appUserRepo.lockByIdIn(listOf(candidate.recipientUserId))
-            val digest = digestRepo.lockById(candidate.id) ?: return@forEach
-            if (digest.status != ChatEmailDigestService.STATUS_PENDING || digest.dueAt > now) return@forEach
-            dispatch(digest, now)
+            runCatching { transaction.executeWithoutResult {
+                appUserRepo.lockByIdIn(listOf(candidate.recipientUserId))
+                val digest = digestRepo.lockById(candidate.id) ?: return@executeWithoutResult
+                if (digest.status != ChatEmailDigestService.STATUS_PENDING || digest.dueAt > now) {
+                    return@executeWithoutResult
+                }
+                val cooldownUntil = digestRepo.findFirstByRecipientUserIdAndStatusOrderBySentAtDesc(
+                    digest.recipientUserId, ChatEmailDigestService.STATUS_SENT,
+                )?.sentAt?.plus(cooldown)
+                if (cooldownUntil != null && cooldownUntil > now) {
+                    digest.dueAt = cooldownUntil
+                    digestRepo.save(digest)
+                } else {
+                    dispatch(digest, now)
+                }
+            } }.onFailure { error ->
+                logger.warn("chat digest transaction failed errorClass={}", error::class.simpleName)
+            }
         }
     }
 
@@ -125,11 +146,6 @@ class ChatEmailDigestScheduler(
             skip(digest, now)
             return
         }
-        if (hub.isOnline(recipient.keycloakSubject)) {
-            skip(digest, now)
-            return
-        }
-
         val links = digestMessageRepo.findByDigestIdOrderByCreatedAtAsc(digest.id)
         val messages = messageRepo.findAllById(links.map { link -> link.messageId })
             .filter { message -> message.senderUserId != recipient.id }
@@ -168,11 +184,11 @@ class ChatEmailDigestScheduler(
             }
             .onFailure { error ->
                 logger.warn(
-                    "chat digest email failed digestId={} recipientUserId={} attempt={}",
+                    "chat digest email failed digestId={} recipientUserId={} attempt={} errorClass={}",
                     digest.id,
                     digest.recipientUserId,
                     digest.attempts,
-                    error,
+                    error::class.simpleName,
                 )
                 val retryDelay = retryDelays.getOrNull(digest.attempts - 1)
                 if (retryDelay == null) {
@@ -181,7 +197,7 @@ class ChatEmailDigestScheduler(
                     digest.status = ChatEmailDigestService.STATUS_PENDING
                     digest.dueAt = now.plus(retryDelay)
                 }
-                digest.lastError = error.message?.take(1024)
+                digest.lastError = error::class.simpleName
             }
         digest.updatedAt = now
         digestRepo.save(digest)

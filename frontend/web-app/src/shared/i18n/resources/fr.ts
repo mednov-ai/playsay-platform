@@ -159,6 +159,7 @@ export const fr = {
     returnToSite: "Retour au site",
   },
   chat: {
+    retry: "Réessayer",
     toolsAria: "Outils importants",
     open: "Ouvrir le chat",
     title: "Messages",
@@ -186,6 +187,7 @@ export const fr = {
       title: "Nouveau message",
     },
     notifications: {
+      browserSettings: "Autorisez les notifications dans les paramètres du site de votre navigateur.",
       enable: "Activer les notifications",
       disable: "Désactiver les notifications",
       enabled: "Notifications activées",
@@ -198,6 +200,8 @@ export const fr = {
     },
     errors: {
       load: "Impossible de charger le chat",
+      contacts: "Impossible de charger les contacts",
+      conversations: "Impossible de charger les conversations",
       messages: "Impossible de charger les messages",
       create: "Impossible d’ouvrir la conversation",
       send: "Impossible d’envoyer le message",

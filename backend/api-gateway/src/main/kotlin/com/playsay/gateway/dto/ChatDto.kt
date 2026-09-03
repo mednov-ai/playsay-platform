@@ -11,6 +11,7 @@ data class ChatContactResponse(
     val subject: String,
     val displayName: String,
     val role: String,
+    val username: String? = null,
 )
 
 data class CreateChatConversationRequest(

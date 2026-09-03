@@ -159,6 +159,7 @@ export const en = {
     returnToSite: "Back to website",
   },
   chat: {
+    retry: "Retry",
     toolsAria: "Important tools",
     open: "Open chat",
     title: "Messages",
@@ -186,6 +187,7 @@ export const en = {
       title: "New message",
     },
     notifications: {
+      browserSettings: "Open site notification settings in your browser to allow notifications.",
       enable: "Enable notifications",
       disable: "Disable notifications",
       enabled: "Notifications enabled",
@@ -198,6 +200,8 @@ export const en = {
     },
     errors: {
       load: "Could not load chat",
+      contacts: "Could not load contacts",
+      conversations: "Could not load conversations",
       messages: "Could not load messages",
       create: "Could not open conversation",
       send: "Could not send message",

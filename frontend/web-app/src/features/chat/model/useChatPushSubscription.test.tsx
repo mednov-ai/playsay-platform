@@ -101,7 +101,7 @@ function installBrowserPush(
   const getRegistration = vi.fn(async () => registration);
   Object.defineProperty(navigator, "serviceWorker", {
     configurable: true,
-    value: { getRegistration, register },
+    value: { getRegistration, register, ready: Promise.resolve(registration) },
   });
   return { getSubscription, register, requestPermission, subscribe };
 }

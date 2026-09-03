@@ -8,11 +8,15 @@ import com.playsay.gateway.dto.ChatPushSubscriptionRequest
 import com.playsay.gateway.dto.ChatPushUnsubscribeRequest
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.ChatMessageEntity
+import com.playsay.gateway.entity.TeacherDelegationEntity
+import com.playsay.gateway.entity.TeacherDelegationStudentEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.realtime.ChatRealtimeHub
 import com.playsay.gateway.realtime.ChatRecordingSession
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.ChatConversationRepo
+import com.playsay.gateway.repo.TeacherDelegationRepo
+import com.playsay.gateway.repo.TeacherDelegationStudentRepo
 import com.playsay.gateway.repo.ChatEmailDigestMessageRepo
 import com.playsay.gateway.repo.ChatEmailDigestRepo
 import com.playsay.gateway.repo.ChatMessageRepo
@@ -90,6 +94,8 @@ class ChatControllerTest @Autowired constructor(
     private val realtimeHub: ChatRealtimeHub,
     private val dataSource: DataSource,
     private val transactionManager: PlatformTransactionManager,
+    private val delegations: TeacherDelegationRepo,
+    private val delegationStudents: TeacherDelegationStudentRepo,
 ) {
     @TestConfiguration
     class ChatEmailTestConfiguration {
@@ -117,6 +123,8 @@ class ChatControllerTest @Autowired constructor(
     @BeforeEach
     fun cleanDatabase() {
         ChatTestClock.current = null
+        delegationStudents.deleteAllInBatch()
+        delegations.deleteAllInBatch()
         RecordingChatEmailClient.sent.clear()
         RecordingChatEmailClient.failuresRemaining = 0
         RecordingChatWebPushClient.commands.clear()
@@ -536,6 +544,30 @@ class ChatControllerTest @Autowired constructor(
         assertEquals(0, controller.conversations(auth).single().unreadCount)
         controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "Reply"))
         assertEquals(2, controller.messages(studentAuth, conversation.id, null, 50).items.size)
+    }
+
+    @Test
+    fun `mixed teacher sees only primary and actively delegated students`() {
+        val teacher = user("delegated-mixed", "ADMIN,TEACHER")
+        val primary = user("delegated-primary", "TEACHER")
+        val own = user("own-student", "STUDENT", teacher)
+        val delegated = user("delegated-student", "STUDENT", primary)
+        user("unrelated-student", "STUDENT", primary)
+        val now = Instant.now()
+        val delegation = delegations.saveAndFlush(TeacherDelegationEntity(
+            primaryTeacherUserId = primary.id, delegateTeacherUserId = teacher.id,
+            createdByUserId = primary.id, startsAt = now.minusSeconds(60), endsAt = now.plusSeconds(3600),
+            createdAt = now,
+        ))
+        delegationStudents.saveAndFlush(TeacherDelegationStudentEntity(
+            delegationId = delegation.id, studentUserId = delegated.id, createdAt = now,
+        ))
+        val auth = authentication(teacher.keycloakSubject, "ROLE_ADMIN", "ROLE_TEACHER")
+        assertEquals(setOf(own.keycloakSubject, delegated.keycloakSubject), controller.contacts(auth).map { it.subject }.toSet())
+        controller.createConversation(auth, CreateChatConversationRequest(delegated.keycloakSubject))
+        delegation.revokedAt = now
+        delegations.saveAndFlush(delegation)
+        assertEquals(listOf(own.keycloakSubject), controller.contacts(auth).map { it.subject })
     }
 
     @Test

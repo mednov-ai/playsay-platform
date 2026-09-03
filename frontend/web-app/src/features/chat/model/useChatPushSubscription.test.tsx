@@ -106,7 +106,7 @@ function installBrowserPush(
   created = pushSubscription(),
 ) {
   let permission = initialPermission;
-  const requestPermission = vi.fn(async () => {
+  const requestPermission = vi.fn(async (): Promise<NotificationPermission> => {
     permission = "granted";
     return permission;
   });

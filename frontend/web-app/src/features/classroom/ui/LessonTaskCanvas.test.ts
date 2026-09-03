@@ -881,6 +881,95 @@ describe("LessonTaskCanvas", () => {
     performanceNow.mockRestore();
   });
 
+  it("does not restore an older published position after a viewport rerender during scrolling", async () => {
+    const callbacks = new Set<ResizeObserverCallback>();
+    const OriginalObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(private callback: ResizeObserverCallback) { callbacks.add(callback); }
+      observe() {}
+      unobserve() {}
+      disconnect() { callbacks.delete(this.callback); }
+    } as unknown as typeof ResizeObserver;
+    try {
+      const publish = vi.fn();
+      const props = {
+        lessonId: "scroll-regression", material, onSaveAnswers: () => undefined,
+        score: null, submission: null, submissionMessage: null, submissionSaving: false,
+        teacherName: "Teacher", viewportSync: { clientId: 7, publish, ready: true, state: null },
+      };
+      const view = render(createElement(LessonTaskCanvas, props));
+      const node = view.container.querySelector<HTMLElement>(".playsay-task-document")!;
+      Object.defineProperty(node, "clientHeight", { configurable: true, value: 100 });
+      Object.defineProperty(node, "scrollHeight", { configurable: true, value: 1100 });
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      fireEvent.wheel(node, { deltaY: 100 });
+      node.scrollTop = 100;
+      fireEvent.scroll(node);
+      await waitFor(() => expect(publish).toHaveBeenCalledWith(expect.objectContaining({ y: 0.1 }), undefined));
+      view.rerender(createElement(LessonTaskCanvas, { ...props, viewportSync: { ...props.viewportSync } }));
+      node.scrollTop = 150;
+      // The browser can advance the viewport before its next scroll event/publication.
+      act(() => callbacks.forEach(callback => callback([], {} as ResizeObserver)));
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      expect(node.scrollTop).toBe(150);
+      view.unmount();
+    } finally { globalThis.ResizeObserver = OriginalObserver; }
+  });
+
+  it("defers remote scrolling through inertia and flushes the final local position", async () => {
+    const publish = vi.fn();
+    const props = {
+      lessonId: "scroll-inertia", material, onSaveAnswers: () => undefined,
+      score: null, submission: null, submissionMessage: null, submissionSaving: false,
+      teacherName: "Teacher", viewportSync: { clientId: 7, publish, ready: true, state: null },
+    };
+    const view = render(createElement(LessonTaskCanvas, props));
+    const node = view.container.querySelector<HTMLElement>(".playsay-task-document")!;
+    Object.defineProperty(node, "clientHeight", { configurable: true, value: 100 });
+    Object.defineProperty(node, "scrollHeight", { configurable: true, value: 1100 });
+    await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+    fireEvent.wheel(node, { deltaY: 100 });
+    node.scrollTop = 100;
+    fireEvent.scroll(node);
+    const remote = { materialId: material.id, pageId: "page-1", presentationMode: "default" as const,
+      scrollContainer: "document" as const, x: 0, y: 0.05, revision: 20, presentationRevision: 1, sourceClientId: 9 };
+    view.rerender(createElement(LessonTaskCanvas, { ...props, viewportSync: { ...props.viewportSync, state: remote } }));
+    for (let i = 0; i < 6; i += 1) {
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 100)); });
+      expect(node.scrollTop).toBe(100 + i * 10);
+      node.scrollTop += 10;
+      fireEvent.scroll(node); // inertia without more wheel input, beyond the old 500 ms window
+    }
+    publish.mockClear();
+    await waitFor(() => expect(publish).toHaveBeenCalledWith(expect.objectContaining({ y: 0.16 }), undefined));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)); });
+    expect(node.scrollTop).toBe(160);
+    view.rerender(createElement(LessonTaskCanvas, { ...props, viewportSync: { ...props.viewportSync, state: { ...remote, revision: 21, y: 0.4 } } }));
+    await waitFor(() => expect(node.scrollTop).toBe(400));
+    publish.mockClear();
+    fireEvent.scroll(node);
+    expect(publish).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("resumes remote following after a gesture at the scroll boundary", async () => {
+    const props = { lessonId: "scroll-boundary", material, onSaveAnswers: () => undefined,
+      score: null, submission: null, submissionMessage: null, submissionSaving: false,
+      teacherName: "Teacher", viewportSync: { clientId: 7, publish: vi.fn(), ready: true, state: null } };
+    const view = render(createElement(LessonTaskCanvas, props));
+    const node = view.container.querySelector<HTMLElement>(".playsay-task-document")!;
+    Object.defineProperty(node, "clientHeight", { configurable: true, value: 100 });
+    Object.defineProperty(node, "scrollHeight", { configurable: true, value: 1100 });
+    fireEvent.wheel(node, { deltaY: -100 });
+    view.rerender(createElement(LessonTaskCanvas, { ...props, viewportSync: { ...props.viewportSync, state: {
+      materialId: material.id, pageId: "page-1", presentationMode: "default", scrollContainer: "document",
+      x: 0, y: 0.4, revision: 20, presentationRevision: 1, sourceClientId: 9,
+    } } }));
+    expect(node.scrollTop).toBe(0);
+    await waitFor(() => expect(node.scrollTop).toBe(400));
+    view.unmount();
+  });
+
   it("does not echo a delayed DOM scroll event after applying a remote viewport", async () => {
     const publish = vi.fn();
     const { container } = render(createElement(LessonTaskCanvas, {

@@ -170,6 +170,9 @@ export function LessonTaskCanvas({
   const lastViewportPublishAtRef = useRef(0);
   const viewportPublishTimerRef = useRef<number | null>(null);
   const viewportReapplyFrameRef = useRef<number | null>(null);
+  const localScrollActiveRef = useRef(false);
+  const [viewportResumeVersion, setViewportResumeVersion] = useState(0);
+  const cancelLocalScrollRef = useRef<() => void>(() => {});
   const scrollIntentRef = useRef<{
     activePointerId: number | null;
     expiresAt: number;
@@ -319,13 +322,48 @@ export function LessonTaskCanvas({
     lastViewportPublishAtRef.current = performance.now();
   }, [activePageId, focusedBlockId, material, presentationMode, viewportSync?.publish, viewportSync?.ready]);
 
+  // Scroll state changes must not recreate DOM subscriptions or their pending timers.
+  const publishViewportRef = useRef(publishViewport);
+  useLayoutEffect(() => { publishViewportRef.current = publishViewport; }, [publishViewport]);
+  const viewportSyncEnabled = Boolean(viewportSync);
+
   useEffect(() => {
     const node = presentationMode === "image-focus"
       ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null
       : taskDocumentRef.current;
-    if (!node || !viewportSync) return undefined;
+    if (!node || !viewportSyncEnabled) return undefined;
 
+    let settleTimer: number | null = null;
+    let dirty = false;
+    let disposed = false;
+    const cancelLocalScroll = () => {
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
+      settleTimer = null;
+      if (viewportPublishTimerRef.current !== null) window.clearTimeout(viewportPublishTimerRef.current);
+      viewportPublishTimerRef.current = null;
+      localScrollActiveRef.current = false;
+      scrollIntentRef.current = { activePointerId: null, expiresAt: 0, node: null };
+      dirty = false;
+    };
+    cancelLocalScrollRef.current = cancelLocalScroll;
+    const settle = () => {
+      settleTimer = null;
+      if (scrollIntentRef.current.activePointerId !== null) return;
+      const shouldPublish = dirty;
+      cancelLocalScroll();
+      if (disposed) return;
+      if (shouldPublish) publishViewportRef.current();
+      else setViewportResumeVersion((version) => version + 1);
+    };
+    const scheduleSettle = () => {
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
+      // Extend on every local scroll, including inertia, not only wheel/touch input.
+      settleTimer = window.setTimeout(settle, 200);
+    };
     const markScrollIntent = (duration = 500) => {
+      localScrollActiveRef.current = true;
+      applyingRemoteViewportRef.current = false;
+      scheduleSettle();
       scrollIntentRef.current.node = node;
       scrollIntentRef.current.expiresAt = performance.now() + duration;
     };
@@ -372,15 +410,19 @@ export function LessonTaskCanvas({
       if (intent.node !== node || (intent.activePointerId === null && performance.now() > intent.expiresAt)) {
         return;
       }
+      localScrollActiveRef.current = true;
+      dirty = true;
+      intent.expiresAt = performance.now() + 500;
+      scheduleSettle();
       const elapsed = performance.now() - lastViewportPublishAtRef.current;
       if (elapsed >= 50) {
-        publishViewport();
+        publishViewportRef.current();
         return;
       }
       if (viewportPublishTimerRef.current !== null) return;
       viewportPublishTimerRef.current = window.setTimeout(() => {
         viewportPublishTimerRef.current = null;
-        publishViewport();
+        if (!disposed) publishViewportRef.current();
       }, Math.max(0, 50 - elapsed));
     };
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -389,9 +431,11 @@ export function LessonTaskCanvas({
           if (viewportReapplyFrameRef.current !== null) return;
           viewportReapplyFrameRef.current = window.requestAnimationFrame(() => {
             viewportReapplyFrameRef.current = null;
+            if (disposed || localScrollActiveRef.current) return;
             const viewport = lastNormalizedViewportRef.current;
             if (
               !viewport
+              || viewport.pageId !== activePageId
               || viewport.materialId !== material?.id
               || viewport.presentationMode !== presentationMode
               || viewport.scrollContainer !== (presentationMode === "image-focus" ? "image" : "document")
@@ -422,6 +466,8 @@ export function LessonTaskCanvas({
     window.addEventListener("pointerup", handlePointerUp, { passive: true });
     window.addEventListener("pointercancel", handlePointerUp, { passive: true });
     return () => {
+      disposed = true;
+      cancelLocalScroll();
       resizeObserver?.disconnect();
       node.removeEventListener("wheel", handleWheelOrTouch);
       node.removeEventListener("touchstart", handleWheelOrTouch);
@@ -441,7 +487,7 @@ export function LessonTaskCanvas({
         viewportReapplyFrameRef.current = null;
       }
     };
-  }, [material?.id, presentationMode, publishViewport, viewportSync]);
+  }, [activePageId, focusedBlockId, material?.id, presentationMode, viewportSyncEnabled]);
 
   useEffect(() => {
     const viewport = viewportSync?.state;
@@ -452,6 +498,11 @@ export function LessonTaskCanvas({
       || viewport.sourceClientId === viewportSync?.clientId
       || !isMaterialViewportNewer(viewport, appliedRemoteViewportRef.current)
     ) return;
+    const samePresentation = viewport.pageId === activePageId
+      && viewport.presentationMode === presentationMode
+      && (viewport.focusedBlockId ?? null) === focusedBlockId;
+    if (samePresentation && localScrollActiveRef.current) return;
+    if (!samePresentation) cancelLocalScrollRef.current();
     let cancelled = false;
     let attemptsRemaining = 12;
     applyingRemoteViewportRef.current = true;
@@ -460,6 +511,10 @@ export function LessonTaskCanvas({
     }
     const applyWhenReady = () => {
       if (cancelled) return;
+      if (samePresentation && localScrollActiveRef.current) {
+        applyingRemoteViewportRef.current = false;
+        return;
+      }
       const node = viewport.scrollContainer === "image"
         ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null
         : taskDocumentRef.current;
@@ -488,7 +543,7 @@ export function LessonTaskCanvas({
       cancelled = true;
       applyingRemoteViewportRef.current = false;
     };
-  }, [activePageId, document, material, setActivePageId, viewportSync?.clientId, viewportSync?.state]);
+  }, [activePageId, document, focusedBlockId, material, presentationMode, setActivePageId, viewportResumeVersion, viewportSync?.clientId, viewportSync?.state]);
 
   function updateAnswer(blockId: string, answer: MaterialAnswerBlock) {
     setAnswers((current) => ({
@@ -628,6 +683,7 @@ export function LessonTaskCanvas({
                 externalActivitySync={externalActivitySync}
                 mode="classroom"
                 onActivePageIdChange={(pageId) => {
+                  cancelLocalScrollRef.current();
                   setActivePageId(pageId);
                   window.requestAnimationFrame(() => publishViewport(
                     pageId,
@@ -638,6 +694,7 @@ export function LessonTaskCanvas({
                 }}
                 onAnswerChange={updateAnswer}
                 onPresentationModeChange={(mode, blockId) => {
+                  cancelLocalScrollRef.current();
                   setPresentationMode(mode);
                   setFocusedBlockId(blockId ?? null);
                   const shared = viewportSync?.state;

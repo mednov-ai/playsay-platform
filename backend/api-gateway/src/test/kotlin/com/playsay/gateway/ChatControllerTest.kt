@@ -34,6 +34,9 @@ import java.time.Clock
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -621,9 +624,69 @@ class ChatControllerTest @Autowired constructor(
         assertEquals(first.idempotencyKey, retry.idempotencyKey)
         digestScheduler.dispatchDueDigests(retry.dueAt.plusSeconds(1))
         assertEquals(1, RecordingChatEmailClient.sent.size)
+        digestScheduler.dispatchDueDigests(retry.dueAt.plusSeconds(31))
+        assertEquals(1, RecordingChatEmailClient.sent.size)
         val pending = digests.findAll().single { it.status == "PENDING" }
         val sentAt = digests.findAll().single { it.status == "SENT" }.sentAt!!
         assertTrue(pending.dueAt >= sentAt.plusSeconds(1800))
+    }
+
+    @Test
+    fun `fresh batch waits for retry resolution and bounded failures stop retrying`() {
+        val teacher = user("retry-boundary-teacher", "TEACHER")
+        val student = user("retry-boundary-student", "STUDENT", teacher).apply {
+            email = "retry-boundary-student@example.com"
+        }.let(users::saveAndFlush)
+        val auth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val conversation = controller.createConversation(auth, CreateChatConversationRequest(student.keycloakSubject))
+        controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "First"))
+        val first = digests.findAll().single()
+        RecordingChatEmailClient.failuresRemaining = 4
+        repeat(2) {
+            digestScheduler.dispatchDueDigests(digests.findById(first.id).orElseThrow().dueAt)
+        }
+        controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "Fresh"))
+        val fresh = digests.findAll().single { it.id != first.id }
+        digestScheduler.dispatchDueDigests(fresh.dueAt)
+        assertEquals(0, digests.findById(fresh.id).orElseThrow().attempts)
+        repeat(2) {
+            digestScheduler.dispatchDueDigests(digests.findById(first.id).orElseThrow().dueAt)
+        }
+        val failed = digests.findById(first.id).orElseThrow()
+        assertEquals("FAILED", failed.status)
+        assertEquals(4, failed.attempts)
+        digestScheduler.dispatchDueDigests(failed.dueAt.plusSeconds(7200))
+        assertEquals(4, digests.findById(first.id).orElseThrow().attempts)
+    }
+
+    @Test
+    fun `concurrent dispatchers and arrival serialize without duplicate emails or lost links`() {
+        val teacher = user("concurrent-teacher", "TEACHER")
+        val student = user("concurrent-student", "STUDENT", teacher).apply {
+            email = "concurrent-student@example.com"
+        }.let(users::saveAndFlush)
+        val auth = authentication(teacher.keycloakSubject, "ROLE_TEACHER")
+        val conversation = controller.createConversation(auth, CreateChatConversationRequest(student.keycloakSubject))
+        controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "First"))
+        val due = digests.findAll().single().dueAt
+        val executor = Executors.newFixedThreadPool(3)
+        try {
+            val results = executor.invokeAll(listOf(
+                Callable { digestScheduler.dispatchDueDigests(due) },
+                Callable { digestScheduler.dispatchDueDigests(due) },
+                Callable {
+                    controller.sendMessage(auth, conversation.id, ChatMessageRequest(UUID.randomUUID(), "Concurrent"))
+                    Unit
+                },
+            ), 10, TimeUnit.SECONDS)
+            results.forEach { it.get() }
+        } finally {
+            executor.shutdownNow()
+        }
+        assertEquals(2, messages.count())
+        assertEquals(2, digestMessages.count())
+        assertEquals(1, RecordingChatEmailClient.sent.size)
+        assertEquals(1, digests.findAll().count { it.status == "SENT" })
     }
 
     private fun user(subject: String, roles: String, primaryTeacher: AppUserEntity? = null): AppUserEntity {

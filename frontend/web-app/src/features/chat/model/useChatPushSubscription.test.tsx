@@ -38,6 +38,26 @@ describe("useChatPushSubscription", () => {
     expect(browser.register).not.toHaveBeenCalled();
   });
 
+  it.each(["denied", "default"] as const)("does not subscribe after a %s permission answer", async (answer) => {
+    const browser = installBrowserPush("default", null);
+    browser.requestPermission.mockResolvedValue(answer);
+    const { result } = renderHook(() => useChatPushSubscription("student", "en"));
+    await waitFor(() => expect(result.current.status).toBe("disabled"));
+    await act(() => result.current.enable());
+    expect(result.current.status).toBe(answer === "denied" ? "denied" : "disabled");
+    expect(browser.subscribe).not.toHaveBeenCalled();
+  });
+
+  it("recovers unavailable capability without requesting permission automatically", async () => {
+    const browser = installBrowserPush("default", null);
+    api.fetchChatPushCapability.mockResolvedValueOnce({ available: false, publicKey: null });
+    const { result } = renderHook(() => useChatPushSubscription("student", "en"));
+    await waitFor(() => expect(result.current.status).toBe("unavailable"));
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.status).toBe("disabled"));
+    expect(browser.requestPermission).not.toHaveBeenCalled();
+  });
+
   it("subscribes only from enable and removes both backend and browser subscription on disable", async () => {
     const subscription = pushSubscription();
     const browser = installBrowserPush("default", null, subscription);

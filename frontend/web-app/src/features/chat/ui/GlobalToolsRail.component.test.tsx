@@ -63,3 +63,22 @@ it("explains unavailable notifications and provides recovery", async () => {
   expect(mocks.push.refresh).toHaveBeenCalledOnce();
   expect(mocks.push.enable).not.toHaveBeenCalled();
 });
+
+it("searches existing dialogs by first login or name letter without duplicating contacts", async () => {
+  mocks.conversations.mockResolvedValue([
+    { id: "a", counterpart: contact, lastMessage: null, unreadCount: 0, unreadVersion: 0 },
+    { id: "b", counterpart: { ...contact, subject: "b", displayName: "Bob", username: "bob" }, lastMessage: null, unreadCount: 0, unreadVersion: 0 },
+  ]);
+  render(<GlobalToolsRail profile={profile} />);
+  await waitFor(() => expect(mocks.contacts).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: "chat.open" }));
+  await screen.findByText("Anna Smith");
+  expect(screen.getAllByText("Anna Smith")).toHaveLength(1);
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "a" } });
+  expect(screen.getAllByText("Anna Smith")).toHaveLength(1);
+  expect(screen.queryByText("Bob")).toBeNull();
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "s" } });
+  expect(screen.getAllByText("Anna Smith")).toHaveLength(1);
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "ann-l" } });
+  expect(screen.getAllByText("Anna Smith")).toHaveLength(1);
+});

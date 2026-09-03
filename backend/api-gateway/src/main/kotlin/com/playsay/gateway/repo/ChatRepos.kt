@@ -115,6 +115,12 @@ interface ChatParticipantStateRepo : JpaRepository<ChatParticipantStateEntity, U
 }
 
 interface ChatEmailDigestRepo : JpaRepository<ChatEmailDigestEntity, UUID> {
+    fun findFirstByRecipientUserIdAndStatusAndAttemptsGreaterThanOrderByCreatedAtAsc(
+        recipientUserId: UUID,
+        status: String,
+        attempts: Int,
+    ): ChatEmailDigestEntity?
+
     fun findFirstByRecipientUserIdAndStatusInOrderByCreatedAtDesc(
         recipientUserId: UUID,
         statuses: Collection<String>,

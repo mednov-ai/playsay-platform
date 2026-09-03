@@ -119,23 +119,35 @@ class ChatEmailDigestScheduler(
 
     fun dispatchDueDigests(now: Instant) {
         digestRepo.findDue(ChatEmailDigestService.STATUS_PENDING, now).forEach { candidate ->
-            runCatching { transaction.executeWithoutResult {
-                appUserRepo.lockByIdIn(listOf(candidate.recipientUserId))
-                val digest = digestRepo.lockById(candidate.id) ?: return@executeWithoutResult
-                if (digest.status != ChatEmailDigestService.STATUS_PENDING || digest.dueAt > now) {
-                    return@executeWithoutResult
-                }
-                val cooldownUntil = digestRepo.findFirstByRecipientUserIdAndStatusOrderBySentAtDesc(
-                    digest.recipientUserId, ChatEmailDigestService.STATUS_SENT,
-                )?.sentAt?.plus(cooldown)
-                if (cooldownUntil != null && cooldownUntil > now) {
-                    digest.dueAt = cooldownUntil
-                    digestRepo.save(digest)
-                } else {
-                    dispatch(digest, now)
-                }
-            } }.onFailure { error ->
+            runCatching { dispatchCandidate(candidate, now) }.onFailure { error ->
                 logger.warn("chat digest transaction failed errorClass={}", error::class.simpleName)
+            }
+        }
+    }
+
+    private fun dispatchCandidate(candidate: ChatEmailDigestEntity, now: Instant) {
+        transaction.executeWithoutResult {
+            appUserRepo.lockByIdIn(listOf(candidate.recipientUserId))
+            val digest = digestRepo.lockById(candidate.id) ?: return@executeWithoutResult
+            if (digest.status != ChatEmailDigestService.STATUS_PENDING || digest.dueAt > now) {
+                return@executeWithoutResult
+            }
+            val retrying = digestRepo.findFirstByRecipientUserIdAndStatusAndAttemptsGreaterThanOrderByCreatedAtAsc(
+                digest.recipientUserId, ChatEmailDigestService.STATUS_PENDING, 0,
+            )
+            if (digest.attempts == 0 && retrying != null && retrying.id != digest.id) {
+                digest.dueAt = maxOf(now.plusSeconds(30), retrying.dueAt)
+                digestRepo.save(digest)
+                return@executeWithoutResult
+            }
+            val cooldownUntil = digestRepo.findFirstByRecipientUserIdAndStatusOrderBySentAtDesc(
+                digest.recipientUserId, ChatEmailDigestService.STATUS_SENT,
+            )?.sentAt?.plus(cooldown)
+            if (cooldownUntil != null && cooldownUntil > now) {
+                digest.dueAt = cooldownUntil
+                digestRepo.save(digest)
+            } else {
+                dispatch(digest, now)
             }
         }
     }

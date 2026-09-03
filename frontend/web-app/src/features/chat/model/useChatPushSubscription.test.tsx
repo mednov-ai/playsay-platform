@@ -44,7 +44,11 @@ describe("useChatPushSubscription", () => {
     const { result } = renderHook(() => useChatPushSubscription("student", "fr"));
     await waitFor(() => expect(result.current.status).toBe("disabled"));
 
-    await act(() => result.current.enable());
+    await act(async () => {
+      const enabling = result.current.enable();
+      expect(browser.requestPermission).toHaveBeenCalledOnce();
+      await enabling;
+    });
     expect(browser.requestPermission).toHaveBeenCalledOnce();
     expect(browser.subscribe).toHaveBeenCalledOnce();
     expect(api.upsertChatPushSubscription).toHaveBeenCalledWith(expect.objectContaining({ endpoint, locale: "fr" }));

@@ -180,6 +180,25 @@ for attempt in 1 2 3; do
     fi
   done
 
+  if [ -f helm-charts/api-gateway/values-prod.yaml ]; then
+    if [ ! -f scripts/validate-regional-routing-release.sh ]; then
+      echo 'Missing regional routing release guard in candidate infra.' >&2
+      exit 1
+    fi
+    routing_rollback=""
+    routing_review="$(yq -r '.regionalRoutingReview // ""' "$MANIFEST_PATH")"
+    case "$routing_review" in
+      '') ;;
+      media-only-rollback) routing_rollback=--media-rollback ;;
+      *) echo 'Unknown regional routing review decision.' >&2; exit 1 ;;
+    esac
+    api_source="$(yq -r '.build.commit // ""' helm-charts/api-gateway/values-prod.yaml)"
+    # Check the source of the actual API image, not only the new release branch.
+    sh scripts/validate-regional-routing-release.sh "$PLATFORM_DIR" "$api_source" "$base_infra_commit" "$routing_rollback"
+    sh scripts/validate-regional-routing-release.sh "$PLATFORM_DIR" "$GIT_COMMIT" "$base_infra_commit" "$routing_rollback"
+    sh scripts/validate-regional-routing-release.sh "$PLATFORM_DIR" "$accepted_dev_commit" "$base_infra_commit" "$routing_rollback"
+  fi
+
   if [ "$manifest_status" != "ready" ]; then
     updated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     UPDATED_AT="$updated_at" yq -i '.status = "ready" | .updatedAt = strenv(UPDATED_AT)' "$MANIFEST_PATH"

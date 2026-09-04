@@ -11,6 +11,7 @@ vi.mock("@livekit/components-react", () => ({
   LiveKitRoom: ({ children }: { children: ReactNode }) => (
     <div data-testid="livekit-room">{children}</div>
   ),
+  useRoomContext: () => ({ engine: { pcManager: undefined } }),
 }));
 
 vi.mock("../../../entities/workspace/model", () => ({

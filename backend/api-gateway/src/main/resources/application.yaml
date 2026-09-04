@@ -87,6 +87,8 @@ playsay:
     regional-relay:
       environment: ${PLAYSAY_REGIONAL_RELAY_ENVIRONMENT:local}
       mode: ${PLAYSAY_REGIONAL_RELAY_MODE:off}
+      signaling-mode: ${PLAYSAY_REGIONAL_SIGNALING_MODE:}
+      media-mode: ${PLAYSAY_REGIONAL_MEDIA_MODE:}
       signaling-url: ${PLAYSAY_REGIONAL_RELAY_SIGNALING_URL:}
       shared-secret: ${PLAYSAY_REGIONAL_RELAY_SHARED_SECRET:}
       credential-ttl-seconds: ${PLAYSAY_REGIONAL_RELAY_CREDENTIAL_TTL_SECONDS:900}

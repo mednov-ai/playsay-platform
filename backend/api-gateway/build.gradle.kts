@@ -41,6 +41,7 @@ dependencies {
 }
 
 tasks.withType<Test> {
+    inputs.property("regionalRoutingHelmMatrix", providers.environmentVariable("REGIONAL_ROUTING_HELM_MATRIX").orElse(""))
     if (providers.gradleProperty("lowMemoryTests").isPresent) {
         maxParallelForks = 1
         forkEvery = 8

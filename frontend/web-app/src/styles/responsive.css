@@ -910,3 +910,16 @@ body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expand
     font-size: 0;
   }
 }
+
+/* Expanded lesson media must leave room for the mobile tools rail. */
+@media (max-width: 640px) {
+  body.playsay-classroom-video-expanded main[data-playsay-tools-layout="true"] .playsay-classroom-shell[data-video-expanded="true"]:not(:fullscreen),
+  body.playsay-classroom-external-activity-focus main[data-playsay-tools-layout="true"] .playsay-classroom-shell[data-presentation-mode="external-activity-focus"]:not(:fullscreen) {
+    height: calc(100dvh - 3.65rem - env(safe-area-inset-bottom));
+    min-height: calc(100dvh - 3.65rem - env(safe-area-inset-bottom));
+  }
+
+  body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expanded="true"] .playsay-video-rail {
+    height: 100%;
+  }
+}

@@ -1518,6 +1518,7 @@ export const ru = {
   classroom: {
     live: "В эфире",
     participantFallback: "Участник",
+    screenSharePreviewHint: "Трансляция идёт · Предпросмотр затемнён против зеркального эффекта",
     connection: {
       overviewTitle: "Состояние связи",
       openOverview: "Состояние связи: {{status}}. Открыть подробности",

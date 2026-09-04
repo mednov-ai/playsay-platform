@@ -987,6 +987,12 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   background: #111111;
 }
 
+/* Each self-capture pass dims the preview again; published tracks stay intact.
+   Target the video only so labels, camera PiP and controls remain readable. */
+.playsay-video-focus[data-local-screen-share="true"] > .lk-participant-tile .lk-participant-media-video[data-lk-source="screen_share"] {
+  filter: brightness(0.4);
+}
+
 .playsay-video-strip {
   position: absolute;
   z-index: 4;
@@ -1055,6 +1061,28 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   padding: 0.375rem 0.625rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.playsay-screen-share-label > svg {
+  flex-shrink: 0;
+}
+
+.playsay-screen-share-description {
+  display: grid;
+  min-width: 0;
+}
+
+.playsay-screen-share-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playsay-screen-share-preview-hint {
+  max-width: 28rem;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .playsay-video-card {

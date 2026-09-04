@@ -325,7 +325,11 @@ export function ClassroomVideoStage({
       data-mode={mode === "focusOnly" ? "focus-only" : "lesson"}
       data-screen-share={activeScreenShareTrack ? "true" : "false"}
     >
-      <div className="playsay-video-focus" ref={focusRef}>
+      <div
+        className="playsay-video-focus"
+        data-local-screen-share={activeScreenShareTrack?.participant.isLocal ? "true" : undefined}
+        ref={focusRef}
+      >
         {activeScreenShareTrack ? <ParticipantTile trackRef={activeScreenShareTrack} /> : featuredSlot ? <ClassroomVideoSlotView slot={featuredSlot} /> : null}
         {!activeScreenShareTrack && featuredSlot?.kind === "track" ? (
           <span className="playsay-video-focus-connection-dot">
@@ -341,8 +345,17 @@ export function ClassroomVideoStage({
               enabled={showLearnerConnectionDots}
               participant={activeScreenShareTrack.participant}
             />
-            <ScreenShare className="h-4 w-4" />
-            {participantDisplayName(activeScreenShareTrack, t("classroom.participantFallback"))}
+            <ScreenShare aria-hidden="true" className="h-4 w-4" />
+            <span className="playsay-screen-share-description">
+              <span className="playsay-screen-share-name">
+                {participantDisplayName(activeScreenShareTrack, t("classroom.participantFallback"))}
+              </span>
+              {activeScreenShareTrack.participant.isLocal ? (
+                <span className="playsay-screen-share-preview-hint">
+                  {t("classroom.screenSharePreviewHint")}
+                </span>
+              ) : null}
+            </span>
           </div>
         ) : null}
         <div

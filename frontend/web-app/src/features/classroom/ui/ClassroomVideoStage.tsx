@@ -330,7 +330,11 @@ export function ClassroomVideoStage({
         data-local-screen-share={activeScreenShareTrack?.participant.isLocal ? "true" : undefined}
         ref={focusRef}
       >
-        {activeScreenShareTrack ? <ParticipantTile trackRef={activeScreenShareTrack} /> : featuredSlot ? <ClassroomVideoSlotView slot={featuredSlot} /> : null}
+        {activeScreenShareTrack?.participant.isLocal ? (
+          <ClassroomScreenSharePreview />
+        ) : activeScreenShareTrack ? (
+          <ParticipantTile trackRef={activeScreenShareTrack} />
+        ) : featuredSlot ? <ClassroomVideoSlotView slot={featuredSlot} /> : null}
         {!activeScreenShareTrack && featuredSlot?.kind === "track" ? (
           <span className="playsay-video-focus-connection-dot">
             <ClassroomParticipantConnectionDot
@@ -350,11 +354,6 @@ export function ClassroomVideoStage({
               <span className="playsay-screen-share-name">
                 {participantDisplayName(activeScreenShareTrack, t("classroom.participantFallback"))}
               </span>
-              {activeScreenShareTrack.participant.isLocal ? (
-                <span className="playsay-screen-share-preview-hint">
-                  {t("classroom.screenSharePreviewHint")}
-                </span>
-              ) : null}
             </span>
           </div>
         ) : null}
@@ -397,6 +396,25 @@ export function ClassroomVideoStage({
       />
       <RoomAudioRenderer />
       <ConnectionStateToast />
+    </div>
+  );
+}
+
+function ClassroomScreenSharePreview() {
+  const { t } = useAppTranslation();
+  return (
+    <div className="playsay-screen-share-preview" data-testid="screen-share-bounded-preview">
+      <div aria-hidden="true" className="playsay-screen-share-mirror">
+        <div className="playsay-screen-share-mirror-frame" data-mirror-depth="1">
+          <div className="playsay-screen-share-mirror-frame" data-mirror-depth="2">
+            <div className="playsay-screen-share-mirror-frame" data-mirror-depth="3">
+              <ScreenShare />
+            </div>
+          </div>
+        </div>
+      </div>
+      <p className="playsay-screen-share-preview-title">{t("classroom.screenSharePreviewTitle")}</p>
+      <p className="playsay-screen-share-preview-hint">{t("classroom.screenSharePreviewHint")}</p>
     </div>
   );
 }

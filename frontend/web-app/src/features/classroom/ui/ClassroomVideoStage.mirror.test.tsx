@@ -33,15 +33,18 @@ function share(isLocal: boolean, trackName = "screen") {
 afterEach(() => { cleanup(); state.tracks = []; });
 
 describe("local screen-share mirror protection", () => {
-  it("protects the local share and keeps its video mounted across layout changes", () => {
+  it("renders exactly three static levels without local video playback across layout changes", () => {
     state.tracks = [share(true)];
     const { container, rerender } = render(<ClassroomVideoStage {...props} />);
-    const video = screen.getByTestId("share-video");
-    expect(container.querySelector('[data-local-screen-share="true"]')).toContainElement(video);
+    const preview = screen.getByTestId("screen-share-bounded-preview");
+    expect(container.querySelector('[data-local-screen-share="true"]')).toContainElement(preview);
     expect(screen.getByText("classroom.screenSharePreviewHint")).toBeVisible();
     expect(screen.getByRole("button", { name: "Stop sharing" })).toBeEnabled();
     rerender(<ClassroomVideoStage {...props} mode="focusOnly" fullscreenActive />);
-    expect(screen.getByTestId("share-video")).toBe(video);
+    expect(screen.getByTestId("screen-share-bounded-preview")).toBe(preview);
+    expect(screen.queryByTestId("share-video")).toBeNull();
+    expect(preview.querySelectorAll("[data-mirror-depth]")).toHaveLength(3);
+    expect(preview.querySelector("[data-mirror-depth=\"3\"] video")).toBeNull();
     expect(container.querySelectorAll('[data-local-screen-share="true"]')).toHaveLength(1);
   });
   it("removes protection when a remote share takes priority while local sharing continues", () => {

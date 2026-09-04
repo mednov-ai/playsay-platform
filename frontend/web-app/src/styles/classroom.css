@@ -987,12 +987,6 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   background: #111111;
 }
 
-/* Each self-capture pass dims the preview again; published tracks stay intact.
-   Target the video only so labels, camera PiP and controls remain readable. */
-.playsay-video-focus[data-local-screen-share="true"] > .lk-participant-tile .lk-participant-media-video[data-lk-source="screen_share"] {
-  filter: brightness(0.4);
-}
-
 .playsay-video-strip {
   position: absolute;
   z-index: 4;
@@ -1077,10 +1071,67 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   text-overflow: ellipsis;
 }
 
+.playsay-screen-share-preview {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow: auto;
+  border-radius: 0.875rem;
+  background: var(--playsay-video-tile);
+  color: var(--playsay-video-text);
+  padding: 3rem 1rem 6rem;
+  text-align: center;
+}
+
+/* A finite illustration replaces local playback, breaking the capture loop.
+   The published screen track is never attached to this preview. */
+.playsay-screen-share-mirror {
+  width: min(26rem, 85%);
+  height: clamp(7rem, 22vh, 15rem);
+  flex: 0 0 auto;
+  margin-bottom: 0.5rem;
+}
+
+.playsay-screen-share-mirror-frame {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 0.75rem;
+  background: #202433;
+  padding: 0.8rem;
+}
+
+.playsay-screen-share-mirror-frame > .playsay-screen-share-mirror-frame {
+  width: 85%;
+  height: 85%;
+  border-color: rgb(255 255 255 / 0.2);
+  background: #12151f;
+}
+
+.playsay-screen-share-mirror-frame[data-mirror-depth="3"] {
+  border-color: rgb(255 255 255 / 0.12);
+  background: #080a10;
+  color: #ffc24a;
+}
+
+.playsay-screen-share-preview-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 .playsay-screen-share-preview-hint {
-  max-width: 28rem;
+  max-width: 26rem;
+  margin: 0;
+  color: var(--playsay-video-muted-text);
+  font-size: 0.8rem;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.4;
   white-space: normal;
   overflow-wrap: anywhere;
 }

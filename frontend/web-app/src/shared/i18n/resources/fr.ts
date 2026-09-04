@@ -1490,7 +1490,8 @@ export const fr = {
   classroom: {
     live: "En direct",
     participantFallback: "Participant",
-    screenSharePreviewHint: "Partage en cours · Aperçu assombri pour limiter l’effet miroir",
+    screenSharePreviewTitle: "Votre écran est partagé",
+    screenSharePreviewHint: "Votre aperçu est masqué pour éviter que l’écran se répète à l’infini.",
     connection: {
       overviewTitle: "État de la connexion",
       openOverview: "État de la connexion : {{status}}. Ouvrir les détails",

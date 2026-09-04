@@ -1490,7 +1490,8 @@ export const de = {
   classroom: {
     live: "Live",
     participantFallback: "Teilnehmer",
-    screenSharePreviewHint: "Übertragung läuft · Vorschau gegen Spiegeleffekt abgedunkelt",
+    screenSharePreviewTitle: "Dein Bildschirm wird geteilt",
+    screenSharePreviewHint: "Die eigene Vorschau ist ausgeblendet, damit sich der Bildschirm nicht endlos wiederholt.",
     connection: {
       overviewTitle: "Verbindungsstatus",
       openOverview: "Verbindungsstatus: {{status}}. Details öffnen",

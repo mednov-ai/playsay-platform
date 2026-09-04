@@ -1490,7 +1490,8 @@ export const en = {
   classroom: {
     live: "Live",
     participantFallback: "Participant",
-    screenSharePreviewHint: "Sharing is on · Preview dimmed to reduce the mirror effect",
+    screenSharePreviewTitle: "Your screen is being shared",
+    screenSharePreviewHint: "Your own preview is hidden to prevent the screen from repeating itself.",
     connection: {
       overviewTitle: "Connection status",
       openOverview: "Connection status: {{status}}. Open details",

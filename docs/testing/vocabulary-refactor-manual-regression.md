@@ -540,3 +540,7 @@ Release decision: PASS | FAIL
 | Environment identity, evidence hygiene, cleanup | OPS-EVID-001/002 | yes |
 
 Repository helpers for repeatable evidence: `scripts/smoke/vocabulary-student-ui-smoke.mjs`, `scripts/smoke/vocabulary-teacher-ui-smoke.mjs`, `scripts/smoke/sprint5-ui-smoke.mjs`, and `scripts/smoke/sprint6-homework-smoke.mjs`. Generated clients and contracts are never edited manually.
+
+## Vocabulary hotfix recovery supplement
+
+For entry/list recovery changes, also execute the defect scenarios and synthetic fixture plan in [2026-09-05 local hotfix evidence](evidence/2026-09-05-dev-vocabulary-hotfix-local.md). A passing mock UI smoke is not a deployed dev pass. Retest initial-load and history failures separately, last-visible-word archive/undo, mutation retry, partial group save, manual translation during provider latency, and existing VA-001–004 acceptance on the exact delivered revisions.

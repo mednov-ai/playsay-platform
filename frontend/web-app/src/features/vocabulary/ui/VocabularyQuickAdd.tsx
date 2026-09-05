@@ -1,18 +1,20 @@
 import { BookPlus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "../../../components/ui/button";
-import type { CreateVocabularyEntry } from "../../../shared/api/playsay";
+import type { CreateVocabularyEntry, VocabularyEntry } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 import { normalizedVariants, VocabularyEntryDialog } from "./VocabularyEntryDialog";
 
 export function VocabularyQuickAdd({
   children,
+  onSaved,
   recipientSubjects = [],
   source,
   triggerClassName = "mt-2",
   triggerLabelClassName,
 }: {
   children?: ReactNode;
+  onSaved?: (entries: VocabularyEntry[]) => void;
   recipientSubjects?: string[];
   source: Omit<CreateVocabularyEntry, "sourceText">;
   triggerClassName?: string;
@@ -37,6 +39,7 @@ export function VocabularyQuickAdd({
       </Button>
       <VocabularyEntryDialog
         onClose={() => setOpen(false)}
+        onSaved={onSaved}
         open={open}
         recipientSubjects={recipientSubjects}
         source={source}

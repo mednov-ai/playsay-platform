@@ -44,3 +44,9 @@ Service-token-protected diagnostics are `GET /internal/vocabulary/diagnostics`, 
 ## Known overlap to preserve
 
 At the start of implementation, `contracts/openapi.yaml`, generated web-app API types, classroom realtime code, and all four web-app locale resources already contain unrelated user changes. Contract generation and localization edits must be diffed narrowly and must not replace those changes. The vocabulary OpenAPI and vocabulary-service sources were clean at baseline; they are the first safe contract surface for additive work.
+
+## Vocabulary UI recovery
+
+Confirmed entry mutations refresh the affected learner dashboard/search/selection preview and learner summary without a page reload or filter reset. Dashboard and history failures have independent localized retry states; a successful empty response is distinct from an unavailable response, and access denial hides cached entries. Entry mutation failures retain input and provide retry; archive undo remains available when no entries are visible. Group addition reports partial success and retries only failed recipients while the request is unchanged. Manual saving does not wait for translation generation, and late provider responses cannot overwrite a manual translation or a saved/reset form.
+
+This UI contract preserves public request/response shapes, duplicate-entry semantics, immutable practice snapshots and vocabulary ownership. Recovery regression evidence is in `docs/testing/evidence/2026-09-05-dev-vocabulary-hotfix-local.md`.

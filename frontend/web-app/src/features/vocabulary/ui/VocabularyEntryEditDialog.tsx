@@ -1,5 +1,5 @@
 import { Loader2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { updateVocabularyEntry, type VocabularyEntry } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -18,6 +18,7 @@ export function VocabularyEntryEditDialog({
   const [partOfSpeech, setPartOfSpeech] = useState("");
   const [example, setExample] = useState("");
   const [exampleTranslation, setExampleTranslation] = useState("");
+  const saveInFlight = useRef(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -33,6 +34,8 @@ export function VocabularyEntryEditDialog({
   const entryId = entry.id;
 
   async function save() {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
     setSaving(true);
     setMessage(null);
     try {
@@ -45,9 +48,10 @@ export function VocabularyEntryEditDialog({
       });
       onSaved();
       onClose();
-    } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : t("vocabulary.messages.saveFailed"));
+    } catch {
+      setMessage(t("vocabulary.messages.saveFailed"));
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   }
@@ -60,9 +64,9 @@ export function VocabularyEntryEditDialog({
             <h2 className="text-lg font-extrabold">{t("vocabulary.editDialog.title")}</h2>
             <p className="mt-1 truncate font-black text-primary">{entry.sourceText}</p>
           </div>
-          <Button aria-label={t("common.actions.close")} onClick={onClose} type="button" variant="outline"><X className="h-4 w-4" /></Button>
+          <Button aria-label={t("common.actions.close")} disabled={saving} onClick={onClose} type="button" variant="outline"><X className="h-4 w-4" /></Button>
         </header>
-        <div className="mt-4 grid gap-3">
+        <fieldset className="mt-4 grid min-w-0 gap-3" disabled={saving}>
           <label className="grid gap-1 text-sm font-bold">
             {t("vocabulary.fields.translation")}
             <input className="playsay-input" maxLength={500} onChange={(event) => setTranslation(event.target.value)} value={translation} />
@@ -79,7 +83,7 @@ export function VocabularyEntryEditDialog({
             {t("vocabulary.editDialog.exampleTranslation")}
             <textarea className="playsay-input min-h-20 resize-y" maxLength={1000} onChange={(event) => setExampleTranslation(event.target.value)} value={exampleTranslation} />
           </label>
-        </div>
+        </fieldset>
         {message ? <p aria-live="assertive" className="mt-3 text-sm font-bold text-destructive">{message}</p> : null}
         <Button className="mt-4 w-full" disabled={saving} onClick={() => void save()} type="button">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

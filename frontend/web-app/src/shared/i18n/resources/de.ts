@@ -5,6 +5,7 @@ export const deChatPushNotification = {
 
 export const de = {
   routeDiagnostics: {
+    geoProvider: "GeoIP-Anbieter: IPinfo Lite · CC BY-SA 4.0",
     configured: "API-Antwort",
     receiving: "Mediendaten werden empfangen",
     noRecentMedia: "Kein aktueller Nachweis des Medienempfangs",

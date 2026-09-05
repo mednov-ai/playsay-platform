@@ -5,6 +5,7 @@ export const frChatPushNotification = {
 
 export const fr = {
   routeDiagnostics: {
+    geoProvider: "Fournisseur GeoIP : IPinfo Lite · CC BY-SA 4.0",
     configured: "Réponse API",
     receiving: "Les données média arrivent",
     noRecentMedia: "Aucune preuve récente de réception média",

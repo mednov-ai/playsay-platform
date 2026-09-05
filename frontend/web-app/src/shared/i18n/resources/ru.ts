@@ -5,6 +5,7 @@ export const ruChatPushNotification = {
 
 export const ru = {
   routeDiagnostics: {
+    geoProvider: "Источник GeoIP: IPinfo Lite · CC BY-SA 4.0",
     configured: "Ответ API",
     receiving: "Медиаданные поступают",
     noRecentMedia: "Свежего подтверждения получения медиа нет",

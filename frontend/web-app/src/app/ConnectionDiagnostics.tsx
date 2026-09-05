@@ -59,6 +59,7 @@ export function ConnectionDiagnostics() {
           })}
         </div>
         <details><summary>{t("routeDiagnostics.events")}</summary><ol>{traces.slice(-12).map((event, index) => <li key={index}>{t(`routeDiagnostics.stages.${event.stage}`)} · {t(`routeDiagnostics.roles.${event.connectionRole}`)} · {t(`routeDiagnostics.outcomes.${event.outcome}`)} · {t("routeDiagnostics.secondsAgo", { count: Math.max(0, Math.floor((now - event.recordedAt) / 1000)) })}</li>)}</ol></details>
+        <p><a href="https://ipinfo.io/developers/ipinfo-lite-database" target="_blank" rel="noreferrer">{t("routeDiagnostics.geoProvider")}</a></p>
         <p><kbd>{mac ? "⌘ + ⌥ + Shift + D" : "Ctrl + Alt + Shift + D"}</kbd> · Esc</p>
       </> : null}
     </dialog>

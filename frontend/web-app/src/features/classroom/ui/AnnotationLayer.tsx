@@ -72,6 +72,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   const anchorPending = anchored && anchorBounds === null;
   const anchorStyle: CSSProperties | undefined = anchorBounds
     ? {
+        clipPath: anchorBounds.clipPath,
         bottom: "auto",
         height: `${anchorBounds.height}px`,
         left: `${anchorBounds.left}px`,
@@ -183,6 +184,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
 });
 
 export type AnnotationLayerBounds = {
+  clipPath?: string;
   height: number;
   left: number;
   top: number;

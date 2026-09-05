@@ -211,6 +211,9 @@ const externalActivityMaterial = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // jsdom does not decode images; layout tests supply their own rectangles.
+  vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(600);
+  vi.spyOn(HTMLImageElement.prototype, "naturalHeight", "get").mockReturnValue(1200);
   Object.defineProperty(window, "PointerEvent", {
     configurable: true,
     value: MouseEvent,

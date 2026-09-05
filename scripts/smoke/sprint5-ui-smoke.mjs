@@ -140,14 +140,14 @@ try {
     await captureAnnotationScreenshot(teacher.page);
     addCheck("text-and-mind-map-use-compact-content-bounds");
     await verifyAnchoredTextScroll(teacher.page, studentA.page);
-    addCheck("teacher-and-student-text-stays-anchored-during-image-scroll");
+    addCheck("teacher-and-student-text-stays-anchored-in-image-focus");
   } else {
     await waitForSharedPresenceReady(teacher.page, studentA.page, studentB.page);
     await drawTextAndMindMap(teacher.page);
     await captureAnnotationScreenshot(teacher.page);
     addCheck("text-and-mind-map-use-compact-content-bounds");
     await verifyAnchoredTextScroll(teacher.page, studentA.page);
-    addCheck("teacher-and-student-text-stays-anchored-during-image-scroll");
+    addCheck("teacher-and-student-text-stays-anchored-in-image-focus");
     await clearMaterialCursors(teacher.page, studentA.page, studentB.page);
     await verifyMaterialCursor(studentA.page, studentB.page);
     await verifyMaterialCursorAlignment(studentA.page, studentB.page, 0.34, 0.38, "student A cursor on student B");
@@ -837,16 +837,20 @@ async function drawAnnotation(page) {
   await page.waitForFunction(() => {
     return document.querySelector(".playsay-annotation-layer")?.getAttribute("data-tool") === "pen";
   }, null, { timeout: timeoutMs });
-  const surface = page.locator("[data-testid='lesson-material-surface']").first();
-  const box = await surface.boundingBox();
-  if (!box) {
-    throw new Error("Material surface is not visible for drawing.");
-  }
-  const viewport = page.viewportSize() ?? { width: 1280, height: 860 };
-  const visibleY = Math.min(Math.max(box.y + 220, box.y + 48), viewport.height - 120);
+  // After shared focus closes, document scroll may leave the image's letterbox under
+  // a page-relative click. Exercise the actual raster instead of that empty field.
+  await page.locator(`.playsay-rendered-image img[data-playsay-annotation-anchor-id='${scrollImageBlockId}']`).scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const box = await page.locator(`.playsay-annotation-layer[data-anchor-id='${scrollImageBlockId}']`).boundingBox();
+  const documentBox = await page.locator(".playsay-task-document").boundingBox();
+  if (!box || !documentBox) throw new Error("Image raster is not visible for drawing.");
+  const visibleTop = Math.max(box.y, documentBox.y);
+  const visibleBottom = Math.min(box.y + box.height, documentBox.y + documentBox.height);
+  if (visibleBottom - visibleTop < 20) throw new Error("Image raster has no usable drawing area.");
+  const visibleY = (visibleTop + visibleBottom) / 2;
   const start = { x: box.x + box.width * 0.28, y: visibleY };
-  const mid = { x: box.x + box.width * 0.42, y: visibleY + 36 };
-  const end = { x: box.x + box.width * 0.56, y: visibleY - 12 };
+  const mid = { x: box.x + box.width * 0.42, y: visibleY + Math.min(12, (visibleBottom - visibleTop) / 4) };
+  const end = { x: box.x + box.width * 0.56, y: visibleY - Math.min(12, (visibleBottom - visibleTop) / 4) };
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(mid.x, mid.y, { steps: 8 });
@@ -1041,7 +1045,27 @@ async function assertAnchoredTextFollowsImageScroll(page, role) {
   const before = await stableImageTextGeometry(page);
   const targetScrollTop = Math.min(360, before.scrollHeight - before.clientHeight);
   if (targetScrollTop < 120) {
-    throw new Error(`${role} focused image is not vertically scrollable: ${JSON.stringify(before)}`);
+    // Image focus initially fits the full raster; overflow is no longer required.
+    const fit = await page.evaluate((blockId) => {
+      const image = document.querySelector(`.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${blockId}']`);
+      const layer = document.querySelector(`.playsay-annotation-layer[data-anchor-id='${blockId}']`);
+      const scroller = document.querySelector(".playsay-material-focused-image");
+      if (!(image instanceof HTMLImageElement) || !layer || !scroller) return false;
+      const box = image.getBoundingClientRect();
+      const area = scroller.getBoundingClientRect();
+      const anchor = layer.getBoundingClientRect();
+      const scale = Math.min(box.width / image.naturalWidth, box.height / image.naturalHeight);
+      const width = image.naturalWidth * scale;
+      const height = image.naturalHeight * scale;
+      const left = box.left + (box.width - width) / 2;
+      const top = box.top + (box.height - height) / 2;
+      return left >= area.left - 2 && top >= area.top - 2
+        && left + width <= area.right + 2 && top + height <= area.bottom + 2
+        && Math.abs(anchor.left - left) <= 2 && Math.abs(anchor.top - top) <= 2
+        && Math.abs(anchor.width - width) <= 2 && Math.abs(anchor.height - height) <= 2;
+    }, scrollImageBlockId);
+    if (!fit) throw new Error(`${role} focused image or annotation does not fit its raster`);
+    return;
   }
 
   await page.locator(".playsay-material-focused-image").evaluate((element, scrollTop) => {

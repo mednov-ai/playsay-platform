@@ -2884,6 +2884,10 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   height: 100%;
 }
 
+.playsay-task-document-surface .playsay-material-focus-close {
+  position: absolute;
+}
+
 .playsay-task-board[data-presentation-mode="image-focus"] .playsay-material-focus-stack {
   z-index: auto;
 }

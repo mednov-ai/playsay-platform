@@ -140,14 +140,14 @@ try {
     await captureAnnotationScreenshot(teacher.page);
     addCheck("text-and-mind-map-use-compact-content-bounds");
     await verifyAnchoredTextScroll(teacher.page, studentA.page);
-    addCheck("teacher-and-student-text-stays-anchored-during-image-scroll");
+    addCheck("teacher-and-student-text-stays-anchored-in-image-focus");
   } else {
     await waitForSharedPresenceReady(teacher.page, studentA.page, studentB.page);
     await drawTextAndMindMap(teacher.page);
     await captureAnnotationScreenshot(teacher.page);
     addCheck("text-and-mind-map-use-compact-content-bounds");
     await verifyAnchoredTextScroll(teacher.page, studentA.page);
-    addCheck("teacher-and-student-text-stays-anchored-during-image-scroll");
+    addCheck("teacher-and-student-text-stays-anchored-in-image-focus");
     await clearMaterialCursors(teacher.page, studentA.page, studentB.page);
     await verifyMaterialCursor(studentA.page, studentB.page);
     await verifyMaterialCursorAlignment(studentA.page, studentB.page, 0.34, 0.38, "student A cursor on student B");
@@ -1041,7 +1041,27 @@ async function assertAnchoredTextFollowsImageScroll(page, role) {
   const before = await stableImageTextGeometry(page);
   const targetScrollTop = Math.min(360, before.scrollHeight - before.clientHeight);
   if (targetScrollTop < 120) {
-    throw new Error(`${role} focused image is not vertically scrollable: ${JSON.stringify(before)}`);
+    // Image focus initially fits the full raster; overflow is no longer required.
+    const fit = await page.evaluate((blockId) => {
+      const image = document.querySelector(`.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${blockId}']`);
+      const layer = document.querySelector(`.playsay-annotation-layer[data-anchor-id='${blockId}']`);
+      const scroller = document.querySelector(".playsay-material-focused-image");
+      if (!(image instanceof HTMLImageElement) || !layer || !scroller) return false;
+      const box = image.getBoundingClientRect();
+      const area = scroller.getBoundingClientRect();
+      const anchor = layer.getBoundingClientRect();
+      const scale = Math.min(box.width / image.naturalWidth, box.height / image.naturalHeight);
+      const width = image.naturalWidth * scale;
+      const height = image.naturalHeight * scale;
+      const left = box.left + (box.width - width) / 2;
+      const top = box.top + (box.height - height) / 2;
+      return left >= area.left - 2 && top >= area.top - 2
+        && left + width <= area.right + 2 && top + height <= area.bottom + 2
+        && Math.abs(anchor.left - left) <= 2 && Math.abs(anchor.top - top) <= 2
+        && Math.abs(anchor.width - width) <= 2 && Math.abs(anchor.height - height) <= 2;
+    }, scrollImageBlockId);
+    if (!fit) throw new Error(`${role} focused image or annotation does not fit its raster`);
+    return;
   }
 
   await page.locator(".playsay-material-focused-image").evaluate((element, scrollTop) => {

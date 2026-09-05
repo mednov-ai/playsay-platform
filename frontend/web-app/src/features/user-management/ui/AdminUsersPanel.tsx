@@ -4,6 +4,7 @@ import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
 import { useAdminManagementData } from "../api/useUserManagementData";
 import type { CreateUserInput, TeacherDirectoryEntry, UserManagementUser } from "../api/userManagement";
+import { ApiError } from "../../../shared/api/errors";
 import { DelegationWizard } from "./DelegationWizard";
 import { DelegationList } from "./TeacherStudentsPanel";
 import { LessonTranslationPermissionControl } from "./LessonTranslationPermissionControl";
@@ -20,7 +21,7 @@ export function AdminUsersPanel() {
   const teachers = data.directory.data ?? [];
   const students = data.students.data ?? [];
   const loading = data.users.isFetching || data.students.isFetching || data.directory.isFetching;
-  const error = data.users.error ?? data.students.error ?? data.directory.error ?? data.addUser.error ?? data.changeRoles.error ?? data.removeUser.error;
+  const error = data.users.error ?? data.students.error ?? data.directory.error;
 
   function search(event: FormEvent) {
     event.preventDefault();
@@ -32,8 +33,8 @@ export function AdminUsersPanel() {
     try {
       await action();
       setMessage(success);
-    } catch {
-      setMessage(t("userManagement.messages.actionFailed"));
+    } catch (caught) {
+      setMessage(t(userManagementErrorKey(caught)));
     }
   }
 
@@ -69,8 +70,8 @@ export function AdminUsersPanel() {
         <Button className="self-end" type="submit"><Search className="h-4 w-4" />{t("userManagement.actions.search")}</Button>
       </form>
 
-      {message ? <p className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-semibold">{message}</p> : null}
-      {error ? <p className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm font-semibold text-destructive">{error instanceof Error ? error.message : t("userManagement.messages.loadFailed")}</p> : null}
+      {message ? <p className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-semibold" role="status">{message}</p> : null}
+      {error ? <p className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm font-semibold text-destructive" role="alert">{error instanceof Error ? error.message : t("userManagement.messages.loadFailed")}</p> : null}
 
       <details className="rounded-2xl border border-border bg-white p-4 shadow-sm">
         <summary className="flex cursor-pointer list-none items-center gap-2 font-extrabold"><UserPlus className="h-5 w-5 text-primary" />{t("userManagement.admin.createUser")}</summary>
@@ -87,7 +88,7 @@ export function AdminUsersPanel() {
             key={user.subject}
             onDelete={(replacementTeacherSubject) => perform(
               () => data.removeUser.mutateAsync({ replacementTeacherSubject, subject: user.subject }),
-              t("userManagement.messages.deletionStarted"),
+              t("userManagement.messages.deletionCompleted"),
             )}
             onPrimaryTeacher={(teacherSubject) => perform(
               () => data.assignTeacher.mutateAsync({ studentSubject: user.subject, teacherSubject }),
@@ -102,6 +103,7 @@ export function AdminUsersPanel() {
             onTranslationPermissionSaved={() => setMessage(t("userManagement.messages.translationPermissionSaved"))}
             teachers={teachers}
             user={user}
+            deleting={data.removeUser.isPending && data.removeUser.variables?.subject === user.subject}
           />
         ))}
       </div>
@@ -130,6 +132,7 @@ export function AdminUsersPanel() {
 }
 
 function UserCard({
+  deleting,
   onDelete,
   onPrimaryTeacher,
   onRoles,
@@ -139,6 +142,7 @@ function UserCard({
   teachers,
   user,
 }: {
+  deleting: boolean;
   onDelete: (replacementTeacherSubject?: string) => Promise<unknown>;
   onPrimaryTeacher: (teacherSubject: string) => Promise<unknown>;
   onRoles: (roles: string[], replacementTeacherSubject?: string) => Promise<unknown>;
@@ -216,7 +220,7 @@ function UserCard({
           <Save className="h-4 w-4" />{t("common.actions.save")}
         </Button>
         <Button
-          disabled={!active}
+          disabled={!active || deleting}
           onClick={() => {
             if (window.confirm(t("userManagement.confirm.delete", { name: user.displayName ?? user.username ?? user.subject }))) {
               void onDelete(replacement || undefined);
@@ -226,12 +230,30 @@ function UserCard({
           type="button"
           variant="outline"
         >
-          <Trash2 className="h-4 w-4" />{t("userManagement.actions.delete")}
+          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          {t(deleting ? "userManagement.actions.deleting" : "userManagement.actions.delete")}
         </Button>
       </div>
     </article>
   );
 }
+
+export function userManagementErrorKey(caught: unknown): string {
+  if (!(caught instanceof ApiError)) return "userManagement.messages.actionFailed";
+  return knownUserManagementErrors[caught.errorCode] ?? "userManagement.messages.actionFailed";
+}
+
+const knownUserManagementErrors: Record<string, string> = {
+  ADMIN_ROLE_REQUIRED: "userManagement.errors.adminRequired",
+  DELEGATION_TEACHER_INVALID: "userManagement.errors.teacherInvalid",
+  LAST_ADMIN_REQUIRED: "userManagement.errors.lastAdmin",
+  USER_DELETE_FAILED: "userManagement.errors.deletionFailed",
+  USER_DELETE_IN_PROGRESS_LESSON: "userManagement.errors.inProgressLesson",
+  USER_DELETE_REPLACEMENT_REQUIRED: "userManagement.errors.replacementRequired",
+  USER_DELETE_TIMEOUT: "userManagement.errors.deletionStillRunning",
+  USER_NOT_FOUND: "userManagement.errors.userNotFound",
+  USER_SELF_ADMIN_CHANGE_FORBIDDEN: "userManagement.errors.selfAdminChange",
+};
 
 function CreateUserForm({ disabled, onSubmit, teachers }: {
   disabled: boolean;

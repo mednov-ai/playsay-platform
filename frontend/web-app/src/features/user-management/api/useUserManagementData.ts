@@ -14,6 +14,7 @@ import {
   revokeDelegation,
   updateUserRoles,
   updateStudentLessonTranslationPermission,
+  waitForUserDeletion,
   userManagementKeys,
   type CreateDelegationInput,
   type CreateUserInput,
@@ -70,8 +71,10 @@ export function useAdminManagementData(filters: { search: string; role: string; 
     onSuccess: refresh,
   });
   const removeUser = useMutation({
-    mutationFn: ({ replacementTeacherSubject, subject }: { subject: string; replacementTeacherSubject?: string }) =>
-      deleteUser(subject, replacementTeacherSubject),
+    mutationFn: async ({ replacementTeacherSubject, subject }: { subject: string; replacementTeacherSubject?: string }) => {
+      const operation = await deleteUser(subject, replacementTeacherSubject);
+      return waitForUserDeletion(operation);
+    },
     onSuccess: refresh,
   });
   const delegate = useMutation({ mutationFn: (input: CreateDelegationInput) => createDelegation("admin", input), onSuccess: refresh });

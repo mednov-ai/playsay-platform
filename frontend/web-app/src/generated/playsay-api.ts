@@ -7489,7 +7489,7 @@ export const getListHomeworkAssignmentsUrl = () => {
 }
 
 /**
- * Lists homework assignments visible to the current teacher or administrator.
+ * Lists homework assignments visible to the current teacher or administrator. A non-owner teacher sees assignments containing at least one currently managed recipient; counts and aggregates include only recipients accessible to that teacher.
  * @summary List homework assignments
  */
 export const listHomeworkAssignments = async ( options?: RequestInit): Promise<listHomeworkAssignmentsResponse> => {
@@ -8477,6 +8477,7 @@ export const getReviewVocabularyHomeworkAssignmentUrl = (assignmentId: string,
 }
 
 /**
+ * Reviews vocabulary homework for the exact recipient currently accessible to the assignment owner, an administrator, or the student's primary or actively delegated teacher.
  * @summary Accept or return vocabulary homework awaiting teacher review
  */
 export const reviewVocabularyHomeworkAssignment = async (assignmentId: string,
@@ -9796,7 +9797,7 @@ export const getGetHomeworkAssignmentUrl = (assignmentId: string,) => {
 }
 
 /**
- * Returns recipients and current score/error progress for a homework assignment.
+ * Returns recipients and current score/error progress for a homework assignment. A non-owner teacher receives only currently managed recipients and aggregates derived from that permitted subset.
  * @summary Get homework assignment progress
  */
 export const getHomeworkAssignment = async (assignmentId: string, options?: RequestInit): Promise<getHomeworkAssignmentResponse> => {
@@ -9853,7 +9854,7 @@ export const getGetSubmittedHomeworkResultUrl = (assignmentId: string,
 }
 
 /**
- * Returns submitted material work to the assignment owner, an administrator, or an active delegate.
+ * Returns submitted material work to the assignment owner, an administrator, or a teacher who currently manages the exact student who owns the submission. Inaccessible submissions and drafts are not disclosed.
  * @summary Get a submitted homework result
  */
 export const getSubmittedHomeworkResult = async (assignmentId: string,

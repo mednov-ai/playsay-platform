@@ -12,7 +12,6 @@ import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.SubmissionRepo
 import com.playsay.gateway.service.AssignmentAccessPolicy
-import com.playsay.gateway.service.StudentAccessPolicy
 import com.playsay.gateway.utils.MetaData
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -24,22 +23,26 @@ class AssignmentQueryService(
     private val assignmentRepo: AssignmentRepo,
     private val assignmentRecipientRepo: AssignmentRecipientRepo,
     private val submissionRepo: SubmissionRepo,
-    private val studentAccessPolicy: StudentAccessPolicy,
     private val assignmentAccessPolicy: AssignmentAccessPolicy,
     private val materialResolver: AssignmentMaterialResolver,
     private val materialResponseMapper: LessonMaterialResponseMapper,
     private val projectionService: AssignmentProjectionService,
 ) {
-    fun listTeacher(currentUserId: UUID, isAdmin: Boolean): List<AssignmentSummaryResponse> =
-        assignmentRepo.findByTypeAndStatusNotOrderByUpdatedAtDesc(
+    fun listTeacher(currentUserId: UUID, isAdmin: Boolean): List<AssignmentSummaryResponse> {
+        val assignments = assignmentRepo.findByTypeAndStatusNotOrderByUpdatedAtDesc(
             type = MetaData.AssignmentTypes.HOMEWORK,
             status = MetaData.AssignmentStatuses.ARCHIVED,
-        ).asSequence()
-            .filter { assignment ->
-                isAdmin || assignment.teacherUserId == currentUserId || canAccessEveryRecipient(currentUserId, assignment.id)
+        )
+        return assignmentAccessPolicy.resolveTeacherScopes(assignments, currentUserId, isAdmin)
+            .asSequence()
+            .mapNotNull { scope ->
+                projectionService.summaryIfMaterialAvailable(
+                    assignment = scope.assignment,
+                    visibleRecipientIds = scope.visibleRecipientIds,
+                )
             }
-            .mapNotNull(projectionService::summaryIfMaterialAvailable)
             .toList()
+    }
 
     fun findVocabularyByPlan(teacherUserId: UUID, planId: UUID): AssignmentEntity? =
         assignmentRepo.findByTeacherUserIdAndPracticePlanId(teacherUserId, planId)
@@ -51,10 +54,10 @@ class AssignmentQueryService(
         authentication: JwtAuthenticationToken,
         assignmentId: UUID,
     ): TeacherAssignmentDetailResponse {
-        val assignment = assignmentAccessPolicy.requireManagedHomework(authentication, assignmentId)
+        val scope = assignmentAccessPolicy.requireManagedHomework(authentication, assignmentId)
         return TeacherAssignmentDetailResponse(
-            assignment = projectionService.summary(assignment),
-            recipients = projectionService.recipientProgress(assignment),
+            assignment = projectionService.summary(scope.assignment, visibleRecipientIds = scope.visibleRecipientIds),
+            recipients = projectionService.recipientProgress(scope.assignment, scope.visibleRecipientIds),
         )
     }
 
@@ -63,17 +66,26 @@ class AssignmentQueryService(
         assignmentId: UUID,
         submissionId: UUID,
     ): TeacherAssignmentSubmissionDetailResponse {
-        val assignment = assignmentAccessPolicy.requireManagedHomework(authentication, assignmentId)
+        val scope = assignmentAccessPolicy.requireManagedHomework(authentication, assignmentId)
+        val assignment = scope.assignment
         requireMaterialAssignment(assignment)
         val submission = submissionRepo.findMaterialSubmissionRowById(submissionId)
-            ?.takeIf { row -> row.assignmentId == assignment.id && row.submittedAt != null }
+            ?.takeIf { row ->
+                row.assignmentId == assignment.id && row.submittedAt != null && scope.includes(row.userId)
+            }
             ?: throw assignmentNotFound()
         val material = materialResolver.require(requireNotNull(assignment.materialId))
         return TeacherAssignmentSubmissionDetailResponse(
             material = materialResponseMapper.toResponse(material),
-            submission = projectionService.submission(submission, assignment),
+            submission = projectionService.submission(submission, assignment, scope.visibleRecipientIds),
         )
     }
+
+    fun requireTeacherRecipient(
+        authentication: JwtAuthenticationToken,
+        assignmentId: UUID,
+        studentSubject: String,
+    ) = assignmentAccessPolicy.requireManagedHomeworkRecipient(authentication, assignmentId, studentSubject)
 
     fun listStudent(userId: UUID): List<AssignmentSummaryResponse> =
         assignmentRecipientRepo.findByStudentUserIdAndArchivedAtIsNullOrderByUpdatedAtDesc(userId)
@@ -120,14 +132,6 @@ class AssignmentQueryService(
                 ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.ASSIGNMENT_NOT_READY),
         )
     }
-
-    private fun canAccessEveryRecipient(actorUserId: UUID, assignmentId: UUID): Boolean =
-        studentAccessPolicy.canAccessEveryStudent(
-            actorUserId,
-            assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignmentId)
-                .filter { recipient -> recipient.archivedAt == null }
-                .map { recipient -> recipient.studentUserId },
-        )
 
     private fun requireMaterialAssignment(assignment: AssignmentEntity) {
         if (assignment.contentKind != MetaData.AssignmentContentKinds.MATERIAL || assignment.materialId == null) {

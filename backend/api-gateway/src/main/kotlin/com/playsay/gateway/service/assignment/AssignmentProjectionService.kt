@@ -31,33 +31,41 @@ class AssignmentProjectionService(
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
-    fun summary(assignment: AssignmentEntity, studentUserId: UUID? = null): AssignmentSummaryResponse =
+    fun summary(
+        assignment: AssignmentEntity,
+        studentUserId: UUID? = null,
+        visibleRecipientIds: Set<UUID>? = null,
+    ): AssignmentSummaryResponse =
         if (assignment.contentKind == MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
-            vocabularySummary(assignment, studentUserId)
+            vocabularySummary(assignment, studentUserId, visibleRecipientIds)
         } else {
-            materialSummary(assignment, studentUserId)
+            materialSummary(assignment, studentUserId, visibleRecipientIds)
         }
 
     fun summaryIfMaterialAvailable(
         assignment: AssignmentEntity,
         studentUserId: UUID? = null,
+        visibleRecipientIds: Set<UUID>? = null,
     ): AssignmentSummaryResponse? {
         if (assignment.contentKind == MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
-            return vocabularySummary(assignment, studentUserId)
+            return vocabularySummary(assignment, studentUserId, visibleRecipientIds)
         }
         val materialId = assignment.materialId ?: return null
         val material = materialResolver.available(materialId) ?: return null
-        return materialSummary(assignment, material.id, material.title, studentUserId)
+        return materialSummary(assignment, material.id, material.title, studentUserId, visibleRecipientIds)
     }
 
-    fun recipientProgress(assignment: AssignmentEntity): List<AssignmentRecipientProgressResponse> {
-        val recipients = assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignment.id)
+    fun recipientProgress(
+        assignment: AssignmentEntity,
+        visibleRecipientIds: Set<UUID>? = null,
+    ): List<AssignmentRecipientProgressResponse> {
+        val recipients = recipientRows(assignment.id, visibleRecipientIds)
         val users = appUserRepo.findByIdIn(recipients.map { recipient -> recipient.studentUserId })
             .associateBy(AppUserEntity::id)
         return if (assignment.contentKind == MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) {
             vocabularyRecipientProgress(assignment, recipients, users)
         } else {
-            materialRecipientProgress(assignment, recipients, users)
+            materialRecipientProgress(assignment, recipients, users, visibleRecipientIds)
         }
     }
 
@@ -108,8 +116,9 @@ class AssignmentProjectionService(
         assignment: AssignmentEntity,
         recipients: List<AssignmentRecipientEntity>,
         users: Map<UUID, AppUserEntity>,
+        visibleRecipientIds: Set<UUID>?,
     ): List<AssignmentRecipientProgressResponse> {
-        val latestByStudent = latestSubmissionsByStudent(assignment.id)
+        val latestByStudent = latestSubmissionsByStudent(assignment.id, visibleRecipientIds)
         val scoredSubmissions = latestByStudent.values.filter { submission -> submission.score != null }
         val scoredErrors = latestByStudent.values.mapNotNull { submission -> submission.errorsCount?.let(::BigDecimal) }
         val groupAverageScore = progressCalculator.average(scoredSubmissions.mapNotNull { submission -> submission.score })
@@ -146,7 +155,11 @@ class AssignmentProjectionService(
         }
     }
 
-    fun submission(row: MaterialSubmissionRow, assignment: AssignmentEntity): AssignmentSubmissionResponse =
+    fun submission(
+        row: MaterialSubmissionRow,
+        assignment: AssignmentEntity,
+        visibleRecipientIds: Set<UUID>? = null,
+    ): AssignmentSubmissionResponse =
         AssignmentSubmissionResponse(
             id = row.id,
             assignmentId = row.assignmentId,
@@ -158,7 +171,7 @@ class AssignmentProjectionService(
             content = objectMapper.readTree(requireNotNull(row.content)),
             score = row.score,
             errorsCount = row.errorsCount,
-            progressTone = if (recipientCount(assignment.id) > 1) {
+            progressTone = if (recipientCount(assignment.id, visibleRecipientIds) > 1) {
                 progressCalculator.progressTone(row.score, assignment.maxScore, row.errorsCount)
             } else {
                 null
@@ -168,9 +181,13 @@ class AssignmentProjectionService(
             updatedAt = row.updatedAt,
         )
 
-    private fun materialSummary(assignment: AssignmentEntity, studentUserId: UUID?): AssignmentSummaryResponse {
+    private fun materialSummary(
+        assignment: AssignmentEntity,
+        studentUserId: UUID?,
+        visibleRecipientIds: Set<UUID>?,
+    ): AssignmentSummaryResponse {
         val material = materialResolver.require(requireNotNull(assignment.materialId))
-        return materialSummary(assignment, material.id, material.title, studentUserId)
+        return materialSummary(assignment, material.id, material.title, studentUserId, visibleRecipientIds)
     }
 
     private fun materialSummary(
@@ -178,8 +195,9 @@ class AssignmentProjectionService(
         materialId: UUID,
         materialTitle: String,
         studentUserId: UUID?,
+        visibleRecipientIds: Set<UUID>?,
     ): AssignmentSummaryResponse {
-        val submissionsByStudent = latestSubmissionsByStudent(assignment.id)
+        val submissionsByStudent = latestSubmissionsByStudent(assignment.id, visibleRecipientIds)
         val submissions = submissionsByStudent.values.toList()
         val scores = submissions.mapNotNull(MaterialSubmissionRow::score)
         val errors = submissions.mapNotNull { submission -> submission.errorsCount?.let(::BigDecimal) }
@@ -198,7 +216,7 @@ class AssignmentProjectionService(
             maxScore = assignment.maxScore,
             dueAt = assignment.dueAt,
             status = assignment.status,
-            recipientCount = recipientCount(assignment.id),
+            recipientCount = recipientCount(assignment.id, visibleRecipientIds),
             submittedCount = submissions.count { submission -> submission.submittedAt != null },
             scoredCount = scores.size,
             averageScore = progressCalculator.average(scores),
@@ -217,8 +235,12 @@ class AssignmentProjectionService(
         )
     }
 
-    private fun vocabularySummary(assignment: AssignmentEntity, studentUserId: UUID?): AssignmentSummaryResponse {
-        val recipients = assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignment.id)
+    private fun vocabularySummary(
+        assignment: AssignmentEntity,
+        studentUserId: UUID?,
+        visibleRecipientIds: Set<UUID>?,
+    ): AssignmentSummaryResponse {
+        val recipients = recipientRows(assignment.id, visibleRecipientIds)
         val studentRecipient = studentUserId?.let { id -> recipients.firstOrNull { it.studentUserId == id } }
         val completed = recipients.count { it.activityState == "COMPLETED" }
         val difficultCounts = recipients.mapNotNull { it.difficultWordCount?.let(::BigDecimal) }
@@ -267,13 +289,26 @@ class AssignmentProjectionService(
         )
     }
 
-    private fun latestSubmissionsByStudent(assignmentId: UUID): Map<UUID, MaterialSubmissionRow> {
+    private fun latestSubmissionsByStudent(
+        assignmentId: UUID,
+        visibleRecipientIds: Set<UUID>? = null,
+    ): Map<UUID, MaterialSubmissionRow> {
         val latest = linkedMapOf<UUID, MaterialSubmissionRow>()
-        submissionRepo.findSubmissionRowsByAssignmentId(assignmentId).forEach { row -> latest.putIfAbsent(row.userId, row) }
+        submissionRepo.findSubmissionRowsByAssignmentId(assignmentId)
+            .asSequence()
+            .filter { row -> visibleRecipientIds == null || row.userId in visibleRecipientIds }
+            .forEach { row -> latest.putIfAbsent(row.userId, row) }
         return latest
     }
 
-    private fun recipientCount(assignmentId: UUID): Int = assignmentRecipientRepo.countByAssignmentId(assignmentId).toInt()
+    private fun recipientRows(
+        assignmentId: UUID,
+        visibleRecipientIds: Set<UUID>?,
+    ): List<AssignmentRecipientEntity> = assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(assignmentId)
+        .filter { recipient -> visibleRecipientIds == null || recipient.studentUserId in visibleRecipientIds }
+
+    private fun recipientCount(assignmentId: UUID, visibleRecipientIds: Set<UUID>?): Int =
+        visibleRecipientIds?.size ?: assignmentRecipientRepo.countByAssignmentId(assignmentId).toInt()
 
     private fun relativeDelta(groupMode: Boolean, value: BigDecimal?, average: BigDecimal?): BigDecimal? =
         if (groupMode && value != null && average != null) {

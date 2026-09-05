@@ -1875,6 +1875,7 @@ export const en = {
       search: "Search",
       create: "Create",
       delete: "Delete",
+      deleting: "Deleting…",
     },
     messages: {
       studentAttached: "Student attached.",
@@ -1882,6 +1883,7 @@ export const en = {
       loadFailed: "The data could not be loaded.",
       userCreated: "User created; staff invitation sent.",
       deletionStarted: "Background deletion started.",
+      deletionCompleted: "User deleted.",
       teacherUpdated: "Primary teacher updated.",
       rolesUpdated: "Roles updated. A fresh token will apply them without stale JWT overwrites.",
       delegationCreated: "Delegation created.",
@@ -1889,6 +1891,17 @@ export const en = {
       translationPermissionFailed: "The voice translation setting could not be changed.",
       connectionRouteSaved: "Connection route saved.",
       connectionRouteFailed: "The connection route could not be changed.",
+    },
+    errors: {
+      adminRequired: "Refresh your session and sign in again with administrator access.",
+      teacherInvalid: "Select an active user who has the teacher role.",
+      lastAdmin: "The last active administrator cannot be deleted.",
+      deletionFailed: "The account could not be deleted. Try again or contact support.",
+      inProgressLesson: "This teacher has a lesson in progress. Finish the lesson before deleting the account.",
+      replacementRequired: "Select another active teacher to receive this teacher’s dependent records.",
+      deletionStillRunning: "Deletion is still running. Refresh the user list in a moment.",
+      userNotFound: "This user no longer exists or is already unavailable.",
+      selfAdminChange: "You cannot delete your own administrator account.",
     },
     empty: {
       teachers: "No teachers are available.",

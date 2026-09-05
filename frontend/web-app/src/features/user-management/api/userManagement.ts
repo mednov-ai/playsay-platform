@@ -1,5 +1,6 @@
 import { authConfig } from "../../../shared/api/auth";
 import { apiJson } from "../../../shared/api/http";
+import { ApiError } from "../../../shared/api/errors";
 
 export type TeacherDirectoryEntry = {
   subject: string;
@@ -53,6 +54,16 @@ export type CreateUserInput = {
   email?: string;
   roles: string[];
   primaryTeacherSubject?: string;
+};
+
+export type UserDeletionOperation = {
+  operationId: string;
+  targetSubject: string;
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+  errorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
 };
 
 export const userManagementKeys = {
@@ -161,7 +172,7 @@ export function removePrimaryTeacher(studentSubject: string): Promise<void> {
   );
 }
 
-export function deleteUser(subject: string, replacementTeacherSubject?: string): Promise<{ operationId: string }> {
+export function deleteUser(subject: string, replacementTeacherSubject?: string): Promise<UserDeletionOperation> {
   const params = new URLSearchParams();
   if (replacementTeacherSubject) params.set("replacementTeacherSubject", replacementTeacherSubject);
   const query = params.size ? `?${params.toString()}` : "";
@@ -171,4 +182,38 @@ export function deleteUser(subject: string, replacementTeacherSubject?: string):
     authConfig,
     202,
   );
+}
+
+export function fetchUserDeletionOperation(operationId: string): Promise<UserDeletionOperation> {
+  return apiJson(
+    `/api/admin/user-management/operations/${encodeURIComponent(operationId)}`,
+    { method: "GET" },
+    authConfig,
+  );
+}
+
+export async function waitForUserDeletion(
+  initial: UserDeletionOperation,
+  options: {
+    load?: (operationId: string) => Promise<UserDeletionOperation>;
+    pause?: () => Promise<void>;
+    maxAttempts?: number;
+  } = {},
+): Promise<UserDeletionOperation> {
+  const load = options.load ?? fetchUserDeletionOperation;
+  const pause = options.pause ?? (() => new Promise((resolve) => window.setTimeout(resolve, 500)));
+  const maxAttempts = options.maxAttempts ?? 120;
+  let operation = initial;
+
+  for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
+    if (operation.status === "COMPLETED") return operation;
+    if (operation.status === "FAILED") {
+      throw new ApiError(409, operation.errorCode ?? "USER_DELETE_FAILED", "User deletion failed");
+    }
+    if (attempt === maxAttempts) break;
+    await pause();
+    operation = await load(operation.operationId);
+  }
+
+  throw new ApiError(504, "USER_DELETE_TIMEOUT", "User deletion is still running");
 }

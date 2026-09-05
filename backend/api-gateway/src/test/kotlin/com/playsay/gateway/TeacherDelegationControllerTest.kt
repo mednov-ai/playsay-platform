@@ -203,6 +203,50 @@ class TeacherDelegationControllerTest @Autowired constructor(
         assertEquals(MetaData.ErrorCodes.TEACHER_OR_ADMIN_ROLE_REQUIRED, studentError.errorCode)
     }
 
+    @Test
+    fun `admin teacher appears in directory and can assign self as primary teacher`() {
+        val maria = user("maria", "ADMIN,TEACHER")
+        val student = user("student", "STUDENT")
+        val authentication = authentication(maria.keycloakSubject, "ROLE_ADMIN", "ROLE_TEACHER")
+
+        val directory = teacherController.directory(authentication)
+        val assigned = adminController.assignTeacher(
+            authentication,
+            student.keycloakSubject,
+            com.playsay.gateway.dto.AssignPrimaryTeacherRequest(maria.keycloakSubject),
+        )
+        val assignedAgain = adminController.assignTeacher(
+            authentication,
+            student.keycloakSubject,
+            com.playsay.gateway.dto.AssignPrimaryTeacherRequest(maria.keycloakSubject),
+        )
+
+        assertTrue(directory.any { it.subject == maria.keycloakSubject })
+        assertEquals(maria.keycloakSubject, assigned.student.primaryTeacher?.subject)
+        assertEquals(maria.keycloakSubject, assignedAgain.student.primaryTeacher?.subject)
+        assertEquals(2, audits.findAll().count { it.action == "PRIMARY_TEACHER_ASSIGNED" })
+    }
+
+    @Test
+    fun `pure admin is not a teacher candidate and cannot be assigned`() {
+        val admin = user("admin", "ADMIN")
+        val student = user("student", "STUDENT")
+        val authentication = authentication(admin.keycloakSubject, "ROLE_ADMIN")
+
+        val directory = teacherController.directory(authentication)
+        val error = assertFailsWith<ProjectResponseException> {
+            adminController.assignTeacher(
+                authentication,
+                student.keycloakSubject,
+                com.playsay.gateway.dto.AssignPrimaryTeacherRequest(admin.keycloakSubject),
+            )
+        }
+
+        assertFalse(directory.any { it.subject == admin.keycloakSubject })
+        assertEquals(MetaData.ErrorCodes.DELEGATION_TEACHER_INVALID, error.errorCode)
+        assertEquals(null, users.findByKeycloakSubject(student.keycloakSubject)?.managedByTeacherUserId)
+    }
+
     private fun user(
         subject: String,
         roles: String,

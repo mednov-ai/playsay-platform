@@ -1875,6 +1875,7 @@ export const de = {
       search: "Suchen",
       create: "Erstellen",
       delete: "Löschen",
+      deleting: "Wird gelöscht…",
     },
     messages: {
       studentAttached: "Schüler wurde zugeordnet.",
@@ -1882,6 +1883,7 @@ export const de = {
       loadFailed: "Die Daten konnten nicht geladen werden.",
       userCreated: "Benutzer erstellt; Mitarbeitereinladung versendet.",
       deletionStarted: "Löschung im Hintergrund gestartet.",
+      deletionCompleted: "Benutzer wurde gelöscht.",
       teacherUpdated: "Hauptlehrkraft aktualisiert.",
       rolesUpdated: "Rollen aktualisiert. Ein neues Token übernimmt sie ohne Überschreiben durch ein veraltetes JWT.",
       delegationCreated: "Delegierung erstellt.",
@@ -1889,6 +1891,17 @@ export const de = {
       translationPermissionFailed: "Die Einstellung für die Sprachübersetzung konnte nicht geändert werden.",
       connectionRouteSaved: "Verbindungsroute gespeichert.",
       connectionRouteFailed: "Die Verbindungsroute konnte nicht geändert werden.",
+    },
+    errors: {
+      adminRequired: "Aktualisieren Sie Ihre Sitzung und melden Sie sich erneut mit Administratorrechten an.",
+      teacherInvalid: "Wählen Sie einen aktiven Benutzer mit der Rolle Lehrkraft.",
+      lastAdmin: "Der letzte aktive Administrator kann nicht gelöscht werden.",
+      deletionFailed: "Das Konto konnte nicht gelöscht werden. Versuchen Sie es erneut oder kontaktieren Sie den Support.",
+      inProgressLesson: "Diese Lehrkraft hat gerade Unterricht. Beenden Sie ihn, bevor Sie das Konto löschen.",
+      replacementRequired: "Wählen Sie eine andere aktive Lehrkraft zur Übernahme der abhängigen Daten.",
+      deletionStillRunning: "Die Löschung läuft noch. Aktualisieren Sie die Benutzerliste gleich noch einmal.",
+      userNotFound: "Dieser Benutzer existiert nicht mehr oder ist bereits nicht verfügbar.",
+      selfAdminChange: "Sie können Ihr eigenes Administratorkonto nicht löschen.",
     },
     empty: {
       teachers: "Keine Lehrkräfte verfügbar.",

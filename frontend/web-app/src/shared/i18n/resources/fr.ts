@@ -1875,6 +1875,7 @@ export const fr = {
       search: "Rechercher",
       create: "Créer",
       delete: "Supprimer",
+      deleting: "Suppression…",
     },
     messages: {
       studentAttached: "Élève rattaché.",
@@ -1882,6 +1883,7 @@ export const fr = {
       loadFailed: "Les données n’ont pas pu être chargées.",
       userCreated: "Utilisateur créé ; invitation envoyée au membre du personnel.",
       deletionStarted: "Suppression en arrière-plan démarrée.",
+      deletionCompleted: "Utilisateur supprimé.",
       teacherUpdated: "Enseignant principal mis à jour.",
       rolesUpdated: "Rôles mis à jour. Un nouveau jeton les appliquera sans écrasement par un JWT obsolète.",
       delegationCreated: "Délégation créée.",
@@ -1889,6 +1891,17 @@ export const fr = {
       translationPermissionFailed: "Le paramètre de traduction vocale n’a pas pu être modifié.",
       connectionRouteSaved: "Itinéraire de connexion enregistré.",
       connectionRouteFailed: "Impossible de modifier l’itinéraire de connexion.",
+    },
+    errors: {
+      adminRequired: "Actualisez votre session et reconnectez-vous avec les droits d’administrateur.",
+      teacherInvalid: "Sélectionnez un utilisateur actif ayant le rôle enseignant.",
+      lastAdmin: "Le dernier administrateur actif ne peut pas être supprimé.",
+      deletionFailed: "Le compte n’a pas pu être supprimé. Réessayez ou contactez l’assistance.",
+      inProgressLesson: "Cet enseignant donne actuellement un cours. Terminez-le avant de supprimer le compte.",
+      replacementRequired: "Sélectionnez un autre enseignant actif pour reprendre les données dépendantes.",
+      deletionStillRunning: "La suppression est toujours en cours. Actualisez la liste des utilisateurs dans un instant.",
+      userNotFound: "Cet utilisateur n’existe plus ou n’est déjà plus disponible.",
+      selfAdminChange: "Vous ne pouvez pas supprimer votre propre compte administrateur.",
     },
     empty: {
       teachers: "Aucun enseignant disponible.",

@@ -198,7 +198,7 @@ class AssignmentStore(
         request: VocabularyHomeworkReviewRequest,
     ): TeacherAssignmentDetailResponse {
         authentication.requireAssignmentManager()
-        teacherDetail(authentication, assignmentId)
+        assignmentQueryService.requireTeacherRecipient(authentication, assignmentId, studentSubject)
         vocabularyAssignmentIntegrationService.review(assignmentId, studentSubject, authentication.token.subject, request)
         return teacherDetail(authentication, assignmentId)
     }

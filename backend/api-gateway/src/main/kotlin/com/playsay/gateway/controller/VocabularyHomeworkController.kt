@@ -76,6 +76,7 @@ class VocabularyHomeworkController(
     @Operation(
         operationId = "reviewVocabularyHomeworkAssignment",
         summary = "Accept or return vocabulary homework awaiting teacher review",
+        description = "Reviews vocabulary homework for the exact recipient currently accessible to the assignment owner, an administrator, or the student's primary or actively delegated teacher.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     fun reviewVocabularyHomeworkAssignment(

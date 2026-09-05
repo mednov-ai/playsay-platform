@@ -2954,6 +2954,9 @@ paths:
       - Assignments
       summary: List homework assignments
       description: Lists homework assignments visible to the current teacher or administrator.
+        A non-owner teacher sees assignments containing at least one currently managed
+        recipient; counts and aggregates include only recipients accessible to that
+        teacher.
       operationId: listHomeworkAssignments
       responses:
         "200":
@@ -3428,6 +3431,9 @@ paths:
       tags:
       - Assignments
       summary: Accept or return vocabulary homework awaiting teacher review
+      description: "Reviews vocabulary homework for the exact recipient currently\
+        \ accessible to the assignment owner, an administrator, or the student's primary\
+        \ or actively delegated teacher."
       operationId: reviewVocabularyHomeworkAssignment
       parameters:
       - name: assignmentId
@@ -4083,7 +4089,8 @@ paths:
       - Assignments
       summary: Get homework assignment progress
       description: Returns recipients and current score/error progress for a homework
-        assignment.
+        assignment. A non-owner teacher receives only currently managed recipients
+        and aggregates derived from that permitted subset.
       operationId: getHomeworkAssignment
       parameters:
       - name: assignmentId
@@ -4107,7 +4114,8 @@ paths:
       - Assignments
       summary: Get a submitted homework result
       description: "Returns submitted material work to the assignment owner, an administrator,\
-        \ or an active delegate."
+        \ or a teacher who currently manages the exact student who owns the submission.\
+        \ Inaccessible submissions and drafts are not disclosed."
       operationId: getSubmittedHomeworkResult
       parameters:
       - name: assignmentId

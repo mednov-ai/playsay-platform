@@ -67,7 +67,16 @@ export function ClassroomMediaTransportProbe({
         const reports = await Promise.all(transports.map(([, transport]) => transport.getStats()));
         if (!stopped) {
           onEvidence(classifyMediaTransportReports(reports));
-          reports.forEach((report, index) => publish(transports[index][0], classifyMediaTransportReports([report]), report));
+          reports.forEach((report, index) => {
+            const role = transports[index][0];
+            const evidence = classifyMediaTransportReports([report]);
+            publish(role, evidence, report);
+            // LiveKit publisher-only mode carries both outbound and inbound RTP
+            // on one connection. Count that connection once, but inspect both flows.
+            if (role === "PUBLISHER" && !manager.subscriber) {
+              publish("SUBSCRIBER", evidence, report);
+            }
+          });
         }
       } catch {
         if (!stopped) unavailable();

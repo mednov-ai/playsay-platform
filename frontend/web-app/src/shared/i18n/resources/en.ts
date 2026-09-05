@@ -4,6 +4,33 @@ export const enChatPushNotification = {
 };
 
 export const en = {
+  routeDiagnostics: {
+    stages: {"ENTRY": "Entry", "AUTH": "Authentication", "POLICY": "Policy", "SIGNALING": "Signaling", "ICE": "ICE connection", "MEDIA": "Media reception"},
+    roles: {"NONE": "General", "PUBLISHER": "Sending", "SUBSCRIBER": "Receiving"},
+    outcomes: {"STARTED": "Started", "SUCCESS": "Success", "FAILURE": "Failed", "UNAVAILABLE": "Unavailable"},
+
+  "title": "Connection diagnostics",
+  "unknown": "Unknown",
+  "expected": "Expected route",
+  "rf": "Via Selectel → AX41",
+  "direct": "Direct to AX41",
+  "explanation": "Recent browser observations follow. A public endpoint response does not prove the internal server path. TURN is verified separately against the selected relay; observations expire after 15 seconds.",
+  "stale": "Stale",
+  "connected": "Connection observed",
+  "unavailable": "No connection",
+  "relayConfirmed": "Selectel TURN confirmed",
+  "relayUnconfirmed": "Selectel TURN unconfirmed",
+  "events": "Recent media events",
+  "secondsAgo": "{{count}} s ago",
+  "channels": {
+    "api": "Website / API",
+    "auth": "Authentication",
+    "signaling": "Signaling",
+    "collaboration": "Collaboration",
+    "publisher": "Media: sending",
+    "subscriber": "Media: receiving"
+  }
+},
   common: {
     appName: "Honey School",
     actions: {

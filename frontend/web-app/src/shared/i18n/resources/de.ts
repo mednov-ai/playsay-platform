@@ -4,6 +4,33 @@ export const deChatPushNotification = {
 };
 
 export const de = {
+  routeDiagnostics: {
+    stages: {"ENTRY": "Einstieg", "AUTH": "Anmeldung", "POLICY": "Richtlinie", "SIGNALING": "Signalisierung", "ICE": "ICE-Verbindung", "MEDIA": "Medienempfang"},
+    roles: {"NONE": "Allgemein", "PUBLISHER": "Senden", "SUBSCRIBER": "Empfangen"},
+    outcomes: {"STARTED": "Gestartet", "SUCCESS": "Erfolgreich", "FAILURE": "Fehler", "UNAVAILABLE": "Nicht verfügbar"},
+
+  "title": "Verbindungsdiagnose",
+  "unknown": "Unbekannt",
+  "expected": "Erwartete Route",
+  "rf": "Über Selectel → AX41",
+  "direct": "Direkt zu AX41",
+  "explanation": "Aktuelle Browserbeobachtungen. Die Antwort einer öffentlichen Adresse belegt nicht den internen Serverpfad. TURN wird anhand des gewählten Relays geprüft; nach 15 Sekunden sind Beobachtungen veraltet.",
+  "stale": "Veraltet",
+  "connected": "Verbindung beobachtet",
+  "unavailable": "Keine Verbindung",
+  "relayConfirmed": "Selectel TURN bestätigt",
+  "relayUnconfirmed": "Selectel TURN unbestätigt",
+  "events": "Letzte Medienereignisse",
+  "secondsAgo": "vor {{count}} s",
+  "channels": {
+    "api": "Website / API",
+    "auth": "Anmeldung",
+    "signaling": "Signalisierung",
+    "collaboration": "Zusammenarbeit",
+    "publisher": "Medien: Senden",
+    "subscriber": "Medien: Empfangen"
+  }
+},
   common: {
     appName: "Honey School",
     actions: {

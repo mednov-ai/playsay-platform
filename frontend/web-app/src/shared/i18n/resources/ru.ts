@@ -4,6 +4,33 @@ export const ruChatPushNotification = {
 };
 
 export const ru = {
+  routeDiagnostics: {
+    stages: {"ENTRY": "Вход", "AUTH": "Авторизация", "POLICY": "Политика", "SIGNALING": "Сигнализация", "ICE": "Соединение ICE", "MEDIA": "Получение медиа"},
+    roles: {"NONE": "Общее", "PUBLISHER": "Отправка", "SUBSCRIBER": "Получение"},
+    outcomes: {"STARTED": "Начато", "SUCCESS": "Успешно", "FAILURE": "Ошибка", "UNAVAILABLE": "Нет данных"},
+
+  "title": "Диагностика соединения",
+  "unknown": "Неизвестно",
+  "expected": "Ожидаемый маршрут",
+  "rf": "Через Selectel → AX41",
+  "direct": "Напрямую к AX41",
+  "explanation": "Ниже — последние наблюдения браузера. Ответ публичного адреса не доказывает внутренний путь сервера. TURN подтверждается отдельно по выбранному relay; после 15 секунд без наблюдений данные устаревают.",
+  "stale": "Устарело",
+  "connected": "Соединение наблюдается",
+  "unavailable": "Нет соединения",
+  "relayConfirmed": "Selectel TURN подтверждён",
+  "relayUnconfirmed": "Selectel TURN не подтверждён",
+  "events": "Последние события медиа",
+  "secondsAgo": "{{count}} с назад",
+  "channels": {
+    "api": "Сайт / API",
+    "auth": "Авторизация",
+    "signaling": "Сигнализация",
+    "collaboration": "Совместная работа",
+    "publisher": "Медиа: отправка",
+    "subscriber": "Медиа: получение"
+  }
+},
   common: {
     appName: "Honey School",
     actions: {

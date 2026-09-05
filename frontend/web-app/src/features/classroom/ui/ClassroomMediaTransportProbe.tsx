@@ -1,3 +1,4 @@
+import { observeConnection } from "../../../shared/routing/connectionDiagnostics";
 import { useRoomContext } from "@livekit/components-react";
 import { useEffect } from "react";
 import { classifyMediaTransportReports, receivedMediaProgress, selectedRegionalRelayMatched, type MediaTransportEvidence } from "../model/mediaTransportEvidence";
@@ -28,6 +29,7 @@ export function ClassroomMediaTransportProbe({
         regionalEndpointMatched: selectedRegionalRelayMatched(report, serverUrl),
         transportClass: evidence.transportClass.replace("-", "_").toUpperCase() as RegionalRouteDiagnosticEvent["transportClass"],
       };
+      observeConnection(role === "PUBLISHER" ? "publisher" : "subscriber", serverUrl, event.outcome === "SUCCESS", { transport: evidence.transportClass, relayMatched: event.regionalEndpointMatched });
       emit(event);
       if (role === "SUBSCRIBER") {
         emit({ ...event, stage: "MEDIA", outcome: receivedMediaProgress(report, receivedCounters) ? "SUCCESS" : "UNAVAILABLE" });
@@ -45,6 +47,8 @@ export function ClassroomMediaTransportProbe({
 
     function unavailable() {
       receivedCounters.clear();
+      observeConnection("publisher", serverUrl, false);
+      observeConnection("subscriber", serverUrl, false);
       onEvidence({ allRelayed: false, peerConnectionCount: 0, transportClass: "unknown" });
       for (const stage of ["ICE", "MEDIA"] as const) {
         emit({ attemptId, stage, outcome: "UNAVAILABLE", connectionRole: "SUBSCRIBER", regionalEndpointMatched: null, transportClass: "UNKNOWN" });
@@ -55,6 +59,7 @@ export function ClassroomMediaTransportProbe({
       if (stopped || collecting) return;
       collecting = true;
       try {
+        observeConnection("signaling", serverUrl, room.state === "connected");
         const manager = room.engine?.pcManager;
         if (!manager) {
           if (!stopped) unavailable();
@@ -89,6 +94,9 @@ export function ClassroomMediaTransportProbe({
     const intervalId = window.setInterval(() => void collect(), 5_000);
     return () => {
       stopped = true;
+      observeConnection("signaling", serverUrl, false);
+      observeConnection("publisher", serverUrl, false);
+      observeConnection("subscriber", serverUrl, false);
       window.clearInterval(intervalId);
     };
   }, [onEvidence, room, serverUrl]);

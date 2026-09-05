@@ -4,6 +4,33 @@ export const frChatPushNotification = {
 };
 
 export const fr = {
+  routeDiagnostics: {
+    stages: {"ENTRY": "Entrée", "AUTH": "Authentification", "POLICY": "Politique", "SIGNALING": "Signalisation", "ICE": "Connexion ICE", "MEDIA": "Réception média"},
+    roles: {"NONE": "Général", "PUBLISHER": "Envoi", "SUBSCRIBER": "Réception"},
+    outcomes: {"STARTED": "Démarré", "SUCCESS": "Réussi", "FAILURE": "Échec", "UNAVAILABLE": "Indisponible"},
+
+  "title": "Diagnostic de connexion",
+  "unknown": "Inconnu",
+  "expected": "Trajet attendu",
+  "rf": "Via Selectel → AX41",
+  "direct": "Direct vers AX41",
+  "explanation": "Observations récentes du navigateur. La réponse d’une adresse publique ne prouve pas le trajet interne du serveur. TURN est vérifié avec le relais sélectionné ; les observations expirent après 15 secondes.",
+  "stale": "Périmé",
+  "connected": "Connexion observée",
+  "unavailable": "Aucune connexion",
+  "relayConfirmed": "Selectel TURN confirmé",
+  "relayUnconfirmed": "Selectel TURN non confirmé",
+  "events": "Derniers événements média",
+  "secondsAgo": "il y a {{count}} s",
+  "channels": {
+    "api": "Site / API",
+    "auth": "Authentification",
+    "signaling": "Signalisation",
+    "collaboration": "Collaboration",
+    "publisher": "Média : envoi",
+    "subscriber": "Média : réception"
+  }
+},
   common: {
     appName: "Honey School",
     actions: {

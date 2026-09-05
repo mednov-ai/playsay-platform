@@ -837,16 +837,20 @@ async function drawAnnotation(page) {
   await page.waitForFunction(() => {
     return document.querySelector(".playsay-annotation-layer")?.getAttribute("data-tool") === "pen";
   }, null, { timeout: timeoutMs });
-  const surface = page.locator("[data-testid='lesson-material-surface']").first();
-  const box = await surface.boundingBox();
-  if (!box) {
-    throw new Error("Material surface is not visible for drawing.");
-  }
-  const viewport = page.viewportSize() ?? { width: 1280, height: 860 };
-  const visibleY = Math.min(Math.max(box.y + 220, box.y + 48), viewport.height - 120);
+  // After shared focus closes, document scroll may leave the image's letterbox under
+  // a page-relative click. Exercise the actual raster instead of that empty field.
+  await page.locator(`.playsay-rendered-image img[data-playsay-annotation-anchor-id='${scrollImageBlockId}']`).scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const box = await page.locator(`.playsay-annotation-layer[data-anchor-id='${scrollImageBlockId}']`).boundingBox();
+  const documentBox = await page.locator(".playsay-task-document").boundingBox();
+  if (!box || !documentBox) throw new Error("Image raster is not visible for drawing.");
+  const visibleTop = Math.max(box.y, documentBox.y);
+  const visibleBottom = Math.min(box.y + box.height, documentBox.y + documentBox.height);
+  if (visibleBottom - visibleTop < 20) throw new Error("Image raster has no usable drawing area.");
+  const visibleY = (visibleTop + visibleBottom) / 2;
   const start = { x: box.x + box.width * 0.28, y: visibleY };
-  const mid = { x: box.x + box.width * 0.42, y: visibleY + 36 };
-  const end = { x: box.x + box.width * 0.56, y: visibleY - 12 };
+  const mid = { x: box.x + box.width * 0.42, y: visibleY + Math.min(12, (visibleBottom - visibleTop) / 4) };
+  const end = { x: box.x + box.width * 0.56, y: visibleY - Math.min(12, (visibleBottom - visibleTop) / 4) };
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(mid.x, mid.y, { steps: 8 });

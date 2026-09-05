@@ -1,3 +1,4 @@
+import { observeConnection, observeSessionPolicy } from "../../../shared/routing/connectionDiagnostics";
 import { LiveKitRoom } from "@livekit/components-react";
 import { Radio } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -59,6 +60,12 @@ export function LiveLessonExperience({
   session: LessonRoomSession;
 }) {
   const { t } = useAppTranslation();
+  useEffect(() => {
+    const rtc = lessonLiveKitRoomConnectOptions(session.mediaRouting).rtcConfig;
+    observeSessionPolicy(session.serverUrl, !session.mediaRouting ? "baseline" : rtc?.iceServers?.length ? "relay" : "invalid");
+    return () => observeConnection("policy", session.serverUrl, false);
+  }, [session.serverUrl, session.mediaRouting]);
+
   const shellRef = useRef<HTMLDivElement>(null);
   const [fullscreenActive, setFullscreenActive] = useState(() => classroomFullscreenActive());
   const [fullscreenPending, setFullscreenPending] = useState(false);

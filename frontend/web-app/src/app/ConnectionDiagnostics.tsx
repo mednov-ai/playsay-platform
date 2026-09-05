@@ -6,7 +6,7 @@ import { readRegionalRouteDiagnostics } from "../shared/api/regionalRouteDiagnos
 import { authConfig } from "../shared/api/auth";
 import "./connectionDiagnostics.css";
 
-const channels: ConnectionChannel[] = ["api", "auth", "signaling", "collaboration", "publisher", "subscriber"];
+const channels: ConnectionChannel[] = ["api", "auth", "policy", "signaling", "collaboration", "publisher", "subscriber"];
 export function ConnectionDiagnostics() {
   const { t } = useAppTranslation();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -50,8 +50,10 @@ export function ConnectionDiagnostics() {
             const endpoint = observation?.endpoint ?? (channel === "auth" ? publicEndpoint(authConfig.issuer) : null);
             return <section key={channel} data-route-channel={channel} data-route-status={status}>
               <strong>{t(`routeDiagnostics.channels.${channel}`)}</strong>
-              <span>{t(`routeDiagnostics.${status}`)}</span>
+              <span>{t(`routeDiagnostics.${channel === "policy" && observation?.policy && status === "connected" ? "configured" : status}`)}</span>
               <small>{endpoint ?? t("routeDiagnostics.unknown")}{channel === "auth" && !observation ? ` · ${t("routeDiagnostics.expected")}` : ""}</small>
+              {channel === "policy" && observation?.policy ? <small>{t(`routeDiagnostics.policies.${observation.policy}`)}</small> : null}
+              {channel === "subscriber" && observation ? <small>{t(`routeDiagnostics.${!stale && observation.received ? "receiving" : "noRecentMedia"}`)}</small> : null}
               {media && observation ? <small>{observation.transport ?? t("routeDiagnostics.unknown")} · {observation.relayMatched === true && !stale && observation.state === "connected" ? t("routeDiagnostics.relayConfirmed") : t("routeDiagnostics.relayUnconfirmed")}</small> : null}
             </section>;
           })}

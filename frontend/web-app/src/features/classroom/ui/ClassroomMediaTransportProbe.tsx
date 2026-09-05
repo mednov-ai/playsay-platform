@@ -29,10 +29,11 @@ export function ClassroomMediaTransportProbe({
         regionalEndpointMatched: selectedRegionalRelayMatched(report, serverUrl),
         transportClass: evidence.transportClass.replace("-", "_").toUpperCase() as RegionalRouteDiagnosticEvent["transportClass"],
       };
-      observeConnection(role === "PUBLISHER" ? "publisher" : "subscriber", serverUrl, event.outcome === "SUCCESS", { transport: evidence.transportClass, relayMatched: event.regionalEndpointMatched });
+      const received = role === "SUBSCRIBER" ? receivedMediaProgress(report, receivedCounters) : null;
+      observeConnection(role === "PUBLISHER" ? "publisher" : "subscriber", serverUrl, event.outcome === "SUCCESS", { transport: evidence.transportClass, relayMatched: event.regionalEndpointMatched, received });
       emit(event);
       if (role === "SUBSCRIBER") {
-        emit({ ...event, stage: "MEDIA", outcome: receivedMediaProgress(report, receivedCounters) ? "SUCCESS" : "UNAVAILABLE" });
+        emit({ ...event, stage: "MEDIA", outcome: received ? "SUCCESS" : "UNAVAILABLE" });
       }
     }
 

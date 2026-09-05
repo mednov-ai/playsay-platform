@@ -5,6 +5,11 @@ export const ruChatPushNotification = {
 
 export const ru = {
   routeDiagnostics: {
+    configured: "Ответ API",
+    receiving: "Медиаданные поступают",
+    noRecentMedia: "Свежего подтверждения получения медиа нет",
+    policies: {"relay": "Требуется Selectel TURN", "baseline": "Базовый маршрут", "invalid": "Региональные настройки недействительны"},
+
     stages: {"ENTRY": "Вход", "AUTH": "Авторизация", "POLICY": "Политика", "SIGNALING": "Сигнализация", "ICE": "Соединение ICE", "MEDIA": "Получение медиа"},
     roles: {"NONE": "Общее", "PUBLISHER": "Отправка", "SUBSCRIBER": "Получение"},
     outcomes: {"STARTED": "Начато", "SUCCESS": "Успешно", "FAILURE": "Ошибка", "UNAVAILABLE": "Нет данных"},
@@ -23,6 +28,7 @@ export const ru = {
   "events": "Последние события медиа",
   "secondsAgo": "{{count}} с назад",
   "channels": {
+    "policy": "Политика сеанса",
     "api": "Сайт / API",
     "auth": "Авторизация",
     "signaling": "Сигнализация",

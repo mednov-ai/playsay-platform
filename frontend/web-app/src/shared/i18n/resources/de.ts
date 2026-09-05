@@ -5,6 +5,11 @@ export const deChatPushNotification = {
 
 export const de = {
   routeDiagnostics: {
+    configured: "API-Antwort",
+    receiving: "Mediendaten werden empfangen",
+    noRecentMedia: "Kein aktueller Nachweis des Medienempfangs",
+    policies: {"relay": "Selectel TURN erforderlich", "baseline": "Standardroute", "invalid": "Ungültige regionale Einstellungen"},
+
     stages: {"ENTRY": "Einstieg", "AUTH": "Anmeldung", "POLICY": "Richtlinie", "SIGNALING": "Signalisierung", "ICE": "ICE-Verbindung", "MEDIA": "Medienempfang"},
     roles: {"NONE": "Allgemein", "PUBLISHER": "Senden", "SUBSCRIBER": "Empfangen"},
     outcomes: {"STARTED": "Gestartet", "SUCCESS": "Erfolgreich", "FAILURE": "Fehler", "UNAVAILABLE": "Nicht verfügbar"},
@@ -23,6 +28,7 @@ export const de = {
   "events": "Letzte Medienereignisse",
   "secondsAgo": "vor {{count}} s",
   "channels": {
+    "policy": "Sitzungsrichtlinie",
     "api": "Website / API",
     "auth": "Anmeldung",
     "signaling": "Signalisierung",

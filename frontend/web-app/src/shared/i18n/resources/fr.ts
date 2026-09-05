@@ -5,6 +5,11 @@ export const frChatPushNotification = {
 
 export const fr = {
   routeDiagnostics: {
+    configured: "Réponse API",
+    receiving: "Les données média arrivent",
+    noRecentMedia: "Aucune preuve récente de réception média",
+    policies: {"relay": "Selectel TURN requis", "baseline": "Trajet standard", "invalid": "Paramètres régionaux invalides"},
+
     stages: {"ENTRY": "Entrée", "AUTH": "Authentification", "POLICY": "Politique", "SIGNALING": "Signalisation", "ICE": "Connexion ICE", "MEDIA": "Réception média"},
     roles: {"NONE": "Général", "PUBLISHER": "Envoi", "SUBSCRIBER": "Réception"},
     outcomes: {"STARTED": "Démarré", "SUCCESS": "Réussi", "FAILURE": "Échec", "UNAVAILABLE": "Indisponible"},
@@ -23,6 +28,7 @@ export const fr = {
   "events": "Derniers événements média",
   "secondsAgo": "il y a {{count}} s",
   "channels": {
+    "policy": "Politique de session",
     "api": "Site / API",
     "auth": "Authentification",
     "signaling": "Signalisation",

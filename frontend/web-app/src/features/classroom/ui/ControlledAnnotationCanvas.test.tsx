@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render } from "@testing-library/react";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
 import { emptyAnnotationContent } from "../model/annotation";
@@ -39,6 +39,22 @@ describe("ControlledAnnotationCanvas", () => {
     );
 
     expect(container.querySelector(".playsay-annotation-toolbar")).toBeNull();
+  });
+
+  it("does not edit loaded image annotations in read-only review", async () => {
+    const width = vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(600);
+    const height = vi.spyOn(HTMLImageElement.prototype, "naturalHeight", "get").mockReturnValue(1200);
+    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 600, 1200));
+    const onChange = vi.fn();
+    const { container } = render(<ControlledAnnotationCanvas answers={{}} content={emptyAnnotationContent("page-1")}
+      material={materialWithBlock("image")} onChange={onChange} readOnly />);
+    try {
+      await waitFor(() => expect(container.querySelector('.playsay-annotation-layer[data-anchor-id="image-1"]')).not.toBeNull());
+      onChange.mockClear();
+      fireEvent.pointerDown(container.querySelector('.playsay-annotation-layer')!, { clientX: 150, clientY: 300 });
+      fireEvent.pointerUp(container.querySelector('.playsay-annotation-layer')!, { clientX: 200, clientY: 350 });
+      expect(onChange).not.toHaveBeenCalled();
+    } finally { width.mockRestore(); height.mockRestore(); rect.mockRestore(); }
   });
 
   it("keeps submitted teacher results read-only", () => {

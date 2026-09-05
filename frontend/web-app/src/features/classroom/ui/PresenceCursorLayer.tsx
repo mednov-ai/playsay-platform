@@ -25,6 +25,7 @@ export function PresenceCursorLayer({
       className="playsay-presence-layer"
       aria-hidden="true"
       style={anchorBounds ? {
+        clipPath: anchorBounds.clipPath,
         bottom: "auto",
         height: `${anchorBounds.height}px`,
         left: `${anchorBounds.left}px`,

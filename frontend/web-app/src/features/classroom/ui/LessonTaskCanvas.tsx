@@ -30,6 +30,7 @@ import {
   type MaterialExerciseSync,
   type MaterialVideoSync,
 } from "../../materials";
+import { imageAnnotationGeometry, isOverAnnotationImage } from "../model/imageAnnotationGeometry";
 import { annotationElementsForPage, type AnnotationElement } from "../model/annotation";
 import type { CollaborationCursor, CollaborationParticipant } from "../hooks/useYjsWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -592,11 +593,11 @@ export function LessonTaskCanvas({
       return;
     }
 
-    const anchor = annotationAnchors.find(({ bounds }) => (
-      event.clientX >= rect.left + bounds.left &&
-      event.clientX <= rect.left + bounds.left + bounds.width &&
-      event.clientY >= rect.top + bounds.top &&
-      event.clientY <= rect.top + bounds.top + bounds.height
+    const anchor = annotationAnchors.find(({ bounds, visibleBounds = bounds }) => (
+      event.clientX >= rect.left + visibleBounds.left &&
+      event.clientX <= rect.left + visibleBounds.left + visibleBounds.width &&
+      event.clientY >= rect.top + visibleBounds.top &&
+      event.clientY <= rect.top + visibleBounds.top + visibleBounds.height
     ));
     annotationSync.updateCursor(anchor ? {
       anchorId: anchor.id,
@@ -618,11 +619,11 @@ export function LessonTaskCanvas({
     const sourceSvg = event.currentTarget.ownerSVGElement;
     if (element && !element.anchorId && surface && sourceSvg) {
       const surfaceRect = surface.getBoundingClientRect();
-      const anchor = annotationAnchors.find(({ bounds }) => (
-        event.clientX >= surfaceRect.left + bounds.left &&
-        event.clientX <= surfaceRect.left + bounds.left + bounds.width &&
-        event.clientY >= surfaceRect.top + bounds.top &&
-        event.clientY <= surfaceRect.top + bounds.top + bounds.height
+      const anchor = annotationAnchors.find(({ bounds, visibleBounds = bounds }) => (
+        event.clientX >= surfaceRect.left + visibleBounds.left &&
+        event.clientX <= surfaceRect.left + visibleBounds.left + visibleBounds.width &&
+        event.clientY >= surfaceRect.top + visibleBounds.top &&
+        event.clientY <= surfaceRect.top + visibleBounds.top + visibleBounds.height
       ));
       if (anchor && reanchorElement(event, elementId, anchor.id, sourceSvg.getBoundingClientRect(), {
         height: anchor.bounds.height,
@@ -728,7 +729,9 @@ export function LessonTaskCanvas({
               editingElementId={editingElementId}
               elements={pageAnnotationElements}
               onAddMindMapNode={addMindMapNode}
-              onBegin={beginAnnotation}
+              onBegin={(event) => {
+                if (!isOverAnnotationImage(materialSurfaceRef.current, event)) beginAnnotation(event);
+              }}
               onDeleteSelected={deleteSelectedElement}
               onDeselect={() => setSelectedElementId(null)}
               onEditText={beginTextEditing}
@@ -841,6 +844,7 @@ const scrollIntentKeys = new Set([
 export type AnnotationAnchor = {
   bounds: AnnotationLayerBounds;
   focused: boolean;
+  visibleBounds?: AnnotationLayerBounds;
   id: string;
 };
 
@@ -900,16 +904,28 @@ export function useAnnotationAnchors(
       const byId = new Map<string, AnnotationAnchor>();
       candidates.forEach((element) => {
         const id = element.dataset.playsayAnnotationAnchorId?.trim();
-        const rect = element.getBoundingClientRect();
-        if (!id || rect.width <= 0 || rect.height <= 0) return;
         const focused = Boolean(element.closest('.playsay-material-focus-stack[data-active="true"]'));
+        if (presentationMode === "image-focus" && !focused) return;
+        const style = getComputedStyle(element);
+        if (style.visibility === "hidden" || style.display === "none") return;
+        const geometry = element instanceof HTMLImageElement ? imageAnnotationGeometry(element) : null;
+        if (element instanceof HTMLImageElement && !geometry) return;
+        const rect = geometry?.bounds ?? element.getBoundingClientRect();
+        if (!id || rect.width <= 0 || rect.height <= 0) return;
+        const relativeBounds = (bounds: AnnotationLayerBounds): AnnotationLayerBounds => ({
+          ...bounds,
+          left: bounds.left - surfaceRect.left,
+          top: bounds.top - surfaceRect.top,
+        });
         const candidate = {
-          bounds: {
+          bounds: relativeBounds({
             height: rect.height,
-            left: rect.left - surfaceRect.left,
-            top: rect.top - surfaceRect.top,
+            left: rect.left,
+            top: rect.top,
             width: rect.width,
-          },
+            ...(geometry?.bounds.clipPath ? { clipPath: geometry.bounds.clipPath } : {}),
+          }),
+          ...(geometry ? { visibleBounds: relativeBounds(geometry.visibleBounds) } : {}),
           focused,
           id,
         };
@@ -923,12 +939,19 @@ export function useAnnotationAnchors(
     const mutationObserver = typeof MutationObserver === "undefined"
       ? null
       : new MutationObserver(scheduleMeasure);
-    mutationObserver?.observe(surfaceElement, { childList: true, subtree: true });
+    mutationObserver?.observe(surfaceElement, {
+      childList: true, subtree: true, attributes: true,
+      attributeFilter: ["src", "class", "data-active", "data-playsay-annotation-anchor-id"],
+    });
+    surfaceElement.addEventListener("load", scheduleMeasure, true);
+    surfaceElement.addEventListener("error", scheduleMeasure, true);
     ownerDocument.addEventListener("scroll", handleRelatedScroll, true);
     window.addEventListener("resize", scheduleMeasure);
     measure();
 
     return () => {
+      surfaceElement.removeEventListener("load", scheduleMeasure, true);
+      surfaceElement.removeEventListener("error", scheduleMeasure, true);
       ownerDocument.removeEventListener("scroll", handleRelatedScroll, true);
       window.removeEventListener("resize", scheduleMeasure);
       if (measurementFrame !== null) {
@@ -954,6 +977,11 @@ function sameAnnotationAnchors(
       anchor.bounds.height === candidate.bounds.height &&
       anchor.bounds.left === candidate.bounds.left &&
       anchor.bounds.top === candidate.bounds.top &&
-      anchor.bounds.width === candidate.bounds.width;
+      anchor.bounds.width === candidate.bounds.width &&
+      anchor.bounds.clipPath === candidate.bounds.clipPath &&
+      anchor.visibleBounds?.left === candidate.visibleBounds?.left &&
+      anchor.visibleBounds?.top === candidate.visibleBounds?.top &&
+      anchor.visibleBounds?.width === candidate.visibleBounds?.width &&
+      anchor.visibleBounds?.height === candidate.visibleBounds?.height;
   });
 }

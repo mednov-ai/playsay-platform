@@ -1,4 +1,3 @@
-import { observeHttpResponse } from "../routing/connectionDiagnostics";
 import { i18n } from "../i18n";
 
 type ProjectErrorBody = {
@@ -39,9 +38,7 @@ export async function apiErrorFromResponse(response: Response, fallbackMessage: 
 
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   try {
-    const response = await fetch(input, init);
-    observeHttpResponse(response);
-    return response;
+    return await fetch(input, init);
   } catch {
     throw new ApiError(0, "NETWORK_ERROR", i18n.t("errors.network"));
   }

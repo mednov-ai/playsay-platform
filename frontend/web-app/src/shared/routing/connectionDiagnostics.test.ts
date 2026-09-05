@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { diagnosticsShortcut, observeConnection, connectionObservations, publicEndpoint, observeSessionPolicy } from "./connectionDiagnostics";
+import { describe, expect, it, vi } from "vitest";
+import { diagnosticsShortcut, observeConnection, connectionObservations, publicEndpoint, observeSessionPolicy, installConnectionObservation } from "./connectionDiagnostics";
 
 describe("connection diagnostic boundary", () => {
   it("keeps only declared public hosts, discarding credentials and paths", () => {
@@ -32,5 +32,35 @@ describe("connection diagnostic boundary", () => {
     const input = document.createElement("input");
     input.addEventListener("keydown", (event) => expect(diagnosticsShortcut(event, false)).toBe(false));
     input.dispatchEvent(new KeyboardEvent("keydown", options));
+  });
+});
+
+describe("generated and handwritten fetch observation", () => {
+  it("preserves the exact native response and unread body while observing its public endpoint", async () => {
+    const original = window.fetch;
+    const response = new Response("private-body");
+    Object.defineProperty(response, "url", { value: "https://dev.online.honeyschool.ru/api/users/me/profile?secret=private" });
+    window.fetch = vi.fn().mockResolvedValue(response);
+    const restore = installConnectionObservation();
+    try {
+      const result = await window.fetch("https://dev.online.honeyschool.ru/api/users/me/profile");
+      expect(result).toBe(response);
+      expect(result.bodyUsed).toBe(false);
+      expect(connectionObservations().get("api")).toMatchObject({ endpoint: "dev.online.honeyschool.ru", state: "connected" });
+      expect(JSON.stringify([...connectionObservations()])).not.toContain("private");
+    } finally { restore(); window.fetch = original; }
+  });
+  it("preserves rejection identity and keeps telemetry failure separate from API connectivity", async () => {
+    const original = window.fetch;
+    const failure = new TypeError("network");
+    window.fetch = vi.fn().mockRejectedValue(failure);
+    const restore = installConnectionObservation();
+    try {
+      observeConnection("api", "https://dev.online.honeyschool.ru", true);
+      await expect(window.fetch("https://dev.online.honeyschool.ru/api/diagnostics/regional-route")).rejects.toBe(failure);
+      expect(connectionObservations().get("api")?.state).toBe("connected");
+      await expect(window.fetch("https://dev.online.honeyschool.ru/api/users/me/profile")).rejects.toBe(failure);
+      expect(connectionObservations().get("api")?.state).toBe("unavailable");
+    } finally { restore(); window.fetch = original; }
   });
 });

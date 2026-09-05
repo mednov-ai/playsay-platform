@@ -21,6 +21,7 @@ export function observeHttpResponse(response: Response) {
   try {
     const url = new URL(response.url);
     if (!publicEndpoint(url.href)) return;
+    if (url.pathname.startsWith("/api/diagnostics/")) return;
     const channel = url.pathname.startsWith("/keycloak/") ? "auth" : url.pathname.startsWith("/api/") ? "api" : null;
     if (channel) observeConnection(channel, url.origin, response.status < 500);
   } catch { /* Synthetic responses need not carry a URL. */ }
@@ -34,4 +35,29 @@ export function diagnosticsShortcut(event: KeyboardEvent, mac: boolean): boolean
 
 export function observeSessionPolicy(endpoint: string, policy: "relay" | "baseline" | "invalid") {
   observations.set("policy", { endpoint: publicEndpoint(endpoint), policy, state: policy === "invalid" ? "unavailable" : "connected", at: Date.now() });
+}
+
+// Install before authentication starts, including requests from generated clients.
+// Preserve the native Response/body and rejection; retain no request data.
+export function installConnectionObservation(): () => void {
+  const nativeFetch = window.fetch;
+  const observedFetch: typeof fetch = async (...args) => {
+    try {
+      const response = await nativeFetch.apply(window, args);
+      observeHttpResponse(response);
+      return response;
+    } catch (error) {
+      try {
+        const input = args[0];
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, window.location.origin);
+        if (publicEndpoint(url.href) && !url.pathname.startsWith("/api/diagnostics/")) {
+          const channel = url.pathname.startsWith("/keycloak/") ? "auth" : url.pathname.startsWith("/api/") ? "api" : null;
+          if (channel) observeConnection(channel, url.origin, false);
+        }
+      } catch { /* Observation must preserve the original fetch error. */ }
+      throw error;
+    }
+  };
+  window.fetch = observedFetch;
+  return () => { if (window.fetch === observedFetch) window.fetch = nativeFetch; };
 }

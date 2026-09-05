@@ -589,7 +589,7 @@ export function WelcomeLanding({
   const { t } = useAppTranslation();
   const theme = useAppTheme();
   const isBusy = status === "checking" || status === "loggingOut";
-  const rfEntryUrl = regionalEntryUrl(window.location);
+  const rfEntryUrl = typeof window === "undefined" ? null : regionalEntryUrl(window.location);
 
   return (
     <div className="playsay-welcome-scene" aria-busy={isBusy}>

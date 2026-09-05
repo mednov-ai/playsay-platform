@@ -53,10 +53,11 @@ import liquibase.integration.spring.SpringLiquibase
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=false",
-        "playsay.collaboration.websocket-url=wss://online.honey.school/collab/ws",
-        "playsay.collaboration.regional-routing.environment=prod",
+        "playsay.collaboration.websocket-url=wss://dev.online.honey.school/collab/ws",
+        "playsay.collaboration.regional-routing.environment=dev",
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=https://dev.ops.honey.school/keycloak/realms/playsay",
         "playsay.collaboration.regional-routing.mode=rf-two-hop",
-        "playsay.collaboration.regional-routing.websocket-url=wss://online.honeyschool.ru/collab/ws",
+        "playsay.collaboration.regional-routing.websocket-url=wss://dev.online.honeyschool.ru/collab/ws",
         "playsay.collaboration.token-secret=01234567890123456789012345678901",
         "playsay.collaboration.token-ttl-seconds=900",
         "playsay.collaboration.service-token=service-token-01234567890123456789",
@@ -336,13 +337,13 @@ class CollaborationDocumentControllerTest @Autowired constructor(
             student,
             classroom.lessonId,
             document.id,
-            "https://online.honeyschool.ru",
+            "https://dev.online.honeyschool.ru",
         )
 
         assertEquals(document.id, token.documentId)
         assertEquals(document.yjsDocumentId, token.yjsDocumentId)
-        assertEquals("wss://online.honey.school/collab/ws", token.websocketUrl)
-        assertEquals("wss://online.honeyschool.ru/collab/ws", regionalToken.websocketUrl)
+        assertEquals("wss://dev.online.honey.school/collab/ws", token.websocketUrl)
+        assertEquals("wss://dev.online.honeyschool.ru/collab/ws", regionalToken.websocketUrl)
         assertTrue(token.token.count { char -> char == '.' } == 2)
         assertTrue(token.expiresAt.isAfter(Instant.now()))
         val directClaims = SignedJWT.parse(token.token).jwtClaimsSet

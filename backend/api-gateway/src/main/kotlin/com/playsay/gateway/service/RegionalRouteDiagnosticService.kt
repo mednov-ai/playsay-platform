@@ -10,7 +10,8 @@ import java.util.concurrent.ConcurrentHashMap
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.utils.MetaData
 
 @Service
 class RegionalRouteDiagnosticService(
@@ -50,7 +51,7 @@ class RegionalRouteDiagnosticService(
     private fun enforceRateLimit(actorSubject: String, now: Instant) {
         windows.entries.removeIf { Duration.between(it.value.startedAt, now) >= RATE_WINDOW }
         if (!windows.containsKey(actorSubject) && windows.size >= MAX_TRACKED_ATTEMPTS) {
-            throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Regional route diagnostic capacity reached")
+            throw ProjectResponseException.localized(HttpStatus.TOO_MANY_REQUESTS, MetaData.ErrorCodes.REGIONAL_DIAGNOSTIC_RATE_LIMIT)
         }
         val allowed = windows.compute(actorSubject) { _, current ->
             if (current == null || Duration.between(current.startedAt, now) >= RATE_WINDOW) {
@@ -60,7 +61,7 @@ class RegionalRouteDiagnosticService(
             }
         }?.count ?: 1
         if (allowed > MAX_EVENTS_PER_WINDOW) {
-            throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Regional route diagnostic rate limit reached")
+            throw ProjectResponseException.localized(HttpStatus.TOO_MANY_REQUESTS, MetaData.ErrorCodes.REGIONAL_DIAGNOSTIC_RATE_LIMIT)
         }
     }
 

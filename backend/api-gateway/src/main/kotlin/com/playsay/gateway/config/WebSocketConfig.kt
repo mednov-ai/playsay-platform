@@ -52,6 +52,7 @@ internal fun websocketAllowedOriginPatterns(configured: String): List<String> =
 
 private val supportedWebSocketOriginPatterns = setOf(
     "https://dev.online.honey.school",
+    "https://dev.online.honeyschool.ru",
     "https://online.honey.school",
     "https://online.honeyschool.ru",
     "https://honeyschool.ru",

@@ -15,6 +15,8 @@ class LessonAccessOriginPolicy(
     val defaultOrigin: String = rfOrigin
     private val allowedOrigins = linkedSetOf(rfOrigin, directOrigin)
 
+    fun forRecipient(preference: String?): String = if (preference == "RF") rfOrigin else directOrigin
+
     fun resolve(requestOrigin: String): String? = normalizeRequest(requestOrigin)?.takeIf(allowedOrigins::contains)
 
     fun compactUrl(origin: String, alias: String): String = "$origin/l#$alias"

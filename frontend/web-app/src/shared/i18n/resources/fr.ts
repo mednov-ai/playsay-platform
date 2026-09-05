@@ -157,6 +157,7 @@ export const fr = {
   welcome: {
     logoLinkAria: "Ouvrir le site principal Honey School",
     returnToSite: "Retour au site",
+    connectViaRf: "Se connecter via la Russie",
   },
   chat: {
     retry: "Réessayer",
@@ -260,6 +261,7 @@ export const fr = {
       name: "Nom",
       language: "Langue",
       country: "Pays",
+      connectionRoute: "Connexion au cours",
       birthDate: "Date de naissance",
       timezone: "Fuseau horaire",
       learningGoal: "Objectif d’apprentissage",
@@ -267,6 +269,11 @@ export const fr = {
     country: {
       unspecified: "Non indiqué",
       russia: "Russie",
+    },
+    connectionRoute: {
+      auto: "Automatique",
+      rf: "Via la Russie",
+      hint: "Ce réglage s’applique lors de la prochaine entrée dans un cours.",
     },
     status: {
       checkingSession: "Vérification de la session",
@@ -1793,6 +1800,12 @@ export const fr = {
     },
   },
   userManagement: {
+    connectionRoute: {
+      label: "Itinéraire du cours",
+      auto: "Automatique",
+      rf: "Via la Russie",
+      aria: "Itinéraire de connexion pour {{name}}",
+    },
     translationPermission: {
       label: "Traduction vocale",
       hint: "Afficher la commande de traduction à l’élève et à l’enseignant pendant les cours individuels.",
@@ -1874,6 +1887,8 @@ export const fr = {
       delegationCreated: "Délégation créée.",
       translationPermissionSaved: "Paramètre de traduction vocale enregistré.",
       translationPermissionFailed: "Le paramètre de traduction vocale n’a pas pu être modifié.",
+      connectionRouteSaved: "Itinéraire de connexion enregistré.",
+      connectionRouteFailed: "Impossible de modifier l’itinéraire de connexion.",
     },
     empty: {
       teachers: "Aucun enseignant disponible.",

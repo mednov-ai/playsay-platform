@@ -157,6 +157,7 @@ export const ru = {
   welcome: {
     logoLinkAria: "Открыть основной сайт Honey School",
     returnToSite: "Вернуться на сайт",
+    connectViaRf: "Подключиться через РФ",
   },
   chat: {
     retry: "Повторить",
@@ -260,6 +261,7 @@ export const ru = {
       name: "Имя",
       language: "Язык",
       country: "Страна",
+      connectionRoute: "Подключение к уроку",
       birthDate: "Дата рождения",
       timezone: "Часовой пояс",
       learningGoal: "Цель обучения",
@@ -267,6 +269,11 @@ export const ru = {
     country: {
       unspecified: "Не указана",
       russia: "Россия",
+    },
+    connectionRoute: {
+      auto: "Автоматически",
+      rf: "Через РФ",
+      hint: "Настройка применяется при следующем входе в урок.",
     },
     status: {
       checkingSession: "Проверяем сессию",
@@ -1825,6 +1832,12 @@ export const ru = {
     },
   },
   userManagement: {
+    connectionRoute: {
+      label: "Маршрут урока",
+      auto: "Автоматически",
+      rf: "Через РФ",
+      aria: "Маршрут подключения для {{name}}",
+    },
     translationPermission: {
       label: "Голосовой перевод",
       hint: "Показывать ученику и преподавателю кнопку перевода на индивидуальном уроке.",
@@ -1906,6 +1919,8 @@ export const ru = {
       delegationCreated: "Делегирование создано.",
       translationPermissionSaved: "Настройка голосового перевода сохранена.",
       translationPermissionFailed: "Не удалось изменить настройку голосового перевода.",
+      connectionRouteSaved: "Маршрут подключения сохранён.",
+      connectionRouteFailed: "Не удалось изменить маршрут подключения.",
     },
     empty: {
       teachers: "Нет доступных преподавателей.",

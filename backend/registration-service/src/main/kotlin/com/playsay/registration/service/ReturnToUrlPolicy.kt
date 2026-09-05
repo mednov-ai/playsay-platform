@@ -23,6 +23,8 @@ class ReturnToUrlPolicy {
         val publicHosts = setOf(
             "dev.key.honey.school",
             "dev.online.honey.school",
+            "dev.key.honeyschool.ru",
+            "dev.online.honeyschool.ru",
             "key.honey.school",
             "online.honey.school",
             "key.honeyschool.ru",

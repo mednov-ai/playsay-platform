@@ -50,6 +50,7 @@ class RegionalMediaRoutingBindingTest {
         .withBean(MeterRegistry::class.java, Supplier { SimpleMeterRegistry() })
         .withUserConfiguration(RegionalMediaRoutingService::class.java)
         .withPropertyValues(
+            "PLAYSAY_AUTH_ISSUER_URI=https://${if (environment == "dev") "dev." else ""}ops.honey.school/keycloak/realms/playsay",
             "PLAYSAY_REGIONAL_RELAY_ENVIRONMENT=$environment",
             "PLAYSAY_REGIONAL_RELAY_MODE=off",
             "PLAYSAY_REGIONAL_SIGNALING_MODE=$signaling",
@@ -89,6 +90,31 @@ class RegionalMediaRoutingBindingTest {
             assertNull(context.getBean(RegionalMediaRoutingService::class.java)
                 .selectionFor("https://online.honeyschool.ru"))
         }
+    }
+
+    @Test
+    fun `dev yaml uses its own issuer signaling and relay endpoints`() {
+        runner("rf-two-hop", "rf-turn-relay", "dev").withPropertyValues(
+            "PLAYSAY_REGIONAL_RELAY_SIGNALING_URL=wss://dev.online.honeyschool.ru/livekit",
+        ).run { context ->
+            assertNull(context.startupFailure)
+            val service = context.getBean(RegionalMediaRoutingService::class.java)
+            val selected = assertNotNull(service.selectionFor("https://dev.online.honeyschool.ru"))
+            assertEquals("wss://dev.online.honeyschool.ru/livekit", selected.serverUrl)
+            assertEquals(
+                "turn:dev.turn.honeyschool.ru:3479?transport=udp",
+                assertNotNull(selected.mediaRouting).iceServers.single().urls.first(),
+            )
+            assertNull(service.selectionFor("https://online.honeyschool.ru"))
+        }
+    }
+
+    @Test
+    fun `dev yaml rejects production issuer even with dev endpoints`() {
+        runner("rf-two-hop", "rf-turn-relay", "dev").withPropertyValues(
+            "PLAYSAY_REGIONAL_RELAY_SIGNALING_URL=wss://dev.online.honeyschool.ru/livekit",
+            "PLAYSAY_AUTH_ISSUER_URI=https://ops.honey.school/keycloak/realms/playsay",
+        ).run { context -> assertNotNull(context.startupFailure) }
     }
 
     @Test

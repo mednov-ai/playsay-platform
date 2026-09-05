@@ -77,6 +77,7 @@ class UserProfileControllerTest @Autowired constructor(
         assertEquals("Student One", initial.displayName)
         assertNull(initial.locale)
         assertEquals("RU", initial.countryCode)
+        assertEquals(ConnectionRoutePreference.AUTO, initial.connectionRoutePreference)
         assertFalse(initial.lessonTranslationAllowed)
 
         val updated = controller.update(
@@ -87,6 +88,7 @@ class UserProfileControllerTest @Autowired constructor(
                 countryCode = " ru ",
                 timezone = "Europe/Moscow",
                 learningGoal = "Practice classroom speaking.",
+                connectionRoutePreference = ConnectionRoutePreference.RF,
                 birthDate = LocalDate.parse("2012-04-03"),
             ),
         )
@@ -96,6 +98,7 @@ class UserProfileControllerTest @Autowired constructor(
         assertEquals("RU", updated.countryCode)
         assertEquals("Europe/Moscow", updated.timezone)
         assertEquals("Practice classroom speaking.", updated.learningGoal)
+        assertEquals(ConnectionRoutePreference.RF, updated.connectionRoutePreference)
         assertEquals(LocalDate.parse("2012-04-03"), updated.birthDate)
         assertEquals(listOf("STUDENT"), updated.roles)
     }
@@ -205,6 +208,43 @@ class UserProfileControllerTest @Autowired constructor(
         assertEquals("Mia", created.name)
         assertEquals("Mia", created.displayName)
         assertEquals(true, created.managedByTeacher)
+    }
+
+    @Test
+    fun `primary teacher updates managed student connection route`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        controller.createManagedStudent(
+            teacher,
+            ManagedStudentRequest(username = "young.learner", firstName = "Mia"),
+        )
+
+        val updated = controller.updateStudentConnectionRoutePreference(
+            teacher,
+            "managed-student-1",
+            UpdateConnectionRoutePreferenceRequest(ConnectionRoutePreference.RF),
+        )
+
+        assertEquals(ConnectionRoutePreference.RF, updated.connectionRoutePreference)
+    }
+
+    @Test
+    fun `unrelated teacher cannot update student connection route`() {
+        val owner = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        controller.createManagedStudent(
+            owner,
+            ManagedStudentRequest(username = "young.learner", firstName = "Mia"),
+        )
+
+        val error = assertFailsWith<ResponseStatusException> {
+            controller.updateStudentConnectionRoutePreference(
+                authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER"),
+                "managed-student-1",
+                UpdateConnectionRoutePreferenceRequest(ConnectionRoutePreference.RF),
+            )
+        }
+
+        assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
+        assertEquals(ConnectionRoutePreference.AUTO, controller.listStudents(owner).single().connectionRoutePreference)
     }
 
     @Test

@@ -30,7 +30,7 @@ class RegionalCollaborationRoutingServiceTest {
     }
 
     @Test
-    fun `enabled routing fails closed outside production`() {
+    fun `dev rejects production collaboration endpoint`() {
         assertFailsWith<IllegalArgumentException> {
             enabledService(environment = "dev", directWebsocketUrl = "wss://dev.online.honey.school/collab/ws")
                 .validateConfiguration()
@@ -62,10 +62,11 @@ class RegionalCollaborationRoutingServiceTest {
 
     @Test
     fun `local and dev direct collaboration urls remain valid while routing is off`() {
-        service(directWebsocketUrl = "/collab/ws").validateConfiguration()
+        service(directWebsocketUrl = "/collab/ws", regionalWebsocketUrl = "").validateConfiguration()
         service(
             directWebsocketUrl = "wss://dev.online.honey.school/collab/ws",
             environment = "dev",
+            regionalWebsocketUrl = "",
         ).validateConfiguration()
     }
 
@@ -113,6 +114,8 @@ class RegionalCollaborationRoutingServiceTest {
         mode,
         regionalWebsocketUrl,
         meterRegistry,
+        if (environment == "dev") "https://dev.ops.honey.school/keycloak/realms/playsay"
+        else "https://ops.honey.school/keycloak/realms/playsay",
     )
 
     companion object {

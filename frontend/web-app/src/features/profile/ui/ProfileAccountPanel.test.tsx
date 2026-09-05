@@ -19,6 +19,7 @@ describe("ProfileAccountPanel", () => {
         displayName: "Teacher One",
         locale: "ru",
         countryCode: "RU",
+        connectionRoutePreference: "RF",
         birthDate: "1990-01-02",
         timezone: "Europe/Moscow",
         learningGoal: null,
@@ -45,6 +46,8 @@ describe("ProfileAccountPanel", () => {
 
     expect(markup).toContain("Страна");
     expect(markup).toContain("Россия");
+    expect(markup).toContain("Подключение к уроку");
+    expect(markup).toContain("Через РФ");
     expect(markup).toContain("Дата рождения");
     expect(markup).toContain("Настройки аккаунта");
     expect(markup).toContain("В рабочую область");

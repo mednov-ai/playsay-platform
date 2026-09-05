@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-09-05-001-add-connection-route-preference" author="honey-school">
+        <addColumn tableName="app_user">
+            <column name="connection_route_preference" type="varchar(8)" defaultValue="AUTO">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>
+            ALTER TABLE app_user
+            ADD CONSTRAINT chk_app_user_connection_route_preference
+            CHECK (connection_route_preference IN ('AUTO', 'RF'))
+        </sql>
+    </changeSet>
+</databaseChangeLog>

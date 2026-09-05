@@ -5,12 +5,13 @@ import { ClassroomMediaTransportProbe } from "./ClassroomMediaTransportProbe";
 
 const state = vi.hoisted(() => ({ room: { engine: { pcManager: undefined as unknown } } }));
 vi.mock("@livekit/components-react", () => ({ useRoomContext: () => state.room }));
+vi.mock("../../../shared/api/regionalRouteDiagnostics", () => ({ reportRegionalRouteDiagnostic: vi.fn() }));
 afterEach(() => { cleanup(); vi.useRealTimers(); state.room.engine.pcManager = undefined; });
 
 describe("classroom media transport probe", () => {
   it("clears evidence when the connection manager is absent", async () => {
     const onEvidence = vi.fn();
-    render(<ClassroomMediaTransportProbe onEvidence={onEvidence} />);
+    render(<ClassroomMediaTransportProbe onEvidence={onEvidence} serverUrl="wss://dev.livekit.honeyschool.ru" />);
     expect(onEvidence).toHaveBeenCalledWith({ allRelayed: false, peerConnectionCount: 0, transportClass: "unknown" });
   });
 
@@ -20,7 +21,7 @@ describe("classroom media transport probe", () => {
     const getStats = vi.fn(() => new Promise<RTCStatsReport>((resolve) => { resolveStats = resolve; }));
     state.room.engine.pcManager = { publisher: { getStats } };
     const onEvidence = vi.fn();
-    const view = render(<ClassroomMediaTransportProbe onEvidence={onEvidence} />);
+    const view = render(<ClassroomMediaTransportProbe onEvidence={onEvidence} serverUrl="wss://dev.livekit.honeyschool.ru" />);
     await act(async () => { vi.advanceTimersByTime(15_000); });
     expect(getStats).toHaveBeenCalledTimes(1);
     view.unmount();

@@ -157,6 +157,7 @@ export const en = {
   welcome: {
     logoLinkAria: "Open the main Honey School website",
     returnToSite: "Back to website",
+    connectViaRf: "Connect via Russia",
   },
   chat: {
     retry: "Retry",
@@ -260,6 +261,7 @@ export const en = {
       name: "Name",
       language: "Language",
       country: "Country",
+      connectionRoute: "Lesson connection",
       birthDate: "Date of birth",
       timezone: "Time zone",
       learningGoal: "Learning goal",
@@ -267,6 +269,11 @@ export const en = {
     country: {
       unspecified: "Not specified",
       russia: "Russia",
+    },
+    connectionRoute: {
+      auto: "Automatic",
+      rf: "Via Russia",
+      hint: "This setting applies the next time you enter a lesson.",
     },
     status: {
       checkingSession: "Checking session",
@@ -1793,6 +1800,12 @@ export const en = {
     },
   },
   userManagement: {
+    connectionRoute: {
+      label: "Lesson route",
+      auto: "Automatic",
+      rf: "Via Russia",
+      aria: "Connection route for {{name}}",
+    },
     translationPermission: {
       label: "Voice translation",
       hint: "Show the translation control to the student and teacher in individual lessons.",
@@ -1874,6 +1887,8 @@ export const en = {
       delegationCreated: "Delegation created.",
       translationPermissionSaved: "Voice translation setting saved.",
       translationPermissionFailed: "The voice translation setting could not be changed.",
+      connectionRouteSaved: "Connection route saved.",
+      connectionRouteFailed: "The connection route could not be changed.",
     },
     empty: {
       teachers: "No teachers are available.",

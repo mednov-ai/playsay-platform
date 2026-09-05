@@ -7,6 +7,64 @@
  */
 export interface JsonNode {}
 
+export type UpdateConnectionRoutePreferenceRequestConnectionRoutePreference = typeof UpdateConnectionRoutePreferenceRequestConnectionRoutePreference[keyof typeof UpdateConnectionRoutePreferenceRequestConnectionRoutePreference];
+
+
+export const UpdateConnectionRoutePreferenceRequestConnectionRoutePreference = {
+  AUTO: 'AUTO',
+  RF: 'RF',
+} as const;
+
+export interface UpdateConnectionRoutePreferenceRequest {
+  connectionRoutePreference: UpdateConnectionRoutePreferenceRequestConnectionRoutePreference;
+}
+
+export type UserProfileResponseConnectionRoutePreference = typeof UserProfileResponseConnectionRoutePreference[keyof typeof UserProfileResponseConnectionRoutePreference];
+
+
+export const UserProfileResponseConnectionRoutePreference = {
+  AUTO: 'AUTO',
+  RF: 'RF',
+} as const;
+
+export interface UserProfileResponse {
+  subject: string;
+  /** @nullable */
+  username?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  name?: string | null;
+  roles: string[];
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  locale?: string | null;
+  /** @nullable */
+  countryCode?: string | null;
+  /** @nullable */
+  timezone?: string | null;
+  /** @nullable */
+  learningGoal?: string | null;
+  connectionRoutePreference: UserProfileResponseConnectionRoutePreference;
+  updatedAt: string;
+  managedByTeacher: boolean;
+  /** @nullable */
+  birthDate?: string | null;
+  readonly lessonTranslationAllowed: boolean;
+}
+
+/**
+ * @nullable
+ */
+export type UpdateUserProfileRequestConnectionRoutePreference = typeof UpdateUserProfileRequestConnectionRoutePreference[keyof typeof UpdateUserProfileRequestConnectionRoutePreference] | null;
+
+
+export const UpdateUserProfileRequestConnectionRoutePreference = {
+  AUTO: 'AUTO',
+  RF: 'RF',
+} as const;
+
 export interface UpdateUserProfileRequest {
   /**
      * @maxLength 120
@@ -35,33 +93,9 @@ export interface UpdateUserProfileRequest {
      */
   learningGoal?: string | null;
   /** @nullable */
-  birthDate?: string | null;
-}
-
-export interface UserProfileResponse {
-  subject: string;
-  /** @nullable */
-  username?: string | null;
-  /** @nullable */
-  email?: string | null;
-  /** @nullable */
-  name?: string | null;
-  roles: string[];
-  /** @nullable */
-  displayName?: string | null;
-  /** @nullable */
-  locale?: string | null;
-  /** @nullable */
-  countryCode?: string | null;
-  /** @nullable */
-  timezone?: string | null;
-  /** @nullable */
-  learningGoal?: string | null;
-  updatedAt: string;
-  managedByTeacher: boolean;
+  connectionRoutePreference?: UpdateUserProfileRequestConnectionRoutePreference;
   /** @nullable */
   birthDate?: string | null;
-  readonly lessonTranslationAllowed: boolean;
 }
 
 export interface UpdateStudentLessonTranslationPermissionRequest {
@@ -72,6 +106,14 @@ export interface TeacherDirectoryEntry {
   subject: string;
   displayName: string;
 }
+
+export type UserManagementUserConnectionRoutePreference = typeof UserManagementUserConnectionRoutePreference[keyof typeof UserManagementUserConnectionRoutePreference];
+
+
+export const UserManagementUserConnectionRoutePreference = {
+  AUTO: 'AUTO',
+  RF: 'RF',
+} as const;
 
 export interface UserManagementUser {
   id: string;
@@ -87,6 +129,7 @@ export interface UserManagementUser {
   primaryTeacher?: TeacherDirectoryEntry | null;
   activeDelegates: TeacherDirectoryEntry[];
   readonly lessonTranslationAllowed: boolean;
+  connectionRoutePreference: UserManagementUserConnectionRoutePreference;
 }
 
 export interface TeacherStudentResponse {
@@ -1546,6 +1589,58 @@ export interface VocabularyAssignmentProgressUpdateRequest {
   updatedAt: string;
 }
 
+export type RegionalRouteDiagnosticEventRequestStage = typeof RegionalRouteDiagnosticEventRequestStage[keyof typeof RegionalRouteDiagnosticEventRequestStage];
+
+
+export const RegionalRouteDiagnosticEventRequestStage = {
+  ENTRY: 'ENTRY',
+  AUTH: 'AUTH',
+  POLICY: 'POLICY',
+  SIGNALING: 'SIGNALING',
+  ICE: 'ICE',
+  MEDIA: 'MEDIA',
+} as const;
+
+export type RegionalRouteDiagnosticEventRequestOutcome = typeof RegionalRouteDiagnosticEventRequestOutcome[keyof typeof RegionalRouteDiagnosticEventRequestOutcome];
+
+
+export const RegionalRouteDiagnosticEventRequestOutcome = {
+  STARTED: 'STARTED',
+  SUCCESS: 'SUCCESS',
+  FAILURE: 'FAILURE',
+  UNAVAILABLE: 'UNAVAILABLE',
+} as const;
+
+export type RegionalRouteDiagnosticEventRequestConnectionRole = typeof RegionalRouteDiagnosticEventRequestConnectionRole[keyof typeof RegionalRouteDiagnosticEventRequestConnectionRole];
+
+
+export const RegionalRouteDiagnosticEventRequestConnectionRole = {
+  PUBLISHER: 'PUBLISHER',
+  SUBSCRIBER: 'SUBSCRIBER',
+  NONE: 'NONE',
+} as const;
+
+export type RegionalRouteDiagnosticEventRequestTransportClass = typeof RegionalRouteDiagnosticEventRequestTransportClass[keyof typeof RegionalRouteDiagnosticEventRequestTransportClass];
+
+
+export const RegionalRouteDiagnosticEventRequestTransportClass = {
+  DIRECT: 'DIRECT',
+  TURN_UDP: 'TURN_UDP',
+  TURN_TCP: 'TURN_TCP',
+  TURN_TLS: 'TURN_TLS',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+
+export interface RegionalRouteDiagnosticEventRequest {
+  attemptId: string;
+  stage: RegionalRouteDiagnosticEventRequestStage;
+  outcome: RegionalRouteDiagnosticEventRequestOutcome;
+  connectionRole: RegionalRouteDiagnosticEventRequestConnectionRole;
+  /** @nullable */
+  regionalEndpointMatched?: boolean | null;
+  transportClass: RegionalRouteDiagnosticEventRequestTransportClass;
+}
+
 export interface CreateChatConversationRequest {
   /** @minLength 1 */
   participantSubject: string;
@@ -2232,6 +2327,63 @@ export const replaceWorksheetImportReview = async (sessionId: string,
 
   const data: replaceWorksheetImportReviewResponse['data'] = body !== null ? body : ''
   return { data, status: res.status, headers: res.headers } as replaceWorksheetImportReviewResponse
+}
+
+
+
+export type updateStudentConnectionRoutePreferenceResponse200 = {
+  data: UserProfileResponse
+  status: 200
+}
+
+export type updateStudentConnectionRoutePreferenceResponse401 = {
+  data: void
+  status: 401
+}
+
+export type updateStudentConnectionRoutePreferenceResponse404 = {
+  data: void
+  status: 404
+}
+
+export type updateStudentConnectionRoutePreferenceResponseSuccess = (updateStudentConnectionRoutePreferenceResponse200) & {
+  headers: Headers;
+};
+export type updateStudentConnectionRoutePreferenceResponseError = (updateStudentConnectionRoutePreferenceResponse401 | updateStudentConnectionRoutePreferenceResponse404) & {
+  headers: Headers;
+};
+
+export type updateStudentConnectionRoutePreferenceResponse = (updateStudentConnectionRoutePreferenceResponseSuccess | updateStudentConnectionRoutePreferenceResponseError)
+
+export const getUpdateStudentConnectionRoutePreferenceUrl = (subject: string,) => {
+
+
+
+
+  return `/api/users/students/${subject}/connection-route`
+}
+
+/**
+ * Updates AUTO/RF routing for a student visible to the current teacher or administrator.
+ * @summary Update a student's connection route preference
+ */
+export const updateStudentConnectionRoutePreference = async (subject: string,
+    updateConnectionRoutePreferenceRequest: UpdateConnectionRoutePreferenceRequest, options?: RequestInit): Promise<updateStudentConnectionRoutePreferenceResponse> => {
+
+  const res = await fetch(getUpdateStudentConnectionRoutePreferenceUrl(subject),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateConnectionRoutePreferenceRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateStudentConnectionRoutePreferenceResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateStudentConnectionRoutePreferenceResponse
 }
 
 
@@ -6970,6 +7122,49 @@ export const updateProgress = async (assignmentId: string,
 
   const data: updateProgressResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as updateProgressResponse
+}
+
+
+
+export type recordRegionalRouteDiagnosticResponse204 = {
+  data: void
+  status: 204
+}
+
+export type recordRegionalRouteDiagnosticResponseSuccess = (recordRegionalRouteDiagnosticResponse204) & {
+  headers: Headers;
+};
+;
+
+export type recordRegionalRouteDiagnosticResponse = (recordRegionalRouteDiagnosticResponseSuccess)
+
+export const getRecordRegionalRouteDiagnosticUrl = () => {
+
+
+
+
+  return `/api/diagnostics/regional-route`
+}
+
+/**
+ * @summary Record a privacy-safe regional route diagnostic event
+ */
+export const recordRegionalRouteDiagnostic = async (regionalRouteDiagnosticEventRequest: RegionalRouteDiagnosticEventRequest, options?: RequestInit): Promise<recordRegionalRouteDiagnosticResponse> => {
+
+  const res = await fetch(getRecordRegionalRouteDiagnosticUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(regionalRouteDiagnosticEventRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: recordRegionalRouteDiagnosticResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as recordRegionalRouteDiagnosticResponse
 }
 
 

@@ -38,6 +38,39 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/JsonNode"
+  /users/students/{subject}/connection-route:
+    put:
+      tags:
+      - Users
+      summary: Update a student's connection route preference
+      description: Updates AUTO/RF routing for a student visible to the current teacher
+        or administrator.
+      operationId: updateStudentConnectionRoutePreference
+      parameters:
+      - name: subject
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConnectionRoutePreferenceRequest"
+        required: true
+      responses:
+        "200":
+          description: Updated student profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "404":
+          description: Student is not visible to the current user
+      security:
+      - bearerAuth: []
   /users/me/profile:
     get:
       tags:
@@ -2644,6 +2677,23 @@ paths:
       responses:
         "204":
           description: No Content
+  /diagnostics/regional-route:
+    post:
+      tags:
+      - Diagnostics
+      summary: Record a privacy-safe regional route diagnostic event
+      operationId: recordRegionalRouteDiagnostic
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegionalRouteDiagnosticEventRequest"
+        required: true
+      responses:
+        "204":
+          description: Diagnostic event recorded
+      security:
+      - bearerAuth: []
   /courses:
     get:
       tags:
@@ -4292,40 +4342,16 @@ paths:
 components:
   schemas:
     JsonNode: {}
-    UpdateUserProfileRequest:
+    UpdateConnectionRoutePreferenceRequest:
       type: object
       properties:
-        displayName:
-          type:
-          - string
-          - "null"
-          maxLength: 120
-        locale:
-          type:
-          - string
-          - "null"
-          maxLength: 16
-        countryCode:
-          type:
-          - string
-          - "null"
-          description: ISO-3166 alpha-2 country code.
-          maxLength: 2
-        timezone:
-          type:
-          - string
-          - "null"
-          maxLength: 64
-        learningGoal:
-          type:
-          - string
-          - "null"
-          maxLength: 500
-        birthDate:
-          type:
-          - string
-          - "null"
-          format: date
+        connectionRoutePreference:
+          type: string
+          enum:
+          - AUTO
+          - RF
+      required:
+      - connectionRoutePreference
     UserProfileResponse:
       type: object
       properties:
@@ -4367,6 +4393,11 @@ components:
           type:
           - string
           - "null"
+        connectionRoutePreference:
+          type: string
+          enum:
+          - AUTO
+          - RF
         updatedAt:
           type: string
           format: date-time
@@ -4381,11 +4412,53 @@ components:
           type: boolean
           readOnly: true
       required:
+      - connectionRoutePreference
       - lessonTranslationAllowed
       - managedByTeacher
       - roles
       - subject
       - updatedAt
+    UpdateUserProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type:
+          - string
+          - "null"
+          maxLength: 120
+        locale:
+          type:
+          - string
+          - "null"
+          maxLength: 16
+        countryCode:
+          type:
+          - string
+          - "null"
+          description: ISO-3166 alpha-2 country code.
+          maxLength: 2
+        timezone:
+          type:
+          - string
+          - "null"
+          maxLength: 64
+        learningGoal:
+          type:
+          - string
+          - "null"
+          maxLength: 500
+        connectionRoutePreference:
+          type:
+          - string
+          - "null"
+          enum:
+          - AUTO
+          - RF
+        birthDate:
+          type:
+          - string
+          - "null"
+          format: date
     UpdateStudentLessonTranslationPermissionRequest:
       type: object
       properties:
@@ -4450,8 +4523,14 @@ components:
         lessonTranslationAllowed:
           type: boolean
           readOnly: true
+        connectionRoutePreference:
+          type: string
+          enum:
+          - AUTO
+          - RF
       required:
       - activeDelegates
+      - connectionRoutePreference
       - id
       - lessonTranslationAllowed
       - roles
@@ -7092,6 +7171,52 @@ components:
       - sessionId
       - state
       - updatedAt
+    RegionalRouteDiagnosticEventRequest:
+      type: object
+      properties:
+        attemptId:
+          type: string
+          format: uuid
+        stage:
+          type: string
+          enum:
+          - ENTRY
+          - AUTH
+          - POLICY
+          - SIGNALING
+          - ICE
+          - MEDIA
+        outcome:
+          type: string
+          enum:
+          - STARTED
+          - SUCCESS
+          - FAILURE
+          - UNAVAILABLE
+        connectionRole:
+          type: string
+          enum:
+          - PUBLISHER
+          - SUBSCRIBER
+          - NONE
+        regionalEndpointMatched:
+          type:
+          - boolean
+          - "null"
+        transportClass:
+          type: string
+          enum:
+          - DIRECT
+          - TURN_UDP
+          - TURN_TCP
+          - TURN_TLS
+          - UNKNOWN
+      required:
+      - attemptId
+      - connectionRole
+      - outcome
+      - stage
+      - transportClass
     CreateChatConversationRequest:
       type: object
       properties:

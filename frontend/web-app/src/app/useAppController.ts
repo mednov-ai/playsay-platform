@@ -58,6 +58,7 @@ import { useMaterialActions } from "./controller/useMaterialActions";
 import { useProfileActions } from "./controller/useProfileActions";
 import { useScheduleActions } from "./controller/useScheduleActions";
 import { useAppShellUiStore } from "./model/useAppShellUiStore";
+import { regionalEntryUrl } from "../shared/routing/regionalEntry";
 
 export function useAppController(): AppShellProps {
   const { i18n, t } = useAppTranslation();
@@ -127,6 +128,13 @@ export function useAppController(): AppShellProps {
           fetchScheduledLessons(),
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
         ]);
+        const preferredRfEntry = currentAppProfile.connectionRoutePreference === "RF"
+          ? regionalEntryUrl(window.location)
+          : null;
+        if (!cancelled && preferredRfEntry) {
+          window.location.replace(preferredRfEntry);
+          return;
+        }
         if (!cancelled) {
           let authenticatedAppProfile = currentAppProfile;
           const languageResolution = resolveAuthenticatedLanguage({

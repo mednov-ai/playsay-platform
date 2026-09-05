@@ -23,6 +23,9 @@ describe("keyboard auth helpers", () => {
     expect(defaultAuthIssuer("dev.key.honey.school")).toBe(
       "https://dev.ops.honey.school/keycloak/realms/playsay",
     );
+    expect(defaultAuthIssuer("dev.key.honeyschool.ru")).toBe(
+      "https://dev.ops.honey.school/keycloak/realms/playsay",
+    );
   });
 
   it("builds a PKCE authorization URL for key.play-and-say.ru", () => {

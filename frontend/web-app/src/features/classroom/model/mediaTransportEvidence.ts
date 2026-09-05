@@ -27,6 +27,33 @@ export function classifyMediaTransportReports(reports: RTCStatsReport[]): MediaT
 }
 
 export function classifySelectedTransport(report: RTCStatsReport): MediaTransportClass {
+  const localCandidate = selectedLocalCandidate(report);
+  if (!localCandidate) return "unknown";
+  if (localCandidate.candidateType !== "relay") return "direct";
+
+  const relayProtocol = String(localCandidate.relayProtocol ?? "").toLowerCase();
+  const protocol = String(localCandidate.protocol ?? "").toLowerCase();
+  const candidateUrl = String(localCandidate.url ?? "").toLowerCase();
+  if (relayProtocol === "tls" || candidateUrl.startsWith("turns:")) return "turn-tls";
+  if (relayProtocol === "tcp" || protocol === "tcp") return "turn-tcp";
+  if (relayProtocol === "udp" || protocol === "udp") return "turn-udp";
+  return "unknown";
+}
+
+export function selectedRegionalRelayMatched(report: RTCStatsReport, serverUrl: string): boolean | null {
+  const candidate = selectedLocalCandidate(report);
+  if (!candidate) return null;
+  if (candidate.candidateType !== "relay") return false;
+  if (!candidate.url) return null;
+  const expected = serverUrl === "wss://dev.online.honeyschool.ru/livekit"
+    ? ["turn:dev.turn.honeyschool.ru:3479?transport=udp", "turn:dev.turn.honeyschool.ru:3479?transport=tcp", "turns:dev.turn.honeyschool.ru:5350?transport=tcp"]
+    : serverUrl === "wss://online.honeyschool.ru/livekit"
+      ? ["turn:turn.honeyschool.ru:3478?transport=udp", "turn:turn.honeyschool.ru:3478?transport=tcp", "turns:turn.honeyschool.ru:5349?transport=tcp"]
+      : [];
+  return expected.includes(candidate.url.toLowerCase());
+}
+
+function selectedLocalCandidate(report: RTCStatsReport): CandidateStats | undefined {
   const stats = new Map<string, RTCStats>();
   let selectedPairId: string | undefined;
   let selectedPair: RTCIceCandidatePairStats | undefined;
@@ -46,16 +73,22 @@ export function classifySelectedTransport(report: RTCStatsReport): MediaTranspor
   });
 
   const pair = (selectedPairId ? stats.get(selectedPairId) : selectedPair) as RTCIceCandidatePairStats | undefined;
-  if (!pair?.localCandidateId) return "unknown";
+  if (!pair?.localCandidateId) return undefined;
   const localCandidate = stats.get(pair.localCandidateId) as CandidateStats | undefined;
-  if (!localCandidate) return "unknown";
-  if (localCandidate.candidateType !== "relay") return "direct";
+  return localCandidate;
+}
 
-  const relayProtocol = String(localCandidate.relayProtocol ?? "").toLowerCase();
-  const protocol = String(localCandidate.protocol ?? "").toLowerCase();
-  const candidateUrl = String(localCandidate.url ?? "").toLowerCase();
-  if (relayProtocol === "tls" || candidateUrl.startsWith("turns:")) return "turn-tls";
-  if (relayProtocol === "tcp" || protocol === "tcp") return "turn-tcp";
-  if (relayProtocol === "udp" || protocol === "udp") return "turn-udp";
-  return "unknown";
+// Only transient counters stay in memory; no stats identifiers enter telemetry.
+export function receivedMediaProgress(report: RTCStatsReport, previous: Map<string, number>): boolean {
+  const next = new Map<string, number>();
+  let receiving = false;
+  report.forEach((value) => {
+    if (value.type !== "inbound-rtp" || typeof value.bytesReceived !== "number" || !Number.isFinite(value.bytesReceived)) return;
+    const before = previous.get(value.id);
+    next.set(value.id, value.bytesReceived);
+    if (before !== undefined && value.bytesReceived > before) receiving = true;
+  });
+  previous.clear();
+  next.forEach((bytes, id) => previous.set(id, bytes));
+  return receiving;
 }

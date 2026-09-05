@@ -45,6 +45,7 @@ import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
 import { useAppTheme } from "./AppProviders";
 import { profilePath } from "./routes";
+import { regionalEntryUrl } from "../shared/routing/regionalEntry";
 
 const BillingPanel = lazy(() => import("../features/payments/ui/BillingPanel").then((module) => ({ default: module.BillingPanel })));
 const CourseWorkspacePanel = lazy(() => (
@@ -588,6 +589,7 @@ export function WelcomeLanding({
   const { t } = useAppTranslation();
   const theme = useAppTheme();
   const isBusy = status === "checking" || status === "loggingOut";
+  const rfEntryUrl = regionalEntryUrl(window.location);
 
   return (
     <div className="playsay-welcome-scene" aria-busy={isBusy}>
@@ -641,6 +643,11 @@ export function WelcomeLanding({
             <UserPlus className="h-4 w-4" />
             <span>{t("registration.actions.create")}</span>
           </a>
+          {rfEntryUrl ? (
+            <a className="playsay-welcome-register" href={rfEntryUrl}>
+              <span>{t("welcome.connectViaRf")}</span>
+            </a>
+          ) : null}
           <a className="playsay-welcome-return" href={publicSiteUrl}>
             {t("welcome.returnToSite")}
           </a>

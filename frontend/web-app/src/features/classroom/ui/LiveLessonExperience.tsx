@@ -193,7 +193,7 @@ export function LiveLessonExperience({
         token={session.token}
         video={session.mediaChoices.videoEnabled ? { deviceId: session.mediaChoices.videoDeviceId } : false}
       >
-        <ClassroomMediaTransportProbe onEvidence={updateMediaTransportEvidence} />
+        <ClassroomMediaTransportProbe onEvidence={updateMediaTransportEvidence} serverUrl={session.serverUrl} />
         <section className="playsay-video-rail">
           <div className="playsay-video-header">
             <span className="playsay-video-live-badge">

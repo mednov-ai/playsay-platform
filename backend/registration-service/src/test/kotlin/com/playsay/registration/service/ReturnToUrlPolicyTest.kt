@@ -12,6 +12,8 @@ class ReturnToUrlPolicyTest {
         val urls = listOf(
             "https://dev.online.honey.school/lessons/lesson-id/classroom",
             "https://dev.key.honey.school/",
+            "https://dev.online.honeyschool.ru/lessons/lesson-id/classroom",
+            "https://dev.key.honeyschool.ru/",
             "https://online.honey.school/lessons/lesson-id/classroom",
             "https://key.honey.school/",
             "https://online.honeyschool.ru/lessons/lesson-id/classroom",

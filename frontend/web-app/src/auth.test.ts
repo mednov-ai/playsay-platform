@@ -35,6 +35,9 @@ describe("auth helpers", () => {
     expect(defaultAuthIssuer("dev.online.honey.school")).toBe(
       "https://dev.ops.honey.school/keycloak/realms/playsay",
     );
+    expect(defaultAuthIssuer("dev.online.honeyschool.ru")).toBe(
+      "https://dev.ops.honey.school/keycloak/realms/playsay",
+    );
   });
 
   it("builds a PKCE authorization URL for the playsay web client", () => {

@@ -17,6 +17,7 @@ export type UserManagementUser = {
   primaryTeacher: TeacherDirectoryEntry | null;
   activeDelegates: TeacherDirectoryEntry[];
   lessonTranslationAllowed: boolean;
+  connectionRoutePreference: "AUTO" | "RF";
 };
 
 export type TeacherStudent = {
@@ -90,6 +91,14 @@ export function updateStudentLessonTranslationPermission(subject: string, allowe
     { body: JSON.stringify({ allowed }), method: "PUT" },
     authConfig,
   );
+}
+
+export function updateStudentConnectionRoute(subject: string, connectionRoutePreference: "AUTO" | "RF"): Promise<void> {
+  return apiJson(
+    `/api/users/students/${encodeURIComponent(subject)}/connection-route`,
+    { body: JSON.stringify({ connectionRoutePreference }), method: "PUT" },
+    authConfig,
+  ).then(() => undefined);
 }
 
 export function fetchDelegations(scope: "admin" | "granted" | "received"): Promise<TeacherDelegation[]> {

@@ -8,6 +8,12 @@ describe("registrationUrlForKeyboard", () => {
     );
   });
 
+  it("keeps the regional dev registration on the regional dev origin", () => {
+    expect(registrationUrlForKeyboard("https://dev.key.honeyschool.ru/")).toBe(
+      "https://dev.online.honeyschool.ru/register?returnTo=https%3A%2F%2Fdev.key.honeyschool.ru%2F",
+    );
+  });
+
   it("keeps production honey registration and returnTo on production hosts", () => {
     expect(registrationUrlForKeyboard("https://key.honey.school/")).toBe(
       "https://online.honey.school/register?returnTo=https%3A%2F%2Fkey.honey.school%2F",

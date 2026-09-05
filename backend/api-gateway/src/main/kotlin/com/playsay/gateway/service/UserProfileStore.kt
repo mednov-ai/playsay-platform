@@ -4,6 +4,8 @@ import com.playsay.gateway.client.RegistrationGateway
 import com.playsay.gateway.dto.ManagedStudentRequest
 import com.playsay.gateway.dto.UpdateUserProfileRequest
 import com.playsay.gateway.dto.UserProfileResponse
+import com.playsay.gateway.dto.ConnectionRoutePreference
+import com.playsay.gateway.dto.UpdateConnectionRoutePreferenceRequest
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.StudentProfileEntity
 import com.playsay.gateway.error.ProjectResponseException
@@ -61,6 +63,9 @@ class UserProfileStore(
         profile.countryCode = cleanCountryCode(request.countryCode) ?: defaultCountryCode
         profile.timezone = clean(request.timezone, 64)
         profile.learningGoal = clean(request.learningGoal, 500)
+        request.connectionRoutePreference?.also { preference ->
+            profile.connectionRoutePreference = preference.name
+        }
         profile.updatedAt = updatedAt
 
         val studentProfile = updateBirthDate(profile, request.birthDate, updatedAt)
@@ -82,6 +87,7 @@ class UserProfileStore(
         profile.countryCode = defaultCountryCode
         profile.timezone = null
         profile.learningGoal = null
+        profile.connectionRoutePreference = ConnectionRoutePreference.AUTO.name
         profile.updatedAt = Instant.now()
 
         studentProfileRepo.findByUserId(profile.id)?.also { student ->
@@ -110,6 +116,27 @@ class UserProfileStore(
         val profiles = userRepo.findByIdIn(studentIds)
         val studentsByUserId = studentProfileRepo.findByUserIdIn(studentIds).associateBy { it.userId }
         return profiles.map { profile -> profile.toResponse(studentsByUserId[profile.id]) }
+    }
+
+    @Transactional
+    fun updateStudentConnectionRoutePreference(
+        authentication: JwtAuthenticationToken,
+        subject: String,
+        request: UpdateConnectionRoutePreferenceRequest,
+    ): UserProfileResponse {
+        requireTeacherOrAdmin(authentication)
+        val target = userRepo.findByKeycloakSubject(subject)
+            ?.takeIf { profile -> MetaData.Roles.STUDENT in profile.roles.toApplicationRoles() }
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.USER_NOT_FOUND)
+        if (authentication.authorities.none { it.authority == MetaData.Authorities.ADMIN }) {
+            val actorId = currentUserId(authentication)
+            if (target.id !in appUserIdsVisibleToTeacher(actorId)) {
+                throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.USER_NOT_FOUND)
+            }
+        }
+        target.connectionRoutePreference = request.connectionRoutePreference.name
+        target.updatedAt = Instant.now(clock)
+        return saveProfile(target).toResponse(studentProfileRepo.findByUserId(target.id))
     }
 
     @Transactional
@@ -304,6 +331,8 @@ private fun AppUserEntity.toResponse(studentProfile: StudentProfileEntity? = nul
         countryCode = countryCode,
         timezone = timezone,
         learningGoal = learningGoal,
+        connectionRoutePreference = runCatching { ConnectionRoutePreference.valueOf(connectionRoutePreference) }
+            .getOrDefault(ConnectionRoutePreference.AUTO),
         updatedAt = updatedAt,
         managedByTeacher = managedByTeacher,
         birthDate = studentProfile?.birthDate,

@@ -1,5 +1,6 @@
 package com.playsay.gateway.service
 
+import com.playsay.gateway.config.RegionalRoutingEnvironment
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.annotation.PostConstruct
 import java.net.URI
@@ -13,7 +14,10 @@ class RegionalCollaborationRoutingService(
     @param:Value("\${playsay.collaboration.regional-routing.mode:off}") private val mode: String,
     @param:Value("\${playsay.collaboration.regional-routing.websocket-url:}") private val regionalWebsocketUrl: String,
     private val meterRegistry: MeterRegistry,
+    @param:Value("\${spring.security.oauth2.resourceserver.jwt.issuer-uri:}") private val issuerUri: String,
 ) {
+    private val routingEnvironment = RegionalRoutingEnvironment.forName(environment)
+
     @PostConstruct
     fun validateConfiguration() {
         require(environment in supportedEnvironments) { "Unsupported collaboration routing environment" }
@@ -21,29 +25,29 @@ class RegionalCollaborationRoutingService(
 
         val directUrl = directWebsocketUrl.trim()
         require(isSafeDirectUrl(directUrl)) { "Direct collaboration WebSocket URL is invalid" }
-        if (environment == productionEnvironment) {
-            require(directUrl == productionDirectUrl) { "Production collaboration WebSocket URL is invalid" }
+        if (routingEnvironment != null) {
+            require(directUrl == routingEnvironment.directCollaborationUrl) {
+                "Environment collaboration WebSocket URL is invalid"
+            }
         }
 
         val regionalUrl = regionalWebsocketUrl.trim()
-        require(regionalUrl.isEmpty() || regionalUrl == trustedRegionalUrl) {
+        require(regionalUrl.isEmpty() || regionalUrl == routingEnvironment?.collaborationUrl) {
             "Regional collaboration WebSocket URL is invalid"
         }
         if (mode == regionalMode) {
-            require(environment == productionEnvironment) {
-                "Regional collaboration routing can be enabled only in production"
-            }
-            require(regionalUrl == trustedRegionalUrl) { "Regional collaboration WebSocket URL is invalid" }
+            require(routingEnvironment != null) { "Regional collaboration environment is invalid" }
+            require(issuerUri == routingEnvironment.issuer) { "Regional collaboration issuer is invalid" }
+            require(regionalUrl == routingEnvironment?.collaborationUrl) { "Regional collaboration WebSocket URL is invalid" }
         }
     }
 
     fun websocketUrlFor(origin: String?): String {
-        val regionalSelected = environment == productionEnvironment &&
-            mode == regionalMode &&
-            origin == trustedRegionalOrigin
+        val regionalSelected = routingEnvironment != null && mode == regionalMode &&
+            origin == routingEnvironment.origin && issuerUri == routingEnvironment.issuer
         val route = if (regionalSelected) regionalRouteClass else directRouteClass
         meterRegistry.counter(routeSelectionMetric, routeTag, route).increment()
-        return if (regionalSelected) trustedRegionalUrl else directWebsocketUrl.trim()
+        return if (regionalSelected) requireNotNull(routingEnvironment).collaborationUrl else directWebsocketUrl.trim()
     }
 
     private fun isSafeDirectUrl(value: String): Boolean {
@@ -60,9 +64,6 @@ class RegionalCollaborationRoutingService(
     companion object {
         private const val productionEnvironment = "prod"
         private const val regionalMode = "rf-two-hop"
-        private const val trustedRegionalOrigin = "https://online.honeyschool.ru"
-        private const val trustedRegionalUrl = "wss://online.honeyschool.ru/collab/ws"
-        private const val productionDirectUrl = "wss://online.honey.school/collab/ws"
         private const val relativeDirectUrl = "/collab/ws"
         private const val collaborationPath = "/collab/ws"
         private const val routeSelectionMetric = "playsay.classroom.collaboration.route.selections"

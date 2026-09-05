@@ -2,6 +2,7 @@
 
 import { createRequire } from "node:module";
 import path from "node:path";
+import { mkdir } from "node:fs/promises";
 
 const baseUrl = process.env.PLAY_SAY_VOCABULARY_UI_BASE_URL ?? "http://127.0.0.1:4178";
 const playwrightPackageDir = process.env.PLAYWRIGHT_PACKAGE_DIR ?? "/Users/evgeniymednov/.codex/tools/playwright";
@@ -27,19 +28,27 @@ try {
       }, { language: locale });
       const page = await context.newPage();
       const mediaState = mediaStateFor(locale, viewport.name);
+      const recovery = { initialFailure: true, archived: false, undoFailure: true };
       const pageErrors = [];
       const consoleErrors = [];
       const failedRequests = [];
       page.on("pageerror", (error) => pageErrors.push(error.message));
       page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
       page.on("requestfailed", (request) => failedRequests.push(`${request.url()}: ${request.failure()?.errorText}`));
-      await page.route((url) => url.pathname.startsWith("/api/"), (route) => fulfillApi(route, locale, mediaState));
+      await page.route((url) => url.pathname.startsWith("/api/"), (route) => fulfillApi(route, locale, mediaState, recovery));
       await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
       await page.getByTestId("workspace-switcher-trigger").click({ timeout: 10_000 }).catch(async (error) => {
         throw new Error(`${locale}-${viewport.name}: app shell did not load: ${await page.locator("body").innerText()} pageErrors=${pageErrors.join(" | ")} console=${consoleErrors.join(" | ")} failed=${failedRequests.join(" | ")} (${error.message})`);
       });
       await page.locator('[data-tab-id="vocabulary"]').click();
       const composer = page.getByTestId("student-practice-composer");
+      const retryLabel = { ru: "Повторить", en: "Retry", de: "Erneut versuchen", fr: "Réessayer" }[locale];
+      const undoLabel = { ru: "Отменить", en: "Undo", de: "Rückgängig", fr: "Annuler" }[locale];
+      await page.getByRole("alert").waitFor();
+      await assertPageState(page, locale, `${locale}-${viewport.name}-load-failure`);
+      await captureRecovery(page, `${locale}-${viewport.name}-load-failure`);
+      recovery.initialFailure = false;
+      await page.getByRole("button", { name: retryLabel, exact: true }).click();
       await composer.waitFor();
 
       await page.locator("section > div.border-b button").nth(1).click();
@@ -54,6 +63,17 @@ try {
       }
       await assertPageState(page, locale, `${locale}-${viewport.name}-media-${mediaState}`);
 
+      const archiveLabel = { ru: "Архивировать", en: "Archive", de: "Archivieren", fr: "Archiver" }[locale];
+      page.once("dialog", (dialog) => dialog.accept());
+      await page.getByRole("button", { name: archiveLabel, exact: true }).click();
+      await page.locator(".vocabulary-media-card").waitFor({ state: "detached" });
+      await page.getByRole("button", { name: undoLabel, exact: true }).click();
+      await page.getByRole("alert").waitFor();
+      await assertPageState(page, locale, `${locale}-${viewport.name}-undo-failure`);
+      await captureRecovery(page, `${locale}-${viewport.name}-undo-failure`);
+      await page.getByRole("button", { name: retryLabel, exact: true }).click();
+      await page.locator(".vocabulary-media-card").waitFor();
+      checks.push(`${locale}-${viewport.name}-load-retry-last-word-undo`);
       await assertSearchGeometry(page, `${locale}-${viewport.name}-search-empty`);
       const search = page.getByTestId("vocabulary-word-search");
       await search.fill("state-of-the-art vocabulary search");
@@ -90,6 +110,13 @@ try {
   process.stdout.write(`${JSON.stringify({ checks }, null, 2)}\n`);
 } finally {
   await browser.close();
+}
+
+async function captureRecovery(page, name) {
+  const directory = process.env.PLAY_SAY_VOCABULARY_SCREENSHOT_DIR;
+  if (!directory) return;
+  await mkdir(directory, { recursive: true });
+  await page.screenshot({ path: path.join(directory, `${name}.png`), fullPage: true });
 }
 
 async function assertSearchGeometry(page, label) {
@@ -138,15 +165,30 @@ async function assertPageState(page, locale, label) {
   if (state.mediaCardBounds && (state.mediaCardBounds.left < -1 || state.mediaCardBounds.right > state.viewportWidth + 1)) {
     throw new Error(`${label}: media card is clipped outside the viewport (${JSON.stringify(state.mediaCardBounds)})`);
   }
-  if (/vocabulary\.(?:selfComposer|practice|studentFilters|occurrences|media)/.test(state.text)) {
+  if (/vocabulary\.(?:selfComposer|practice|studentFilters|occurrences|media|messages|actions)/.test(state.text)) {
     throw new Error(`${label}: an untranslated vocabulary key is visible`);
   }
 }
 
-async function fulfillApi(route, locale, mediaState) {
+async function fulfillApi(route, locale, mediaState, recovery) {
   const request = route.request();
   const url = new URL(request.url());
   const pathName = url.pathname;
+  if (pathName === "/api/vocabulary/dashboard" && recovery.initialFailure) {
+    return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Synthetic unavailable" }) });
+  }
+  if (pathName === "/api/vocabulary/entries/entry-1" && request.method() === "DELETE") {
+    recovery.archived = true;
+    return route.fulfill({ status: 204, body: "" });
+  }
+  if (pathName === "/api/vocabulary/entries/entry-1" && request.method() === "PATCH") {
+    if (recovery.undoFailure) {
+      recovery.undoFailure = false;
+      return route.fulfill({ status: 503, contentType: "application/json", body: "{}" });
+    }
+    recovery.archived = false;
+    return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  }
   const now = "2026-08-20T18:00:00Z";
   const entry = {
     createdAt: "2026-08-01T10:00:00Z",
@@ -248,6 +290,10 @@ async function fulfillApi(route, locale, mediaState) {
     status = 204;
   }
 
+  if (pathName === "/api/vocabulary/dashboard" && recovery.archived) {
+    body.entries = [];
+    body.totalCount = 0;
+  }
   await route.fulfill({
     body: typeof body === "string" ? body : JSON.stringify(body),
     contentType: "application/json",

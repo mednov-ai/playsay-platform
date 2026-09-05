@@ -26,6 +26,9 @@ export function useVocabularyEntryFormController({
 }) {
   const { t } = useAppTranslation();
   const requestSerial = useRef(0);
+  const saveInFlight = useRef(false);
+  const manualTranslation = useRef(false);
+  const savedBatch = useRef<{ signature: string; owners: Set<string | undefined> } | null>(null);
   const translationAbortController = useRef<AbortController | null>(null);
   const [sourceText, setSourceText] = useState("");
   const [translation, setTranslation] = useState("");
@@ -38,6 +41,7 @@ export function useVocabularyEntryFormController({
   const [addToAll, setAddToAll] = useState(false);
 
   const changeSourceText = useCallback((value: string) => {
+    manualTranslation.current = false;
     requestSerial.current += 1;
     translationAbortController.current?.abort();
     translationAbortController.current = null;
@@ -95,11 +99,15 @@ export function useVocabularyEntryFormController({
 
   useEffect(() => {
     if (!active || !sourceText.trim()) return undefined;
-    const timer = window.setTimeout(() => void translate("", []), automaticTranslationDelayMs);
+    const timer = window.setTimeout(() => {
+      if (!manualTranslation.current && !saveInFlight.current) void translate("", []);
+    }, automaticTranslationDelayMs);
     return () => window.clearTimeout(timer);
   }, [active, sourceText, translate]);
 
   function selectVariant(variant: TranslationVariant) {
+    cancelPending();
+    manualTranslation.current = true;
     setSelectedVariant(variant);
     setTranslation(variant.translation);
   }
@@ -113,29 +121,59 @@ export function useVocabularyEntryFormController({
   }
 
   async function save() {
-    if (!sourceText.trim()) return;
+    if (!sourceText.trim() || saveInFlight.current) return;
+    saveInFlight.current = true;
+    cancelPending();
+    manualTranslation.current = true;
     setSaving(true);
+    setMessage("");
+    const owners = [...new Set(addToAll && recipientSubjects.length > 0 ? recipientSubjects : [source.ownerSubject])];
+    const input = {
+      ...source, sourceText, translation,
+      partOfSpeech: selectedVariant?.partOfSpeech ?? undefined,
+      example: selectedVariant?.example ?? undefined,
+      exampleTranslation: selectedVariant?.exampleTranslation ?? undefined,
+      translationState: translation ? "CONFIRMED" as const : "MISSING" as const,
+    };
+    const signature = JSON.stringify({ input, owners });
+    if (savedBatch.current?.signature !== signature) savedBatch.current = { signature, owners: new Set() };
+    const batch = savedBatch.current;
+    const pendingOwners = owners.filter((owner) => !batch.owners.has(owner));
     try {
-      const owners = addToAll && recipientSubjects.length > 0 ? recipientSubjects : [source.ownerSubject];
-      const savedEntries = await Promise.all(owners.map((ownerSubject) => createVocabularyEntry({
-        ...source,
-        ownerSubject,
-        sourceText,
-        translation,
-        partOfSpeech: selectedVariant?.partOfSpeech ?? undefined,
-        example: selectedVariant?.example ?? undefined,
-        exampleTranslation: selectedVariant?.exampleTranslation ?? undefined,
-        translationState: translation ? "CONFIRMED" : "MISSING",
-      })));
-      changeSourceText("");
-      setInstruction("");
-      setMessage(t("vocabulary.messages.saved"));
-      onSaved?.(savedEntries);
-    } catch {
-      setMessage(t("vocabulary.messages.saveFailed"));
+      const results = await Promise.allSettled(pendingOwners.map(async (ownerSubject) => createVocabularyEntry({ ...input, ownerSubject })));
+      const savedEntries: VocabularyEntry[] = [];
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          batch.owners.add(pendingOwners[index]);
+          savedEntries.push(result.value);
+        }
+      });
+      const failed = owners.filter((owner) => !batch.owners.has(owner));
+      if (failed.length === 0) {
+        changeSourceText("");
+        setInstruction("");
+        savedBatch.current = null;
+        setMessage(t("vocabulary.messages.saved"));
+      } else if (batch.owners.size > 0) {
+        setMessage(t("vocabulary.messages.partiallySaved", {
+          saved: batch.owners.size, total: owners.length,
+          participants: failed.map((owner) => recipientSubjects.indexOf(owner ?? "") + 1).join(", "),
+        }));
+      } else {
+        setMessage(t("vocabulary.messages.saveFailed"));
+      }
+      if (savedEntries.length > 0) onSaved?.(savedEntries);
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
+  }
+
+  function changeTranslation(value: string) {
+    cancelPending();
+    manualTranslation.current = true;
+    setSelectedVariant(null);
+    setTranslation(value);
   }
 
   function cancelPending() {
@@ -158,7 +196,7 @@ export function useVocabularyEntryFormController({
     selectedVariant,
     setAddToAll,
     setInstruction,
-    setTranslation,
+    setTranslation: changeTranslation,
     sourceText,
     suggestion,
     translating,
@@ -198,7 +236,7 @@ export function VocabularyEntryForm({
   } = controller;
 
   return (
-    <div className="playsay-vocabulary-entry-form">
+    <fieldset className="playsay-vocabulary-entry-form min-w-0" disabled={saving}>
       <label className="grid gap-1 text-sm font-bold">
         {t("vocabulary.fields.word")}
         <input
@@ -231,9 +269,9 @@ export function VocabularyEntryForm({
       {message ? <p className="mt-3 text-sm font-semibold text-muted-foreground" role="status">{message}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button disabled={saving || translating || !sourceText.trim()} onClick={regenerate} type="button" variant="outline">{translating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{t("vocabulary.actions.regenerate")}</Button>
-        <Button disabled={saving || translating || !sourceText.trim()} onClick={() => void save()} type="button">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{t("vocabulary.actions.save")}</Button>
+        <Button disabled={saving || !sourceText.trim()} onClick={() => void save()} type="button">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{t("vocabulary.actions.save")}</Button>
       </div>
-    </div>
+    </fieldset>
   );
 }
 
@@ -277,7 +315,7 @@ export function VocabularyEntryDialog({
       <div className="my-auto w-full max-w-xl rounded-2xl border border-border bg-background p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-extrabold">{t("vocabulary.quickAdd.title")}</h2>
-          <Button aria-label={t("common.actions.close")} onClick={close} type="button" variant="outline"><X className="h-4 w-4" /></Button>
+          <Button aria-label={t("common.actions.close")} disabled={controller.saving} onClick={close} type="button" variant="outline"><X className="h-4 w-4" /></Button>
         </div>
         <VocabularyEntryForm controller={controller} inputRef={inputRef} recipientSubjects={recipientSubjects} />
       </div>

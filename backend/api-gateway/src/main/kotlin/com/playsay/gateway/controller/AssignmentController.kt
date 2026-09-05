@@ -90,7 +90,7 @@ class AssignmentController(
     @Operation(
         operationId = "listHomeworkAssignments",
         summary = "List homework assignments",
-        description = "Lists homework assignments visible to the current teacher or administrator.",
+        description = "Lists homework assignments visible to the current teacher or administrator. A non-owner teacher sees assignments containing at least one currently managed recipient; counts and aggregates include only recipients accessible to that teacher.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     fun listHomeworkAssignments(authentication: JwtAuthenticationToken): List<AssignmentSummaryResponse> =
@@ -100,7 +100,7 @@ class AssignmentController(
     @Operation(
         operationId = "getHomeworkAssignment",
         summary = "Get homework assignment progress",
-        description = "Returns recipients and current score/error progress for a homework assignment.",
+        description = "Returns recipients and current score/error progress for a homework assignment. A non-owner teacher receives only currently managed recipients and aggregates derived from that permitted subset.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     fun getHomeworkAssignment(
@@ -116,7 +116,7 @@ class AssignmentController(
     @Operation(
         operationId = "getSubmittedHomeworkResult",
         summary = "Get a submitted homework result",
-        description = "Returns submitted material work to the assignment owner, an administrator, or an active delegate.",
+        description = "Returns submitted material work to the assignment owner, an administrator, or a teacher who currently manages the exact student who owns the submission. Inaccessible submissions and drafts are not disclosed.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(

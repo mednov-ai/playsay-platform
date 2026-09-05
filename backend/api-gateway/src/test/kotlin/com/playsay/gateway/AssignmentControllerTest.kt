@@ -20,6 +20,7 @@ import com.playsay.gateway.dto.VocabularyHomeworkReviewRequest
 import com.playsay.gateway.dto.VocabularyAssignmentProgressUpdateRequest
 import com.playsay.gateway.entity.TeacherDelegationEntity
 import com.playsay.gateway.entity.TeacherDelegationStudentEntity
+import com.playsay.gateway.entity.AssignmentRecipientEntity
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
@@ -278,6 +279,128 @@ class AssignmentControllerTest @Autowired constructor(
     }
 
     @Test
+    fun `mixed recipient homework is projected to each authorized teacher without leaking other students`() {
+        val admin = authentication(subject = "admin-1", username = "admin.one", role = "ROLE_ADMIN")
+        val primaryTeacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val secondTeacher = authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER")
+        val delegate = authentication(subject = "delegate-1", username = "delegate.one", role = "ROLE_TEACHER")
+        val unrelated = authentication(subject = "unrelated-1", username = "unrelated.one", role = "ROLE_TEACHER")
+        val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(admin)
+        val primaryTeacherId = userProfileStore.currentUserId(primaryTeacher)
+        val secondTeacherId = userProfileStore.currentUserId(secondTeacher)
+        val delegateId = userProfileStore.currentUserId(delegate)
+        userProfileStore.currentUserId(unrelated)
+        val studentOneId = userProfileStore.currentUserId(studentOne)
+        userProfileStore.currentUserId(studentTwo)
+        appUserRepo.assignStudentToTeacher("student-2", "teacher-2")
+
+        val now = Instant.now()
+        val delegation = teacherDelegationRepo.saveAndFlush(
+            TeacherDelegationEntity(
+                primaryTeacherUserId = primaryTeacherId,
+                delegateTeacherUserId = delegateId,
+                startsAt = now.minus(Duration.ofHours(1)),
+                endsAt = now.plus(Duration.ofDays(1)),
+                createdByUserId = primaryTeacherId,
+                createdAt = now,
+            ),
+        )
+        teacherDelegationStudentRepo.saveAndFlush(
+            TeacherDelegationStudentEntity(
+                delegationId = delegation.id,
+                studentUserId = studentOneId,
+                createdAt = now,
+            ),
+        )
+        val secondTeacherDelegation = teacherDelegationRepo.saveAndFlush(
+            TeacherDelegationEntity(
+                primaryTeacherUserId = primaryTeacherId,
+                delegateTeacherUserId = secondTeacherId,
+                startsAt = now.minus(Duration.ofHours(1)),
+                endsAt = now.plus(Duration.ofDays(1)),
+                createdByUserId = primaryTeacherId,
+                createdAt = now,
+            ),
+        )
+        teacherDelegationStudentRepo.saveAndFlush(
+            TeacherDelegationStudentEntity(
+                delegationId = secondTeacherDelegation.id,
+                studentUserId = studentOneId,
+                createdAt = now,
+            ),
+        )
+
+        val material = fillGapMaterial(admin)
+        val assignmentId = assignmentController.createHomeworkAssignment(
+            admin,
+            HomeworkAssignmentRequest(materialId = material.id, studentSubjects = listOf("student-1", "student-2")),
+        ).body!!.assignment.id
+        val studentOneSubmission = assignmentController.saveMyHomeworkAssignmentSubmission(
+            studentOne,
+            assignmentId,
+            MaterialSubmissionRequest(content = fillGapAnswer(material.id, "dog", correct = false), submitted = true),
+        )
+        val studentTwoSubmission = assignmentController.saveMyHomeworkAssignmentSubmission(
+            studentTwo,
+            assignmentId,
+            MaterialSubmissionRequest(content = fillGapAnswer(material.id, "cat", correct = true), submitted = true),
+        )
+
+        val adminSummary = assignmentController.listHomeworkAssignments(admin).single { it.id == assignmentId }
+        assertEquals(2, adminSummary.recipientCount)
+        assertEquals(2, adminSummary.scoredCount)
+        assertEquals(BigDecimal("5.00"), adminSummary.averageScore)
+
+        listOf(primaryTeacher, delegate).forEach { viewer ->
+            val summary = assignmentController.listHomeworkAssignments(viewer).single { it.id == assignmentId }
+            assertEquals(1, summary.recipientCount)
+            assertEquals(1, summary.scoredCount)
+            assertEquals(BigDecimal("0.00"), summary.averageScore)
+            val detail = assignmentController.getHomeworkAssignment(viewer, assignmentId)
+            assertEquals(listOf("student-1"), detail.recipients.map { it.studentSubject })
+            assertTrue(detail.recipients.none { it.showGroupIndicator })
+            assertEquals(studentOneSubmission.id, assignmentController.getSubmittedHomeworkResult(viewer, assignmentId, studentOneSubmission.id).submission.id)
+            assertEquals(
+                HttpStatus.NOT_FOUND,
+                assertFailsWith<ResponseStatusException> {
+                    assignmentController.getSubmittedHomeworkResult(viewer, assignmentId, studentTwoSubmission.id)
+                }.statusCode,
+            )
+        }
+
+        val delegatedSecondTeacherSummary = assignmentController.listHomeworkAssignments(secondTeacher).single { it.id == assignmentId }
+        assertEquals(2, delegatedSecondTeacherSummary.recipientCount)
+        assertEquals(BigDecimal("5.00"), delegatedSecondTeacherSummary.averageScore)
+
+        secondTeacherDelegation.revokedAt = Instant.now()
+        teacherDelegationRepo.saveAndFlush(secondTeacherDelegation)
+
+        val secondTeacherSummary = assignmentController.listHomeworkAssignments(secondTeacher).single { it.id == assignmentId }
+        assertEquals(1, secondTeacherSummary.recipientCount)
+        assertEquals(BigDecimal("10.00"), secondTeacherSummary.averageScore)
+        assertEquals(
+            listOf("student-2"),
+            assignmentController.getHomeworkAssignment(secondTeacher, assignmentId).recipients.map { it.studentSubject },
+        )
+        assertEquals(
+            HttpStatus.NOT_FOUND,
+            assertFailsWith<ResponseStatusException> {
+                assignmentController.getSubmittedHomeworkResult(secondTeacher, assignmentId, studentOneSubmission.id)
+            }.statusCode,
+        )
+
+        assertTrue(assignmentController.listHomeworkAssignments(unrelated).none { it.id == assignmentId })
+        assertEquals(
+            HttpStatus.NOT_FOUND,
+            assertFailsWith<ResponseStatusException> {
+                assignmentController.getHomeworkAssignment(unrelated, assignmentId)
+            }.statusCode,
+        )
+    }
+
+    @Test
     fun `single recipient homework keeps group progress indicator hidden`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
@@ -491,6 +614,128 @@ class AssignmentControllerTest @Autowired constructor(
         assertEquals("COMPLETED", accepted.activityState)
         assertEquals("ACCEPT", accepted.reviewState)
         assertEquals("Enough meaningful work", accepted.reviewNote)
+    }
+
+    @Test
+    fun `vocabulary homework progress and review are scoped to the exact accessible recipient`() {
+        val primaryTeacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val secondTeacher = authentication(subject = "teacher-2", username = "teacher.two", role = "ROLE_TEACHER")
+        val delegate = authentication(subject = "delegate-1", username = "delegate.one", role = "ROLE_TEACHER")
+        val primaryTeacherId = userProfileStore.currentUserId(primaryTeacher)
+        userProfileStore.currentUserId(secondTeacher)
+        val delegateId = userProfileStore.currentUserId(delegate)
+        val studentOne = appUserRepo.findByKeycloakSubject("student-1")!!
+        val studentTwo = appUserRepo.findByKeycloakSubject("student-2")!!
+        appUserRepo.assignStudentToTeacher("student-2", "teacher-2")
+        val now = Instant.now()
+        val delegation = teacherDelegationRepo.saveAndFlush(
+            TeacherDelegationEntity(
+                primaryTeacherUserId = primaryTeacherId,
+                delegateTeacherUserId = delegateId,
+                startsAt = now.minus(Duration.ofHours(1)),
+                endsAt = now.plus(Duration.ofDays(1)),
+                createdByUserId = primaryTeacherId,
+                createdAt = now,
+            ),
+        )
+        teacherDelegationStudentRepo.saveAndFlush(
+            TeacherDelegationStudentEntity(
+                delegationId = delegation.id,
+                studentUserId = studentOne.id,
+                createdAt = now,
+            ),
+        )
+
+        val created = assignmentStore.createVocabularyHomework(
+            primaryTeacher,
+            VocabularyHomeworkRequest(
+                studentSubjects = listOf("student-1"),
+                completionPolicy = VocabularyHomeworkCompletionPolicy.TEACHER_REVIEW,
+            ),
+        )
+        assignmentRecipientRepo.saveAndFlush(
+            AssignmentRecipientEntity(
+                assignmentId = created.assignment.id,
+                studentUserId = studentTwo.id,
+                assignedAt = now,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        val studentOneSession = UUID.randomUUID()
+        val studentTwoSession = UUID.randomUUID()
+        assignmentStore.applyVocabularyPreparation(
+            created.assignment.id,
+            VocabularyAssignmentPreparationResponse(
+                practiceId = UUID.randomUUID(),
+                sessions = listOf(
+                    VocabularyAssignmentSessionRef(studentOneSession, "student-1"),
+                    VocabularyAssignmentSessionRef(studentTwoSession, "student-2"),
+                ),
+            ),
+            actorSubject = "teacher-1",
+        )
+        assignmentStore.updateVocabularyProgress(
+            created.assignment.id,
+            VocabularyAssignmentProgressUpdateRequest(
+                eventId = UUID.randomUUID(),
+                sessionId = studentOneSession,
+                ownerSubject = "student-1",
+                revision = 1,
+                state = "AWAITING_REVIEW",
+                completionRatio = BigDecimal.ONE,
+                accuracy = BigDecimal("0.50"),
+                difficultWordCount = 2,
+                updatedAt = now,
+            ),
+        )
+        assignmentStore.updateVocabularyProgress(
+            created.assignment.id,
+            VocabularyAssignmentProgressUpdateRequest(
+                eventId = UUID.randomUUID(),
+                sessionId = studentTwoSession,
+                ownerSubject = "student-2",
+                revision = 1,
+                state = "AWAITING_REVIEW",
+                completionRatio = BigDecimal.ONE,
+                accuracy = BigDecimal("0.90"),
+                difficultWordCount = 8,
+                updatedAt = now,
+            ),
+        )
+
+        val delegateSummary = assignmentController.listHomeworkAssignments(delegate).single { it.id == created.assignment.id }
+        assertEquals(1, delegateSummary.recipientCount)
+        assertEquals(1, delegateSummary.scoredCount)
+        assertEquals(BigDecimal("2.00"), delegateSummary.averageErrorsCount)
+        assertEquals(
+            listOf("student-1"),
+            assignmentController.getHomeworkAssignment(delegate, created.assignment.id).recipients.map { it.studentSubject },
+        )
+        assertEquals(
+            HttpStatus.NOT_FOUND,
+            assertFailsWith<ResponseStatusException> {
+                assignmentStore.reviewVocabularyHomework(
+                    delegate,
+                    created.assignment.id,
+                    "student-2",
+                    VocabularyHomeworkReviewRequest(VocabularyHomeworkReviewAction.ACCEPT),
+                )
+            }.statusCode,
+        )
+        val reviewed = assignmentStore.reviewVocabularyHomework(
+            delegate,
+            created.assignment.id,
+            "student-1",
+            VocabularyHomeworkReviewRequest(VocabularyHomeworkReviewAction.ACCEPT),
+        )
+        assertEquals(listOf("student-1"), reviewed.recipients.map { it.studentSubject })
+        assertEquals("COMPLETED", reviewed.recipients.single().activityState)
+
+        val secondTeacherDetail = assignmentController.getHomeworkAssignment(secondTeacher, created.assignment.id)
+        assertEquals(listOf("student-2"), secondTeacherDetail.recipients.map { it.studentSubject })
+        assertEquals(1, secondTeacherDetail.assignment.recipientCount)
+        assertEquals(BigDecimal("8.00"), secondTeacherDetail.assignment.averageErrorsCount)
     }
 
     @Test

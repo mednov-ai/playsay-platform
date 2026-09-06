@@ -10,7 +10,25 @@ import org.springframework.data.jpa.repository.Query
 import jakarta.persistence.LockModeType
 
 interface AppUserRepo : JpaRepository<AppUserEntity, UUID> {
+    @Query("select count(d) > 0 from UserDeletionOperationEntity d where d.targetSubject = :subject and (d.stage <> 'LEGACY' or d.status in ('PENDING', 'RUNNING', 'COMPLETED'))")
+    fun hasDeletionIntent(subject: String): Boolean
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from AppUserEntity u where u.deletedAt is null and u.roles like '%ADMIN%' order by u.id")
+    fun lockAdministrators(): List<AppUserEntity>
+
+    @Query("""
+        select count(u) from AppUserEntity u
+        where u.deletedAt is null and u.roles like '%ADMIN%'
+          and not exists (select d.id from UserDeletionOperationEntity d where d.targetUserId = u.id
+            and (d.stage <> 'LEGACY' or d.status in ('PENDING', 'RUNNING', 'COMPLETED')))
+    """)
+    fun countAdministratorsWithoutDeletion(): Long
     fun findByKeycloakSubject(keycloakSubject: String): AppUserEntity?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from AppUserEntity u where u.keycloakSubject = :subject")
+    fun lockBySubject(subject: String): AppUserEntity?
 
     fun findByKeycloakSubjectIn(keycloakSubjects: Collection<String>): List<AppUserEntity>
 

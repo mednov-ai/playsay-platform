@@ -126,11 +126,16 @@ interface TeacherDelegationStudentRepo : JpaRepository<TeacherDelegationStudentE
     fun findByDelegationIdIn(delegationIds: Collection<UUID>): List<TeacherDelegationStudentEntity>
     fun findByDelegationId(delegationId: UUID): List<TeacherDelegationStudentEntity>
     fun deleteByDelegationId(delegationId: UUID): Long
+    fun deleteByStudentUserId(studentUserId: UUID): Long
 }
 
 interface UserManagementAuditRepo : JpaRepository<UserManagementAuditEntity, UUID>
 
 interface UserDeletionOperationRepo : JpaRepository<UserDeletionOperationEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from UserDeletionOperationEntity d where d.id = :id")
+    fun lockById(id: UUID): UserDeletionOperationEntity?
+    fun findTop20ByStatusInAndUpdatedAtBeforeOrderByUpdatedAtAsc(statuses: Collection<String>, before: Instant): List<UserDeletionOperationEntity>
     fun findByIdAndRequestedByUserId(id: UUID, requestedByUserId: UUID): UserDeletionOperationEntity?
     fun findFirstByTargetSubjectOrderByCreatedAtDesc(targetSubject: String): UserDeletionOperationEntity?
 }

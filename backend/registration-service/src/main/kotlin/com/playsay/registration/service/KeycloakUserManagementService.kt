@@ -88,6 +88,11 @@ class KeycloakUserManagementService(
         keycloak.deleteUser(subject)
     }
 
+    fun suspend(subject: String) {
+        keycloak.disableUser(subject)
+        keycloak.revokeAllSessions(subject)
+    }
+
     private fun validateRoles(roles: Set<String>) {
         if (roles.isEmpty() || roles.any { it !in applicationRoles } ||
             (studentRole in roles && roles.size != 1) ||

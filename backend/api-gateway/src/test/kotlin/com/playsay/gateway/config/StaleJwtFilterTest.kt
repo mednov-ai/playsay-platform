@@ -17,6 +17,17 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 
 class StaleJwtFilterTest {
+    @Test
+    fun `deletion intent rejects even a fresh token`() {
+        val repo = mock(AppUserRepo::class.java)
+        `when`(repo.hasDeletionIntent("admin-1")).thenReturn(true)
+        SecurityContextHolder.getContext().authentication = authentication(Instant.now())
+        val response = MockHttpServletResponse()
+        var continued = false
+        StaleJwtFilter(repo).doFilter(MockHttpServletRequest(), response) { _, _ -> continued = true }
+        assertEquals(403, response.status)
+        assertFalse(continued)
+    }
     @AfterTest
     fun clearSecurityContext() {
         SecurityContextHolder.clearContext()

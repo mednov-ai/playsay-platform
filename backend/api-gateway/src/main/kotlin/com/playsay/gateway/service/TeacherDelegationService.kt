@@ -51,6 +51,7 @@ class TeacherDelegationService(
         requireTeacherOrAdmin(authentication)
         val actorId = userProfileStore.currentUserId(authentication)
         return appUserRepo.findByRoleOrdered(MetaData.Roles.TEACHER)
+            .filterNot { appUserRepo.hasDeletionIntent(it.keycloakSubject) }
             .filter { teacher -> authentication.isAdmin() || teacher.id != actorId }
             .map(AppUserEntity::toTeacherDirectoryEntry)
     }
@@ -81,7 +82,7 @@ class TeacherDelegationService(
         } else {
             appUserRepo.findByUsernameIgnoreCase(identifier)
         }
-        val student = localStudent ?: registrationGateway.findExactUser(identifier)
+        val student = localStudent?.let { user(it.keycloakSubject) } ?: registrationGateway.findExactUser(identifier)
             ?.takeIf { identity -> MetaData.Roles.STUDENT in identity.roles }
             ?.let { identity ->
                 val now = Instant.now(clock)
@@ -369,7 +370,7 @@ class TeacherDelegationService(
     }
 
     private fun user(subject: String): AppUserEntity =
-        appUserRepo.findByKeycloakSubject(subject)?.takeIf { it.deletedAt == null } ?: notFound()
+        appUserRepo.lockBySubject(subject)?.takeIf { it.deletedAt == null && !appUserRepo.hasDeletionIntent(subject) } ?: notFound()
 
     private fun requireStudent(user: AppUserEntity) {
         if (!user.roles.hasApplicationRole(MetaData.Roles.STUDENT)) fail(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.DELEGATION_STUDENT_INVALID)

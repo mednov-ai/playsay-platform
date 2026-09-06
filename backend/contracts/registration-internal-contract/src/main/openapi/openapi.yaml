@@ -302,6 +302,21 @@ paths:
           description: User identity not found.
         "503":
           description: Internal service-token authentication is not configured.
+  /api/internal/user-management/users/{subject}/suspension:
+    put:
+      tags: [Internal user management]
+      operationId: suspendInternalUser
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: "#/components/parameters/Subject"
+      responses:
+        "204":
+          description: Identity disabled and sessions revoked, or identity already absent. Safe to repeat.
+        "401":
+          description: Missing or invalid service token.
+        "503":
+          description: Suspension could not be confirmed. Do not start data cleanup.
   /api/internal/user-management/users/{subject}:
     delete:
       tags: [Internal user management]

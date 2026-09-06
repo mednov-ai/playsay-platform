@@ -32,10 +32,17 @@ class UserProfileStore(
     private val delegationRepo: TeacherDelegationRepo,
     private val clock: Clock = Clock.systemUTC(),
 ) {
+    private fun rejectDeletion(authentication: JwtAuthenticationToken) {
+        if (userRepo.hasDeletionIntent(authentication.token.subject)) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.USER_DELETED)
+        }
+    }
+
     @Transactional
     fun current(authentication: JwtAuthenticationToken): UserProfileResponse {
+        rejectDeletion(authentication)
         val identity = authentication.toIdentity()
-        val profile = userRepo.findByKeycloakSubject(identity.subject)
+        val profile = userRepo.lockBySubject(identity.subject)
             ?.also { existing -> updateIdentity(existing, identity) }
             ?: insertProfile(identity)
 
@@ -48,8 +55,10 @@ class UserProfileStore(
 
     @Transactional
     fun update(authentication: JwtAuthenticationToken, request: UpdateUserProfileRequest): UserProfileResponse {
+        rejectDeletion(authentication)
         val identity = authentication.toIdentity()
-        val profile = userRepo.findByKeycloakSubject(identity.subject) ?: insertProfile(identity)
+        val profile = userRepo.lockBySubject(identity.subject) ?: insertProfile(identity)
+        rejectDeletion(authentication)
         val updatedAt = Instant.now()
 
         profile.username = identity.username
@@ -70,8 +79,10 @@ class UserProfileStore(
 
     @Transactional
     fun deleteCurrent(authentication: JwtAuthenticationToken) {
+        rejectDeletion(authentication)
         val identity = authentication.toIdentity()
-        val profile = userRepo.findByKeycloakSubject(identity.subject) ?: return
+        val profile = userRepo.lockBySubject(identity.subject) ?: return
+        rejectDeletion(authentication)
 
         profile.username = identity.username
         profile.email = identity.email
@@ -158,6 +169,7 @@ class UserProfileStore(
             ).distinct()
 
     fun currentUserId(authentication: JwtAuthenticationToken): UUID {
+        rejectDeletion(authentication)
         val identity = authentication.toIdentity()
         return identityRepository.upsert(
             id = UUID.randomUUID(),
@@ -210,6 +222,9 @@ class UserProfileStore(
     }
 
     private fun updateIdentity(profile: AppUserEntity, identity: CurrentIdentity) {
+        if (profile.deletedAt != null || userRepo.hasDeletionIntent(identity.subject)) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.USER_DELETED)
+        }
         profile.username = identity.username
         profile.email = identity.email
         profile.name = identity.name

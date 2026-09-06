@@ -18,6 +18,11 @@ class StaleJwtFilter(
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         val authentication = SecurityContextHolder.getContext().authentication as? JwtAuthenticationToken
         if (authentication != null) {
+            if (appUserRepo.hasDeletionIntent(authentication.token.subject)) {
+                SecurityContextHolder.clearContext()
+                response.sendError(HttpStatus.FORBIDDEN.value())
+                return
+            }
             val user = appUserRepo.findByKeycloakSubject(authentication.token.subject)
             val rolesChangedAt = user?.rolesChangedAt
             val issuedAt = authentication.token.issuedAt ?: Instant.EPOCH

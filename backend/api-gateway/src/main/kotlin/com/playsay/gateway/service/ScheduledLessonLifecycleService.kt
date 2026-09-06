@@ -30,7 +30,7 @@ class ScheduledLessonLifecycleService(
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
-        if (lesson.status in closedLessonStatuses) {
+        if (lesson.status in closedLessonStatuses || lessonRepo.hasDeletingParticipant(lessonId)) {
             throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_CANNOT_START)
         }
 

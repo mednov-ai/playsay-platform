@@ -124,6 +124,8 @@ class UserManagementService(
     ): UserManagementUser {
         requireAdmin(authentication)
         val actorId = userProfileStore.currentUserId(authentication)
+        appUserRepo.lockAdministrators()
+        requireActiveActor(authentication)
         val target = activeUser(subject)
         val previousRoles = target.roles.toApplicationRoles().toSet()
         val roles = validatedRoles(request.roles)
@@ -131,7 +133,7 @@ class UserManagementService(
             fail(HttpStatus.CONFLICT, MetaData.ErrorCodes.USER_SELF_ADMIN_CHANGE_FORBIDDEN)
         }
         if (MetaData.Roles.ADMIN in previousRoles && MetaData.Roles.ADMIN !in roles &&
-            appUserRepo.countByRolesContainingAndDeletedAtIsNull(MetaData.Roles.ADMIN) <= 1
+            appUserRepo.countAdministratorsWithoutDeletion() <= 1
         ) {
             fail(HttpStatus.CONFLICT, MetaData.ErrorCodes.LAST_ADMIN_REQUIRED)
         }
@@ -162,22 +164,34 @@ class UserManagementService(
     ): UserDeletionOperationResponse {
         requireAdmin(authentication)
         val actorId = userProfileStore.currentUserId(authentication)
+        appUserRepo.lockAdministrators()
+        requireActiveActor(authentication)
         operationRepo.findFirstByTargetSubjectOrderByCreatedAtDesc(subject)?.let { existing ->
             if (existing.status in idempotentStatuses) return existing.toResponse()
+            if (existing.status == "FAILED" && existing.stage != "LEGACY") {
+                val retry = operationRepo.lockById(existing.id) ?: notFound()
+                if (retry.status != "FAILED") return retry.toResponse()
+                retry.status = "PENDING"
+                retry.errorCode = null
+                retry.updatedAt = Instant.now(clock)
+                operationRepo.saveAndFlush(retry)
+                eventPublisher.publishEvent(UserDeletionRequestedEvent(retry.id))
+                return retry.toResponse()
+            }
         }
         val target = appUserRepo.findByKeycloakSubject(subject) ?: notFound()
+        appUserRepo.lockByIdIn(listOf(target.id))
         if (target.id == actorId && target.roles.hasApplicationRole(MetaData.Roles.ADMIN)) {
             fail(HttpStatus.CONFLICT, MetaData.ErrorCodes.USER_SELF_ADMIN_CHANGE_FORBIDDEN)
         }
         if (target.roles.hasApplicationRole(MetaData.Roles.ADMIN) &&
-            appUserRepo.countByRolesContainingAndDeletedAtIsNull(MetaData.Roles.ADMIN) <= 1
+            appUserRepo.countAdministratorsWithoutDeletion() <= 1
         ) {
             fail(HttpStatus.CONFLICT, MetaData.ErrorCodes.LAST_ADMIN_REQUIRED)
         }
-        val replacement = if (target.roles.hasApplicationRole(MetaData.Roles.TEACHER)) {
-            validateTeacherRemoval(target, replacementTeacherSubject)
-        } else {
-            null
+        ownershipService.lockUserLessons(target.id)
+        if (ownershipService.hasInProgressLesson(target.id)) {
+            fail(HttpStatus.CONFLICT, MetaData.ErrorCodes.USER_DELETE_IN_PROGRESS_LESSON)
         }
         val now = Instant.now(clock)
         val operation = operationRepo.saveAndFlush(
@@ -186,13 +200,13 @@ class UserManagementService(
                 targetUserId = target.id,
                 targetSubject = target.keycloakSubject,
                 requestedByUserId = actorId,
-                replacementTeacherUserId = replacement?.id,
+                replacementTeacherUserId = null,
                 status = "PENDING",
                 createdAt = now,
                 updatedAt = now,
             ),
         )
-        audit(actorId, "USER_DELETE_REQUESTED", subject, mapOf("replacementTeacherSubject" to replacement?.keycloakSubject))
+        audit(actorId, "USER_DELETE_REQUESTED", subject, mapOf("cleanupMode" to "SUSPEND_AND_DETACH"))
         eventPublisher.publishEvent(UserDeletionRequestedEvent(operation.id))
         return operation.toResponse()
     }
@@ -250,7 +264,9 @@ class UserManagementService(
     }
 
     private fun activeUser(subject: String): AppUserEntity =
-        appUserRepo.findByKeycloakSubject(subject)?.takeIf { it.deletedAt == null } ?: notFound()
+        appUserRepo.findByKeycloakSubject(subject)
+            ?.also { appUserRepo.lockByIdIn(listOf(it.id)) }
+            ?.takeIf { it.deletedAt == null && !appUserRepo.hasDeletionIntent(subject) } ?: notFound()
 
     private fun AppUserEntity.status(): String = if (deletedAt == null) "ACTIVE" else "DELETED"
 
@@ -270,6 +286,12 @@ class UserManagementService(
     private fun requireAdmin(authentication: JwtAuthenticationToken) {
         if (authentication.authorities.none { it.authority == MetaData.Authorities.ADMIN }) {
             fail(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.ADMIN_ROLE_REQUIRED)
+        }
+    }
+
+    private fun requireActiveActor(authentication: JwtAuthenticationToken) {
+        if (appUserRepo.hasDeletionIntent(authentication.token.subject)) {
+            fail(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.USER_DELETED)
         }
     }
 

@@ -167,43 +167,74 @@ export function deleteUser(subject: string, replacementTeacherSubject?: string):
   const params = new URLSearchParams();
   if (replacementTeacherSubject) params.set("replacementTeacherSubject", replacementTeacherSubject);
   const query = params.size ? `?${params.toString()}` : "";
-  return apiJson(
+  return deletionRequest((signal) => apiJson(
     `/api/admin/user-management/users/${encodeURIComponent(subject)}${query}`,
-    { method: "DELETE" },
+    { method: "DELETE", signal },
     authConfig,
     202,
-  );
+  ));
 }
 
-export function fetchUserDeletionOperation(operationId: string): Promise<UserDeletionOperation> {
-  return apiJson(
+export function fetchUserDeletionOperation(operationId: string, budgetMs = 30_000): Promise<UserDeletionOperation> {
+  return deletionRequest((signal) => apiJson(
     `/api/admin/user-management/operations/${encodeURIComponent(operationId)}`,
-    { method: "GET" },
+    { method: "GET", signal },
     authConfig,
-  );
+  ), budgetMs);
+}
+
+async function deletionRequest(
+  request: (signal: AbortSignal) => Promise<UserDeletionOperation>, budgetMs = 30_000,
+): Promise<UserDeletionOperation> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      request(controller.signal),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new ApiError(504, "USER_DELETE_TIMEOUT", "Deletion request timed out"));
+          controller.abort();
+        }, Math.min(budgetMs, 30_000));
+      }),
+    ]);
+    if (!result || !result.operationId || !result.targetSubject ||
+        !["PENDING", "RUNNING", "COMPLETED", "FAILED"].includes(result.status)) {
+      throw new ApiError(502, "USER_DELETE_INVALID_RESPONSE", "Invalid deletion response");
+    }
+    return result;
+  } finally { clearTimeout(timer); }
 }
 
 export async function waitForUserDeletion(
   initial: UserDeletionOperation,
   options: {
-    load?: (operationId: string) => Promise<UserDeletionOperation>;
+    load?: (operationId: string, budgetMs?: number) => Promise<UserDeletionOperation>;
     pause?: () => Promise<void>;
     maxAttempts?: number;
+    now?: () => number;
   } = {},
 ): Promise<UserDeletionOperation> {
   const load = options.load ?? fetchUserDeletionOperation;
   const pause = options.pause ?? (() => new Promise((resolve) => window.setTimeout(resolve, 500)));
   const maxAttempts = options.maxAttempts ?? 120;
+  const now = options.now ?? Date.now;
+  const deadline = now() + 60_000;
   let operation = initial;
 
-  for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
+  for (let attempt = 0; ; attempt += 1) {
     if (operation.status === "COMPLETED") return operation;
     if (operation.status === "FAILED") {
       throw new ApiError(409, operation.errorCode ?? "USER_DELETE_FAILED", "User deletion failed");
     }
-    if (attempt === maxAttempts) break;
+    if (attempt >= maxAttempts || now() >= deadline) break;
     await pause();
-    operation = await load(operation.operationId);
+    const remaining = deadline - now();
+    if (remaining <= 0) break;
+    operation = await load(operation.operationId, Math.min(30_000, remaining));
+    if (operation.operationId !== initial.operationId || operation.targetSubject !== initial.targetSubject) {
+      throw new ApiError(502, "USER_DELETE_INVALID_RESPONSE", "Mismatched deletion response");
+    }
   }
 
   throw new ApiError(504, "USER_DELETE_TIMEOUT", "User deletion is still running");

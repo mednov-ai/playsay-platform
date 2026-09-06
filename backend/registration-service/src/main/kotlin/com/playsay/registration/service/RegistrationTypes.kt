@@ -136,6 +136,10 @@ interface KeycloakRegistrationClient {
         error("User deletion is not supported by this Keycloak client.")
     }
 
+    fun disableUser(subject: String) {
+        error("User suspension is not supported by this Keycloak client.")
+    }
+
     fun sendRequiredActionsEmail(subject: String, actions: List<String>) {
         error("Required actions email is not supported by this Keycloak client.")
     }

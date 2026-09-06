@@ -1,3 +1,4 @@
+import { webcrypto } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildAuthorizeUrl,
@@ -8,6 +9,8 @@ import {
   mapTokenResponse,
   readTokens,
   storeTokens,
+  startLogin,
+  startSilentLogin,
   type AuthConfig,
 } from "./shared/auth/oidc";
 
@@ -23,6 +26,36 @@ describe("auth helpers", () => {
       clearTokens();
     }
     vi.unstubAllGlobals();
+  });
+
+  it.each([startLogin, startSilentLogin])("preserves lesson navigation for explicit and silent login", async (login) => {
+    const storage = new MemoryStorage();
+    const assign = vi.fn();
+    vi.stubGlobal("window", {
+      sessionStorage: storage,
+      localStorage: new MemoryStorage(),
+      crypto: webcrypto,
+      btoa,
+      location: { origin: "https://dev.online.honeyschool.ru", pathname: "/lessons/fixture/classroom", search: "?tab=lesson", hash: "#section", assign },
+    });
+    await login(config);
+    const flow = JSON.parse(storage.getItem("playsay.auth.loginFlow")!);
+    expect(flow.returnPath).toBe("/lessons/fixture/classroom?tab=lesson#section");
+    expect(flow.redirectUri).toBe("https://dev.online.honeyschool.ru/auth/callback");
+    expect(assign).toHaveBeenCalledOnce();
+  });
+
+  it.each([startLogin, startSilentLogin])("never retains callback credentials in a new return path", async (login) => {
+    const storage = new MemoryStorage();
+    vi.stubGlobal("window", {
+      sessionStorage: storage,
+      localStorage: new MemoryStorage(),
+      crypto: webcrypto,
+      btoa,
+      location: { origin: "https://dev.online.honeyschool.ru", pathname: "/auth/callback", search: "?code=synthetic&state=synthetic", hash: "", assign: vi.fn() },
+    });
+    await login(config);
+    expect(JSON.parse(storage.getItem("playsay.auth.loginFlow")!).returnPath).toBe("/");
   });
 
   it("selects the canonical honey issuer for production and development hosts", () => {

@@ -1,16 +1,12 @@
 package com.playsay.gateway.service
 
 import com.playsay.gateway.repo.AppUserRepo
-import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.AssignmentRepo
 import com.playsay.gateway.repo.CourseRepo
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
-import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.repo.TeacherDelegationRepo
-import com.playsay.gateway.repo.TeacherDelegationStudentRepo
-import com.playsay.gateway.repo.TeacherProfileRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Clock
 import java.time.Instant
@@ -24,14 +20,9 @@ class UserOwnershipTransferService(
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val assignmentRepo: AssignmentRepo,
-    private val assignmentRecipientRepo: AssignmentRecipientRepo,
     private val materialRepo: LessonMaterialRepo,
     private val courseRepo: CourseRepo,
     private val delegationRepo: TeacherDelegationRepo,
-    private val delegationStudentRepo: TeacherDelegationStudentRepo,
-    private val lessonReminderService: LessonReminderService,
-    private val studentProfileRepo: StudentProfileRepo,
-    private val teacherProfileRepo: TeacherProfileRepo,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -51,35 +42,6 @@ class UserOwnershipTransferService(
 
     @Transactional
     fun lockUserLessons(userId: UUID) { lessonRepo.lockForUser(userId) }
-
-    @Transactional
-    fun detachDeletedTeacher(teacherUserId: UUID) {
-        val now = Instant.now(clock)
-        appUserRepo.findByManagedByTeacherUserIdOrderByDisplayNameAscUsernameAsc(teacherUserId).forEach { student ->
-            student.managedByTeacherUserId = null
-            student.managedByTeacher = false
-            student.updatedAt = now
-        }
-        lessonRepo.findByTeacherUserId(teacherUserId)
-            .filter { it.status == MetaData.LessonStatuses.SCHEDULED }
-            .forEach { lesson ->
-                lesson.status = MetaData.LessonStatuses.CANCELLED
-                lesson.updatedAt = now
-                lessonReminderService.cancelPendingReminders(lesson.id)
-            }
-        assignmentRepo.findByTeacherUserId(teacherUserId).forEach { assignment ->
-            assignment.teacherUserId = null
-            assignment.updatedAt = now
-        }
-        materialRepo.findByOwnerTeacherUserId(teacherUserId).forEach { material ->
-            material.ownerTeacherUserId = null
-            material.updatedAt = now
-        }
-        courseRepo.findByCreatedByUserId(teacherUserId).forEach { course ->
-            course.createdByUserId = null
-            course.updatedAt = now
-        }
-    }
 
     @Transactional
     fun transferTeacherOwnership(fromTeacherUserId: UUID, toTeacherUserId: UUID, actorUserId: UUID) {
@@ -107,36 +69,5 @@ class UserOwnershipTransferService(
         delegationRepo.revokeForTeacher(teacherUserId, actorUserId, Instant.now(clock))
     }
 
-    @Transactional
-    fun removeFutureStudentAssignments(studentUserId: UUID) {
-        val now = Instant.now(clock)
-        // Remove only this student's scope; a delegation may also cover other students.
-        delegationStudentRepo.deleteByStudentUserId(studentUserId)
-        assignmentRecipientRepo.findByStudentUserIdAndArchivedAtIsNullOrderByUpdatedAtDesc(studentUserId)
-            .forEach { recipient -> recipient.archivedAt = now; recipient.updatedAt = now }
-        lessonParticipantRepo.findByStudentUserId(studentUserId).forEach { participant ->
-            val lesson = lessonRepo.findById(participant.lessonId).orElse(null)
-            if (lesson?.status == MetaData.LessonStatuses.SCHEDULED) {
-                lessonParticipantRepo.delete(participant)
-            }
-        }
-    }
 
-    @Transactional
-    fun clearProfiles(userId: UUID) {
-        studentProfileRepo.findByUserId(userId)?.also { profile ->
-            profile.birthDate = null
-            profile.parentContact = null
-            profile.notes = null
-            profile.currentLevel = null
-            profile.lessonTranslationAllowed = false
-            profile.updatedAt = Instant.now(clock)
-        }
-        teacherProfileRepo.findByUserId(userId)?.also { profile ->
-            profile.bio = null
-            profile.specializations = null
-            profile.hourlyRate = null
-            profile.updatedAt = Instant.now(clock)
-        }
-    }
 }

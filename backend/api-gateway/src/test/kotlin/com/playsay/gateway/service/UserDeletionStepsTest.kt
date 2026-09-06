@@ -18,9 +18,11 @@ class UserDeletionStepsTest {
     private val operations = mock(UserDeletionOperationRepo::class.java)
     private val users = mock(AppUserRepo::class.java)
     private val ownership = mock(UserOwnershipTransferService::class.java)
+    private val teacherCleanup = mock(UserTeacherDeletionCleanup::class.java)
+    private val studentCleanup = mock(UserStudentDeletionCleanup::class.java)
     private val purge = mock(UserDataPurgeClient::class.java)
     private val registration = mock(RegistrationGateway::class.java)
-    private val steps = UserDeletionSteps(operations, users, ownership, purge, registration, Clock.systemUTC())
+    private val steps = UserDeletionSteps(operations, users, ownership, teacherCleanup, studentCleanup, purge, registration, Clock.systemUTC())
     private val operation = UserDeletionOperationEntity(targetSubject = "disposable-user")
 
     @Test
@@ -28,14 +30,14 @@ class UserDeletionStepsTest {
         `when`(operations.lockById(operation.id)).thenReturn(operation)
         `when`(users.findById(operation.targetUserId)).thenReturn(Optional.of(AppUserEntity(id = operation.targetUserId)))
         repeat(5) { steps.advance(operation.id) }
-        val order = inOrder(registration, ownership, purge)
+        val order = inOrder(registration, ownership, teacherCleanup, studentCleanup, purge)
         order.verify(registration).suspendUser(operation.targetSubject)
-        order.verify(ownership).detachDeletedTeacher(operation.targetUserId)
+        order.verify(teacherCleanup).detachDeletedTeacher(operation.targetUserId)
         order.verify(ownership).revokeTeacherDelegations(operation.targetUserId, operation.requestedByUserId)
-        order.verify(ownership).removeFutureStudentAssignments(operation.targetUserId)
+        order.verify(studentCleanup).removeFutureStudentAssignments(operation.targetUserId)
         order.verify(purge).purge(operation.targetSubject)
         order.verify(registration).deleteUser(operation.targetSubject)
-        order.verify(ownership).clearProfiles(operation.targetUserId)
+        order.verify(studentCleanup).clearProfiles(operation.targetUserId)
         assertEquals("COMPLETED", operation.status)
         assertFalse(steps.advance(operation.id))
         verify(registration, times(1)).deleteUser(operation.targetSubject)
@@ -49,7 +51,7 @@ class UserDeletionStepsTest {
         steps.fail(operation.id)
         assertEquals("REQUESTED", operation.stage)
         assertEquals("FAILED", operation.status)
-        verifyNoInteractions(ownership, purge)
+        verifyNoInteractions(ownership, teacherCleanup, studentCleanup, purge)
         verify(registration, never()).deleteUser(operation.targetSubject)
     }
 

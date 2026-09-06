@@ -117,19 +117,19 @@ class ScheduledLessonLiveKitControllerTest : ScheduledLessonControllerTestFixtur
         ).body!!
         scheduleController.start(teacher, lesson.id)
 
-        val direct = liveKitRoomController.createToken(student, lesson.id, "https://online.honey.school")
-        val regional = liveKitRoomController.createToken(student, lesson.id, "https://online.honeyschool.ru")
+        val direct = liveKitRoomController.createToken(student, lesson.id, "https://dev.online.honey.school")
+        val regional = liveKitRoomController.createToken(student, lesson.id, "https://dev.online.honeyschool.ru")
 
         assertEquals("wss://online.honey.school/livekit", direct.serverUrl)
         assertNull(direct.mediaRouting)
-        assertEquals("wss://online.honeyschool.ru/livekit", regional.serverUrl)
+        assertEquals("wss://dev.online.honeyschool.ru/livekit", regional.serverUrl)
         assertEquals("REGIONAL_RELAY", regional.mediaRouting?.policy)
         assertEquals("relay", regional.mediaRouting?.iceTransportPolicy)
         assertEquals(3, regional.mediaRouting?.iceServers?.single()?.urls?.size)
         assertTrue(regional.mediaRouting!!.expiresAt.isAfter(now))
         assertFalse(regional.mediaRouting!!.iceServers.single().username.contains("student-1"))
         assertFailsWith<ResponseStatusException> {
-            liveKitRoomController.createToken(otherStudent, lesson.id, "https://online.honeyschool.ru")
+            liveKitRoomController.createToken(otherStudent, lesson.id, "https://dev.online.honeyschool.ru")
         }.also { error -> assertEquals(HttpStatus.NOT_FOUND, error.statusCode) }
     }
 

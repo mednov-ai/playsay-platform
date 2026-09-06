@@ -85,6 +85,9 @@ export function TeacherStudentsPanel() {
               onTranslationPermission={(student, allowed) => data.translationPermission.mutateAsync({ allowed, subject: student.student.subject })}
               onTranslationPermissionError={() => setMessage(t("userManagement.messages.translationPermissionFailed"))}
               onTranslationPermissionSaved={() => setMessage(t("userManagement.messages.translationPermissionSaved"))}
+              onConnectionRoute={(student, preference) => data.connectionRoute.mutateAsync({ preference, subject: student.student.subject })}
+              onConnectionRouteError={() => setMessage(t("userManagement.messages.connectionRouteFailed"))}
+              onConnectionRouteSaved={() => setMessage(t("userManagement.messages.connectionRouteSaved"))}
               students={mine}
             />
           </div>
@@ -104,6 +107,9 @@ export function TeacherStudentsPanel() {
           onTranslationPermission={(student, allowed) => data.translationPermission.mutateAsync({ allowed, subject: student.student.subject })}
           onTranslationPermissionError={() => setMessage(t("userManagement.messages.translationPermissionFailed"))}
           onTranslationPermissionSaved={() => setMessage(t("userManagement.messages.translationPermissionSaved"))}
+          onConnectionRoute={(student, preference) => data.connectionRoute.mutateAsync({ preference, subject: student.student.subject })}
+          onConnectionRouteError={() => setMessage(t("userManagement.messages.connectionRouteFailed"))}
+          onConnectionRouteSaved={() => setMessage(t("userManagement.messages.connectionRouteSaved"))}
           students={receivedStudents}
         />
       ) : null}
@@ -126,6 +132,9 @@ function StudentList({
   onTranslationPermission,
   onTranslationPermissionError,
   onTranslationPermissionSaved,
+  onConnectionRoute,
+  onConnectionRouteError,
+  onConnectionRouteSaved,
   students,
 }: {
   empty: string;
@@ -133,6 +142,9 @@ function StudentList({
   onTranslationPermission: (student: TeacherStudent, allowed: boolean) => Promise<unknown>;
   onTranslationPermissionError: () => void;
   onTranslationPermissionSaved: () => void;
+  onConnectionRoute: (student: TeacherStudent, preference: "AUTO" | "RF") => Promise<unknown>;
+  onConnectionRouteError: () => void;
+  onConnectionRouteSaved: () => void;
   students: TeacherStudent[];
 }) {
   const { t } = useAppTranslation();
@@ -140,12 +152,32 @@ function StudentList({
   return (
     <div className="grid gap-2">
       {students.map((item) => (
-        <article className="grid items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(16rem,.9fr)_auto]" key={item.student.subject}>
+        <article className="grid items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(13rem,.7fr)_minmax(16rem,.9fr)_auto]" key={item.student.subject}>
           <div className="min-w-0">
             <h3 className="truncate font-extrabold">{item.student.displayName ?? item.student.username ?? item.student.subject}</h3>
             <p className="truncate text-sm text-muted-foreground">{item.student.email ?? item.student.username ?? item.student.subject}</p>
             {item.student.activeDelegates.length > 0 ? <p className="mt-1 text-xs font-bold text-primary">{t("userManagement.student.delegateCount", { count: item.student.activeDelegates.length })}</p> : null}
           </div>
+          <label className="grid gap-1 text-xs font-bold">
+            {t("userManagement.connectionRoute.label")}
+            <select
+              aria-label={t("userManagement.connectionRoute.aria", { name: item.student.displayName ?? item.student.username ?? item.student.subject })}
+              className="playsay-input"
+              defaultValue={item.student.connectionRoutePreference}
+              onChange={async (event) => {
+                try {
+                  await onConnectionRoute(item, event.target.value === "RF" ? "RF" : "AUTO");
+                  onConnectionRouteSaved();
+                } catch {
+                  event.target.value = item.student.connectionRoutePreference;
+                  onConnectionRouteError();
+                }
+              }}
+            >
+              <option value="AUTO">{t("userManagement.connectionRoute.auto")}</option>
+              <option value="RF">{t("userManagement.connectionRoute.rf")}</option>
+            </select>
+          </label>
           <LessonTranslationPermissionControl
             allowed={item.student.lessonTranslationAllowed}
             onChange={(allowed) => onTranslationPermission(item, allowed)}

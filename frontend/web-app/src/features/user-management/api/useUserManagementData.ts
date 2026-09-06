@@ -14,6 +14,7 @@ import {
   revokeDelegation,
   updateUserRoles,
   updateStudentLessonTranslationPermission,
+  updateStudentConnectionRoute,
   userManagementKeys,
   type CreateDelegationInput,
   type CreateUserInput,
@@ -36,8 +37,13 @@ export function useTeacherManagementData() {
       updateStudentLessonTranslationPermission(subject, allowed),
     onSuccess: refresh,
   });
+  const connectionRoute = useMutation({
+    mutationFn: ({ preference, subject }: { preference: "AUTO" | "RF"; subject: string }) =>
+      updateStudentConnectionRoute(subject, preference),
+    onSuccess: refresh,
+  });
 
-  return { attach, delegate, detach, directory, granted, received, revoke, students, translationPermission };
+  return { attach, connectionRoute, delegate, detach, directory, granted, received, revoke, students, translationPermission };
 }
 
 export function useAdminManagementData(filters: { search: string; role: string; status: string }) {

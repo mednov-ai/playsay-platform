@@ -58,6 +58,7 @@ import { useMaterialActions } from "./controller/useMaterialActions";
 import { useProfileActions } from "./controller/useProfileActions";
 import { useScheduleActions } from "./controller/useScheduleActions";
 import { useAppShellUiStore } from "./model/useAppShellUiStore";
+import { regionalEntryUrl } from "../shared/routing/regionalEntry";
 
 export function useAppController(): AppShellProps {
   const { i18n, t } = useAppTranslation();
@@ -100,7 +101,7 @@ export function useAppController(): AppShellProps {
           await completeLogin(currentUrl);
           const returnPath = consumeCompletedLoginReturnPath() ?? "/";
           window.history.replaceState({}, document.title, returnPath);
-          setCurrentPath(returnPath);
+          setCurrentPath(window.location.pathname);
         }
 
         if (!readTokens()) {
@@ -127,6 +128,13 @@ export function useAppController(): AppShellProps {
           fetchScheduledLessons(),
           canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
         ]);
+        const preferredRfEntry = currentAppProfile.connectionRoutePreference === "RF"
+          ? regionalEntryUrl(window.location)
+          : null;
+        if (!cancelled && preferredRfEntry) {
+          window.location.replace(preferredRfEntry);
+          return;
+        }
         if (!cancelled) {
           let authenticatedAppProfile = currentAppProfile;
           const languageResolution = resolveAuthenticatedLanguage({
@@ -169,7 +177,7 @@ export function useAppController(): AppShellProps {
         if (isSilentLoginUnavailable(caught)) {
           const returnPath = consumeCompletedLoginReturnPath() ?? "/";
           window.history.replaceState({}, document.title, returnPath);
-          setCurrentPath(returnPath);
+          setCurrentPath(window.location.pathname);
           if (!cancelled) {
             setStatus("anonymous");
           }

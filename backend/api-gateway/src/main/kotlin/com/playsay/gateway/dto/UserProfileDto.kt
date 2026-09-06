@@ -8,6 +8,11 @@ import jakarta.validation.constraints.Size
 import java.time.Instant
 import java.time.LocalDate
 
+enum class ConnectionRoutePreference {
+    AUTO,
+    RF,
+}
+
 data class UserProfileResponse(
     val subject: String,
     val username: String?,
@@ -19,6 +24,7 @@ data class UserProfileResponse(
     val countryCode: String?,
     val timezone: String?,
     val learningGoal: String?,
+    val connectionRoutePreference: ConnectionRoutePreference = ConnectionRoutePreference.AUTO,
     val updatedAt: Instant,
     val managedByTeacher: Boolean = false,
     @field:Schema(type = "string", format = "date", nullable = true)
@@ -38,8 +44,13 @@ data class UpdateUserProfileRequest(
     val timezone: String? = null,
     @field:Schema(maxLength = 500)
     val learningGoal: String? = null,
+    val connectionRoutePreference: ConnectionRoutePreference? = null,
     @field:Schema(type = "string", format = "date", nullable = true)
     val birthDate: LocalDate? = null,
+)
+
+data class UpdateConnectionRoutePreferenceRequest(
+    val connectionRoutePreference: ConnectionRoutePreference,
 )
 
 data class ManagedStudentRequest(

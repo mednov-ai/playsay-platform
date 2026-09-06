@@ -17,6 +17,7 @@ export type SessionStatus = "checking" | "anonymous" | "authenticated" | "loggin
 
 type ProfileFormState = {
   birthDate: string;
+  connectionRoutePreference: "AUTO" | "RF";
   countryCode: string;
   displayName: string;
   timezone: string;
@@ -187,6 +188,7 @@ function ProfileEditor({
   const { i18n, t } = useAppTranslation();
   const [form, setForm] = useState<ProfileFormState>({
     birthDate: "",
+    connectionRoutePreference: "AUTO",
     countryCode: "",
     displayName: "",
     timezone: "",
@@ -196,6 +198,7 @@ function ProfileEditor({
   useEffect(() => {
     setForm({
       birthDate: profile?.birthDate ?? "",
+      connectionRoutePreference: profile?.connectionRoutePreference === "RF" ? "RF" : "AUTO",
       countryCode: profile?.countryCode ?? "",
       displayName: profile?.displayName ?? "",
       timezone: profile?.timezone ?? "",
@@ -203,7 +206,7 @@ function ProfileEditor({
     });
   }, [profile]);
 
-  function updateField(field: keyof ProfileFormState, value: string) {
+  function updateField<Field extends keyof ProfileFormState>(field: Field, value: ProfileFormState[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -211,6 +214,7 @@ function ProfileEditor({
     event.preventDefault();
     onSave({
       birthDate: form.birthDate || null,
+      connectionRoutePreference: form.connectionRoutePreference,
       countryCode: form.countryCode,
       displayName: form.displayName,
       locale: normalizeLanguage(i18n.resolvedLanguage ?? i18n.language),
@@ -251,6 +255,22 @@ function ProfileEditor({
           <option value="">{t("profile.country.unspecified")}</option>
           <option value="RU">{t("profile.country.russia")}</option>
         </select>
+      </FormField>
+
+      <FormField label={t("profile.fields.connectionRoute")}>
+        <select
+          className="playsay-input"
+          disabled={disabled}
+          onChange={(event) => updateField(
+            "connectionRoutePreference",
+            event.target.value === "RF" ? "RF" : "AUTO",
+          )}
+          value={form.connectionRoutePreference}
+        >
+          <option value="AUTO">{t("profile.connectionRoute.auto")}</option>
+          <option value="RF">{t("profile.connectionRoute.rf")}</option>
+        </select>
+        <p className="mt-1 text-xs text-muted-foreground">{t("profile.connectionRoute.hint")}</p>
       </FormField>
 
       <FormField label={t("profile.fields.birthDate")}>

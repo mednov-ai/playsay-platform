@@ -1,0 +1,15 @@
+.connection-diagnostics-trigger { position: fixed; bottom: .75rem; left: .75rem; z-index: 60; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border: 1px solid hsl(var(--border)); border-radius: 50%; background: hsl(var(--surface)); color: hsl(var(--foreground)); }
+.connection-diagnostics { width: min(40rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.25rem; border: 1px solid hsl(var(--border)); border-radius: 1rem; background: hsl(var(--surface)); color: hsl(var(--foreground)); }
+.connection-diagnostics::backdrop { background: rgb(0 0 0 / .5); }
+.connection-diagnostics header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+.connection-diagnostics h2 { font-size: 1.25rem; font-weight: 700; }
+.connection-diagnostics p, .connection-diagnostics dl, .connection-diagnostics details { margin-top: 1rem; }
+.connection-diagnostics button { padding: .5rem; border: 1px solid hsl(var(--border)); border-radius: .5rem; }
+.connection-diagnostics-rows { display: grid; gap: .5rem; margin-top: 1rem; }
+.connection-diagnostics-rows section { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; padding: .75rem; background: hsl(var(--surface-muted)); border-radius: .5rem; }
+.connection-diagnostics-rows small { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.connection-diagnostics :focus-visible, .connection-diagnostics-trigger:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+@media(max-width: 480px) { .connection-diagnostics-rows section { grid-template-columns: 1fr; } }
+.connection-diagnostics p, .connection-diagnostics dl, .connection-diagnostics details { font-size: .875rem; line-height: 1.4; }
+.connection-diagnostics header { position: sticky; top: -1.25rem; padding-block: .5rem; background: hsl(var(--surface)); }
+.connection-diagnostics-rows section { line-height: 1.35; }

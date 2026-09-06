@@ -1,5 +1,6 @@
 package com.playsay.gateway.service
 
+import com.playsay.gateway.config.RegionalRoutingEnvironment
 import com.playsay.gateway.dto.MediaRoutingIceServerResponse
 import com.playsay.gateway.dto.MediaRoutingResponse
 import io.micrometer.core.instrument.MeterRegistry
@@ -31,7 +32,10 @@ class RegionalMediaRoutingService(
     @param:Value("\${playsay.livekit.regional-relay.credential-ttl-seconds:900}") private val credentialTtlSeconds: Long,
     private val clock: Clock,
     private val meterRegistry: MeterRegistry,
+    @param:Value("\${spring.security.oauth2.resourceserver.jwt.issuer-uri:}") private val issuerUri: String,
 ) {
+    private val routingEnvironment = RegionalRoutingEnvironment.forName(environment)
+
     @PostConstruct
     fun validateConfiguration() {
         require(legacyMode in supportedLegacyModes) { "Unsupported regional relay compatibility mode" }
@@ -46,10 +50,11 @@ class RegionalMediaRoutingService(
             "Regional media requires regional signaling"
         }
         if (selectedSignalingMode == rfSignalingMode || selectedMediaMode == rfMediaMode) {
-            require(environment == productionEnvironment) { "Regional media relay can be enabled only in production" }
+            require(routingEnvironment != null) { "Regional routing environment is invalid" }
+            require(issuerUri == routingEnvironment.issuer) { "Regional routing issuer is invalid" }
         }
         if (selectedSignalingMode == rfSignalingMode) {
-            require(signalingUrl.trim() == trustedSignalingUrl) { "Regional classroom signaling URL is invalid" }
+            require(signalingUrl.trim() == routingEnvironment?.signalingUrl) { "Regional classroom signaling URL is invalid" }
         }
         if (selectedMediaMode == rfMediaMode) {
             require(sharedSecret.matches(secretPattern)) { "Regional media relay secret is invalid" }
@@ -60,7 +65,8 @@ class RegionalMediaRoutingService(
     }
 
     fun selectionFor(origin: String?): RegionalClassroomRoutingSelection? {
-        val trustedRequest = environment == productionEnvironment && origin == trustedOrigin
+        val trustedRequest = routingEnvironment != null && origin == routingEnvironment.origin &&
+            issuerUri == routingEnvironment.issuer
         val signalingSelected = trustedRequest && resolvedSignalingMode() == rfSignalingMode
         val mediaSelected = trustedRequest && resolvedMediaMode() == rfMediaMode
         recordSignalingRoute(if (signalingSelected) regionalSignalingRouteClass else baselineSignalingRouteClass)
@@ -71,7 +77,7 @@ class RegionalMediaRoutingService(
         }
 
         return RegionalClassroomRoutingSelection(
-            serverUrl = trustedSignalingUrl.takeIf { signalingSelected },
+            serverUrl = routingEnvironment?.signalingUrl.takeIf { signalingSelected },
             mediaRouting = if (mediaSelected) createMediaRouting() else null,
         )
     }
@@ -86,7 +92,7 @@ class RegionalMediaRoutingService(
             iceTransportPolicy = relayTransportPolicy,
             iceServers = listOf(
                 MediaRoutingIceServerResponse(
-                    urls = relayUrls,
+                    urls = requireNotNull(routingEnvironment).relayUrls,
                     username = username,
                     credential = credential,
                 ),
@@ -127,9 +133,6 @@ class RegionalMediaRoutingService(
         private const val legacyCombinedMode = "rf-origin-relay"
         private const val rfSignalingMode = "rf-two-hop"
         private const val rfMediaMode = "rf-turn-relay"
-        private const val productionEnvironment = "prod"
-        private const val trustedOrigin = "https://online.honeyschool.ru"
-        private const val trustedSignalingUrl = "wss://online.honeyschool.ru/livekit"
         private const val regionalPolicy = "REGIONAL_RELAY"
         private const val routingRevision = "selectel-rf-v1"
         private const val relayTransportPolicy = "relay"
@@ -149,10 +152,5 @@ class RegionalMediaRoutingService(
         private val supportedMediaModes = setOf(offMode, rfMediaMode)
         private val secretPattern = Regex("^[0-9a-f]{64}$")
         private val secureRandom = SecureRandom()
-        private val relayUrls = listOf(
-            "turn:turn.honeyschool.ru:3478?transport=udp",
-            "turn:turn.honeyschool.ru:3478?transport=tcp",
-            "turns:turn.honeyschool.ru:5349?transport=tcp",
-        )
     }
 }

@@ -4,6 +4,40 @@ export const frChatPushNotification = {
 };
 
 export const fr = {
+  routeDiagnostics: {
+    geoProvider: "Fournisseur GeoIP : IPinfo Lite · CC BY-SA 4.0",
+    configured: "Réponse API",
+    receiving: "Les données média arrivent",
+    noRecentMedia: "Aucune preuve récente de réception média",
+    policies: {"relay": "Selectel TURN requis", "baseline": "Trajet standard", "invalid": "Paramètres régionaux invalides"},
+
+    stages: {"ENTRY": "Entrée", "AUTH": "Authentification", "POLICY": "Politique", "SIGNALING": "Signalisation", "ICE": "Connexion ICE", "MEDIA": "Réception média"},
+    roles: {"NONE": "Général", "PUBLISHER": "Envoi", "SUBSCRIBER": "Réception"},
+    outcomes: {"STARTED": "Démarré", "SUCCESS": "Réussi", "FAILURE": "Échec", "UNAVAILABLE": "Indisponible"},
+
+  "title": "Diagnostic de connexion",
+  "unknown": "Inconnu",
+  "expected": "Trajet attendu",
+  "rf": "Via Selectel → AX41",
+  "direct": "Direct vers AX41",
+  "explanation": "Observations récentes du navigateur. La réponse d’une adresse publique ne prouve pas le trajet interne du serveur. TURN est vérifié avec le relais sélectionné ; les observations expirent après 15 secondes.",
+  "stale": "Périmé",
+  "connected": "Connexion observée",
+  "unavailable": "Aucune connexion",
+  "relayConfirmed": "Selectel TURN confirmé",
+  "relayUnconfirmed": "Selectel TURN non confirmé",
+  "events": "Derniers événements média",
+  "secondsAgo": "il y a {{count}} s",
+  "channels": {
+    "policy": "Politique de session",
+    "api": "Site / API",
+    "auth": "Authentification",
+    "signaling": "Signalisation",
+    "collaboration": "Collaboration",
+    "publisher": "Média : envoi",
+    "subscriber": "Média : réception"
+  }
+},
   common: {
     appName: "Honey School",
     actions: {
@@ -157,6 +191,7 @@ export const fr = {
   welcome: {
     logoLinkAria: "Ouvrir le site principal Honey School",
     returnToSite: "Retour au site",
+    connectViaRf: "Se connecter via la Russie",
   },
   chat: {
     retry: "Réessayer",
@@ -260,6 +295,7 @@ export const fr = {
       name: "Nom",
       language: "Langue",
       country: "Pays",
+      connectionRoute: "Connexion au cours",
       birthDate: "Date de naissance",
       timezone: "Fuseau horaire",
       learningGoal: "Objectif d’apprentissage",
@@ -267,6 +303,11 @@ export const fr = {
     country: {
       unspecified: "Non indiqué",
       russia: "Russie",
+    },
+    connectionRoute: {
+      auto: "Automatique",
+      rf: "Via la Russie",
+      hint: "Ce réglage s’applique lors de la prochaine entrée dans un cours.",
     },
     status: {
       checkingSession: "Vérification de la session",
@@ -1793,6 +1834,12 @@ export const fr = {
     },
   },
   userManagement: {
+    connectionRoute: {
+      label: "Itinéraire du cours",
+      auto: "Automatique",
+      rf: "Via la Russie",
+      aria: "Itinéraire de connexion pour {{name}}",
+    },
     translationPermission: {
       label: "Traduction vocale",
       hint: "Afficher la commande de traduction à l’élève et à l’enseignant pendant les cours individuels.",
@@ -1876,6 +1923,8 @@ export const fr = {
       delegationCreated: "Délégation créée.",
       translationPermissionSaved: "Paramètre de traduction vocale enregistré.",
       translationPermissionFailed: "Le paramètre de traduction vocale n’a pas pu être modifié.",
+      connectionRouteSaved: "Itinéraire de connexion enregistré.",
+      connectionRouteFailed: "Impossible de modifier l’itinéraire de connexion.",
     },
     errors: {
       adminRequired: "Actualisez votre session et reconnectez-vous avec les droits d’administrateur.",

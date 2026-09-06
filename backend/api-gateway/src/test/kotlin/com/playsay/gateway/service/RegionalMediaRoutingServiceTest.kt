@@ -69,7 +69,7 @@ class RegionalMediaRoutingServiceTest {
     }
 
     @Test
-    fun `enabled routing fails closed outside production`() {
+    fun `dev rejects production signaling endpoint`() {
         assertFailsWith<IllegalArgumentException> { enabledService(environment = "dev").validateConfiguration() }
     }
 
@@ -166,5 +166,7 @@ class RegionalMediaRoutingServiceTest {
         ttlSeconds,
         fixedClock,
         meterRegistry,
+        if (environment == "dev") "https://dev.ops.honey.school/keycloak/realms/playsay"
+        else "https://ops.honey.school/keycloak/realms/playsay",
     )
 }

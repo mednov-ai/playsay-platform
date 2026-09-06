@@ -3,6 +3,7 @@ package com.playsay.gateway.mapper
 import com.playsay.gateway.dto.TeacherDirectoryEntry
 import com.playsay.gateway.dto.UserDeletionOperationResponse
 import com.playsay.gateway.dto.UserManagementUser
+import com.playsay.gateway.dto.ConnectionRoutePreference
 import com.playsay.gateway.entity.AppUserEntity
 import com.playsay.gateway.entity.UserDeletionOperationEntity
 import com.playsay.gateway.utils.toApplicationRoles
@@ -29,6 +30,8 @@ fun AppUserEntity.toUserManagementUser(
         primaryTeacher = primaryTeacher?.toTeacherDirectoryEntry(),
         activeDelegates = activeDelegates.map(AppUserEntity::toTeacherDirectoryEntry),
         lessonTranslationAllowed = lessonTranslationAllowed,
+        connectionRoutePreference = runCatching { ConnectionRoutePreference.valueOf(connectionRoutePreference) }
+            .getOrDefault(ConnectionRoutePreference.AUTO),
     )
 
 fun UserDeletionOperationEntity.toResponse(): UserDeletionOperationResponse =

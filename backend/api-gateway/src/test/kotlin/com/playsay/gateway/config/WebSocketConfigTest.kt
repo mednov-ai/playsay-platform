@@ -92,6 +92,18 @@ class WebSocketConfigTest {
         assertFalse(policy.allows(null))
     }
 
+    @Test
+    fun `regional dev origin must be explicitly configured`() {
+        val dev = WebSocketOriginPolicy(
+            "https://dev.online.honey.school,https://dev.online.honeyschool.ru",
+        )
+        val prod = WebSocketOriginPolicy("https://online.honey.school,https://online.honeyschool.ru")
+
+        assertTrue(dev.allows("https://dev.online.honeyschool.ru"))
+        assertFalse(dev.allows("https://online.honeyschool.ru"))
+        assertFalse(prod.allows("https://dev.online.honeyschool.ru"))
+    }
+
     private fun OriginHandshakeInterceptor.accepts(origin: String): Boolean {
         val servletRequest = MockHttpServletRequest("GET", "/ws/lessons").apply {
             scheme = "https"

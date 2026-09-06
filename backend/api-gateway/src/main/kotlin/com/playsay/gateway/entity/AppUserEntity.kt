@@ -9,6 +9,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "app_user")
+@Suppress("LongParameterList")
 class AppUserEntity(
     @Id
     @Column(name = "id", nullable = false)
@@ -35,6 +36,8 @@ class AppUserEntity(
     var timezone: String? = null,
     @Column(name = "learning_goal", length = 500)
     var learningGoal: String? = null,
+    @Column(name = "connection_route_preference", nullable = false, length = 8)
+    var connectionRoutePreference: String = "AUTO",
     @Column(name = "managed_by_teacher", nullable = false)
     var managedByTeacher: Boolean = false,
     @Column(name = "managed_by_teacher_user_id")

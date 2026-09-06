@@ -3,6 +3,7 @@ import com.playsay.gateway.client.LessonReminderEmailClient
 import com.playsay.gateway.client.LessonReminderEmailCommand
 
 import com.playsay.gateway.entity.AppUserEntity
+import com.playsay.gateway.entity.LessonEntity
 import com.playsay.gateway.entity.LessonEmailReminderEntity
 import com.playsay.gateway.repo.AppUserRepo
 import com.playsay.gateway.repo.schedule.LessonEmailReminderRepo
@@ -18,7 +19,6 @@ import java.time.format.FormatStyle
 import java.util.Locale
 import java.util.UUID
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -192,8 +192,7 @@ class LessonReminderScheduler(
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val appUserRepo: AppUserRepo,
     private val emailClient: LessonReminderEmailClient,
-    @param:Value("\${playsay.public-app-url:https://online.honey.school}")
-    private val publicAppUrl: String,
+    private val originPolicy: LessonAccessOriginPolicy,
 ) {
     @Scheduled(fixedDelayString = "\${playsay.lesson-reminders.poll-delay-ms:60000}")
     @Transactional
@@ -209,15 +208,7 @@ class LessonReminderScheduler(
 
     private fun dispatch(reminder: LessonEmailReminderEntity, now: Instant) {
         val lesson = lessonRepo.findById(reminder.lessonId).orElse(null)
-        val canDispatch = when (reminder.reminderType) {
-            MetaData.LessonReminderTypes.LESSON_START_30M ->
-                lesson != null && lesson.status == MetaData.LessonStatuses.SCHEDULED && lesson.scheduledStart?.isAfter(now) == true
-            MetaData.LessonReminderTypes.LESSON_RESCHEDULED ->
-                lesson != null && lesson.status !in closedReminderLessonStatuses &&
-                    reminder.scheduledStartSnapshot != null && reminder.scheduledEndSnapshot != null
-            else -> false
-        }
-        if (!canDispatch) {
+        if (!canDispatch(reminder, lesson, now)) {
             mark(reminder, MetaData.LessonReminderStatuses.SKIPPED, now)
             return
         }
@@ -264,6 +255,16 @@ class LessonReminderScheduler(
         lessonEmailReminderRepo.save(reminder)
     }
 
+    private fun canDispatch(reminder: LessonEmailReminderEntity, lesson: LessonEntity?, now: Instant): Boolean =
+        when (reminder.reminderType) {
+            MetaData.LessonReminderTypes.LESSON_START_30M ->
+                lesson != null && lesson.status == MetaData.LessonStatuses.SCHEDULED && lesson.scheduledStart?.isAfter(now) == true
+            MetaData.LessonReminderTypes.LESSON_RESCHEDULED ->
+                lesson != null && lesson.status !in closedReminderLessonStatuses &&
+                    reminder.scheduledStartSnapshot != null && reminder.scheduledEndSnapshot != null
+            else -> false
+        }
+
     private fun reminderModel(
         recipient: AppUserEntity,
         lesson: ScheduledLessonRow?,
@@ -284,7 +285,7 @@ class LessonReminderScheduler(
             "startsAt" to startsAt,
             "teacherName" to lesson?.teacherName,
             "studentNames" to studentNames.joinToString(", "),
-            "lessonUrl" to "${publicAppUrl.trimEnd('/')}/lessons/${lesson?.id}/classroom",
+            "lessonUrl" to lessonUrl(recipient, lesson?.id),
         )
     }
 
@@ -305,8 +306,13 @@ class LessonReminderScheduler(
             "startsAt" to reminder.scheduledStartSnapshot?.let(formatter::format),
             "endsAt" to reminder.scheduledEndSnapshot?.let(formatter::format),
             "teacherName" to lesson?.teacherName,
-            "lessonUrl" to "${publicAppUrl.trimEnd('/')}/lessons/${lesson?.id}/classroom",
+            "lessonUrl" to lessonUrl(recipient, lesson?.id),
         )
+    }
+
+    private fun lessonUrl(recipient: AppUserEntity, lessonId: UUID?): String {
+        val origin = originPolicy.forRecipient(recipient.connectionRoutePreference)
+        return "$origin/lessons/$lessonId/classroom"
     }
 
     private fun mark(reminder: LessonEmailReminderEntity, status: String, now: Instant) {

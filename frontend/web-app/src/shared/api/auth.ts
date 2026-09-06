@@ -48,7 +48,12 @@ export function defaultAuthIssuer(hostname = globalThis.location?.hostname ?? ""
   ) {
     return "https://ops.honey.school/keycloak/realms/playsay";
   }
-  if (hostname === "dev.online.honey.school" || hostname === "dev.key.honey.school") {
+  if (
+    hostname === "dev.online.honey.school"
+    || hostname === "dev.key.honey.school"
+    || hostname === "dev.online.honeyschool.ru"
+    || hostname === "dev.key.honeyschool.ru"
+  ) {
     return "https://dev.ops.honey.school/keycloak/realms/playsay";
   }
   return "https://ops.play-and-say.ru:18443/keycloak/realms/playsay";
@@ -115,7 +120,7 @@ export async function startLogin(config = authConfig): Promise<void> {
   const codeChallenge = await createCodeChallenge(codeVerifier);
   const state = createCodeVerifier();
   const language = currentApiLanguage();
-  const flow: LoginFlow = { codeVerifier, state, redirectUri };
+  const flow: LoginFlow = { codeVerifier, state, redirectUri, returnPath: currentLoginReturnPath() };
 
   rememberPendingLoginLanguage(language);
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
@@ -160,7 +165,7 @@ export async function startSilentLogin(config = authConfig, returnPath?: string)
   const codeVerifier = createCodeVerifier();
   const codeChallenge = await createCodeChallenge(codeVerifier);
   const state = createCodeVerifier();
-  const flow: LoginFlow = { codeVerifier, state, redirectUri, silent: true, returnPath: safeReturnPath(returnPath) };
+  const flow: LoginFlow = { codeVerifier, state, redirectUri, silent: true, returnPath: returnPath === undefined ? currentLoginReturnPath() : safeReturnPath(returnPath) };
 
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
   window.location.assign(
@@ -453,6 +458,11 @@ function base64UrlEncode(bytes: Uint8Array): string {
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+function currentLoginReturnPath(): string {
+  const { pathname, search, hash } = window.location;
+  return pathname === "/auth/callback" ? "/" : safeReturnPath(`${pathname}${search}${hash}`);
 }
 
 function safeReturnPath(value: string | null | undefined): string {

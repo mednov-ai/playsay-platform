@@ -85,7 +85,10 @@ class ScheduledLessonReminderControllerTest : ScheduledLessonControllerTestFixtu
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val studentOne = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
         val studentTwo = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
-        userProfileStore.currentUserId(studentOne)
+        userProfileStore.update(
+            studentOne,
+            UpdateUserProfileRequest(connectionRoutePreference = ConnectionRoutePreference.RF),
+        )
         val studentTwoId = userProfileStore.currentUserId(studentTwo)
         appUserRepo.findById(studentTwoId).orElseThrow().apply {
             email = null
@@ -111,7 +114,13 @@ class ScheduledLessonReminderControllerTest : ScheduledLessonControllerTestFixtu
         assertEquals(2, sent.size)
         assertEquals(listOf("student.one@example.com", "teacher.one@example.com"), sent.map { email -> email.to }.sorted())
         assertTrue(sent.all { email -> email.templateKey == "lesson-reminder-30m" })
-        assertTrue(sent.all { email -> email.model["lessonUrl"] == "https://online.honey.school/lessons/${lesson.id}/classroom" })
+        assertEquals(
+            mapOf(
+                "student.one@example.com" to "https://online.honeyschool.ru/lessons/${lesson.id}/classroom",
+                "teacher.one@example.com" to "https://online.honey.school/lessons/${lesson.id}/classroom",
+            ),
+            sent.associate { email -> email.to to email.model["lessonUrl"] },
+        )
         assertEquals(2, reminders.count { reminder -> reminder.status == "SENT" })
         assertEquals(1, reminders.count { reminder -> reminder.status == "SKIPPED" })
     }

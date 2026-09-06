@@ -73,6 +73,7 @@ function appShellProps(): AppShellProps {
       displayName: "Teacher Demo",
       locale: "ru",
       countryCode: "RU",
+      connectionRoutePreference: "AUTO",
       timezone: "Europe/Moscow",
       learningGoal: null,
       lessonTranslationAllowed: false,

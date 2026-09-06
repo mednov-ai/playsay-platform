@@ -4,6 +4,40 @@ export const enChatPushNotification = {
 };
 
 export const en = {
+  routeDiagnostics: {
+    geoProvider: "GeoIP provider: IPinfo Lite · CC BY-SA 4.0",
+    configured: "API response",
+    receiving: "Media data is arriving",
+    noRecentMedia: "No recent media reception evidence",
+    policies: {"relay": "Selectel TURN required", "baseline": "Baseline route", "invalid": "Invalid regional settings"},
+
+    stages: {"ENTRY": "Entry", "AUTH": "Authentication", "POLICY": "Policy", "SIGNALING": "Signaling", "ICE": "ICE connection", "MEDIA": "Media reception"},
+    roles: {"NONE": "General", "PUBLISHER": "Sending", "SUBSCRIBER": "Receiving"},
+    outcomes: {"STARTED": "Started", "SUCCESS": "Success", "FAILURE": "Failed", "UNAVAILABLE": "Unavailable"},
+
+  "title": "Connection diagnostics",
+  "unknown": "Unknown",
+  "expected": "Expected route",
+  "rf": "Via Selectel → AX41",
+  "direct": "Direct to AX41",
+  "explanation": "Recent browser observations follow. A public endpoint response does not prove the internal server path. TURN is verified separately against the selected relay; observations expire after 15 seconds.",
+  "stale": "Stale",
+  "connected": "Connection observed",
+  "unavailable": "No connection",
+  "relayConfirmed": "Selectel TURN confirmed",
+  "relayUnconfirmed": "Selectel TURN unconfirmed",
+  "events": "Recent media events",
+  "secondsAgo": "{{count}} s ago",
+  "channels": {
+    "policy": "Session policy",
+    "api": "Website / API",
+    "auth": "Authentication",
+    "signaling": "Signaling",
+    "collaboration": "Collaboration",
+    "publisher": "Media: sending",
+    "subscriber": "Media: receiving"
+  }
+},
   common: {
     appName: "Honey School",
     actions: {
@@ -157,6 +191,7 @@ export const en = {
   welcome: {
     logoLinkAria: "Open the main Honey School website",
     returnToSite: "Back to website",
+    connectViaRf: "Connect via Russia",
   },
   chat: {
     retry: "Retry",
@@ -260,6 +295,7 @@ export const en = {
       name: "Name",
       language: "Language",
       country: "Country",
+      connectionRoute: "Lesson connection",
       birthDate: "Date of birth",
       timezone: "Time zone",
       learningGoal: "Learning goal",
@@ -267,6 +303,11 @@ export const en = {
     country: {
       unspecified: "Not specified",
       russia: "Russia",
+    },
+    connectionRoute: {
+      auto: "Automatic",
+      rf: "Via Russia",
+      hint: "This setting applies the next time you enter a lesson.",
     },
     status: {
       checkingSession: "Checking session",
@@ -1793,6 +1834,12 @@ export const en = {
     },
   },
   userManagement: {
+    connectionRoute: {
+      label: "Lesson route",
+      auto: "Automatic",
+      rf: "Via Russia",
+      aria: "Connection route for {{name}}",
+    },
     translationPermission: {
       label: "Voice translation",
       hint: "Show the translation control to the student and teacher in individual lessons.",
@@ -1876,6 +1923,8 @@ export const en = {
       delegationCreated: "Delegation created.",
       translationPermissionSaved: "Voice translation setting saved.",
       translationPermissionFailed: "The voice translation setting could not be changed.",
+      connectionRouteSaved: "Connection route saved.",
+      connectionRouteFailed: "The connection route could not be changed.",
     },
     errors: {
       adminRequired: "Refresh your session and sign in again with administrator access.",

@@ -4,6 +4,40 @@ export const deChatPushNotification = {
 };
 
 export const de = {
+  routeDiagnostics: {
+    geoProvider: "GeoIP-Anbieter: IPinfo Lite · CC BY-SA 4.0",
+    configured: "API-Antwort",
+    receiving: "Mediendaten werden empfangen",
+    noRecentMedia: "Kein aktueller Nachweis des Medienempfangs",
+    policies: {"relay": "Selectel TURN erforderlich", "baseline": "Standardroute", "invalid": "Ungültige regionale Einstellungen"},
+
+    stages: {"ENTRY": "Einstieg", "AUTH": "Anmeldung", "POLICY": "Richtlinie", "SIGNALING": "Signalisierung", "ICE": "ICE-Verbindung", "MEDIA": "Medienempfang"},
+    roles: {"NONE": "Allgemein", "PUBLISHER": "Senden", "SUBSCRIBER": "Empfangen"},
+    outcomes: {"STARTED": "Gestartet", "SUCCESS": "Erfolgreich", "FAILURE": "Fehler", "UNAVAILABLE": "Nicht verfügbar"},
+
+  "title": "Verbindungsdiagnose",
+  "unknown": "Unbekannt",
+  "expected": "Erwartete Route",
+  "rf": "Über Selectel → AX41",
+  "direct": "Direkt zu AX41",
+  "explanation": "Aktuelle Browserbeobachtungen. Die Antwort einer öffentlichen Adresse belegt nicht den internen Serverpfad. TURN wird anhand des gewählten Relays geprüft; nach 15 Sekunden sind Beobachtungen veraltet.",
+  "stale": "Veraltet",
+  "connected": "Verbindung beobachtet",
+  "unavailable": "Keine Verbindung",
+  "relayConfirmed": "Selectel TURN bestätigt",
+  "relayUnconfirmed": "Selectel TURN unbestätigt",
+  "events": "Letzte Medienereignisse",
+  "secondsAgo": "vor {{count}} s",
+  "channels": {
+    "policy": "Sitzungsrichtlinie",
+    "api": "Website / API",
+    "auth": "Anmeldung",
+    "signaling": "Signalisierung",
+    "collaboration": "Zusammenarbeit",
+    "publisher": "Medien: Senden",
+    "subscriber": "Medien: Empfangen"
+  }
+},
   common: {
     appName: "Honey School",
     actions: {
@@ -157,6 +191,7 @@ export const de = {
   welcome: {
     logoLinkAria: "Hauptwebsite von Honey School öffnen",
     returnToSite: "Zur Website zurück",
+    connectViaRf: "Über Russland verbinden",
   },
   chat: {
     retry: "Erneut versuchen",
@@ -260,6 +295,7 @@ export const de = {
       name: "Name",
       language: "Sprache",
       country: "Land",
+      connectionRoute: "Unterrichtsverbindung",
       birthDate: "Geburtsdatum",
       timezone: "Zeitzone",
       learningGoal: "Lernziel",
@@ -267,6 +303,11 @@ export const de = {
     country: {
       unspecified: "Nicht angegeben",
       russia: "Russland",
+    },
+    connectionRoute: {
+      auto: "Automatisch",
+      rf: "Über Russland",
+      hint: "Diese Einstellung gilt beim nächsten Unterrichtseintritt.",
     },
     status: {
       checkingSession: "Sitzung wird geprüft",
@@ -1793,6 +1834,12 @@ export const de = {
     },
   },
   userManagement: {
+    connectionRoute: {
+      label: "Unterrichtsroute",
+      auto: "Automatisch",
+      rf: "Über Russland",
+      aria: "Verbindungsroute für {{name}}",
+    },
     translationPermission: {
       label: "Sprachübersetzung",
       hint: "Die Übersetzungsschaltfläche im Einzelunterricht für Schüler und Lehrkraft anzeigen.",
@@ -1876,6 +1923,8 @@ export const de = {
       delegationCreated: "Delegierung erstellt.",
       translationPermissionSaved: "Einstellung für die Sprachübersetzung gespeichert.",
       translationPermissionFailed: "Die Einstellung für die Sprachübersetzung konnte nicht geändert werden.",
+      connectionRouteSaved: "Verbindungsroute gespeichert.",
+      connectionRouteFailed: "Die Verbindungsroute konnte nicht geändert werden.",
     },
     errors: {
       adminRequired: "Aktualisieren Sie Ihre Sitzung und melden Sie sich erneut mit Administratorrechten an.",

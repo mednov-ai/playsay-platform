@@ -20,6 +20,14 @@ class LessonAccessOriginPolicyTest {
     }
 
     @Test
+    fun `recipient policy uses explicit preference and does not infer unknown country`() {
+        assertEquals(policy.rfOrigin, policy.forRecipient("RF"))
+        assertEquals(policy.directOrigin, policy.forRecipient("AUTO"))
+        assertEquals(policy.directOrigin, policy.forRecipient(null))
+        assertEquals(policy.directOrigin, policy.forRecipient("unknown"))
+    }
+
+    @Test
     fun `rejects lookalike foreign and path-bearing origins`() {
         assertNull(policy.resolve("https://online.honeyschool.ru.example"))
         assertNull(policy.resolve("https://online.honey.school.evil"))

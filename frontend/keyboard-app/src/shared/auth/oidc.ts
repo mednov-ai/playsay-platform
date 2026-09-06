@@ -46,7 +46,12 @@ export function defaultAuthIssuer(hostname = globalThis.location?.hostname ?? ""
   ) {
     return "https://ops.honey.school/keycloak/realms/playsay";
   }
-  if (hostname === "dev.online.honey.school" || hostname === "dev.key.honey.school") {
+  if (
+    hostname === "dev.online.honey.school"
+    || hostname === "dev.key.honey.school"
+    || hostname === "dev.online.honeyschool.ru"
+    || hostname === "dev.key.honeyschool.ru"
+  ) {
     return "https://dev.ops.honey.school/keycloak/realms/playsay";
   }
   return "https://ops.play-and-say.ru:18443/keycloak/realms/playsay";

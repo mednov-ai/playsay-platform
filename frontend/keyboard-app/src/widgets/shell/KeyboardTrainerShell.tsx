@@ -2291,7 +2291,7 @@ export function validatedReturnTarget(search = window.location.search): string |
   if (!value) return null;
   try {
     const target = new URL(value);
-    const allowedHosts = new Set(["online.honey.school", "dev.online.honey.school", "online.play-and-say.ru", "online.honeyschool.ru", "honeyschool.ru", "localhost", "127.0.0.1"]);
+    const allowedHosts = new Set(["online.honey.school", "dev.online.honey.school", "dev.online.honeyschool.ru", "online.play-and-say.ru", "online.honeyschool.ru", "honeyschool.ru", "localhost", "127.0.0.1"]);
     const secure = target.protocol === "https:";
     const localDevelopment = target.protocol === "http:" && (target.hostname === "localhost" || target.hostname === "127.0.0.1");
     return (secure || localDevelopment) && !target.username && !target.password && allowedHosts.has(target.hostname) ? target.toString() : null;

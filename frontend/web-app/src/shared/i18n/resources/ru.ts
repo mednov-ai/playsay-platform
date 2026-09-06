@@ -4,6 +4,40 @@ export const ruChatPushNotification = {
 };
 
 export const ru = {
+  routeDiagnostics: {
+    geoProvider: "Источник GeoIP: IPinfo Lite · CC BY-SA 4.0",
+    configured: "Ответ API",
+    receiving: "Медиаданные поступают",
+    noRecentMedia: "Свежего подтверждения получения медиа нет",
+    policies: {"relay": "Требуется Selectel TURN", "baseline": "Базовый маршрут", "invalid": "Региональные настройки недействительны"},
+
+    stages: {"ENTRY": "Вход", "AUTH": "Авторизация", "POLICY": "Политика", "SIGNALING": "Сигнализация", "ICE": "Соединение ICE", "MEDIA": "Получение медиа"},
+    roles: {"NONE": "Общее", "PUBLISHER": "Отправка", "SUBSCRIBER": "Получение"},
+    outcomes: {"STARTED": "Начато", "SUCCESS": "Успешно", "FAILURE": "Ошибка", "UNAVAILABLE": "Нет данных"},
+
+  "title": "Диагностика соединения",
+  "unknown": "Неизвестно",
+  "expected": "Ожидаемый маршрут",
+  "rf": "Через Selectel → AX41",
+  "direct": "Напрямую к AX41",
+  "explanation": "Ниже — последние наблюдения браузера. Ответ публичного адреса не доказывает внутренний путь сервера. TURN подтверждается отдельно по выбранному relay; после 15 секунд без наблюдений данные устаревают.",
+  "stale": "Устарело",
+  "connected": "Соединение наблюдается",
+  "unavailable": "Нет соединения",
+  "relayConfirmed": "Selectel TURN подтверждён",
+  "relayUnconfirmed": "Selectel TURN не подтверждён",
+  "events": "Последние события медиа",
+  "secondsAgo": "{{count}} с назад",
+  "channels": {
+    "policy": "Политика сеанса",
+    "api": "Сайт / API",
+    "auth": "Авторизация",
+    "signaling": "Сигнализация",
+    "collaboration": "Совместная работа",
+    "publisher": "Медиа: отправка",
+    "subscriber": "Медиа: получение"
+  }
+},
   common: {
     appName: "Honey School",
     actions: {
@@ -157,6 +191,7 @@ export const ru = {
   welcome: {
     logoLinkAria: "Открыть основной сайт Honey School",
     returnToSite: "Вернуться на сайт",
+    connectViaRf: "Подключиться через РФ",
   },
   chat: {
     retry: "Повторить",
@@ -260,6 +295,7 @@ export const ru = {
       name: "Имя",
       language: "Язык",
       country: "Страна",
+      connectionRoute: "Подключение к уроку",
       birthDate: "Дата рождения",
       timezone: "Часовой пояс",
       learningGoal: "Цель обучения",
@@ -267,6 +303,11 @@ export const ru = {
     country: {
       unspecified: "Не указана",
       russia: "Россия",
+    },
+    connectionRoute: {
+      auto: "Автоматически",
+      rf: "Через РФ",
+      hint: "Настройка применяется при следующем входе в урок.",
     },
     status: {
       checkingSession: "Проверяем сессию",
@@ -1825,6 +1866,12 @@ export const ru = {
     },
   },
   userManagement: {
+    connectionRoute: {
+      label: "Маршрут урока",
+      auto: "Автоматически",
+      rf: "Через РФ",
+      aria: "Маршрут подключения для {{name}}",
+    },
     translationPermission: {
       label: "Голосовой перевод",
       hint: "Показывать ученику и преподавателю кнопку перевода на индивидуальном уроке.",
@@ -1908,6 +1955,8 @@ export const ru = {
       delegationCreated: "Делегирование создано.",
       translationPermissionSaved: "Настройка голосового перевода сохранена.",
       translationPermissionFailed: "Не удалось изменить настройку голосового перевода.",
+      connectionRouteSaved: "Маршрут подключения сохранён.",
+      connectionRouteFailed: "Не удалось изменить маршрут подключения.",
     },
     errors: {
       adminRequired: "Обновите сессию и войдите снова с правами администратора.",

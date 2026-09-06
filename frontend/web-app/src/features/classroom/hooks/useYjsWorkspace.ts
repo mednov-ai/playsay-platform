@@ -1,3 +1,4 @@
+import { observeConnection } from "../../../shared/routing/connectionDiagnostics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createCollaborationDocumentToken,
@@ -207,15 +208,20 @@ export function useYjsWorkspace({
             socket.close();
             return;
           }
+          observeConnection("collaboration", socket.url, true);
           reconnectAttempt = 0;
           setStatus("connected");
           runtime.startSocketSync(socket);
         };
         socket.onmessage = (event) => {
-          if (socketRef.current === socket) runtime.handleSocketMessage(event.data);
+          if (socketRef.current === socket) {
+            observeConnection("collaboration", socket.url, true);
+            runtime.handleSocketMessage(event.data);
+          }
         };
         socket.onclose = () => {
           if (socketRef.current !== socket) return;
+          observeConnection("collaboration", socket.url, false);
           socketRef.current = null;
           runtime.setSocket(null);
           if (!disposed) scheduleReconnect();

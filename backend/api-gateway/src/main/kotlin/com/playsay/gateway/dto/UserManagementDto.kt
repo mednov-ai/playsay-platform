@@ -22,6 +22,7 @@ data class UserManagementUser(
     val activeDelegates: List<TeacherDirectoryEntry> = emptyList(),
     @field:Schema(accessMode = Schema.AccessMode.READ_ONLY)
     val lessonTranslationAllowed: Boolean = false,
+    val connectionRoutePreference: ConnectionRoutePreference = ConnectionRoutePreference.AUTO,
 )
 
 data class TeacherDirectoryEntry(

@@ -169,7 +169,8 @@ class UserProfileStore(
             ).distinct()
 
     fun currentUserId(authentication: JwtAuthenticationToken): UUID {
-        rejectDeletion(authentication)
+        // The isolated upsert checks deletion intent atomically. Do not acquire an
+        // outer transaction's connection here before its REQUIRES_NEW transaction.
         val identity = authentication.toIdentity()
         return identityRepository.upsert(
             id = UUID.randomUUID(),

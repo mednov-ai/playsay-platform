@@ -260,6 +260,9 @@ interface VocabularySkillStateRepo : JpaRepository<VocabularySkillStateEntity, U
 }
 
 interface VocabularyPracticeRepo : JpaRepository<VocabularyPracticeEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from VocabularyPracticeEntity p where p.settingsJson like concat('%', :subject, '%')")
+    fun lockContainingSubject(subject: String): List<VocabularyPracticeEntity>
     fun findFirstByLessonIdAndStatusInOrderByUpdatedAtDesc(
         lessonId: UUID,
         statuses: Collection<PracticeStatus>,
@@ -308,6 +311,9 @@ interface VocabularyKeyResultRepo : JpaRepository<VocabularyKeyResultEntity, UUI
 }
 
 interface VocabularyPracticePlanRepo : JpaRepository<VocabularyPracticePlanEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from VocabularyPracticePlanEntity p where p.payloadJson like concat('%', :subject, '%')")
+    fun lockContainingSubject(subject: String): List<VocabularyPracticePlanEntity>
     fun findByIdAndCreatedBySubject(id: UUID, createdBySubject: String): VocabularyPracticePlanEntity?
     fun findByCreatedBySubjectAndMaterializationKey(createdBySubject: String, materializationKey: String): VocabularyPracticePlanEntity?
     @Lock(LockModeType.PESSIMISTIC_WRITE)

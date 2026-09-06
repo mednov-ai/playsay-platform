@@ -190,7 +190,7 @@ class UserManagementServiceTest {
         )
         `when`(operationRepo.findFirstByTargetSubjectOrderByCreatedAtDesc(lastAdmin.keycloakSubject)).thenReturn(null)
         `when`(appUserRepo.findByKeycloakSubject(lastAdmin.keycloakSubject)).thenReturn(lastAdmin)
-        `when`(appUserRepo.countByRolesContainingAndDeletedAtIsNull(MetaData.Roles.ADMIN)).thenReturn(1)
+        `when`(appUserRepo.countAdministratorsWithoutDeletion()).thenReturn(1)
 
         val lastAdminDelete = assertFailsWith<ProjectResponseException> {
             service.requestDeletion(authentication, lastAdmin.keycloakSubject, null)
@@ -200,7 +200,7 @@ class UserManagementServiceTest {
     }
 
     @Test
-    fun `teacher deletion requires a valid different replacement when dependencies exist`() {
+    fun `teacher deletion allows detaching without replacement but rejects an active lesson`() {
         val actorId = UUID.randomUUID()
         val target = AppUserEntity(
             id = UUID.randomUUID(),
@@ -223,15 +223,13 @@ class UserManagementServiceTest {
 
         `when`(ownershipService.hasInProgressLesson(target.id)).thenReturn(false)
 
-        val missingReplacement = assertFailsWith<ProjectResponseException> {
-            service.requestDeletion(authentication, target.keycloakSubject, null)
+        `when`(operationRepo.saveAndFlush(any(UserDeletionOperationEntity::class.java))).thenAnswer {
+            val saved = it.arguments[0] as UserDeletionOperationEntity
+            assertEquals(null, saved.replacementTeacherUserId)
+            saved
         }
-        assertEquals(MetaData.ErrorCodes.USER_DELETE_REPLACEMENT_REQUIRED, missingReplacement.errorCode)
-
-        val invalidReplacement = assertFailsWith<ProjectResponseException> {
-            service.requestDeletion(authentication, target.keycloakSubject, target.keycloakSubject)
-        }
-        assertEquals(MetaData.ErrorCodes.DELEGATION_TEACHER_INVALID, invalidReplacement.errorCode)
+        assertEquals("PENDING", service.requestDeletion(authentication, target.keycloakSubject, null).status)
+        assertEquals("PENDING", service.requestDeletion(authentication, target.keycloakSubject, target.keycloakSubject).status)
         assertTrue(target.deletedAt == null)
     }
 

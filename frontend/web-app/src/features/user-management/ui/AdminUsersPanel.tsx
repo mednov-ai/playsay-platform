@@ -1,13 +1,15 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Loader2, Plus, RefreshCw, Save, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
 import { useAdminManagementData } from "../api/useUserManagementData";
 import type { CreateUserInput, TeacherDirectoryEntry, UserManagementUser } from "../api/userManagement";
 import { ApiError } from "../../../shared/api/errors";
+import { showErrorToast } from "../../../shared/ui/ErrorToast";
 import { DelegationWizard } from "./DelegationWizard";
 import { DelegationList } from "./TeacherStudentsPanel";
 import { LessonTranslationPermissionControl } from "./LessonTranslationPermissionControl";
+import { UserDeletionDialog, useUserDeletion } from "./UserDeletionDialog";
 
 const roleNames = ["STUDENT", "TEACHER", "ADMIN"] as const;
 
@@ -17,11 +19,20 @@ export function AdminUsersPanel() {
   const [filters, setFilters] = useState({ role: "", search: "", status: "ACTIVE" });
   const [message, setMessage] = useState<string | null>(null);
   const data = useAdminManagementData(filters);
+  const deletion = useUserDeletion({
+    submit: data.removeUser.mutateAsync,
+    refresh: data.refreshAfterDeletion,
+    errorKey: userManagementErrorKey,
+  });
   const users = data.users.data ?? [];
   const teachers = data.directory.data ?? [];
   const students = data.students.data ?? [];
   const loading = data.users.isFetching || data.students.isFetching || data.directory.isFetching;
   const error = data.users.error ?? data.students.error ?? data.directory.error;
+
+  useEffect(() => {
+    if (error) showErrorToast(error, userManagementErrorKey(error));
+  }, [error]);
 
   function search(event: FormEvent) {
     event.preventDefault();
@@ -34,7 +45,9 @@ export function AdminUsersPanel() {
       await action();
       setMessage(success);
     } catch (caught) {
-      setMessage(t(userManagementErrorKey(caught)));
+      const key = userManagementErrorKey(caught);
+      setMessage(t(key));
+      showErrorToast(caught, key);
     }
   }
 
@@ -44,7 +57,7 @@ export function AdminUsersPanel() {
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">{t("userManagement.admin.eyebrow")}</p>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="flex items-center gap-2 text-2xl font-black"><ShieldCheck className="h-6 w-6 text-primary" />{t("userManagement.admin.title")}</h2>
+            <h2 id="admin-users-title" tabIndex={-1} className="flex items-center gap-2 text-2xl font-black"><ShieldCheck className="h-6 w-6 text-primary" />{t("userManagement.admin.title")}</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t("userManagement.admin.subtitle")}</p>
           </div>
           <Button onClick={() => void data.users.refetch()} type="button" variant="outline">
@@ -71,7 +84,7 @@ export function AdminUsersPanel() {
       </form>
 
       {message ? <p className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-semibold" role="status">{message}</p> : null}
-      {error ? <p className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm font-semibold text-destructive" role="alert">{error instanceof Error ? error.message : t("userManagement.messages.loadFailed")}</p> : null}
+      {error ? <p className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm font-semibold text-destructive" role="alert">{t(userManagementErrorKey(error))}</p> : null}
 
       <details className="rounded-2xl border border-border bg-white p-4 shadow-sm">
         <summary className="flex cursor-pointer list-none items-center gap-2 font-extrabold"><UserPlus className="h-5 w-5 text-primary" />{t("userManagement.admin.createUser")}</summary>
@@ -86,10 +99,7 @@ export function AdminUsersPanel() {
         {users.length === 0 ? <Empty>{t("userManagement.empty.users")}</Empty> : users.map((user) => (
           <UserCard
             key={user.subject}
-            onDelete={(replacementTeacherSubject) => perform(
-              () => data.removeUser.mutateAsync({ replacementTeacherSubject, subject: user.subject }),
-              t("userManagement.messages.deletionCompleted"),
-            )}
+            onDelete={() => deletion.open(user)}
             onPrimaryTeacher={(teacherSubject) => perform(
               () => data.assignTeacher.mutateAsync({ studentSubject: user.subject, teacherSubject }),
               t("userManagement.messages.teacherUpdated"),
@@ -99,15 +109,19 @@ export function AdminUsersPanel() {
               t("userManagement.messages.rolesUpdated"),
             )}
             onTranslationPermission={(allowed) => data.translationPermission.mutateAsync({ allowed, subject: user.subject })}
-            onTranslationPermissionError={() => setMessage(t("userManagement.messages.translationPermissionFailed"))}
+            onTranslationPermissionError={() => {
+              setMessage(t("userManagement.messages.translationPermissionFailed"));
+              showErrorToast(undefined, "userManagement.messages.translationPermissionFailed");
+            }}
             onTranslationPermissionSaved={() => setMessage(t("userManagement.messages.translationPermissionSaved"))}
             teachers={teachers}
             user={user}
-            deleting={data.removeUser.isPending && data.removeUser.variables?.subject === user.subject}
+            deleting={deletion.locked || deletion.isCompleted(user.subject)}
           />
         ))}
       </div>
 
+      <UserDeletionDialog deletion={deletion} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
         <DelegationWizard
           admin
@@ -123,7 +137,14 @@ export function AdminUsersPanel() {
             delegations={data.delegations.data ?? []}
             empty={t("userManagement.empty.delegations")}
             locale={i18n.language}
-            onRevoke={(id) => data.revoke.mutateAsync(id)}
+            onRevoke={async (id) => {
+              try {
+                await data.revoke.mutateAsync(id);
+              } catch (caught) {
+                showErrorToast(caught, userManagementErrorKey(caught));
+                throw caught;
+              }
+            }}
           />
         </div>
       </div>
@@ -143,7 +164,7 @@ function UserCard({
   user,
 }: {
   deleting: boolean;
-  onDelete: (replacementTeacherSubject?: string) => Promise<unknown>;
+  onDelete: () => void;
   onPrimaryTeacher: (teacherSubject: string) => Promise<unknown>;
   onRoles: (roles: string[], replacementTeacherSubject?: string) => Promise<unknown>;
   onTranslationPermission: (allowed: boolean) => Promise<unknown>;
@@ -179,7 +200,7 @@ function UserCard({
         {user.activeDelegates.length > 0 ? <p className="mt-1 text-xs font-bold text-primary">{t("userManagement.student.delegateCount", { count: user.activeDelegates.length })}</p> : null}
       </div>
       <div className="grid gap-3">
-        <fieldset className="flex flex-wrap gap-3" disabled={!active}>
+        <fieldset className="flex flex-wrap gap-3" disabled={!active || deleting}>
           <legend className="sr-only">{t("userManagement.fields.roles")}</legend>
           {roleNames.map((role) => (
             <label className="flex items-center gap-1.5 text-sm font-semibold" key={role}>
@@ -190,12 +211,12 @@ function UserCard({
         {student ? (
           <label className="grid gap-1 text-sm font-bold">
             {t("userManagement.fields.primaryTeacher")}
-            <select className="playsay-input" disabled={!active} onChange={(event) => void onPrimaryTeacher(event.target.value)} value={user.primaryTeacher?.subject ?? ""}>
+            <select className="playsay-input" disabled={!active || deleting} onChange={(event) => void onPrimaryTeacher(event.target.value)} value={user.primaryTeacher?.subject ?? ""}>
               <option value="">{t("userManagement.placeholders.noTeacher")}</option>
               {teachers.map((teacher) => <option key={teacher.subject} value={teacher.subject}>{teacher.displayName}</option>)}
             </select>
           </label>
-        ) : (
+        ) : user.roles.includes("TEACHER") && !roles.includes("TEACHER") ? (
           <label className="grid gap-1 text-sm font-bold">
             {t("userManagement.fields.replacementTeacher")}
             <select className="playsay-input" disabled={!active} onChange={(event) => setReplacement(event.target.value)} value={replacement}>
@@ -203,11 +224,11 @@ function UserCard({
               {teachers.filter((teacher) => teacher.subject !== user.subject).map((teacher) => <option key={teacher.subject} value={teacher.subject}>{teacher.displayName}</option>)}
             </select>
           </label>
-        )}
+        ) : null}
         {storedStudent ? (
           <LessonTranslationPermissionControl
             allowed={user.lessonTranslationAllowed}
-            disabled={!active}
+            disabled={!active || deleting}
             onChange={onTranslationPermission}
             onError={onTranslationPermissionError}
             onSaved={onTranslationPermissionSaved}
@@ -216,22 +237,19 @@ function UserCard({
         ) : null}
       </div>
       <div className="flex items-end gap-2 lg:flex-col lg:justify-end">
-        <Button className="h-9" disabled={!active || roles.length === 0} onClick={() => void onRoles(roles, replacement || undefined)} type="button">
+        <Button className="h-9" disabled={!active || deleting || roles.length === 0} onClick={() => void onRoles(roles, replacement || undefined)} type="button">
           <Save className="h-4 w-4" />{t("common.actions.save")}
         </Button>
         <Button
           disabled={!active || deleting}
-          onClick={() => {
-            if (window.confirm(t("userManagement.confirm.delete", { name: user.displayName ?? user.username ?? user.subject }))) {
-              void onDelete(replacement || undefined);
-            }
-          }}
+          onClick={onDelete}
+          title={deleting ? t("userManagement.deletion.locked") : undefined}
           className="h-9"
           type="button"
           variant="outline"
         >
-          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-          {t(deleting ? "userManagement.actions.deleting" : "userManagement.actions.delete")}
+          <Trash2 className="h-4 w-4" />
+          {t("userManagement.actions.delete")}
         </Button>
       </div>
     </article>

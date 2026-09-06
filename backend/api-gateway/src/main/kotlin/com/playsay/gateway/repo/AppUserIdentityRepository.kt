@@ -1,8 +1,12 @@
 package com.playsay.gateway.repo
 
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.utils.MetaData
 import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
+import org.springframework.dao.EmptyResultDataAccessException
+import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Propagation
@@ -24,25 +28,31 @@ class AppUserIdentityRepository(
         displayName: String?,
         issuedAt: Instant,
         now: Instant,
-    ): UUID = if (isH2()) {
-        upsertH2(id, subject, username, email, name, roles, displayName, now)
-    } else requireNotNull(
-        jdbcTemplate.queryForObject(
-            UPSERT_SQL,
-            UUID::class.java,
-            id,
-            subject,
-            username,
-            email,
-            name,
-            roles,
-            displayName,
-            Timestamp.from(now),
-            Timestamp.from(now),
-            Timestamp.from(issuedAt),
-            Timestamp.from(issuedAt),
-        ),
-    )
+    ): UUID = try {
+        if (isH2()) {
+            upsertH2(id, subject, username, email, name, roles, displayName, issuedAt, now)
+        } else {
+            requireNotNull(
+                jdbcTemplate.queryForObject(
+                    UPSERT_SQL,
+                    UUID::class.java,
+                    id,
+                    subject,
+                    username,
+                    email,
+                    name,
+                    roles,
+                    displayName,
+                    Timestamp.from(now),
+                    Timestamp.from(now),
+                    Timestamp.from(issuedAt),
+                    Timestamp.from(issuedAt),
+                ),
+            )
+        }
+    } catch (_: EmptyResultDataAccessException) {
+        throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.USER_DELETED)
+    }
 
     @Suppress("LongParameterList")
     private fun upsertH2(
@@ -53,17 +63,28 @@ class AppUserIdentityRepository(
         name: String?,
         roles: String?,
         displayName: String?,
+        issuedAt: Instant,
         now: Instant,
     ): UUID {
         val existingId = jdbcTemplate.query(
-            "select id from app_user where keycloak_subject = ?",
+            "select id from app_user where keycloak_subject = ? for update",
             { result, _ -> result.getObject("id", UUID::class.java) },
             subject,
         ).firstOrNull()
         if (existingId != null) {
+            val blocked = jdbcTemplate.queryForObject(
+                """select count(*) from app_user u where u.id = ? and
+                   (u.deleted_at is not null or exists (select 1 from user_deletion_operation d
+                     where d.target_user_id = u.id and
+                     (d.stage <> 'LEGACY' or d.status in ('PENDING', 'RUNNING', 'COMPLETED'))))""",
+                Long::class.java, existingId,
+            ) ?: 0
+            if (blocked > 0) throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.USER_DELETED)
             jdbcTemplate.update(
-                "update app_user set username = ?, email = ?, name = ?, roles = ?, updated_at = ? where id = ?",
-                username, email, name, roles, Timestamp.from(now), existingId,
+                """update app_user set username = ?, email = ?, name = ?,
+                   roles = case when roles_changed_at is null or ? >= roles_changed_at then ? else roles end,
+                   updated_at = ? where id = ?""",
+                username, email, name, Timestamp.from(issuedAt), roles, Timestamp.from(now), existingId,
             )
             return existingId
         }
@@ -98,6 +119,10 @@ class AppUserIdentityRepository(
                     else app_user.roles_changed_at
                 end,
                 updated_at = excluded.updated_at
+            where app_user.deleted_at is null and not exists (
+                select 1 from user_deletion_operation d where d.target_user_id = app_user.id
+                  and (d.stage <> 'LEGACY' or d.status in ('PENDING', 'RUNNING', 'COMPLETED'))
+            )
             returning id
         """.trimIndent()
 

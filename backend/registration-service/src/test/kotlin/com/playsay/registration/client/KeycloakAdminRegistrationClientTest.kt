@@ -13,6 +13,35 @@ import kotlin.test.assertTrue
 
 class KeycloakAdminRegistrationClientTest {
     @Test
+    fun `disable logout and delete address the exact identity and accept absence on replay`() {
+        val requests = mutableListOf<CapturedRequest>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            requests += CapturedRequest(exchange.requestMethod, exchange.requestURI.path, exchange.requestBody.readBytes().toString(Charsets.UTF_8))
+            if (exchange.requestURI.path.endsWith("/protocol/openid-connect/token")) {
+                exchange.respondJson(200, """{"access_token":"test-token"}""")
+            } else exchange.respondJson(404, """{"error":"not-found"}""")
+        }
+        server.start()
+        try {
+            val client = KeycloakAdminRegistrationClient(
+                HttpClient.newHttpClient(), jacksonObjectMapper(),
+                "http://127.0.0.1:${server.address.port}/keycloak", "playsay", "client", "secret",
+            )
+            repeat(2) {
+                client.disableUser("exact-subject")
+                client.revokeAllSessions("exact-subject")
+                client.deleteUser("exact-subject")
+            }
+            val adminRequests = requests.filter { "/admin/" in it.path }
+            assertEquals(listOf("PUT", "POST", "DELETE", "PUT", "POST", "DELETE"), adminRequests.map { it.method })
+            assertTrue(adminRequests.all { it.path.startsWith("/keycloak/admin/realms/playsay/users/exact-subject") })
+            assertEquals("""{"enabled":false}""", adminRequests.first().body)
+            assertTrue(adminRequests[1].path.endsWith("/logout"))
+        } finally { server.stop(0) }
+    }
+
+    @Test
     fun `current device revocation deletes only a session owned by the exact subject`() {
         val requests = mutableListOf<CapturedRequest>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

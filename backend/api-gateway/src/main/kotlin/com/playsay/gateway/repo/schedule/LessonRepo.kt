@@ -11,6 +11,21 @@ import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 
 interface LessonRepo : JpaRepository<LessonEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select l from LessonEntity l where l.teacherUserId = :userId
+          or exists (select p.id from LessonParticipantEntity p where p.lessonId = l.id and p.studentUserId = :userId)
+        order by l.id
+    """)
+    fun lockForUser(userId: UUID): List<LessonEntity>
+
+    @Query("""
+        select count(d) > 0 from UserDeletionOperationEntity d, LessonEntity l
+        where l.id = :lessonId and (d.stage <> 'LEGACY' or d.status in ('PENDING', 'RUNNING', 'COMPLETED'))
+          and (d.targetUserId = l.teacherUserId or exists
+            (select p.id from LessonParticipantEntity p where p.lessonId = l.id and p.studentUserId = d.targetUserId))
+    """)
+    fun hasDeletingParticipant(lessonId: UUID): Boolean
     fun countByTeacherUserIdAndStatus(teacherUserId: UUID, status: String): Long
 
     fun findByTeacherUserId(teacherUserId: UUID): List<LessonEntity>

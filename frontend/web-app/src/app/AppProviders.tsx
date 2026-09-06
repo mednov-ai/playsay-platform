@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import { useThemeMode } from "../shared/theme";
+import { ErrorToastHost } from "../shared/ui/ErrorToast";
 
 export const appQueryClient = new QueryClient({
   defaultOptions: {
@@ -17,7 +18,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={appQueryClient}>
-      <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
+      <ThemeContext.Provider value={theme}>{children}<ErrorToastHost /></ThemeContext.Provider>
     </QueryClientProvider>
   );
 }

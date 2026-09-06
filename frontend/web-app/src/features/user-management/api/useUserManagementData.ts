@@ -15,7 +15,6 @@ import {
   updateUserRoles,
   updateStudentLessonTranslationPermission,
   updateStudentConnectionRoute,
-  waitForUserDeletion,
   userManagementKeys,
   type CreateDelegationInput,
   type CreateUserInput,
@@ -52,6 +51,7 @@ export function useAdminManagementData(filters: { search: string; role: string; 
   const users = useQuery({
     queryFn: () => fetchAdminUsers(filters),
     queryKey: userManagementKeys.adminUsers(filters.search, filters.role, filters.status),
+    refetchOnMount: "always",
   });
   const students = useQuery({
     queryFn: () => fetchAdminUsers({ role: "STUDENT", search: "", status: "ACTIVE" }),
@@ -77,11 +77,8 @@ export function useAdminManagementData(filters: { search: string; role: string; 
     onSuccess: refresh,
   });
   const removeUser = useMutation({
-    mutationFn: async ({ replacementTeacherSubject, subject }: { subject: string; replacementTeacherSubject?: string }) => {
-      const operation = await deleteUser(subject, replacementTeacherSubject);
-      return waitForUserDeletion(operation);
-    },
-    onSuccess: refresh,
+    mutationFn: ({ subject }: { subject: string }) => deleteUser(subject),
+    retry: false,
   });
   const delegate = useMutation({ mutationFn: (input: CreateDelegationInput) => createDelegation("admin", input), onSuccess: refresh });
   const revoke = useMutation({ mutationFn: (id: string) => revokeDelegation("admin", id), onSuccess: refresh });
@@ -90,5 +87,6 @@ export function useAdminManagementData(filters: { search: string; role: string; 
       updateStudentLessonTranslationPermission(subject, allowed),
     onSuccess: refresh,
   });
-  return { addUser, assignTeacher, changeRoles, delegate, delegations, directory, removeUser, revoke, students, translationPermission, users };
+  const refreshAfterDeletion = () => queryClient.invalidateQueries({ queryKey: userManagementKeys.all }, { throwOnError: true });
+  return { addUser, assignTeacher, changeRoles, delegate, delegations, directory, refreshAfterDeletion, removeUser, revoke, students, translationPermission, users };
 }

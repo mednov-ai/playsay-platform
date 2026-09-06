@@ -64,6 +64,9 @@ interface RegistrationGateway {
     fun deleteUser(subject: String) {
         throw UnsupportedOperationException("User management is not supported by this registration gateway.")
     }
+    fun suspendUser(subject: String) {
+        throw UnsupportedOperationException("User suspension is not supported by this registration gateway.")
+    }
     fun resolveLessonIdentity(email: String): LessonIdentityResolveResponse? = null
     fun createLessonAuthAssertion(request: LessonAuthAssertionRequest): LessonAuthAssertionResponse =
         throw UnsupportedOperationException("Lesson authentication is not supported by this registration gateway.")
@@ -196,6 +199,11 @@ class HttpRegistrationGateway(
         val path = "/api/internal/user-management/users/${subject.urlEncoded()}"
         val response = send(path, deleteMethod, null, null)
         requireExpected(path, response, HttpStatus.NO_CONTENT)
+    }
+
+    override fun suspendUser(subject: String) {
+        val path = "/api/internal/user-management/users/${subject.urlEncoded()}/suspension"
+        requireExpected(path, send(path, "PUT", null, null), HttpStatus.NO_CONTENT)
     }
 
     override fun resolveLessonIdentity(email: String): LessonIdentityResolveResponse? {

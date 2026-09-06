@@ -94,7 +94,8 @@ class LiveKitWebhookAttendanceStore(
         val identity = event.participantIdentity() ?: return
         val seenAt = event.seenAt()
 
-        val lesson = lessonRepo.findByLivekitRoomName(roomName)
+        val lesson = lessonRepo.findByLivekitRoomName(roomName)?.let { lessonRepo.lockById(it.id) }
+        if (lesson != null && lessonRepo.hasDeletingParticipant(lesson.id)) return
         if (lesson != null) {
             lesson.actualStart = lesson.actualStart ?: seenAt
             if (lesson.status == MetaData.LessonStatuses.SCHEDULED) {

@@ -116,6 +116,17 @@ class KeycloakAdminRegistrationClient(
         }
     }
 
+    override fun disableUser(subject: String) {
+        val response = sendAdmin(
+            path = "/admin/realms/$realm/users/${subject.urlEncoded()}",
+            method = "PUT",
+            body = objectMapper.writeValueAsString(mapOf("enabled" to false)),
+        )
+        require(response.statusCode() in 200..299 || response.statusCode() == 404) {
+            "Keycloak user suspension failed with HTTP ${response.statusCode()}"
+        }
+    }
+
     override fun sendRequiredActionsEmail(subject: String, actions: List<String>) {
         val response = sendAdmin(
             path = "/admin/realms/$realm/users/${subject.urlEncoded()}/execute-actions-email",
@@ -238,6 +249,7 @@ class KeycloakAdminRegistrationClient(
 
     private fun sendAdmin(path: String, method: String, body: String? = null): HttpResponse<String> {
         val builder = HttpRequest.newBuilder(URI.create("${keycloakBaseUrl.trimEnd('/')}$path"))
+            .timeout(java.time.Duration.ofSeconds(10))
             .header("authorization", "Bearer ${accessToken()}")
         if (body == null) {
             builder.method(method, HttpRequest.BodyPublishers.noBody())
@@ -256,6 +268,7 @@ class KeycloakAdminRegistrationClient(
             "client_secret" to clientSecret,
         ).joinToString("&") { (key, value) -> "${key.urlEncoded()}=${value.urlEncoded()}" }
         val request = HttpRequest.newBuilder(URI.create("${keycloakBaseUrl.trimEnd('/')}/realms/$realm/protocol/openid-connect/token"))
+            .timeout(java.time.Duration.ofSeconds(10))
             .header("content-type", "application/x-www-form-urlencoded")
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build()

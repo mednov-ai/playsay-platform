@@ -58,6 +58,10 @@ class InternalUserManagementController(
     @DeleteMapping("/api/internal/user-management/users/{subject}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable subject: String) = service.delete(subject)
+
+    @PutMapping("/api/internal/user-management/users/{subject}/suspension")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun suspend(@PathVariable subject: String) = service.suspend(subject)
 }
 
 private fun KeycloakManagedIdentity.toResponse(): InternalUserIdentityResponse =

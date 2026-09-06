@@ -16,6 +16,8 @@ class UserDeletionSteps(
     private val operationRepo: UserDeletionOperationRepo,
     private val appUserRepo: AppUserRepo,
     private val ownershipService: UserOwnershipTransferService,
+    private val teacherCleanup: UserTeacherDeletionCleanup,
+    private val studentCleanup: UserStudentDeletionCleanup,
     private val userDataPurgeClient: UserDataPurgeClient,
     private val registrationGateway: RegistrationGateway,
     private val clock: Clock,
@@ -35,9 +37,9 @@ class UserDeletionSteps(
                 operation.replacementTeacherUserId?.let {
                     ownershipService.transferTeacherOwnership(operation.targetUserId, it, operation.requestedByUserId)
                 }
-                ownershipService.detachDeletedTeacher(operation.targetUserId)
+                teacherCleanup.detachDeletedTeacher(operation.targetUserId)
                 ownershipService.revokeTeacherDelegations(operation.targetUserId, operation.requestedByUserId)
-                ownershipService.removeFutureStudentAssignments(operation.targetUserId)
+                studentCleanup.removeFutureStudentAssignments(operation.targetUserId)
                 operation.stage = "LOCAL_CLEANED"
             }
             "LOCAL_CLEANED" -> {
@@ -50,7 +52,7 @@ class UserDeletionSteps(
             }
             "IDENTITY_DELETED" -> {
                 val target = appUserRepo.findById(operation.targetUserId).orElseThrow()
-                ownershipService.clearProfiles(target.id)
+                studentCleanup.clearProfiles(target.id)
                 val now = Instant.now(clock)
                 target.username = null
                 target.email = null

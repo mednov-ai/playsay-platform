@@ -22,8 +22,6 @@ class UserDeletionOperationEntity(
     var replacementTeacherUserId: UUID? = null,
     @Column(name = "status", nullable = false, length = 24)
     var status: String = "PENDING",
-    @Column(name = "stage", nullable = false, length = 32)
-    var stage: String = "REQUESTED",
     @Column(name = "error_code", length = 120)
     var errorCode: String? = null,
     @Column(name = "created_at", nullable = false)
@@ -32,4 +30,7 @@ class UserDeletionOperationEntity(
     var updatedAt: Instant = Instant.EPOCH,
     @Column(name = "completed_at")
     var completedAt: Instant? = null,
-)
+) {
+    @Column(name = "stage", nullable = false, length = 32)
+    var stage: String = "REQUESTED"
+}

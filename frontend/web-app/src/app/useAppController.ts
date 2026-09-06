@@ -101,7 +101,7 @@ export function useAppController(): AppShellProps {
           await completeLogin(currentUrl);
           const returnPath = consumeCompletedLoginReturnPath() ?? "/";
           window.history.replaceState({}, document.title, returnPath);
-          setCurrentPath(returnPath);
+          setCurrentPath(window.location.pathname);
         }
 
         if (!readTokens()) {
@@ -177,7 +177,7 @@ export function useAppController(): AppShellProps {
         if (isSilentLoginUnavailable(caught)) {
           const returnPath = consumeCompletedLoginReturnPath() ?? "/";
           window.history.replaceState({}, document.title, returnPath);
-          setCurrentPath(returnPath);
+          setCurrentPath(window.location.pathname);
           if (!cancelled) {
             setStatus("anonymous");
           }

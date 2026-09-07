@@ -126,6 +126,11 @@ class HttpYoutubeMediaClient(
             body = command,
             timeout = Duration.ofSeconds(cacheRequestTimeoutSeconds.coerceIn(30, 900)),
         ) ?: return null
+        if (response.statusCode == HttpStatus.UNPROCESSABLE_ENTITY.value() || response.statusCode == HttpStatus.PAYLOAD_TOO_LARGE.value()) {
+            val reason = runCatching { objectMapper.readTree(response.body).path("code").asText() }
+                .getOrNull()?.takeIf { it.isNotBlank() } ?: "YOUTUBE_CACHE_REJECTED"
+            throw YoutubeVideoCacheRejectedException(reason)
+        }
         if (response.statusCode !in 200..299) {
             logger.warn(
                 "media-service cache request failed videoId={} requestedQuality={} status={}",

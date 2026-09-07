@@ -1,3 +1,4 @@
+import { MaterialVideoMetadataFields } from "./MaterialVideoMetadataFields";
 import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ChevronDown, ChevronRight, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "../../../components/ui/button";
@@ -249,7 +250,7 @@ export function MaterialBlockEditor({
                 <select
                   className="playsay-input"
                   disabled={disabled}
-                  onChange={(event) => onUpdate({ provider: event.target.value })}
+                  onChange={(event) => onUpdate({ provider: event.target.value, videoMeta: undefined })}
                   value={block.provider ?? "YOUTUBE"}
                 >
                   <option value="YOUTUBE">YouTube</option>
@@ -261,12 +262,20 @@ export function MaterialBlockEditor({
                 <input
                   className="playsay-input"
                   disabled={disabled}
-                  onChange={(event) => onUpdate({ url: event.target.value })}
+                  onChange={(event) => onUpdate({ url: event.target.value, videoMeta: undefined })}
                   placeholder={t("materials.blockEditor.linkPlaceholder")}
                   value={block.url ?? ""}
                 />
               </FormField>
             </div>
+            {(block.provider ?? "YOUTUBE").toUpperCase() === "YOUTUBE" ? (
+              <MaterialVideoMetadataFields
+                key={`${block.id}:${block.provider}:${block.url}`}
+                block={block}
+                disabled={disabled}
+                onUpdate={onUpdate}
+              />
+            ) : null}
             <div className="playsay-material-field-grid rounded-lg border border-border bg-muted/20 p-2" data-layout="video-clip">
               <FormField label={t("materials.blockEditor.videoClipStart")}>
                 <input

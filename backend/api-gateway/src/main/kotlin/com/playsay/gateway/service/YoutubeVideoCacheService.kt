@@ -47,6 +47,7 @@ class YoutubeVideoCacheService(
     private val cacheRepo: YoutubeVideoCacheRepo,
     private val referenceRepo: YoutubeVideoCacheReferenceRepo,
     private val meterRegistry: MeterRegistry,
+    private val materialRepo: com.playsay.gateway.repo.LessonMaterialRepo,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -83,6 +84,19 @@ class YoutubeVideoCacheService(
     @Transactional(readOnly = true)
     fun find(videoId: String, quality: String = YOUTUBE_CACHE_QUALITY): YoutubeVideoCacheSnapshot? =
         cacheRepo.findByVideoIdAndQuality(videoId, quality)?.toSnapshot()
+
+    @Transactional(readOnly = true)
+    fun confirmedMetadata(cacheId: UUID, videoId: String): YoutubeVideoMeta? =
+        referenceRepo.findByCacheId(cacheId).asSequence().mapNotNull { reference ->
+            val material = materialRepo.findById(reference.materialId).orElse(null) ?: return@mapNotNull null
+            if (material.status == com.playsay.gateway.utils.MetaData.MaterialStatuses.ARCHIVED) return@mapNotNull null
+            val document = runCatching { objectMapper.readTree(material.document) }.getOrNull() ?: return@mapNotNull null
+            val block = document.path("pages").asSequence().flatMap { it.path("blocks").asSequence() }
+                .firstOrNull { it.path("id").asText() == reference.blockId } ?: return@mapNotNull null
+            if (block.path("type").asText() != "videoEmbed" || !block.path("provider").asText().equals("YOUTUBE", true)) return@mapNotNull null
+            if (block.path("videoMeta").path("validationStatus").asText() != "TEACHER_CONFIRMED") return@mapNotNull null
+            YoutubeVideoSupport.metaFromBlock(block)?.takeIf { it.videoId == videoId && YoutubeVideoSupport.videoMeetsPolicy(it).approved }
+        }.firstOrNull()
 
     @Transactional
     fun claimNext(leaseDuration: Duration): YoutubeVideoCacheSnapshot? {

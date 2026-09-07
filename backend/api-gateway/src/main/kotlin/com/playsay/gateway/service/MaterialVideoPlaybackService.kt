@@ -64,7 +64,6 @@ class MaterialVideoPlaybackService(
         val storedMetaComplete = storedMeta?.durationSeconds != null && storedMeta.language != null
         val cachedMeta = diagnostics.videoId
             ?.let { videoId -> youtubeVideoCacheService.find(videoId) }
-            ?.takeIf { cache -> cache.durationSeconds != null && cache.language != null }
             ?.let { cache ->
                 YoutubeVideoMeta(
                     videoId = cache.videoId,
@@ -73,31 +72,23 @@ class MaterialVideoPlaybackService(
                     thumbnailUrl = cache.thumbnailUrl,
                 )
             }
-        val resolvedMeta = if (storedMetaComplete || cachedMeta != null) null else diagnostics.videoId?.let { videoId -> youtubeMediaClient.resolveMetadata(videoId) }
-        val meta = storedMeta?.takeIf { storedMetaComplete } ?: cachedMeta ?: resolvedMeta
-            ?: return response(
-                materialId,
-                request.blockId,
-                diagnostics.videoId,
-                "NEEDS_REVIEW",
-                "YOUTUBE_METADATA_MISSING",
-                null,
-                diagnostics,
-                profileCountry,
-                ipCountry,
-                requestedQuality,
-                metadataSource = "MISSING",
-                effectiveMeta = null,
-            )
+        val resolvedMeta = if (storedMetaComplete || (cachedMeta?.durationSeconds != null && cachedMeta.language != null)) null else diagnostics.videoId?.let { videoId -> youtubeMediaClient.resolveMetadata(videoId) }
+        val automaticMeta = YoutubeVideoSupport.effectiveMeta(cachedMeta, resolvedMeta)
+        val meta = YoutubeVideoSupport.effectiveMeta(storedMeta, automaticMeta)
+        val videoId = diagnostics.videoId
+            ?: return response(materialId, request.blockId, null, "BLOCKED", "YOUTUBE_BLOCK_REQUIRED", null, diagnostics, profileCountry, ipCountry, requestedQuality)
+        val embedUrl = YoutubeVideoSupport.embedUrl(videoId)
+        if (meta == null) {
+            return response(materialId, request.blockId, videoId, "EMBED", "YOUTUBE_METADATA_MISSING", embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality)
+        }
         val metadataSource = when {
             storedMetaComplete -> "STORED"
             cachedMeta != null -> "CACHE_RECORD"
             else -> "MEDIA_SERVICE_ON_DEMAND"
         }
-        val embedUrl = YoutubeVideoSupport.embedUrl(meta.videoId)
         val policy = YoutubeVideoSupport.videoMeetsPolicy(meta)
         if (!policy.approved) {
-            return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", policy.reason, embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
+            return response(materialId, request.blockId, meta.videoId, if (policy.reason == "YOUTUBE_METADATA_MISSING") "EMBED" else "NEEDS_REVIEW", policy.reason, embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
         }
 
         if (!rfRelayEnabled) {
@@ -114,17 +105,24 @@ class MaterialVideoPlaybackService(
         val existingThumbnail = materialAssetService.findYoutubeThumbnailAsset(materialId, request.blockId, meta.videoId)
         val thumbnailAssetId = existingThumbnail?.id ?: UUID.randomUUID()
         val thumbnailStorageKey = existingThumbnail?.storageKey ?: "material-assets/$materialId/$thumbnailAssetId.youtube-thumbnail"
-        val mediaSession = youtubeMediaClient.createPlaybackSession(
-            YoutubePlaybackSessionRequest(
-                subject = profile.subject,
-                materialId = materialId,
-                blockId = request.blockId,
-                videoId = meta.videoId,
-                requestedQuality = requestedQuality,
-                thumbnailStorageKey = if (existingThumbnail == null) thumbnailStorageKey else null,
-                thumbnailSourceUrl = meta.thumbnailUrl,
-            ),
-        )
+        val mediaSession = try {
+            youtubeMediaClient.createPlaybackSession(
+                YoutubePlaybackSessionRequest(
+                    subject = profile.subject,
+                    materialId = materialId,
+                    blockId = request.blockId,
+                    videoId = meta.videoId,
+                    requestedQuality = requestedQuality,
+                    thumbnailStorageKey = if (existingThumbnail == null) thumbnailStorageKey else null,
+                    thumbnailSourceUrl = meta.thumbnailUrl,
+                ),
+            )
+        } catch (error: com.playsay.gateway.client.YoutubeVideoCacheRejectedException) {
+            return response(materialId, request.blockId, meta.videoId, "NEEDS_REVIEW", error.reason, embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
+        } catch (error: ProjectResponseException) {
+            if (error.errorCode != MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE) throw error
+            return response(materialId, request.blockId, meta.videoId, "BLOCKED", "YOUTUBE_RELAY_UNAVAILABLE", embedUrl, diagnostics, profileCountry, ipCountry, requestedQuality, metadataSource, meta)
+        }
         if (
             youtubeCacheEnabled &&
             requestedQuality == YoutubePlaybackQuality.MEDIUM &&

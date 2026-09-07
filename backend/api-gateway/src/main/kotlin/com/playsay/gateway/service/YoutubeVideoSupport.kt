@@ -61,7 +61,7 @@ object YoutubeVideoSupport {
 
     fun videoMeetsPolicy(meta: YoutubeVideoMeta): YoutubeVideoPolicyDecision {
         val duration = meta.durationSeconds
-        if (duration == null) {
+        if (duration == null || duration <= 0 || meta.language.isNullOrBlank()) {
             return YoutubeVideoPolicyDecision(false, "YOUTUBE_METADATA_MISSING")
         }
         if (duration > 420) {
@@ -76,13 +76,44 @@ object YoutubeVideoSupport {
     fun metaFromBlock(block: JsonNode): YoutubeVideoMeta? {
         val videoId = parseVideoId(block.path("url").asText(null)) ?: return null
         val videoMeta = block.path("videoMeta")
-        val duration = videoMeta.path("durationSeconds").takeIf { node -> node.isInt || node.isLong }?.asInt()
-        val language = videoMeta.path("language").asText(null)
+        if (videoMeta.has("sourceUrl") && videoMeta.path("sourceUrl").asText() != block.path("url").asText()) {
+            return YoutubeVideoMeta(videoId, null, null)
+        }
+        val duration = validDuration(videoMeta.path("durationSeconds"))
+        val language = videoMeta.path("language").takeIf { it.isTextual }?.asText()?.trim()?.takeIf { it.isNotEmpty() }
         return YoutubeVideoMeta(
             videoId = videoId,
             durationSeconds = duration,
             language = language,
         )
+    }
+
+    fun validDuration(node: JsonNode): Int? =
+        node.takeIf { it.isIntegralNumber && it.canConvertToInt() }?.asInt()?.takeIf { it > 0 }
+
+    /** Trusted automatic fields fill or constrain manual input; never override a known rejection. */
+    fun effectiveMeta(stored: YoutubeVideoMeta?, automatic: YoutubeVideoMeta?): YoutubeVideoMeta? {
+        if (stored == null) return automatic
+        if (automatic == null || automatic.videoId != stored.videoId) return stored
+        return stored.copy(
+            durationSeconds = listOfNotNull(stored.durationSeconds, automatic.durationSeconds).maxOrNull(),
+            language = if (!automatic.language.isNullOrBlank() && !isEnglish(automatic.language)) automatic.language
+                else stored.language ?: automatic.language,
+            thumbnailUrl = automatic.thumbnailUrl ?: stored.thumbnailUrl,
+        )
+    }
+
+    fun clearMetadataForChangedSources(previous: JsonNode, next: JsonNode) {
+        val oldBlocks = previous.path("pages").flatMap { it.path("blocks").toList() }.associateBy { it.path("id").asText() }
+        next.path("pages").forEach { page -> page.path("blocks").forEach { block ->
+            val old = oldBlocks[block.path("id").asText()]
+            if (old != null && (old.path("url") != block.path("url") || old.path("provider") != block.path("provider"))) {
+                val explicitlyReconfirmed = block.path("provider").asText().equals("YOUTUBE", true) &&
+                    block.path("videoMeta").path("sourceUrl").asText() == block.path("url").asText() &&
+                    block.path("videoMeta").has("sourceUrl")
+                if (!explicitlyReconfirmed) (block as? com.fasterxml.jackson.databind.node.ObjectNode)?.remove("videoMeta")
+            }
+        } }
     }
 
     fun diagnosticsFromBlock(block: JsonNode): YoutubeVideoBlockDiagnostics {

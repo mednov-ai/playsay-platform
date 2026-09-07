@@ -37,6 +37,7 @@ export function LessonMaterialDocumentView({
   onExerciseInteractionChange,
   onAssetTagsChange,
   onBlockPatchCommit,
+  onVideoMetadataEdit,
   onBlockPatch,
   score,
   showScoreBadge = true,
@@ -57,6 +58,7 @@ export function LessonMaterialDocumentView({
   exerciseParticipants?: MaterialExerciseParticipant[];
   onExerciseInteractionChange?: (interaction: MaterialExerciseInteraction | null) => void;
   onAssetTagsChange?: (assetId: string, tags: string[]) => Promise<LessonMaterialAsset | null>;
+  onVideoMetadataEdit?: (blockId: string) => void;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   score?: number | null;
@@ -390,6 +392,7 @@ export function LessonMaterialDocumentView({
               await onAssetTagsChange?.(assetId, tags);
             }}
             onBlockPatchCommit={onBlockPatchCommit}
+            onVideoMetadataEdit={onVideoMetadataEdit}
             onBlockPatch={onBlockPatch}
             onRequestFocus={requestBlockFocus}
             pageLayout={page.layout}

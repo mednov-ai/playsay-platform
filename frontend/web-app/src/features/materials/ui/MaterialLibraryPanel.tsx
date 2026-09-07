@@ -118,6 +118,7 @@ export function MaterialLibraryPanel({
   const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<"library" | "edit" | "preview">("library");
   const [worksheetImportOpen, setWorksheetImportOpen] = useState(false);
+  const [videoMetadataBlockId, setVideoMetadataBlockId] = useState<string | null>(null);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1028,6 +1029,11 @@ export function MaterialLibraryPanel({
                 form={form}
                 imageGenerationProgress={imageGenerationProgress}
                 message={assetUploadMessage ?? message}
+                onVideoMetadataEdit={disabled ? undefined : (blockId) => {
+                  setVideoMetadataBlockId(blockId);
+                  setActiveBlockId(blockId);
+                  setWorkspaceMode("edit");
+                }}
                 onBlockPatch={updateMaterialBlock}
                 onBlockPatchCommit={(blockId, patch) => void persistMaterialBlockPatch(blockId, patch)}
                 onUpdateAssetTags={updatePreviewAssetTags}
@@ -1044,6 +1050,7 @@ export function MaterialLibraryPanel({
               <div className="grid min-w-0 gap-4">
                 <MaterialEditorForm
                   activeBlockId={activeBlockId}
+                  initialExpandedBlockId={videoMetadataBlockId}
                   assetLibrary={assetLibrary}
                   canSuggestAcceptedAnswers={Boolean(form.id)}
                   disabled={disabled}

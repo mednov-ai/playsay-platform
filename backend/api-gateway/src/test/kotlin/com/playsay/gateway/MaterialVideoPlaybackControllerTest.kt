@@ -397,6 +397,41 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
         assertEquals(1, materialAssetService.list(material.id).size)
     }
 
+
+    @Test
+    fun `missing metadata offers embed then manual save recovers relay and source changes clear confirmation`() {
+        val teacher = authentication("teacher-recovery", "teacher.recovery", "ROLE_TEACHER")
+        userProfileStore.update(teacher, UpdateUserProfileRequest(countryCode = "RU"))
+        testYoutubeMediaClient.metadataMissing = true
+        val material = createYoutubeMaterial(teacher, includeVideoMeta = false)
+        fun playback() = materialVideoPlaybackController.playback(teacher, material.id, MaterialVideoPlaybackRequest("video-1"), requestWithCountry("RU"))
+        assertEquals("EMBED", playback().mode)
+        assertEquals("YOUTUBE_METADATA_MISSING", playback().reason)
+        assertNotNull(playback().embedUrl)
+        assertEquals(0, testYoutubeMediaClient.sessionRequests.size)
+
+        val document = material.document.deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>()
+        val block = document.path("pages").path(0).path("blocks").path(0) as com.fasterxml.jackson.databind.node.ObjectNode
+        block.putObject("videoMeta").put("durationSeconds", 420).put("language", "en").put("validationStatus", "TEACHER_CONFIRMED")
+        val saved = materialCrudController.update(teacher, material.id, LessonMaterialRequest(title = material.title, document = document))
+        assertEquals(420, saved.document.path("pages").path(0).path("blocks").path(0).path("videoMeta").path("durationSeconds").asInt())
+        assertEquals("RF_RELAY", playback().mode)
+        val cache = youtubeVideoCacheService.find("5l-fo-d0gt8")!!
+        assertEquals(420, youtubeVideoCacheService.confirmedMetadata(cache.id, cache.videoId)?.durationSeconds)
+
+        youtubeVideoCacheService.recordMetadata(cache.id, YoutubeVideoMeta(cache.videoId, 421, "en"))
+        assertEquals("YOUTUBE_DURATION_TOO_LONG", playback().reason)
+        testYoutubeMediaClient.relayUnavailable = true
+        youtubeVideoCacheService.recordMetadata(cache.id, YoutubeVideoMeta(cache.videoId, 120, "en"))
+        assertEquals("YOUTUBE_RELAY_UNAVAILABLE", playback().reason)
+        assertEquals(420, youtubeVideoCacheService.confirmedMetadata(cache.id, cache.videoId)?.durationSeconds)
+
+        block.put("url", "https://youtu.be/abcdefghijk")
+        val changed = materialCrudController.update(teacher, material.id, LessonMaterialRequest(title = material.title, document = document))
+        assertEquals(true, changed.document.path("pages").path(0).path("blocks").path(0).path("videoMeta").isMissingNode)
+        assertNull(youtubeVideoCacheService.confirmedMetadata(cache.id, cache.videoId))
+    }
+
     private fun createYoutubeMaterial(
         authentication: JwtAuthenticationToken,
         durationSeconds: Int = 300,
@@ -472,14 +507,18 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
 class TestYoutubeMediaClient : YoutubeMediaClient {
     val sessionRequests = mutableListOf<YoutubePlaybackSessionRequest>()
     var thumbnailStored: Boolean = false
+    var metadataMissing = false
+    var relayUnavailable = false
 
     fun reset() {
         sessionRequests.clear()
         thumbnailStored = false
+        metadataMissing = false
+        relayUnavailable = false
     }
 
     override fun resolveMetadata(videoId: String): YoutubeVideoMeta? =
-        YoutubeVideoMeta(
+        if (metadataMissing) null else YoutubeVideoMeta(
             videoId = videoId,
             durationSeconds = 105,
             language = "en",
@@ -487,6 +526,7 @@ class TestYoutubeMediaClient : YoutubeMediaClient {
         )
 
     override fun createPlaybackSession(command: YoutubePlaybackSessionRequest): YoutubePlaybackSessionResponse {
+        if (relayUnavailable) throw com.playsay.gateway.error.ProjectResponseException.localized(HttpStatus.SERVICE_UNAVAILABLE, MetaData.ErrorCodes.YOUTUBE_RELAY_UNAVAILABLE)
         sessionRequests.add(command)
         val height = when (command.requestedQuality) {
             YoutubePlaybackQuality.LOW -> 480

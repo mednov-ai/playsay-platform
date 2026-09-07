@@ -128,13 +128,19 @@ class YoutubeVideoCacheWorker(
 
     private fun process(work: YoutubeVideoCacheSnapshot) {
         val sample = Timer.start(meterRegistry)
-        val metadata = mediaClient.resolveMetadata(work.videoId)
+        val resolvedMetadata = mediaClient.resolveMetadata(work.videoId)
+        val recordedMetadata = YoutubeVideoMeta(work.videoId, work.durationSeconds, work.language)
+            .takeIf { it.durationSeconds != null || it.language != null }
+        val automaticMetadata = YoutubeVideoSupport.effectiveMeta(recordedMetadata, resolvedMetadata)
+        val metadata = YoutubeVideoSupport.effectiveMeta(
+            cacheService.confirmedMetadata(work.id, work.videoId), automaticMetadata,
+        )
         if (metadata == null) {
             retry(work, "YOUTUBE_METADATA_NOT_FOUND")
             sample.stop(cacheTimer("retry"))
             return
         }
-        cacheService.recordMetadata(work.id, metadata)
+        if (automaticMetadata != null) cacheService.recordMetadata(work.id, automaticMetadata)
         val policy = YoutubeVideoSupport.videoMeetsPolicy(metadata)
         if (!policy.approved) {
             cacheService.markRejected(work.id, policy.reason ?: "YOUTUBE_CACHE_REJECTED")

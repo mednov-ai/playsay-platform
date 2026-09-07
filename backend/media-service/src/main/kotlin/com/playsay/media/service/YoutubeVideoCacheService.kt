@@ -127,6 +127,7 @@ class YoutubeVideoCacheService(
         val sample = Timer.start(meterRegistry)
         val metadata = metadataResolver.resolve(videoId)
             ?: throw cacheFailure(videoId, "metadata", "YOUTUBE_CACHE_UNAVAILABLE")
+        YoutubeVideoPolicy.requireNoKnownViolation(metadata.durationSeconds, metadata.language)
         val selectedHeight = metadata.formats.asSequence()
             .filter { format -> format.vcodec?.lowercase() != "none" }
             .filter { format -> format.ext?.lowercase() == "mp4" }

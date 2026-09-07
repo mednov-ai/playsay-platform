@@ -16,6 +16,7 @@ import { resetExpandedMaterialBlock, toggleExpandedMaterialBlock } from "./mater
 
 export function MaterialEditorForm({
   activeBlockId,
+  initialExpandedBlockId,
   assetLibrary,
   canSuggestAcceptedAnswers,
   disabled,
@@ -39,6 +40,7 @@ export function MaterialEditorForm({
   onUploadBlockAsset,
 }: {
   activeBlockId: string | null;
+  initialExpandedBlockId?: string | null;
   assetLibrary: MaterialAssetLibraryItem[];
   canSuggestAcceptedAnswers: boolean;
   disabled: boolean;
@@ -62,17 +64,17 @@ export function MaterialEditorForm({
   onUploadBlockAsset: (blockId: string, kind: "image" | "htmlGame", file: File) => Promise<void>;
 }) {
   const { t } = useAppTranslation();
-  const [expandedBlockId, setExpandedBlockId] = useState<string | null>(() => resetExpandedMaterialBlock());
+  const [expandedBlockId, setExpandedBlockId] = useState<string | null>(() => initialExpandedBlockId ?? resetExpandedMaterialBlock());
   const [previewBlockId, setPreviewBlockId] = useState<string | null>(null);
   const blocks = form.document.pages[0]?.blocks ?? [];
   const blockIdsKey = blocks.map((block) => block.id).join("|");
   const previousBlockIdsRef = useRef<Set<string>>(new Set(blocks.map((block) => block.id)));
 
   useEffect(() => {
-    setExpandedBlockId(resetExpandedMaterialBlock());
+    setExpandedBlockId(initialExpandedBlockId ?? resetExpandedMaterialBlock());
     setPreviewBlockId(null);
     previousBlockIdsRef.current = new Set(blocks.map((block) => block.id));
-  }, [form.id]);
+  }, [form.id, initialExpandedBlockId]);
 
   useEffect(() => {
     const previousIds = previousBlockIdsRef.current;

@@ -99,4 +99,38 @@ class YoutubeVideoSupportTest {
         assertEquals("STRING", diagnostics.durationNodeType)
         assertFalse(diagnostics.languagePresent)
     }
+    @Test
+    fun `invalid integer metadata cannot wrap around into an allowed duration`() {
+        for (raw in listOf("0", "-1", "1.5", "4294967416", "\"120\"", "null")) {
+            val block = objectMapper.readTree("""{"url":"https://youtu.be/5l-fo-d0gt8","videoMeta":{"durationSeconds":$raw,"language":"en"}}""")
+            val meta = YoutubeVideoSupport.metaFromBlock(block)!!
+            assertNull(meta.durationSeconds)
+            assertFalse(YoutubeVideoSupport.videoMeetsPolicy(meta).approved)
+        }
+    }
+
+    @Test
+    fun `manual fields fill gaps but never override known policy rejections`() {
+        val manual = YoutubeVideoMeta("5l-fo-d0gt8", 180, "en")
+        assertTrue(YoutubeVideoSupport.videoMeetsPolicy(YoutubeVideoSupport.effectiveMeta(manual, null)!!).approved)
+        assertFalse(YoutubeVideoSupport.videoMeetsPolicy(YoutubeVideoSupport.effectiveMeta(manual, manual.copy(durationSeconds = 421))!!).approved)
+        assertFalse(YoutubeVideoSupport.videoMeetsPolicy(YoutubeVideoSupport.effectiveMeta(manual, manual.copy(language = "de"))!!).approved)
+        assertEquals(manual, YoutubeVideoSupport.effectiveMeta(manual, manual.copy(videoId = "another-id", durationSeconds = 421)))
+        assertEquals("en", YoutubeVideoSupport.effectiveMeta(manual.copy(language = null), manual)?.language)
+        assertFalse(YoutubeVideoSupport.videoMeetsPolicy(manual.copy(durationSeconds = 0)).approved)
+    }
+
+    @Test
+    fun `source change accepts a new bound confirmation but never the previous URL metadata`() {
+        val previous = objectMapper.readTree("""{"pages":[{"blocks":[{"id":"v","provider":"YOUTUBE","url":"https://youtu.be/5l-fo-d0gt8"}]}]}""")
+        val next = objectMapper.readTree("""{"pages":[{"blocks":[{"id":"v","provider":"YOUTUBE","url":"https://youtu.be/abcdefghijk","videoMeta":{"durationSeconds":180,"language":"en","sourceUrl":"https://youtu.be/abcdefghijk"}}]}]}""")
+        YoutubeVideoSupport.clearMetadataForChangedSources(previous, next)
+        val block = next.path("pages").path(0).path("blocks").path(0)
+        assertEquals(180, YoutubeVideoSupport.metaFromBlock(block)?.durationSeconds)
+        (block.path("videoMeta") as com.fasterxml.jackson.databind.node.ObjectNode).put("sourceUrl", "https://youtu.be/5l-fo-d0gt8")
+        assertNull(YoutubeVideoSupport.metaFromBlock(block)?.durationSeconds)
+        YoutubeVideoSupport.clearMetadataForChangedSources(previous, next)
+        assertTrue(block.path("videoMeta").isMissingNode)
+    }
+
 }

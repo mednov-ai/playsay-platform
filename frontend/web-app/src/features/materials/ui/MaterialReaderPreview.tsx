@@ -14,12 +14,14 @@ export function MaterialReaderPreview({
   message,
   onBlockPatch,
   onBlockPatchCommit,
+  onVideoMetadataEdit,
   onUpdateAssetTags,
 }: {
   form: MaterialFormState;
   imageGenerationProgress: MaterialImageGenerationProgress | null;
   message: string | null;
   onBlockPatch: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
+  onVideoMetadataEdit?: (blockId: string) => void;
   onBlockPatchCommit: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onUpdateAssetTags: (assetId: string, tags: string[]) => Promise<LessonMaterialAsset | null>;
 }) {
@@ -34,6 +36,7 @@ export function MaterialReaderPreview({
           mode="teacherPreview"
           onAssetTagsChange={onUpdateAssetTags}
           onBlockPatchCommit={onBlockPatchCommit}
+          onVideoMetadataEdit={onVideoMetadataEdit}
           onBlockPatch={onBlockPatch}
         />
       </div>

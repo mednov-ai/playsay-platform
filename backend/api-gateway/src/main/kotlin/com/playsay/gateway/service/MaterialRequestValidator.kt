@@ -57,6 +57,13 @@ class MaterialRequestValidator(
         validateJsonSize("document", document, 6_000_000)
         worksheetDocumentValidator.validate(document)
         normalizeExternalActivities(document)
+        document.path("pages").forEach { page -> page.path("blocks").forEach { block ->
+            val duration = block.path("videoMeta").path("durationSeconds")
+            if (block.path("type").asText() == "videoEmbed" && !duration.isMissingNode &&
+                YoutubeVideoSupport.validDuration(duration) == null) {
+                throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.FIELD_EMPTY, "videoMeta.durationSeconds")
+            }
+        } }
         validateManualHtmlGameTitles(document)
         validateJsonSize("sourceMeta", sourceMeta, 40_000)
         validateJsonSize("scoringRubric", scoringRubric, 40_000)

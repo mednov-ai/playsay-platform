@@ -1,3 +1,4 @@
+import * as playsayApi from "../../../shared/api/playsay";
 // @vitest-environment jsdom
 // @vitest-environment-options { "url": "http://localhost/" }
 
@@ -110,6 +111,62 @@ describe("MaterialLibraryPanel focused editor", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Название" }), { target: { value: "New card" } });
     await waitFor(() => expect(onAuthoringStateChange).toHaveBeenCalledWith({ dirty: true, focused: true }));
   });
+
+  it("stores a teacher-confirmed YouTube duration and clears it when the URL changes", async () => {
+    const onSave = vi.fn(async (input: LessonMaterialInput) => savedMaterial(input));
+    renderPanel({ onSave });
+
+    fireEvent.click(screen.getByRole("button", { name: "Новая" }));
+    fireEvent.click(screen.getByRole("button", { name: "Видео" }));
+
+    const duration = screen.getByLabelText("Полная длительность (м:сс)");
+    fireEvent.change(duration, { target: { value: "3:42" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Аудио на английском" }));
+
+    expect(screen.getByRole("status")).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("Ссылка"), {
+      target: { value: "https://www.youtube.com/watch?v=_TGPrAdUaTY" },
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Название" }), { target: { value: "YouTube lesson" } });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    const savedDocument = onSave.mock.calls[0]?.[0].document as {
+      pages: Array<{ blocks: Array<{ videoMeta?: unknown }> }>;
+    };
+    expect(savedDocument.pages[0]?.blocks[0]?.videoMeta).toBeUndefined();
+  });
+  it("recovers missing metadata through manual save, reopen and retry", async () => {
+    let savedInput: LessonMaterialInput | undefined;
+    const playback = vi.spyOn(playsayApi, "createMaterialVideoPlayback").mockImplementation(async () => {
+      const block = (savedInput?.document as { pages: Array<{ blocks: Array<{ videoMeta?: { durationSeconds?: number; language?: string } }> }> }).pages[0].blocks[0];
+      return { materialId: "material-1", blockId: "video-1", mode: "EMBED", embedUrl: "https://www.youtube-nocookie.com/embed/5l-fo-d0gt8?rel=0",
+        reason: block.videoMeta?.durationSeconds === 222 && block.videoMeta.language === "en" ? undefined : "YOUTUBE_METADATA_MISSING" };
+    });
+    const onSave = vi.fn(async (input: LessonMaterialInput) => { savedInput = input; return savedMaterial(input); });
+    renderPanel({ onSave });
+    fireEvent.click(screen.getByRole("button", { name: "Новая" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Название" }), { target: { value: "Recovery video" } });
+    fireEvent.click(screen.getByRole("button", { name: "Видео" }));
+    fireEvent.change(screen.getByLabelText("Ссылка"), { target: { value: "https://youtu.be/5l-fo-d0gt8" } });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Указать длительность" }));
+    const duration = screen.getByLabelText("Полная длительность (м:сс)");
+    expect(duration).toBeVisible();
+    fireEvent.change(duration, { target: { value: "3:42" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Аудио на английском" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(playback.mock.calls.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Указать длительность" })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Редактировать" }));
+    expect(screen.getByLabelText("Полная длительность (м:сс)")).toHaveValue("3:42");
+    expect(screen.getByRole("checkbox", { name: "Аудио на английском" })).toBeChecked();
+  });
+
 });
 
 function renderPanel({

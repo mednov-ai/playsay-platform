@@ -110,6 +110,7 @@ class LessonMaterialCatalogService(
         val values = materialRequestValidator.validate(request)
         val entity = lessonMaterialRepo.findById(materialId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        YoutubeVideoSupport.clearMetadataForChangedSources(objectMapper.readTree(entity.document), values.document)
         entity.title = values.title
         entity.description = values.description
         entity.language = values.language

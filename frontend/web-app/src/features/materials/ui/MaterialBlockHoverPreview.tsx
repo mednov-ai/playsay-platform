@@ -37,7 +37,7 @@ export function MaterialBlockHoverPreview({ block, form }: { block: MaterialEdit
           node?.setAttribute("inert", "");
         }}
       >
-        <LessonMaterialDocumentView material={materialPreviewFromForm(previewForm)} mode="teacherPreview" showScoreBadge={false} />
+        <LessonMaterialDocumentView material={{ ...materialPreviewFromForm(previewForm), ...(block.type === "videoEmbed" ? { id: "preview" } : {}) }} mode="teacherPreview" showScoreBadge={false} />
       </div>
     </aside>
   );

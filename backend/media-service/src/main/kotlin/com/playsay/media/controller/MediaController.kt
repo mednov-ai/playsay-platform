@@ -10,6 +10,7 @@ import com.playsay.contract.media.model.YoutubeVideoCacheRequest
 import com.playsay.contract.media.model.YoutubeVideoCacheResponse
 import com.playsay.media.service.MediaInternalAuth
 import com.playsay.media.service.MediaServiceException
+import com.playsay.media.service.YoutubeVideoPolicy
 import com.playsay.media.service.YoutubeMetadataResolver
 import com.playsay.media.service.YoutubePlaybackQuality
 import com.playsay.media.service.YoutubePlaybackSessionStore
@@ -77,6 +78,7 @@ class MediaController(
         val requestedQuality = YoutubePlaybackQuality.normalized(request.requestedQuality?.value)
         val cached = if (requestedQuality == YoutubePlaybackQuality.MEDIUM) videoCacheService.find(request.videoId, requestedQuality) else null
         if (cached != null) {
+            YoutubeVideoPolicy.requireNoKnownViolation(cached.durationSeconds, cached.language)
             val thumbnail = thumbnailService.store(request.thumbnailSourceUrl ?: cached.thumbnailUrl, request.thumbnailStorageKey)
             val session = sessionStore.create(
                 subject = request.subject,
@@ -106,6 +108,7 @@ class MediaController(
         }
         val metadata = metadataResolver.resolve(request.videoId)
             ?: throw MediaServiceException(HttpStatus.SERVICE_UNAVAILABLE, "YOUTUBE_RELAY_UNAVAILABLE")
+        YoutubeVideoPolicy.requireNoKnownViolation(metadata.durationSeconds, metadata.language)
         val selected = YoutubeQualitySelector.select(metadata.formats, requestedQuality)
             ?: throw MediaServiceException(HttpStatus.SERVICE_UNAVAILABLE, "YOUTUBE_RELAY_UNAVAILABLE")
         val thumbnail = thumbnailService.store(metadata.thumbnailUrl, request.thumbnailStorageKey)

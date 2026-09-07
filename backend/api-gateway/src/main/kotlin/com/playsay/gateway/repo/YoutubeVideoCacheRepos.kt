@@ -55,6 +55,8 @@ interface YoutubeVideoCacheRepo : JpaRepository<YoutubeVideoCacheEntity, UUID> {
 }
 
 interface YoutubeVideoCacheReferenceRepo : JpaRepository<YoutubeVideoCacheReferenceEntity, UUID> {
+    fun findByCacheId(cacheId: UUID): List<YoutubeVideoCacheReferenceEntity>
+
     fun findByMaterialId(materialId: UUID): List<YoutubeVideoCacheReferenceEntity>
 
     fun countByCacheId(cacheId: UUID): Long

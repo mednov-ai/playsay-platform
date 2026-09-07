@@ -1,3 +1,4 @@
+import { Button } from "../../../../components/ui/button";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { CircleAlert, ExternalLink, Gamepad2, ImageIcon, Maximize2, Play, Video } from "lucide-react";
 import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
@@ -42,6 +43,7 @@ export function RenderedMaterialBlock({
   onExerciseInteractionChange,
   onAssetTagsChange,
   onBlockPatchCommit,
+  onVideoMetadataEdit,
   onBlockPatch,
   onRequestFocus,
   pageLayout,
@@ -61,6 +63,7 @@ export function RenderedMaterialBlock({
   exerciseParticipants?: MaterialExerciseParticipant[];
   onExerciseInteractionChange?: (interaction: MaterialExerciseInteraction | null) => void;
   onAssetTagsChange?: (assetId: string, tags: string[]) => void | Promise<void>;
+  onVideoMetadataEdit?: (blockId: string) => void;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onRequestFocus?: (kind: "htmlGame" | "image" | "externalActivity", blockId: string) => void;
@@ -68,6 +71,7 @@ export function RenderedMaterialBlock({
 }) {
   const { t } = useAppTranslation();
   const [videoPlayback, setVideoPlayback] = useState<MaterialVideoPlayback | null>(null);
+  const [videoRetry, setVideoRetry] = useState(0);
   const [videoQuality, setVideoQuality] = useState<MaterialVideoQuality>("MEDIUM");
   const [videoResumeAtSeconds, setVideoResumeAtSeconds] = useState<number | null>(null);
   const contextLabel = materialBlockContextLabel(block);
@@ -109,7 +113,7 @@ export function RenderedMaterialBlock({
     return () => {
       active = false;
     };
-  }, [block.id, block.provider, block.type, materialId, videoQuality]);
+  }, [block.id, block.provider, block.type, block.url, block.videoMeta?.durationSeconds, block.videoMeta?.language, materialId, videoQuality, videoRetry]);
 
   const blockSection = (children: ReactNode, className = "playsay-render-block") => (
     <section
@@ -166,6 +170,22 @@ export function RenderedMaterialBlock({
         return blockSection(
           <>
             <h4>{block.title}</h4>
+            {videoPlayback && videoPlayback.reason && videoPlayback.reason !== "VIDEO_PLAYBACK_LOADING"
+              && (frame?.kind === "UNAVAILABLE" || videoPlayback.reason === "YOUTUBE_METADATA_MISSING") ? (
+              <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-2">
+                <p className="text-sm">{t("materials.renderer.videoRecoveryHint")}</p>
+                <div className="flex flex-wrap gap-2">
+                  {mode === "teacherPreview" && onVideoMetadataEdit ? (
+                    <Button onClick={() => onVideoMetadataEdit(block.id)} type="button" variant="outline">
+                      {t("materials.renderer.videoEditMetadata")}
+                    </Button>
+                  ) : null}
+                  <Button onClick={() => setVideoRetry((current) => current + 1)} type="button" variant="outline">
+                    {t("materials.renderer.videoRetry")}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {frame?.kind === "RF_RELAY" ? (
               <>
                 <div
@@ -223,7 +243,6 @@ export function RenderedMaterialBlock({
                   <CircleAlert className="h-5 w-5 text-primary" />
                   <span>{t("materials.renderer.videoRelayUnavailable")}</span>
                   <small>{reasonLabel}</small>
-                  {frame.reason ? <code>{t("materials.renderer.videoRelayReasonCode", { reason: frame.reason })}</code> : null}
                 </div>
                 {videoAttribution}
               </>

@@ -128,10 +128,7 @@ class YoutubeVideoCacheWorker(
 
     private fun process(work: YoutubeVideoCacheSnapshot) {
         val sample = Timer.start(meterRegistry)
-        val resolvedMetadata = mediaClient.resolveMetadata(work.videoId)
-        val recordedMetadata = YoutubeVideoMeta(work.videoId, work.durationSeconds, work.language)
-            .takeIf { it.durationSeconds != null || it.language != null }
-        val automaticMetadata = YoutubeVideoSupport.effectiveMeta(recordedMetadata, resolvedMetadata)
+        val automaticMetadata = resolveAutomaticMetadata(work)
         val metadata = YoutubeVideoSupport.effectiveMeta(
             cacheService.confirmedMetadata(work.id, work.videoId), automaticMetadata,
         )
@@ -187,6 +184,13 @@ class YoutubeVideoCacheWorker(
             result.selectedHeight,
             result.byteSize,
         )
+    }
+
+    private fun resolveAutomaticMetadata(work: YoutubeVideoCacheSnapshot): YoutubeVideoMeta? {
+        val resolvedMetadata = mediaClient.resolveMetadata(work.videoId)
+        val recordedMetadata = YoutubeVideoMeta(work.videoId, work.durationSeconds, work.language)
+            .takeIf { it.durationSeconds != null || it.language != null }
+        return YoutubeVideoSupport.effectiveMeta(recordedMetadata, resolvedMetadata)
     }
 
     private fun retry(work: YoutubeVideoCacheSnapshot, reason: String) {

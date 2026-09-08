@@ -351,6 +351,7 @@ spec:
           withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
             timeout(time: 45, unit: 'MINUTES') {
               sh './scripts/ci/check-jvm-dependencies.sh all'
+              archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: false
             }
           }
         }

@@ -21,6 +21,9 @@ mkdir -p "$repo/backend/build/dependency-security-data"
 run=$(mktemp -d "$repo/backend/build/dependency-security-data/run.XXXXXXXX")
 reports="$repo/backend/build/reports/dependency-security"
 mkdir -p "$reports"
+# The Gradle container and Jenkins archiver may use different UIDs.
+# Only report parents are traversable; the advisory database stays private.
+chmod a+rx "$repo/backend/build" "$repo/backend/build/reports" "$reports"
 # Each run has its own reports and writable database; stale reports cannot imply success.
 run_id=$(basename "$run")
 reports="$reports/$run_id"
@@ -32,6 +35,8 @@ finish() {
   trap - EXIT
   if [ "$code" -ne 0 ]; then echo 'state=failed-or-incomplete' >> "$reports/status.txt"; fi
   printf 'exit_code=%s\nfinished_at=%s\n' "$code" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$reports/status.txt"
+  # Reports contain dependency metadata only; permit the Jenkins archiver to read them.
+  chmod -R a+rX "$reports"
   echo "Dependency security reports: $reports"
   # Keep the database for an operator to reuse as a seed, never share it for writing.
   exit "$code"

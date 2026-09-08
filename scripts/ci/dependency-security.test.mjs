@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -43,6 +43,9 @@ esac
     });
     const reports = resolve(dir, 'backend/build/reports/dependency-security');
     return { result, calls: readFileSync(resolve(dir, 'calls'), 'utf8'),
+      reportParentMode: statSync(reports).mode & 0o777,
+      reportMode: statSync(resolve(reports, readdirSync(reports)[0], 'status.txt')).mode & 0o777,
+      dataMode: statSync(resolve(dir, 'backend/build/dependency-security-data')).mode & 0o777,
       status: readFileSync(resolve(reports, readdirSync(reports)[0], 'status.txt'), 'utf8') };
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -93,6 +96,7 @@ test('all JVM publication paths run the credential-bound gate before tests, migr
     const gate = source.indexOf("stage('Dependency security')");
     assert.ok(gate >= 0, file);
     assert.match(source, /activeDeadlineSeconds: 5400/);
+    assert.match(source, /archiveArtifacts artifacts: 'backend\/build\/reports\/dependency-security\/\*\*\/\*', allowEmptyArchive: false/);
     assert.match(source.slice(0, gate), /timeout\(time: 75, unit: 'MINUTES'\)/);
     const publication = source.search(/stage\('Build and push image/);
     assert.ok(publication > gate, file);
@@ -113,4 +117,13 @@ test('accepted risks remain distinguishable from a clean scan in runner status',
   assert.equal(result.status, 0, result.stderr);
   assert.match(status, /state=passed-with-accepted-risks/);
   assert.doesNotMatch(status, /^state=passed$/m);
+});
+
+test('Jenkins can traverse and archive reports from a different container UID while data remains private', () => {
+  for (const failure of ['', 'update', 'backend']) {
+    const { reportParentMode, reportMode, dataMode } = exercise('all', failure);
+    assert.equal(reportParentMode & 0o005, 0o005);
+    assert.equal(reportMode & 0o004, 0o004);
+    assert.equal(dataMode & 0o077, 0);
+  }
 });
